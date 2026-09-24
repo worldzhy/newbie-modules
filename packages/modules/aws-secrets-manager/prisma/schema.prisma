@@ -1,0 +1,49 @@
+// ! ------------------------------------------------------------ //
+// !         [Module] Aws Secrets Manager models            //
+// ! ------------------------------------------------------------ //
+// * SecretGroup                                                  //
+// * Secret                                                       //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+model SecretGroup {
+    id                String   @id @default(uuid()) @db.Uuid
+    name              String
+    description       String?
+    accessKeyId       String?  @unique
+    secretAccessKey   String?
+    rotationLambdaArn String? // Lambda ARN for rotation
+    createdAt         DateTime @default(now())
+    updatedAt         DateTime @updatedAt
+    secrets           Secret[]
+
+    @@schema("module/aws-secrets-manager")
+}
+
+model Secret {
+    id                String      @id @default(uuid()) @db.Uuid
+    name              String
+    description       String?
+    type              SecretType
+    arn               String // AWS Secret ARN (required, all secrets stored in AWS)
+    region            String      @default("us-east-1")
+    rotationEnabled   Boolean     @default(false)
+    rotationRules     Json? // {"AutomaticallyAfterDays": 30}
+    rotationLambdaArn String? // Lambda ARN for rotation
+    lastRotatedAt     DateTime? // Last rotation timestamp
+    createdAt         DateTime    @default(now())
+    updatedAt         DateTime    @updatedAt
+    group             SecretGroup @relation(fields: [groupId], references: [id])
+    groupId           String      @db.Uuid
+
+    @@unique([name, groupId])
+    @@schema("module/aws-secrets-manager")
+}
+
+enum SecretType {
+    RDS_CREDENTIALS // RDS database credentials
+    DOCUMENTDB_CREDENTIALS // DocumentDB credentials
+    AWS_API_KEY // AWS API keys (SNS/SES/S3)
+    GENERIC_SECRET // Generic secret
+
+    @@schema("module/aws-secrets-manager")
+}

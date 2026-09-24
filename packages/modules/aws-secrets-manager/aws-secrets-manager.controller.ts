@@ -1,0 +1,117 @@
+import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import {BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query} from '@nestjs/common';
+import {ApiTags, ApiOperation, ApiResponse, ApiBearerAuth} from '@nestjs/swagger';
+import {Prisma} from '@generated/prisma/client';
+import {
+  CreateSecretDto,
+  ListSecretsRequestDto,
+  SecretListResponseDto,
+  SecretResponseDto,
+  UpdateSecretDto,
+  GetSecretValueResponseDto,
+  DeployRotationLambdaDto,
+} from './aws-secrets-manager.dto';
+import {AwsSecretsManagerService} from './aws-secrets-manager.service';
+
+@ApiTags('AWS Secrets Manager')
+@ApiBearerAuth()
+@Controller('aws-secrets-manager/secrets')
+export class AwsSecretsManagerController {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly secretsService: AwsSecretsManagerService
+  ) {}
+
+  @Post('')
+  @ApiOperation({summary: 'Create Secret'})
+  @ApiResponse({status: 201, description: 'Secret created successfully', type: SecretResponseDto})
+  async createSecret(@Body() body: CreateSecretDto) {
+    return await this.secretsService.createSecret({
+      name: body.name,
+      type: body.type,
+      region: body.region,
+      secretValue: body.secretValue,
+      rotationEnabled: body.rotationEnabled,
+      rotationRules: body.rotationRules,
+      description: body.description,
+      projectId: body.projectId,
+    });
+  }
+
+  @Get('')
+  @ApiOperation({summary: 'List all Secrets (metadata only, no secret values)'})
+  @ApiResponse({type: SecretListResponseDto})
+  async listSecrets(@Query() query: ListSecretsRequestDto) {
+    const project = await this.prisma.project.findUniqueOrThrow({
+      where: {id: query.projectId},
+      select: {secretGroupId: true},
+    });
+    if (!project.secretGroupId) {
+      throw new BadRequestException(`Project ${query.projectId} does not have a Secret Group configured`);
+    }
+
+    return await this.prisma.findManyInManyPages({
+      model: Prisma.ModelName.Secret,
+      pagination: {page: query.page, pageSize: query.pageSize},
+      findManyArgs: {
+        where: {groupId: project.secretGroupId},
+        orderBy: {createdAt: 'desc'},
+      },
+    });
+  }
+
+  @Get(':id')
+  @ApiOperation({summary: 'Get Secret metadata (no secret value)'})
+  @ApiResponse({type: SecretResponseDto})
+  async getSecret(@Param('id') id: string) {
+    return await this.prisma.secret.findUniqueOrThrow({where: {id}});
+  }
+
+  @Get(':id/value')
+  @ApiOperation({summary: 'Get complete Secret information (including secret value)'})
+  @ApiResponse({type: GetSecretValueResponseDto, description: 'Complete Secret information (including secret value)'})
+  async getSecretValue(@Param('id') id: string): Promise<GetSecretValueResponseDto> {
+    // This endpoint is called when user clicks "View Password" in UI
+    return await this.secretsService.getSecretWithValue(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({summary: 'Update Secret'})
+  @ApiResponse({type: SecretResponseDto})
+  async updateSecret(@Param('id') id: string, @Body() body: UpdateSecretDto) {
+    return await this.secretsService.updateSecret(id, {
+      secretValue: body.secretValue,
+      description: body.description,
+    });
+  }
+
+  @Delete(':id')
+  @ApiOperation({summary: 'Delete Secret'})
+  @ApiResponse({type: SecretResponseDto})
+  async deleteSecret(@Param('id') id: string) {
+    return await this.secretsService.deleteSecret(id);
+  }
+
+  @Post(':id/rotate')
+  @ApiOperation({summary: 'Manually trigger Secret rotation'})
+  @ApiResponse({status: 200, description: 'Rotation triggered successfully', type: Boolean})
+  async rotateSecret(@Param('id') id: string) {
+    return await this.secretsService.rotateSecret(id);
+  }
+
+  @Post('deploy-rotation-lambda')
+  @ApiOperation({summary: 'Deploy Rotation Lambda via SST'})
+  @ApiResponse({status: 200, description: 'Lambda deployed successfully', type: Boolean})
+  async deployRotationLambda(@Body() body: DeployRotationLambdaDto) {
+    return await this.secretsService.deployRotationLambda(body.projectId);
+  }
+
+  @Post('remove-rotation-lambda')
+  @ApiOperation({summary: 'Remove Rotation Lambda via SST'})
+  @ApiResponse({status: 200, description: 'Lambda removed successfully', type: Boolean})
+  async removeRotationLambda(@Body() body: DeployRotationLambdaDto) {
+    return await this.secretsService.removeRotationLambda(body.projectId);
+  }
+
+  /* End */
+}

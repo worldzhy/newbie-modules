@@ -1,0 +1,25 @@
+{
+  "key": "elasticsearch",
+  "module": {
+    "file": "elasticsearch.module",
+    "className": "ElasticsearchModule"
+  },
+  "config-service": {
+    "elasticsearch": {
+      "node": "process.env.ELASTICSEARCH_NODE || 'http://127.0.0.1'",
+      "username": "process.env.ELASTICSEARCH_USERNAME",
+      "password": "process.env.ELASTICSEARCH_PASSWORD"
+    }
+  },
+  "env": {
+    "ELASTICSEARCH_NODE": "http://127.0.0.1",
+    "ELASTICSEARCH_USERNAME": "",
+    "ELASTICSEARCH_PASSWORD": ""
+  },
+  "dependencies": {
+    "@elastic/elasticsearch": "7.13.0",
+    "p-queue": "latest",
+    "p-retry": "latest"
+  },
+  "devDependencies": {}
+}

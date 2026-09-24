@@ -1,0 +1,24 @@
+{
+  "key": "local-storage",
+  "module": {
+    "file": "local-storage.module",
+    "className": "LocalStorageModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {
+    "storage": {
+      "local": {
+        "path": "process.env.STORAGE_LOCAL_PATH"
+      }
+    }
+  },
+  "env": {
+    "STORAGE_LOCAL_PATH": ""
+  },
+  "dependencies": {
+    "multer": "latest"
+  },
+  "devDependencies": {
+    "@types/multer": "latest"
+  }
+}

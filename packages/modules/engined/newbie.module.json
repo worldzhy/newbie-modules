@@ -1,0 +1,8 @@
+{
+  "key": "engined",
+  "module": {
+    "file": "engined.module",
+    "className": "EnginedModule"
+  },
+  "schema": "prisma/schema.prisma"
+}

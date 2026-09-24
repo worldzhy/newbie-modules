@@ -1,0 +1,14 @@
+{
+  "key": "task-scheduling",
+  "module": {
+    "file": "task-scheduling.module",
+    "className": "TaskSchedulingModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "dependencies": {
+    "@nestjs/schedule": "latest"
+  },
+  "devDependencies": {
+    "@types/cron": "latest"
+  }
+}

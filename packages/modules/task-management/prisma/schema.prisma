@@ -1,0 +1,160 @@
+// !! ------------------------------------------------------------ //
+// !!            [Module] Task Management models             //
+// !! ------------------------------------------------------------ //
+// * TaskGroup (Project Group)                                     //
+// * Task (Work Item)                                              //
+// * TaskUser (User Reference)                                     //
+// * Requirement (Breakdown Attempt & Feedback)                    //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+model TaskGroup {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  chatId      String     @unique // Lark group chat ID or other platform group ID
+  name        String?    // Group name
+  description String?    // Group description
+  
+  projectId   String?    @db.Uuid // Relation to Application Project
+  // Note: We cannot enforce foreign key constraint across schemas easily in Prisma without manual SQL or complex setup if schemas are fully isolated. 
+  // Assuming loose coupling or same DB. If strict relation needed, add `project Project @relation(...)` and import Project model.
+  // For microservice architecture, usually we keep ID reference.
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  tasks       Task[]
+  requirements Requirement[] // Requirements belonging to this group
+  taskProjects TaskProject[]  // Projects belonging to this group
+  weeklyReports WeeklyReport[] // Weekly reports belonging to this group
+
+  @@schema("module/task-management")
+}
+
+model TaskProject {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String?    @unique @db.Uuid // Linked Nightwatch Project ID
+  name        String     // Project name
+  description String?    // Project description
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime?  // Soft delete timestamp
+
+  groupId     String     @db.Uuid
+  group       TaskGroup  @relation(fields: [groupId], references: [id])
+  tasks       Task[]     // Tasks belonging to this project
+  monthlyReports MonthlyReport[] // Monthly reports belonging to this project
+
+  @@schema("module/task-management")
+}
+
+model TaskUser {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  openId      String     @unique // External user ID (e.g. Lark open_id)
+  userId      String?    @unique @db.Uuid // Linked Nightwatch User ID
+  name        String?    // User display name
+  avatarUrl   String?    // User avatar URL
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  createdTasks Task[]    @relation("CreatedTasks") // Tasks created by this user
+  assignedTasks Task[]   @relation("AssignedTasks") // Tasks assigned to this user
+  weeklyReports WeeklyReport[] // User's weekly reports
+
+  @@schema("module/task-management")
+}
+
+model WeeklyReport {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  year        Int        // e.g. 2024
+  week        Int        // e.g. 42 (Week number of the year)
+  content     String     // The actual text of the weekly report
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  groupId     String     @db.Uuid
+  group       TaskGroup  @relation(fields: [groupId], references: [id])
+
+  userId      String     @db.Uuid
+  user        TaskUser   @relation(fields: [userId], references: [id])
+
+  @@unique([groupId, userId, year, week]) // One user can only have one report per week in a specific group
+  @@schema("module/task-management")
+}
+
+model MonthlyReport {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  year        Int        // e.g. 2024
+  month       Int        // e.g. 10
+  content     String     // The actual text of the monthly report
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  projectId   String     @db.Uuid
+  project     TaskProject @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, year, month]) // One project can only have one report per month
+  @@schema("module/task-management")
+}
+
+model Task {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String         // Task title
+  description String?        // Task details
+  status      TaskStatus     @default(PENDING) // Current workflow status
+  dueDate     DateTime?      // Expected completion time
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?      // Soft delete timestamp
+  
+  groupId     String         @db.Uuid
+  group       TaskGroup      @relation(fields: [groupId], references: [id])
+  
+  taskProjectId String?      @db.Uuid
+  taskProject   TaskProject? @relation(fields: [taskProjectId], references: [id])
+  
+  creatorId   String?        @db.Uuid
+  creator     TaskUser?      @relation("CreatedTasks", fields: [creatorId], references: [id])
+  
+  assigneeId  String?        @db.Uuid
+  assignee    TaskUser?      @relation("AssignedTasks", fields: [assigneeId], references: [id])
+
+  // Relation to the requirement breakdown attempt
+  requirementId Int?           
+  requirement   Requirement?   @relation(fields: [requirementId], references: [id])
+
+  // Last Operation Tracking
+  lastOperatorId     String? // User ID or External ID of the last modifier
+  lastOperatorName   String? // Display Name of the last modifier
+  lastOperatorSource String? // "LARK" | "SYSTEM"
+
+  @@schema("module/task-management")
+}
+
+model Requirement {
+  id            Int        @id @default(autoincrement())
+  
+  // Original Message / Requirement Content
+  parentMessageId      String? // Original Lark message_id
+  parentMessageContent String? // The raw text content of the requirement (from parent message)
+  
+  skillId       String?    // The skill used for breakdown
+  prompt        String?    // The prompt used to trigger breakdown (user input)
+  score         Int?       // Feedback score (1-5)
+  
+  groupId       String?    @db.Uuid
+  group         TaskGroup? @relation(fields: [groupId], references: [id])
+
+  tasks         Task[]     // Tasks resulting from this breakdown attempt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  @@schema("module/task-management")
+}
+
+enum TaskStatus {
+  PENDING
+  DEVELOPING
+  TESTING
+  DEPLOYED
+  COMPLETED
+  CANCELLED
+
+  @@schema("module/task-management")
+}

@@ -1,0 +1,119 @@
+// !! ------------------------------------------------------------ //
+// !!            [Module] Order models                       //
+// !! ------------------------------------------------------------ //
+// * Product                                                       //
+// * Order                                                         //
+// * OrderItem                                                     //
+// * Contributor                                                   //
+// * CostPaymentRule                                               //
+// * CostPayment                                                   //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+model Product {
+  id                     Int               @id @default(autoincrement())
+  skuId                  String            @unique @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                   String
+  imageFileId            String?
+  priceInCents           Int // current price in cents
+  priceInCentsDiscounted Int? // current price after discount in cents
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
+  costPaymentRules       CostPaymentRule[]
+
+  @@schema("module/order")
+}
+
+model Order {
+  id                  String        @id @default(cuid())
+  status              OrderStatus   @default(PENDING)
+  totalInCents        Int // total amount in cents
+  paymentMethod       PaymentMethod
+  note                String?
+  userId              String        @db.Uuid
+  wechatTransactionId String?
+  paidAt              DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  items               OrderItem[]
+  costPayments        CostPayment[]
+
+  @@schema("module/order")
+}
+
+model OrderItem {
+  id              String   @id @default(cuid())
+  skuId           String   @db.Uuid
+  name            String
+  priceInCents    Int // sold unit price in cents
+  quantity        Int
+  subTotalInCents Int // sub total in cents
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId         String
+
+  @@schema("module/order")
+}
+
+model Contributor {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  isActive     Boolean       @default(true)
+  name         String
+  phone        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  costPayments CostPayment[]
+
+  @@schema("module/order")
+}
+
+model CostPaymentRule {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contribution  String
+  amountInCents Int? // fixed amount in cents
+  percentage    Int? // percentage of the order total amount
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  product       Product? @relation(fields: [productId], references: [id])
+  productId     Int?
+
+  @@schema("module/order")
+}
+
+model CostPayment {
+  id            String        @id @default(cuid())
+  method        PaymentMethod
+  amountInCents Int // actual payment amount in cents
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       String
+  contributor   Contributor   @relation(fields: [contributorId], references: [id])
+  contributorId String        @db.Uuid
+
+  @@schema("module/order")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  SHIPPED
+  COMPLETED
+  CANCELLED
+  REFUND_REQUESTED
+  REFUND_APPROVED
+  REFUND_REJECTED
+  REFUNDED
+
+  @@schema("module/order")
+}
+
+enum PaymentMethod {
+  ALIPAY
+  BANK_TRANSFER
+  CASH
+  PAYPAL
+  WECHAT_PAY
+
+  @@schema("module/order")
+}

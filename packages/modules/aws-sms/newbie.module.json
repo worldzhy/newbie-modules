@@ -1,0 +1,25 @@
+{
+  "key": "aws-sms",
+  "module": {
+    "file": "aws-sms.module",
+    "className": "AwsSmsModule"
+  },
+  "config-service": {
+    "aws-sms": {
+      "accessKeyId": "process.env.AWS_SMS_ACCESS_KEY_ID",
+      "secretAccessKey": "process.env.AWS_SMS_SECRET_ACCESS_KEY",
+      "region": "process.env.AWS_SMS_REGION || 'us-east-1'",
+      "configurationSetName": "process.env.AWS_SMS_CONFIGURATION_SET_NAME"
+    }
+  },
+  "env": {
+    "AWS_SMS_ACCESS_KEY_ID": "",
+    "AWS_SMS_SECRET_ACCESS_KEY": "",
+    "AWS_SMS_REGION": "",
+    "AWS_SMS_CONFIGURATION_SET_NAME": ""
+  },
+  "dependencies": {
+    "@aws-sdk/client-pinpoint-sms-voice-v2": "latest"
+  },
+  "devDependencies": {}
+}

@@ -1,0 +1,8 @@
+{
+  "key": "task-management",
+  "module": {
+    "file": "task-management.module",
+    "className": "TaskManagementModule"
+  },
+  "schema": "prisma/schema.prisma"
+}

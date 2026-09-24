@@ -1,0 +1,28 @@
+{
+  "key": "message-tracker",
+  "module": {
+    "file": "message-tracker.module",
+    "className": "MessageTrackerModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {
+    "message-tracker": {
+      "accessKeyId": "process.env.MESSAGE_TRACKER_AWS_ACCESS_KEY_ID",
+      "secretAccessKey": "process.env.MESSAGE_TRACKER_AWS_SECRET_ACCESS_KEY",
+      "region": "process.env.MESSAGE_TRACKER_AWS_REGION || 'us-east-1'",
+      "emailQueueUrl": "process.env.MESSAGE_TRACKER_SQS_EMAIL_QUEUE_URL",
+      "textQueueUrl": "process.env.MESSAGE_TRACKER_SQS_TEXT_QUEUE_URL"
+    }
+  },
+  "env": {
+    "MESSAGE_TRACKER_AWS_ACCESS_KEY_ID": "",
+    "MESSAGE_TRACKER_AWS_SECRET_ACCESS_KEY": "",
+    "MESSAGE_TRACKER_AWS_REGION": "",
+    "MESSAGE_TRACKER_SQS_EMAIL_QUEUE_URL": "",
+    "MESSAGE_TRACKER_SQS_TEXT_QUEUE_URL": ""
+  },
+  "dependencies": {
+    "@aws-sdk/client-sqs": "^3.831.0"
+  },
+  "devDependencies": {}
+}

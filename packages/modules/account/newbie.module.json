@@ -1,0 +1,116 @@
+{
+  "key": "account",
+  "module": {
+    "file": "account.module",
+    "className": "AccountModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {
+    "account": {
+      "cache": {
+        "geolocationLruSize": "int(process.env.CACHE_GEOLOCATION_LRU_SIZE, 100)",
+        "apiKeyLruSize": "int(process.env.CACHE_APIKEY_LRU_SIZE, 100)"
+      },
+      "ratelimiter": {
+        "ipLoginLimiter": {
+          "points": 10,
+          "durationSeconds": 600
+        },
+        "userLoginLimiter": {
+          "points": 5,
+          "durationSeconds": 600
+        },
+        "ipAccessLimiter": {
+          "points": 20,
+          "durationSeconds": 60
+        },
+        "redis": {
+          "host": "process.env.ACCOUNT_REDIS_HOST",
+          "port": "int(process.env.ACCOUNT_REDIS_PORT, 6379)"
+        }
+      },
+      "token": {
+        "defaultSecret": "process.env.ACCOUNT_DEFAULT_TOKEN_SECRET || 'your-default-token-secret'",
+        "userAccess": {
+          "expiresIn": "10m",
+          "secret": "process.env.ACCOUNT_USER_ACCESS_TOKEN_SECRET"
+        },
+        "userRefresh": {
+          "expiresIn": "30d",
+          "secret": "process.env.ACCOUNT_USER_REFRESH_TOKEN_SECRET"
+        },
+        "apiKeyAccess": {
+          "secret": "process.env.ACCOUNT_APIKEY_ACCESS_TOKEN_SECRET"
+        }
+      },
+      "tracking": {
+        "mode": "process.env.TRACKING_MODE || 'api-key'",
+        "index": "process.env.TRACKING_INDEX || 'saas-logs'",
+        "deleteOldLogs": "bool(process.env.TRACKING_DELETE_OLD_LOGS, true)",
+        "deleteOldLogsDays": "int(process.env.TRACKING_DELETE_OLD_LOGS_DAYS, 90)"
+      },
+      "verificationCode": {
+        "timeoutMinutes": 10,
+        "resendMinutes": 1
+      },
+      "googleAuth": {
+        "clientId": "process.env.GOOGLE_AUTH_CLIENT_ID || 'your-client-id'",
+        "clientSecret": "process.env.GOOGLE_AUTH_CLIENT_SECRET || 'your-client-secret'",
+        "callbackURL": "process.env.GOOGLE_AUTH_CALLBACK_URL || 'your-callback-url'"
+      },
+      "wechat": {
+        "appId": "process.env.WECHAT_APP_ID || 'your-app-id'",
+        "appSecret": "process.env.WECHAT_APP_SECRET || 'your-app-secret'"
+      },
+      "security": {
+        "defaultGuard": "process.env.ACCOUNT_DEFAULT_GUARD || 'jwt'"
+      }
+    }
+  },
+  "env": {
+    "ACCOUNT_REDIS_HOST": "",
+    "ACCOUNT_REDIS_PORT": "",
+    "ACCOUNT_DEFAULT_TOKEN_SECRET": "",
+    "ACCOUNT_USER_ACCESS_TOKEN_SECRET": "",
+    "ACCOUNT_USER_REFRESH_TOKEN_SECRET": "",
+    "ACCOUNT_APIKEY_ACCESS_TOKEN_SECRET": "",
+    "ACCOUNT_DEFAULT_GUARD": "",
+    "CACHE_GEOLOCATION_LRU_SIZE": "",
+    "CACHE_APIKEY_LRU_SIZE": "",
+    "TRACKING_MODE": "",
+    "TRACKING_INDEX": "",
+    "TRACKING_DELETE_OLD_LOGS": "",
+    "TRACKING_DELETE_OLD_LOGS_DAYS": "",
+    "GOOGLE_AUTH_CLIENT_ID": "",
+    "GOOGLE_AUTH_CLIENT_SECRET": "",
+    "GOOGLE_AUTH_CALLBACK_URL": "",
+    "WECHAT_APP_ID": "",
+    "WECHAT_APP_SECRET": ""
+  },
+  "dependencies": {
+    "@aws-sdk/client-pinpoint": "latest",
+    "@nestjs/passport": "latest",
+    "@casl/prisma": "latest",
+    "geolite2-redist": "latest",
+    "ioredis": "latest",
+    "ip-anonymize": "latest",
+    "jsonwebtoken": "latest",
+    "lru-cache": "latest",
+    "maxmind": "latest",
+    "passport": "latest",
+    "passport-custom": "latest",
+    "passport-google-oauth20": "latest",
+    "passport-jwt": "latest",
+    "passport-local": "latest",
+    "randomcolor": "latest",
+    "rate-limiter-flexible": "latest",
+    "ua-parser-js": "latest",
+    "validator": "latest"
+  },
+  "devDependencies": {
+    "@types/passport-google-oauth20": "latest",
+    "@types/passport-jwt": "latest",
+    "@types/passport-local": "latest",
+    "@types/validator": "latest"
+  }
+}

@@ -1,0 +1,18 @@
+// !! ------------------------------------------------------------ //
+// !!            [Module] Storage models             //
+// !! ------------------------------------------------------------ //
+// * LocalFile                                                     //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+model LocalFile {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  originalName String?
+  type         String // could be 'Folder'
+  size         Int? // in bytes
+  parentId     String?  @db.Uuid
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@schema("module/local-storage")
+}

@@ -1,0 +1,8 @@
+{
+  "key": "map",
+  "module": {
+    "file": "map.module",
+    "className": "MapModule"
+  },
+  "schema": "prisma/schema.prisma"
+}

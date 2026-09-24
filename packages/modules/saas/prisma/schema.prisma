@@ -1,0 +1,325 @@
+// ! ------------------------------------------------------------ //
+// !           [Module] SaaS models                 //
+// ! ------------------------------------------------------------ //
+// * User                                                         //
+// * Team                                                        //
+// * Email                                                        //
+// * ApiKey                                                       //
+// * ApprovedSubnet                                               //
+// * BackupCode                                                   //
+// * CouponCode                                                   //
+// * Domain                                                       //
+// * Identity                                                     //
+// * Membership                                                   //
+// * Session                                                      //
+// * Webhook                                                      //
+// * AuditLog                                                     //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+model User {
+    checkLocationOnLogin Boolean              @default(false)
+    countryCode          String               @default("us")
+    createdAt            DateTime             @default(now())
+    gender               Gender               @default(UNKNOWN)
+    id                   Int                  @id
+    googleId             String?
+    name                 String
+    notificationEmail    NotificationEmail    @default(ACCOUNT)
+    password             String?
+    prefersLanguage      String               @default("en-us")
+    prefersColorScheme   PrefersColorScheme   @default(NO_PREFERENCE)
+    prefersReducedMotion PrefersReducedMotion @default(NO_PREFERENCE)
+    prefersEmailId       Int?
+    profilePictureUrl    String               @default("https://unavatar.now.sh/fallback.png")
+    role                 UserRole             @default(USER)
+    timezone             String               @default("America/Los_Angeles")
+    twoFactorMethod      MfaMethod            @default(NONE)
+    twoFactorPhone       String?
+    twoFactorSecret      String?
+    attributes           Json?
+    updatedAt            DateTime             @updatedAt
+    active               Boolean              @default(true)
+    prefersEmail         Email?               @relation("userPrefersEmail", fields: [prefersEmailId], references: [id])
+    apiKeys              ApiKey[]             @relation("userApiKey")
+    approvedSubnets      ApprovedSubnet[]     @relation("userApprovedSubnet")
+    auditLogs            AuditLog[]           @relation("userAuditLog")
+    backupCodes          BackupCode[]         @relation("userBackupCode")
+    emails               Email[]              @relation("userEmail")
+    identities           Identity[]           @relation("userIdentity")
+    memberships          Membership[]         @relation("userMembership")
+    sessions             Session[]            @relation("userSession")
+
+    @@index([prefersEmailId])
+    @@schema("module/saas")
+}
+
+model Team {
+    autoJoinDomain     Boolean             @default(false)
+    createdAt          DateTime            @default(now())
+    forceTwoFactor     Boolean             @default(false)
+    id                 Int                 @id
+    ipRestrictions     String?
+    name               String
+    onlyAllowDomain    Boolean             @default(false)
+    profilePictureUrl  String              @default("https://unavatar.now.sh/fallback.png")
+    attributes         Json?
+    updatedAt          DateTime            @updatedAt
+    apiKeys            ApiKey[]            @relation("teamApiKey")
+    auditLogs          AuditLog[]          @relation("teamAuditLog")
+    domains            Domain[]            @relation("teamDomain")
+    memberships        Membership[]        @relation("teamMembership")
+    webhooks           Webhook[]           @relation("teamWebhook")
+
+    @@schema("module/saas")
+}
+
+model Email {
+    createdAt  DateTime @default(now())
+    email      String   @unique
+    emailSafe  String   @unique
+    id         Int      @id @default(autoincrement())
+    isVerified Boolean  @default(false)
+    updatedAt  DateTime @updatedAt
+    userId     Int
+    user       User     @relation("userEmail", fields: [userId], references: [id])
+    users      User[]   @relation("userPrefersEmail")
+
+    @@index([userId])
+    @@schema("module/saas")
+}
+
+model ApiKey {
+    createdAt            DateTime   @default(now())
+    description          String?
+    id                   Int        @id @default(autoincrement())
+    ipRestrictions       Json?
+    apiKey               String     @unique
+    name                 String?
+    teamId               Int?
+    referrerRestrictions Json?
+    scopes               String[]
+    updatedAt            DateTime   @updatedAt
+    userId               Int?
+    auditLogs            AuditLog[] @relation("apiKeyAuditLog")
+    team                 Team?      @relation("teamApiKey", fields: [teamId], references: [id])
+    user                 User?      @relation("userApiKey", fields: [userId], references: [id])
+
+    @@index([teamId])
+    @@index([userId])
+    @@schema("module/saas")
+}
+
+model ApprovedSubnet {
+    createdAt   DateTime @default(now())
+    id          Int      @id @default(autoincrement())
+    subnet      String
+    city        String?
+    region      String?
+    timezone    String?
+    countryCode String?
+    updatedAt   DateTime @updatedAt
+    userId      Int
+    user        User     @relation("userApprovedSubnet", fields: [userId], references: [id])
+
+    @@index([userId])
+    @@schema("module/saas")
+}
+
+model BackupCode {
+    id        Int      @id @default(autoincrement())
+    code      String
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    isUsed    Boolean  @default(false)
+    userId    Int
+    user      User     @relation("userBackupCode", fields: [userId], references: [id])
+
+    @@index([userId])
+    @@schema("module/saas")
+}
+
+model CouponCode {
+    id               Int       @id @default(autoincrement())
+    code             String
+    createdAt        DateTime  @default(now())
+    updatedAt        DateTime  @updatedAt
+    expiresAt        DateTime?
+    maxUses          Int       @default(1000)
+    usedCount        Int       @default(0)
+    teamRestrictions String?
+    amount           Float     @default(0.00)
+    currency         String
+    description      String?
+
+    @@schema("module/saas")
+}
+
+model Domain {
+    createdAt        DateTime @default(now())
+    domain           String
+    id               Int      @id @default(autoincrement())
+    isVerified       Boolean  @default(false)
+    teamId           Int
+    updatedAt        DateTime @updatedAt
+    verificationCode String
+    team             Team     @relation("teamDomain", fields: [teamId], references: [id])
+
+    @@index([teamId])
+    @@schema("module/saas")
+}
+
+model Identity {
+    createdAt DateTime     @default(now())
+    id        Int          @id @default(autoincrement())
+    loginName String
+    type      IdentityType
+    updatedAt DateTime     @updatedAt
+    userId    Int
+    user      User         @relation("userIdentity", fields: [userId], references: [id])
+
+    @@index([userId])
+    @@schema("module/saas")
+}
+
+model Membership {
+    createdAt DateTime       @default(now())
+    id        Int            @id @default(autoincrement())
+    teamId    Int
+    role      MembershipRole @default(MEMBER)
+    updatedAt DateTime       @updatedAt
+    userId    Int
+    team      Team           @relation("teamMembership", fields: [teamId], references: [id])
+    user      User           @relation("userMembership", fields: [userId], references: [id])
+
+    @@index([teamId])
+    @@index([userId])
+    @@schema("module/saas")
+}
+
+model Session {
+    createdAt       DateTime @default(now())
+    id              Int      @id @default(autoincrement())
+    ipAddress       String
+    token           String
+    updatedAt       DateTime @updatedAt
+    userAgent       String?
+    city            String?
+    region          String?
+    timezone        String?
+    countryCode     String?
+    browser         String?
+    operatingSystem String?
+    userId          Int
+    user            User     @relation("userSession", fields: [userId], references: [id])
+
+    @@index([userId])
+    @@schema("module/saas")
+}
+
+model Webhook {
+    contentType String    @default("application/json")
+    createdAt   DateTime  @default(now())
+    event       String
+    id          Int       @id @default(autoincrement())
+    isActive    Boolean   @default(false)
+    lastFiredAt DateTime?
+    secret      String?
+    updatedAt   DateTime  @updatedAt
+    url         String
+    teamId      Int
+    team        Team      @relation("teamWebhook", fields: [teamId], references: [id])
+
+    @@index([teamId])
+    @@schema("module/saas")
+}
+
+model AuditLog {
+    createdAt       DateTime @default(now())
+    event           String
+    rawEvent        String
+    id              Int      @id @default(autoincrement())
+    teamId          Int?
+    updatedAt       DateTime @updatedAt
+    userId          Int?
+    apiKeyId        Int?
+    ipAddress       String?
+    userAgent       String?
+    city            String?
+    region          String?
+    timezone        String?
+    countryCode     String?
+    browser         String?
+    operatingSystem String?
+    team            Team?    @relation("teamAuditLog", fields: [teamId], references: [id])
+    user            User?    @relation("userAuditLog", fields: [userId], references: [id])
+    apiKey          ApiKey?  @relation("apiKeyAuditLog", fields: [apiKeyId], references: [id])
+
+    @@index([apiKeyId])
+    @@index([teamId])
+    @@index([userId])
+    @@schema("module/saas")
+}
+
+enum Gender {
+    MALE
+    FEMALE
+    NONBINARY
+    UNKNOWN
+
+    @@schema("module/saas")
+}
+
+enum NotificationEmail {
+    ACCOUNT
+    UPDATES
+    PROMOTIONS
+
+    @@schema("module/saas")
+}
+
+enum PrefersColorScheme {
+    NO_PREFERENCE
+    LIGHT
+    DARK
+
+    @@schema("module/saas")
+}
+
+enum PrefersReducedMotion {
+    NO_PREFERENCE
+    REDUCE
+
+    @@schema("module/saas")
+}
+
+enum UserRole {
+    SUDO
+    USER
+
+    @@schema("module/saas")
+}
+
+enum MfaMethod {
+    NONE
+    SMS
+    TOTP
+    EMAIL
+
+    @@schema("module/saas")
+}
+
+enum MembershipRole {
+    OWNER
+    ADMIN
+    MEMBER
+
+    @@schema("module/saas")
+}
+
+enum IdentityType {
+    GOOGLE
+    APPLE
+    SLACK
+
+    @@schema("module/saas")
+}

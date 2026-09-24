@@ -1,0 +1,103 @@
+// ! ------------------------------------------------------------ //
+// !             [Module] Message Tracker models            //
+// ! ------------------------------------------------------------ //
+// * EmailMessageGroup                                                 //
+// * EmailMessage                                                      //
+// * EmailMessageEvent                                                 //
+// * TextMessageGroup                                                 //
+// * TextMessage                                                      //
+// * TextMessageEvent                                                 //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+model EmailMessageGroup {
+  id        Int            @id @default(autoincrement())
+  subject   String
+  html      String
+  text      String
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  messages  EmailMessage[]
+
+  @@schema("module/message-tracker")
+}
+
+model EmailMessage {
+  id                 Int                 @id @default(autoincrement())
+  status             String?
+  toAddress          String
+  subject            String
+  html               String
+  text               String
+  sqsMessageId       String // When the ReceiveCount for a message exceeds the maxReceiveCount for a queue, SQS moves the message to the DLQ. The original message ID is retained.
+  sqsMessageStatus   String? // FAILED if the message is in dead letter queue
+  sesMessageId       String?
+  sesMessageStatus   Int?
+  sesMessageResponse Json?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  events             EmailMessageEvent[]
+  messageGroupId     Int?
+  messageGroup       EmailMessageGroup?  @relation(fields: [messageGroupId], references: [id])
+
+  @@schema("module/message-tracker")
+}
+
+model EmailMessageEvent {
+  id           Int           @id @default(autoincrement())
+  eventType    String
+  eventTime    DateTime
+  event        Json
+  mail         Json
+  sesMessageId String
+  createdAt    DateTime      @default(now())
+  messageId    Int?
+  message      EmailMessage? @relation(fields: [messageId], references: [id])
+
+  @@schema("module/message-tracker")
+}
+
+model TextMessageGroup {
+  id        Int           @id @default(autoincrement())
+  text      String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  messages  TextMessage[]
+
+  @@schema("module/message-tracker")
+}
+
+model TextMessage {
+  id                 Int                @id @default(autoincrement())
+  status             String? // From event which's isFinal = true
+  statusDescription  String? // From event which's isFinal = true
+  phoneNumber        String
+  text               String
+  sqsMessageId       String // When the ReceiveCount for a message exceeds the maxReceiveCount for a queue, SQS moves the message to the DLQ. The original message ID is retained.
+  sqsMessageStatus   String? // FAILED if the message is in dead letter queue
+  smsMessageId       String?
+  smsMessageStatus   Int?
+  smsMessageResponse Json?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  events             TextMessageEvent[]
+  messageGroupId     Int?
+  messageGroup       TextMessageGroup?  @relation(fields: [messageGroupId], references: [id])
+
+  @@schema("module/message-tracker")
+}
+
+model TextMessageEvent {
+  id                       Int          @id @default(autoincrement())
+  eventType                String
+  eventTime                DateTime
+  event                    Json
+  isFinalEvent             Boolean
+  messageStatus            String
+  messageStatusDescription String
+  smsMessageId             String
+  createdAt                DateTime     @default(now())
+  messageId                Int?
+  message                  TextMessage? @relation(fields: [messageId], references: [id])
+
+  @@schema("module/message-tracker")
+}

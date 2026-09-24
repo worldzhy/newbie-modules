@@ -1,0 +1,8 @@
+{
+  "key": "tag",
+  "module": {
+    "file": "tag.module",
+    "className": "TagModule"
+  },
+  "schema": "prisma/schema.prisma"
+}

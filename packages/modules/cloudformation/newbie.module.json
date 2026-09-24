@@ -1,0 +1,22 @@
+{
+  "key": "cloudformation",
+  "module": {
+    "file": "cloudformation.module",
+    "className": "AwsCloudformationModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {
+    "cloudformation": {
+      "token": {
+        "secret": "process.env.AWS_CLOUDFORMATION_SECRETKEY_TOKEN_SECRET || 'your-secretkey-token-secret'"
+      }
+    }
+  },
+  "env": {
+    "AWS_CLOUDFORMATION_SECRETKEY_TOKEN_SECRET": ""
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudformation": "latest",
+    "@nestjs/jwt": "latest"
+  }
+}

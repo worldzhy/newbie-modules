@@ -1,0 +1,38 @@
+{
+  "key": "aws-ses",
+  "module": {
+    "file": "aws-ses.module",
+    "className": "AwsSesModule"
+  },
+  "config-service": {
+    "aws-ses": {
+      "accessKeyId": "process.env.AWS_SES_ACCESS_KEY_ID",
+      "secretAccessKey": "process.env.AWS_SES_SECRET_ACCESS_KEY",
+      "region": "process.env.AWS_SES_REGION || 'us-east-1'",
+      "configurationSetName": "process.env.AWS_SES_CONFIGURATION_SET_NAME",
+      "fromEmailAddress": "process.env.AWS_SES_FROM_EMAIL_ADDRESS"
+    }
+  },
+  "env": {
+    "AWS_SES_ACCESS_KEY_ID": "",
+    "AWS_SES_SECRET_ACCESS_KEY": "",
+    "AWS_SES_REGION": "",
+    "AWS_SES_CONFIGURATION_SET_NAME": "",
+    "AWS_SES_FROM_EMAIL_ADDRESS": ""
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "latest",
+    "@aws-sdk/client-sesv2": "latest",
+    "marked": "latest",
+    "mustache": "latest"
+  },
+  "devDependencies": {
+    "@types/mustache": "latest"
+  },
+  "assets": [
+    {
+      "include": "microservices/aws-ses/templates/",
+      "outDir": "dist/src"
+    }
+  ]
+}

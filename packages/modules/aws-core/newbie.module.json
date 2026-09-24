@@ -1,0 +1,22 @@
+{
+  "key": "aws-core",
+  "module": {
+    "file": "aws-core.module",
+    "className": "AwsCoreModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {
+    "aws-core": {
+      "cryptoEncryptKey": "process.env.AWS_CREDENTIAL_ENCRYPT_KEY",
+      "cryptoEncryptIV": "process.env.AWS_CREDENTIAL_ENCRYPT_IV"
+    }
+  },
+  "env": {
+    "AWS_CREDENTIAL_ENCRYPT_KEY": "",
+    "AWS_CREDENTIAL_ENCRYPT_IV": ""
+  },
+  "dependencies": {
+    "@aws-sdk/client-sts": "latest"
+  },
+  "devDependencies": {}
+}

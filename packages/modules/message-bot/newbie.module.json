@@ -1,0 +1,11 @@
+{
+  "key": "message-bot",
+  "module": {
+    "file": "message-bot.module",
+    "className": "MessageBotModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {},
+  "env": {},
+  "dependencies": {}
+}

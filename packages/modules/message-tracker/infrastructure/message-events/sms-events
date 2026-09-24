@@ -1,0 +1,22 @@
+{
+  "eventType": "TEXT_SUCCESSFUL",
+  "eventVersion": "1.0",
+  "eventTimestamp": 1750669238212,
+  "isFinal": true,
+  "originationPhoneNumber": "+18558902302",
+  "destinationPhoneNumber": "+14254147755",
+  "isoCountryCode": "US",
+  "messageId": "0ef84e57-c390-4dfa-8aef-db446c127679",
+  "messageRequestTimestamp": 1750669237757,
+  "messageEncoding": "GSM",
+  "messageType": "TRANSACTIONAL",
+  "messageStatus": "SUCCESSFUL",
+  "messageStatusDescription": "Message has been accepted by phone carrier",
+  "totalMessageParts": 1,
+  "totalMessagePrice": 0.00581,
+  "totalCarrierFee": 0.003,
+  "protectConfiguration": {
+    "protectConfigurationId": "protect-614a0da32dba42a7844e3d020a8504e3",
+    "protectStatus": "ALLOW"
+  }
+}

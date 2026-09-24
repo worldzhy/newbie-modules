@@ -1,0 +1,8 @@
+{
+  "key": "membership",
+  "module": {
+    "file": "membership.module",
+    "className": "MembershipModule"
+  },
+  "schema": "prisma/schema.prisma"
+}

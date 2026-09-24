@@ -1,0 +1,7 @@
+{
+  "key": "lark-bot",
+  "module": {
+    "file": "lark-bot.module",
+    "className": "LarkBotModule"
+  }
+}

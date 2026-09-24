@@ -1,0 +1,29 @@
+{
+  "key": "aws-cloudwatch",
+  "module": {
+    "file": "aws-cloudwatch.module",
+    "className": "AwsCloudwatchModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {
+    "cloudwatch": {
+      "cryptoEncryptKey": "process.env.AWS_CLOUDWATCH_CRYPTO_ENCRYPT_KEY",
+      "cryptoEncryptIV": "process.env.AWS_CLOUDWATCH_CRYPTO_ENCRYPT_IV",
+      "ai": {
+        "deepseekKey": "process.env.AWS_CLOUDWATCH_AI_DEEPSEEK_KEY"
+      }
+    }
+  },
+  "env": {
+    "AWS_CLOUDWATCH_CRYPTO_ENCRYPT_KEY": "",
+    "AWS_CLOUDWATCH_CRYPTO_ENCRYPT_IV": "",
+    "AWS_CLOUDWATCH_AI_DEEPSEEK_KEY": ""
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch": "latest",
+    "@aws-sdk/client-ec2": "latest",
+    "@aws-sdk/client-rds": "latest",
+    "dayjs": "latest"
+  },
+  "devDependencies": {}
+}

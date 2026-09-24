@@ -1,0 +1,52 @@
+// !! ------------------------------------------------------------ //
+// !!            [Module] MessageBot models                  //
+// !! ------------------------------------------------------------ //
+// * MessageBotChannel                                             //
+// * MessageBotChannelGroup                                        //
+// * MessageBotRecord                                              //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+model MessageBotChannel {
+  id          String                  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String?
+  webhook     String
+  platform    String // lark, slack ...
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  records     MessageBotRecord[]
+  groupId     String?                 @db.Uuid
+  // Detaching a group keeps its channels as ungrouped instead of blocking deletion.
+  group       MessageBotChannelGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+
+  @@unique([name, platform, groupId])
+  @@schema("module/message-bot")
+}
+
+model MessageBotChannelGroup {
+  id          String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  description String?
+  sort        Int                 @default(0)
+  parentId    String?             @db.Uuid
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  channels    MessageBotChannel[]
+
+  @@schema("module/message-bot")
+}
+
+model MessageBotRecord {
+  id        Int               @id @default(autoincrement())
+  webhook   String
+  request   Json
+  response  Json?
+  status    String // pending, succeeded, failed
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  // Delivery records are owned by the channel: deleting a channel removes its history as well.
+  channel   MessageBotChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  channelId String            @db.Uuid
+
+  @@schema("module/message-bot")
+}

@@ -1,0 +1,84 @@
+// ! ------------------------------------------------------------ //
+// !             [Module] Membership models                 //
+// ! ------------------------------------------------------------ //
+// * Membership                                                   //
+// * MembershipLevel                                              //
+// * Subscription                                                 //
+// * SubscriptionPlan                                             //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+model Membership {
+  id            String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cardNumber    String?          @unique
+  points        Int              @default(0)
+  userId        String           @unique @db.Uuid
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  level         MembershipLevel? @relation(fields: [levelId], references: [id])
+  levelId       Int?
+  subscriptions Subscription[]
+
+  @@schema("module/membership")
+}
+
+model MembershipLevel {
+  id             Int          @id @default(autoincrement())
+  name           String       @unique
+  requiredPoints Int          @default(0)
+  discountRate   Float        @default(0.0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  memberships    Membership[]
+
+  @@schema("module/membership")
+}
+
+model Subscription {
+  id                   String             @id @default(cuid())
+  status               SubscriptionStatus @default(PENDING_PAYMENT)
+  dateOfStart          DateTime
+  dateOfEnd            DateTime
+  autoRenew            Boolean            @default(false)
+  paymentAmountInCents Int
+  wechatTransactionId  String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  membership           Membership         @relation(fields: [membershipId], references: [id])
+  membershipId         String             @db.Uuid
+  plan                 SubscriptionPlan   @relation(fields: [planId], references: [id])
+  planId               Int
+
+  @@schema("module/membership")
+}
+
+model SubscriptionPlan {
+  id            Int            @id @default(autoincrement())
+  name          String         @unique
+  priceInCents  Int
+  billingCycle  BillingCycle
+  features      Json?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
+
+  @@schema("module/membership")
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUALLY
+  ANNUALLY
+  LIFETIME
+
+  @@schema("module/membership")
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELED
+  PENDING_PAYMENT
+
+  @@schema("module/membership")
+}

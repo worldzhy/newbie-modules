@@ -1,0 +1,24 @@
+{
+  "key": "googlemaps",
+  "module": {
+    "file": "googlemaps.module",
+    "className": "GoogleMapsModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {
+    "googlemaps": {
+      "credentials": {
+        "apiKey": "process.env.GOOGLE_CREDENTIALS_API_KEY",
+        "serviceAccount": "process.env.GOOGLE_CREDENTIALS_SERVICE_ACCOUNT"
+      }
+    }
+  },
+  "env": {
+    "GOOGLE_CREDENTIALS_API_KEY": "",
+    "GOOGLE_CREDENTIALS_SERVICE_ACCOUNT": ""
+  },
+  "dependencies": {
+    "@googlemaps/places": "^2.1.0"
+  },
+  "devDependencies": {}
+}

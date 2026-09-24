@@ -1,0 +1,8 @@
+{
+  "key": "stock-mgmt",
+  "module": {
+    "file": "stock-mgmt.module",
+    "className": "StockManagementModule"
+  },
+  "schema": "prisma/schema.prisma"
+}

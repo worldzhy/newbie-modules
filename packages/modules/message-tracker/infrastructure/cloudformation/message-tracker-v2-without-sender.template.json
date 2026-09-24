@@ -1,0 +1,388 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Message Tracker is a microservice that tracks messages(Email, Text). It stores the messages and events in a Postgres database.",
+  "Parameters": {
+    "DatabaseHost": {
+      "Description": "User name of the postgres database.",
+      "Type": "String"
+    },
+    "DatabasePort": {
+      "Description": "User name of the postgres database.",
+      "Type": "String",
+      "Default": "5432"
+    },
+    "DatabaseMasterUsername": {
+      "Description": "User name of the postgres database.",
+      "Type": "String",
+      "Default": "postgres",
+      "ConstraintDescription": "[1] Required for PostgreSQL. [2] Must be 1 to 63 letters or numbers. [3] First character must be a letter. [4] Can't be a reserved word for the chosen database engine."
+    },
+    "DatabaseMasterUserPassword": {
+      "Description": "Password of the postgres database.",
+      "Type": "String",
+      "ConstraintDescription": "Must contain from 8 to 128 characters."
+    },
+    "DatabaseName": {
+      "Description": "Name of the postgres database.",
+      "Type": "String",
+      "Default": "postgres",
+      "ConstraintDescription": "[1] Must contain 1 to 63 letters, numbers, or underscores. [2] Must begin with a letter or an underscore. Subsequent characters can be letters, underscores, or digits (0-9). [3] Can't be a word reserved by the specified database engine."
+    },
+
+    "AwsRegion": {
+      "Description": "AWS Region of SES and SMS.",
+      "Type": "String",
+      "Default": "us-east-1",
+      "AllowedValues": ["cn-northwest-1", "us-east-1", "us-west-2"],
+      "ConstraintDescription": "Must be a valid AWS region."
+    },
+
+    "SesConfigurationSetName": {
+      "Description": "Name of the SES configuration set.",
+      "Type": "String",
+      "Default": "MessageTrackerSESConfigurationSet"
+    },
+    "SmsConfigurationSetName": {
+      "Description": "Name of the SMS configuration set.",
+      "Type": "String",
+      "Default": "MessageTrackerSMSConfigurationSet"
+    },
+
+    "LambdaCodeS3BucketName": {
+      "Description": "Name of S3 bucket for Lambda codes.",
+      "Type": "String",
+      "Default": "aws-quickstart-975050274643"
+    },
+    "EventStreamS3BucketName": {
+      "Description": "Name of Event stream bucket which should be between 3 and 63 characters long.",
+      "Type": "String",
+      "Default": "message-tracker-eventstream-bucket"
+    },
+    "EventStreamS3Prefix": {
+      "Description": "Name of the bucket using to store event stream.",
+      "Type": "String",
+      "Default": "message-events/"
+    },
+    "EventStreamS3ErrorOutputPrefix": {
+      "Description": "Name of the bucket using to store event stream.",
+      "Type": "String",
+      "Default": "message-events-errors/"
+    },
+
+    "MessageEventDeliveryStreamName": {
+      "Description": "Name of the message event stream.",
+      "Type": "String",
+      "Default": "MessageTracker-message-event-deliverystream"
+    },
+    "MessageEventProcessorLambdaName": {
+      "Description": "Name of the message event processor Lambda.",
+      "Type": "String",
+      "Default": "MessageTracker-message-event-processor"
+    },
+    "MessageEventProcessorLambdaCodeZipFileName": {
+      "Description": "Path and file name of the Lambda code zip. Example: If s3://aws-quickstart-067174804713/quickstart-message-tracker/message-event-processor.zip , then fill 'quickstart-message-tracker/message-event-processor.zip'",
+      "Type": "String",
+      "Default": "quickstart-message-tracker/message-event-processor.zip"
+    }
+  },
+  "Resources": {
+    "EventStreamS3": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "${EventStreamS3BucketName}-${AWS::AccountId}"
+        },
+        "NotificationConfiguration": {
+          "LambdaConfigurations": [
+            {
+              "Event": "s3:ObjectCreated:*",
+              "Filter": {
+                "S3Key": {
+                  "Rules": [
+                    {
+                      "Name": "prefix",
+                      "Value": {"Ref": "EventStreamS3Prefix"}
+                    }
+                  ]
+                }
+              },
+              "Function": {"Fn::GetAtt": ["MessageEventProcessorLambda", "Arn"]}
+            }
+          ]
+        }
+      },
+      "DependsOn": ["S3InvokeLambdaPermission"]
+    },
+    "S3InvokeLambdaPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": ["MessageEventProcessorLambda", "Arn"]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "s3.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::Sub": "arn:aws:s3:::${EventStreamS3BucketName}-${AWS::AccountId}"
+        }
+      },
+      "DependsOn": ["MessageEventProcessorLambda"]
+    },
+    "MessageEventProcessorLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
+          "S3Key": {"Ref": "MessageEventProcessorLambdaCodeZipFileName"}
+        },
+        "Description": "It processes the message events from the Kinesis Firehose.",
+        "Environment": {
+          "Variables": {
+            "DB_HOST": {"Ref": "DatabaseHost"},
+            "DB_PORT": {"Ref": "DatabasePort"},
+            "DB_USER": {"Ref": "DatabaseMasterUsername"},
+            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
+            "DB_NAME": {"Ref": "DatabaseName"},
+            "DB_SSL": true
+          }
+        },
+        "FunctionName": {"Ref": "MessageEventProcessorLambdaName"},
+        "Handler": "packages/functions/src/message-event-processor/index.handler",
+        "MemorySize": 256,
+        "PackageType": "Zip",
+        "Role": {"Fn::GetAtt": ["MessageEventProcessorLambdaRole", "Arn"]},
+        "Runtime": "nodejs22.x",
+        "Timeout": 60
+      },
+      "DependsOn": ["MessageEventProcessorLambdaRole"]
+    },
+    "MessageEventProcessorLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Description": "It has some logs/s3 permissions",
+        "ManagedPolicyArns": ["arn:aws:iam::aws:policy/AWSLambdaExecute"]
+      }
+    },
+
+    "KinesisDeliveryStreamRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "firehose.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "MessageTracker-deliverystream-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:AbortMultipartUpload",
+                    "s3:GetBucketLocation",
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:ListBucketMultipartUploads",
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:s3:::${EventStreamS3BucketName}-${AWS::AccountId}*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "KinesisDeliveryStream": {
+      "Type": "AWS::KinesisFirehose::DeliveryStream",
+      "Properties": {
+        "DeliveryStreamName": {"Ref": "MessageEventDeliveryStreamName"},
+        "DeliveryStreamType": "DirectPut",
+        "ExtendedS3DestinationConfiguration": {
+          "BucketARN": {"Fn::GetAtt": ["EventStreamS3", "Arn"]},
+          "BufferingHints": {
+            "IntervalInSeconds": 60,
+            "SizeInMBs": 5
+          },
+          "CloudWatchLoggingOptions": {
+            "Enabled": true,
+            "LogGroupName": {
+              "Fn::Join": [
+                "",
+                [
+                  "/aws/kinesisfirehose/",
+                  {
+                    "Ref": "MessageEventDeliveryStreamName"
+                  }
+                ]
+              ]
+            },
+            "LogStreamName": "S3Delivery"
+          },
+          "EncryptionConfiguration": {
+            "NoEncryptionConfig": "NoEncryption"
+          },
+          "ErrorOutputPrefix": {"Ref": "EventStreamS3ErrorOutputPrefix"},
+          "Prefix": {"Ref": "EventStreamS3Prefix"},
+          "RoleARN": {
+            "Fn::GetAtt": ["KinesisDeliveryStreamRole", "Arn"]
+          }
+        }
+      },
+      "DependsOn": ["KinesisDeliveryStreamRole", "EventStreamS3"]
+    },
+
+    "SesConfigurationSet": {
+      "Type": "AWS::SES::ConfigurationSet",
+      "Properties": {
+        "Name": {"Ref": "SesConfigurationSetName"},
+        "SendingOptions": {"SendingEnabled": true}
+      }
+    },
+    "SesConfigurationSetEventDestinationRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "ses.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "MessageTracker-DeliveryStreamPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["firehose:PutRecordBatch"],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:firehose:${AwsRegion}:${AWS::AccountId}:deliverystream/${KinesisDeliveryStream}"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "SesConfigurationSetEventDestination": {
+      "Type": "AWS::SES::ConfigurationSetEventDestination",
+      "Properties": {
+        "ConfigurationSetName": {"Ref": "SesConfigurationSet"},
+        "EventDestination": {
+          "Enabled": true,
+          "MatchingEventTypes": [
+            "SEND",
+            "REJECT",
+            "BOUNCE",
+            "COMPLAINT",
+            "DELIVERY",
+            "OPEN",
+            "CLICK",
+            "RENDERING_FAILURE",
+            "DELIVERY_DELAY",
+            "SUBSCRIPTION"
+          ],
+          "KinesisFirehoseDestination": {
+            "DeliveryStreamARN": {
+              "Fn::GetAtt": ["KinesisDeliveryStream", "Arn"]
+            },
+            "IAMRoleARN": {
+              "Fn::GetAtt": ["SesConfigurationSetEventDestinationRole", "Arn"]
+            }
+          }
+        }
+      },
+      "DependsOn": ["SesConfigurationSet"]
+    },
+
+    "SmsConfigurationSetEventDestinationRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "sms-voice.amazonaws.com"},
+              "Action": "sts:AssumeRole",
+              "Condition": {
+                "StringEquals": {
+                  "aws:SourceAccount": {"Fn::Sub": "${AWS::AccountId}"}
+                },
+                "ArnLike": {
+                  "aws:SourceArn": {
+                    "Fn::Sub": "arn:aws:sms-voice:${AwsRegion}:${AWS::AccountId}:configuration-set/${SmsConfigurationSetName}"
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "MessageTracker-DeliveryStreamPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["firehose:PutRecord"],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:firehose:${AwsRegion}:${AWS::AccountId}:deliverystream/${KinesisDeliveryStream}"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "KinesisDeliveryStreamArn": {
+      "Value": {"Fn::GetAtt": ["KinesisDeliveryStream", "Arn"]},
+      "Description": "MessageTracker Kinesis delivery stream ARN"
+    },
+    "SmsConfigurationSetEventDestinationRoleArn": {
+      "Value": {
+        "Fn::GetAtt": ["SmsConfigurationSetEventDestinationRole", "Arn"]
+      },
+      "Description": "MessageTracker SMS configuration set event destination role ARN"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "key": "order",
+  "module": {
+    "file": "order.module",
+    "className": "OrderModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "dependencies": {}
+}

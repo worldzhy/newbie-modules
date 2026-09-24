@@ -1,0 +1,26 @@
+// ! ------------------------------------------------------------ //
+// !           [Module] Tag  models                         //
+// ! ------------------------------------------------------------ //
+// * Tag                                                          //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+model Tag {
+  id        Int       @id @default(autoincrement())
+  name      String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  group     TagGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId   Int?
+
+  @@schema("module/tag")
+}
+
+model TagGroup {
+  id        Int      @id @default(autoincrement())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tags      Tag[]
+
+  @@schema("module/tag")
+}

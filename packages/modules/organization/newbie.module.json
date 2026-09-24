@@ -1,0 +1,8 @@
+{
+  "key": "organization",
+  "module": {
+    "file": "organization.module",
+    "className": "OrganizationModule"
+  },
+  "schema": "prisma/schema.prisma"
+}

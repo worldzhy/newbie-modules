@@ -1,0 +1,676 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Message Tracker is a microservice that tracks messages(Email, Text). It stores the messages and events in a Postgres database.",
+  "Parameters": {
+    "DatabaseHost": {
+      "Description": "User name of the postgres database.",
+      "Type": "String"
+    },
+    "DatabasePort": {
+      "Description": "User name of the postgres database.",
+      "Type": "String",
+      "Default": "5432"
+    },
+    "DatabaseMasterUsername": {
+      "Description": "User name of the postgres database.",
+      "Type": "String",
+      "Default": "postgres",
+      "ConstraintDescription": "[1] Required for PostgreSQL. [2] Must be 1 to 63 letters or numbers. [3] First character must be a letter. [4] Can't be a reserved word for the chosen database engine."
+    },
+    "DatabaseMasterUserPassword": {
+      "Description": "Password of the postgres database.",
+      "Type": "String",
+      "ConstraintDescription": "Must contain from 8 to 128 characters."
+    },
+    "DatabaseName": {
+      "Description": "Name of the postgres database.",
+      "Type": "String",
+      "Default": "postgres",
+      "ConstraintDescription": "[1] Must contain 1 to 63 letters, numbers, or underscores. [2] Must begin with a letter or an underscore. Subsequent characters can be letters, underscores, or digits (0-9). [3] Can't be a word reserved by the specified database engine."
+    },
+
+    "AwsRegion": {
+      "Description": "AWS Region of SES and SMS.",
+      "Type": "String",
+      "Default": "us-east-1",
+      "AllowedValues": ["cn-northwest-1", "us-east-1", "us-west-2"],
+      "ConstraintDescription": "Must be a valid AWS region."
+    },
+
+    "SesConfigurationSetName": {
+      "Description": "Name of the SES configuration set.",
+      "Type": "String",
+      "Default": "MessageTrackerSESConfigurationSet"
+    },
+    "FromEmailAddress": {
+      "Description": "Address that has been verified in SES.",
+      "Type": "String"
+    },
+    "AdminEmailAddress": {
+      "Description": "Address that will receive alarm emails.",
+      "Type": "String"
+    },
+    "SmsConfigurationSetName": {
+      "Description": "Name of the SMS configuration set.",
+      "Type": "String",
+      "Default": "MessageTrackerSMSConfigurationSet"
+    },
+
+    "LambdaCodeS3BucketName": {
+      "Description": "Name of S3 bucket for Lambda codes.",
+      "Type": "String",
+      "Default": "aws-quickstart-975050274643"
+    },
+    "EventStreamS3BucketName": {
+      "Description": "Name of Event stream bucket which should be between 3 and 63 characters long.",
+      "Type": "String",
+      "Default": "message-tracker-eventstream-bucket"
+    },
+    "EventStreamS3Prefix": {
+      "Description": "Name of the bucket using to store event stream.",
+      "Type": "String",
+      "Default": "message-events/"
+    },
+    "EventStreamS3ErrorOutputPrefix": {
+      "Description": "Name of the bucket using to store event stream.",
+      "Type": "String",
+      "Default": "message-events-errors/"
+    },
+
+    "MessageEventDeliveryStreamName": {
+      "Description": "Name of the message event stream.",
+      "Type": "String",
+      "Default": "MessageTracker-message-event-deliverystream"
+    },
+    "MessageEventProcessorLambdaName": {
+      "Description": "Name of the message event processor Lambda.",
+      "Type": "String",
+      "Default": "MessageTracker-message-event-processor"
+    },
+    "MessageEventProcessorLambdaCodeZipFileName": {
+      "Description": "Path and file name of the Lambda code zip. Example: If s3://aws-quickstart-067174804713/quickstart-message-tracker/message-event-processor.zip , then fill 'quickstart-message-tracker/message-event-processor.zip'",
+      "Type": "String",
+      "Default": "quickstart-message-tracker/message-event-processor.zip"
+    },
+
+    "FailedMessageSQSName": {
+      "Description": "Name of the failed message dead-letter SQS.",
+      "Type": "String",
+      "Default": "MessageTracker-failed-message-queue"
+    },
+    "FailedMessageProcessorLambdaName": {
+      "Description": "Name of the Lambda function that processes the failed messages from the dead-letter queue.",
+      "Type": "String",
+      "Default": "MessageTracker-failed-message-processor"
+    },
+    "FailedMessageProcessorLambdaCodeZipFileName": {
+      "Description": "Path and file name of the Lambda code zip. Example: If s3://aws-quickstart-067174804713/quickstart-message-tracker/failed-message-processor.zip , then fill 'quickstart-message-tracker/failed-message-processor.zip'",
+      "Type": "String",
+      "Default": "quickstart-message-tracker/failed-message-processor.zip"
+    },
+
+    "EmailSQSName": {
+      "Description": "Name of the email queue.",
+      "Type": "String",
+      "Default": "MessageTracker-email-queue"
+    },
+    "EmailSenderLambdaName": {
+      "Description": "Name of the email sender Lambda.",
+      "Type": "String",
+      "Default": "MessageTracker-email-sender"
+    },
+    "EmailSenderLambdaCodeZipFileName": {
+      "Description": "Path and file name of the Lambda code zip. Example: If s3://aws-quickstart-067174804713/quickstart-message-tracker/email-sender.zip , then fill 'quickstart-message-tracker/email-sender.zip'",
+      "Type": "String",
+      "Default": "quickstart-message-tracker/email-sender.zip"
+    },
+
+    "TextSQSName": {
+      "Description": "Name of the text queue.",
+      "Type": "String",
+      "Default": "MessageTracker-text-queue"
+    },
+    "TextSenderLambdaName": {
+      "Description": "Name of the text sender Lambda.",
+      "Type": "String",
+      "Default": "MessageTracker-text-sender"
+    },
+    "TextSenderLambdaCodeZipFileName": {
+      "Description": "Path and file name of the Lambda code zip. Example: If s3://aws-quickstart-067174804713/quickstart-message-tracker/text-sender.zip , then fill 'quickstart-message-tracker/text-sender.zip'",
+      "Type": "String",
+      "Default": "quickstart-message-tracker/text-sender.zip"
+    }
+  },
+  "Resources": {
+    "EventStreamS3": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "${EventStreamS3BucketName}-${AWS::AccountId}"
+        },
+        "NotificationConfiguration": {
+          "LambdaConfigurations": [
+            {
+              "Event": "s3:ObjectCreated:*",
+              "Filter": {
+                "S3Key": {
+                  "Rules": [
+                    {
+                      "Name": "prefix",
+                      "Value": {"Ref": "EventStreamS3Prefix"}
+                    }
+                  ]
+                }
+              },
+              "Function": {"Fn::GetAtt": ["MessageEventProcessorLambda", "Arn"]}
+            }
+          ]
+        }
+      },
+      "DependsOn": ["S3InvokeLambdaPermission"]
+    },
+    "S3InvokeLambdaPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": ["MessageEventProcessorLambda", "Arn"]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "s3.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::Sub": "arn:aws:s3:::${EventStreamS3BucketName}-${AWS::AccountId}"
+        }
+      },
+      "DependsOn": ["MessageEventProcessorLambda"]
+    },
+    "MessageEventProcessorLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
+          "S3Key": {"Ref": "MessageEventProcessorLambdaCodeZipFileName"}
+        },
+        "Description": "It processes the message events from the Kinesis Firehose.",
+        "Environment": {
+          "Variables": {
+            "DB_HOST": {"Ref": "DatabaseHost"},
+            "DB_PORT": {"Ref": "DatabasePort"},
+            "DB_USER": {"Ref": "DatabaseMasterUsername"},
+            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
+            "DB_NAME": {"Ref": "DatabaseName"},
+            "DB_SSL": true
+          }
+        },
+        "FunctionName": {"Ref": "MessageEventProcessorLambdaName"},
+        "Handler": "packages/functions/src/message-event-processor/index.handler",
+        "MemorySize": 256,
+        "PackageType": "Zip",
+        "Role": {"Fn::GetAtt": ["MessageEventProcessorLambdaRole", "Arn"]},
+        "Runtime": "nodejs22.x",
+        "Timeout": 60
+      },
+      "DependsOn": ["MessageEventProcessorLambdaRole"]
+    },
+    "MessageEventProcessorLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Description": "It has some logs/s3 permissions",
+        "ManagedPolicyArns": ["arn:aws:iam::aws:policy/AWSLambdaExecute"]
+      }
+    },
+
+    "KinesisDeliveryStreamRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "firehose.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "MessageTracker-deliverystream-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:AbortMultipartUpload",
+                    "s3:GetBucketLocation",
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:ListBucketMultipartUploads",
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:s3:::${EventStreamS3BucketName}-${AWS::AccountId}*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "KinesisDeliveryStream": {
+      "Type": "AWS::KinesisFirehose::DeliveryStream",
+      "Properties": {
+        "DeliveryStreamName": {"Ref": "MessageEventDeliveryStreamName"},
+        "DeliveryStreamType": "DirectPut",
+        "ExtendedS3DestinationConfiguration": {
+          "BucketARN": {"Fn::GetAtt": ["EventStreamS3", "Arn"]},
+          "BufferingHints": {
+            "IntervalInSeconds": 60,
+            "SizeInMBs": 5
+          },
+          "CloudWatchLoggingOptions": {
+            "Enabled": true,
+            "LogGroupName": {
+              "Fn::Join": [
+                "",
+                [
+                  "/aws/kinesisfirehose/",
+                  {
+                    "Ref": "MessageEventDeliveryStreamName"
+                  }
+                ]
+              ]
+            },
+            "LogStreamName": "S3Delivery"
+          },
+          "EncryptionConfiguration": {
+            "NoEncryptionConfig": "NoEncryption"
+          },
+          "ErrorOutputPrefix": {"Ref": "EventStreamS3ErrorOutputPrefix"},
+          "Prefix": {"Ref": "EventStreamS3Prefix"},
+          "RoleARN": {
+            "Fn::GetAtt": ["KinesisDeliveryStreamRole", "Arn"]
+          }
+        }
+      },
+      "DependsOn": ["KinesisDeliveryStreamRole", "EventStreamS3"]
+    },
+
+    "SesConfigurationSet": {
+      "Type": "AWS::SES::ConfigurationSet",
+      "Properties": {
+        "Name": {"Ref": "SesConfigurationSetName"},
+        "SendingOptions": {"SendingEnabled": true}
+      }
+    },
+    "SesConfigurationSetEventDestinationRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "ses.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "MessageTracker-DeliveryStreamPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["firehose:PutRecordBatch"],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:firehose:${AwsRegion}:${AWS::AccountId}:deliverystream/${KinesisDeliveryStream}"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "SesConfigurationSetEventDestination": {
+      "Type": "AWS::SES::ConfigurationSetEventDestination",
+      "Properties": {
+        "ConfigurationSetName": {"Ref": "SesConfigurationSet"},
+        "EventDestination": {
+          "Enabled": true,
+          "MatchingEventTypes": [
+            "SEND",
+            "REJECT",
+            "BOUNCE",
+            "COMPLAINT",
+            "DELIVERY",
+            "OPEN",
+            "CLICK",
+            "RENDERING_FAILURE",
+            "DELIVERY_DELAY",
+            "SUBSCRIPTION"
+          ],
+          "KinesisFirehoseDestination": {
+            "DeliveryStreamARN": {
+              "Fn::GetAtt": ["KinesisDeliveryStream", "Arn"]
+            },
+            "IAMRoleARN": {
+              "Fn::GetAtt": ["SesConfigurationSetEventDestinationRole", "Arn"]
+            }
+          }
+        }
+      },
+      "DependsOn": ["SesConfigurationSet"]
+    },
+
+    "FailedMessageSQS": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {"Ref": "FailedMessageSQSName"},
+        "VisibilityTimeout": 60
+      }
+    },
+    "EmailSQS": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {"Ref": "EmailSQSName"},
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {"Fn::GetAtt": ["FailedMessageSQS", "Arn"]},
+          "maxReceiveCount": 1
+        },
+        "VisibilityTimeout": 60
+      },
+      "DependsOn": ["FailedMessageSQS"]
+    },
+    "TextSQS": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {"Ref": "TextSQSName"},
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {"Fn::GetAtt": ["FailedMessageSQS", "Arn"]},
+          "maxReceiveCount": 1
+        },
+        "VisibilityTimeout": 60
+      },
+      "DependsOn": ["FailedMessageSQS"]
+    },
+
+    "FailedMessageProcessorLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Description": "It has some logs/sqs permissions",
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AWSLambdaExecute",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "MessageTracker-failed-message-processor-lambda-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["ses:SendEmail"],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "FailedMessageProcessorLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
+          "S3Key": {"Ref": "FailedMessageProcessorLambdaCodeZipFileName"}
+        },
+        "Description": "It receives dead-letter queue messages to send alarm email or sms.",
+        "Environment": {
+          "Variables": {
+            "DB_HOST": {"Ref": "DatabaseHost"},
+            "DB_PORT": {"Ref": "DatabasePort"},
+            "DB_USER": {"Ref": "DatabaseMasterUsername"},
+            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
+            "DB_NAME": {"Ref": "DatabaseName"},
+            "DB_SSL": true,
+            "AWS_SES_REGION": {"Ref": "AwsRegion"},
+            "AWS_SES_CONFIGURATION_SET_NAME": {
+              "Ref": "SesConfigurationSetName"
+            },
+            "FROM_EMAIL_ADDRESS": {"Ref": "FromEmailAddress"},
+            "ADMIN_EMAIL_ADDRESS": {"Ref": "AdminEmailAddress"},
+            "AWS_SMS_REGION": {"Ref": "AwsRegion"},
+            "AWS_SMS_CONFIGURATION_SET_NAME": {
+              "Ref": "SmsConfigurationSetName"
+            }
+          }
+        },
+        "FunctionName": {
+          "Ref": "FailedMessageProcessorLambdaName"
+        },
+        "Handler": "packages/functions/src/failed-message-processor/index.handler",
+        "MemorySize": 256,
+        "PackageType": "Zip",
+        "Role": {"Fn::GetAtt": ["FailedMessageProcessorLambdaRole", "Arn"]},
+        "Runtime": "nodejs22.x",
+        "Timeout": 60
+      },
+      "DependsOn": ["FailedMessageProcessorLambdaRole"]
+    },
+    "FailedMessageProcessorLambdaTrigger": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "BatchSize": 10,
+        "Enabled": true,
+        "EventSourceArn": {"Fn::GetAtt": ["FailedMessageSQS", "Arn"]},
+        "FunctionName": {"Fn::GetAtt": ["FailedMessageProcessorLambda", "Arn"]},
+        "MaximumBatchingWindowInSeconds": 0
+      },
+      "DependsOn": ["FailedMessageProcessorLambda", "FailedMessageSQS"]
+    },
+
+    "EmailSenderLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Description": "It has some logs/sqs permissions",
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AWSLambdaExecute",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "MessageTracker-email-sender-lambda-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["ses:SendEmail"],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "EmailSenderLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
+          "S3Key": {"Ref": "EmailSenderLambdaCodeZipFileName"}
+        },
+        "Description": "It receives SQS messages to send emails or sms.",
+        "Environment": {
+          "Variables": {
+            "DB_HOST": {"Ref": "DatabaseHost"},
+            "DB_PORT": {"Ref": "DatabasePort"},
+            "DB_USER": {"Ref": "DatabaseMasterUsername"},
+            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
+            "DB_NAME": {"Ref": "DatabaseName"},
+            "DB_SSL": true,
+            "AWS_SES_REGION": {"Ref": "AwsRegion"},
+            "AWS_SES_CONFIGURATION_SET_NAME": {
+              "Ref": "SesConfigurationSetName"
+            },
+            "FROM_EMAIL_ADDRESS": {"Ref": "FromEmailAddress"},
+            "ADMIN_EMAIL_ADDRESS": {"Ref": "AdminEmailAddress"}
+          }
+        },
+        "FunctionName": {"Ref": "EmailSenderLambdaName"},
+        "Handler": "packages/functions/src/email-sender/index.handler",
+        "MemorySize": 256,
+        "PackageType": "Zip",
+        "Role": {"Fn::GetAtt": ["EmailSenderLambdaRole", "Arn"]},
+        "Runtime": "nodejs22.x",
+        "Timeout": 60
+      },
+      "DependsOn": ["EmailSenderLambdaRole"]
+    },
+    "EmailSenderLambdaTrigger": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "BatchSize": 10,
+        "Enabled": true,
+        "EventSourceArn": {"Fn::GetAtt": ["EmailSQS", "Arn"]},
+        "FunctionName": {"Fn::GetAtt": ["EmailSenderLambda", "Arn"]},
+        "MaximumBatchingWindowInSeconds": 0
+      },
+      "DependsOn": ["EmailSenderLambda", "EmailSQS"]
+    },
+
+    "TextSenderLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Description": "It has some logs/sqs permissions",
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AWSLambdaExecute",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "MessageTracker-text-sender-lambda-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["sms-voice:SendTextMessage"],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "TextSenderLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
+          "S3Key": {"Ref": "TextSenderLambdaCodeZipFileName"}
+        },
+        "Description": "It receives SQS messages to send text.",
+        "Environment": {
+          "Variables": {
+            "DB_HOST": {"Ref": "DatabaseHost"},
+            "DB_PORT": {"Ref": "DatabasePort"},
+            "DB_USER": {"Ref": "DatabaseMasterUsername"},
+            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
+            "DB_NAME": {"Ref": "DatabaseName"},
+            "DB_SSL": true,
+            "AWS_SMS_REGION": {"Ref": "AwsRegion"},
+            "AWS_SMS_CONFIGURATION_SET_NAME": {
+              "Ref": "SmsConfigurationSetName"
+            }
+          }
+        },
+        "FunctionName": {"Ref": "TextSenderLambdaName"},
+        "Handler": "packages/functions/src/text-sender/index.handler",
+        "MemorySize": 256,
+        "PackageType": "Zip",
+        "Role": {"Fn::GetAtt": ["TextSenderLambdaRole", "Arn"]},
+        "Runtime": "nodejs22.x",
+        "Timeout": 60
+      },
+      "DependsOn": ["TextSenderLambdaRole"]
+    },
+    "TextSenderLambdaTrigger": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "BatchSize": 10,
+        "Enabled": true,
+        "EventSourceArn": {"Fn::GetAtt": ["TextSQS", "Arn"]},
+        "FunctionName": {"Fn::GetAtt": ["TextSenderLambda", "Arn"]},
+        "MaximumBatchingWindowInSeconds": 0
+      },
+      "DependsOn": ["TextSenderLambda", "TextSQS"]
+    }
+  },
+  "Outputs": {
+    "EmailQueueUrl": {
+      "Value": {"Fn::GetAtt": ["EmailSQS", "QueueUrl"]},
+      "Description": "MessageTracker email queue URL"
+    },
+    "TextQueueUrl": {
+      "Value": {"Fn::GetAtt": ["TextSQS", "QueueUrl"]},
+      "Description": "MessageTracker text queue URL"
+    }
+  }
+}

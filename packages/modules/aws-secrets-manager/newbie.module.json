@@ -1,0 +1,16 @@
+{
+  "key": "aws-secrets-manager",
+  "module": {
+    "file": "aws-secrets-manager.module",
+    "className": "AwsSecretsManagerModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {
+    "aws-secrets-manager": {}
+  },
+  "env": {},
+  "dependencies": {
+    "@aws-sdk/client-secrets-manager": "latest"
+  },
+  "devDependencies": {}
+}

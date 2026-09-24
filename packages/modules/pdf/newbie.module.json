@@ -1,0 +1,15 @@
+{
+  "key": "pdf",
+  "module": {
+    "file": "pdf.module",
+    "className": "PdfModule"
+  },
+  "dependencies": {
+    "fs-extra": "latest",
+    "pdf-lib": "latest",
+    "pdf2pic": "latest"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "latest"
+  }
+}

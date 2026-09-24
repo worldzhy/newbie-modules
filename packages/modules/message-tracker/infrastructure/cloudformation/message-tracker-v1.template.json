@@ -1,0 +1,730 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "InceptionPad Message Service",
+  "Parameters": {
+    "DatabaseHost": {
+      "Description": "User name of the postgres database.",
+      "Type": "String"
+    },
+    "DatabasePort": {
+      "Description": "User name of the postgres database.",
+      "Type": "String",
+      "Default": "5432"
+    },
+    "DatabaseMasterUsername": {
+      "Description": "User name of the postgres database.",
+      "Type": "String",
+      "Default": "postgres",
+      "ConstraintDescription": "[1] Required for PostgreSQL. [2] Must be 1 to 63 letters or numbers. [3] First character must be a letter. [4] Can't be a reserved word for the chosen database engine."
+    },
+    "DatabaseMasterUserPassword": {
+      "Description": "Password of the postgres database.",
+      "Type": "String",
+      "ConstraintDescription": "Must contain from 8 to 128 characters."
+    },
+    "DatabaseName": {
+      "Description": "Name of the postgres database.",
+      "Type": "String",
+      "Default": "postgres",
+      "ConstraintDescription": "[1] Must contain 1 to 63 letters, numbers, or underscores. [2] Must begin with a letter or an underscore. Subsequent characters can be letters, underscores, or digits (0-9). [3] Can't be a word reserved by the specified database engine."
+    },
+
+    "SESIdentityARN": {
+      "Description": "This is the FromAddress ARN. It is required during creating Pinpoint Email Channel.",
+      "Type": "String"
+    },
+    "FromAddress": {
+      "Description": "Address that has been verified in SES.",
+      "Type": "String"
+    },
+    "PinpointAlarmAppName": {
+      "Description": "Name of the Pinpoint application for alarming.",
+      "Type": "String",
+      "Default": "message-tracker-alarm"
+    },
+    "PinpointLevel1AppName": {
+      "Description": "Name of the Pinpoint application level 1.",
+      "Type": "String",
+      "Default": "message-tracker-level1"
+    },
+    "PinpointLevel2AppName": {
+      "Description": "Name of the Pinpoint application level 2.",
+      "Type": "String",
+      "Default": "message-tracker-level2"
+    },
+
+    "LambdaCodeS3BucketName": {
+      "Description": "Name of S3 bucket for Lambda codes.",
+      "Type": "String",
+      "Default": "aws-quickstart-975050274643"
+    },
+    "EventStreamS3BucketName": {
+      "Description": "Name of Event stream bucket which should be between 3 and 63 characters long.",
+      "Type": "String",
+      "Default": "message-tracker-eventstream-bucket"
+    },
+    "EventStreamS3Prefix": {
+      "Description": "Name of the bucket using to store event stream.",
+      "Type": "String",
+      "Default": "pinpoint-events/"
+    },
+    "EventStreamS3ErrorOutputPrefix": {
+      "Description": "Name of the bucket using to store event stream.",
+      "Type": "String",
+      "Default": "pinpoint-events-errors/"
+    },
+
+    "PinpointEventDeliveryStreamName": {
+      "Description": "Name of the Pinpoint message event stream.",
+      "Type": "String",
+      "Default": "message-tracker-pinpointevent-deliverystream"
+    },
+    "PinpointEventProcessorLambdaName": {
+      "Description": "Name of the pinpoint events processor Lambda.",
+      "Type": "String",
+      "Default": "message-tracker-event-processor"
+    },
+    "PinpointEventProcessorLambdaCodeArchiveName": {
+      "Description": "Path and file name of the alarm Lambda code zip. Example: If s3://aws-quickstart-067174804713/message-tracker-functions/message-event-processor.zip , then fill 'message-tracker-functions/message-event-processor.zip'",
+      "Type": "String",
+      "Default": "message-tracker-functions/message-event-processor.zip"
+    },
+
+    "FinalDeadLetterSQSName": {
+      "Description": "Name of the final dead-letter SQS.",
+      "Type": "String",
+      "Default": "message-tracker-final-deadletter-queue"
+    },
+    "AlarmLambdaName": {
+      "Description": "Name of the alarm Lambda.",
+      "Type": "String",
+      "Default": "message-tracker-alarm-function"
+    },
+    "AlarmLambdaCodeArchiveName": {
+      "Description": "File name of the alarm Lambda code zip. Example: code-alarm-function.zip",
+      "Type": "String",
+      "Default": "message-tracker-functions/failed-message-processor.zip"
+    },
+
+    "EmailSQSLevel2Name": {
+      "Description": "Name of the SQS level 2.",
+      "Type": "String",
+      "Default": "message-tracker-email-queue-level2"
+    },
+    "EmailSQSLevel1Name": {
+      "Description": "Name of the SQS level 1.",
+      "Type": "String",
+      "Default": "message-tracker-email-queue-level1"
+    },
+    "EmailShooterLevel1LambdaName": {
+      "Description": "Name of the email shooter level 1 Lambda.",
+      "Type": "String",
+      "Default": "message-tracker-email-shooter-level1"
+    },
+    "EmailShooterLevel2LambdaName": {
+      "Description": "Name of the email shooter level 2 Lambda.",
+      "Type": "String",
+      "Default": "message-tracker-email-shooter-level2"
+    },
+    "MessageShooterLambdaCodeArchiveName": {
+      "Description": "File name of the alarm Lambda code zip. Example: code-message-shooter.zip",
+      "Type": "String",
+      "Default": "message-tracker-functions/message-sender.zip"
+    }
+  },
+  "Resources": {
+    "EventStreamS3": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "${EventStreamS3BucketName}-${AWS::AccountId}"
+        },
+        "NotificationConfiguration": {
+          "LambdaConfigurations": [
+            {
+              "Event": "s3:ObjectCreated:*",
+              "Filter": {
+                "S3Key": {
+                  "Rules": [
+                    {
+                      "Name": "prefix",
+                      "Value": {"Ref": "EventStreamS3Prefix"}
+                    }
+                  ]
+                }
+              },
+              "Function": {"Fn::GetAtt": ["S3EventLambdaFunction", "Arn"]}
+            }
+          ]
+        }
+      },
+      "DependsOn": ["S3InvokeLambdaPermission"]
+    },
+    "PinpintEventDeliveryStreamRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "firehose.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "message-tracker-deliverystream-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:AbortMultipartUpload",
+                    "s3:GetBucketLocation",
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:ListBucketMultipartUploads",
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Sub": "arn:aws:s3:::${EventStreamS3BucketName}-${AWS::AccountId}*"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "PinpintEventDeliveryStream": {
+      "Type": "AWS::KinesisFirehose::DeliveryStream",
+      "Properties": {
+        "DeliveryStreamName": {"Ref": "PinpointEventDeliveryStreamName"},
+        "DeliveryStreamType": "DirectPut",
+        "ExtendedS3DestinationConfiguration": {
+          "BucketARN": {"Fn::GetAtt": ["EventStreamS3", "Arn"]},
+          "BufferingHints": {
+            "IntervalInSeconds": 300,
+            "SizeInMBs": 5
+          },
+          "CloudWatchLoggingOptions": {
+            "Enabled": true,
+            "LogGroupName": {
+              "Fn::Join": [
+                "",
+                [
+                  "/aws/kinesisfirehose/",
+                  {
+                    "Ref": "PinpointEventDeliveryStreamName"
+                  }
+                ]
+              ]
+            },
+            "LogStreamName": "S3Delivery"
+          },
+          "EncryptionConfiguration": {
+            "NoEncryptionConfig": "NoEncryption"
+          },
+          "ErrorOutputPrefix": {"Ref": "EventStreamS3ErrorOutputPrefix"},
+          "Prefix": {"Ref": "EventStreamS3Prefix"},
+          "RoleARN": {
+            "Fn::GetAtt": ["PinpintEventDeliveryStreamRole", "Arn"]
+          }
+        }
+      },
+      "DependsOn": ["PinpintEventDeliveryStreamRole", "EventStreamS3"]
+    },
+
+    "PinpointEmailChannelRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "pinpoint.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "message-tracker-emailchannel-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "mobileanalytics:PutEvents",
+                    "mobileanalytics:PutItems"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "PinpointAlarmEmailChannel": {
+      "Type": "AWS::Pinpoint::EmailChannel",
+      "Properties": {
+        "ApplicationId": {"Ref": "PinpointAlarm"},
+        "Enabled": true,
+        "FromAddress": {"Ref": "FromAddress"},
+        "Identity": {"Ref": "SESIdentityARN"},
+        "RoleArn": {"Fn::GetAtt": ["PinpointEmailChannelRole", "Arn"]}
+      },
+      "DependsOn": ["PinpointEmailChannelRole", "PinpointAlarm"]
+    },
+    "PinpointLevel1EmailChannel": {
+      "Type": "AWS::Pinpoint::EmailChannel",
+      "Properties": {
+        "ApplicationId": {"Ref": "PinpointLevel1"},
+        "Enabled": true,
+        "FromAddress": {"Ref": "FromAddress"},
+        "Identity": {"Ref": "SESIdentityARN"},
+        "RoleArn": {"Fn::GetAtt": ["PinpointEmailChannelRole", "Arn"]}
+      },
+      "DependsOn": ["PinpointEmailChannelRole", "PinpointLevel1"]
+    },
+    "PinpointLevel2EmailChannel": {
+      "Type": "AWS::Pinpoint::EmailChannel",
+      "Properties": {
+        "ApplicationId": {"Ref": "PinpointLevel2"},
+        "Enabled": true,
+        "FromAddress": {"Ref": "FromAddress"},
+        "Identity": {"Ref": "SESIdentityARN"},
+        "RoleArn": {"Fn::GetAtt": ["PinpointEmailChannelRole", "Arn"]}
+      },
+      "DependsOn": ["PinpointEmailChannelRole", "PinpointLevel2"]
+    },
+
+    "PinpointAlarm": {
+      "Type": "AWS::Pinpoint::App",
+      "Properties": {
+        "Name": {
+          "Ref": "PinpointAlarmAppName"
+        }
+      }
+    },
+    "PinpointLevel1": {
+      "Type": "AWS::Pinpoint::App",
+      "Properties": {
+        "Name": {
+          "Ref": "PinpointLevel1AppName"
+        }
+      }
+    },
+    "PinpointLevel1EventStream": {
+      "Type": "AWS::Pinpoint::EventStream",
+      "Properties": {
+        "ApplicationId": {"Ref": "PinpointLevel1"},
+        "DestinationStreamArn": {
+          "Fn::GetAtt": ["PinpintEventDeliveryStream", "Arn"]
+        },
+        "RoleArn": {
+          "Fn::GetAtt": ["PinpointLevel1EventStreamRole", "Arn"]
+        }
+      },
+      "DependsOn": ["PinpointLevel1", "PinpointLevel1EventStreamRole"]
+    },
+    "PinpointLevel1EventStreamRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "pinpoint.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "message-tracker-level1-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "firehose:PutRecordBatch",
+                    "firehose:DescribeDeliveryStream"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": ["PinpintEventDeliveryStream", "Arn"]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "PinpointLevel2": {
+      "Type": "AWS::Pinpoint::App",
+      "Properties": {
+        "Name": {"Ref": "PinpointLevel2AppName"}
+      }
+    },
+    "PinpointLevel2EventStream": {
+      "Type": "AWS::Pinpoint::EventStream",
+      "Properties": {
+        "ApplicationId": {"Ref": "PinpointLevel2"},
+        "DestinationStreamArn": {
+          "Fn::GetAtt": ["PinpintEventDeliveryStream", "Arn"]
+        },
+        "RoleArn": {"Fn::GetAtt": ["PinpointLevel2EventStreamRole", "Arn"]}
+      },
+      "DependsOn": ["PinpointLevel2", "PinpointLevel2EventStreamRole"]
+    },
+    "PinpointLevel2EventStreamRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "pinpoint.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "message-tracker-level2-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "firehose:PutRecordBatch",
+                    "firehose:DescribeDeliveryStream"
+                  ],
+                  "Resource": {
+                    "Fn::GetAtt": ["PinpintEventDeliveryStream", "Arn"]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "FinalDeadLetterSQS": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {"Ref": "FinalDeadLetterSQSName"},
+        "VisibilityTimeout": 60
+      }
+    },
+    "EmailSQSLevel2": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {"Ref": "EmailSQSLevel2Name"},
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {"Fn::GetAtt": ["FinalDeadLetterSQS", "Arn"]},
+          "maxReceiveCount": 1
+        },
+        "VisibilityTimeout": 60
+      },
+      "DependsOn": ["FinalDeadLetterSQS"]
+    },
+    "EmailSQSLevel1": {
+      "Type": "AWS::SQS::Queue",
+      "Properties": {
+        "QueueName": {"Ref": "EmailSQSLevel1Name"},
+        "RedrivePolicy": {
+          "deadLetterTargetArn": {"Fn::GetAtt": ["EmailSQSLevel2", "Arn"]},
+          "maxReceiveCount": 1
+        },
+        "VisibilityTimeout": 60
+      },
+      "DependsOn": ["EmailSQSLevel2"]
+    },
+
+    "AlarmLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Description": "It has some logs/sqs permissions",
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AWSLambdaExecute",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "message-tracker-alarm-lambda-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["mobiletargeting:*"],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "DependsOn": ["PinpointAlarm"]
+    },
+    "AlarmLambda": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
+          "S3Key": {"Ref": "AlarmLambdaCodeArchiveName"}
+        },
+        "Description": "It receives final dead-letter queue messages to send alarm email or sms.",
+        "Environment": {
+          "Variables": {
+            "DB_HOST": {"Ref": "DatabaseHost"},
+            "DB_PORT": {"Ref": "DatabasePort"},
+            "DB_USER": {"Ref": "DatabaseMasterUsername"},
+            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
+            "DB_NAME": {"Ref": "DatabaseName"},
+            "PINPOINT_APP_ID": {"Ref": "PinpointAlarm"},
+            "FROM_EMAIL_ADDRESS": {"Ref": "FromAddress"},
+            "ALARM_TO_EMAIL_ADDRESS": ""
+          }
+        },
+        "FunctionName": {
+          "Ref": "AlarmLambdaName"
+        },
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "PackageType": "Zip",
+        "Role": {"Fn::GetAtt": ["AlarmLambdaRole", "Arn"]},
+        "Runtime": "nodejs22.x",
+        "Timeout": 60
+      },
+      "DependsOn": ["AlarmLambdaRole"]
+    },
+    "AlarmLambdaTrigger": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "BatchSize": 10,
+        "Enabled": true,
+        "EventSourceArn": {"Fn::GetAtt": ["FinalDeadLetterSQS", "Arn"]},
+        "FunctionName": {"Fn::GetAtt": ["AlarmLambda", "Arn"]},
+        "MaximumBatchingWindowInSeconds": 0
+      },
+      "DependsOn": ["AlarmLambda", "FinalDeadLetterSQS"]
+    },
+
+    "ShooterLambdaRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Description": "It has some logs/sqs permissions",
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AWSLambdaExecute",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaSQSQueueExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "message-tracker-shooter-lambda-role",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": ["mobiletargeting:*"],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "DependsOn": ["PinpointLevel1", "PinpointLevel2"]
+    },
+    "EmailShooterLevel1": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
+          "S3Key": {"Ref": "MessageShooterLambdaCodeArchiveName"}
+        },
+        "Description": "It receives SQS messages to send emails or sms.",
+        "Environment": {
+          "Variables": {
+            "MESSAGE_TYPE": "email",
+            "SHOOTER_LEVEL": 1,
+            "DB_HOST": {"Ref": "DatabaseHost"},
+            "DB_PORT": {"Ref": "DatabasePort"},
+            "DB_USER": {"Ref": "DatabaseMasterUsername"},
+            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
+            "DB_NAME": {"Ref": "DatabaseName"},
+            "PINPOINT_APP_ID": {"Ref": "PinpointLevel1"},
+            "FROM_EMAIL_ADDRESS": {"Ref": "FromAddress"}
+          }
+        },
+        "FunctionName": {"Ref": "EmailShooterLevel1LambdaName"},
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "PackageType": "Zip",
+        "Role": {"Fn::GetAtt": ["ShooterLambdaRole", "Arn"]},
+        "Runtime": "nodejs22.x",
+        "Timeout": 60
+      },
+      "DependsOn": ["ShooterLambdaRole"]
+    },
+    "EmailShooterLevel1Trigger": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "BatchSize": 10,
+        "Enabled": true,
+        "EventSourceArn": {"Fn::GetAtt": ["EmailSQSLevel1", "Arn"]},
+        "FunctionName": {"Fn::GetAtt": ["EmailShooterLevel1", "Arn"]},
+        "MaximumBatchingWindowInSeconds": 0
+      },
+      "DependsOn": ["EmailShooterLevel1", "EmailSQSLevel1"]
+    },
+    "EmailShooterLevel2": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
+          "S3Key": {"Ref": "MessageShooterLambdaCodeArchiveName"}
+        },
+        "Description": "It receives SQS messages to send emails or sms.",
+        "Environment": {
+          "Variables": {
+            "MESSAGE_TYPE": "email",
+            "SHOOTER_LEVEL": 2,
+            "DB_HOST": {"Ref": "DatabaseHost"},
+            "DB_PORT": {"Ref": "DatabasePort"},
+            "DB_USER": {"Ref": "DatabaseMasterUsername"},
+            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
+            "DB_NAME": {"Ref": "DatabaseName"},
+            "PINPOINT_APP_ID": {"Ref": "PinpointLevel2"},
+            "FROM_EMAIL_ADDRESS": {"Ref": "FromAddress"}
+          }
+        },
+        "FunctionName": {"Ref": "EmailShooterLevel2LambdaName"},
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "PackageType": "Zip",
+        "Role": {"Fn::GetAtt": ["ShooterLambdaRole", "Arn"]},
+        "Runtime": "nodejs22.x",
+        "Timeout": 60
+      },
+      "DependsOn": ["ShooterLambdaRole"]
+    },
+    "EmailShooterLevel2Trigger": {
+      "Type": "AWS::Lambda::EventSourceMapping",
+      "Properties": {
+        "BatchSize": 10,
+        "Enabled": true,
+        "EventSourceArn": {"Fn::GetAtt": ["EmailSQSLevel2", "Arn"]},
+        "FunctionName": {"Fn::GetAtt": ["EmailShooterLevel2", "Arn"]},
+        "MaximumBatchingWindowInSeconds": 0
+      },
+      "DependsOn": ["EmailShooterLevel2", "EmailSQSLevel2"]
+    },
+    "S3InvokeLambdaPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Properties": {
+        "FunctionName": {
+          "Fn::GetAtt": ["S3EventLambdaFunction", "Arn"]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "s3.amazonaws.com",
+        "SourceAccount": {
+          "Ref": "AWS::AccountId"
+        },
+        "SourceArn": {
+          "Fn::Sub": "arn:aws:s3:::${EventStreamS3BucketName}-${AWS::AccountId}"
+        }
+      },
+      "DependsOn": ["S3EventLambdaFunction"]
+    },
+    "S3EventLambdaFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Properties": {
+        "Code": {
+          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
+          "S3Key": {"Ref": "PinpointEventProcessorLambdaCodeArchiveName"}
+        },
+        "Description": "It processes the pinpoint events from the Kinesis Firehose.",
+        "Environment": {
+          "Variables": {
+            "DB_HOST": {"Ref": "DatabaseHost"},
+            "DB_PORT": {"Ref": "DatabasePort"},
+            "DB_USER": {"Ref": "DatabaseMasterUsername"},
+            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
+            "DB_NAME": {"Ref": "DatabaseName"}
+          }
+        },
+        "FunctionName": {"Ref": "PinpointEventProcessorLambdaName"},
+        "Handler": "index.handler",
+        "MemorySize": 128,
+        "PackageType": "Zip",
+        "Role": {"Fn::GetAtt": ["S3EventLambdaFunctionRole", "Arn"]},
+        "Runtime": "nodejs22.x",
+        "Timeout": 60
+      },
+      "DependsOn": ["S3EventLambdaFunctionRole"]
+    },
+    "S3EventLambdaFunctionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Description": "It has some logs/s3 permissions",
+        "ManagedPolicyArns": ["arn:aws:iam::aws:policy/AWSLambdaExecute"]
+      }
+    }
+  },
+  "Outputs": {
+    "EmailQueueUrl": {
+      "Value": {"Fn::GetAtt": ["EmailSQSLevel1", "QueueUrl"]},
+      "Description": "InceptionPad message service email queue URL"
+    }
+  }
+}

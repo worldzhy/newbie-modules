@@ -1,0 +1,8 @@
+{
+  "key": "shortcut",
+  "module": {
+    "file": "shortcut.module",
+    "className": "ShortcutModule"
+  },
+  "schema": "prisma/schema.prisma"
+}

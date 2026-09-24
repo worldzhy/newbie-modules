@@ -1,0 +1,8 @@
+{
+  "key": "workflow",
+  "module": {
+    "file": "workflow.module",
+    "className": "WorkflowModule"
+  },
+  "schema": "prisma/schema.prisma"
+}
