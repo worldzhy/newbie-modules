@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -33,6 +34,7 @@ import randomColor from 'randomcolor';
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private appFrontendUrl: string;
 
   constructor(
@@ -136,7 +138,10 @@ export class AuthService {
           }>(`https://api.genderize.io/?name=${data.name.split(' ')[0]}`);
           if (prediction.data.probability > 0.5 && prediction.data.gender === 'male') data.gender = UserGender.MALE;
           if (prediction.data.probability > 0.5 && prediction.data.gender === 'female') data.gender = UserGender.FEMALE;
-        } catch (error) {}
+        } catch (error) {
+          // Best-effort enrichment: gender prediction is optional and must not block sign-up.
+          this.logger.debug(`Gender prediction failed for name "${data.name}": ${error}`);
+        }
       }
     }
 

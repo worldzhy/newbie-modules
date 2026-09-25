@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   BadRequestException,
   NotFoundException,
   ConflictException,
@@ -25,7 +26,9 @@ const execAsync = promisify(exec);
 
 @Injectable()
 export class AwsSecretsManagerService {
+  private readonly logger = new Logger(AwsSecretsManagerService.name);
   private activeDeployments = new Set<string>();
+  private readonly clientCache = new Map<string, SecretsManagerClient>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -149,7 +152,10 @@ export class AwsSecretsManagerService {
               ForceDeleteWithoutRecovery: true,
             })
           );
-        } catch (rollbackError) {}
+        } catch (rollbackError: any) {
+          // The AWS-side secret may now be orphaned — surface it for manual cleanup.
+          this.logger.warn(`Failed to rollback AWS secret ${name} after database failure: ${rollbackError}`);
+        }
       }
       throw error;
     }
@@ -264,7 +270,10 @@ export class AwsSecretsManagerService {
     try {
       const projectConfig = await this.getProjectSecretConfigByGroupId(secret.groupId);
       client = this.getClient(projectConfig, secret.region);
-    } catch (e) {}
+    } catch (e: any) {
+      // Without the config the AWS-side secret cannot be deleted and may be orphaned.
+      this.logger.warn(`Failed to load project config for secret ${secret.name}; AWS deletion will be skipped: ${e}`);
+    }
 
     // Delete AWS Secret
     if (client) {
@@ -598,14 +607,26 @@ export class AwsSecretsManagerService {
     return await this.getProjectSecretConfig(project.id);
   }
 
+  /**
+   * Get a Secrets Manager client for the given credentials and region. Clients
+   * hold connection pools and credential chains, so they are cached and reused
+   * instead of being recreated per call. The cache key includes the secret so
+   * rotated credentials never reuse a stale client.
+   */
   private getClient(config: {accessKeyId: string; secretAccessKey: string}, region?: string): SecretsManagerClient {
-    return new SecretsManagerClient({
-      region,
-      credentials: {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      },
-    });
+    const cacheKey = `${config.accessKeyId}:${config.secretAccessKey}:${region ?? ''}`;
+    let client = this.clientCache.get(cacheKey);
+    if (!client) {
+      client = new SecretsManagerClient({
+        region,
+        credentials: {
+          accessKeyId: config.accessKeyId,
+          secretAccessKey: config.secretAccessKey,
+        },
+      });
+      this.clientCache.set(cacheKey, client);
+    }
+    return client;
   }
 
   /**
@@ -654,6 +675,9 @@ export class AwsSecretsManagerService {
           awsSecretsManagerDeploymentMessage: message || null,
         },
       });
-    } catch (e) {}
+    } catch (e: any) {
+      // A stale deployment status misleads the user, so record the database failure.
+      this.logger.warn(`Failed to update deployment status for secret group ${secretGroupId}: ${e}`);
+    }
   }
 }

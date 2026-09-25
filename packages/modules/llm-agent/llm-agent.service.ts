@@ -685,7 +685,9 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
             if (parsed?.success === true) {
               return '✅ 操作已执行成功。';
             }
-          } catch (e) {}
+          } catch {
+            // Expected failure: tool result content may not be JSON — fall back to the default success message.
+          }
           return '✅ 操作已执行成功。';
         }
 
@@ -695,7 +697,9 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
             try {
               const parsed = JSON.parse(r.content || '{}');
               if (parsed?.success === true) successCount++;
-            } catch (e) {}
+            } catch {
+              // Expected failure: tool result content may not be JSON — skip this entry.
+            }
           }
           if (successCount > 0) {
             return `✅ 已执行 ${executedToolResults.length} 个操作（成功 ${successCount} 个）。`;

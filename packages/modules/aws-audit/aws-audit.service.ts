@@ -96,11 +96,29 @@ export class AwsAuditService {
   private readonly severityRank: Record<Severity, number> = {high: 3, medium: 2, low: 1};
   private readonly policyCache = new Map<string, Promise<ManagedPolicyAnalysis>>();
   private readonly activeScans = new Set<string>();
+  private readonly clientCache = new Map<string, unknown>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly credentialService: AwsCredentialService
   ) {}
+
+  /**
+   * Get a cached AWS SDK client for the given service, credentials and region.
+   * Clients hold connection pools and credential chains, so they must be reused
+   * across calls instead of being recreated per request. The cache key includes
+   * the secret so rotated credentials never reuse a stale client.
+   */
+  private cachedClient<T>(service: string, credentials: AwsCredentials, region: string, createClient: () => T): T {
+    const cacheKey = `${service}:${credentials.accessKeyId}:${credentials.secretAccessKey}:${region}`;
+    const cached = this.clientCache.get(cacheKey) as T | undefined;
+    if (cached) {
+      return cached;
+    }
+    const client = createClient();
+    this.clientCache.set(cacheKey, client);
+    return client;
+  }
 
   async getProjectAuditReport(projectId: string, options: {detail: boolean}) {
     await this.ensureProjectExists(projectId);
@@ -366,7 +384,7 @@ export class AwsAuditService {
   }
 
   private async auditIam(credentials: AwsCredentials, region: string) {
-    const client = new IAMClient({region, credentials});
+    const client = this.cachedClient('iam', credentials, region, () => new IAMClient({region, credentials}));
     const findings: AuditFinding[] = [];
 
     const passwordPolicy = await this.getPasswordPolicy(client);
@@ -552,7 +570,7 @@ export class AwsAuditService {
   }
 
   private async auditS3(credentials: AwsCredentials, region: string) {
-    const client = new S3Client({region, credentials});
+    const client = this.cachedClient('s3', credentials, region, () => new S3Client({region, credentials}));
     const findings: AuditFinding[] = [];
 
     const response = await client.send(new ListBucketsCommand({}));
@@ -560,10 +578,12 @@ export class AwsAuditService {
       (response.Buckets || []).map(async bucket => {
         const bucketName = bucket.Name || 'unknown-bucket';
         const bucketRegion = await this.resolveBucketRegion(client, bucketName);
-        const bucketClient = new S3Client({
-          region: bucketRegion,
+        const bucketClient = this.cachedClient(
+          's3',
           credentials,
-        });
+          bucketRegion,
+          () => new S3Client({region: bucketRegion, credentials})
+        );
 
         const [publicAccessBlock, acl, policyStatus, encryption, versioning] = await Promise.all([
           this.safeBucketCall(() => bucketClient.send(new GetPublicAccessBlockCommand({Bucket: bucketName}))),
@@ -689,7 +709,7 @@ export class AwsAuditService {
   }
 
   private async auditEc2Region(credentials: AwsCredentials, region: string) {
-    const client = new EC2Client({region, credentials});
+    const client = this.cachedClient('ec2', credentials, region, () => new EC2Client({region, credentials}));
     const findings: AuditFinding[] = [];
     const instances: any[] = [];
     const securityGroupIds = new Set<string>();
@@ -744,7 +764,7 @@ export class AwsAuditService {
   }
 
   private async auditRdsRegion(credentials: AwsCredentials, region: string) {
-    const client = new RDSClient({region, credentials});
+    const client = this.cachedClient('rds', credentials, region, () => new RDSClient({region, credentials}));
     const findings: AuditFinding[] = [];
     const instances: any[] = [];
 

@@ -297,7 +297,9 @@ export class WebReportTaskService {
     try {
       const newurl = new URL(item.name);
       if (newurl.searchParams.toString()) _ajax.query = newurl.searchParams.toString();
-    } catch {}
+    } catch {
+      // Expected failure: the URL may be malformed — skip query extraction.
+    }
     if (item.traceId) _ajax.traceId = item.traceId;
     if (data.uid) _ajax.uid = String(data.uid);
     if (data.p) _ajax.phone = func.decryptPhone(data.p);
@@ -346,7 +348,9 @@ export class WebReportTaskService {
       try {
         const u = new URL(item?.data?.resourceUrl || '');
         if (u.searchParams.toString()) errors.query = u.searchParams.toString();
-      } catch {}
+      } catch {
+        // Expected failure: the URL may be malformed — skip query extraction.
+      }
       if (item.options) errors.options = func.filterKeyWord(item.options);
       if (item.traceId) errors.traceId = item.traceId;
 

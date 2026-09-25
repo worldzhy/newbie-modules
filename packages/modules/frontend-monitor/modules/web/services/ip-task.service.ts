@@ -75,7 +75,9 @@ export class WebIpTaskService {
       try {
         const json = JSON.parse(datas);
         return await this.updateWebEnvironment(json, _id, appId);
-      } catch {}
+      } catch {
+        // Expected failure: the cached value may be corrupt — refetch from the Tencent API.
+      }
     }
     return await this.getIpDataByTencentApi(ip, _id, copyip, appId);
   }
