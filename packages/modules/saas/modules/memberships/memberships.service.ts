@@ -23,7 +23,7 @@ import {AuthService} from '../auth/auth.service';
 import {TeamsService} from '../teams/teams.service';
 import {CreateMembershipInput} from './memberships.interface';
 import {generateRandomString} from '@devbie/newbie/utilities/random.util';
-import {EmailService} from '@microservices/notification/email/email.service';
+import {EmailService} from '@modules/notification/email/email.service';
 
 @Injectable()
 export class MembershipsService {
@@ -203,7 +203,7 @@ export class MembershipsService {
           userName: user.name,
           teamName: result.team.name,
           link: `${this.configService.get<string>(
-            'microservices.app.frontendUrl'
+            'modules.app.frontendUrl'
           )}/groups/${teamId}`,
         },
       },

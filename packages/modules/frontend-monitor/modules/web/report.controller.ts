@@ -19,7 +19,7 @@ export class WebReportController {
     private readonly dayReportNum: DayReportNumService,
     private readonly redis: RedisService
   ) {
-    this.config = this.configService.get('microservices.frontend-monitor');
+    this.config = this.configService.get('modules.frontend-monitor');
   }
 
   @Post('/report/web')

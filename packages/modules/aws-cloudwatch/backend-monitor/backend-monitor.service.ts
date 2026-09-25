@@ -1,6 +1,7 @@
 import {Injectable, UnauthorizedException} from '@nestjs/common';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {ClickhouseService} from '@microservices/clickhouse/clickhouse.service';
+import {AgentStatus, AgentType} from '@generated/prisma/enums';
+import {ClickhouseService} from '@modules/clickhouse/clickhouse.service';
 import {
   CreateBackendMonitorErrorReportDto,
   CreateBackendMonitorReportDto,
@@ -27,17 +28,31 @@ export class BackendMonitorService {
   ) {}
 
   /**
-   * Resolves an application by its report token.
-   * Throws UnauthorizedException when the token is invalid.
+   * Resolves the owning application ID from a SERVER_MONITOR agent token.
+   * A report is accepted when the token matches an agent that is not DISABLED
+   * (a PENDING agent is activated by its first successful report).
+   * Throws UnauthorizedException when the token is invalid or revoked.
    */
-  private async resolveApplication(reportToken: string) {
-    const application = await this.prisma.application.findUnique({
-      where: {reportToken},
+  private async resolveApplicationId(reportToken: string): Promise<string> {
+    const agent = await this.prisma.agent.findUnique({
+      where: {token: reportToken},
     });
-    if (!application) {
+    if (!agent || agent.type !== AgentType.SERVER_MONITOR || agent.status === AgentStatus.DISABLED) {
       throw new UnauthorizedException('Invalid application report token.');
     }
-    return application;
+
+    // Anti-regression touch: never let an older concurrent report move
+    // lastSeenAt backwards; also flips PENDING -> ACTIVE on first contact.
+    const now = new Date();
+    await this.prisma.$executeRaw`
+      UPDATE "application"."Agent"
+      SET "lastSeenAt" = ${now},
+          "status" = CASE WHEN "status" = 'PENDING' THEN 'ACTIVE'::"application"."AgentStatus" ELSE "status" END
+      WHERE "id" = ${agent.id}::uuid
+        AND ("lastSeenAt" IS NULL OR "lastSeenAt" < ${now})
+    `;
+
+    return agent.applicationId;
   }
 
   /**
@@ -49,7 +64,7 @@ export class BackendMonitorService {
    * @throws UnauthorizedException when the token does not match any Application.
    */
   async createReport(reportToken: string, body: CreateBackendMonitorReportDto): Promise<void> {
-    const application = await this.resolveApplication(reportToken);
+    const applicationId = await this.resolveApplicationId(reportToken);
 
     const requestAt = new Date(body.requestAt);
     const responseAt = new Date(body.responseAt);
@@ -61,7 +76,7 @@ export class BackendMonitorService {
       table: 'application_request_logs',
       values: [
         {
-          application_id: application.id,
+          application_id: applicationId,
           path: body.path,
           method: body.method.toUpperCase(),
           status_code: body.statusCode,
@@ -84,7 +99,7 @@ export class BackendMonitorService {
    * @throws UnauthorizedException when the token does not match any Application.
    */
   async createErrorReport(reportToken: string, body: CreateBackendMonitorErrorReportDto): Promise<void> {
-    const application = await this.resolveApplication(reportToken);
+    const applicationId = await this.resolveApplicationId(reportToken);
 
     const occurredAt = new Date(body.occurredAt);
 
@@ -92,7 +107,7 @@ export class BackendMonitorService {
       table: 'application_error_logs',
       values: [
         {
-          application_id: application.id,
+          application_id: applicationId,
           type: body.type,
           message: body.message,
           stack: body.stack ?? '',

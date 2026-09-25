@@ -9,7 +9,7 @@ import {
   UpdateOrderResponseDto,
 } from './order.dto';
 import {OrderService} from './order.service';
-import {TokenService} from '@microservices/account/security/token/token.service';
+import {TokenService} from '@modules/account/security/token/token.service';
 import {Request} from 'express';
 import {OrderStatus, Prisma} from '@generated/prisma/client';
 

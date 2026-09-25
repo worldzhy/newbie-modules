@@ -14,7 +14,7 @@ import {AwsCloudformationService} from './cloudformation.service';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow<string>('microservices.cloudformation.token.secret'),
+        secret: config.getOrThrow<string>('modules.cloudformation.token.secret'),
       }),
     }),
   ],

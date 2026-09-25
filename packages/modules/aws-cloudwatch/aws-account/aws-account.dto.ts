@@ -1,6 +1,6 @@
 import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
 import {ArrayMinSize, IsArray, IsEnum, IsNotEmpty, IsString, ValidateIf} from 'class-validator';
-import {AWSRegion} from '@microservices/aws-cloudwatch/aws-cloudwatch.enum';
+import {AWSRegion} from '@modules/aws-cloudwatch/aws-cloudwatch.enum';
 
 /**
  * Response DTO for AwsAccount.

@@ -28,7 +28,7 @@ export class AwsSesService {
       region: string;
       configurationSetName: string;
       fromEmailAddress: string;
-    }>('microservices.aws-ses');
+    }>('modules.aws-ses');
 
     this.configurationSetName = config.configurationSetName;
     this.fromAddress = config.fromEmailAddress;

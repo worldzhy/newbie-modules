@@ -1,7 +1,7 @@
 import {BadRequestException, Injectable, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AwsCredentialService} from '@microservices/aws-core/aws-credential.service';
-import {getCallerIdentity} from '@microservices/aws-core/aws-sts.helper';
+import {AwsCredentialService} from '@modules/aws-core/aws-credential.service';
+import {getCallerIdentity} from '@modules/aws-core/aws-sts.helper';
 import {EC2Client, DescribeInstancesCommand, DescribeSecurityGroupsCommand, SecurityGroup} from '@aws-sdk/client-ec2';
 import {RDSClient, DescribeDBInstancesCommand} from '@aws-sdk/client-rds';
 import {

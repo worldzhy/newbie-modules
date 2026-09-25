@@ -9,7 +9,7 @@ import {
   PeopleFinderBatchTaskStatus,
   PeopleFinderBatchTaskCallBackStatus,
 } from './constants';
-import {PeopleFinderUserReq} from '@microservices/people-finder/constants';
+import {PeopleFinderUserReq} from '@modules/people-finder/constants';
 import {CreateContactSearchTaskBatchReqDto} from './people-finder.dto';
 import {PeopleFinderNotificationService} from './people-finder.notification.service';
 export * from './constants';

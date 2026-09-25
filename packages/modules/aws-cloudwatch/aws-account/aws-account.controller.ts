@@ -4,7 +4,7 @@ import {
   AwsAccountResponseDto,
   CreateAWSAccountDto,
   UpdateAWSAccountDto,
-} from '@microservices/aws-cloudwatch/aws-account/aws-account.dto';
+} from '@modules/aws-cloudwatch/aws-account/aws-account.dto';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {encryptString} from '@devbie/newbie/utilities/crypto.util';
 import {ConfigService} from '@nestjs/config';
@@ -21,8 +21,8 @@ export class AWSAccountController {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService
   ) {
-    this.encryptKey = this.configService.get('microservices.cloudwatch.cryptoEncryptKey') as string;
-    this.encryptIV = this.configService.get('microservices.cloudwatch.cryptoEncryptIV') as string;
+    this.encryptKey = this.configService.get('modules.cloudwatch.cryptoEncryptKey') as string;
+    this.encryptIV = this.configService.get('modules.cloudwatch.cryptoEncryptIV') as string;
   }
 
   @Get(':id')

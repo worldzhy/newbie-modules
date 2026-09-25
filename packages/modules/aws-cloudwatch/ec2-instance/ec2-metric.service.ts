@@ -5,7 +5,7 @@ import {decryptString} from '@devbie/newbie/utilities/crypto.util';
 import {GetEC2InstancesCPUMetricParams, MetricData} from '../aws-cloudwatch.interface';
 import {AwsCloudwatchService} from '../aws-cloudwatch.service';
 import dayjs from 'dayjs';
-import {GetWatchedEC2InstancesMetricDto} from '@microservices/aws-cloudwatch/ec2-instance/ec2-metric.dto';
+import {GetWatchedEC2InstancesMetricDto} from '@modules/aws-cloudwatch/ec2-instance/ec2-metric.dto';
 
 @Injectable()
 export class Ec2MetricService {
@@ -17,8 +17,8 @@ export class Ec2MetricService {
     private readonly configService: ConfigService,
     private readonly cloudwatchService: AwsCloudwatchService
   ) {
-    this.encryptKey = this.configService.get('microservices.cloudwatch.cryptoEncryptKey') as string;
-    this.encryptIV = this.configService.get('microservices.cloudwatch.cryptoEncryptIV') as string;
+    this.encryptKey = this.configService.get('modules.cloudwatch.cryptoEncryptKey') as string;
+    this.encryptIV = this.configService.get('modules.cloudwatch.cryptoEncryptIV') as string;
   }
 
   async getWatchedInstancesMetric(data: GetWatchedEC2InstancesMetricDto) {

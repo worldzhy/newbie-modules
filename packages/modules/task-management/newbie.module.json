@@ -4,5 +4,8 @@
     "file": "task-management.module",
     "className": "TaskManagementModule"
   },
-  "schema": "prisma/schema.prisma"
+  "schema": "prisma/schema.prisma",
+  "dependencies": {
+    "chinese-days": "^1.5.7"
+  }
 }

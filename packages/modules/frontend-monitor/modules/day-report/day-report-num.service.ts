@@ -14,7 +14,7 @@ export class DayReportNumService {
     private readonly redis: RedisService,
     private readonly configService: ConfigService
   ) {
-    this.cfg = this.configService.get('microservices.frontend-monitor');
+    this.cfg = this.configService.get('modules.frontend-monitor');
   }
 
   async numCountTask() {

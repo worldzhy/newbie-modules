@@ -2,7 +2,7 @@ import {Injectable} from '@nestjs/common';
 import {Prisma, UserRole} from '@generated/prisma/client';
 import {Request} from 'express';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {TokenService} from '@microservices/account/security/token/token.service';
+import {TokenService} from '@modules/account/security/token/token.service';
 
 @Injectable()
 export class AccountService {

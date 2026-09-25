@@ -15,10 +15,10 @@ export class LarkWsService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const appId =
-      this.configService.get<string>('LARK_APP_ID') || this.configService.get<string>('microservices.lark-bot.appId');
+      this.configService.get<string>('LARK_APP_ID') || this.configService.get<string>('modules.lark-bot.appId');
     const appSecret =
       this.configService.get<string>('LARK_APP_SECRET') ||
-      this.configService.get<string>('microservices.lark-bot.appSecret');
+      this.configService.get<string>('modules.lark-bot.appSecret');
 
     if (!appId || !appSecret) {
       this.logger.warn('Lark App ID or Secret is missing, skipping WebSocket client initialization.');

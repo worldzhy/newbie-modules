@@ -16,7 +16,7 @@ import {ApiKey, Prisma} from '@generated/prisma/client';
 import {CursorPipe} from '@devbie/newbie/pipes/cursor.pipe';
 import {OrderByPipe} from '@devbie/newbie/pipes/order-by.pipe';
 import {WherePipe} from '@devbie/newbie/pipes/where.pipe';
-import {UserRequest} from '@microservices/account/account.interface';
+import {UserRequest} from '@modules/account/account.interface';
 import {Expose} from '../../helpers/expose';
 import {AuditLog} from '../audit-logs/audit-log.decorator';
 import {ApiKeyResponseDto, CreateApiKeyDto, ReplaceApiKeyDto, UpdateApiKeyDto} from './api-key.dto';

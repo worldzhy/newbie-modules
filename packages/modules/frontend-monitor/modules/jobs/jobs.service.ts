@@ -35,7 +35,7 @@ export class JobsService implements OnModuleInit {
     private readonly wxPvuvipTask: WxPvuvipTaskService,
     private readonly wxIpTask: WxIpTaskService
   ) {
-    this.cfg = this.configService.get('microservices.frontend-monitor');
+    this.cfg = this.configService.get('modules.frontend-monitor');
   }
 
   async onModuleInit() {

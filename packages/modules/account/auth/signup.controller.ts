@@ -1,8 +1,8 @@
 import {Controller, Post, Body, Ip} from '@nestjs/common';
 import {ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {AuthService} from '@microservices/account/auth/auth.service';
-import {SignUpDto} from '@microservices/account/auth/auth.dto';
-import {NoGuard} from '@microservices/account/security/passport/public/public.decorator';
+import {AuthService} from '@modules/account/auth/auth.service';
+import {SignUpDto} from '@modules/account/auth/auth.dto';
+import {NoGuard} from '@modules/account/security/passport/public/public.decorator';
 
 @ApiTags('Account / Auth')
 @Controller('auth')

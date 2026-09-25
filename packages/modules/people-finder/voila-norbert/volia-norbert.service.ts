@@ -35,7 +35,7 @@ export class VoilaNorbertService {
     private peopleFinderNotification: PeopleFinderNotificationService,
     private readonly logger: Logger
   ) {
-    this.apiKey = this.configService.getOrThrow<string>('microservices.peopleFinder.voilanorbert.apiKey');
+    this.apiKey = this.configService.getOrThrow<string>('modules.peopleFinder.voilanorbert.apiKey');
     this.reqConfig = {
       auth: {
         username: 'inception',

@@ -6,7 +6,7 @@ import {
   ListMetricsCommand,
 } from '@aws-sdk/client-cloudwatch';
 import {GetEC2InstancesCPUMetricParams, GetRDSInstancesMetricParams, MetricData} from './aws-cloudwatch.interface';
-import {CloudwatchEC2MetricName} from '@microservices/aws-cloudwatch/aws-cloudwatch.enum';
+import {CloudwatchEC2MetricName} from '@modules/aws-cloudwatch/aws-cloudwatch.enum';
 
 @Injectable()
 export class AwsCloudwatchService {

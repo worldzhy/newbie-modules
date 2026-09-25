@@ -1,5 +1,5 @@
 import {BadRequestException, Injectable} from '@nestjs/common';
-import {ElasticsearchService} from '@microservices/elasticsearch/elasticsearch.service';
+import {ElasticsearchService} from '@modules/elasticsearch/elasticsearch.service';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 
 @Injectable()

@@ -1,7 +1,7 @@
 import {Controller, Get, NotFoundException, Req} from '@nestjs/common';
 import {ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {GuardByGoogle} from '@microservices/account/security/passport/google-oauth/google.decorator';
-import {GoogleOAuthRedirectResponseDto} from '@microservices/account/auth/auth.dto';
+import {GuardByGoogle} from '@modules/account/security/passport/google-oauth/google.decorator';
+import {GoogleOAuthRedirectResponseDto} from '@modules/account/auth/auth.dto';
 
 /**
  * local dev, to change file node_modules/oauth/lib/oauth2.js

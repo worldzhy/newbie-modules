@@ -12,12 +12,12 @@ import {ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
 import {Response} from 'express';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {NO_TOKEN_PROVIDED, USER_NOT_FOUND} from '@devbie/newbie/exceptions/errors.constants';
-import {AuthService} from '@microservices/account/auth/auth.service';
-import {ApprovedSubnetService} from '@microservices/account/modules/approved-subnet/approved-subnet.service';
-import {TokenService} from '@microservices/account/security/token/token.service';
-import {TokenSubject} from '@microservices/account/security/token/token.constants';
-import {NoGuard} from '@microservices/account/security/passport/public/public.decorator';
-import {LoginByPasswordResponseDto} from '@microservices/account/auth/auth.dto';
+import {AuthService} from '@modules/account/auth/auth.service';
+import {ApprovedSubnetService} from '@modules/account/modules/approved-subnet/approved-subnet.service';
+import {TokenService} from '@modules/account/security/token/token.service';
+import {TokenSubject} from '@modules/account/security/token/token.constants';
+import {NoGuard} from '@modules/account/security/passport/public/public.decorator';
+import {LoginByPasswordResponseDto} from '@modules/account/auth/auth.dto';
 
 @ApiTags('Account / Auth')
 @Controller('auth')

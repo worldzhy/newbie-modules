@@ -22,7 +22,7 @@ export class AwsSesSuppressionListService {
       region: string;
       configurationSetName: string;
       fromEmailAddress: string;
-    }>('microservices.aws-ses');
+    }>('modules.aws-ses');
 
     // Create SES Client
     const clientConfig: SESv2ClientConfig = {};

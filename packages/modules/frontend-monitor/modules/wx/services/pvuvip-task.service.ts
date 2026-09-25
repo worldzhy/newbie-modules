@@ -21,7 +21,7 @@ export class WxPvuvipTaskService {
     private readonly models: MonitorModelsService,
     private readonly ch: MonitorClickhouseService
   ) {
-    this.cfg = this.config.get('microservices.frontend-monitor');
+    this.cfg = this.config.get('modules.frontend-monitor');
   }
 
   async getWxPvUvIpByMinute() {

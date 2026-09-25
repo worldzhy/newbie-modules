@@ -18,16 +18,16 @@ import {
 } from '@devbie/newbie/exceptions/errors.constants';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {compareHash} from '@devbie/newbie/utilities/common.util';
-import {SignUpDto} from '@microservices/account/auth/auth.dto';
-import {Expose, expose} from '@microservices/account/helpers/expose';
-import {verifyEmail} from '@microservices/account/helpers/validator';
-import {GeolocationService} from '@microservices/account/helpers/geolocation.service';
-import {ApprovedSubnetService} from '@microservices/account/modules/approved-subnet/approved-subnet.service';
-import {SessionService} from '@microservices/account/modules/session/session.service';
-import {CookieService} from '@microservices/account/security/cookie/cookie.service';
-import {TokenService} from '@microservices/account/security/token/token.service';
-import {TokenSubject} from '@microservices/account/security/token/token.constants';
-import {AwsSesService} from '@microservices/aws-ses/aws-ses.service';
+import {SignUpDto} from '@modules/account/auth/auth.dto';
+import {Expose, expose} from '@modules/account/helpers/expose';
+import {verifyEmail} from '@modules/account/helpers/validator';
+import {GeolocationService} from '@modules/account/helpers/geolocation.service';
+import {ApprovedSubnetService} from '@modules/account/modules/approved-subnet/approved-subnet.service';
+import {SessionService} from '@modules/account/modules/session/session.service';
+import {CookieService} from '@modules/account/security/cookie/cookie.service';
+import {TokenService} from '@modules/account/security/token/token.service';
+import {TokenSubject} from '@modules/account/security/token/token.constants';
+import {AwsSesService} from '@modules/aws-ses/aws-ses.service';
 import anonymize from 'ip-anonymize';
 import randomColor from 'randomcolor';
 

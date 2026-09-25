@@ -4,9 +4,9 @@ import {Strategy} from 'passport-custom';
 import {Request} from 'express';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {NO_TOKEN_PROVIDED} from '@devbie/newbie/exceptions/errors.constants';
-import {SessionService} from '@microservices/account/modules/session/session.service';
-import {TokenService} from '@microservices/account/security/token/token.service';
-import {CookieName} from '@microservices/account/security/cookie/cookie.service';
+import {SessionService} from '@modules/account/modules/session/session.service';
+import {TokenService} from '@modules/account/security/token/token.service';
+import {CookieName} from '@modules/account/security/cookie/cookie.service';
 
 @Injectable()
 export class RefreshTokenStrategy extends PassportStrategy(Strategy, 'custom.refresh-token') {

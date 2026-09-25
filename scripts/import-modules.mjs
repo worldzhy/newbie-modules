@@ -249,12 +249,18 @@ function moderniseSchemaFragment(fragment) {
 }
 
 /**
- * Legacy module repositories import framework sources through the
- * `@framework/<subpath>` alias (a project-local src/framework in the template
- * era). The framework is now the `@devbie/newbie` package, which exposes the
- * same subpath layout via its "./*" export map.
+ * Legacy module repositories use three project-local import styles from the
+ * template era:
+ * - `@framework/<subpath>` — now the `@devbie/newbie` package, which exposes
+ *   the same subpath layout via its "./*" export map;
+ * - `@microservices/<key>/<subpath>` — assembled modules now live under
+ *   `src/modules/<key>/`, aliased as `@modules/<key>/<subpath>`;
+ * - relative `../../framework/<subpath>` — the same framework sources reached
+ *   by walking up to the legacy monorepo root instead of using an alias;
+ * - relative `../../microservices/<key>/<subpath>` — cross-module imports via
+ *   the legacy directory name rather than the `@modules` alias.
  */
-async function moderniseFrameworkImports(target) {
+async function moderniseImportAliases(target) {
   // Plain recursive walk (Dirent.path from recursive readdir is not portable
   // across Node versions).
   async function walk(dir) {
@@ -264,10 +270,11 @@ async function moderniseFrameworkImports(target) {
         await walk(file);
       } else if (entry.isFile() && entry.name.endsWith(".ts")) {
         const content = await fs.readFile(file, "utf8");
-        const next = content.replace(
-          /(['"])@framework\//g,
-          "$1@devbie/newbie/",
-        );
+        const next = content
+          .replace(/(['"])@framework\//g, "$1@devbie/newbie/")
+          .replace(/(['"])@microservices\//g, "$1@modules/")
+          .replace(/(['"])(?:\.\.\/)+framework\//g, "$1@devbie/newbie/")
+          .replace(/(['"])(?:\.\.\/)+microservices\//g, "$1@modules/");
         if (next !== content) await fs.writeFile(file, next, "utf8");
       }
     }
@@ -341,7 +348,7 @@ async function importModule(meta, refresh) {
     }
 
     await copyTree(tmp, target);
-    await moderniseFrameworkImports(target);
+    await moderniseImportAliases(target);
     if (schema !== null) {
       await fs.mkdir(path.join(target, "prisma"), { recursive: true });
       await fs.writeFile(

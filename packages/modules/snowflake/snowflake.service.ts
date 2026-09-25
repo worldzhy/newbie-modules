@@ -7,7 +7,7 @@ export class SnowflakeService {
   private connectionPool: {use: (arg0: (conn: any) => Promise<void>) => void};
 
   constructor(private readonly configService: ConfigService) {
-    const config = this.configService.getOrThrow('microservices.snowflake');
+    const config = this.configService.getOrThrow('modules.snowflake');
 
     this.connectionPool = createPool(
       config.connectionOptions,

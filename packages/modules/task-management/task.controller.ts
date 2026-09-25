@@ -1,8 +1,8 @@
 import {Controller, Get, Post, Patch, Param, Body, UseGuards, Req, BadRequestException, Query} from '@nestjs/common';
 import {ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiParam} from '@nestjs/swagger';
-import {JwtAuthGuard} from '../../microservices/account/security/passport/jwt/jwt.guard';
+import {JwtAuthGuard} from '@modules/account/security/passport/jwt/jwt.guard';
 import {TaskService} from './task.service';
-import {UserRequest} from '../../microservices/account/account.interface';
+import {UserRequest} from '@modules/account/account.interface';
 import {TaskCronService} from './task-cron.service';
 import {
   CreateGroupDto,

@@ -1,8 +1,8 @@
 import {Controller, Post} from '@nestjs/common';
 import {ApiBody, ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {GuardByApiKey} from '@microservices/account/security/passport/api-key/api-key.decorator';
-import {TokenService} from '@microservices/account/security/token/token.service';
-import {LoginByApiKeyRequestDto} from '@microservices/account/auth/auth.dto';
+import {GuardByApiKey} from '@modules/account/security/passport/api-key/api-key.decorator';
+import {TokenService} from '@modules/account/security/token/token.service';
+import {LoginByApiKeyRequestDto} from '@modules/account/auth/auth.dto';
 
 @ApiTags('Account / Auth')
 @Controller('auth')

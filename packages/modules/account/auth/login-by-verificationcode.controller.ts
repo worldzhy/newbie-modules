@@ -3,21 +3,21 @@ import {ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags} from '@nestj
 import {VerificationCodeUse} from '@generated/prisma/client';
 import {Response} from 'express';
 import {NewbieException, NewbieExceptionType} from '@devbie/newbie/exceptions/newbie.exception';
-import {UserRequest} from '@microservices/account/account.interface';
-import {AuthService} from '@microservices/account/auth/auth.service';
-import {verifyEmail, verifyPhone} from '@microservices/account/helpers/validator';
-import {NoGuard} from '@microservices/account/security/passport/public/public.decorator';
-import {GuardByVerificationCode} from '@microservices/account/security/passport/verification-code/verification-code.decorator';
-import {UserService} from '@microservices/account/modules/user/user.service';
-import {VerificationCodeService} from '@microservices/account/modules/verification-code/verification-code.service';
-import {AwsSesService} from '@microservices/aws-ses/aws-ses.service';
-import {AwsSmsService} from '@microservices/aws-sms/aws-sms.service';
+import {UserRequest} from '@modules/account/account.interface';
+import {AuthService} from '@modules/account/auth/auth.service';
+import {verifyEmail, verifyPhone} from '@modules/account/helpers/validator';
+import {NoGuard} from '@modules/account/security/passport/public/public.decorator';
+import {GuardByVerificationCode} from '@modules/account/security/passport/verification-code/verification-code.decorator';
+import {UserService} from '@modules/account/modules/user/user.service';
+import {VerificationCodeService} from '@modules/account/modules/verification-code/verification-code.service';
+import {AwsSesService} from '@modules/aws-ses/aws-ses.service';
+import {AwsSmsService} from '@modules/aws-sms/aws-sms.service';
 import {
   LoginByPasswordResponseDto,
   LoginByVerificationCodeRequestDto,
   SendVerificationCodeRequestDto,
   SendVerificationCodeResponseDto,
-} from '@microservices/account/auth/auth.dto';
+} from '@modules/account/auth/auth.dto';
 
 @ApiTags('Account / Auth')
 @Controller('auth')

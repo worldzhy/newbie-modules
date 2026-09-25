@@ -2,7 +2,7 @@ import {Injectable} from '@nestjs/common';
 import {PassportStrategy} from '@nestjs/passport';
 import {Strategy} from 'passport-local';
 import {compareHash} from '@devbie/newbie/utilities/common.util';
-import {UserService} from '@microservices/account/modules/user/user.service';
+import {UserService} from '@modules/account/modules/user/user.service';
 import {NewbieException, NewbieExceptionType} from '@devbie/newbie/exceptions/newbie.exception';
 import {UserStatus} from '@generated/prisma/client';
 

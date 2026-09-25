@@ -26,8 +26,8 @@ export class AwsCredentialService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService
   ) {
-    const key = this.config.get<string>('microservices.aws-core.cryptoEncryptKey');
-    const iv = this.config.get<string>('microservices.aws-core.cryptoEncryptIV');
+    const key = this.config.get<string>('modules.aws-core.cryptoEncryptKey');
+    const iv = this.config.get<string>('modules.aws-core.cryptoEncryptIV');
     if (!key || !iv) {
       throw new Error('aws-core requires AWS_CREDENTIAL_ENCRYPT_KEY/IV to be configured.');
     }

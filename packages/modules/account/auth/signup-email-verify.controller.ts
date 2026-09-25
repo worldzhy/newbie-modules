@@ -2,9 +2,9 @@ import {Controller, Post, Body, UnprocessableEntityException, NotFoundException}
 import {ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
 import {NO_TOKEN_PROVIDED, EMAIL_NOT_FOUND} from '@devbie/newbie/exceptions/errors.constants';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {TokenService} from '@microservices/account/security/token/token.service';
-import {TokenSubject} from '@microservices/account/security/token/token.constants';
-import {NoGuard} from '@microservices/account/security/passport/public/public.decorator';
+import {TokenService} from '@modules/account/security/token/token.service';
+import {TokenSubject} from '@modules/account/security/token/token.constants';
+import {NoGuard} from '@modules/account/security/passport/public/public.decorator';
 
 @ApiTags('Account / Auth')
 @Controller('auth')

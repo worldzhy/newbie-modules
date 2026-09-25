@@ -9,7 +9,7 @@ import {
   ListBackendMonitorErrorLogsDto,
   ListBackendMonitorRequestLogsDto,
 } from './backend-monitor.dto';
-import {NoGuard} from '@microservices/account/security/passport/public/public.decorator';
+import {NoGuard} from '@modules/account/security/passport/public/public.decorator';
 
 @ApiTags('Backend Monitor')
 @Controller('backend-monitor')
@@ -19,7 +19,7 @@ export class BackendMonitorController {
   /**
    * Receives a single request-processing metric report from an application.
    * Authentication is performed via the X-Application-Token header which must
-   * match the reportToken stored on the Application record in the database.
+   * match the token of a SERVER_MONITOR Agent record in the database.
    *
    * This endpoint intentionally does NOT require user-level JWT authentication
    * so that backend services can call it without managing user sessions.
@@ -27,7 +27,7 @@ export class BackendMonitorController {
   @ApiOperation({summary: 'Report a backend request metric'})
   @ApiHeader({
     name: 'X-Application-Token',
-    description: 'The unique report token of the application (Application.reportToken)',
+    description: 'The secret token of the SERVER_MONITOR agent (Agent.token)',
     required: true,
   })
   @ApiResponse({status: 204, description: 'Report accepted.'})
@@ -45,12 +45,12 @@ export class BackendMonitorController {
   /**
    * Receives an error/exception report from an application.
    * Authentication is performed via the X-Application-Token header which must
-   * match the reportToken stored on the Application record in the database.
+   * match the token of a SERVER_MONITOR Agent record in the database.
    */
   @ApiOperation({summary: 'Report a backend error/exception'})
   @ApiHeader({
     name: 'X-Application-Token',
-    description: 'The unique report token of the application (Application.reportToken)',
+    description: 'The secret token of the SERVER_MONITOR agent (Agent.token)',
     required: true,
   })
   @ApiResponse({status: 204, description: 'Error report accepted.'})

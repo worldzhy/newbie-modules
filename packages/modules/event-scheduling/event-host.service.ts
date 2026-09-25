@@ -1,6 +1,6 @@
 import {Injectable} from '@nestjs/common';
 import {Prisma} from '@generated/prisma/client';
-import {AvailabilityService} from '@microservices/event-scheduling/availability.service';
+import {AvailabilityService} from '@modules/event-scheduling/availability.service';
 import {ceilByMinutes, floorByMinutes} from '@devbie/newbie/utilities/datetime.util';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 

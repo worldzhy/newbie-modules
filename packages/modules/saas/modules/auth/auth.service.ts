@@ -70,7 +70,7 @@ import {
 } from '../../helpers/scopes';
 import axios from 'axios';
 import {generateRandomString} from '@devbie/newbie/utilities/random.util';
-import {EmailService} from '@microservices/notification/email/email.service';
+import {EmailService} from '@modules/notification/email/email.service';
 
 @Injectable()
 export class AuthService {
@@ -89,10 +89,10 @@ export class AuthService {
     this.authenticator = authenticator.create({
       window: [
         this.configService.get<number>(
-          'microservices.saas.security.totpWindowPast'
+          'modules.saas.security.totpWindowPast'
         ) ?? 0,
         this.configService.get<number>(
-          'microservices.saas.security.totpWindowFuture'
+          'modules.saas.security.totpWindowFuture'
         ) ?? 0,
       ],
       keyEncoder,
@@ -219,7 +219,7 @@ export class AuthService {
     }
 
     if (
-      this.configService.get<boolean>('microservices.saas.gravatar.enabled')
+      this.configService.get<boolean>('modules.saas.gravatar.enabled')
     ) {
       for await (const emailString of [email, emailSafe]) {
         const md5Email = createHash('md5').update(emailString).digest('hex');
@@ -360,7 +360,7 @@ export class AuthService {
               userName: emailDetails.user.name,
               link: `${
                 origin ??
-                this.configService.get<string>('microservices.app.frontendUrl')
+                this.configService.get<string>('modules.app.frontendUrl')
               }/auth/link/verify-email?token=${this.tokensService.signJwt(
                 EMAIL_VERIFY_TOKEN,
                 {id: emailDetails.id},
@@ -374,7 +374,7 @@ export class AuthService {
               userName: emailDetails.user.name,
               link: `${
                 origin ??
-                this.configService.get<string>('microservices.app.frontendUrl')
+                this.configService.get<string>('modules.app.frontendUrl')
               }/auth/link/verify-email?token=${this.tokensService.signJwt(
                 EMAIL_VERIFY_TOKEN,
                 {id: emailDetails.id},
@@ -448,7 +448,7 @@ export class AuthService {
     });
     const otpauth = this.authenticator.keyuri(
       userId.toString(),
-      this.configService.get<string>('microservices.saas.app.name') ?? '',
+      this.configService.get<string>('modules.saas.app.name') ?? '',
       secret
     );
     return qrcode.toDataURL(otpauth);
@@ -521,7 +521,7 @@ export class AuthService {
           userName: emailDetails.user.name,
           link: `${
             origin ??
-            this.configService.get<string>('microservices.app.frontendUrl')
+            this.configService.get<string>('modules.app.frontendUrl')
           }/auth/link/reset-password?token=${this.tokensService.signJwt(
             PASSWORD_RESET_TOKEN,
             {id: emailDetails.user.id},
@@ -607,7 +607,7 @@ export class AuthService {
             teamName: team.name,
             link: `${
               origin ??
-              this.configService.get<string>('microservices.app.frontendUrl')
+              this.configService.get<string>('modules.app.frontendUrl')
             }/teams/${team.id}`,
           },
         },
@@ -669,7 +669,7 @@ export class AuthService {
                   link: `${
                     origin ??
                     this.configService.get<string>(
-                      'microservices.app.frontendUrl'
+                      'modules.app.frontendUrl'
                     )
                   }/users/${id}/sessions`,
                 },
@@ -694,7 +694,7 @@ export class AuthService {
       LOGIN_ACCESS_TOKEN,
       payload,
       this.configService.get<string>(
-        'microservices.saas.security.accessTokenExpiry'
+        'modules.saas.security.accessTokenExpiry'
       )
     );
   }
@@ -744,7 +744,7 @@ export class AuthService {
       MULTI_FACTOR_TOKEN,
       mfaTokenPayload,
       this.configService.get<string>(
-        'microservices.saas.security.mfaTokenExpiry'
+        'modules.saas.security.mfaTokenExpiry'
       )
     );
     if (user.twoFactorMethod === 'EMAIL' || forceMethod === 'EMAIL') {
@@ -755,7 +755,7 @@ export class AuthService {
             'auth/login-link': {
               userName: user.name,
               link: `${this.configService.get<string>(
-                'microservices.app.frontendUrl'
+                'modules.app.frontendUrl'
               )}/auth/link/login%2Ftoken?token=${this.tokensService.signJwt(
                 EMAIL_MFA_TOKEN,
                 {id: user.id},
@@ -763,7 +763,7 @@ export class AuthService {
               )}`,
               linkValidMinutes: parseInt(
                 this.configService.get<string>(
-                  'microservices.saas.security.mfaTokenExpiry'
+                  'modules.saas.security.mfaTokenExpiry'
                 ) ?? ''
               ),
             },
@@ -778,7 +778,7 @@ export class AuthService {
         this.twilioService.send({
           to: user.twoFactorPhone,
           body: `${this.getOneTimePassword(user.twoFactorSecret)} is your ${
-            this.configService.get<string>('microservices.saas.app.name') ?? ''
+            this.configService.get<string>('modules.saas.app.name') ?? ''
           } verification code.`,
         });
       }
@@ -832,7 +832,7 @@ export class AuthService {
               locationName,
               link: `${
                 origin ??
-                this.configService.get<string>('microservices.app.frontendUrl')
+                this.configService.get<string>('modules.app.frontendUrl')
               }/auth/link/approve-subnet?token=${this.tokensService.signJwt(
                 APPROVE_SUBNET_TOKEN,
                 {id},
@@ -853,13 +853,13 @@ export class AuthService {
     if (!ignorePwnedPassword) {
       if (
         !this.configService.get<boolean>(
-          'microservices.saas.security.passwordPwnedCheck'
+          'modules.saas.security.passwordPwnedCheck'
         )
       )
         return await hash(
           password,
           this.configService.getOrThrow<number>(
-            'microservices.saas.security.saltRounds'
+            'modules.saas.security.saltRounds'
           )
         );
       if (!(await this.pwnedService.isPasswordSafe(password)))
@@ -868,7 +868,7 @@ export class AuthService {
     return await hash(
       password,
       this.configService.getOrThrow<number>(
-        'microservices.saas.security.saltRounds'
+        'modules.saas.security.saltRounds'
       )
     );
   }

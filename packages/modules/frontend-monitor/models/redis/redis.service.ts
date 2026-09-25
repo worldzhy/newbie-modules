@@ -9,7 +9,7 @@ export class RedisService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const raw = this.configService.get('microservices.frontend-monitor.redis');
+    const raw = this.configService.get('modules.frontend-monitor.redis');
     const cfg = (() => {
       if (typeof raw === 'string') {
         const [host, port, password, db] = raw.split(':');

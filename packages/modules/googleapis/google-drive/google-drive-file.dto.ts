@@ -1,7 +1,7 @@
 import {ApiProperty} from '@nestjs/swagger';
 import {IsString, IsOptional} from 'class-validator';
 import {CommonListRequestDto, CommonListResponseDto} from '@devbie/newbie/common.dto';
-import {GoogleDriveFileEntity} from '@microservices/googleapis/google-drive/google-drive.entity';
+import {GoogleDriveFileEntity} from '@modules/googleapis/google-drive/google-drive.entity';
 
 export class ListGoogleDriveFilesRequestDto extends CommonListRequestDto {
   @ApiProperty({type: String, required: false, description: 'The parent folder ID to list files for.'})

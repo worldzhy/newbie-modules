@@ -34,12 +34,12 @@ export class GoogleDriveFileService {
   ) {
     // Create a new JWT client using the key file downloaded from the Google Developer Console.
     const authObj = new auth.GoogleAuth({
-      keyFile: this.config.getOrThrow<string>('microservices.googleapis.credentials.serviceAccount'),
+      keyFile: this.config.getOrThrow<string>('modules.googleapis.credentials.serviceAccount'),
       scopes: ['https://www.googleapis.com/auth/drive'],
     });
 
     this.client = drive({version: 'v3', auth: authObj});
-    this.googleSharedDriveId = this.config.getOrThrow<string>('microservices.googleapis.googleSharedDriveId');
+    this.googleSharedDriveId = this.config.getOrThrow<string>('modules.googleapis.googleSharedDriveId');
   }
 
   async getFile(name: string) {

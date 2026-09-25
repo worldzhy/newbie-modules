@@ -14,8 +14,8 @@ export class RdsInstanceService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService
   ) {
-    this.encryptKey = this.configService.get('microservices.cloudwatch.cryptoEncryptKey') as string;
-    this.encryptIV = this.configService.get('microservices.cloudwatch.cryptoEncryptIV') as string;
+    this.encryptKey = this.configService.get('modules.cloudwatch.cryptoEncryptKey') as string;
+    this.encryptIV = this.configService.get('modules.cloudwatch.cryptoEncryptIV') as string;
   }
 
   async fetchRDSInstances(awsAccountId: string) {

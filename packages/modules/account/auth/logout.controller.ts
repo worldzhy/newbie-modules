@@ -1,11 +1,11 @@
 import {Controller, Post, Req, Res} from '@nestjs/common';
 import {ApiOperation, ApiResponse, ApiTags, ApiBearerAuth} from '@nestjs/swagger';
 import {Response} from 'express';
-import {CookieName, CookieService} from '@microservices/account/security/cookie/cookie.service';
-import {TokenService} from '@microservices/account/security/token/token.service';
-import {LimitLoginByUserService} from '@microservices/account/security/rate-limiter/rate-limiter.service';
-import {SessionService} from '@microservices/account/modules/session/session.service';
-import {LogoutResponseDto} from '@microservices/account/auth/auth.dto';
+import {CookieName, CookieService} from '@modules/account/security/cookie/cookie.service';
+import {TokenService} from '@modules/account/security/token/token.service';
+import {LimitLoginByUserService} from '@modules/account/security/rate-limiter/rate-limiter.service';
+import {SessionService} from '@modules/account/modules/session/session.service';
+import {LogoutResponseDto} from '@modules/account/auth/auth.dto';
 
 @ApiTags('Account / Auth')
 @Controller('auth')

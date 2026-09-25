@@ -9,7 +9,7 @@ export class WxAjaxService {
     private readonly ch: MonitorClickhouseService,
     private readonly config: ConfigService
   ) {
-    this.cfg = this.config.get('microservices.frontend-monitor');
+    this.cfg = this.config.get('modules.frontend-monitor');
   }
 
   async getPageAjaxsAvg(appId: string, url: string, beginTime?: string, endTime?: string) {

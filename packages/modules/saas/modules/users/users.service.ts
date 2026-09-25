@@ -22,8 +22,8 @@ import {TokensService} from '../../providers/tokens/tokens.service';
 import {ApiKeysService} from '../api-keys/api-keys.service';
 import {AuthService} from '../auth/auth.service';
 import {PasswordUpdateInput} from './users.interface';
-import {AwsS3Service} from '@microservices/aws-s3/aws-s3.service';
-import {EmailService} from '@microservices/notification/email/email.service';
+import {AwsS3Service} from '@modules/aws-s3/aws-s3.service';
+import {EmailService} from '@modules/notification/email/email.service';
 
 @Injectable()
 export class UsersService {
@@ -163,7 +163,7 @@ export class UsersService {
     if (user.id === userId) throw new NotFoundException(USER_NOT_FOUND);
     const minutes = parseInt(
       this.configService.get<string>(
-        'microservices.saas.security.mergeUsersTokenExpiry'
+        'modules.saas.security.mergeUsersTokenExpiry'
       ) ?? ''
     );
     if (user.prefersEmail) {
@@ -173,7 +173,7 @@ export class UsersService {
           'users/merge-request': {
             userName: user.name,
             link: `${this.configService.get<string>(
-              'microservices.app.frontendUrl'
+              'modules.app.frontendUrl'
             )}/auth/link/merge-accounts?token=${this.tokensService.signJwt(
               MERGE_ACCOUNTS_TOKEN,
               {baseUserId: userId, mergeUserId: user.id},

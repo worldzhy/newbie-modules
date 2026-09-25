@@ -2,7 +2,7 @@ import {ArrayMinSize, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, IsUU
 import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
 import {Transform} from 'class-transformer';
 import {BooleanTransformer} from '@devbie/newbie/transformers/boolean.transformer';
-import {AWSRegion} from '@microservices/aws-cloudwatch/aws-cloudwatch.enum';
+import {AWSRegion} from '@modules/aws-cloudwatch/aws-cloudwatch.enum';
 
 /**
  * Response DTO for an EC2 instance record.

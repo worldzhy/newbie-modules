@@ -1,8 +1,8 @@
 import {Injectable} from '@nestjs/common';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {SessionService} from '@microservices/account/modules/session/session.service';
-import {TokenService} from '@microservices/account/security/token/token.service';
-import {expose} from '@microservices/account/helpers/expose';
+import {SessionService} from '@modules/account/modules/session/session.service';
+import {TokenService} from '@modules/account/security/token/token.service';
+import {expose} from '@modules/account/helpers/expose';
 
 @Injectable()
 export class WechatAuthService {

@@ -1,7 +1,7 @@
 import {Injectable, OnModuleInit, Logger} from '@nestjs/common';
 import {DiscoveryService, MetadataScanner, Reflector} from '@nestjs/core';
 import {SKILL_METADATA, SkillMetadata} from './skill.decorator';
-import {PrismaService} from '../../../framework/prisma/prisma.service';
+import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 
 @Injectable()
 export class SkillRegistry implements OnModuleInit {

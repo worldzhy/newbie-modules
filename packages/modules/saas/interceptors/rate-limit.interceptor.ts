@@ -25,7 +25,7 @@ export class RateLimitInterceptor implements NestInterceptor {
     private configService: ConfigService
   ) {
     const config = this.configService.getOrThrow(
-      'microservices.saas.rateLimit'
+      'modules.saas.rateLimit'
     );
     this.rateLimiterPublic = new RateLimiterMemory(config.public);
     this.rateLimiterAuthenticated = new RateLimiterMemory(config.authenticated);

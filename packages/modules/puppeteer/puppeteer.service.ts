@@ -7,7 +7,7 @@ export class PuppeteerService {
   private config: {chromiumPath: string};
 
   constructor(private readonly configService: ConfigService) {
-    this.config = this.configService.getOrThrow('microservices.puppeteer');
+    this.config = this.configService.getOrThrow('modules.puppeteer');
   }
 
   async renderHtmlToImage(

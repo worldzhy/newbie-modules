@@ -11,7 +11,7 @@ export class ElasticsearchService extends Client {
   private queue = new PQueue({concurrency: 1});
 
   constructor(private readonly configService: ConfigService) {
-    const config = configService.getOrThrow('microservices.elasticsearch');
+    const config = configService.getOrThrow('modules.elasticsearch');
 
     super({
       node: config.node,
@@ -23,7 +23,7 @@ export class ElasticsearchService extends Client {
     this.queue
       .add(() =>
         pRetry(() => this.indexRecord(index, record, params), {
-          retries: this.configService.get<number>('microservices.elasticsearch.retries') ?? 3,
+          retries: this.configService.get<number>('modules.elasticsearch.retries') ?? 3,
           onFailedAttempt: error => {
             this.logger.error(
               `Indexing record failed, retrying (${error.retriesLeft} attempts left)`,

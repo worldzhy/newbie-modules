@@ -6,7 +6,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AwsCredentialService} from '@microservices/aws-core/aws-credential.service';
+import {AwsCredentialService} from '@modules/aws-core/aws-credential.service';
 import {exec} from 'child_process';
 import * as path from 'path';
 import {promisify} from 'util';

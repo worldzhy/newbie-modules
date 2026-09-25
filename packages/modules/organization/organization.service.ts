@@ -4,7 +4,7 @@ import {Organization} from '@generated/prisma/client';
 import randomColor from 'randomcolor';
 import {GROUP_NOT_FOUND} from '@devbie/newbie/exceptions/errors.constants';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {Expose, expose} from '@microservices/account/helpers/expose';
+import {Expose, expose} from '@modules/account/helpers/expose';
 
 @Injectable()
 export class OrganizationService {

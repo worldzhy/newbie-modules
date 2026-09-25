@@ -91,6 +91,7 @@
     "@aws-sdk/client-pinpoint": "latest",
     "@nestjs/passport": "latest",
     "@casl/prisma": "latest",
+    "crypto-random-string": "^5.0.0",
     "geolite2-redist": "latest",
     "ioredis": "latest",
     "ip-anonymize": "latest",
@@ -105,6 +106,7 @@
     "randomcolor": "latest",
     "rate-limiter-flexible": "latest",
     "ua-parser-js": "latest",
+    "uuid": "^14.0.0",
     "validator": "latest"
   },
   "devDependencies": {

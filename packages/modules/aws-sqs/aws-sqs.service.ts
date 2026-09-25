@@ -14,13 +14,13 @@ export class AwsSqsService {
 
   constructor(private readonly configService: ConfigService) {
     const accessKeyId = this.configService.getOrThrow<string>(
-      'microservices.aws-sqs.accessKeyId'
+      'modules.aws-sqs.accessKeyId'
     );
     const secretAccessKey = this.configService.getOrThrow<string>(
-      'microservices.aws-sqs.secretAccessKey'
+      'modules.aws-sqs.secretAccessKey'
     );
     const region = this.configService.getOrThrow<string>(
-      'microservices.aws-sqs.region'
+      'modules.aws-sqs.region'
     );
 
     if (accessKeyId && secretAccessKey && region) {
@@ -34,7 +34,7 @@ export class AwsSqsService {
     }
 
     this.queueUrl = this.configService.getOrThrow<string>(
-      'microservices.aws-sqs.queueUrl'
+      'modules.aws-sqs.queueUrl'
     );
   }
 

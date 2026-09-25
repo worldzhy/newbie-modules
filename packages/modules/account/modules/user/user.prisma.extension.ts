@@ -1,6 +1,6 @@
 import {Prisma} from '@generated/prisma/client';
 import {generateHash} from '@devbie/newbie/utilities/common.util';
-import {verifyEmail, verifyPassword} from '@microservices/account/helpers/validator';
+import {verifyEmail, verifyPassword} from '@modules/account/helpers/validator';
 import {BadRequestException} from '@nestjs/common';
 
 export const userPrismaExtension = Prisma.defineExtension(prisma =>

@@ -1,5 +1,5 @@
 import {Injectable} from '@nestjs/common';
-import {MongoModelRegistry} from '@microservices/mongo/mongo-model.registry';
+import {MongoModelRegistry} from '@modules/mongo/mongo-model.registry';
 
 import {SystemSchema} from './system.schema';
 import {EmailSchema} from './email.schema';

@@ -24,12 +24,12 @@ export class AwsS3Service {
   private signedUrlExpiresIn: number;
 
   constructor(private readonly config: ConfigService) {
-    this.bucket = this.config.getOrThrow<string>('microservices.aws-s3.bucket');
-    this.region = this.config.getOrThrow<string>('microservices.aws-s3.region');
-    this.signedUrlExpiresIn = this.config.getOrThrow<number>('microservices.aws-s3.signedUrlExpiresIn');
+    this.bucket = this.config.getOrThrow<string>('modules.aws-s3.bucket');
+    this.region = this.config.getOrThrow<string>('modules.aws-s3.region');
+    this.signedUrlExpiresIn = this.config.getOrThrow<number>('modules.aws-s3.signedUrlExpiresIn');
 
-    const accessKeyId = this.config.get<string>('microservices.aws-s3.accessKeyId');
-    const secretAccessKey = this.config.get<string>('microservices.aws-s3.secretAccessKey');
+    const accessKeyId = this.config.get<string>('modules.aws-s3.accessKeyId');
+    const secretAccessKey = this.config.get<string>('modules.aws-s3.secretAccessKey');
     if (accessKeyId && secretAccessKey) {
       this.client = new S3Client({
         region: this.region,

@@ -161,7 +161,7 @@ export class WebhooksService {
               pRetry(() => this.callWebhook(webhook, event), {
                 retries:
                   this.configService.get<number>(
-                    'microservices.saas.webhooks.retries'
+                    'modules.saas.webhooks.retries'
                   ) ?? 3,
                 onFailedAttempt: error => {
                   this.logger.error(

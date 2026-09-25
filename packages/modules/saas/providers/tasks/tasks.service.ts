@@ -5,7 +5,7 @@ import {DomainsService} from '../../modules/domains/domains.service';
 import {MetricsService} from '../../modules/metrics/metrics.service';
 import {UsersService} from '../../modules/users/users.service';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {ElasticsearchService} from '@microservices/elasticsearch/elasticsearch.service';
+import {ElasticsearchService} from '@modules/elasticsearch/elasticsearch.service';
 
 @Injectable()
 export class TasksService {
@@ -29,7 +29,7 @@ export class TasksService {
     const now = new Date();
     const unusedRefreshTokenExpiryDays =
       this.configService.get<number>(
-        'microservices.saas.security.unusedRefreshTokenExpiryDays'
+        'modules.saas.security.unusedRefreshTokenExpiryDays'
       ) ?? 30;
     now.setDate(now.getDate() - unusedRefreshTokenExpiryDays);
     const deleted = await this.prisma.session.deleteMany({
@@ -44,7 +44,7 @@ export class TasksService {
     const now = new Date();
     const inactiveUserDeleteDays =
       this.configService.get<number>(
-        'microservices.saas.security.inactiveUserDeleteDays'
+        'modules.saas.security.inactiveUserDeleteDays'
       ) ?? 30;
     now.setDate(now.getDate() - inactiveUserDeleteDays);
     const deleted = await this.prisma.user.findMany({
@@ -63,7 +63,7 @@ export class TasksService {
 
   @Cron(CronExpression.EVERY_DAY_AT_3PM)
   async deleteOldLogs() {
-    const config = this.configService.getOrThrow('microservices.saas.tracking');
+    const config = this.configService.getOrThrow('modules.saas.tracking');
     if (config.deleteOldLogs)
       return this.elasticsearch.deleteOldRecords(
         config.index,

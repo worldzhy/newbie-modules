@@ -16,7 +16,7 @@ export class ApiKeyService {
     private configService: ConfigService
   ) {
     this.lru = new LRUCache({
-      maxSize: this.configService.getOrThrow<number>('microservices.account.cache.apiKeyLruSize'),
+      maxSize: this.configService.getOrThrow<number>('modules.account.cache.apiKeyLruSize'),
       sizeCalculation: (value, key) => JSON.stringify(value).length,
     });
   }
@@ -218,13 +218,13 @@ export class ApiKeyService {
   ): Promise<Record<string, any>[]> {
     const now = new Date();
     now.setDate(
-      now.getDate() - this.configService.getOrThrow<number>('microservices.account.tracking.deleteOldLogsDays')
+      now.getDate() - this.configService.getOrThrow<number>('modules.account.tracking.deleteOldLogsDays')
     );
 
     /*
     const result = await this.elasticsearch.search({
       index: this.configService.get<string>(
-        'microservices.account.tracking.index'
+        'modules.account.tracking.index'
       ),
       from: params.cursor?.id,
       body: {

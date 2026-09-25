@@ -1,15 +1,15 @@
 import {Controller, Post, Res, Ip, Headers, Req} from '@nestjs/common';
 import {ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
 import {Response} from 'express';
-import {UserRequest} from '@microservices/account/account.interface';
-import {AuthService} from '@microservices/account/auth/auth.service';
-import {GuardByProfile} from '@microservices/account/security/passport/profile/profile.decorator';
-import {GuardByUuid} from '@microservices/account/security/passport/uuid/uuid.decorator';
+import {UserRequest} from '@modules/account/account.interface';
+import {AuthService} from '@modules/account/auth/auth.service';
+import {GuardByProfile} from '@modules/account/security/passport/profile/profile.decorator';
+import {GuardByUuid} from '@modules/account/security/passport/uuid/uuid.decorator';
 import {
   LoginByPasswordResponseDto,
   LoginByProfileRequestDto,
   LoginByUuidRequestDto,
-} from '@microservices/account/auth/auth.dto';
+} from '@modules/account/auth/auth.dto';
 
 @ApiTags('Account / Auth')
 @Controller('auth')

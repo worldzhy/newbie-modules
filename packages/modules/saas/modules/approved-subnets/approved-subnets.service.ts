@@ -85,7 +85,7 @@ export class ApprovedSubnetsService {
     const subnet = await hash(
       anonymize(ipAddress),
       this.configService.getOrThrow<number>(
-        'microservices.saas.security.saltRounds'
+        'modules.saas.security.saltRounds'
       )
     );
     const location = await this.geolocationService.getLocation(ipAddress);

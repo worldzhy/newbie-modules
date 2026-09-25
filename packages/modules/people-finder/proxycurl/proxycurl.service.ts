@@ -27,7 +27,7 @@ export class ProxycurlService {
     private readonly logger: Logger,
     private peopleFinderNotification: PeopleFinderNotificationService
   ) {
-    this.apiKey = this.configService.getOrThrow<string>('microservices.peopleFinder.proxycurl.apiKey');
+    this.apiKey = this.configService.getOrThrow<string>('modules.peopleFinder.proxycurl.apiKey');
     const defaultClient = ProxycurlApi.ApiClient.instance;
     // Configure Bearer access token for authorization: BearerAuth
     const BearerAuth = defaultClient.authentications['BearerAuth'];

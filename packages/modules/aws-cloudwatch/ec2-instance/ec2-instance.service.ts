@@ -14,8 +14,8 @@ export class Ec2InstanceService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService
   ) {
-    this.encryptKey = this.configService.get('microservices.cloudwatch.cryptoEncryptKey') as string;
-    this.encryptIV = this.configService.get('microservices.cloudwatch.cryptoEncryptIV') as string;
+    this.encryptKey = this.configService.get('modules.cloudwatch.cryptoEncryptKey') as string;
+    this.encryptIV = this.configService.get('modules.cloudwatch.cryptoEncryptIV') as string;
   }
 
   async fetchEC2Instances(awsAccountId: string) {

@@ -20,7 +20,7 @@ import {Expose} from '../../helpers/interfaces';
 import {expose} from '../../helpers/expose';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {generateRandomString} from '@devbie/newbie/utilities/random.util';
-import {ElasticsearchService} from '@microservices/elasticsearch/elasticsearch.service';
+import {ElasticsearchService} from '@modules/elasticsearch/elasticsearch.service';
 import {LRUCache} from 'lru-cache';
 
 @Injectable()
@@ -34,7 +34,7 @@ export class ApiKeysService {
   ) {
     this.lru = new LRUCache({
       maxSize: this.configService.getOrThrow<number>(
-        'microservices.saas.cache.apiKeyLruSize'
+        'modules.saas.cache.apiKeyLruSize'
       ),
     });
   }
@@ -331,12 +331,12 @@ export class ApiKeysService {
     now.setDate(
       now.getDate() -
         this.configService.getOrThrow<number>(
-          'microservices.saas.tracking.deleteOldLogsDays'
+          'modules.saas.tracking.deleteOldLogsDays'
         )
     );
     const result = await this.elasticsearch.search({
       index: this.configService.get<string>(
-        'microservices.saas.tracking.index'
+        'modules.saas.tracking.index'
       ),
       from: params.cursor?.id,
       body: {

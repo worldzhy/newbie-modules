@@ -2,7 +2,7 @@ import {Injectable, UnauthorizedException} from '@nestjs/common';
 import {PassportStrategy} from '@nestjs/passport';
 import {Strategy} from 'passport-custom';
 import {Request} from 'express';
-import {verifyUuid} from '@microservices/account/helpers/validator';
+import {verifyUuid} from '@modules/account/helpers/validator';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 
 @Injectable()

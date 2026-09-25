@@ -1,6 +1,6 @@
 import {Injectable, NotFoundException} from '@nestjs/common';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {GeolocationService} from '@microservices/account/helpers/geolocation.service';
+import {GeolocationService} from '@modules/account/helpers/geolocation.service';
 import {UAParser} from 'ua-parser-js';
 import {SESSION_NOT_FOUND} from '@devbie/newbie/exceptions/errors.constants';
 import {secondsUntilUnixTimestamp} from '@devbie/newbie/utilities/datetime.util';

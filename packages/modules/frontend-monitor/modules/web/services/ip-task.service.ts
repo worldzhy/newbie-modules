@@ -16,7 +16,7 @@ export class WebIpTaskService {
     private readonly redis: RedisService,
     private readonly system: SystemService
   ) {
-    this.cfg = this.config.get('microservices.frontend-monitor');
+    this.cfg = this.config.get('modules.frontend-monitor');
   }
 
   async saveWebGetIpDatas() {

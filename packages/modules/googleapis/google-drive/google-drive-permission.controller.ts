@@ -2,7 +2,7 @@ import {Body, Controller, Delete, Get, Param, Post, Query} from '@nestjs/common'
 import {ApiBearerAuth, ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
 import {Prisma} from '@generated/prisma/client';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {GoogleDrivePermissionService} from '@microservices/googleapis/google-drive/google-drive-permission.service';
+import {GoogleDrivePermissionService} from '@modules/googleapis/google-drive/google-drive-permission.service';
 import {
   CreateGoogleDrivePermissionRequestDto,
   CreateGoogleDrivePermissionResponseDto,

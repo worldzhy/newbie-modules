@@ -7,9 +7,9 @@ import {ConfigService} from '@nestjs/config';
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(private readonly config: ConfigService) {
-    const clientID = config.getOrThrow<string>('microservices.account.googleAuth.clientId');
-    const clientSecret = config.getOrThrow<string>('microservices.account.googleAuth.clientSecret');
-    const callbackURL = config.getOrThrow<string>('microservices.account.googleAuth.callbackURL');
+    const clientID = config.getOrThrow<string>('modules.account.googleAuth.clientId');
+    const clientSecret = config.getOrThrow<string>('modules.account.googleAuth.clientSecret');
+    const callbackURL = config.getOrThrow<string>('modules.account.googleAuth.callbackURL');
 
     super({
       clientID: clientID,

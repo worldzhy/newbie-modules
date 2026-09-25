@@ -1,5 +1,5 @@
-import {ClickhouseDataType} from '@microservices/clickhouse/clickhouse.types';
-import {ClickhouseService} from '@microservices/clickhouse/clickhouse.service';
+import {ClickhouseDataType} from '@modules/clickhouse/clickhouse.types';
+import {ClickhouseService} from '@modules/clickhouse/clickhouse.service';
 import {ClickHouseTablePrefix} from '../../enum';
 
 export default function WebAjax(clickhouse: ClickhouseService, dbName: string) {

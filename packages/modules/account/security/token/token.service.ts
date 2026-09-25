@@ -12,7 +12,7 @@ export class TokenService {
   private tokenConfig: any;
 
   constructor(private config: ConfigService) {
-    this.tokenConfig = this.config.getOrThrow('microservices.account.token');
+    this.tokenConfig = this.config.getOrThrow('modules.account.token');
   }
 
   /**

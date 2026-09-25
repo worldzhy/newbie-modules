@@ -5,16 +5,16 @@ import {Prisma, VerificationCodeUse} from '@generated/prisma/client';
 import {NewbieException, NewbieExceptionType} from '@devbie/newbie/exceptions/newbie.exception';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {compareHash} from '@devbie/newbie/utilities/common.util';
-import {AccountService} from '@microservices/account/account.service';
-import {verifyEmail, verifyPhone} from '@microservices/account/helpers/validator';
-import {VerificationCodeService} from '@microservices/account/modules/verification-code/verification-code.service';
-import {NoGuard} from '@microservices/account/security/passport/public/public.decorator';
+import {AccountService} from '@modules/account/account.service';
+import {verifyEmail, verifyPhone} from '@modules/account/helpers/validator';
+import {VerificationCodeService} from '@modules/account/modules/verification-code/verification-code.service';
+import {NoGuard} from '@modules/account/security/passport/public/public.decorator';
 import {
   ChangePasswordDto,
   GetCurrentUserResponseDto,
   PasswordChangeResponseDto,
   ResetPasswordDto,
-} from '@microservices/account/account.dto';
+} from '@modules/account/account.dto';
 
 @ApiTags('Account')
 @Controller('account')

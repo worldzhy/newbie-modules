@@ -1,7 +1,7 @@
 import {Controller, Delete, Get, Patch, Post, Body, Param, Query} from '@nestjs/common';
 import {ApiTags, ApiBearerAuth, ApiBody} from '@nestjs/swagger';
 import {Organization, PermissionAction, Prisma} from '@generated/prisma/client';
-import {RequirePermission} from '@microservices/account/security/authorization/authorization.decorator';
+import {RequirePermission} from '@modules/account/security/authorization/authorization.decorator';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 
 @ApiTags('Organization')

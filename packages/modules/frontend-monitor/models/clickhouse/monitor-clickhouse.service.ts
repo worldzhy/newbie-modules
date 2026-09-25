@@ -1,6 +1,6 @@
 import {Injectable, OnModuleInit} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
-import {ClickhouseService} from '@microservices/clickhouse/clickhouse.service';
+import {ClickhouseService} from '@modules/clickhouse/clickhouse.service';
 
 import WebAjaxFactory from './web/ajax';
 import WebErrorFactory from './web/error';
@@ -30,8 +30,8 @@ export class MonitorClickhouseService implements OnModuleInit {
     // exposes the ORM-like helpers (createDatabase / model). The business layer
     // only needs to select which database to use.
     const dbName =
-      this.configService.get<string>('microservices.frontend-monitor.clickhouseDB') ||
-      this.configService.getOrThrow<string>('microservices.clickhouse.database');
+      this.configService.get<string>('modules.frontend-monitor.clickhouseDB') ||
+      this.configService.getOrThrow<string>('modules.clickhouse.database');
 
     // Ensure the database exists before creating tables.
     await this.clickhouse.createDatabase(dbName);

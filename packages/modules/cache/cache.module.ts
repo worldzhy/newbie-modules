@@ -20,11 +20,11 @@ function getModules(): (DynamicModule | Promise<DynamicModule>)[] {
       CacheModule.registerAsync({
         imports: [ConfigModule],
         useFactory: async (configService: ConfigService) => {
-          const ttl = configService.get('microservices.cache.redis.ttl');
-          const host = configService.get('microservices.cache.redis.host');
-          const port = configService.get('microservices.cache.redis.port');
-          const user = configService.get('microservices.cache.redis.user');
-          const password = configService.get('microservices.cache.redis.password');
+          const ttl = configService.get('modules.cache.redis.ttl');
+          const host = configService.get('modules.cache.redis.host');
+          const port = configService.get('modules.cache.redis.port');
+          const user = configService.get('modules.cache.redis.user');
+          const password = configService.get('modules.cache.redis.password');
 
           const uri =
             user && password
@@ -42,8 +42,8 @@ function getModules(): (DynamicModule | Promise<DynamicModule>)[] {
       CacheModule.registerAsync({
         imports: [ConfigModule],
         useFactory: async (configService: ConfigService) => {
-          const ttl = configService.get('microservices.cache.memory.ttl'); // milliseconds
-          const lruSize = configService.get('microservices.cache.memory.lruSize');
+          const ttl = configService.get('modules.cache.memory.ttl'); // milliseconds
+          const lruSize = configService.get('modules.cache.memory.lruSize');
 
           return {stores: [new Keyv({store: new CacheableMemory({ttl, lruSize})})]};
         },

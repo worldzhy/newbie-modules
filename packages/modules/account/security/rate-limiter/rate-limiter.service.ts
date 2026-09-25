@@ -20,27 +20,27 @@ abstract class RateLimiterService {
   ) {
     switch (limiterType) {
       case LimiterType.IP_ACCESS:
-        this.points = this.config.getOrThrow<number>('microservices.account.ratelimiter.ipAccessLimiter.points');
+        this.points = this.config.getOrThrow<number>('modules.account.ratelimiter.ipAccessLimiter.points');
         this.duration = this.config.getOrThrow<number>(
-          'microservices.account.ratelimiter.ipAccessLimiter.durationSeconds'
+          'modules.account.ratelimiter.ipAccessLimiter.durationSeconds'
         );
         break;
       case LimiterType.IP_LOGIN:
-        this.points = this.config.getOrThrow<number>('microservices.account.ratelimiter.ipLoginLimiter.points');
+        this.points = this.config.getOrThrow<number>('modules.account.ratelimiter.ipLoginLimiter.points');
         this.duration = this.config.getOrThrow<number>(
-          'microservices.account.ratelimiter.ipLoginLimiter.durationSeconds'
+          'modules.account.ratelimiter.ipLoginLimiter.durationSeconds'
         );
         break;
       case LimiterType.USER_LOGIN:
-        this.points = this.config.getOrThrow<number>('microservices.account.ratelimiter.userLoginLimiter.points');
+        this.points = this.config.getOrThrow<number>('modules.account.ratelimiter.userLoginLimiter.points');
         this.duration = this.config.getOrThrow<number>(
-          'microservices.account.ratelimiter.userLoginLimiter.durationSeconds'
+          'modules.account.ratelimiter.userLoginLimiter.durationSeconds'
         );
         break;
     }
 
-    const redisHost = this.config.get<string>('microservices.account.redis.host');
-    const redisPort = this.config.get<number>('microservices.account.redis.port');
+    const redisHost = this.config.get<string>('modules.account.redis.host');
+    const redisPort = this.config.get<number>('modules.account.redis.port');
     if (redisHost && redisPort) {
       this.limiter = new RateLimiterRedis({
         storeClient: new Redis({

@@ -1,7 +1,7 @@
 import {Injectable} from '@nestjs/common';
 import {User} from '@generated/prisma/client';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {verifyEmail, verifyPhone} from '@microservices/account/helpers/validator';
+import {verifyEmail, verifyPhone} from '@modules/account/helpers/validator';
 import {userPrismaExtension} from './user.prisma.extension';
 
 @Injectable()

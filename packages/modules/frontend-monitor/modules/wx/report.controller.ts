@@ -17,7 +17,7 @@ export class WxReportController {
     private readonly redis: RedisService,
     private readonly dayReportNum: DayReportNumService
   ) {
-    this.config = this.configService.get('microservices.frontend-monitor');
+    this.config = this.configService.get('modules.frontend-monitor');
   }
 
   @Post('/report/wx')

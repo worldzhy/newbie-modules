@@ -1,5 +1,5 @@
 import {Injectable, Logger} from '@nestjs/common';
-import {PrismaService} from '../../framework/prisma/prisma.service';
+import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {TaskStatus} from '@generated/prisma/enums';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';

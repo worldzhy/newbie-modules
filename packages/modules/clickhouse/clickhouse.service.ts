@@ -29,10 +29,10 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {
     // Read the shared ClickHouse configuration through NestJS configuration services.
-    const url = this.configService.getOrThrow<string>('microservices.clickhouse.url') || 'http://localhost:8123';
-    const username = this.configService.get<string>('microservices.clickhouse.username') || 'default';
-    const password = this.configService.get<string>('microservices.clickhouse.password') || '';
-    const database = this.configService.get<string | undefined>('microservices.clickhouse.database');
+    const url = this.configService.getOrThrow<string>('modules.clickhouse.url') || 'http://localhost:8123';
+    const username = this.configService.get<string>('modules.clickhouse.username') || 'default';
+    const password = this.configService.get<string>('modules.clickhouse.password') || '';
+    const database = this.configService.get<string | undefined>('modules.clickhouse.database');
 
     this.defaultDbName = database;
     this.client = createClient({

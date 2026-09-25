@@ -2,7 +2,7 @@ import {BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post} 
 import {ApiBearerAuth, ApiBody, ApiTags} from '@nestjs/swagger';
 import {AwsEnvironment, Prisma} from '@generated/prisma/client';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AwsEnvironmentService} from '@microservices/cloudformation/environment/environment.service';
+import {AwsEnvironmentService} from '@modules/cloudformation/environment/environment.service';
 
 @ApiTags('AWS Environment')
 @ApiBearerAuth()

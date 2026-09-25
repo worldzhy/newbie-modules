@@ -16,7 +16,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const tokenConfig = config.getOrThrow<{
       defaultSecret: string;
       userAccess: {secret: string; expiresIn: string | number};
-    }>('microservices.account.token');
+    }>('modules.account.token');
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),

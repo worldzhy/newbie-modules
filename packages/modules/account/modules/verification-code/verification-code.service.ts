@@ -16,8 +16,8 @@ export class VerificationCodeService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService
   ) {
-    this.timeoutMinutes = this.config.getOrThrow<number>('microservices.account.verificationCode.timeoutMinutes');
-    this.resendMinutes = this.config.getOrThrow<number>('microservices.account.verificationCode.resendMinutes');
+    this.timeoutMinutes = this.config.getOrThrow<number>('modules.account.verificationCode.timeoutMinutes');
+    this.resendMinutes = this.config.getOrThrow<number>('modules.account.verificationCode.resendMinutes');
   }
 
   async generateForEmail(email: string, use: VerificationCodeUse): Promise<VerificationCode> {

@@ -20,7 +20,7 @@ export class AwsSmsService {
       secretAccessKey?: string;
       region: string;
       configurationSetName: string;
-    }>('microservices.aws-sms');
+    }>('modules.aws-sms');
 
     this.configurationSetName = config.configurationSetName;
 

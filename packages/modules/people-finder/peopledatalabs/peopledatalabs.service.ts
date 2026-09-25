@@ -28,7 +28,7 @@ export class PeopledatalabsService {
     private peopleFinderNotification: PeopleFinderNotificationService,
     private readonly logger: Logger
   ) {
-    this.apiKey = this.configService.getOrThrow<string>('microservices.peopleFinder.peopledatalabs.apiKey');
+    this.apiKey = this.configService.getOrThrow<string>('modules.peopleFinder.peopledatalabs.apiKey');
     // @ts-ignore
     this.api = PDLJS({apiKey: this.apiKey});
 

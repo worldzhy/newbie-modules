@@ -122,7 +122,7 @@ export class PassportGuard extends AuthGuard('authentication') {
 
     // JWT guard is the default guard.
     const defaultGuard =
-      (this.config.get<string>('microservices.account.security.defaultGuard') as GuardType) || GuardType.JWT;
+      (this.config.get<string>('modules.account.security.defaultGuard') as GuardType) || GuardType.JWT;
 
     switch (defaultGuard) {
       case GuardType.NONE:

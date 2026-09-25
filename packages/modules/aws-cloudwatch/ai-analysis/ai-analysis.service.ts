@@ -1,7 +1,7 @@
 import {BadRequestException, Injectable, Logger, UnauthorizedException} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {ClickhouseService} from '@microservices/clickhouse/clickhouse.service';
+import {ClickhouseService} from '@modules/clickhouse/clickhouse.service';
 import OpenAI from 'openai';
 import {AiAnalysisChatDto} from './ai-analysis.dto';
 
@@ -40,35 +40,37 @@ const FORBIDDEN_KEYWORDS =
 @Injectable()
 export class AiAnalysisService {
   private readonly logger = new Logger(AiAnalysisService.name);
-  private client: OpenAI;
+  private client: OpenAI | null = null;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly clickhouse: ClickhouseService
   ) {
-    // Debug: trace the DeepSeek API key resolution
-    const rawEnv = process.env.AWS_CLOUDWATCH_AI_DEEPSEEK_KEY;
-    const fromConfig = this.configService.get<string>('microservices.cloudwatch.ai.deepseekKey');
-    const fromConfigWrong = this.configService.get<string>('microservices.ai.deepseekKey');
-    this.logger.log(
-      `[DEBUG] raw env AWS_CLOUDWATCH_AI_DEEPSEEK_KEY = ${rawEnv ? `"${rawEnv.slice(0, 12)}..." (len=${rawEnv.length})` : 'UNDEFINED / EMPTY'}`
-    );
-    this.logger.log(
-      `[DEBUG] configService.get('microservices.cloudwatch.ai.deepseekKey') = ${fromConfig ? `"${fromConfig.slice(0, 12)}..." (len=${fromConfig.length})` : 'UNDEFINED / EMPTY'}`
-    );
-    this.logger.log(
-      `[DEBUG] configService.get('microservices.ai.deepseekKey') = ${fromConfigWrong ? `"${fromConfigWrong.slice(0, 12)}..." (len=${fromConfigWrong.length})` : 'UNDEFINED / EMPTY'}`
-    );
-
-    const apiKey = fromConfig;
-    this.logger.log(
-      `[DEBUG] final apiKey passed to OpenAI = ${apiKey ? `"${apiKey.slice(0, 12)}..." (len=${apiKey.length})` : 'UNDEFINED / EMPTY'}`
-    );
+    // DeepSeek exposes an OpenAI-compatible API. A missing key must not crash
+    // the whole application at startup — AI analysis is an optional feature.
+    const apiKey = this.configService.get<string>('modules.cloudwatch.ai.deepseekKey');
+    if (!apiKey) {
+      this.logger.warn(
+        'modules.cloudwatch.ai.deepseekKey is not configured; AI analysis endpoints will be unavailable.'
+      );
+      return;
+    }
     this.client = new OpenAI({
-      apiKey: apiKey || '',
+      apiKey,
       baseURL: 'https://api.deepseek.com',
     });
+  }
+
+  /**
+   * Returns the initialized OpenAI client or throws a business error when the
+   * DeepSeek key is not configured for this deployment.
+   */
+  private requireClient(): OpenAI {
+    if (!this.client) {
+      throw new BadRequestException('AI analysis is not available: DeepSeek key is not configured.');
+    }
+    return this.client;
   }
 
   /**
@@ -298,7 +300,7 @@ Example 5 — Specific date filter (April 21):
     let fullContent = '';
     const keepaliveTimer = setInterval(() => emit('__keepalive__', null), 15000);
     try {
-      const completion = await this.client.chat.completions.create(
+      const completion = await this.requireClient().chat.completions.create(
         {
           model: 'deepseek-v4-flash',
           messages,
@@ -574,7 +576,7 @@ P95 Response Time:
       emit('analysis-start', {});
 
       // Use streaming for the analysis call to give the user real-time feedback.
-      const stream = await this.client.chat.completions.create({
+      const stream = await this.requireClient().chat.completions.create({
         model: 'deepseek-v4-flash',
         messages: analysisMessages,
         temperature: 0.2,

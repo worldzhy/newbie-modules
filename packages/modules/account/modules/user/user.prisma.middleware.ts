@@ -1,7 +1,7 @@
 // import {BadRequestException} from '@nestjs/common';
 // import {Prisma} from '@generated/prisma/client';
 // import {generateHash} from '@devbie/newbie/utilities/common.util';
-// import {verifyEmail, verifyPassword} from '@microservices/account/helpers/validator';
+// import {verifyEmail, verifyPassword} from '@modules/account/helpers/validator';
 //
 // export async function userPrismaMiddleware(
 //   params: Prisma.MiddlewareParams,

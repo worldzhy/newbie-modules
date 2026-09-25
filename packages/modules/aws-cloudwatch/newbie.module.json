@@ -23,7 +23,8 @@
     "@aws-sdk/client-cloudwatch": "latest",
     "@aws-sdk/client-ec2": "latest",
     "@aws-sdk/client-rds": "latest",
-    "dayjs": "latest"
+    "dayjs": "latest",
+    "openai": "^6.34.0"
   },
   "devDependencies": {}
 }

@@ -126,7 +126,7 @@ export class WebhookService {
           this.queue
             .add(() =>
               pRetry(() => this.callWebhook(webhook, event), {
-                retries: this.configService.get<number>('microservices.webhook.retries'),
+                retries: this.configService.get<number>('modules.webhook.retries'),
                 onFailedAttempt: error => {
                   this.logger.error(
                     `Triggering webhoook failed, retrying (${error.retriesLeft} attempts left)`,

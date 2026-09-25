@@ -20,7 +20,7 @@ import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {TwilioService} from '../../providers/twilio/twilio.service';
 import {AuthService} from '../auth/auth.service';
 import {generateRandomString} from '@devbie/newbie/utilities/random.util';
-import {EmailService} from '@microservices/notification/email/email.service';
+import {EmailService} from '@modules/notification/email/email.service';
 
 @Injectable()
 export class MultiFactorAuthenticationService {
@@ -59,7 +59,7 @@ export class MultiFactorAuthenticationService {
     return this.twilioService.send({
       to: phone,
       body: `${this.auth.getOneTimePassword(secret)} is your ${
-        this.configService.get<string>('microservices.saas.app.name') ?? ''
+        this.configService.get<string>('modules.saas.app.name') ?? ''
       } verification code.`,
     });
   }
@@ -127,7 +127,7 @@ export class MultiFactorAuthenticationService {
       const code = await hash(
         unsafeCode,
         this.configService.get<number>(
-          'microservices.saas.security.saltRounds'
+          'modules.saas.security.saltRounds'
         ) ?? 10
       );
       await this.prisma.backupCode.create({

@@ -15,12 +15,12 @@ export class TencentCosService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService
   ) {
-    this.region = this.config.getOrThrow<string>('microservices.tencent-cos.region');
-    this.bucket = this.config.getOrThrow<string>('microservices.tencent-cos.bucket');
+    this.region = this.config.getOrThrow<string>('modules.tencent-cos.region');
+    this.bucket = this.config.getOrThrow<string>('modules.tencent-cos.bucket');
 
     this.cos = new COS({
-      SecretId: this.config.getOrThrow<string>('microservices.tencent-cos.secretId'),
-      SecretKey: this.config.getOrThrow<string>('microservices.tencent-cos.secretKey'),
+      SecretId: this.config.getOrThrow<string>('modules.tencent-cos.secretId'),
+      SecretKey: this.config.getOrThrow<string>('modules.tencent-cos.secretKey'),
     });
   }
 

@@ -1,7 +1,7 @@
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {Body, Controller, Get, Param, Patch, Post} from '@nestjs/common';
 import {ApiTags, ApiBearerAuth, ApiResponse, ApiOperation} from '@nestjs/swagger';
-import {GuardByApiKey} from '@microservices/account/security/passport/api-key/api-key.decorator';
+import {GuardByApiKey} from '@modules/account/security/passport/api-key/api-key.decorator';
 import {OrderService} from '../order.service';
 import {CreateOrderResponseDto, UpdateOrderResponseDto} from '../order.dto';
 import {WechatWorkflowCreateOrderRequestDto, WechatWorkflowUpdateOrderPaidRequestDto} from './wechat-workflow.dto';

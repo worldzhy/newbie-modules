@@ -9,7 +9,7 @@ export class GoogleMapsService {
 
   constructor(private configService: ConfigService) {
     const config = this.configService.getOrThrow(
-      'microservices.saas.googleMaps'
+      'modules.saas.googleMaps'
     );
 
     if (config.apiKey) this.client = new Client();
@@ -18,7 +18,7 @@ export class GoogleMapsService {
 
   autocomplete(query: string, components?: string[]) {
     const config = this.configService.getOrThrow(
-      'microservices.saas.googleMaps'
+      'modules.saas.googleMaps'
     );
 
     return this.client.placeAutocomplete({

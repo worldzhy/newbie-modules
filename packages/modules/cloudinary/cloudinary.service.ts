@@ -36,7 +36,7 @@ export class CloudinaryService {
   private logger = new Logger(CloudinaryService.name);
 
   constructor(private configService: ConfigService) {
-    const config = this.configService.getOrThrow('microservices.cloudinary');
+    const config = this.configService.getOrThrow('modules.cloudinary');
     if (config.cloudName)
       cloudinary.v2.config({
         cloud_name: config.cloudName,

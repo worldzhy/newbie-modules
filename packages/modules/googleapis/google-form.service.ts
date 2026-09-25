@@ -9,7 +9,7 @@ export class GoogleFormService {
   constructor(private readonly config: ConfigService) {
     // Create a new JWT client using the key file downloaded from the Google Developer Console.
     const authObj = new auth.GoogleAuth({
-      keyFile: this.config.getOrThrow<string>('microservices.googleapis.credentials.serviceAccount'),
+      keyFile: this.config.getOrThrow<string>('modules.googleapis.credentials.serviceAccount'),
       scopes: ['https://www.googleapis.com/auth/forms'],
     });
 

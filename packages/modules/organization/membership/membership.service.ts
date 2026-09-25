@@ -9,8 +9,8 @@ import {
   UNAUTHORIZED_RESOURCE,
 } from '@devbie/newbie/exceptions/errors.constants';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AuthService} from '@microservices/account/auth/auth.service';
-import {AwsSesService} from '@microservices/aws-ses/aws-ses.service';
+import {AuthService} from '@modules/account/auth/auth.service';
+import {AwsSesService} from '@modules/aws-ses/aws-ses.service';
 
 @Injectable()
 export class MembershipService {

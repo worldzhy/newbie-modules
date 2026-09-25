@@ -1,8 +1,8 @@
 import {ApiProperty} from '@nestjs/swagger';
 import {IsString, IsEmail, IsEnum, IsNumber} from 'class-validator';
 import {CommonListRequestDto, CommonListResponseDto} from '@devbie/newbie/common.dto';
-import {GoogleAccountRole} from '@microservices/googleapis/google-drive/google-drive.enum';
-import {GoogleDrivePermissionEntity} from '@microservices/googleapis/google-drive/google-drive.entity';
+import {GoogleAccountRole} from '@modules/googleapis/google-drive/google-drive.enum';
+import {GoogleDrivePermissionEntity} from '@modules/googleapis/google-drive/google-drive.entity';
 
 export class ListGoogleDrivePermissionsRequestDto extends CommonListRequestDto {
   @ApiProperty({type: String, required: true, description: 'The file ID to list permissions for.'})

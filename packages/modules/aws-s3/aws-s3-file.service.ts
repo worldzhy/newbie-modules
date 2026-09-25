@@ -19,9 +19,9 @@ export class AwsS3FileService {
     private readonly prisma: PrismaService,
     private readonly s3: AwsS3Service
   ) {
-    this.bucket = this.config.getOrThrow<string>('microservices.aws-s3.bucket');
-    this.region = this.config.getOrThrow<string>('microservices.aws-s3.region');
-    this.cdnHostname = this.config.get<string>('microservices.aws-s3.cdnHostname');
+    this.bucket = this.config.getOrThrow<string>('modules.aws-s3.bucket');
+    this.region = this.config.getOrThrow<string>('modules.aws-s3.region');
+    this.cdnHostname = this.config.get<string>('modules.aws-s3.cdnHostname');
   }
 
   getSystemFolderPath() {

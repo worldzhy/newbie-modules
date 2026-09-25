@@ -20,7 +20,7 @@ export class GooglePlacesService {
   ) {
     this.client = new PlacesClient({
       apiKey: this.config.getOrThrow<string>(
-        'microservices.googlemaps.credentials.apiKey'
+        'modules.googlemaps.credentials.apiKey'
       ),
     });
   }

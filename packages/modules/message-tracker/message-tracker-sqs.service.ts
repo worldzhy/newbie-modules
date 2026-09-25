@@ -15,13 +15,13 @@ export class MessageTrackerSqsService {
 
   constructor(private readonly configService: ConfigService) {
     const accessKeyId = this.configService.getOrThrow<string>(
-      'microservices.message-tracker.accessKeyId'
+      'modules.message-tracker.accessKeyId'
     );
     const secretAccessKey = this.configService.getOrThrow<string>(
-      'microservices.message-tracker.secretAccessKey'
+      'modules.message-tracker.secretAccessKey'
     );
     const region = this.configService.getOrThrow<string>(
-      'microservices.message-tracker.region'
+      'modules.message-tracker.region'
     );
 
     if (accessKeyId && secretAccessKey && region) {
@@ -35,10 +35,10 @@ export class MessageTrackerSqsService {
     }
 
     this.emailQueueUrl = this.configService.getOrThrow<string>(
-      'microservices.message-tracker.emailQueueUrl'
+      'modules.message-tracker.emailQueueUrl'
     );
     this.textQueueUrl = this.configService.getOrThrow<string>(
-      'microservices.message-tracker.textQueueUrl'
+      'modules.message-tracker.textQueueUrl'
     );
   }
 

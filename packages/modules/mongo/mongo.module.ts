@@ -19,7 +19,7 @@ import {MongoModelRegistry} from './mongo-model.registry';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
-        const uri = config.get<string>('microservices.mongo.uri');
+        const uri = config.get<string>('modules.mongo.uri');
         if (!uri) {
           // Fail fast instead of falling back to an implicit database: the
           // connection is shared by multiple business microservices, so a

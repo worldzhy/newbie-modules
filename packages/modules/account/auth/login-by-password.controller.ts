@@ -1,11 +1,11 @@
 import {Body, Controller, Headers, Ip, Post, Req, Res} from '@nestjs/common';
 import {ApiBearerAuth, ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
 import {Response} from 'express';
-import {AuthService} from '@microservices/account/auth/auth.service';
-import {GuardByPassword} from '@microservices/account/security/passport/password/password.decorator';
-import {UserRequest} from '@microservices/account/account.interface';
-import {LimitLoginByIp, LimitLoginByUser} from '@microservices/account/security/rate-limiter/rate-limiter.decorator';
-import {LoginByPasswordRequestDto, LoginByPasswordResponseDto} from '@microservices/account/auth/auth.dto';
+import {AuthService} from '@modules/account/auth/auth.service';
+import {GuardByPassword} from '@modules/account/security/passport/password/password.decorator';
+import {UserRequest} from '@modules/account/account.interface';
+import {LimitLoginByIp, LimitLoginByUser} from '@modules/account/security/rate-limiter/rate-limiter.decorator';
+import {LoginByPasswordRequestDto, LoginByPasswordResponseDto} from '@modules/account/auth/auth.dto';
 
 @ApiTags('Account / Auth')
 @Controller('auth')

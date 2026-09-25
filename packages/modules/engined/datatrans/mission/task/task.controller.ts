@@ -9,7 +9,7 @@ import {
   PostgresqlDatasourceTable,
   Prisma,
 } from '@generated/prisma/client';
-import {AwsSqsService} from '@microservices/aws-sqs/aws-sqs.service';
+import {AwsSqsService} from '@modules/aws-sqs/aws-sqs.service';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {ConfigService} from '@nestjs/config';
 
@@ -153,7 +153,7 @@ export class DatatransTaskController {
 
     // [step 2] Send task to queue.
     const output = await this.sqs.sendMessage({
-      queueUrl: this.configService.getOrThrow<string>('microservices.aws.sqs.queueUrl'),
+      queueUrl: this.configService.getOrThrow<string>('modules.aws.sqs.queueUrl'),
       body: {missionId: task.missionId, take: task.take, skip: task.skip},
     });
 

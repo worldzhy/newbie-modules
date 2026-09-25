@@ -2,9 +2,9 @@ import {Injectable, UnauthorizedException} from '@nestjs/common';
 import {PassportStrategy} from '@nestjs/passport';
 import {Strategy} from 'passport-local';
 import {VerificationCodeUse} from '@generated/prisma/client';
-import {VerificationCodeService} from '@microservices/account/modules/verification-code/verification-code.service';
-import {UserService} from '@microservices/account/modules/user/user.service';
-import {verifyEmail, verifyPhone} from '@microservices/account/helpers/validator';
+import {VerificationCodeService} from '@modules/account/modules/verification-code/verification-code.service';
+import {UserService} from '@modules/account/modules/user/user.service';
+import {verifyEmail, verifyPhone} from '@modules/account/helpers/validator';
 
 @Injectable()
 export class VerificationCodeStrategy extends PassportStrategy(Strategy, 'local.verification-code') {

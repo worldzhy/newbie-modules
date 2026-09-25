@@ -102,7 +102,7 @@ export class AuthController {
       googleLogin: true,
     });
     const frontEndHost = this.configService.get(
-      'microservices.saas.clientLoginUrl'
+      'modules.saas.clientLoginUrl'
     );
     const redirect = `${frontEndHost}?${queryString.stringify({...token})}`;
     // console.log(redirect);

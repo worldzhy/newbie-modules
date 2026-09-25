@@ -1,7 +1,7 @@
 import {Global, Module} from '@nestjs/common';
-import {ClickhouseModule} from '@microservices/clickhouse/clickhouse.module';
-import {AwsCloudwatchService} from '@microservices/aws-cloudwatch/aws-cloudwatch.service';
-import {AWSAccountController} from '@microservices/aws-cloudwatch/aws-account/aws-account.controller';
+import {ClickhouseModule} from '@modules/clickhouse/clickhouse.module';
+import {AwsCloudwatchService} from '@modules/aws-cloudwatch/aws-cloudwatch.service';
+import {AWSAccountController} from '@modules/aws-cloudwatch/aws-account/aws-account.controller';
 import {Ec2InstanceController} from './ec2-instance/ec2-instance.controller';
 import {Ec2InstanceService} from './ec2-instance/ec2-instance.service';
 import {Ec2MetricController} from './ec2-instance/ec2-metric.controller';

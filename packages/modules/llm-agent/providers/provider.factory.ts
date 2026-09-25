@@ -5,7 +5,7 @@ import {QwenProvider} from './qwen.provider';
 import {OpenaiProvider} from './openai.provider';
 import {DeepseekProvider} from './deepseek.provider';
 import {ClaudeProvider} from './claude.provider';
-import {PrismaService} from '../../../framework/prisma/prisma.service';
+import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 
 export interface ProviderInfo {
   id: string;

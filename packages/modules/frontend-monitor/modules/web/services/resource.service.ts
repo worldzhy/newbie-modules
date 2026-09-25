@@ -9,7 +9,7 @@ export class ResourceService {
     private readonly models: MonitorModelsService,
     private readonly config: ConfigService
   ) {
-    this.cfg = this.config.get('microservices.frontend-monitor');
+    this.cfg = this.config.get('modules.frontend-monitor');
   }
 
   async getResourceForType(

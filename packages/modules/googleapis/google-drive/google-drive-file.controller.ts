@@ -1,7 +1,7 @@
 import {Body, Controller, Delete, Get, Param, Patch, Post, Res, UploadedFile, UseInterceptors} from '@nestjs/common';
 import {Prisma} from '@generated/prisma/client';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {GoogleDriveFileService} from '@microservices/googleapis/google-drive/google-drive-file.service';
+import {GoogleDriveFileService} from '@modules/googleapis/google-drive/google-drive-file.service';
 import {ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiConsumes, ApiBody} from '@nestjs/swagger';
 import {
   CreateGoogleDriveFileRequestDto,

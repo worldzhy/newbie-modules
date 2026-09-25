@@ -11,7 +11,7 @@ export class GeolocationService implements OnModuleDestroy {
 
   constructor(private config: ConfigService) {
     this.lru = new LRUCache({
-      maxSize: this.config.getOrThrow<number>('microservices.account.cache.geolocationLruSize'),
+      maxSize: this.config.getOrThrow<number>('modules.account.cache.geolocationLruSize'),
       sizeCalculation: (value, key) => JSON.stringify(value).length,
     });
   }

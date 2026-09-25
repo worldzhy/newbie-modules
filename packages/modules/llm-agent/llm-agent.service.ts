@@ -2,7 +2,7 @@ import {Injectable, Logger, BadRequestException} from '@nestjs/common';
 import {SkillRegistry} from './skills/skill.registry';
 import {LLMProviderFactory} from './providers/provider.factory';
 import {LLMMessage} from './providers/llm-provider.interface';
-import {PrismaService} from '../../framework/prisma/prisma.service';
+import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 
 export enum UserIntent {
   CHAT = 'CHAT', // Casual chat

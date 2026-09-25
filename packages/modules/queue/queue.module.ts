@@ -10,9 +10,9 @@ import {BullModule} from '@nestjs/bull';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         redis: {
-          host: configService.get('microservices.queue.redis.host'),
-          port: configService.get('microservices.queue.redis.port'),
-          password: configService.get('microservices.queue.redis.password'),
+          host: configService.get('modules.queue.redis.host'),
+          port: configService.get('modules.queue.redis.port'),
+          password: configService.get('modules.queue.redis.password'),
         },
       }),
     }),

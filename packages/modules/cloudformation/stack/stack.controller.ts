@@ -1,9 +1,9 @@
 import {BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query} from '@nestjs/common';
 import {ApiBearerAuth, ApiBody, ApiTags} from '@nestjs/swagger';
 import {AwsResourceStack, AwsResourceStackState, Prisma} from '@generated/prisma/client';
-import {CloudFormationStackType} from '@microservices/cloudformation/stack/stack.service';
+import {CloudFormationStackType} from '@modules/cloudformation/stack/stack.service';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AwsCloudformationService} from '@microservices/cloudformation/cloudformation.service';
+import {AwsCloudformationService} from '@modules/cloudformation/cloudformation.service';
 
 @ApiTags('AWS CloudFormation Stack')
 @ApiBearerAuth()

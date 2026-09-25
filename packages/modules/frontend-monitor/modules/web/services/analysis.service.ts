@@ -9,7 +9,7 @@ export class AnalysisService {
     private readonly models: MonitorModelsService,
     private readonly config: ConfigService
   ) {
-    this.cfg = this.config.get('microservices.frontend-monitor');
+    this.cfg = this.config.get('modules.frontend-monitor');
   }
 
   async getAnalysislist(appId: string, beginTime?: string, endTime?: string, filter?: {phone?: string; uid?: string}) {

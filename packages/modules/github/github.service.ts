@@ -8,7 +8,7 @@ export class GitHubService {
   octokit: Octokit;
 
   constructor(private configService: ConfigService) {
-    const config = this.configService.getOrThrow('microservices.github');
+    const config = this.configService.getOrThrow('modules.github');
     if (config.auth)
       this.octokit = new Octokit({
         auth: config.auth,

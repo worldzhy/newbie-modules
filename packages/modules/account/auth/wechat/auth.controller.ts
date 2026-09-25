@@ -1,17 +1,17 @@
 import {Controller, Post, Body, Ip, Req} from '@nestjs/common';
 import {ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {NoGuard} from '@microservices/account/security/passport/public/public.decorator';
-import {GuardByRefreshToken} from '@microservices/account/security/passport/refresh-token/refresh-token.decorator';
-import {TokenService} from '@microservices/account/security/token/token.service';
-import {LimitLoginByUserService} from '@microservices/account/security/rate-limiter/rate-limiter.service';
-import {SessionService} from '@microservices/account/modules/session/session.service';
-import {WechatAuthService} from '@microservices/account/auth/wechat/auth.service';
+import {NoGuard} from '@modules/account/security/passport/public/public.decorator';
+import {GuardByRefreshToken} from '@modules/account/security/passport/refresh-token/refresh-token.decorator';
+import {TokenService} from '@modules/account/security/token/token.service';
+import {LimitLoginByUserService} from '@modules/account/security/rate-limiter/rate-limiter.service';
+import {SessionService} from '@modules/account/modules/session/session.service';
+import {WechatAuthService} from '@modules/account/auth/wechat/auth.service';
 import {
   WechatLoginDto,
   WechatLoginResponseDto,
   WechatRefreshAccessTokenResponseDto,
-} from '@microservices/account/auth/wechat/auth.dto';
-import {LogoutResponseDto} from '@microservices/account/auth/auth.dto';
+} from '@modules/account/auth/wechat/auth.dto';
+import {LogoutResponseDto} from '@modules/account/auth/auth.dto';
 
 @ApiTags('Account / Auth / Wechat')
 @Controller('auth/wechat')

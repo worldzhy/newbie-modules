@@ -28,7 +28,7 @@ export class StripeService {
     private prisma: PrismaService
   ) {
     const stripeApiKey = this.configService.getOrThrow<string>(
-      'microservices.saas.payments.stripeApiKey'
+      'modules.saas.payments.stripeApiKey'
     );
     this.stripe = new Stripe(stripeApiKey, {
       apiVersion: '2024-06-20',
@@ -84,7 +84,7 @@ export class StripeService {
     return this.stripe.billingPortal.sessions.create({
       customer: stripeId,
       return_url: `${this.configService.get<string>(
-        'microservices.app.frontendUrl'
+        'modules.app.frontendUrl'
       )}/teams/${teamId}`,
     });
   }
@@ -182,12 +182,12 @@ export class StripeService {
       mode,
       payment_method_types: this.configService.get<
         Array<Stripe.Checkout.SessionCreateParams.PaymentMethodType>
-      >('microservices.saas.payments.paymentMethodTypes') ?? ['card'],
+      >('modules.saas.payments.paymentMethodTypes') ?? ['card'],
       success_url: `${this.configService.get<string>(
-        'microservices.app.frontendUrl'
+        'modules.app.frontendUrl'
       )}/teams/${teamId}`,
       cancel_url: `${this.configService.get<string>(
-        'microservices.app.frontendUrl'
+        'modules.app.frontendUrl'
       )}/teams/${teamId}`,
     };
     if (mode === 'subscription')
@@ -237,7 +237,7 @@ export class StripeService {
       payload,
       signature,
       this.configService.get<string>(
-        'microservices.saas.payments.stripeEndpointSecret'
+        'modules.saas.payments.stripeEndpointSecret'
       ) ?? ''
     );
     switch (event.type) {

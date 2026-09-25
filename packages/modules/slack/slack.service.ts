@@ -17,7 +17,7 @@ export class SlackService {
   private queue = new PQueue({concurrency: 1});
 
   constructor(private configService: ConfigService) {
-    this.config = this.configService.getOrThrow('microservices.slack');
+    this.config = this.configService.getOrThrow('modules.slack');
 
     if (this.config.token)
       this.client = new WebClient(this.config.token, {

@@ -28,11 +28,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy) {
     private readonly configService: ConfigService
   ) {
     super(<StrategyOptionWithRequest>{
-      clientID: configService.get('microservices.saas.googleAuth.clientId'),
+      clientID: configService.get('modules.saas.googleAuth.clientId'),
       clientSecret: configService.get(
-        'microservices.saas.googleAuth.clientSecret'
+        'modules.saas.googleAuth.clientSecret'
       ),
-      callbackURL: `${configService.get('microservices.saas.serverHost')}/auth/google/callback`,
+      callbackURL: `${configService.get('modules.saas.serverHost')}/auth/google/callback`,
       // passReqToCallback: true,
       scope: ['email', 'profile'],
     });
