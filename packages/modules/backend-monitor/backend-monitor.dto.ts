@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsArray,
   IsDateString,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -266,6 +267,7 @@ export class ListBackendMonitorRequestLogsDto {
   @ApiPropertyOptional({ description: "Sort direction: asc | desc" })
   @IsOptional()
   @IsString()
+  @IsIn(["asc", "desc"])
   sortOrder?: "asc" | "desc";
 }
 
@@ -311,6 +313,7 @@ export class ListBackendMonitorErrorLogsDto {
   @ApiPropertyOptional({ description: "Sort direction: asc | desc" })
   @IsOptional()
   @IsString()
+  @IsIn(["asc", "desc"])
   sortOrder?: "asc" | "desc";
 }
 

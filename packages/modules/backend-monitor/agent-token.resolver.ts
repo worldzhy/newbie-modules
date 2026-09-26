@@ -1,6 +1,6 @@
-import {Injectable, UnauthorizedException} from '@nestjs/common';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AgentStatus, AgentType} from '@generated/prisma/enums';
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AgentStatus, AgentType } from "@generated/prisma/enums";
 
 /** Positive token cache lifetime. Tokens rarely change, so 60s saves a PG hit per batch. */
 const POSITIVE_TTL_MS = 60_000;
@@ -8,6 +8,16 @@ const POSITIVE_TTL_MS = 60_000;
 const NEGATIVE_TTL_MS = 10_000;
 /** Minimum interval between lastSeenAt/status UPDATEs for one agent. */
 const TOUCH_THROTTLE_MS = 30_000;
+/**
+ * Hard cap on cached tokens (positive + negative). The endpoint is
+ * unauthenticated, so random-token traffic must not grow the Map without
+ * bound; at this size oldest entries are evicted.
+ */
+const MAX_CACHE_ENTRIES = 10_000;
+
+/** Canonical UUID format of the agent token column (PG uuid). */
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface CachedAgent {
   /** Null means the token was rejected (negative cache entry). */
@@ -39,32 +49,68 @@ export class AgentTokenResolver {
    */
   async resolveApplicationId(token: string | undefined): Promise<string> {
     if (!token) {
-      throw new UnauthorizedException('Missing application report token.');
+      throw new UnauthorizedException("Missing application report token.");
     }
 
     const now = Date.now();
+
+    // Reject malformed tokens up front: a non-UUID value would make Prisma
+    // throw a validation error (surfacing as 400) and bypass the negative
+    // cache, exposing the open endpoint to per-request PG hits.
+    if (!UUID_PATTERN.test(token)) {
+      this.putNegativeCache(token, now);
+      throw new UnauthorizedException("Invalid application report token.");
+    }
+
     const cached = this.cache.get(token);
-    if (cached && cached.expiresAt > now) {
-      if (!cached.applicationId || !cached.agentId) {
-        throw new UnauthorizedException('Invalid application report token.');
+    if (cached) {
+      if (cached.expiresAt <= now) {
+        // Lazy eviction of expired entries.
+        this.cache.delete(token);
+      } else if (!cached.applicationId || !cached.agentId) {
+        throw new UnauthorizedException("Invalid application report token.");
+      } else {
+        await this.touchAgent(cached.agentId);
+        return cached.applicationId;
       }
-      await this.touchAgent(cached.agentId);
-      return cached.applicationId;
     }
 
-    const agent = await this.prisma.agent.findUnique({where: {token}});
-    if (!agent || agent.type !== AgentType.SERVER_MONITOR || agent.status === AgentStatus.DISABLED) {
-      this.cache.set(token, {agentId: null, applicationId: null, expiresAt: now + NEGATIVE_TTL_MS});
-      throw new UnauthorizedException('Invalid application report token.');
+    const agent = await this.prisma.agent.findUnique({ where: { token } });
+    if (
+      !agent ||
+      agent.type !== AgentType.SERVER_MONITOR ||
+      agent.status === AgentStatus.DISABLED
+    ) {
+      this.putNegativeCache(token, now);
+      throw new UnauthorizedException("Invalid application report token.");
     }
 
-    this.cache.set(token, {
+    this.putCache(token, {
       agentId: agent.id,
       applicationId: agent.applicationId,
       expiresAt: now + POSITIVE_TTL_MS,
     });
     await this.touchAgent(agent.id);
     return agent.applicationId;
+  }
+
+  /** Stores a negative cache entry with the size cap applied. */
+  private putNegativeCache(token: string, now: number): void {
+    this.putCache(token, {
+      agentId: null,
+      applicationId: null,
+      expiresAt: now + NEGATIVE_TTL_MS,
+    });
+  }
+
+  /** Inserts a cache entry, evicting the oldest one when the cap is reached. */
+  private putCache(token: string, entry: CachedAgent): void {
+    if (this.cache.size >= MAX_CACHE_ENTRIES) {
+      // Map iteration order is insertion order; drop the oldest key.
+      const oldest = this.cache.keys().next().value;
+      if (oldest !== undefined) this.cache.delete(oldest);
+    }
+    this.cache.set(token, entry);
   }
 
   /**
