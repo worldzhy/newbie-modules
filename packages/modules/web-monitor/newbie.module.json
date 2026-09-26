@@ -1,0 +1,59 @@
+{
+  "key": "web-monitor",
+  "module": {
+    "file": "web-monitor.module",
+    "className": "WebMonitorModule"
+  },
+  "config-service": {
+    "web-monitor": {
+      "isLocalDev": false,
+      "clickhouseDB": "process.env.WEB_MONITOR_CLICKHOUSE_DB",
+      "redis": "process.env.WEB_MONITOR_REDIS || '127.0.0.1:6379::1'",
+      "redis_consumption": {
+        "task_time": "*/10 * * * * *",
+        "thread_web": 1000,
+        "total_limit_web": 100000
+      },
+      "TENCENTMAPKEY": "process.env.WEB_MONITOR_TENCENT_MAP_KEY || ''",
+      "top_alalysis_size": {
+        "web": 10
+      },
+      "pvuvip_task_minute_cron_time": "0 */2 * * * *",
+      "pvuvip_task_minute_lock_time": 20,
+      "ipRedisTTL": 2592000,
+      "ip_task_cron_time": "0 */1 * * * *",
+      "ip_task_lock_time": 20,
+      "ip_task_space_time": 60000,
+      "alarm": false,
+      "alarm_task_cron_time": "0 */1 * * * *",
+      "alarm_task_lock_time": 20,
+      "alarm_time": 60000,
+      "is_web_consume_task_run": true,
+      "day_report_num": true,
+      "day_report_num_task_cron_time": "0 0 0 */1 * *",
+      "day_report_num_task_lock_time": 3000,
+      "pvuvip_task_day_time": "0 0 0 */1 * *",
+      "day_report": false,
+      "day_report_task_cron_time": "0 0 0 */1 * *",
+      "day_report_task_lock_time": 3000,
+      "ip_thread": 5,
+      "appid_task_time": "0 */5 * * * *",
+      "pageSize": 15
+    }
+  },
+  "env": {
+    "WEB_MONITOR_CLICKHOUSE_DB": "",
+    "WEB_MONITOR_REDIS": "127.0.0.1:6379::1",
+    "WEB_MONITOR_TENCENT_MAP_KEY": ""
+  },
+  "dependencies": {
+    "@nestjs/schedule": "latest",
+    "cron-parser": "4.x",
+    "dotenv": "latest",
+    "ioredis": "latest",
+    "ip": "latest",
+    "nodemailer": "latest",
+    "ua-parser-js": "latest"
+  },
+  "devDependencies": {}
+}
