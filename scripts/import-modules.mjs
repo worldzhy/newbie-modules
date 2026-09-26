@@ -59,6 +59,12 @@ const MODULES = [
   { key: "aws-sms", file: "aws-sms", className: "AwsSmsModule", schema: false },
   { key: "aws-sqs", file: "aws-sqs", className: "AwsSqsModule", schema: false },
   {
+    key: "backend-monitor",
+    file: "backend-monitor",
+    className: "BackendMonitorModule",
+    schema: false,
+  },
+  {
     key: "cache",
     file: "cache",
     className: "NewbieCacheModule",

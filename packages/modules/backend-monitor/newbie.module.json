@@ -1,0 +1,9 @@
+{
+  "key": "backend-monitor",
+  "module": {
+    "file": "backend-monitor.module",
+    "className": "BackendMonitorModule"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
