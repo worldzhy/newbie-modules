@@ -66,7 +66,7 @@ export class InstallationsController {
   }
 
   @Get("catalog/:moduleKey/releases")
-  async releases(@Param("moduleKey") moduleKey: string) {
+  async moduleReleases(@Param("moduleKey") moduleKey: string) {
     return this.releases.getReleasesForModule(moduleKey);
   }
 

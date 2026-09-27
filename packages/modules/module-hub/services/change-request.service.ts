@@ -78,7 +78,7 @@ export class ModuleHubChangeRequestService {
       });
     }
     return claimed.map((row) => {
-      const payload = row.payload as ChangePayload;
+      const payload = row.payload as unknown as ChangePayload;
       return {
         id: row.id,
         type: row.type as "ADD" | "REMOVE" | "UPGRADE",
