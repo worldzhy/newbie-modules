@@ -1,5 +1,6 @@
 import { Body, Controller, Headers, Post, UnauthorizedException } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { NoGuard } from "@modules/account/security/passport/public/public.decorator";
 
 import { HubAgentPollDto } from "../module-hub.dto";
 import { ModuleHubChangeRequestService } from "../services/change-request.service";
@@ -22,6 +23,7 @@ export class AgentPollController {
   ) {}
 
   @Post("poll")
+  @NoGuard()
   async poll(@Headers("x-module-hub-token") token: string, @Body() body: HubAgentPollDto) {
     if (!token) {
       throw new UnauthorizedException("Missing X-Module-Hub-Token header.");
