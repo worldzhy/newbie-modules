@@ -1,0 +1,10 @@
+{
+  "key": "module-hub",
+  "module": {
+    "file": "module-hub.module",
+    "className": "ModuleHubModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "dependencies": {},
+  "devDependencies": {}
+}
