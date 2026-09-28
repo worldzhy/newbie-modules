@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
-/** An installation polls every 60s; three missed intervals marks it offline. */
+/** An installation reports every 60s; three missed intervals marks it offline (design §4.2). */
 export const ONLINE_THRESHOLD_SECONDS = 180;
 
 export function hashInstallationToken(token: string): string {
@@ -12,8 +12,9 @@ export function hashInstallationToken(token: string): string {
 
 /**
  * Installation registry. One token = one installation instance; the host
- * pre-creates rows and distributes the plaintext token out of band, the CLI
- * self-registers runtime facts on its first poll.
+ * pre-creates rows and distributes the plaintext report token out of band,
+ * and the running process self-registers runtime facts on its first full
+ * report (process-start hook, design §5.1).
  */
 @Injectable()
 export class ModuleHubInstallationService {
@@ -64,7 +65,7 @@ export class ModuleHubInstallationService {
     return this.withDerivedState(await this.getOrThrow(id));
   }
 
-  /** Latest module snapshot reported by the agent (`newbie status --json`). */
+  /** Latest module snapshot reported by the instance (`newbie status --json` modules[]). */
   async getModules(id: string) {
     const row = await this.getOrThrow(id);
     return row.modulesSnapshot ?? null;
@@ -82,7 +83,7 @@ export class ModuleHubInstallationService {
     return { id, token };
   }
 
-  /** Soft revocation: polls are rejected, rows are retained for audit. */
+  /** Soft revocation: reports are rejected (401), rows are retained for audit. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
     await this.prisma.hubInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
@@ -90,7 +91,7 @@ export class ModuleHubInstallationService {
     return { id, revoked: true };
   }
 
-  /** Token-only authentication for the agent poll endpoint. */
+  /** Token-only authentication for the report endpoint. */
   async resolveByToken(token: string) {
     const row = await this.prisma.hubInstallation.findUnique({
       where: { tokenHash: hashInstallationToken(token) },
@@ -99,21 +100,49 @@ export class ModuleHubInstallationService {
     return row;
   }
 
-  /** Self-registration of runtime facts on every poll. */
-  async touchOnPoll(id: string, facts: { cliVersion: string; status: any }) {
+  /**
+   * Self-registration of runtime facts on every report (design doc §4.2).
+   * - kind="ping": only refreshes lastSeenAt.
+   * - kind="full": writes firstSeenAt once (COALESCE) and refreshes all
+   *   runtime fact columns, modulesSnapshot and registrySourceCommit.
+   *
+   * Routine reports (full and ping) are NOT audited.
+   */
+  async touchOnReport(
+    id: string,
+    facts: {
+      kind: "full" | "ping";
+      framework?: string;
+      frameworkVersion?: string;
+      appVersion?: string;
+      env?: string;
+      instanceId?: string;
+      modules?: Array<Record<string, unknown>>;
+      registrySourceCommit?: string;
+    },
+  ) {
     const now = new Date();
-    const registrySourceCommit =
-      facts.status?.registry?.available && typeof facts.status.registry.sourceCommit === "string"
-        ? facts.status.registry.sourceCommit
-        : null;
-    // firstSeenAt is written exactly once (COALESCE); everything else refreshes.
+    if (facts.kind === "ping") {
+      await this.prisma.$executeRaw`
+        UPDATE "module/module-hub"."HubInstallation"
+        SET "lastSeenAt" = ${now}, "updatedAt" = ${now}
+        WHERE "id" = ${id}::uuid
+      `;
+      return;
+    }
+    // kind === "full": refresh all runtime fact columns + modulesSnapshot.
+    const modulesJson = facts.modules ? JSON.stringify(facts.modules) : null;
     await this.prisma.$executeRaw`
       UPDATE "module/module-hub"."HubInstallation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
-          "newbieVersion" = ${facts.cliVersion},
-          "registrySourceCommit" = ${registrySourceCommit},
-          "modulesSnapshot" = ${JSON.stringify(facts.status)}::jsonb,
+          "framework" = ${facts.framework ?? null},
+          "frameworkVersion" = ${facts.frameworkVersion ?? null},
+          "appVersion" = ${facts.appVersion ?? null},
+          "env" = ${facts.env ?? null},
+          "instanceId" = ${facts.instanceId ?? null},
+          "registrySourceCommit" = ${facts.registrySourceCommit ?? null},
+          "modulesSnapshot" = ${modulesJson}::jsonb,
           "updatedAt" = ${now}
       WHERE "id" = ${id}::uuid
     `;

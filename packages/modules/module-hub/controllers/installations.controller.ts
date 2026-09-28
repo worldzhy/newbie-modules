@@ -2,13 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/commo
 import { ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 
-import {
-  CreateHubChangeRequestDto,
-  CreateHubInstallationDto,
-  ListHubChangeRequestsQueryDto,
-  ListHubInstallationsQueryDto,
-} from "../module-hub.dto";
-import { ModuleHubChangeRequestService } from "../services/change-request.service";
+import { CreateHubInstallationDto, ListHubInstallationsQueryDto } from "../module-hub.dto";
 import { ModuleHubInstallationService } from "../services/installation.service";
 import { ModuleHubReleaseService } from "../services/release.service";
 
@@ -16,6 +10,10 @@ import { ModuleHubReleaseService } from "../services/release.service";
  * Host integration API. Protected by the host's own auth layer; hub does not
  * define user models. The UI-facing grouping (project/application) is the
  * host's business — hub only stores the opaque externalRef.
+ *
+ * v3 alignment note: change-request endpoints were removed (no execution
+ * channel in v3). The `PUT /installations/:id/target-spec` endpoint and its
+ * audit action are scheduled for Phase 1 (host integration API completion).
  */
 @ApiTags("Module Hub")
 @Controller("module-hub")
@@ -23,7 +21,6 @@ export class InstallationsController {
   constructor(
     private readonly installations: ModuleHubInstallationService,
     private readonly releases: ModuleHubReleaseService,
-    private readonly changes: ModuleHubChangeRequestService,
   ) {}
 
   // -- Installations ---------------------------------------------------------
@@ -68,20 +65,5 @@ export class InstallationsController {
   @Get("catalog/:moduleKey/releases")
   async moduleReleases(@Param("moduleKey") moduleKey: string) {
     return this.releases.getReleasesForModule(moduleKey);
-  }
-
-  // -- Change requests -------------------------------------------------------
-
-  @Get("installations/:id/change-requests")
-  async listChangeRequests(
-    @Param() params: CommonGetByStringIdRequestDto,
-    @Query() query: ListHubChangeRequestsQueryDto,
-  ) {
-    return this.changes.list(params.id, query);
-  }
-
-  @Post("installations/:id/change-requests")
-  async createChangeRequest(@Param() params: CommonGetByStringIdRequestDto, @Body() body: CreateHubChangeRequestDto) {
-    return this.changes.create(params.id, body);
   }
 }

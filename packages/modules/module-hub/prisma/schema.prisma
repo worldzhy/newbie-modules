@@ -3,23 +3,25 @@
 // ! ------------------------------------------------------------ //
 // * HubInstallation                                                //
 // * HubModuleRelease                                               //
-// * HubChangeRequest                                               //
 // * HubAuditLog                                                    //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// module-hub control-plane models. PostgreSQL schema: "module/module-hub".
+// Module-hub observer-plane models. PostgreSQL schema: "module/module-hub".
 // The hub is project-agnostic: an Installation is identified solely by its
-// token. Host-side project/application grouping lives in opaque `externalRef`.
-
-// Lifecycle is derived, not stored: never-seen (lastSeenAt null) / online /
-// stale. Only revocation is an explicit persisted state.
+// report token. Host-side project/application grouping lives in opaque
+// `externalRef`.
+//
+// One Installation = one running deployment endpoint of a consuming project
+// (a newbie backend or fewbie SSR process). Lifecycle is derived, not stored:
+// never-seen (lastSeenAt null) / online / stale, see section 4.2 of the
+// design doc. Only revocation is an explicit persisted state.
 model HubInstallation {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   // Human-readable label assigned at enrollment, e.g. "nightwatch-prod".
   label String @db.VarChar(255)
-  // SHA-256 hex of the installation token. The plaintext token is returned
-  // once at creation/rotation and never stored.
+  // SHA-256 hex of the report token. The plaintext token is returned once at
+  // creation/rotation and never stored.
   tokenHash String @unique @db.VarChar(64)
 
   // Optional source-repository URL, supplied by the host at enrollment.
@@ -27,17 +29,33 @@ model HubInstallation {
   // Opaque host-owned tag (e.g. "projectId/applicationId"); hub never parses it.
   externalRef String? @db.VarChar(255)
 
-  // Runtime facts self-registered on the first agent poll and refreshed later.
-  // newbie CLI version (from the agent process package.json VERSION).
-  newbieVersion String? @db.VarChar(64)
-  // Registry sourceCommit the installation last reported.
+  // Runtime facts self-registered at process start and refreshed on reports.
+  // Framework family of the running process: "newbie" | "fewbie" | "other-node".
+  framework String? @db.VarChar(32)
+  // Framework version, e.g. "newbie@0.2".
+  frameworkVersion String? @db.VarChar(64)
+  // Deployed application version (self-reported), e.g. git sha or semver.
+  appVersion String? @db.VarChar(64)
+  // Self-reported deployment environment, e.g. "prod". Informational only.
+  env String? @db.VarChar(64)
+  // Self-reported instance identifier (EC2 instance id, hostname, ...).
+  instanceId String? @db.VarChar(128)
+
+  // Registry sourceCommit the installation last reported. Derived from the
+  // first module entry's sourceCommit in the reported modules snapshot.
   registrySourceCommit String? @db.VarChar(64)
-  // Full snapshot mirroring `newbie status --json` output:
-  // { registry: {...}, modules: [{key, version, sourceCommit, localPatches,
-  //   installed, hasSchema, missingEnv, updateAvailable, drift?}] }
+  // Module snapshot in the shape of `newbie status --json` modules[] entries:
+  // [{key, version, sourceCommit, localPatches, installed, hasSchema,
+  //   missingEnv, updateAvailable, drift?}]
   modulesSnapshot Json?
-  firstSeenAt     DateTime?
-  lastSeenAt      DateTime?
+
+  // Desired module set marked by host users, in modules.json spec shape.
+  // Pure data for read-time "target vs actual" display — NOT an execution
+  // channel: the hub never dispatches it.
+  targetSpec Json?
+
+  firstSeenAt DateTime?
+  lastSeenAt  DateTime?
 
   // Soft revocation: token rejected, rows retained for audit/history.
   revokedAt DateTime?
@@ -45,8 +63,7 @@ model HubInstallation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  changeRequests HubChangeRequest[]
-  auditLogs      HubAuditLog[]
+  auditLogs HubAuditLog[]
 
   @@schema("module/module-hub")
 }
@@ -68,78 +85,18 @@ model HubModuleRelease {
   @@schema("module/module-hub")
 }
 
-enum HubChangeRequestStatus {
-  // Created by the host; waiting for an agent poll to pick it up.
-  PENDING
-  // Dispatched to an agent; the CLI is executing.
-  RUNNING
-  // Agent reported success; resultSummary holds the post-change facts.
-  DONE
-  // Agent reported failure; errorReason is populated; a new request is needed.
-  FAILED
-
-  @@schema("module/module-hub")
-}
-
-enum HubChangeRequestType {
-  // Enable a module not present in the current set (executed via `newbie apply`).
-  ADD
-  // Disable an installed module (executed via `newbie apply`).
-  REMOVE
-  // Move module(s) to a newer registry snapshot (executed via `newbie update`).
-  UPGRADE
-
-  @@schema("module/module-hub")
-}
-
-// A single module change order, scoped to one installation. Creating the
-// request IS the approval decision — there is no separate approve step in v1
-// (the hub has no user concept; authorization belongs to the host).
-model HubChangeRequest {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-
-  installationId String          @db.Uuid
-  installation   HubInstallation @relation(fields: [installationId], references: [id], onDelete: Cascade)
-
-  type   HubChangeRequestType
-  status HubChangeRequestStatus @default(PENDING)
-
-  // Change descriptor:
-  // { moduleKey, targetSourceCommit?,
-  //   options: { driftPolicy: "reject" | "force", delivery: "worktree" | "pr" } }
-  // ADD/REMOVE: moduleKey + apply semantics; UPGRADE: targetSourceCommit may be
-  // null (= registry HEAD at execution). delivery "pr" reserved for future CLI
-  // work; v1 executes "worktree" only.
-  payload Json @db.JsonB
-
-  // Receipt: post-execution snapshot excerpt and changed-file summary.
-  resultSummary Json?
-  errorReason   String? @db.Text
-
-  // Host actor identifier string (the hub has no users table).
-  createdBy String? @db.VarChar(255)
-
-  pickedAt   DateTime? // PENDING -> RUNNING
-  finishedAt DateTime? // -> DONE / FAILED
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  @@index([installationId, status])
-  @@schema("module/module-hub")
-}
-
 // Append-only audit trail (enrollment, token rotation/revocation, release
-// ingestion, change-request lifecycle). Routine polls are NOT audited.
+// ingestion, target-spec edits). Routine reports are NOT audited.
 model HubAuditLog {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  installationId String?         @db.Uuid
+  installationId String?          @db.Uuid
   installation   HubInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
 
   // Dot-namespaced, e.g. "installation.enroll", "installation.revoke",
-  // "release.ingest", "change.pick", "change.done", "change.fail".
+  // "installation.target-spec", "release.ingest".
   action String @db.VarChar(128)
-  // "host:<actor>", "agent:<installationId>", "webhook".
+  // "host:<actor>", "instance:<installationId>", "webhook".
   actor  String @db.VarChar(255)
   detail Json?
 

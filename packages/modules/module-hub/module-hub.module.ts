@@ -1,24 +1,24 @@
 import { Module } from "@nestjs/common";
 
-import { AgentPollController } from "./controllers/agent-poll.controller";
 import { InstallationsController } from "./controllers/installations.controller";
+import { ReportController } from "./controllers/report.controller";
 import { WebhookController } from "./controllers/webhook.controller";
-import { ModuleHubChangeRequestService } from "./services/change-request.service";
 import { ModuleHubInstallationService } from "./services/installation.service";
 import { ModuleHubReleaseService } from "./services/release.service";
 
 /**
- * Module Hub — control plane for remote installation management.
+ * Module Hub — observer plane for remote installation management.
  *
- * - InstallationsController: host integration (installation lifecycle, catalog,
- *   change-request creation). Protected by the host's own auth.
- * - AgentPollController: token-only open endpoint where CLI agents report
- *   status and pick up pending changes.
+ * - InstallationsController: host integration (installation lifecycle,
+ *   catalog). Protected by the host's own auth.
+ * - ReportController: token-only open endpoint where running instances report
+ *   process-start facts and periodic liveness. Module upgrades happen via
+ *   `newbie update` + deploy; the resulting snapshot IS the receipt.
  * - WebhookController: registry push ingestion. HMAC verified.
  */
 @Module({
-  controllers: [InstallationsController, AgentPollController, WebhookController],
-  providers: [ModuleHubInstallationService, ModuleHubChangeRequestService, ModuleHubReleaseService],
-  exports: [ModuleHubInstallationService, ModuleHubChangeRequestService, ModuleHubReleaseService],
+  controllers: [InstallationsController, ReportController, WebhookController],
+  providers: [ModuleHubInstallationService, ModuleHubReleaseService],
+  exports: [ModuleHubInstallationService, ModuleHubReleaseService],
 })
 export class ModuleHubModule {}

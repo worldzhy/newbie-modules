@@ -1,14 +1,19 @@
 # Module Hub
 
-Newbie module-hub control plane. One token = one installation instance.
+Newbie module-hub observer plane. One report token = one running deployment endpoint.
 
 ## API Groups
 
 | Group            | Auth                 | Base path                                          |
 | ---------------- | -------------------- | -------------------------------------------------- |
 | Host integration | Host JWT/Guard       | `/module-hub/installations`, `/module-hub/catalog` |
-| Agent polling    | `X-Module-Hub-Token` | `POST /module-hub/agent/poll`                      |
+| Instance report  | `X-Module-Hub-Token` | `POST /module-hub/report`                          |
 | GitHub webhook   | HMAC-SHA256          | `POST /module-hub/webhooks/registry`               |
+
+The report endpoint carries two kinds:
+
+- `kind="full"` — process-start self-registration with runtime facts and module snapshot.
+- `kind="ping"` — periodic liveness touch without snapshot.
 
 ## Environment Variables
 
@@ -20,4 +25,4 @@ Newbie module-hub control plane. One token = one installation instance.
 
 ## Design Reference
 
-See `.agent/documents/module-hub-design.md` in the newbie repository (v1.1).
+See `module-hub-design.md` (v3) in the nightwatch repository's `.trae/documents/`.

@@ -1,6 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsArray, IsIn, IsObject, IsOptional, IsString, IsUUID, ValidateNested } from "class-validator";
-import { Type } from "class-transformer";
+import { IsArray, IsIn, IsObject, IsOptional, IsString } from "class-validator";
 
 // ---------------------------------------------------------------------------
 // host integration API DTOs (hub side; the host may also inject the services
@@ -35,89 +34,69 @@ export class ListHubInstallationsQueryDto {
   externalRef?: string;
 }
 
-export class CreateHubChangeRequestDto {
-  @ApiProperty({ enum: ["ADD", "REMOVE", "UPGRADE"] })
-  @IsIn(["ADD", "REMOVE", "UPGRADE"])
-  type: "ADD" | "REMOVE" | "UPGRADE";
-
-  @ApiProperty()
-  @IsString()
-  moduleKey: string;
-
-  /** UPGRADE only. Null/absent = registry HEAD at execution time. */
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  targetSourceCommit?: string;
-
-  @ApiPropertyOptional({
-    description: "reject: refuse execution when local drift exists (default); force: pass --force",
-    enum: ["reject", "force"],
-  })
-  @IsOptional()
-  @IsIn(["reject", "force"])
-  driftPolicy?: "reject" | "force";
-
-  /** Reserved. v1 always executes as "worktree". */
-  @ApiPropertyOptional({ enum: ["worktree", "pr"] })
-  @IsOptional()
-  @IsIn(["worktree", "pr"])
-  delivery?: "worktree" | "pr";
-
-  @ApiPropertyOptional({ description: "Host actor identifier recorded on the change request" })
-  @IsOptional()
-  @IsString()
-  createdBy?: string;
-}
-
-export class ListHubChangeRequestsQueryDto {
-  @ApiPropertyOptional({ enum: ["PENDING", "RUNNING", "DONE", "FAILED"] })
-  @IsOptional()
-  @IsIn(["PENDING", "RUNNING", "DONE", "FAILED"])
-  status?: "PENDING" | "RUNNING" | "DONE" | "FAILED";
-}
-
 // ---------------------------------------------------------------------------
-// agent polling API DTOs (token-only, X-Module-Hub-Token)
+// instance report API DTOs (token-only, X-Module-Hub-Token). Design doc §4.2.
 // ---------------------------------------------------------------------------
 
-export class HubAgentResultDto {
-  @ApiProperty()
-  @IsUUID()
-  changeRequestId: string;
+export class HubReportDto {
+  // "full": process-start self-registration with runtime facts and snapshot;
+  // "ping": periodic liveness touch without snapshot.
+  @ApiProperty({ enum: ["full", "ping"] })
+  @IsIn(["full", "ping"])
+  kind: "full" | "ping";
 
-  @ApiProperty({ enum: ["DONE", "FAILED"] })
-  @IsIn(["DONE", "FAILED"])
-  outcome: "DONE" | "FAILED";
+  // --- kind="full" fields below; "ping" omits them ---
 
-  /** Post-execution snapshot excerpt + changed-file summary. */
-  @ApiPropertyOptional()
+  // Framework family of the running process.
+  @ApiPropertyOptional({ enum: ["newbie", "fewbie", "other-node"] })
   @IsOptional()
-  @IsObject()
-  summary?: Record<string, unknown>;
+  @IsIn(["newbie", "fewbie", "other-node"])
+  framework?: "newbie" | "fewbie" | "other-node";
 
+  @ApiPropertyOptional({ description: 'e.g. "newbie@0.2"' })
+  @IsOptional()
+  @IsString()
+  frameworkVersion?: string;
+
+  // Deployed application version (git sha / semver), self-reported.
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  error?: string;
-}
+  appVersion?: string;
 
-export class HubAgentPollDto {
-  /** newbie CLI version of the agent process, e.g. "0.1.0-stage.2". */
-  @ApiProperty()
+  // Self-reported deployment environment, e.g. "prod".
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
-  cliVersion: string;
+  env?: string;
 
-  /** Verbatim output of `newbie status --json [--drift]` from the project root. */
-  @ApiProperty({ description: "Verbatim `newbie status --json` output" })
-  @IsObject()
-  status: Record<string, unknown>;
+  // Self-reported instance identifier (EC2 instance id, hostname, ...).
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  instanceId?: string;
 
-  /** Receipts for change requests received in earlier polls. */
-  @ApiPropertyOptional({ type: [HubAgentResultDto] })
+  // Module snapshot in the shape of `newbie status --json` modules[] entries
+  // (see design doc section 3). Source: the framework's own assembled-module
+  // inventory, NOT a CLI invocation (design doc section 5).
+  @ApiPropertyOptional({ description: "newbie status --json modules[] shape" })
   @IsOptional()
   @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => HubAgentResultDto)
-  results?: HubAgentResultDto[];
+  @IsObject({ each: true })
+  modules?: Array<Record<string, unknown>>;
+}
+
+export class HubReportResponseDto {
+  @ApiProperty()
+  serverTime: Date;
+
+  // Requested report interval (seconds) for "ping" reports. v1 fixed 60;
+  // reserved for hub-side throttling without a client upgrade.
+  @ApiProperty()
+  reportIntervalSeconds: number;
+
+  // Latest registry HEAD commit known to the hub (webhook/fallback ingested).
+  // Lets clients/ops see upgradability without a catalog query.
+  @ApiPropertyOptional()
+  latestRegistrySourceCommit?: string;
 }
