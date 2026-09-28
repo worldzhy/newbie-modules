@@ -71,6 +71,23 @@ export class ModuleHubInstallationService {
     return row.modulesSnapshot ?? null;
   }
 
+  /**
+   * Set or clear the desired module set marked by host users (design §3, §4.1).
+   * Pure data for read-time "target vs actual" display — NOT an execution
+   * channel: the hub never dispatches it. Passing null clears the spec.
+   */
+  async setTargetSpec(id: string, spec: Record<string, unknown> | null, actor?: string) {
+    await this.getOrThrow(id);
+    // Prisma's Json? column type narrows null/objects at runtime; cast to any
+    // to accept both null (clears) and arbitrary JSON objects (sets).
+    await this.prisma.hubInstallation.update({
+      where: { id },
+      data: { targetSpec: spec as any },
+    });
+    await this.audit(id, "installation.target-spec", `host:${actor ?? "unknown"}`, { spec });
+    return { id, targetSpec: spec };
+  }
+
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);

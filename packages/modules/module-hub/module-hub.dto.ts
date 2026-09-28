@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsArray, IsIn, IsObject, IsOptional, IsString } from "class-validator";
+import { IsArray, IsIn, IsObject, IsOptional, IsString, ValidateIf } from "class-validator";
 
 // ---------------------------------------------------------------------------
 // host integration API DTOs (hub side; the host may also inject the services
@@ -32,6 +32,25 @@ export class ListHubInstallationsQueryDto {
   @IsOptional()
   @IsString()
   externalRef?: string;
+}
+
+/**
+ * Body of PUT /module-hub/installations/:id/target-spec. The hub stores the
+ * spec verbatim — it is pure data for read-time "target vs actual" display
+ * and is NOT an execution channel (design §3, §4.1).
+ */
+export class SetHubTargetSpecDto {
+  // modules.json spec shape; null clears the target spec. Validation skips
+  // when the value is null/undefined so clients can send `{"spec": null}`
+  // to clear.
+  @ApiProperty({
+    description: "modules.json spec shape; null clears the target spec",
+    type: Object,
+    nullable: true,
+  })
+  @ValidateIf((o) => o.spec !== null && o.spec !== undefined)
+  @IsObject()
+  spec: Record<string, unknown> | null;
 }
 
 // ---------------------------------------------------------------------------

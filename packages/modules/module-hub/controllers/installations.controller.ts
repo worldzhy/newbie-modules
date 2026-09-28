@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 
-import { CreateHubInstallationDto, ListHubInstallationsQueryDto } from "../module-hub.dto";
+import { CreateHubInstallationDto, ListHubInstallationsQueryDto, SetHubTargetSpecDto } from "../module-hub.dto";
 import { ModuleHubInstallationService } from "../services/installation.service";
 import { ModuleHubReleaseService } from "../services/release.service";
 
@@ -11,9 +11,11 @@ import { ModuleHubReleaseService } from "../services/release.service";
  * define user models. The UI-facing grouping (project/application) is the
  * host's business — hub only stores the opaque externalRef.
  *
- * v3 alignment note: change-request endpoints were removed (no execution
- * channel in v3). The `PUT /installations/:id/target-spec` endpoint and its
- * audit action are scheduled for Phase 1 (host integration API completion).
+ * v3 alignment (Phase 1): change-request endpoints removed (no execution
+ * channel in v3); PUT /installations/:id/target-spec added (pure data, audited
+ * as "installation.target-spec"). GET /installations/:id/modules returns the
+ * raw snapshot for now — the read-time "target vs actual" comparison with
+ * targetSpec and the latest release is deferred to Phase 2 (client integration).
  */
 @ApiTags("Module Hub")
 @Controller("module-hub")
@@ -43,6 +45,15 @@ export class InstallationsController {
   @Get("installations/:id/modules")
   async modules(@Param() params: CommonGetByStringIdRequestDto) {
     return this.installations.getModules(params.id);
+  }
+
+  @Put("installations/:id/target-spec")
+  async setTargetSpec(
+    @Param() params: CommonGetByStringIdRequestDto,
+    @Body() body: SetHubTargetSpecDto,
+    @Query("actor") actor?: string,
+  ) {
+    return this.installations.setTargetSpec(params.id, body.spec, actor);
   }
 
   @Post("installations/:id/token/regenerate")
