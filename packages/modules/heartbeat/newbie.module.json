@@ -1,0 +1,10 @@
+{
+  "key": "heartbeat",
+  "module": {
+    "file": "heartbeat.module",
+    "className": "HeartbeatModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "dependencies": {},
+  "devDependencies": {}
+}

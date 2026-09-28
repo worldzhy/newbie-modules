@@ -1,0 +1,45 @@
+// ! ------------------------------------------------------------ //
+// !             [Module] Heartbeat models                        //
+// ! ------------------------------------------------------------ //
+// * HeartbeatInstallation                                          //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+// Heartbeat installation identity. PostgreSQL schema: "module/heartbeat".
+// One Installation = one running deployment endpoint holding a heartbeat token
+// (a newbie backend, fewbie SSR process, or any other node service). The
+// module is project-agnostic: host-side grouping lives in opaque
+// `externalRef` and is never parsed here.
+//
+// Lifecycle is derived, not stored: never-seen (lastSeenAt null) / online /
+// offline. Only revocation is an explicit persisted state.
+model HeartbeatInstallation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // Human-readable label assigned at enrollment, e.g. "nightwatch-prod".
+  label String @db.VarChar(255)
+  // SHA-256 hex of the heartbeat token. The plaintext token is returned once
+  // at creation/rotation and never stored.
+  tokenHash String @unique @db.VarChar(64)
+
+  // Opaque host-owned tag (e.g. "projectId/applicationId"); never parsed here.
+  externalRef String? @db.VarChar(255)
+
+  // Runtime facts self-reported by the client on ping. All informational.
+  // Deployed application version (git sha / semver).
+  appVersion String? @db.VarChar(64)
+  // Deployment environment, e.g. "prod".
+  env String? @db.VarChar(64)
+  // Instance identifier (EC2 instance id, hostname, ...).
+  instanceId String? @db.VarChar(128)
+
+  firstSeenAt DateTime?
+  lastSeenAt  DateTime?
+
+  // Soft revocation: token rejected, rows retained for audit/history.
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/heartbeat")
+}
