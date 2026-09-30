@@ -17,25 +17,26 @@ export class BackendMonitorController {
 
   /**
    * Batched ingestion endpoint for backend applications.
-   * Open route (no user JWT); authentication is the SERVER_MONITOR agent
-   * token presented via X-Application-Token. One call carries request metrics
-   * and/or errors, enabling one auth lookup and at most one insert per table.
+   * Open route (no user JWT); authentication is the MonitorInstallation
+   * report token presented via X-Backend-Monitor-Token (module-hub design
+   * §9.2). One call carries request metrics and/or errors, enabling one auth
+   * lookup and at most one insert per table.
    */
   @ApiOperation({summary: 'Ingest a batch of backend request/error events'})
   @ApiHeader({
-    name: 'X-Application-Token',
-    description: 'The secret token of the SERVER_MONITOR agent (Agent.token)',
+    name: 'X-Backend-Monitor-Token',
+    description: 'The plaintext report token returned once at installation enrollment',
     required: true,
   })
   @ApiResponse({status: 204, description: 'Batch accepted.'})
   @ApiResponse({status: 400, description: 'Empty batch or invalid event payload.'})
-  @ApiResponse({status: 401, description: 'Invalid or missing application token.'})
+  @ApiResponse({status: 401, description: 'Invalid or missing monitor installation token.'})
   @ApiResponse({status: 413, description: 'An event array exceeds the batch limit.'})
   @HttpCode(HttpStatus.NO_CONTENT)
   @NoGuard()
   @Post('ingest')
   async ingest(
-    @Headers('x-application-token') reportToken: string,
+    @Headers('x-backend-monitor-token') reportToken: string,
     @Body() body: CreateBackendMonitorIngestDto
   ): Promise<void> {
     await this.backendMonitorService.ingest(reportToken, body);

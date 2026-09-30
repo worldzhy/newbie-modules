@@ -4,6 +4,7 @@
     "file": "backend-monitor.module",
     "className": "BackendMonitorModule"
   },
+  "schema": "prisma/schema.prisma",
   "dependencies": {},
   "devDependencies": {}
 }

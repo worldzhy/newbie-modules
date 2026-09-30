@@ -319,41 +319,73 @@ export class ListBackendMonitorErrorLogsDto {
 
 /** One row of application_request_logs (ClickHouse snake_case shape). */
 export class BackendMonitorRequestLogResponseDto {
+  @ApiProperty()
   application_id: string;
+  @ApiProperty()
   request_id: string;
+  @ApiProperty()
   route: string;
+  @ApiProperty()
   path: string;
+  @ApiProperty({ description: "HTTP method in upper-case" })
   method: string;
+  @ApiProperty()
   status_code: number;
+  @ApiProperty()
   request_at: string;
+  @ApiProperty()
   response_at: string;
+  @ApiProperty()
   duration_ms: number;
+  @ApiProperty()
   env: string;
+  @ApiProperty()
   instance_id: string;
+  @ApiProperty()
   app_version: string;
+  @ApiPropertyOptional()
   ip: string;
+  @ApiPropertyOptional()
   user_agent: string;
+  @ApiProperty()
   ingested_at: string;
 }
 
 /** One row of application_error_logs (ClickHouse snake_case shape). */
 export class BackendMonitorErrorLogResponseDto {
+  @ApiProperty()
   application_id: string;
+  @ApiPropertyOptional()
   request_id: string;
+  @ApiProperty()
   fingerprint: string;
+  @ApiProperty({ description: "Error type / class name" })
   type: string;
+  @ApiProperty({ description: "Error message" })
   message: string;
+  @ApiPropertyOptional({ description: "Full stack trace" })
   stack: string;
+  @ApiPropertyOptional()
   route: string;
+  @ApiPropertyOptional({ description: "Pathname without query string" })
   path: string;
+  @ApiPropertyOptional({ description: "HTTP method in upper-case" })
   method: string;
+  @ApiPropertyOptional({ description: "HTTP response status code; 0 for non-HTTP errors" })
   status_code: number;
+  @ApiProperty()
   env: string;
+  @ApiProperty()
   instance_id: string;
+  @ApiProperty()
   app_version: string;
+  @ApiPropertyOptional()
   ip: string;
+  @ApiPropertyOptional()
   user_agent: string;
+  @ApiProperty({ description: "ISO 8601 timestamp of when the error occurred" })
   occurred_at: string;
+  @ApiProperty()
   ingested_at: string;
 }
 

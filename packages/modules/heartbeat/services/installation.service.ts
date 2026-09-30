@@ -49,6 +49,26 @@ export class HeartbeatInstallationService {
     return rows.map((row) => this.withDerivedState(row));
   }
 
+  /**
+   * Batch liveness lookup for host-side list views: externalRef -> online.
+   * One query for the whole set; an externalRef with no online installation
+   * (or none at all) is simply absent from the map.
+   */
+  async getOnlineByExternalRefs(externalRefs: string[]): Promise<Map<string, boolean>> {
+    if (externalRefs.length === 0) return new Map();
+    const rows = await this.prisma.heartbeatInstallation.findMany({
+      where: { externalRef: { in: externalRefs }, revokedAt: null },
+      select: { externalRef: true, lastSeenAt: true },
+    });
+    const online = new Map<string, boolean>();
+    for (const row of rows) {
+      if (!row.externalRef || !row.lastSeenAt) continue;
+      const isOnline = Date.now() - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_SECONDS * 1000;
+      online.set(row.externalRef, (online.get(row.externalRef) ?? false) || isOnline);
+    }
+    return online;
+  }
+
   async getOrThrow(id: string) {
     const row = await this.prisma.heartbeatInstallation.findUnique({ where: { id } });
     if (!row) throw new NotFoundException(`Installation ${id} not found.`);

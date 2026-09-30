@@ -1,0 +1,53 @@
+// ! ------------------------------------------------------------ //
+// !             [Module] Backend Monitor models                  //
+// ! ------------------------------------------------------------ //
+// * MonitorInstallation                                            //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+// Backend-monitor ingest identity. PostgreSQL schema: "module/backend-monitor".
+// One MonitorInstallation = one running deployment endpoint reporting request
+// and error logs (module-hub design §9.2, Phase 3 pilot). The module owns the
+// token end to end instead of reading application.Agent (SERVER_MONITOR):
+// the token is a random UUID, only its SHA-256 hash is stored, the plaintext
+// is returned once at enrollment/rotation, and revocation is a soft delete.
+//
+// Host-side grouping lives in opaque `externalRef` (convention:
+// "projectId/applicationId"); the ingest resolver maps it back to the
+// application_id written to ClickHouse.
+//
+// Lifecycle is derived, not stored: never-seen (lastSeenAt null) / online /
+// stale. Only revocation is an explicit persisted state.
+model MonitorInstallation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // Human-readable label assigned at enrollment, e.g. "nightwatch-prod".
+  label String @db.VarChar(255)
+  // SHA-256 hex of the report token. The plaintext token is returned once at
+  // creation/rotation and never stored.
+  tokenHash String @unique @db.VarChar(64)
+
+  // Opaque host-owned tag (convention: "projectId/applicationId"); the ingest
+  // resolver parses the applicationId segment to stamp CH rows.
+  externalRef String? @db.VarChar(255)
+
+  // Runtime facts refreshed from ingest batch headers/body. Informational.
+  // Deployment environment, e.g. "prod".
+  env String? @db.VarChar(64)
+  // Deployed application version (git sha / semver), self-reported.
+  appVersion String? @db.VarChar(64)
+  // Reporting instance identifier (EC2 instance id, hostname, ...).
+  instanceId String? @db.VarChar(128)
+  // Reporter family/kind, e.g. "newbie" (reserved, informational).
+  kind String? @db.VarChar(32)
+
+  firstSeenAt DateTime?
+  lastSeenAt  DateTime?
+
+  // Soft revocation: ingest rejected (401), rows retained for history.
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/backend-monitor")
+}

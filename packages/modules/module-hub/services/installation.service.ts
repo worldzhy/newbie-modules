@@ -10,6 +10,112 @@ export function hashInstallationToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+// --- target-spec vs reported snapshot (read-time, design §3 targetSpec) ------
+
+/** A single module row inside a `newbie status --json` modules[] snapshot. */
+interface SnapshotModule {
+  key: string;
+  version?: string | null;
+  sourceCommit?: string | null;
+  installed?: boolean;
+  hasSchema?: boolean;
+  missingEnv?: string[];
+  updateAvailable?: boolean;
+  drift?: boolean;
+  localPatches?: string[];
+}
+
+/** A module entry inside a stored targetSpec (modules.json modules[] shape). */
+interface TargetModule {
+  key: string;
+  version?: string | null;
+  sourceCommit?: string | null;
+}
+
+export type ModuleConvergenceStatus = "converged" | "pending" | "missing" | "untracked";
+
+export interface ModuleConvergenceEntry {
+  key: string;
+  status: ModuleConvergenceStatus;
+  target: Pick<TargetModule, "version" | "sourceCommit"> | null;
+  actual: SnapshotModule | null;
+}
+
+export interface TargetActualComparison {
+  // true = every target module reported at the pinned commit; false = some
+  // target module missing or at a different commit; null = no targetSpec set
+  // (nothing to converge against).
+  converged: boolean | null;
+  entries: ModuleConvergenceEntry[];
+}
+
+/**
+ * Pure read-time comparison between a stored targetSpec (modules.json shape)
+ * and the last reported module snapshot (`newbie status --json` modules[]).
+ *
+ * The hub never dispatches the spec: developers/CI run `newbie update`, and
+ * the next process-start "full" report proves convergence with its snapshot.
+ */
+export function compareTargetWithSnapshot(
+  targetSpec: Record<string, unknown> | null,
+  snapshot: unknown,
+): TargetActualComparison {
+  const targetModules = Array.isArray(targetSpec?.modules)
+    ? ((targetSpec.modules as TargetModule[]).filter((m) => m && typeof m.key === "string") ?? [])
+    : [];
+  const actualModules = Array.isArray(snapshot)
+    ? (snapshot as SnapshotModule[]).filter((m) => m && typeof m.key === "string")
+    : [];
+
+  if (targetModules.length === 0) {
+    return { converged: null, entries: [] };
+  }
+
+  const actualByKey = new Map(actualModules.map((m) => [m.key, m]));
+  const targetKeys = new Set(targetModules.map((m) => m.key));
+  const entries: ModuleConvergenceEntry[] = [];
+
+  for (const target of targetModules) {
+    const actual = actualByKey.get(target.key) ?? null;
+    let status: ModuleConvergenceStatus;
+    if (!actual || actual.installed === false) {
+      status = "missing";
+    } else if (
+      // A null pin means "whatever is installed is fine"; only explicit pins
+      // participate in the commit comparison.
+      target.sourceCommit != null &&
+      actual.sourceCommit !== target.sourceCommit
+    ) {
+      status = "pending";
+    } else {
+      status = "converged";
+    }
+    entries.push({
+      key: target.key,
+      status,
+      target: { version: target.version ?? null, sourceCommit: target.sourceCommit ?? null },
+      actual,
+    });
+  }
+
+  // Reported modules absent from the target are informational only — they do
+  // not block convergence (the spec is a desired subset, not a deny list).
+  for (const actual of actualModules) {
+    if (!targetKeys.has(actual.key)) {
+      entries.push({
+        key: actual.key,
+        status: "untracked",
+        target: null,
+        actual,
+      });
+    }
+  }
+
+  const converged = entries.filter((e) => e.status !== "untracked").every((e) => e.status === "converged");
+
+  return { converged, entries };
+}
+
 /**
  * Installation registry. One token = one installation instance; the host
  * pre-creates rows and distributes the plaintext report token out of band,
@@ -65,10 +171,20 @@ export class ModuleHubInstallationService {
     return this.withDerivedState(await this.getOrThrow(id));
   }
 
-  /** Latest module snapshot reported by the instance (`newbie status --json` modules[]). */
+  /**
+   * Latest module snapshot reported by the instance (`newbie status --json`
+   * modules[]) plus the read-time "target vs actual" comparison against the
+   * stored targetSpec (design §4.1).
+   */
   async getModules(id: string) {
     const row = await this.getOrThrow(id);
-    return row.modulesSnapshot ?? null;
+    const targetSpec = (row.targetSpec as Record<string, unknown> | null) ?? null;
+    return {
+      actual: (row.modulesSnapshot as unknown[] | null) ?? null,
+      targetSpec,
+      reportedAt: row.lastSeenAt ?? null,
+      comparison: compareTargetWithSnapshot(targetSpec, row.modulesSnapshot),
+    };
   }
 
   /**
@@ -168,6 +284,30 @@ export class ModuleHubInstallationService {
   async audit(installationId: string | null, action: string, actor: string, detail?: any) {
     await this.prisma.hubAuditLog.create({
       data: { installationId, action, actor, detail: detail ?? undefined },
+    });
+  }
+
+  /** Audit trail of one installation (lifecycle events), newest first. */
+  async listAuditForInstallation(id: string, limit = 50) {
+    await this.getOrThrow(id);
+    return this.prisma.hubAuditLog.findMany({
+      where: { installationId: id },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    });
+  }
+
+  /**
+   * Global audit feed. With no filter this returns the newest lifecycle and
+   * registry events across all installations; `action` narrows it (e.g.
+   * "release.ingest" for registry publications, which carry null
+   * installationId and never appear in installation-scoped feeds).
+   */
+  async listAuditFeed(query: { action?: string; limit?: number }) {
+    return this.prisma.hubAuditLog.findMany({
+      where: query.action ? { action: query.action } : undefined,
+      orderBy: { createdAt: "desc" },
+      take: query.limit ?? 50,
     });
   }
 }

@@ -46,10 +46,10 @@ export class ReportController {
     // entry, if any. The hub stores it as a convenience column for
     // "is upgradable" checks without re-parsing modulesSnapshot.
     const modules = body.modules ?? [];
-    const firstSourceCommit = modules.find((m) => m && typeof (m as { sourceCommit?: unknown }).sourceCommit === "string")
-      ?.sourceCommit;
-    const registrySourceCommit =
-      typeof firstSourceCommit === "string" ? firstSourceCommit : undefined;
+    const firstSourceCommit = modules.find(
+      (m) => m && typeof (m as { sourceCommit?: unknown }).sourceCommit === "string",
+    )?.sourceCommit;
+    const registrySourceCommit = typeof firstSourceCommit === "string" ? firstSourceCommit : undefined;
 
     // Refresh runtime facts (firstSeenAt is written exactly once via COALESCE
     // on the first "full" report; "ping" only touches lastSeenAt).

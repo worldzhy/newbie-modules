@@ -2,7 +2,12 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query } from "@nestjs/
 import { ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 
-import { CreateHubInstallationDto, ListHubInstallationsQueryDto, SetHubTargetSpecDto } from "../module-hub.dto";
+import {
+  CreateHubInstallationDto,
+  ListHubAuditQueryDto,
+  ListHubInstallationsQueryDto,
+  SetHubTargetSpecDto,
+} from "../module-hub.dto";
 import { ModuleHubInstallationService } from "../services/installation.service";
 import { ModuleHubReleaseService } from "../services/release.service";
 
@@ -12,10 +17,10 @@ import { ModuleHubReleaseService } from "../services/release.service";
  * host's business — hub only stores the opaque externalRef.
  *
  * v3 alignment (Phase 1): change-request endpoints removed (no execution
- * channel in v3); PUT /installations/:id/target-spec added (pure data, audited
- * as "installation.target-spec"). GET /installations/:id/modules returns the
- * raw snapshot for now — the read-time "target vs actual" comparison with
- * targetSpec and the latest release is deferred to Phase 2 (client integration).
+ * channel in v3); PUT /installations/:id/target-spec stores pure data,
+ * audited as "installation.target-spec". GET /installations/:id/modules
+ * returns the reported snapshot plus the read-time "target vs actual"
+ * comparison (Phase 2 convergence view).
  */
 @ApiTags("Module Hub")
 @Controller("module-hub")
@@ -47,6 +52,11 @@ export class InstallationsController {
     return this.installations.getModules(params.id);
   }
 
+  @Get("installations/:id/audit")
+  async installationAudit(@Param() params: CommonGetByStringIdRequestDto, @Query() query: ListHubAuditQueryDto) {
+    return this.installations.listAuditForInstallation(params.id, query.limit ?? 50);
+  }
+
   @Put("installations/:id/target-spec")
   async setTargetSpec(
     @Param() params: CommonGetByStringIdRequestDto,
@@ -76,5 +86,12 @@ export class InstallationsController {
   @Get("catalog/:moduleKey/releases")
   async moduleReleases(@Param("moduleKey") moduleKey: string) {
     return this.releases.getReleasesForModule(moduleKey);
+  }
+
+  // -- Audit -----------------------------------------------------------------
+
+  @Get("audit")
+  async auditFeed(@Query() query: ListHubAuditQueryDto) {
+    return this.installations.listAuditFeed({ action: query.action, limit: query.limit });
   }
 }

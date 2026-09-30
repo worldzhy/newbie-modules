@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsArray, IsIn, IsObject, IsOptional, IsString, ValidateIf } from "class-validator";
+import { Type } from "class-transformer";
+import { IsArray, IsIn, IsInt, IsObject, IsOptional, IsString, Max, Min, ValidateIf } from "class-validator";
 
 // ---------------------------------------------------------------------------
 // host integration API DTOs (hub side; the host may also inject the services
@@ -32,6 +33,24 @@ export class ListHubInstallationsQueryDto {
   @IsOptional()
   @IsString()
   externalRef?: string;
+}
+
+/** Query params for audit feeds (installation-scoped and global). */
+export class ListHubAuditQueryDto {
+  @ApiPropertyOptional({
+    description: "Filter by dot-namespaced action, e.g. release.ingest",
+  })
+  @IsOptional()
+  @IsString()
+  action?: string;
+
+  @ApiPropertyOptional({ description: "Max rows to return", default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  limit?: number;
 }
 
 /**

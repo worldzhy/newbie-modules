@@ -1,11 +1,7 @@
-import {
-  BadRequestException,
-  Injectable,
-  PayloadTooLargeException,
-} from "@nestjs/common";
+import { BadRequestException, Injectable, PayloadTooLargeException } from "@nestjs/common";
 import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
-import { AgentTokenResolver } from "./agent-token.resolver";
 import { computeErrorFingerprint } from "./error-fingerprint.util";
+import { MonitorTokenResolver } from "./monitor-token.resolver";
 import {
   BackendMonitorErrorEventDto,
   BackendMonitorRequestEventDto,
@@ -16,21 +12,9 @@ import {
 } from "./backend-monitor.dto";
 
 /** Allowed sort fields for request logs (whitelist guards the ORDER BY clause). */
-const ALLOWED_REQUEST_SORT_FIELDS = new Set([
-  "path",
-  "method",
-  "status_code",
-  "duration_ms",
-  "request_at",
-]);
+const ALLOWED_REQUEST_SORT_FIELDS = new Set(["path", "method", "status_code", "duration_ms", "request_at"]);
 /** Allowed sort fields for error logs. */
-const ALLOWED_ERROR_SORT_FIELDS = new Set([
-  "type",
-  "message",
-  "path",
-  "status_code",
-  "occurred_at",
-]);
+const ALLOWED_ERROR_SORT_FIELDS = new Set(["type", "message", "path", "status_code", "occurred_at"]);
 
 /** Accepted client-clock skew into the past. */
 const MAX_PAST_SKEW_MS = 60 * 60 * 1000; // 1 hour
@@ -39,6 +23,10 @@ const MAX_FUTURE_SKEW_MS = 60 * 1000; // 1 minute
 
 export interface RequestLogRow {
   application_id: string;
+  // MonitorInstallation that reported the row (module-hub design §9.2,
+  // Phase 3). application_id stays the leading partition/sort key so the
+  // frontend query contract is unchanged.
+  installation_id: string;
   request_id: string;
   route: string;
   path: string;
@@ -56,6 +44,7 @@ export interface RequestLogRow {
 
 export interface ErrorLogRow {
   application_id: string;
+  installation_id: string;
   request_id: string;
   fingerprint: string;
   type: string;
@@ -82,45 +71,41 @@ function toClickHouseDate(date: Date): string {
 export class BackendMonitorService {
   constructor(
     private readonly clickhouse: ClickhouseService,
-    private readonly agentTokenResolver: AgentTokenResolver,
+    private readonly monitorTokenResolver: MonitorTokenResolver,
   ) {}
 
   /**
-   * Authenticates one batch and inserts its events into ClickHouse with at
-   * most one multi-row insert per non-empty event array.
+   * Authenticates one batch against its MonitorInstallation token and inserts
+   * its events into ClickHouse with at most one multi-row insert per
+   * non-empty event array. The installation id is stamped on every row;
+   * application_id is mapped from the installation's externalRef so existing
+   * application-scoped queries keep working unchanged.
    */
-  async ingest(
-    reportToken: string | undefined,
-    body: CreateBackendMonitorIngestDto,
-  ): Promise<void> {
-    const applicationId =
-      await this.agentTokenResolver.resolveApplicationId(reportToken);
+  async ingest(reportToken: string | undefined, body: CreateBackendMonitorIngestDto): Promise<void> {
+    const env = body.env ?? "";
+    const instanceId = body.instanceId ?? "";
+    const appVersion = body.appVersion ?? "";
+
+    const { installationId, applicationId } = await this.monitorTokenResolver.resolve(reportToken, {
+      env: env || undefined,
+      appVersion: appVersion || undefined,
+      instanceId: instanceId || undefined,
+    });
 
     const requests = body.requests ?? [];
     const errors = body.errors ?? [];
     if (requests.length === 0 && errors.length === 0) {
-      throw new BadRequestException(
-        'At least one of "requests" or "errors" must be non-empty.',
-      );
+      throw new BadRequestException('At least one of "requests" or "errors" must be non-empty.');
     }
-    if (
-      requests.length > INGEST_BATCH_LIMIT ||
-      errors.length > INGEST_BATCH_LIMIT
-    ) {
-      throw new PayloadTooLargeException(
-        `Each event array must contain at most ${INGEST_BATCH_LIMIT} items.`,
-      );
+    if (requests.length > INGEST_BATCH_LIMIT || errors.length > INGEST_BATCH_LIMIT) {
+      throw new PayloadTooLargeException(`Each event array must contain at most ${INGEST_BATCH_LIMIT} items.`);
     }
-
-    const env = body.env ?? "";
-    const instanceId = body.instanceId ?? "";
-    const appVersion = body.appVersion ?? "";
 
     if (requests.length > 0) {
       await this.clickhouse.insert({
         table: "application_request_logs",
         values: requests.map((event) =>
-          this.toRequestRow(applicationId, event, env, instanceId, appVersion),
+          this.toRequestRow(applicationId, installationId, event, env, instanceId, appVersion),
         ),
         format: "JSONEachRow",
       });
@@ -130,7 +115,7 @@ export class BackendMonitorService {
       await this.clickhouse.insert({
         table: "application_error_logs",
         values: errors.map((event) =>
-          this.toErrorRow(applicationId, event, env, instanceId, appVersion),
+          this.toErrorRow(applicationId, installationId, event, env, instanceId, appVersion),
         ),
         format: "JSONEachRow",
       });
@@ -144,6 +129,7 @@ export class BackendMonitorService {
    */
   private toRequestRow(
     applicationId: string,
+    installationId: string,
     event: BackendMonitorRequestEventDto,
     env: string,
     instanceId: string,
@@ -152,18 +138,15 @@ export class BackendMonitorService {
     const requestAt = new Date(event.requestAt);
     const responseAt = new Date(event.responseAt);
     const now = new Date();
-    const valid =
-      this.isTrustedTimestamp(requestAt, now) &&
-      this.isTrustedTimestamp(responseAt, now);
+    const valid = this.isTrustedTimestamp(requestAt, now) && this.isTrustedTimestamp(responseAt, now);
 
     const safeRequestAt = valid ? requestAt : now;
     const safeResponseAt = valid ? responseAt : now;
-    const durationMs = valid
-      ? Math.max(0, safeResponseAt.getTime() - safeRequestAt.getTime())
-      : 0;
+    const durationMs = valid ? Math.max(0, safeResponseAt.getTime() - safeRequestAt.getTime()) : 0;
 
     return {
       application_id: applicationId,
+      installation_id: installationId,
       request_id: event.requestId,
       route: event.route ?? "",
       path: event.path,
@@ -183,24 +166,20 @@ export class BackendMonitorService {
   /** Builds the stored error row, including the server-computed fingerprint. */
   private toErrorRow(
     applicationId: string,
+    installationId: string,
     event: BackendMonitorErrorEventDto,
     env: string,
     instanceId: string,
     appVersion: string,
   ): ErrorLogRow {
     const occurredAt = new Date(event.occurredAt);
-    const safeOccurredAt = this.isTrustedTimestamp(occurredAt, new Date())
-      ? occurredAt
-      : new Date();
+    const safeOccurredAt = this.isTrustedTimestamp(occurredAt, new Date()) ? occurredAt : new Date();
 
     return {
       application_id: applicationId,
+      installation_id: installationId,
       request_id: event.requestId ?? "",
-      fingerprint: computeErrorFingerprint(
-        event.type,
-        event.message,
-        event.stack,
-      ),
+      fingerprint: computeErrorFingerprint(event.type, event.message, event.stack),
       type: event.type,
       message: event.message,
       stack: event.stack ?? "",
@@ -224,19 +203,12 @@ export class BackendMonitorService {
    */
   private isTrustedTimestamp(date: Date, now: Date): boolean {
     if (Number.isNaN(date.getTime())) return false;
-    return (
-      date.getTime() >= now.getTime() - MAX_PAST_SKEW_MS &&
-      date.getTime() <= now.getTime() + MAX_FUTURE_SKEW_MS
-    );
+    return date.getTime() >= now.getTime() - MAX_PAST_SKEW_MS && date.getTime() <= now.getTime() + MAX_FUTURE_SKEW_MS;
   }
 
   /** Queries paginated request logs. All values are bound as query parameters. */
-  async listRequestLogs(
-    query: ListBackendMonitorRequestLogsDto,
-  ): Promise<{ records: RequestLogRow[]; total: number }> {
-    const safeField = ALLOWED_REQUEST_SORT_FIELDS.has(query.sortField ?? "")
-      ? query.sortField!
-      : "request_at";
+  async listRequestLogs(query: ListBackendMonitorRequestLogsDto): Promise<{ records: RequestLogRow[]; total: number }> {
+    const safeField = ALLOWED_REQUEST_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "request_at";
     const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
     const keyword = query.keyword ? `%${query.keyword}%` : "%";
     const page = query.page ?? 0;
@@ -286,12 +258,8 @@ export class BackendMonitorService {
   }
 
   /** Queries paginated error logs. All values are bound as query parameters. */
-  async listErrorLogs(
-    query: ListBackendMonitorErrorLogsDto,
-  ): Promise<{ records: ErrorLogRow[]; total: number }> {
-    const safeField = ALLOWED_ERROR_SORT_FIELDS.has(query.sortField ?? "")
-      ? query.sortField!
-      : "occurred_at";
+  async listErrorLogs(query: ListBackendMonitorErrorLogsDto): Promise<{ records: ErrorLogRow[]; total: number }> {
+    const safeField = ALLOWED_ERROR_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "occurred_at";
     const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
     const keyword = query.keyword ? `%${query.keyword}%` : "%";
     const page = query.page ?? 0;
