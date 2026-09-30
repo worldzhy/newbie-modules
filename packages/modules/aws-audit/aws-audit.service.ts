@@ -1,9 +1,9 @@
-import {BadRequestException, Injectable, NotFoundException} from '@nestjs/common';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AwsCredentialService} from '@modules/aws-core/aws-credential.service';
-import {getCallerIdentity} from '@modules/aws-core/aws-sts.helper';
-import {EC2Client, DescribeInstancesCommand, DescribeSecurityGroupsCommand, SecurityGroup} from '@aws-sdk/client-ec2';
-import {RDSClient, DescribeDBInstancesCommand} from '@aws-sdk/client-rds';
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AwsCredentialService } from "@modules/aws-core/aws-credential.service";
+import { getCallerIdentity } from "@modules/aws-core/aws-sts.helper";
+import { EC2Client, DescribeInstancesCommand, DescribeSecurityGroupsCommand, SecurityGroup } from "@aws-sdk/client-ec2";
+import { RDSClient, DescribeDBInstancesCommand } from "@aws-sdk/client-rds";
 import {
   GetBucketAclCommand,
   GetBucketEncryptionCommand,
@@ -13,7 +13,7 @@ import {
   GetPublicAccessBlockCommand,
   S3Client,
   ListBucketsCommand,
-} from '@aws-sdk/client-s3';
+} from "@aws-sdk/client-s3";
 import {
   GenerateCredentialReportCommand,
   GetAccountPasswordPolicyCommand,
@@ -34,10 +34,10 @@ import {
   ListRolesCommand,
   ListUserPoliciesCommand,
   ListUsersCommand,
-} from '@aws-sdk/client-iam';
+} from "@aws-sdk/client-iam";
 
-type Severity = 'high' | 'medium' | 'low';
-type ScanStatus = 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED';
+type Severity = "high" | "medium" | "low";
+type ScanStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED";
 
 interface AwsCredentials {
   accessKeyId: string;
@@ -45,7 +45,8 @@ interface AwsCredentials {
 }
 
 interface AuditFinding {
-  service: 'iam' | 's3' | 'ec2' | 'rds' | 'sts';
+  ruleId: string;
+  service: "iam" | "s3" | "ec2" | "rds" | "sts";
   severity: Severity;
   resourceType: string;
   resourceId: string;
@@ -56,7 +57,7 @@ interface AuditFinding {
 }
 
 interface AuditError {
-  service: 'iam' | 's3' | 'ec2' | 'rds' | 'sts';
+  service: "iam" | "s3" | "ec2" | "rds" | "sts";
   message: string;
 }
 
@@ -80,6 +81,7 @@ interface CredentialReportRow {
 }
 
 interface PolicyRisk {
+  ruleId: string;
   severity: Severity;
   summary: string;
   detail: string;
@@ -93,14 +95,14 @@ interface ManagedPolicyAnalysis {
 
 @Injectable()
 export class AwsAuditService {
-  private readonly severityRank: Record<Severity, number> = {high: 3, medium: 2, low: 1};
+  private readonly severityRank: Record<Severity, number> = { high: 3, medium: 2, low: 1 };
   private readonly policyCache = new Map<string, Promise<ManagedPolicyAnalysis>>();
   private readonly activeScans = new Set<string>();
   private readonly clientCache = new Map<string, unknown>();
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly credentialService: AwsCredentialService
+    private readonly credentialService: AwsCredentialService,
   ) {}
 
   /**
@@ -120,26 +122,26 @@ export class AwsAuditService {
     return client;
   }
 
-  async getProjectAuditReport(projectId: string, options: {detail: boolean}) {
+  async getProjectAuditReport(projectId: string, options: { detail: boolean }) {
     await this.ensureProjectExists(projectId);
 
-    const credential = await this.prisma.projectAwsCredential.findUnique({where: {projectId}});
+    const credential = await this.prisma.projectAwsCredential.findUnique({ where: { projectId } });
     const [currentScan, latestScan, latestSuccessfulScan, latestFailedScan] = await Promise.all([
       this.prisma.awsAuditScan.findFirst({
-        where: {projectId, status: {in: ['PENDING', 'RUNNING']}},
-        orderBy: {createdAt: 'desc'},
+        where: { projectId, status: { in: ["PENDING", "RUNNING"] } },
+        orderBy: { createdAt: "desc" },
       }),
       this.prisma.awsAuditScan.findFirst({
-        where: {projectId},
-        orderBy: {createdAt: 'desc'},
+        where: { projectId },
+        orderBy: { createdAt: "desc" },
       }),
       this.prisma.awsAuditScan.findFirst({
-        where: {projectId, status: 'SUCCESS'},
-        orderBy: {createdAt: 'desc'},
+        where: { projectId, status: "SUCCESS" },
+        orderBy: { createdAt: "desc" },
       }),
       this.prisma.awsAuditScan.findFirst({
-        where: {projectId, status: 'FAILED'},
-        orderBy: {createdAt: 'desc'},
+        where: { projectId, status: "FAILED" },
+        orderBy: { createdAt: "desc" },
       }),
     ]);
 
@@ -161,16 +163,16 @@ export class AwsAuditService {
   async startProjectAuditScan(projectId: string) {
     const project = await this.ensureProjectExists(projectId);
 
-    const credential = await this.prisma.projectAwsCredential.findUnique({where: {projectId}});
+    const credential = await this.prisma.projectAwsCredential.findUnique({ where: { projectId } });
     if (!credential) {
       throw new BadRequestException(
-        `Project ${project.name} does not have an AWS credential configured. Set it up in the AWS CREDENTIAL tab first.`
+        `Project ${project.name} does not have an AWS credential configured. Set it up in the AWS CREDENTIAL tab first.`,
       );
     }
 
     const latestRunningScan = await this.prisma.awsAuditScan.findFirst({
-      where: {projectId, status: {in: ['PENDING', 'RUNNING']}},
-      orderBy: {createdAt: 'desc'},
+      where: { projectId, status: { in: ["PENDING", "RUNNING"] } },
+      orderBy: { createdAt: "desc" },
     });
 
     if (latestRunningScan && this.activeScans.has(projectId)) {
@@ -182,10 +184,10 @@ export class AwsAuditService {
 
     if (latestRunningScan && !this.activeScans.has(projectId)) {
       await this.prisma.awsAuditScan.update({
-        where: {id: latestRunningScan.id},
+        where: { id: latestRunningScan.id },
         data: {
-          status: 'FAILED',
-          errorMessage: latestRunningScan.errorMessage || 'Scan was interrupted before completion.',
+          status: "FAILED",
+          errorMessage: latestRunningScan.errorMessage || "Scan was interrupted before completion.",
           finishedAt: new Date(),
         },
       });
@@ -195,7 +197,7 @@ export class AwsAuditService {
     const scan = await this.prisma.awsAuditScan.create({
       data: {
         projectId,
-        status: 'PENDING',
+        status: "PENDING",
       },
     });
 
@@ -231,7 +233,7 @@ export class AwsAuditService {
   }
 
   private async ensureProjectExists(projectId: string) {
-    const project = await this.prisma.project.findUnique({where: {id: projectId}});
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
     if (!project) {
       throw new NotFoundException(`Project not found: ${projectId}`);
     }
@@ -241,9 +243,9 @@ export class AwsAuditService {
   private async runAuditScanInBackground(projectId: string, scanId: string) {
     try {
       await this.prisma.awsAuditScan.update({
-        where: {id: scanId},
+        where: { id: scanId },
         data: {
-          status: 'RUNNING',
+          status: "RUNNING",
           startedAt: new Date(),
           errorMessage: null,
         },
@@ -251,20 +253,22 @@ export class AwsAuditService {
 
       const report = await this.buildAuditReport(projectId);
       await this.prisma.awsAuditScan.update({
-        where: {id: scanId},
+        where: { id: scanId },
         data: {
-          status: 'SUCCESS',
+          status: "SUCCESS",
           summary: report.summary as any,
           report: report as any,
           finishedAt: new Date(),
           errorMessage: null,
         },
       });
+
+      await this.upsertFindings(projectId, scanId, report.findings);
     } catch (error: any) {
       await this.prisma.awsAuditScan.update({
-        where: {id: scanId},
+        where: { id: scanId },
         data: {
-          status: 'FAILED',
+          status: "FAILED",
           errorMessage: this.getErrorMessage(error),
           finishedAt: new Date(),
         },
@@ -279,10 +283,75 @@ export class AwsAuditService {
     await this.prisma.awsAuditScan.deleteMany({
       where: {
         projectId,
-        status: 'FAILED',
-        id: {not: keepId},
+        status: "FAILED",
+        id: { not: keepId },
       },
     });
+  }
+
+  /**
+   * Persist the findings from a successful scan into the AwsAuditFinding table.
+   * Each finding is identified by a stable fingerprint so repeated scans update
+   * the same row (lastSeenAt refresh) instead of creating duplicates. Findings
+   * that were open in a previous scan but did not recur are marked resolved.
+   */
+  private async upsertFindings(projectId: string, scanId: string, findings: AuditFinding[]) {
+    const seenFingerprints = new Set<string>();
+    const now = new Date();
+
+    for (const finding of findings) {
+      const fingerprint = this.findingFingerprint(projectId, finding);
+      seenFingerprints.add(fingerprint);
+
+      await this.prisma.awsAuditFinding.upsert({
+        where: { fingerprint },
+        create: {
+          projectId,
+          scanId,
+          fingerprint,
+          service: finding.service,
+          resourceType: finding.resourceType,
+          resourceId: finding.resourceId,
+          ruleId: finding.ruleId,
+          severity: finding.severity,
+          title: finding.title,
+          detail: finding.detail,
+          recommendation: finding.recommendation,
+          region: finding.region || null,
+          status: "open",
+          firstSeenAt: now,
+          lastSeenAt: now,
+        },
+        update: {
+          scanId,
+          severity: finding.severity,
+          title: finding.title,
+          detail: finding.detail,
+          recommendation: finding.recommendation,
+          region: finding.region || null,
+          status: "open",
+          lastSeenAt: now,
+          resolvedAt: null,
+        },
+      });
+    }
+
+    // Findings that were open before but did not recur in this scan are resolved.
+    await this.prisma.awsAuditFinding.updateMany({
+      where: {
+        projectId,
+        status: "open",
+        fingerprint: { notIn: [...seenFingerprints] },
+      },
+      data: {
+        status: "resolved",
+        resolvedAt: now,
+      },
+    });
+  }
+
+  private findingFingerprint(projectId: string, finding: AuditFinding) {
+    return `${projectId}:${finding.service}:${finding.resourceType}:${finding.resourceId}:${finding.ruleId}`;
   }
 
   private async buildAuditReport(projectId: string) {
@@ -293,8 +362,8 @@ export class AwsAuditService {
       accessKeyId: resolved.accessKeyId,
       secretAccessKey: resolved.secretAccessKey,
     };
-    const regions = (resolved.regions?.length ? resolved.regions : [resolved.defaultRegion || 'us-east-1']).map(
-      region => this.normalizeRegion(region)
+    const regions = (resolved.regions?.length ? resolved.regions : [resolved.defaultRegion || "us-east-1"]).map(
+      (region) => this.normalizeRegion(region),
     );
     const primaryRegion = regions[0];
     const errors: AuditError[] = [];
@@ -302,46 +371,46 @@ export class AwsAuditService {
     const identity = await getCallerIdentity(credentials, primaryRegion);
 
     const iamAudit = await this.captureStep(
-      'iam',
+      "iam",
       () => this.auditIam(credentials, primaryRegion),
-      {findings: [], resources: {passwordPolicy: null, users: [], groups: [], roles: []}},
-      errors
+      { findings: [], resources: { passwordPolicy: null, users: [], groups: [], roles: [] } },
+      errors,
     );
 
     const s3Audit = await this.captureStep(
-      's3',
+      "s3",
       () => this.auditS3(credentials, primaryRegion),
-      {findings: [], resources: []},
-      errors
+      { findings: [], resources: [] },
+      errors,
     );
 
     const regionalAudits = await Promise.all(
-      regions.map(async region => ({
+      regions.map(async (region) => ({
         region,
         ec2: await this.captureStep(
-          'ec2',
+          "ec2",
           () => this.auditEc2Region(credentials, region),
-          {findings: [], resources: {instances: [], securityGroups: []}},
-          errors
+          { findings: [], resources: { instances: [], securityGroups: [] } },
+          errors,
         ),
         rds: await this.captureStep(
-          'rds',
+          "rds",
           () => this.auditRdsRegion(credentials, region),
-          {findings: [], resources: []},
-          errors
+          { findings: [], resources: [] },
+          errors,
         ),
-      }))
+      })),
     );
 
     const findings = [
       ...iamAudit.findings,
       ...s3Audit.findings,
-      ...regionalAudits.flatMap(item => [...item.ec2.findings, ...item.rds.findings]),
+      ...regionalAudits.flatMap((item) => [...item.ec2.findings, ...item.rds.findings]),
     ].sort((left, right) => this.severityRank[right.severity] - this.severityRank[left.severity]);
 
     await this.prisma.projectAwsCredential.update({
-      where: {projectId},
-      data: {lastVerifiedAt: new Date()},
+      where: { projectId },
+      data: { lastVerifiedAt: new Date() },
     });
 
     return {
@@ -359,22 +428,22 @@ export class AwsAuditService {
       summary: {
         regionsScanned: regions,
         totalFindings: findings.length,
-        high: findings.filter(item => item.severity === 'high').length,
-        medium: findings.filter(item => item.severity === 'medium').length,
-        low: findings.filter(item => item.severity === 'low').length,
+        high: findings.filter((item) => item.severity === "high").length,
+        medium: findings.filter((item) => item.severity === "medium").length,
+        low: findings.filter((item) => item.severity === "low").length,
         partialFailures: errors.length,
       },
       limitations: [
-        'AWS does not expose IAM console passwords, EC2 instance login passwords, or RDS master passwords in plaintext via normal APIs.',
-        'This report returns credential metadata, policy risk, network exposure, and secret references. Raw passwords are intentionally not returned.',
-        'Findings are heuristic checks. Access Analyzer-style formal authorization proofs are not included in this implementation.',
+        "AWS does not expose IAM console passwords, EC2 instance login passwords, or RDS master passwords in plaintext via normal APIs.",
+        "This report returns credential metadata, policy risk, network exposure, and secret references. Raw passwords are intentionally not returned.",
+        "Findings are heuristic checks. Access Analyzer-style formal authorization proofs are not included in this implementation.",
       ],
       errors,
       findings,
       resources: {
         iam: iamAudit.resources,
         s3: s3Audit.resources,
-        regional: regionalAudits.map(item => ({
+        regional: regionalAudits.map((item) => ({
           region: item.region,
           ec2: item.ec2.resources,
           rds: item.rds.resources,
@@ -384,84 +453,89 @@ export class AwsAuditService {
   }
 
   private async auditIam(credentials: AwsCredentials, region: string) {
-    const client = this.cachedClient('iam', credentials, region, () => new IAMClient({region, credentials}));
+    const client = this.cachedClient("iam", credentials, region, () => new IAMClient({ region, credentials }));
     const findings: AuditFinding[] = [];
 
     const passwordPolicy = await this.getPasswordPolicy(client);
     if (!passwordPolicy) {
       findings.push(
         this.createFinding({
-          service: 'iam',
-          severity: 'medium',
-          resourceType: 'AwsAccount',
-          resourceId: 'account-password-policy',
-          title: 'IAM account password policy is not configured',
-          detail: 'Console passwords do not appear to have an enforced account-wide policy.',
-          recommendation: 'Configure an IAM account password policy with expiration and strong password requirements.',
+          service: "iam",
+          severity: "medium",
+          resourceType: "AwsAccount",
+          resourceId: "account-password-policy",
+          ruleId: "iam.password-policy-missing",
+          title: "IAM account password policy is not configured",
+          detail: "Console passwords do not appear to have an enforced account-wide policy.",
+          recommendation: "Configure an IAM account password policy with expiration and strong password requirements.",
           region,
-        })
+        }),
       );
     } else {
       if (!passwordPolicy.expirePasswords || !passwordPolicy.maxPasswordAge) {
         findings.push(
           this.createFinding({
-            service: 'iam',
-            severity: 'medium',
-            resourceType: 'AwsAccount',
-            resourceId: 'account-password-policy',
-            title: 'IAM console passwords do not expire',
-            detail: 'The account password policy does not enforce password expiration.',
-            recommendation: 'Set `maxPasswordAge` to enforce password rotation for IAM console users.',
+            service: "iam",
+            severity: "medium",
+            resourceType: "AwsAccount",
+            resourceId: "account-password-policy",
+            ruleId: "iam.password-no-expiration",
+            title: "IAM console passwords do not expire",
+            detail: "The account password policy does not enforce password expiration.",
+            recommendation: "Set `maxPasswordAge` to enforce password rotation for IAM console users.",
             region,
-          })
+          }),
         );
       }
 
       if ((passwordPolicy.minimumPasswordLength || 0) < 14) {
         findings.push(
           this.createFinding({
-            service: 'iam',
-            severity: 'low',
-            resourceType: 'AwsAccount',
-            resourceId: 'account-password-policy',
-            title: 'IAM password minimum length is below 14 characters',
+            service: "iam",
+            severity: "low",
+            resourceType: "AwsAccount",
+            resourceId: "account-password-policy",
+            ruleId: "iam.password-min-length",
+            title: "IAM password minimum length is below 14 characters",
             detail: `Current minimum password length is ${passwordPolicy.minimumPasswordLength || 0}.`,
-            recommendation: 'Increase the minimum password length to at least 14 characters.',
+            recommendation: "Increase the minimum password length to at least 14 characters.",
             region,
-          })
+          }),
         );
       }
     }
 
     const credentialReport = await this.getCredentialReportMap(client);
-    const rootRow = credentialReport.get('<root_account>');
+    const rootRow = credentialReport.get("<root_account>");
     if (rootRow) {
       if (this.isTruthy(rootRow.access_key_1_active) || this.isTruthy(rootRow.access_key_2_active)) {
         findings.push(
           this.createFinding({
-            service: 'iam',
-            severity: 'high',
-            resourceType: 'RootAccount',
-            resourceId: '<root_account>',
-            title: 'Root account has active access keys',
-            detail: 'The AWS root account still has active programmatic credentials.',
-            recommendation: 'Remove root access keys and use IAM roles or IAM users instead.',
+            service: "iam",
+            severity: "high",
+            resourceType: "RootAccount",
+            resourceId: "<root_account>",
+            ruleId: "iam.root-active-access-keys",
+            title: "Root account has active access keys",
+            detail: "The AWS root account still has active programmatic credentials.",
+            recommendation: "Remove root access keys and use IAM roles or IAM users instead.",
             region,
-          })
+          }),
         );
       }
       if (this.isTruthy(rootRow.password_enabled) && !this.isTruthy(rootRow.mfa_active)) {
         findings.push(
           this.createFinding({
-            service: 'iam',
-            severity: 'high',
-            resourceType: 'RootAccount',
-            resourceId: '<root_account>',
-            title: 'Root account password is enabled without MFA',
-            detail: 'Root console access appears enabled but MFA is not active.',
-            recommendation: 'Enable MFA on the root account immediately.',
+            service: "iam",
+            severity: "high",
+            resourceType: "RootAccount",
+            resourceId: "<root_account>",
+            ruleId: "iam.root-no-mfa",
+            title: "Root account password is enabled without MFA",
+            detail: "Root console access appears enabled but MFA is not active.",
+            recommendation: "Enable MFA on the root account immediately.",
             region,
-          })
+          }),
         );
       }
     }
@@ -473,16 +547,16 @@ export class AwsAuditService {
     ]);
 
     const userResources = await Promise.all(
-      users.map(async user => {
-        const userName = user.UserName || user.Arn || 'unknown-user';
+      users.map(async (user) => {
+        const userName = user.UserName || user.Arn || "unknown-user";
         const [attachedPolicies, inlinePolicies, userGroups] = await Promise.all([
           this.listAttachedUserPolicyAnalysis(client, userName),
           this.listInlineUserPolicyAnalysis(client, userName),
           this.listGroupsForUser(client, userName),
         ]);
 
-        findings.push(...this.collectPolicyFindings('iam', 'IamUser', userName, attachedPolicies, region));
-        findings.push(...this.collectPolicyFindings('iam', 'IamUser', userName, inlinePolicies, region));
+        findings.push(...this.collectPolicyFindings("iam", "IamUser", userName, attachedPolicies, region));
+        findings.push(...this.collectPolicyFindings("iam", "IamUser", userName, inlinePolicies, region));
 
         const reportRow = credentialReport.get(userName);
         findings.push(...this.collectCredentialFindings(userName, reportRow, passwordPolicy, region));
@@ -495,8 +569,8 @@ export class AwsAuditService {
           passwordLastChanged: this.toNullableStringDate(reportRow?.password_last_changed),
           passwordNextRotation: this.toNullableStringDate(reportRow?.password_next_rotation),
           mfaActive: this.isTruthy(reportRow?.mfa_active),
-          groups: userGroups.map(group => group.GroupName).filter(Boolean),
-          attachedPolicies: attachedPolicies.map(item => ({
+          groups: userGroups.map((group) => group.GroupName).filter(Boolean),
+          attachedPolicies: attachedPolicies.map((item) => ({
             policyName: item.policyName,
             policyArn: item.policyArn,
             risks: item.findings,
@@ -504,58 +578,58 @@ export class AwsAuditService {
           inlinePolicies: inlinePolicies,
           accessKeys: this.serializeCredentialReportAccessKeys(reportRow),
         };
-      })
+      }),
     );
 
     const groupResources = await Promise.all(
-      groups.map(async group => {
-        const groupName = group.GroupName || group.Arn || 'unknown-group';
+      groups.map(async (group) => {
+        const groupName = group.GroupName || group.Arn || "unknown-group";
         const [attachedPolicies, inlinePolicies] = await Promise.all([
           this.listAttachedGroupPolicyAnalysis(client, groupName),
           this.listInlineGroupPolicyAnalysis(client, groupName),
         ]);
 
-        findings.push(...this.collectPolicyFindings('iam', 'IamGroup', groupName, attachedPolicies, region));
-        findings.push(...this.collectPolicyFindings('iam', 'IamGroup', groupName, inlinePolicies, region));
+        findings.push(...this.collectPolicyFindings("iam", "IamGroup", groupName, attachedPolicies, region));
+        findings.push(...this.collectPolicyFindings("iam", "IamGroup", groupName, inlinePolicies, region));
 
         return {
           groupName,
           arn: group.Arn || null,
           createdAt: group.CreateDate || null,
-          attachedPolicies: attachedPolicies.map(item => ({
+          attachedPolicies: attachedPolicies.map((item) => ({
             policyName: item.policyName,
             policyArn: item.policyArn,
             risks: item.findings,
           })),
           inlinePolicies: inlinePolicies,
         };
-      })
+      }),
     );
 
     const roleResources = await Promise.all(
-      roles.map(async role => {
-        const roleName = role.RoleName || role.Arn || 'unknown-role';
+      roles.map(async (role) => {
+        const roleName = role.RoleName || role.Arn || "unknown-role";
         const [attachedPolicies, inlinePolicies] = await Promise.all([
           this.listAttachedRolePolicyAnalysis(client, roleName),
           this.listInlineRolePolicyAnalysis(client, roleName),
         ]);
 
-        findings.push(...this.collectPolicyFindings('iam', 'IamRole', roleName, attachedPolicies, region));
-        findings.push(...this.collectPolicyFindings('iam', 'IamRole', roleName, inlinePolicies, region));
+        findings.push(...this.collectPolicyFindings("iam", "IamRole", roleName, attachedPolicies, region));
+        findings.push(...this.collectPolicyFindings("iam", "IamRole", roleName, inlinePolicies, region));
 
         return {
           roleName,
           arn: role.Arn || null,
           createdAt: role.CreateDate || null,
           lastUsedAt: role.RoleLastUsed?.LastUsedDate || null,
-          attachedPolicies: attachedPolicies.map(item => ({
+          attachedPolicies: attachedPolicies.map((item) => ({
             policyName: item.policyName,
             policyArn: item.policyArn,
             risks: item.findings,
           })),
           inlinePolicies: inlinePolicies,
         };
-      })
+      }),
     );
 
     return {
@@ -570,42 +644,43 @@ export class AwsAuditService {
   }
 
   private async auditS3(credentials: AwsCredentials, region: string) {
-    const client = this.cachedClient('s3', credentials, region, () => new S3Client({region, credentials}));
+    const client = this.cachedClient("s3", credentials, region, () => new S3Client({ region, credentials }));
     const findings: AuditFinding[] = [];
 
     const response = await client.send(new ListBucketsCommand({}));
     const buckets = await Promise.all(
-      (response.Buckets || []).map(async bucket => {
-        const bucketName = bucket.Name || 'unknown-bucket';
+      (response.Buckets || []).map(async (bucket) => {
+        const bucketName = bucket.Name || "unknown-bucket";
         const bucketRegion = await this.resolveBucketRegion(client, bucketName);
         const bucketClient = this.cachedClient(
-          's3',
+          "s3",
           credentials,
           bucketRegion,
-          () => new S3Client({region: bucketRegion, credentials})
+          () => new S3Client({ region: bucketRegion, credentials }),
         );
 
         const [publicAccessBlock, acl, policyStatus, encryption, versioning] = await Promise.all([
-          this.safeBucketCall(() => bucketClient.send(new GetPublicAccessBlockCommand({Bucket: bucketName}))),
-          this.safeBucketCall(() => bucketClient.send(new GetBucketAclCommand({Bucket: bucketName}))),
-          this.safeBucketCall(() => bucketClient.send(new GetBucketPolicyStatusCommand({Bucket: bucketName}))),
-          this.safeBucketCall(() => bucketClient.send(new GetBucketEncryptionCommand({Bucket: bucketName}))),
-          this.safeBucketCall(() => bucketClient.send(new GetBucketVersioningCommand({Bucket: bucketName}))),
+          this.safeBucketCall(() => bucketClient.send(new GetPublicAccessBlockCommand({ Bucket: bucketName }))),
+          this.safeBucketCall(() => bucketClient.send(new GetBucketAclCommand({ Bucket: bucketName }))),
+          this.safeBucketCall(() => bucketClient.send(new GetBucketPolicyStatusCommand({ Bucket: bucketName }))),
+          this.safeBucketCall(() => bucketClient.send(new GetBucketEncryptionCommand({ Bucket: bucketName }))),
+          this.safeBucketCall(() => bucketClient.send(new GetBucketVersioningCommand({ Bucket: bucketName }))),
         ]);
 
         const publicAccessConfig = publicAccessBlock?.PublicAccessBlockConfiguration;
         if (!publicAccessConfig) {
           findings.push(
             this.createFinding({
-              service: 's3',
-              severity: 'medium',
-              resourceType: 'S3Bucket',
+              service: "s3",
+              severity: "medium",
+              resourceType: "S3Bucket",
               resourceId: bucketName,
-              title: 'S3 bucket does not have Public Access Block configured',
+              ruleId: "s3.pab-missing",
+              title: "S3 bucket does not have Public Access Block configured",
               detail: `Bucket ${bucketName} is missing a Public Access Block configuration.`,
-              recommendation: 'Enable all four Public Access Block settings unless the bucket must be public.',
+              recommendation: "Enable all four Public Access Block settings unless the bucket must be public.",
               region: bucketRegion,
-            })
+            }),
           );
         } else if (
           !publicAccessConfig.BlockPublicAcls ||
@@ -615,76 +690,81 @@ export class AwsAuditService {
         ) {
           findings.push(
             this.createFinding({
-              service: 's3',
-              severity: 'high',
-              resourceType: 'S3Bucket',
+              service: "s3",
+              severity: "high",
+              resourceType: "S3Bucket",
               resourceId: bucketName,
-              title: 'S3 bucket Public Access Block is partially disabled',
+              ruleId: "s3.pab-partial",
+              title: "S3 bucket Public Access Block is partially disabled",
               detail: `Bucket ${bucketName} does not block every public access path.`,
-              recommendation: 'Enable every Public Access Block flag on the bucket and account level.',
+              recommendation: "Enable every Public Access Block flag on the bucket and account level.",
               region: bucketRegion,
-            })
+            }),
           );
         }
 
         if (policyStatus?.PolicyStatus?.IsPublic) {
           findings.push(
             this.createFinding({
-              service: 's3',
-              severity: 'high',
-              resourceType: 'S3Bucket',
+              service: "s3",
+              severity: "high",
+              resourceType: "S3Bucket",
               resourceId: bucketName,
-              title: 'S3 bucket policy allows public access',
+              ruleId: "s3.policy-public",
+              title: "S3 bucket policy allows public access",
               detail: `Bucket policy on ${bucketName} is evaluated by AWS as public.`,
               recommendation:
-                'Remove public principals from the bucket policy or front the bucket with a private origin.',
+                "Remove public principals from the bucket policy or front the bucket with a private origin.",
               region: bucketRegion,
-            })
+            }),
           );
         }
 
         if (this.hasPublicAclGrant(acl)) {
           findings.push(
             this.createFinding({
-              service: 's3',
-              severity: 'high',
-              resourceType: 'S3Bucket',
+              service: "s3",
+              severity: "high",
+              resourceType: "S3Bucket",
               resourceId: bucketName,
-              title: 'S3 bucket ACL grants public access',
+              ruleId: "s3.acl-public",
+              title: "S3 bucket ACL grants public access",
               detail: `Bucket ${bucketName} has ACL grants for AllUsers or AuthenticatedUsers.`,
-              recommendation: 'Remove public ACL grants and rely on explicit private policies instead.',
+              recommendation: "Remove public ACL grants and rely on explicit private policies instead.",
               region: bucketRegion,
-            })
+            }),
           );
         }
 
         if (!encryption?.ServerSideEncryptionConfiguration?.Rules?.length) {
           findings.push(
             this.createFinding({
-              service: 's3',
-              severity: 'medium',
-              resourceType: 'S3Bucket',
+              service: "s3",
+              severity: "medium",
+              resourceType: "S3Bucket",
               resourceId: bucketName,
-              title: 'S3 bucket default encryption is not enabled',
+              ruleId: "s3.no-encryption",
+              title: "S3 bucket default encryption is not enabled",
               detail: `Bucket ${bucketName} does not report a default server-side encryption rule.`,
-              recommendation: 'Enable SSE-S3 or SSE-KMS for default bucket encryption.',
+              recommendation: "Enable SSE-S3 or SSE-KMS for default bucket encryption.",
               region: bucketRegion,
-            })
+            }),
           );
         }
 
-        if (versioning?.Status !== 'Enabled') {
+        if (versioning?.Status !== "Enabled") {
           findings.push(
             this.createFinding({
-              service: 's3',
-              severity: 'low',
-              resourceType: 'S3Bucket',
+              service: "s3",
+              severity: "low",
+              resourceType: "S3Bucket",
               resourceId: bucketName,
-              title: 'S3 bucket versioning is not enabled',
-              detail: `Bucket ${bucketName} has versioning status ${versioning?.Status || 'Disabled'}.`,
-              recommendation: 'Enable versioning when the bucket stores important or mutable data.',
+              ruleId: "s3.no-versioning",
+              title: "S3 bucket versioning is not enabled",
+              detail: `Bucket ${bucketName} has versioning status ${versioning?.Status || "Disabled"}.`,
+              recommendation: "Enable versioning when the bucket stores important or mutable data.",
               region: bucketRegion,
-            })
+            }),
           );
         }
 
@@ -697,9 +777,9 @@ export class AwsAuditService {
           policyIsPublic: policyStatus?.PolicyStatus?.IsPublic || false,
           hasPublicAcl: this.hasPublicAclGrant(acl),
           encryptionEnabled: Boolean(encryption?.ServerSideEncryptionConfiguration?.Rules?.length),
-          versioningStatus: versioning?.Status || 'Disabled',
+          versioningStatus: versioning?.Status || "Disabled",
         };
-      })
+      }),
     );
 
     return {
@@ -709,20 +789,20 @@ export class AwsAuditService {
   }
 
   private async auditEc2Region(credentials: AwsCredentials, region: string) {
-    const client = this.cachedClient('ec2', credentials, region, () => new EC2Client({region, credentials}));
+    const client = this.cachedClient("ec2", credentials, region, () => new EC2Client({ region, credentials }));
     const findings: AuditFinding[] = [];
     const instances: any[] = [];
     const securityGroupIds = new Set<string>();
 
     let nextToken: string | undefined;
     do {
-      const response = await client.send(new DescribeInstancesCommand({NextToken: nextToken}));
+      const response = await client.send(new DescribeInstancesCommand({ NextToken: nextToken }));
       for (const reservation of response.Reservations || []) {
         for (const instance of reservation.Instances || []) {
           const name =
-            instance.Tags?.find(tag => tag.Key === 'Name')?.Value || instance.InstanceId || 'unknown-instance';
-          const sgIds = (instance.SecurityGroups || []).map(group => group.GroupId).filter(Boolean) as string[];
-          sgIds.forEach(id => securityGroupIds.add(id));
+            instance.Tags?.find((tag) => tag.Key === "Name")?.Value || instance.InstanceId || "unknown-instance";
+          const sgIds = (instance.SecurityGroups || []).map((group) => group.GroupId).filter(Boolean) as string[];
+          sgIds.forEach((id) => securityGroupIds.add(id));
 
           instances.push({
             instanceId: instance.InstanceId || null,
@@ -747,16 +827,16 @@ export class AwsAuditService {
       findings,
       resources: {
         instances,
-        securityGroups: securityGroups.map(group => ({
+        securityGroups: securityGroups.map((group) => ({
           groupId: group.GroupId || null,
           groupName: group.GroupName || null,
           description: group.Description || null,
-          ingressRules: (group.IpPermissions || []).map(permission => ({
+          ingressRules: (group.IpPermissions || []).map((permission) => ({
             protocol: permission.IpProtocol,
             fromPort: permission.FromPort ?? null,
             toPort: permission.ToPort ?? null,
-            ipv4Ranges: (permission.IpRanges || []).map(item => item.CidrIp).filter(Boolean),
-            ipv6Ranges: (permission.Ipv6Ranges || []).map(item => item.CidrIpv6).filter(Boolean),
+            ipv4Ranges: (permission.IpRanges || []).map((item) => item.CidrIp).filter(Boolean),
+            ipv6Ranges: (permission.Ipv6Ranges || []).map((item) => item.CidrIpv6).filter(Boolean),
           })),
         })),
       },
@@ -764,43 +844,45 @@ export class AwsAuditService {
   }
 
   private async auditRdsRegion(credentials: AwsCredentials, region: string) {
-    const client = this.cachedClient('rds', credentials, region, () => new RDSClient({region, credentials}));
+    const client = this.cachedClient("rds", credentials, region, () => new RDSClient({ region, credentials }));
     const findings: AuditFinding[] = [];
     const instances: any[] = [];
 
     let marker: string | undefined;
     do {
-      const response = await client.send(new DescribeDBInstancesCommand({Marker: marker}));
+      const response = await client.send(new DescribeDBInstancesCommand({ Marker: marker }));
       for (const instance of response.DBInstances || []) {
-        const identifier = instance.DBInstanceIdentifier || instance.DbiResourceId || 'unknown-rds';
+        const identifier = instance.DBInstanceIdentifier || instance.DbiResourceId || "unknown-rds";
         if (instance.PubliclyAccessible) {
           findings.push(
             this.createFinding({
-              service: 'rds',
-              severity: 'high',
-              resourceType: 'RdsInstance',
+              service: "rds",
+              severity: "high",
+              resourceType: "RdsInstance",
               resourceId: identifier,
-              title: 'RDS instance is publicly accessible',
+              ruleId: "rds.publicly-accessible",
+              title: "RDS instance is publicly accessible",
               detail: `RDS instance ${identifier} allows public network access.`,
               recommendation:
-                'Move the database to private subnets and access it through application tiers or bastion hosts.',
+                "Move the database to private subnets and access it through application tiers or bastion hosts.",
               region,
-            })
+            }),
           );
         }
 
         if (!instance.StorageEncrypted) {
           findings.push(
             this.createFinding({
-              service: 'rds',
-              severity: 'high',
-              resourceType: 'RdsInstance',
+              service: "rds",
+              severity: "high",
+              resourceType: "RdsInstance",
               resourceId: identifier,
-              title: 'RDS storage encryption is disabled',
+              ruleId: "rds.no-encryption",
+              title: "RDS storage encryption is disabled",
               detail: `RDS instance ${identifier} is not encrypted at rest.`,
-              recommendation: 'Enable storage encryption on the database and snapshots.',
+              recommendation: "Enable storage encryption on the database and snapshots.",
               region,
-            })
+            }),
           );
         }
 
@@ -808,15 +890,16 @@ export class AwsAuditService {
         if (!hasManagedMasterSecret) {
           findings.push(
             this.createFinding({
-              service: 'rds',
-              severity: 'medium',
-              resourceType: 'RdsInstance',
+              service: "rds",
+              severity: "medium",
+              resourceType: "RdsInstance",
               resourceId: identifier,
-              title: 'RDS master password is not managed by AWS Secrets Manager',
+              ruleId: "rds.master-password-not-managed",
+              title: "RDS master password is not managed by AWS Secrets Manager",
               detail: `RDS instance ${identifier} does not report managed master user credentials.`,
-              recommendation: 'Use AWS-managed master passwords or store credentials in Secrets Manager with rotation.',
+              recommendation: "Use AWS-managed master passwords or store credentials in Secrets Manager with rotation.",
               region,
-            })
+            }),
           );
         }
 
@@ -852,7 +935,7 @@ export class AwsAuditService {
     const groups: SecurityGroup[] = [];
     for (let index = 0; index < securityGroupIds.length; index += 100) {
       const chunk = securityGroupIds.slice(index, index + 100);
-      const response = await client.send(new DescribeSecurityGroupsCommand({GroupIds: chunk}));
+      const response = await client.send(new DescribeSecurityGroupsCommand({ GroupIds: chunk }));
       groups.push(...(response.SecurityGroups || []));
     }
     return groups;
@@ -860,27 +943,28 @@ export class AwsAuditService {
 
   private collectSecurityGroupFindings(group: SecurityGroup, region: string) {
     const findings: AuditFinding[] = [];
-    const groupId = group.GroupId || group.GroupName || 'unknown-security-group';
+    const groupId = group.GroupId || group.GroupName || "unknown-security-group";
 
     for (const permission of group.IpPermissions || []) {
-      const ipv4Public = (permission.IpRanges || []).some(item => item.CidrIp === '0.0.0.0/0');
-      const ipv6Public = (permission.Ipv6Ranges || []).some(item => item.CidrIpv6 === '::/0');
+      const ipv4Public = (permission.IpRanges || []).some((item) => item.CidrIp === "0.0.0.0/0");
+      const ipv6Public = (permission.Ipv6Ranges || []).some((item) => item.CidrIpv6 === "::/0");
       if (!ipv4Public && !ipv6Public) {
         continue;
       }
 
-      if (permission.IpProtocol === '-1') {
+      if (permission.IpProtocol === "-1") {
         findings.push(
           this.createFinding({
-            service: 'ec2',
-            severity: 'high',
-            resourceType: 'SecurityGroup',
+            service: "ec2",
+            severity: "high",
+            resourceType: "SecurityGroup",
             resourceId: groupId,
-            title: 'Security group allows all traffic from the internet',
+            ruleId: "ec2.sg-all-traffic-public",
+            title: "Security group allows all traffic from the internet",
             detail: `Security group ${groupId} allows every protocol from a public CIDR range.`,
-            recommendation: 'Restrict the rule to trusted CIDRs and the minimum required ports.',
+            recommendation: "Restrict the rule to trusted CIDRs and the minimum required ports.",
             region,
-          })
+          }),
         );
         continue;
       }
@@ -888,32 +972,34 @@ export class AwsAuditService {
       const sensitivePorts = [22, 3389, 3306, 5432, 6379, 27017, 9200];
       const fromPort = permission.FromPort ?? -1;
       const toPort = permission.ToPort ?? -1;
-      const exposedSensitivePorts = sensitivePorts.filter(port => port >= fromPort && port <= toPort);
+      const exposedSensitivePorts = sensitivePorts.filter((port) => port >= fromPort && port <= toPort);
       if (exposedSensitivePorts.length) {
         findings.push(
           this.createFinding({
-            service: 'ec2',
-            severity: 'high',
-            resourceType: 'SecurityGroup',
+            service: "ec2",
+            severity: "high",
+            resourceType: "SecurityGroup",
             resourceId: groupId,
-            title: 'Security group exposes sensitive ports to the internet',
-            detail: `Security group ${groupId} exposes public ingress on ports ${exposedSensitivePorts.join(', ')}.`,
-            recommendation: 'Restrict SSH/RDP/database ports to trusted internal CIDRs or VPN ingress.',
+            ruleId: "ec2.sg-sensitive-ports-public",
+            title: "Security group exposes sensitive ports to the internet",
+            detail: `Security group ${groupId} exposes public ingress on ports ${exposedSensitivePorts.join(", ")}.`,
+            recommendation: "Restrict SSH/RDP/database ports to trusted internal CIDRs or VPN ingress.",
             region,
-          })
+          }),
         );
       } else {
         findings.push(
           this.createFinding({
-            service: 'ec2',
-            severity: 'medium',
-            resourceType: 'SecurityGroup',
+            service: "ec2",
+            severity: "medium",
+            resourceType: "SecurityGroup",
             resourceId: groupId,
-            title: 'Security group has public ingress',
+            ruleId: "ec2.sg-public-ingress",
+            title: "Security group has public ingress",
             detail: `Security group ${groupId} allows ingress from a public CIDR range.`,
-            recommendation: 'Review whether the public ingress rule is required.',
+            recommendation: "Review whether the public ingress rule is required.",
             region,
-          })
+          }),
         );
       }
     }
@@ -941,7 +1027,7 @@ export class AwsAuditService {
         hardExpiry: policy.HardExpiry || false,
       };
     } catch (error: any) {
-      if (error?.name === 'NoSuchEntityException') {
+      if (error?.name === "NoSuchEntityException") {
         return null;
       }
       throw error;
@@ -954,7 +1040,7 @@ export class AwsAuditService {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const response = await client.send(new GetCredentialReportCommand({}));
       if (response.Content) {
-        const csv = Buffer.from(response.Content).toString('utf8');
+        const csv = Buffer.from(response.Content).toString("utf8");
         const rows = this.parseCsv(csv);
         const map = new Map<string, CredentialReportRow>();
         for (const row of rows) {
@@ -975,7 +1061,7 @@ export class AwsAuditService {
     let marker: string | undefined;
 
     do {
-      const response = await client.send(new ListUsersCommand({Marker: marker, MaxItems: 1000}));
+      const response = await client.send(new ListUsersCommand({ Marker: marker, MaxItems: 1000 }));
       items.push(...(response.Users || []));
       marker = response.IsTruncated ? response.Marker : undefined;
     } while (marker);
@@ -988,7 +1074,7 @@ export class AwsAuditService {
     let marker: string | undefined;
 
     do {
-      const response = await client.send(new ListGroupsCommand({Marker: marker, MaxItems: 1000}));
+      const response = await client.send(new ListGroupsCommand({ Marker: marker, MaxItems: 1000 }));
       items.push(...(response.Groups || []));
       marker = response.IsTruncated ? response.Marker : undefined;
     } while (marker);
@@ -1001,7 +1087,7 @@ export class AwsAuditService {
     let marker: string | undefined;
 
     do {
-      const response = await client.send(new ListRolesCommand({Marker: marker, MaxItems: 1000}));
+      const response = await client.send(new ListRolesCommand({ Marker: marker, MaxItems: 1000 }));
       items.push(...(response.Roles || []));
       marker = response.IsTruncated ? response.Marker : undefined;
     } while (marker);
@@ -1015,7 +1101,7 @@ export class AwsAuditService {
 
     do {
       const response = await client.send(
-        new ListGroupsForUserCommand({UserName: userName, Marker: marker, MaxItems: 1000})
+        new ListGroupsForUserCommand({ UserName: userName, Marker: marker, MaxItems: 1000 }),
       );
       items.push(...(response.Groups || []));
       marker = response.IsTruncated ? response.Marker : undefined;
@@ -1030,7 +1116,7 @@ export class AwsAuditService {
 
     do {
       const response = await client.send(
-        new ListAttachedUserPoliciesCommand({UserName: userName, Marker: marker, MaxItems: 1000})
+        new ListAttachedUserPoliciesCommand({ UserName: userName, Marker: marker, MaxItems: 1000 }),
       );
       for (const policy of response.AttachedPolicies || []) {
         if (!policy.PolicyArn || !policy.PolicyName) {
@@ -1050,10 +1136,10 @@ export class AwsAuditService {
 
     do {
       const response = await client.send(
-        new ListUserPoliciesCommand({UserName: userName, Marker: marker, MaxItems: 1000})
+        new ListUserPoliciesCommand({ UserName: userName, Marker: marker, MaxItems: 1000 }),
       );
       for (const policyName of response.PolicyNames || []) {
-        const policy = await client.send(new GetUserPolicyCommand({UserName: userName, PolicyName: policyName}));
+        const policy = await client.send(new GetUserPolicyCommand({ UserName: userName, PolicyName: policyName }));
         analyses.push({
           policyName,
           policyArn: `inline:user:${userName}:${policyName}`,
@@ -1072,7 +1158,7 @@ export class AwsAuditService {
 
     do {
       const response = await client.send(
-        new ListAttachedGroupPoliciesCommand({GroupName: groupName, Marker: marker, MaxItems: 1000})
+        new ListAttachedGroupPoliciesCommand({ GroupName: groupName, Marker: marker, MaxItems: 1000 }),
       );
       for (const policy of response.AttachedPolicies || []) {
         if (!policy.PolicyArn || !policy.PolicyName) {
@@ -1092,10 +1178,10 @@ export class AwsAuditService {
 
     do {
       const response = await client.send(
-        new ListGroupPoliciesCommand({GroupName: groupName, Marker: marker, MaxItems: 1000})
+        new ListGroupPoliciesCommand({ GroupName: groupName, Marker: marker, MaxItems: 1000 }),
       );
       for (const policyName of response.PolicyNames || []) {
-        const policy = await client.send(new GetGroupPolicyCommand({GroupName: groupName, PolicyName: policyName}));
+        const policy = await client.send(new GetGroupPolicyCommand({ GroupName: groupName, PolicyName: policyName }));
         analyses.push({
           policyName,
           policyArn: `inline:group:${groupName}:${policyName}`,
@@ -1114,7 +1200,7 @@ export class AwsAuditService {
 
     do {
       const response = await client.send(
-        new ListAttachedRolePoliciesCommand({RoleName: roleName, Marker: marker, MaxItems: 1000})
+        new ListAttachedRolePoliciesCommand({ RoleName: roleName, Marker: marker, MaxItems: 1000 }),
       );
       for (const policy of response.AttachedPolicies || []) {
         if (!policy.PolicyArn || !policy.PolicyName) {
@@ -1134,10 +1220,10 @@ export class AwsAuditService {
 
     do {
       const response = await client.send(
-        new ListRolePoliciesCommand({RoleName: roleName, Marker: marker, MaxItems: 1000})
+        new ListRolePoliciesCommand({ RoleName: roleName, Marker: marker, MaxItems: 1000 }),
       );
       for (const policyName of response.PolicyNames || []) {
-        const policy = await client.send(new GetRolePolicyCommand({RoleName: roleName, PolicyName: policyName}));
+        const policy = await client.send(new GetRolePolicyCommand({ RoleName: roleName, PolicyName: policyName }));
         analyses.push({
           policyName,
           policyArn: `inline:role:${roleName}:${policyName}`,
@@ -1155,23 +1241,23 @@ export class AwsAuditService {
       this.policyCache.set(
         policyArn,
         (async () => {
-          const policy = await client.send(new GetPolicyCommand({PolicyArn: policyArn}));
+          const policy = await client.send(new GetPolicyCommand({ PolicyArn: policyArn }));
           const defaultVersionId = policy.Policy?.DefaultVersionId;
           if (!defaultVersionId) {
-            return {policyArn, policyName, findings: []};
+            return { policyArn, policyName, findings: [] };
           }
           const version = await client.send(
             new GetPolicyVersionCommand({
               PolicyArn: policyArn,
               VersionId: defaultVersionId,
-            })
+            }),
           );
           return {
             policyArn,
             policyName,
             findings: this.evaluatePolicyDocument(version.PolicyVersion?.Document),
           };
-        })()
+        })(),
       );
     }
 
@@ -1188,37 +1274,40 @@ export class AwsAuditService {
     const findings: PolicyRisk[] = [];
 
     for (const statement of statements) {
-      if (!statement || statement.Effect !== 'Allow') {
+      if (!statement || statement.Effect !== "Allow") {
         continue;
       }
 
       const actions = this.toArray(statement.Action);
       const notActions = this.toArray(statement.NotAction);
       const resources = this.toArray(statement.Resource);
-      const hasGlobalResource = resources.includes('*');
+      const hasGlobalResource = resources.includes("*");
 
       if (notActions.length) {
         findings.push({
-          severity: 'high',
-          summary: 'Allow statement uses NotAction',
-          detail: 'An Allow + NotAction statement often grants very broad permissions and should be reviewed manually.',
+          ruleId: "iam.policy-notaction",
+          severity: "high",
+          summary: "Allow statement uses NotAction",
+          detail: "An Allow + NotAction statement often grants very broad permissions and should be reviewed manually.",
         });
       }
 
-      if (actions.includes('*') && hasGlobalResource) {
+      if (actions.includes("*") && hasGlobalResource) {
         findings.push({
-          severity: 'high',
-          summary: 'Policy allows * on *',
-          detail: 'The policy grants unrestricted access across all services and resources.',
+          ruleId: "iam.policy-star-on-star",
+          severity: "high",
+          summary: "Policy allows * on *",
+          detail: "The policy grants unrestricted access across all services and resources.",
         });
       }
 
-      const serviceWildcards = actions.filter(action => typeof action === 'string' && action.endsWith(':*'));
+      const serviceWildcards = actions.filter((action) => typeof action === "string" && action.endsWith(":*"));
       for (const action of serviceWildcards) {
-        const serviceName = action.split(':')[0];
-        const severity: Severity = ['iam', 'sts', 'kms', 'organizations'].includes(serviceName) ? 'high' : 'medium';
+        const serviceName = action.split(":")[0];
+        const severity: Severity = ["iam", "sts", "kms", "organizations"].includes(serviceName) ? "high" : "medium";
         if (hasGlobalResource) {
           findings.push({
+            ruleId: "iam.policy-service-wildcard",
             severity,
             summary: `Policy grants ${action} on *`,
             detail: `The policy grants broad ${serviceName.toUpperCase()} access across all resources.`,
@@ -1226,13 +1315,14 @@ export class AwsAuditService {
         }
       }
 
-      const sensitiveActions = ['iam:PassRole', 'sts:AssumeRole', 'kms:Decrypt', 'secretsmanager:GetSecretValue'];
-      const exposedSensitiveActions = actions.filter(action => sensitiveActions.includes(action));
+      const sensitiveActions = ["iam:PassRole", "sts:AssumeRole", "kms:Decrypt", "secretsmanager:GetSecretValue"];
+      const exposedSensitiveActions = actions.filter((action) => sensitiveActions.includes(action));
       if (exposedSensitiveActions.length && hasGlobalResource) {
         findings.push({
-          severity: 'high',
+          ruleId: "iam.policy-sensitive-action",
+          severity: "high",
           summary: `Policy grants sensitive actions on *`,
-          detail: `Sensitive actions ${exposedSensitiveActions.join(', ')} are allowed on every resource.`,
+          detail: `Sensitive actions ${exposedSensitiveActions.join(", ")} are allowed on every resource.`,
         });
       }
     }
@@ -1241,33 +1331,34 @@ export class AwsAuditService {
   }
 
   private collectPolicyFindings(
-    service: AuditFinding['service'],
+    service: AuditFinding["service"],
     resourceType: string,
     resourceId: string,
     policies: ManagedPolicyAnalysis[],
-    region: string
+    region: string,
   ) {
-    return policies.flatMap(policy =>
-      policy.findings.map(finding =>
+    return policies.flatMap((policy) =>
+      policy.findings.map((finding) =>
         this.createFinding({
+          ruleId: finding.ruleId,
           service,
           severity: finding.severity,
           resourceType,
           resourceId,
           title: `${policy.policyName}: ${finding.summary}`,
           detail: finding.detail,
-          recommendation: 'Replace wildcard permissions with least-privilege actions and resource ARNs.',
+          recommendation: "Replace wildcard permissions with least-privilege actions and resource ARNs.",
           region,
-        })
-      )
+        }),
+      ),
     );
   }
 
   private collectCredentialFindings(
     userName: string,
     row: CredentialReportRow | undefined,
-    passwordPolicy: {maxPasswordAge: number | null} | null,
-    region: string
+    passwordPolicy: { maxPasswordAge: number | null } | null,
+    region: string,
   ) {
     const findings: AuditFinding[] = [];
     if (!row) {
@@ -1277,15 +1368,16 @@ export class AwsAuditService {
     if (this.isTruthy(row.password_enabled) && !this.isTruthy(row.mfa_active)) {
       findings.push(
         this.createFinding({
-          service: 'iam',
-          severity: 'medium',
-          resourceType: 'IamUser',
+          service: "iam",
+          severity: "medium",
+          resourceType: "IamUser",
           resourceId: userName,
-          title: 'IAM console user does not have MFA enabled',
+          ruleId: "iam.user-no-mfa",
+          title: "IAM console user does not have MFA enabled",
           detail: `User ${userName} has console password access without MFA.`,
-          recommendation: 'Require MFA for every console-capable IAM user.',
+          recommendation: "Require MFA for every console-capable IAM user.",
           region,
-        })
+        }),
       );
     }
 
@@ -1293,45 +1385,48 @@ export class AwsAuditService {
     if (this.isTruthy(row.password_enabled) && passwordNextRotation && passwordNextRotation.getTime() < Date.now()) {
       findings.push(
         this.createFinding({
-          service: 'iam',
-          severity: 'high',
-          resourceType: 'IamUser',
+          service: "iam",
+          severity: "high",
+          resourceType: "IamUser",
           resourceId: userName,
-          title: 'IAM user password is past the next rotation date',
+          ruleId: "iam.user-password-expired",
+          title: "IAM user password is past the next rotation date",
           detail: `User ${userName} password rotation deadline was ${passwordNextRotation.toISOString()}.`,
-          recommendation: 'Reset the user password and review whether the account still needs console access.',
+          recommendation: "Reset the user password and review whether the account still needs console access.",
           region,
-        })
+        }),
       );
     } else if (this.isTruthy(row.password_enabled) && passwordPolicy?.maxPasswordAge && !passwordNextRotation) {
       findings.push(
         this.createFinding({
-          service: 'iam',
-          severity: 'medium',
-          resourceType: 'IamUser',
+          service: "iam",
+          severity: "medium",
+          resourceType: "IamUser",
           resourceId: userName,
-          title: 'IAM user password rotation status is unclear',
+          ruleId: "iam.user-password-rotation-unclear",
+          title: "IAM user password rotation status is unclear",
           detail: `User ${userName} has a console password but no next rotation date was derived from the credential report.`,
-          recommendation: 'Review the user login profile and force a password reset if needed.',
+          recommendation: "Review the user login profile and force a password reset if needed.",
           region,
-        })
+        }),
       );
     }
 
     const accessKeys = this.serializeCredentialReportAccessKeys(row);
-    const activeAccessKeys = accessKeys.filter(item => item.active);
+    const activeAccessKeys = accessKeys.filter((item) => item.active);
     if (activeAccessKeys.length > 1) {
       findings.push(
         this.createFinding({
-          service: 'iam',
-          severity: 'low',
-          resourceType: 'IamUser',
+          service: "iam",
+          severity: "low",
+          resourceType: "IamUser",
           resourceId: userName,
-          title: 'IAM user has multiple active access keys',
+          ruleId: "iam.user-multiple-access-keys",
+          title: "IAM user has multiple active access keys",
           detail: `User ${userName} currently has ${activeAccessKeys.length} active access keys.`,
-          recommendation: 'Rotate and remove older access keys when they are no longer needed.',
+          recommendation: "Rotate and remove older access keys when they are no longer needed.",
           region,
-        })
+        }),
       );
     }
 
@@ -1339,30 +1434,32 @@ export class AwsAuditService {
       if (accessKey.lastRotatedAt && this.daysSince(accessKey.lastRotatedAt) > 90) {
         findings.push(
           this.createFinding({
-            service: 'iam',
-            severity: 'medium',
-            resourceType: 'IamAccessKey',
+            service: "iam",
+            severity: "medium",
+            resourceType: "IamAccessKey",
             resourceId: `${userName}:${accessKey.slot}`,
-            title: 'IAM access key is older than 90 days',
+            ruleId: "iam.access-key-old",
+            title: "IAM access key is older than 90 days",
             detail: `Access key slot ${accessKey.slot} for user ${userName} was last rotated on ${accessKey.lastRotatedAt}.`,
-            recommendation: 'Rotate long-lived access keys or replace them with short-lived IAM roles.',
+            recommendation: "Rotate long-lived access keys or replace them with short-lived IAM roles.",
             region,
-          })
+          }),
         );
       }
 
       if (!accessKey.lastUsedAt) {
         findings.push(
           this.createFinding({
-            service: 'iam',
-            severity: 'low',
-            resourceType: 'IamAccessKey',
+            service: "iam",
+            severity: "low",
+            resourceType: "IamAccessKey",
             resourceId: `${userName}:${accessKey.slot}`,
-            title: 'IAM access key has no recorded usage',
+            ruleId: "iam.access-key-no-usage",
+            title: "IAM access key has no recorded usage",
             detail: `Access key slot ${accessKey.slot} for user ${userName} does not show a last-used timestamp.`,
-            recommendation: 'Delete the key if it is no longer required.',
+            recommendation: "Delete the key if it is no longer required.",
             region,
-          })
+          }),
         );
       }
     }
@@ -1396,9 +1493,9 @@ export class AwsAuditService {
   }
 
   private async resolveBucketRegion(client: S3Client, bucketName: string) {
-    const response = await client.send(new GetBucketLocationCommand({Bucket: bucketName}));
+    const response = await client.send(new GetBucketLocationCommand({ Bucket: bucketName }));
     if (!response.LocationConstraint) {
-      return 'us-east-1';
+      return "us-east-1";
     }
     return String(response.LocationConstraint);
   }
@@ -1408,10 +1505,10 @@ export class AwsAuditService {
       return await fn();
     } catch (error: any) {
       if (
-        error?.name === 'NoSuchPublicAccessBlockConfiguration' ||
-        error?.name === 'ServerSideEncryptionConfigurationNotFoundError' ||
-        error?.name === 'NoSuchBucketPolicy' ||
-        error?.name === 'NoSuchBucket'
+        error?.name === "NoSuchPublicAccessBlockConfiguration" ||
+        error?.name === "ServerSideEncryptionConfigurationNotFoundError" ||
+        error?.name === "NoSuchBucketPolicy" ||
+        error?.name === "NoSuchBucket"
       ) {
         return null;
       }
@@ -1427,8 +1524,8 @@ export class AwsAuditService {
     return grants.some((grant: any) => {
       const uri = grant.Grantee?.URI;
       return (
-        uri === 'http://acs.amazonaws.com/groups/global/AllUsers' ||
-        uri === 'http://acs.amazonaws.com/groups/global/AuthenticatedUsers'
+        uri === "http://acs.amazonaws.com/groups/global/AllUsers" ||
+        uri === "http://acs.amazonaws.com/groups/global/AuthenticatedUsers"
       );
     });
   }
@@ -1437,10 +1534,10 @@ export class AwsAuditService {
     if (!document) {
       return null;
     }
-    if (typeof document === 'object') {
+    if (typeof document === "object") {
       return document as Record<string, any>;
     }
-    if (typeof document !== 'string') {
+    if (typeof document !== "string") {
       return null;
     }
     try {
@@ -1463,7 +1560,7 @@ export class AwsAuditService {
 
   private deduplicatePolicyRisks(findings: PolicyRisk[]) {
     const seen = new Set<string>();
-    return findings.filter(finding => {
+    return findings.filter((finding) => {
       const key = `${finding.severity}:${finding.summary}:${finding.detail}`;
       if (seen.has(key)) {
         return false;
@@ -1480,10 +1577,10 @@ export class AwsAuditService {
     }
 
     const headers = this.parseCsvLine(lines[0]);
-    return lines.slice(1).map(line => {
+    return lines.slice(1).map((line) => {
       const values = this.parseCsvLine(line);
       return headers.reduce<Record<string, string>>((accumulator, header, index) => {
-        accumulator[header] = values[index] || '';
+        accumulator[header] = values[index] || "";
         return accumulator;
       }, {});
     });
@@ -1491,7 +1588,7 @@ export class AwsAuditService {
 
   private parseCsvLine(line: string) {
     const values: string[] = [];
-    let current = '';
+    let current = "";
     let inQuotes = false;
 
     for (let index = 0; index < line.length; index += 1) {
@@ -1509,9 +1606,9 @@ export class AwsAuditService {
         continue;
       }
 
-      if (character === ',' && !inQuotes) {
+      if (character === "," && !inQuotes) {
         values.push(current);
-        current = '';
+        current = "";
         continue;
       }
 
@@ -1523,7 +1620,7 @@ export class AwsAuditService {
   }
 
   private toDate(value?: string | null) {
-    if (!value || ['N/A', 'no_information', 'not_supported'].includes(value)) {
+    if (!value || ["N/A", "no_information", "not_supported"].includes(value)) {
       return null;
     }
     const date = new Date(value);
@@ -1535,14 +1632,14 @@ export class AwsAuditService {
   }
 
   private normalizeNullableString(value?: string | null) {
-    if (!value || ['N/A', 'no_information', 'not_supported'].includes(value)) {
+    if (!value || ["N/A", "no_information", "not_supported"].includes(value)) {
       return null;
     }
     return value;
   }
 
   private isTruthy(value?: string | null) {
-    return value === 'true';
+    return value === "true";
   }
 
   private daysSince(dateIsoString: string) {
@@ -1555,10 +1652,10 @@ export class AwsAuditService {
   }
 
   private async captureStep<T>(
-    service: AuditError['service'],
+    service: AuditError["service"],
     fn: () => Promise<T>,
     fallback: T,
-    errors: AuditError[]
+    errors: AuditError[],
   ) {
     try {
       return await fn();
@@ -1572,7 +1669,7 @@ export class AwsAuditService {
   }
 
   private getErrorMessage(error: any) {
-    return error?.message || error?.name || 'Unknown AWS audit error';
+    return error?.message || error?.name || "Unknown AWS audit error";
   }
 
   private normalizeRegion(region: string) {
@@ -1580,6 +1677,6 @@ export class AwsAuditService {
   }
 
   private sleep(milliseconds: number) {
-    return new Promise(resolve => setTimeout(resolve, milliseconds));
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
   }
 }

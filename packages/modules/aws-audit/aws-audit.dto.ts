@@ -90,6 +90,9 @@ export class AwsAuditAccountDto {
 
 /** A single security finding from the audit. */
 export class AwsAuditFindingDto {
+  @ApiProperty({description: 'Stable rule identifier used for cross-scan deduplication'})
+  ruleId: string;
+
   @ApiProperty({description: 'AWS service that produced the finding'})
   service: 'iam' | 's3' | 'ec2' | 'rds' | 'sts';
 

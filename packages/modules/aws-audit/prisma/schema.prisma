@@ -3,22 +3,20 @@
 // !! ------------------------------------------------------------ //
 // * AwsAuditProjectSetting                                        //
 // * AwsAuditScan                                                  //
+// * AwsAuditFinding                                               //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// Audit-specific per-project settings. AWS credentials are NOT stored here
-// any more; they now live in application.ProjectAwsCredential (aws-core).
-// The legacy credential columns are kept nullable for backward compatibility.
+// Audit-specific per-project settings. AWS credentials are NOT stored here;
+// they live in application.ProjectAwsCredential (aws-core).
 model AwsAuditProjectSetting {
-  id              String    @id @default(uuid()) @db.Uuid
-  projectId       String    @unique @db.Uuid
-  awsAccountId    String?
-  iamUserName     String?
-  accessKeyId     String?
-  secretAccessKey String?
-  regions         String[]
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  lastVerifiedAt  DateTime?
+  id             String    @id @default(uuid()) @db.Uuid
+  projectId      String    @unique @db.Uuid
+  awsAccountId   String?
+  iamUserName    String?
+  regions        String[]
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  lastVerifiedAt DateTime?
 
   @@index([projectId])
   @@schema("module/aws-audit")
@@ -38,5 +36,38 @@ model AwsAuditScan {
 
   @@index([projectId])
   @@index([projectId, createdAt])
+  @@schema("module/aws-audit")
+}
+
+// Deduplicated, cross-scan persistent finding. One row per (project, service,
+// resourceType, resourceId, ruleId) tuple; upserted after every successful
+// scan so trends / MTTR / roll-up views can be derived without re-parsing the
+// report JSON blob on AwsAuditScan.
+model AwsAuditFinding {
+  id             String    @id @default(uuid()) @db.Uuid
+  projectId      String    @db.Uuid
+  scanId         String?   @db.Uuid
+  fingerprint    String    @unique
+  service        String    @db.VarChar(20)
+  resourceType   String    @db.VarChar(50)
+  resourceId     String    @db.VarChar(512)
+  ruleId         String    @db.VarChar(100)
+  severity       String    @db.VarChar(10)
+  title          String    @db.VarChar(512)
+  detail         String?   @db.Text
+  recommendation String?   @db.Text
+  region         String?   @db.VarChar(50)
+  status         String    @default("open") @db.VarChar(20)
+  firstSeenAt    DateTime  @default(now())
+  lastSeenAt     DateTime  @default(now())
+  resolvedAt     DateTime?
+  suppressedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([projectId])
+  @@index([projectId, status])
+  @@index([projectId, severity])
+  @@index([projectId, lastSeenAt])
   @@schema("module/aws-audit")
 }
