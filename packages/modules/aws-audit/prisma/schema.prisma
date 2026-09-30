@@ -52,6 +52,7 @@ model AwsAuditFinding {
   resourceType   String    @db.VarChar(50)
   resourceId     String    @db.VarChar(512)
   ruleId         String    @db.VarChar(100)
+  cisControlId   String?   @db.VarChar(30)
   severity       String    @db.VarChar(10)
   title          String    @db.VarChar(512)
   detail         String?   @db.Text
@@ -68,6 +69,7 @@ model AwsAuditFinding {
   @@index([projectId])
   @@index([projectId, status])
   @@index([projectId, severity])
+  @@index([projectId, cisControlId])
   @@index([projectId, lastSeenAt])
   @@schema("module/aws-audit")
 }

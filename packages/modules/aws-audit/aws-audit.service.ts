@@ -46,6 +46,7 @@ interface AwsCredentials {
 
 interface AuditFinding {
   ruleId: string;
+  cisControlId?: string;
   service: "iam" | "s3" | "ec2" | "rds" | "sts";
   severity: Severity;
   resourceType: string;
@@ -99,6 +100,37 @@ export class AwsAuditService {
   private readonly policyCache = new Map<string, Promise<ManagedPolicyAnalysis>>();
   private readonly activeScans = new Set<string>();
   private readonly clientCache = new Map<string, unknown>();
+
+  /**
+   * Maps internal rule IDs to CIS AWS Foundations Benchmark control IDs.
+   * Rules without a direct CIS equivalent are intentionally unmapped (null)
+   * so compliance reports can distinguish "covered by CIS" from "custom rule".
+   * Reference: CIS AWS Foundations Benchmark v1.5.
+   */
+  private readonly ruleIdToCisControl: Record<string, string> = {
+    // IAM (CIS Chapter 1)
+    "iam.root-active-access-keys": "1.4",
+    "iam.root-no-mfa": "1.5",
+    "iam.user-no-mfa": "1.8",
+    "iam.password-policy-missing": "1.13",
+    "iam.password-min-length": "1.13",
+    "iam.password-no-expiration": "1.15",
+    "iam.user-password-expired": "1.15",
+    "iam.user-password-rotation-unclear": "1.15",
+    // S3 (CIS Chapter 2)
+    "s3.no-encryption": "2.1.1",
+    "s3.policy-public": "2.1.2",
+    "s3.acl-public": "2.1.2",
+    "s3.pab-missing": "2.1.2",
+    "s3.pab-partial": "2.1.2",
+    // RDS (CIS Chapter 2)
+    "rds.publicly-accessible": "2.3.1",
+    "rds.no-encryption": "2.3.1",
+    // EC2 Security Groups (CIS Chapter 4)
+    "ec2.sg-all-traffic-public": "4.1",
+    "ec2.sg-sensitive-ports-public": "4.1",
+    "ec2.sg-public-ingress": "4.2",
+  };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -313,6 +345,7 @@ export class AwsAuditService {
           resourceType: finding.resourceType,
           resourceId: finding.resourceId,
           ruleId: finding.ruleId,
+          cisControlId: finding.cisControlId ?? null,
           severity: finding.severity,
           title: finding.title,
           detail: finding.detail,
@@ -324,6 +357,7 @@ export class AwsAuditService {
         },
         update: {
           scanId,
+          cisControlId: finding.cisControlId ?? null,
           severity: finding.severity,
           title: finding.title,
           detail: finding.detail,
@@ -1647,8 +1681,9 @@ export class AwsAuditService {
     return Math.floor((Date.now() - timestamp) / (1000 * 60 * 60 * 24));
   }
 
-  private createFinding(args: AuditFinding) {
-    return args;
+  private createFinding(args: AuditFinding): AuditFinding {
+    const cisControlId = args.cisControlId ?? this.ruleIdToCisControl[args.ruleId] ?? null;
+    return { ...args, cisControlId: cisControlId ?? undefined };
   }
 
   private async captureStep<T>(
