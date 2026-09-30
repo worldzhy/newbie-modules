@@ -7,14 +7,21 @@
   "config-service": {
     "github": {
       "auth": "process.env.GITHUB_AUTH",
-      "userAgent": "process.env.GITHUB_USER_AGENT"
+      "userAgent": "process.env.GITHUB_USER_AGENT",
+      "appId": "process.env.GITHUB_APP_ID",
+      "privateKey": "process.env.GITHUB_PRIVATE_KEY",
+      "installationId": "process.env.GITHUB_INSTALLATION_ID"
     }
   },
   "env": {
     "GITHUB_AUTH": "",
-    "GITHUB_USER_AGENT": ""
+    "GITHUB_USER_AGENT": "",
+    "GITHUB_APP_ID": "",
+    "GITHUB_PRIVATE_KEY": "",
+    "GITHUB_INSTALLATION_ID": ""
   },
   "dependencies": {
-    "@octokit/rest": "latest"
+    "@octokit/rest": "latest",
+    "@octokit/auth-app": "latest"
   }
 }
