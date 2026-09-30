@@ -1,13 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 /** Scan lifecycle status. */
-export type DepScanStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED";
+export type DependencyScanStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED";
 
 /** Finding severity level, normalized from the vulnerability record metadata. */
-export type DepScanSeverity = "critical" | "high" | "medium" | "low" | "unknown";
+export type DependencyScanSeverity = "critical" | "high" | "medium" | "low" | "unknown";
 
 /** Aggregated counts of open findings by severity. */
-export class DepScanOpenSummaryDto {
+export class DependencyScanOpenSummaryDto {
   @ApiProperty({ description: "Total open findings" })
   total: number;
 
@@ -28,7 +28,7 @@ export class DepScanOpenSummaryDto {
 }
 
 /** Aggregated summary of a finished scan. */
-export class DepScanScanSummaryDto extends DepScanOpenSummaryDto {
+export class DependencyScanScanSummaryDto extends DependencyScanOpenSummaryDto {
   @ApiProperty({ description: "Total locked packages matched against OSV" })
   packagesScanned: number;
 
@@ -36,8 +36,8 @@ export class DepScanScanSummaryDto extends DepScanOpenSummaryDto {
   vulnerablePackages: number;
 }
 
-/** A single persisted dep-scan record (serialized for the client). */
-export class DepScanScanRecordDto {
+/** A single persisted dependency-scan record (serialized for the client). */
+export class DependencyScanScanRecordDto {
   @ApiProperty({ description: "Scan record ID" })
   id: string;
 
@@ -45,13 +45,13 @@ export class DepScanScanRecordDto {
   applicationId: string;
 
   @ApiProperty({ description: "Scan lifecycle status", example: "SUCCESS" })
-  status: DepScanStatus;
+  status: DependencyScanStatus;
 
   @ApiPropertyOptional({ description: "Error message when status is FAILED", type: String })
   errorMessage?: string | null;
 
-  @ApiPropertyOptional({ description: "Aggregated summary counts, null until scan completes", type: DepScanScanSummaryDto })
-  summary?: DepScanScanSummaryDto | null;
+  @ApiPropertyOptional({ description: "Aggregated summary counts, null until scan completes", type: DependencyScanScanSummaryDto })
+  summary?: DependencyScanScanSummaryDto | null;
 
   @ApiPropertyOptional({ description: "Locked packages found in the lockfile", type: Number })
   packageCount?: number | null;
@@ -79,7 +79,7 @@ export class DepScanScanRecordDto {
 }
 
 /** A persisted open vulnerability finding for an application dependency. */
-export class DepScanFindingDto {
+export class DependencyScanFindingDto {
   @ApiProperty({ description: "Finding record ID" })
   id: string;
 
@@ -99,7 +99,7 @@ export class DepScanFindingDto {
   aliases: string[];
 
   @ApiProperty({ description: "Severity level" })
-  severity: DepScanSeverity;
+  severity: DependencyScanSeverity;
 
   @ApiProperty({ description: "Short vulnerability title" })
   title: string;
@@ -124,7 +124,7 @@ export class DepScanFindingDto {
 }
 
 /** Per-application scan state and open findings within a project report. */
-export class DepScanApplicationOverviewDto {
+export class DependencyScanApplicationOverviewDto {
   @ApiProperty({ description: "Application ID" })
   applicationId: string;
 
@@ -140,24 +140,24 @@ export class DepScanApplicationOverviewDto {
   @ApiProperty({ description: "Whether the application has a repository URL configured" })
   hasRepository: boolean;
 
-  @ApiPropertyOptional({ description: "Currently running scan, or null", type: DepScanScanRecordDto })
-  currentScan?: DepScanScanRecordDto | null;
+  @ApiPropertyOptional({ description: "Currently running scan, or null", type: DependencyScanScanRecordDto })
+  currentScan?: DependencyScanScanRecordDto | null;
 
-  @ApiPropertyOptional({ description: "Most recent successful scan, or null", type: DepScanScanRecordDto })
-  latestSuccessfulScan?: DepScanScanRecordDto | null;
+  @ApiPropertyOptional({ description: "Most recent successful scan, or null", type: DependencyScanScanRecordDto })
+  latestSuccessfulScan?: DependencyScanScanRecordDto | null;
 
-  @ApiPropertyOptional({ description: "Most recent failed scan, or null", type: DepScanScanRecordDto })
-  latestFailedScan?: DepScanScanRecordDto | null;
+  @ApiPropertyOptional({ description: "Most recent failed scan, or null", type: DependencyScanScanRecordDto })
+  latestFailedScan?: DependencyScanScanRecordDto | null;
 
-  @ApiProperty({ description: "Open findings counts by severity", type: DepScanOpenSummaryDto })
-  openSummary: DepScanOpenSummaryDto;
+  @ApiProperty({ description: "Open findings counts by severity", type: DependencyScanOpenSummaryDto })
+  openSummary: DependencyScanOpenSummaryDto;
 
-  @ApiProperty({ type: [DepScanFindingDto], description: "Open findings sorted by severity" })
-  findings: DepScanFindingDto[];
+  @ApiProperty({ type: [DependencyScanFindingDto], description: "Open findings sorted by severity" })
+  findings: DependencyScanFindingDto[];
 }
 
-/** Project-level aggregated dep-scan report. */
-export class DepScanProjectSummaryDto extends DepScanOpenSummaryDto {
+/** Project-level aggregated dependency-scan report. */
+export class DependencyScanProjectSummaryDto extends DependencyScanOpenSummaryDto {
   @ApiProperty({ description: "Total applications in the project" })
   applicationsTotal: number;
 
@@ -165,23 +165,23 @@ export class DepScanProjectSummaryDto extends DepScanOpenSummaryDto {
   applicationsScanned: number;
 }
 
-/** Response for GET /dep-scan/projects/:projectId/report. */
-export class DepScanProjectReportResponseDto {
+/** Response for GET /dependency-scan/projects/:projectId/report. */
+export class DependencyScanProjectReportResponseDto {
   @ApiProperty({ description: "Project ID" })
   projectId: string;
 
-  @ApiProperty({ description: "Project-level aggregated summary", type: DepScanProjectSummaryDto })
-  summary: DepScanProjectSummaryDto;
+  @ApiProperty({ description: "Project-level aggregated summary", type: DependencyScanProjectSummaryDto })
+  summary: DependencyScanProjectSummaryDto;
 
-  @ApiProperty({ type: [DepScanApplicationOverviewDto], description: "Per-application scan state and open findings" })
-  applications: DepScanApplicationOverviewDto[];
+  @ApiProperty({ type: [DependencyScanApplicationOverviewDto], description: "Per-application scan state and open findings" })
+  applications: DependencyScanApplicationOverviewDto[];
 }
 
-/** Response for POST /dep-scan/applications/:applicationId/scan. */
-export class DepScanScanStartResponseDto {
+/** Response for POST /dependency-scan/applications/:applicationId/scan. */
+export class DependencyScanScanStartResponseDto {
   @ApiProperty({ description: "Whether the scan request was accepted" })
   accepted: boolean;
 
-  @ApiProperty({ description: "The scan record that was started (or the already-running one)", type: DepScanScanRecordDto })
-  scan: DepScanScanRecordDto;
+  @ApiProperty({ description: "The scan record that was started (or the already-running one)", type: DependencyScanScanRecordDto })
+  scan: DependencyScanScanRecordDto;
 }

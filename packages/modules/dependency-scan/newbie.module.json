@@ -1,8 +1,8 @@
 {
-  "key": "dep-scan",
+  "key": "dependency-scan",
   "module": {
-    "file": "dep-scan.module",
-    "className": "DepScanModule"
+    "file": "dependency-scan.module",
+    "className": "DependencyScanModule"
   },
   "schema": "prisma/schema.prisma",
   "config-service": {},

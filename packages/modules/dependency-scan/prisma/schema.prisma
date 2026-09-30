@@ -1,14 +1,14 @@
 // !! ------------------------------------------------------------ //
-// !!               [Module] Dep Scan models                        //
+// !!               [Module] Dependency Scan models                        //
 // !! ------------------------------------------------------------ //
-// * DepScan                                                       //
-// * DepScanFinding                                                //
+// * DependencyScan                                                       //
+// * DependencyScanFinding                                                //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 // One dependency vulnerability scan execution for a single Application.
 // Scans fetch the repository lockfile via the GitHub API and match locked
 // package versions against the OSV vulnerability database.
-model DepScan {
+model DependencyScan {
   id            String    @id @default(uuid()) @db.Uuid
   applicationId String    @db.Uuid
   status        String    @db.VarChar(30)
@@ -25,16 +25,16 @@ model DepScan {
 
   @@index([applicationId])
   @@index([applicationId, createdAt])
-  @@schema("module/dep-scan")
+  @@schema("module/dependency-scan")
 }
 
 // Deduplicated, cross-scan persistent finding. One row per
 // (application, packageName, vulnId) tuple; upserted after every successful
 // scan so trends and project-level roll-ups can be derived without re-parsing
-// the report JSON blob on DepScan. The installed version is a mutable field on
+// the report JSON blob on DependencyScan. The installed version is a mutable field on
 // the row, not part of the fingerprint: upgrading to another still-affected
 // version keeps the same finding open.
-model DepScanFinding {
+model DependencyScanFinding {
   id             String    @id @default(uuid()) @db.Uuid
   applicationId  String    @db.Uuid
   projectId      String    @db.Uuid
@@ -61,5 +61,5 @@ model DepScanFinding {
   @@index([projectId])
   @@index([projectId, status])
   @@index([projectId, severity])
-  @@schema("module/dep-scan")
+  @@schema("module/dependency-scan")
 }

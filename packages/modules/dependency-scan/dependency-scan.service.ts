@@ -10,7 +10,7 @@ interface LockedPackage {
   dev: boolean;
 }
 
-interface DepScanFindingInput {
+interface DependencyScanFindingInput {
   packageName: string;
   packageVersion: string;
   isDev: boolean;
@@ -31,8 +31,8 @@ const VULN_DETAIL_CONCURRENCY = 10;
 const LOCKFILE_CANDIDATES = ["package-lock.json"];
 
 @Injectable()
-export class DepScanService {
-  private readonly logger = new Logger(DepScanService.name);
+export class DependencyScanService {
+  private readonly logger = new Logger(DependencyScanService.name);
   private readonly severityRank: Record<Severity, number> = { critical: 4, high: 3, medium: 2, low: 1, unknown: 0 };
   private readonly activeScans = new Set<string>();
 
@@ -52,7 +52,7 @@ export class DepScanService {
       throw new BadRequestException("GitHub credentials are not configured on the server.");
     }
 
-    const latestRunningScan = await this.prisma.depScan.findFirst({
+    const latestRunningScan = await this.prisma.dependencyScan.findFirst({
       where: { applicationId, status: { in: ["PENDING", "RUNNING"] } },
       orderBy: { createdAt: "desc" },
     });
@@ -62,7 +62,7 @@ export class DepScanService {
     }
 
     if (latestRunningScan && !this.activeScans.has(applicationId)) {
-      await this.prisma.depScan.update({
+      await this.prisma.dependencyScan.update({
         where: { id: latestRunningScan.id },
         data: {
           status: "FAILED",
@@ -73,7 +73,7 @@ export class DepScanService {
       await this.pruneFailedScans(applicationId, latestRunningScan.id);
     }
 
-    const scan = await this.prisma.depScan.create({
+    const scan = await this.prisma.dependencyScan.create({
       data: { applicationId, status: "PENDING", repositoryUrl: application.repositoryUrl },
     });
 
@@ -96,11 +96,11 @@ export class DepScanService {
     const applicationIds = applications.map((application) => application.id);
 
     const [scans, openFindings] = await Promise.all([
-      this.prisma.depScan.findMany({
+      this.prisma.dependencyScan.findMany({
         where: { applicationId: { in: applicationIds } },
         orderBy: { createdAt: "desc" },
       }),
-      this.prisma.depScanFinding.findMany({
+      this.prisma.dependencyScanFinding.findMany({
         where: { projectId, status: "open" },
         orderBy: { lastSeenAt: "desc" },
       }),
@@ -215,7 +215,7 @@ export class DepScanService {
 
   private async runScanInBackground(applicationId: string, scanId: string) {
     try {
-      await this.prisma.depScan.update({
+      await this.prisma.dependencyScan.update({
         where: { id: scanId },
         data: { status: "RUNNING", startedAt: new Date(), errorMessage: null },
       });
@@ -223,7 +223,7 @@ export class DepScanService {
       const application = await this.ensureApplicationExists(applicationId);
       const result = await this.scanApplicationLockfile(application);
 
-      await this.prisma.depScan.update({
+      await this.prisma.dependencyScan.update({
         where: { id: scanId },
         data: {
           status: "SUCCESS",
@@ -238,10 +238,10 @@ export class DepScanService {
 
       await this.upsertFindings(application, scanId, result.findings);
       this.logger.log(
-        `Dep scan ${scanId} finished for application ${application.name}: ${result.findings.length} findings across ${result.packageCount} packages`,
+        `Dependency scan ${scanId} finished for application ${application.name}: ${result.findings.length} findings across ${result.packageCount} packages`,
       );
     } catch (error: any) {
-      await this.prisma.depScan.update({
+      await this.prisma.dependencyScan.update({
         where: { id: scanId },
         data: { status: "FAILED", errorMessage: this.getErrorMessage(error), finishedAt: new Date() },
       });
@@ -252,7 +252,7 @@ export class DepScanService {
   }
 
   private async pruneFailedScans(applicationId: string, keepId: string) {
-    await this.prisma.depScan.deleteMany({
+    await this.prisma.dependencyScan.deleteMany({
       where: { applicationId, status: "FAILED", id: { not: keepId } },
     });
   }
@@ -288,7 +288,7 @@ export class DepScanService {
     const vulnIds = [...new Set([...vulnsByPackage.values()].flat().map((vuln) => vuln.id))];
     const vulnDetails = await this.fetchVulnDetails(vulnIds);
 
-    const findings: DepScanFindingInput[] = [];
+    const findings: DependencyScanFindingInput[] = [];
     for (const pkg of packages) {
       const vulns = vulnsByPackage.get(this.packageKey(pkg)) ?? [];
       for (const vuln of vulns) {
@@ -407,7 +407,7 @@ export class DepScanService {
     return details;
   }
 
-  private buildFinding(pkg: LockedPackage, vulnId: string, vuln: any): DepScanFindingInput {
+  private buildFinding(pkg: LockedPackage, vulnId: string, vuln: any): DependencyScanFindingInput {
     return {
       packageName: pkg.name,
       packageVersion: pkg.version,
@@ -454,7 +454,7 @@ export class DepScanService {
   }
 
   /**
-   * Persist the findings from a successful scan into the DepScanFinding table.
+   * Persist the findings from a successful scan into the DependencyScanFinding table.
    * Each finding is identified by a stable fingerprint so repeated scans update
    * the same row (lastSeenAt refresh) instead of creating duplicates. Findings
    * that were open in a previous scan but did not recur are marked resolved.
@@ -462,7 +462,7 @@ export class DepScanService {
   private async upsertFindings(
     application: { id: string; projectId: string },
     scanId: string,
-    findings: DepScanFindingInput[],
+    findings: DependencyScanFindingInput[],
   ) {
     const seenFingerprints = new Set<string>();
     const now = new Date();
@@ -471,7 +471,7 @@ export class DepScanService {
       const fingerprint = this.findingFingerprint(application.id, finding);
       seenFingerprints.add(fingerprint);
 
-      await this.prisma.depScanFinding.upsert({
+      await this.prisma.dependencyScanFinding.upsert({
         where: { fingerprint },
         create: {
           applicationId: application.id,
@@ -509,7 +509,7 @@ export class DepScanService {
     }
 
     // Findings that were open before but did not recur in this scan are resolved.
-    await this.prisma.depScanFinding.updateMany({
+    await this.prisma.dependencyScanFinding.updateMany({
       where: {
         applicationId: application.id,
         status: "open",
@@ -519,7 +519,7 @@ export class DepScanService {
     });
   }
 
-  private findingFingerprint(applicationId: string, finding: DepScanFindingInput) {
+  private findingFingerprint(applicationId: string, finding: DependencyScanFindingInput) {
     return `${applicationId}:${finding.packageName}:${finding.vulnId}`;
   }
 
