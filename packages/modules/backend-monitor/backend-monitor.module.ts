@@ -24,6 +24,8 @@ import { MonitorInstallationService } from "./services/monitor-installation.serv
   imports: [ClickhouseModule],
   controllers: [BackendMonitorController, BackendMonitorInstallationsController],
   providers: [BackendMonitorService, MonitorInstallationService, MonitorTokenResolver],
-  exports: [BackendMonitorService],
+  // MonitorInstallationService is exported for consuming projects whose
+  // application layer provisions installations (e.g. nightwatch).
+  exports: [BackendMonitorService, MonitorInstallationService],
 })
 export class BackendMonitorModule {}
