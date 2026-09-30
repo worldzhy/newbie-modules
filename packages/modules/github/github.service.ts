@@ -143,6 +143,25 @@ export class GitHubService {
   }
 
   /**
+   * Read a UTF-8 text file from a repository (default branch). Returns null
+   * when the path does not exist or is not a regular file (404 / directory).
+   * Used by dep-scan to fetch lockfiles from application repositories.
+   */
+  async getFileContent(owner: string, repo: string, path: string): Promise<string | null> {
+    try {
+      const { data } = await this.octokit.repos.getContent({ owner, repo, path });
+      // Content API returns an array for directories; we only care about files.
+      if (Array.isArray(data) || data.type !== "file") {
+        return null;
+      }
+      return Buffer.from(data.content, "base64").toString("utf-8");
+    } catch (e: any) {
+      if (e.status === 404) return null;
+      throw e;
+    }
+  }
+
+  /**
    * Upsert placeholder lines into `.env.example` of `org/repo`. Only appends
    * lines whose env-var key is not already present in the file — never
    * overwrites template content. Idempotent across retries. When the file

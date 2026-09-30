@@ -1,0 +1,12 @@
+{
+  "key": "dep-scan",
+  "module": {
+    "file": "dep-scan.module",
+    "className": "DepScanModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {},
+  "env": {},
+  "dependencies": {},
+  "devDependencies": {}
+}
