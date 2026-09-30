@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { Cron } from "@nestjs/schedule";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCredentialService } from "@modules/aws-core/aws-credential.service";
 import { getCallerIdentity } from "@modules/aws-core/aws-sts.helper";
@@ -202,7 +203,7 @@ export class AwsAuditService {
     });
 
     this.activeScans.add(projectId);
-    this.runAuditScanInBackground(projectId, scan.id).catch(() => {});
+    this.runAuditScanInBackground(projectId, scan.id);
 
     return {
       accepted: true,
@@ -240,7 +241,11 @@ export class AwsAuditService {
     return project;
   }
 
-  private async runAuditScanInBackground(projectId: string, scanId: string) {
+  private runAuditScanInBackground(projectId: string, scanId: string) {
+    this.executeScan(projectId, scanId).catch(() => {});
+  }
+
+  private async executeScan(projectId: string, scanId: string) {
     try {
       await this.prisma.awsAuditScan.update({
         where: { id: scanId },
@@ -276,6 +281,47 @@ export class AwsAuditService {
       await this.pruneFailedScans(projectId, scanId);
     } finally {
       this.activeScans.delete(projectId);
+    }
+  }
+
+  /**
+   * Daily scheduled scan: every project that has both an AwsAuditProjectSetting
+   * and a ProjectAwsCredential gets a fresh audit scan. Scans run sequentially
+   * to avoid flooding the AWS API with concurrent requests across projects.
+   * Projects with an already-running scan are skipped.
+   */
+  @Cron("0 0 2 * * *", { timeZone: "Asia/Shanghai" })
+  async runDailyScheduledScans() {
+    const settings = await this.prisma.awsAuditProjectSetting.findMany({
+      select: { projectId: true },
+    });
+
+    for (const { projectId } of settings) {
+      const credential = await this.prisma.projectAwsCredential.findUnique({
+        where: { projectId },
+        select: { id: true },
+      });
+      if (!credential) {
+        continue;
+      }
+
+      if (this.activeScans.has(projectId)) {
+        continue;
+      }
+
+      const hasRunningScan = await this.prisma.awsAuditScan.findFirst({
+        where: { projectId, status: { in: ["PENDING", "RUNNING"] } },
+        select: { id: true },
+      });
+      if (hasRunningScan) {
+        continue;
+      }
+
+      const scan = await this.prisma.awsAuditScan.create({
+        data: { projectId, status: "PENDING" },
+      });
+      this.activeScans.add(projectId);
+      await this.executeScan(projectId, scan.id);
     }
   }
 
