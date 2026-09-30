@@ -21,7 +21,7 @@ Backend application monitoring ingestion for nightwatch.
   - `DELETE /backend-monitor/installations/:id` — soft revoke; subsequent ingest
     gets 401.
 
-## Identity model (module-hub design §9.2, Phase 3 pilot)
+## Identity model (module-hub design §9.2, Phase 3)
 
 The module owns its own token table, `MonitorInstallation`
 (PostgreSQL schema `"module/backend-monitor"`), instead of reading
@@ -48,22 +48,3 @@ env `BACKEND_MONITOR_API_URL` / `BACKEND_MONITOR_REPORT_TOKEN`); it POSTs to
   after `application_id` in
   `20260930_add_installation_id_to_backend_monitor.sql`; `application_id` stays
   the leading partition/sort dimension.
-
-## SERVER_MONITOR agent decommission path
-
-As of the Phase 3 pilot the ingest resolver no longer reads
-`Agent(type=SERVER_MONITOR)`; legacy agent tokens are rejected (401). The
-`AgentType.SERVER_MONITOR` enum and the SERVER_MONITOR row created at backend
-application creation in `src/application/` are intentionally **retained** this
-milestone (the application creation flow is outside this module's boundary;
-`NEWBIE_MANAGEMENT` is the existing precedent of a retained agent type with no
-ingest consumer). Follow-up cleanup path:
-
-1. Application creation (`src/application/project/application/application.service.ts`)
-   stops creating the SERVER_MONITOR agent and instead enrolls a
-   `MonitorInstallation` (via this module's host API or its service), returning
-   the one-time token in onboarding.
-2. Remove `AgentType.SERVER_MONITOR` from the Prisma enum plus
-   `CREATION_AGENT_TYPES` / `AGENT_REPORT_ENDPOINTS` and the onboarding DTO
-   mapping.
-3. Drop `Agent` rows of that type in a PG migration.
