@@ -13,22 +13,22 @@ GitHub API 封装 module。提供双模式鉴权与仓库编排所需的通用�
 
 ## env
 
-| env | 必填 | 说明 |
-|---|---|---|
-| `GITHUB_USER_AGENT` | 否 | User-Agent，默认 `saas-starter` |
-| `GITHUB_AUTH` | App 模式可空 | PAT / personal token |
-| `GITHUB_APP_ID` | PAT 模式可空 | GitHub App ID |
-| `GITHUB_PRIVATE_KEY` | PAT 模式可空 | App PEM 私钥，换行用 `\n` 字面量存储（构造时还原） |
-| `GITHUB_INSTALLATION_ID` | PAT 模式可空 | App installation ID（数字字符串） |
+| env                      | 必填         | 说明                                               |
+| ------------------------ | ------------ | -------------------------------------------------- |
+| `GITHUB_USER_AGENT`      | 否           | User-Agent，默认 `saas-starter`                    |
+| `GITHUB_AUTH`            | App 模式可空 | PAT / personal token                               |
+| `GITHUB_APP_ID`          | PAT 模式可空 | GitHub App ID                                      |
+| `GITHUB_PRIVATE_KEY`     | PAT 模式可空 | App PEM 私钥，换行用 `\n` 字面量存储（构造时还原） |
+| `GITHUB_INSTALLATION_ID` | PAT 模式可空 | App installation ID（数字字符串）                  |
 
 ## 方法
 
-| 方法 | 语义 |
-|---|---|
-| `isConfigured()` | 是否有足够凭证执行编排（App 三件套或 PAT 至少其一） |
+| 方法                                                           | 语义                                                                                                                                                                                  |
+| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isConfigured()`                                               | 是否有足够凭证执行编排（App 三件套或 PAT 至少其一）                                                                                                                                   |
 | `ensureRepoExists(org, name, tplOwner, tplRepo, description?)` | 幂等建仓：GET 200 跳过；404 → 从模板 generate（private:true）；422 → 抛 `RepoNameConflictError`。generate 返回 202 后内部重试 3 次（每次 2s）等仓库可读。返回 `{cloneUrl, generated}` |
-| `upsertEnvExample(org, repo, placeholderLines)` | 幂等写 `.env.example`：GET 取 sha + 现有内容，按 env-var key 去重，仅追加缺失的占位行（注释格式，不含真实值），PUT 带 sha；404 → 创建。**不覆盖模板内容** |
-| `deleteRepo(org, repo)` | best-effort 删仓，404 忽略。用于 teardown 清理 |
+| `upsertEnvExample(org, repo, placeholderLines)`                | 幂等写 `.env.example`：GET 取 sha + 现有内容，按 env-var key 去重，仅追加缺失的占位行（注释格式，不含真实值），PUT 带 sha；404 → 创建。**不覆盖模板内容**                             |
+| `deleteRepo(org, repo)`                                        | best-effort 删仓，404 忽略。用于 teardown 清理                                                                                                                                        |
 
 `RepoNameConflictError` 在 `ensureRepoExists` 的 generate 返回 422 时抛出，表示仓库名被不属于自己的仓库占用。
 

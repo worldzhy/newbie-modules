@@ -1,7 +1,7 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {Octokit} from '@octokit/rest';
-import {createAppAuth} from '@octokit/auth-app';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Octokit } from "@octokit/rest";
+import { createAppAuth } from "@octokit/auth-app";
 
 /**
  * Thrown when `ensureRepoExists` finds the repo name is already taken by a
@@ -10,12 +10,12 @@ import {createAppAuth} from '@octokit/auth-app';
 export class RepoNameConflictError extends Error {
   constructor(org: string, name: string) {
     super(`Repository ${org}/${name} already exists and is not owned by this provisioning`);
-    this.name = 'RepoNameConflictError';
+    this.name = "RepoNameConflictError";
   }
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Extract the env-var key from a placeholder line. Accepts:
@@ -28,7 +28,7 @@ function extractKeyFromLine(line: string): string | null {
 
 function extractEnvKeys(content: string): Set<string> {
   const keys = new Set<string>();
-  for (const line of content.split('\n')) {
+  for (const line of content.split("\n")) {
     const k = extractKeyFromLine(line);
     if (k) keys.add(k);
   }
@@ -45,7 +45,7 @@ export class GitHubService {
   private readonly pat?: string;
 
   constructor(private configService: ConfigService) {
-    const config = this.configService.getOrThrow('modules.github');
+    const config = this.configService.getOrThrow("modules.github");
     this.appId = config.appId;
     this.privateKey = config.privateKey;
     this.installationId = config.installationId;
@@ -55,7 +55,7 @@ export class GitHubService {
       // GitHub App mode: mint an installation token per request via
       // @octokit/auth-app. The PEM private key is stored in env with literal
       // `\n` sequences; restore real newlines before handing to the auth lib.
-      const privateKey = this.privateKey.replace(/\\n/g, '\n');
+      const privateKey = this.privateKey.replace(/\\n/g, "\n");
       this.octokit = new Octokit({
         authStrategy: createAppAuth,
         auth: {
@@ -63,26 +63,24 @@ export class GitHubService {
           privateKey,
           installationId: Number(this.installationId),
         },
-        userAgent: config.userAgent ?? 'saas-starter',
+        userAgent: config.userAgent ?? "saas-starter",
       });
-      this.logger.log('GitHub Octokit initialized with GitHub App authentication');
+      this.logger.log("GitHub Octokit initialized with GitHub App authentication");
     } else if (this.pat) {
       // PAT mode (transition / single-user use).
       this.octokit = new Octokit({
         auth: this.pat,
-        userAgent: config.userAgent ?? 'saas-starter',
+        userAgent: config.userAgent ?? "saas-starter",
       });
-      this.logger.log('GitHub Octokit initialized with PAT authentication');
+      this.logger.log("GitHub Octokit initialized with PAT authentication");
     } else {
-      this.logger.warn('GitHub credentials not configured (no App triplet nor PAT)');
+      this.logger.warn("GitHub credentials not configured (no App triplet nor PAT)");
     }
   }
 
   /** Whether enough credentials are present to perform provisioning. */
   isConfigured(): boolean {
-    return Boolean(
-      (this.appId && this.privateKey && this.installationId) || this.pat,
-    );
+    return Boolean((this.appId && this.privateKey && this.installationId) || this.pat);
   }
 
   /**
@@ -100,18 +98,18 @@ export class GitHubService {
     tplOwner: string,
     tplRepo: string,
     description?: string,
-  ): Promise<{cloneUrl: string; generated: boolean}> {
+  ): Promise<{ cloneUrl: string; generated: boolean }> {
     // 1. Already exists?
     try {
-      const {data} = await this.octokit.repos.get({owner: org, repo: name});
-      return {cloneUrl: data.clone_url, generated: false};
+      const { data } = await this.octokit.repos.get({ owner: org, repo: name });
+      return { cloneUrl: data.clone_url, generated: false };
     } catch (e: any) {
       if (e.status !== 404) throw e;
     }
 
     // 2. Generate from template. 422 here means the name is taken by a repo
     //    we don't own (race / pre-existing) — surface as a typed error.
-    let gen: {clone_url: string};
+    let gen: { clone_url: string };
     try {
       const resp = await this.octokit.repos.createUsingTemplate({
         template_owner: tplOwner,
@@ -132,7 +130,7 @@ export class GitHubService {
     for (let i = 0; i < 3; i++) {
       await sleep(2000);
       try {
-        await this.octokit.repos.get({owner: org, repo: name});
+        await this.octokit.repos.get({ owner: org, repo: name });
         break;
       } catch (e: any) {
         if (e.status !== 404) throw e;
@@ -141,7 +139,7 @@ export class GitHubService {
         }
       }
     }
-    return {cloneUrl: gen.clone_url, generated: true};
+    return { cloneUrl: gen.clone_url, generated: true };
   }
 
   /**
@@ -153,25 +151,21 @@ export class GitHubService {
    * `placeholderLines` are comment-form lines like `# NIGHTWATCH_TOKEN=...`
    * (no real secrets); the caller assembles them.
    */
-  async upsertEnvExample(
-    org: string,
-    repo: string,
-    placeholderLines: string[],
-  ): Promise<void> {
+  async upsertEnvExample(org: string, repo: string, placeholderLines: string[]): Promise<void> {
     if (placeholderLines.length === 0) return;
 
     let sha: string | undefined;
-    let existing = '';
+    let existing = "";
     try {
-      const {data} = await this.octokit.repos.getContent({
+      const { data } = await this.octokit.repos.getContent({
         owner: org,
         repo,
-        path: '.env.example',
+        path: ".env.example",
       });
       // Content API returns an array for directories; we only care about files.
-      if (!Array.isArray(data) && data.type === 'file') {
+      if (!Array.isArray(data) && data.type === "file") {
         sha = data.sha;
-        existing = Buffer.from(data.content, 'base64').toString('utf-8');
+        existing = Buffer.from(data.content, "base64").toString("utf-8");
       }
     } catch (e: any) {
       if (e.status !== 404) throw e;
@@ -179,21 +173,21 @@ export class GitHubService {
     }
 
     const existingKeys = extractEnvKeys(existing);
-    const toAdd = placeholderLines.filter(line => {
+    const toAdd = placeholderLines.filter((line) => {
       const key = extractKeyFromLine(line);
       return key && !existingKeys.has(key);
     });
     if (toAdd.length === 0) return;
 
-    const separator = existing && !existing.endsWith('\n') ? '\n' : '';
-    const updated = existing + separator + toAdd.join('\n') + '\n';
+    const separator = existing && !existing.endsWith("\n") ? "\n" : "";
+    const updated = existing + separator + toAdd.join("\n") + "\n";
 
     await this.octokit.repos.createOrUpdateFileContents({
       owner: org,
       repo,
-      path: '.env.example',
-      message: 'chore: add monitoring credential placeholders',
-      content: Buffer.from(updated).toString('base64'),
+      path: ".env.example",
+      message: "chore: add monitoring credential placeholders",
+      content: Buffer.from(updated).toString("base64"),
       sha,
     });
   }
@@ -204,7 +198,7 @@ export class GitHubService {
    */
   async deleteRepo(org: string, repo: string): Promise<void> {
     try {
-      await this.octokit.repos.delete({owner: org, repo});
+      await this.octokit.repos.delete({ owner: org, repo });
     } catch (e: any) {
       if (e.status !== 404) throw e;
     }
