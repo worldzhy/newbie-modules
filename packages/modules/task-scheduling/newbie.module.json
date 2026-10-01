@@ -7,8 +7,5 @@
   "schema": "prisma/schema.prisma",
   "dependencies": {
     "@nestjs/schedule": "latest"
-  },
-  "devDependencies": {
-    "@types/cron": "latest"
   }
 }

@@ -1,30 +1,46 @@
 // ! ------------------------------------------------------------ //
 // !           [Module] Task scheduling models              //
 // ! ------------------------------------------------------------ //
-// * CronTask                                                     //
-// * TimeoutTask                                                  //
+// * ScheduledJob                                                 //
+// * ScheduledJobRun                                              //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-model CronTask {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  cronTime  String
-  running   Boolean  @default(false)
-  command   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/// Declarative job definition. Business modules upsert defaults on startup
+/// (`createdVia="declaration"`); the database row wins at runtime so operators
+/// can pause a job, change its cron expression, or trigger it manually.
+model ScheduledJob {
+  id         Int      @id @default(autoincrement())
+  key        String   @unique
+  handlerKey String
+  cronExpr   String
+  timezone   String   @default("Asia/Shanghai")
+  enabled    Boolean  @default(true)
+  payload    Json?
+  createdVia String   @default("declaration")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  runs ScheduledJobRun[]
 
   @@schema("module/task-scheduling")
 }
 
-model TimeoutTask {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  running   Boolean  @default(false)
-  command   String?
-    triggeredAt   DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+/// Execution history for one job run. `status="skipped"` records a reentry
+/// guard rejection: the previous run of the same job was still in progress.
+model ScheduledJobRun {
+  id         Int       @id @default(autoincrement())
+  jobId      Int
+  /// schedule | manual
+  trigger    String
+  /// running | success | failed | skipped
+  status     String
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  durationMs Int?
+  error      String?
 
+  job ScheduledJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, startedAt])
   @@schema("module/task-scheduling")
 }
