@@ -48,13 +48,13 @@ export class ScheduledJobRunDto {
   @ApiProperty()
   startedAt: Date;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ nullable: true, type: String, format: "date-time" })
   finishedAt: Date | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ nullable: true, type: Number })
   durationMs: number | null;
 
-  @ApiProperty({ nullable: true })
+  @ApiProperty({ nullable: true, type: String })
   error: string | null;
 }
 
