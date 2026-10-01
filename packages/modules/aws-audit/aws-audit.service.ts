@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCredentialService } from "@modules/aws-core/aws-credential.service";
 import { getCallerIdentity } from "@modules/aws-core/aws-sts.helper";
@@ -135,6 +136,7 @@ export class AwsAuditService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly credentialService: AwsCredentialService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -296,6 +298,7 @@ export class AwsAuditService {
       });
 
       await this.upsertFindings(projectId, scanId, report.findings);
+      this.eventEmitter.emit("aws-audit.scan-completed", { projectId, scanId });
     } catch (error: any) {
       await this.prisma.awsAuditScan.update({
         where: { id: scanId },

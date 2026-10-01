@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { GitHubService } from "@modules/github/github.service";
 
@@ -39,6 +40,7 @@ export class DependencyScanService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gitHubService: GitHubService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async startApplicationScan(applicationId: string) {
@@ -123,8 +125,7 @@ export class DependencyScanService {
     const applicationOverviews = applications.map((application) => {
       const applicationScans = scansByApplication.get(application.id) ?? [];
       const applicationFindings = (findingsByApplication.get(application.id) ?? []).sort(
-        (left, right) =>
-          this.severityRank[right.severity as Severity] - this.severityRank[left.severity as Severity],
+        (left, right) => this.severityRank[right.severity as Severity] - this.severityRank[left.severity as Severity],
       );
       const currentScan = applicationScans.find((scan) => scan.status === "PENDING" || scan.status === "RUNNING");
       const latestSuccessfulScan = applicationScans.find((scan) => scan.status === "SUCCESS");
@@ -237,6 +238,11 @@ export class DependencyScanService {
       });
 
       await this.upsertFindings(application, scanId, result.findings);
+      this.eventEmitter.emit("dependency-scan.scan-completed", {
+        applicationId,
+        projectId: application.projectId,
+        scanId,
+      });
       this.logger.log(
         `Dependency scan ${scanId} finished for application ${application.name}: ${result.findings.length} findings across ${result.packageCount} packages`,
       );
@@ -261,7 +267,12 @@ export class DependencyScanService {
    * Fetch the repository lockfile via the GitHub API, parse every locked
    * package version, and match them against the OSV vulnerability database.
    */
-  private async scanApplicationLockfile(application: { id: string; name: string; projectId: string; repositoryUrl: string | null }) {
+  private async scanApplicationLockfile(application: {
+    id: string;
+    name: string;
+    projectId: string;
+    repositoryUrl: string | null;
+  }) {
     const repository = this.parseGitHubRepo(application.repositoryUrl!);
     if (!repository) {
       throw new Error(`Repository URL is not a supported GitHub URL: ${application.repositoryUrl}`);
@@ -415,7 +426,10 @@ export class DependencyScanService {
       vulnId,
       aliases: Array.isArray(vuln?.aliases) ? vuln.aliases.slice(0, 10) : [],
       severity: this.extractSeverity(vuln),
-      title: (typeof vuln?.summary === "string" && vuln.summary ? vuln.summary : `Vulnerability ${vulnId}`).slice(0, 500),
+      title: (typeof vuln?.summary === "string" && vuln.summary ? vuln.summary : `Vulnerability ${vulnId}`).slice(
+        0,
+        500,
+      ),
       detail: typeof vuln?.details === "string" ? vuln.details.slice(0, 4000) : undefined,
       fixedVersion: this.extractFixedVersion(vuln, pkg.name),
     };

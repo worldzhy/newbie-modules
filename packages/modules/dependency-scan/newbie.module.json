@@ -7,6 +7,8 @@
   "schema": "prisma/schema.prisma",
   "config-service": {},
   "env": {},
-  "dependencies": {},
+  "dependencies": {
+    "@nestjs/event-emitter": "latest"
+  },
   "devDependencies": {}
 }
