@@ -1,8 +1,8 @@
-import {Global, Module} from '@nestjs/common';
-import {ScheduleModule} from '@nestjs/schedule';
-import {HandlerRegistryService} from './scheduler/handler-registry.service';
-import {TaskSchedulerService} from './scheduler/task-scheduler.service';
-import {TaskSchedulingController} from './task-scheduling.controller';
+import { Global, Module } from "@nestjs/common";
+import { ScheduleModule } from "@nestjs/schedule";
+import { HandlerRegistryService } from "./scheduler/handler-registry.service";
+import { TaskSchedulerService } from "./scheduler/task-scheduler.service";
+import { TaskSchedulingController } from "./task-scheduling.controller";
 
 @Global()
 @Module({

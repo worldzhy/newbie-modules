@@ -1,4 +1,4 @@
-import {Injectable, Logger} from '@nestjs/common';
+import { Injectable, Logger } from "@nestjs/common";
 
 /// Business code registers an in-process handler under a stable key; the
 /// scheduler dispatches a job run to the handler matching `ScheduledJob.handlerKey`.

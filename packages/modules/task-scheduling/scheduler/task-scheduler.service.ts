@@ -1,23 +1,17 @@
-import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
-import {SchedulerRegistry} from '@nestjs/schedule';
-import {CronJob} from 'cron';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {HandlerRegistryService, ScheduledHandler} from './handler-registry.service';
+import { Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { SchedulerRegistry } from "@nestjs/schedule";
+import { CronJob } from "cron";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { HandlerRegistryService, ScheduledHandler } from "./handler-registry.service";
 
 const RECONCILE_INTERVAL_MS = 30_000;
-const CRON_JOB_NAME_PREFIX = 'task-scheduling:';
-const DEFAULT_TIMEZONE = 'Asia/Shanghai';
+const CRON_JOB_NAME_PREFIX = "task-scheduling:";
+const DEFAULT_TIMEZONE = "Asia/Shanghai";
 const DEFAULT_RUN_LIMIT = 50;
 const MAX_RUN_LIMIT = 200;
-const PG_UNIQUE_VIOLATION = 'P2002';
+const PG_UNIQUE_VIOLATION = "P2002";
 
-type JobTrigger = 'schedule' | 'manual';
+type JobTrigger = "schedule" | "manual";
 
 export interface JobDeclaration {
   key: string;
@@ -45,19 +39,19 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly runningJobKeys = new Set<string>();
   /// What the in-memory cron jobs were built from, so reconcile can detect
   /// database-side cron/timezone drift without touching cron internals.
-  private readonly registeredJobs = new Map<string, {cronExpr: string; timezone: string}>();
+  private readonly registeredJobs = new Map<string, { cronExpr: string; timezone: string }>();
   private reconcileTimer?: NodeJS.Timeout;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly schedulerRegistry: SchedulerRegistry,
-    private readonly handlerRegistry: HandlerRegistryService
+    private readonly handlerRegistry: HandlerRegistryService,
   ) {}
 
   async onModuleInit() {
     await this.reconcile();
     this.reconcileTimer = setInterval(() => {
-      this.reconcile().catch(error => {
+      this.reconcile().catch((error) => {
         this.logger.error(`Scheduled job reconcile failed: ${this.getErrorMessage(error)}`);
       });
     }, RECONCILE_INTERVAL_MS);
@@ -73,7 +67,7 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
   /// enabled jobs, remove cron jobs for disabled or deleted definitions.
   async reconcile() {
     const jobs = (await this.prisma.scheduledJob.findMany({
-      orderBy: {key: 'asc'},
+      orderBy: { key: "asc" },
     })) as unknown as ScheduledJobRecord[];
 
     const desiredCronJobNames = new Set<string>();
@@ -93,7 +87,7 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
 
       this.deleteCronJob(cronJobName);
       this.addCronJob(job, cronJobName);
-      this.registeredJobs.set(cronJobName, {cronExpr: job.cronExpr, timezone: job.timezone});
+      this.registeredJobs.set(cronJobName, { cronExpr: job.cronExpr, timezone: job.timezone });
     }
 
     for (const cronJobName of this.registeredJobs.keys()) {
@@ -108,17 +102,17 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
   /// the same reentry guard: while a run is in progress the run is recorded as
   /// `skipped`.
   async triggerJob(key: string) {
-    const job = await this.prisma.scheduledJob.findUnique({where: {key}});
+    const job = await this.prisma.scheduledJob.findUnique({ where: { key } });
     if (!job) {
       throw new NotFoundException(`Scheduled job not found: ${key}`);
     }
-    return this.executeJob(job as unknown as ScheduledJobRecord, 'manual');
+    return this.executeJob(job as unknown as ScheduledJobRecord, "manual");
   }
 
   /// Declare a default job definition from business code. The database row
   /// wins: declarations only create missing rows, never override runtime edits.
   async upsertJobDeclaration(declaration: JobDeclaration): Promise<void> {
-    const existing = await this.prisma.scheduledJob.findUnique({where: {key: declaration.key}});
+    const existing = await this.prisma.scheduledJob.findUnique({ where: { key: declaration.key } });
     if (existing) {
       return;
     }
@@ -132,13 +126,13 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
           timezone: declaration.timezone ?? DEFAULT_TIMEZONE,
           enabled: declaration.enabled ?? true,
           payload: (declaration.payload ?? null) as any,
-          createdVia: 'declaration',
+          createdVia: "declaration",
         },
       });
       this.logger.log(
         `Scheduled job declared: ${declaration.key} (${declaration.cronExpr} ${
           declaration.timezone ?? DEFAULT_TIMEZONE
-        })`
+        })`,
       );
     } catch (error: any) {
       // Concurrent declaration (e.g. another process bootstrapping) won the race.
@@ -149,24 +143,22 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   listJobs() {
-    return this.prisma.scheduledJob.findMany({orderBy: {key: 'asc'}});
+    return this.prisma.scheduledJob.findMany({ orderBy: { key: "asc" } });
   }
 
   async listJobRuns(key: string, limitQuery?: string) {
-    const job = await this.prisma.scheduledJob.findUnique({where: {key}});
+    const job = await this.prisma.scheduledJob.findUnique({ where: { key } });
     if (!job) {
       throw new NotFoundException(`Scheduled job not found: ${key}`);
     }
 
-    const parsedLimit = Number.parseInt(limitQuery ?? '', 10);
+    const parsedLimit = Number.parseInt(limitQuery ?? "", 10);
     const limit =
-      Number.isFinite(parsedLimit) && parsedLimit > 0
-        ? Math.min(parsedLimit, MAX_RUN_LIMIT)
-        : DEFAULT_RUN_LIMIT;
+      Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, MAX_RUN_LIMIT) : DEFAULT_RUN_LIMIT;
 
     return this.prisma.scheduledJobRun.findMany({
-      where: {jobId: job.id},
-      orderBy: {startedAt: 'desc'},
+      where: { jobId: job.id },
+      orderBy: { startedAt: "desc" },
       take: limit,
     });
   }
@@ -175,15 +167,13 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
     const cronJob = new CronJob(
       job.cronExpr,
       () => {
-        this.executeJob(job, 'schedule').catch(error => {
-          this.logger.error(
-            `Scheduled job ${job.key} failed unexpectedly: ${this.getErrorMessage(error)}`
-          );
+        this.executeJob(job, "schedule").catch((error) => {
+          this.logger.error(`Scheduled job ${job.key} failed unexpectedly: ${this.getErrorMessage(error)}`);
         });
       },
       null,
       false,
-      job.timezone || DEFAULT_TIMEZONE
+      job.timezone || DEFAULT_TIMEZONE,
     );
 
     this.schedulerRegistry.addCronJob(cronJobName, cronJob);
@@ -203,18 +193,16 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
 
   private async executeJob(job: ScheduledJobRecord, trigger: JobTrigger) {
     if (this.runningJobKeys.has(job.key)) {
-      this.logger.warn(
-        `Skipping ${trigger} run of scheduled job ${job.key}: previous run is still in progress.`
-      );
+      this.logger.warn(`Skipping ${trigger} run of scheduled job ${job.key}: previous run is still in progress.`);
       return this.prisma.scheduledJobRun.create({
         data: {
           jobId: job.id,
           trigger,
-          status: 'skipped',
+          status: "skipped",
           startedAt: new Date(),
           finishedAt: new Date(),
           durationMs: 0,
-          error: 'Previous run is still in progress.',
+          error: "Previous run is still in progress.",
         },
       });
     }
@@ -222,7 +210,7 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
     this.runningJobKeys.add(job.key);
     const startedAt = new Date();
     const run = await this.prisma.scheduledJobRun.create({
-      data: {jobId: job.id, trigger, status: 'running', startedAt},
+      data: { jobId: job.id, trigger, status: "running", startedAt },
     });
 
     try {
@@ -234,9 +222,9 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
 
       const finishedAt = new Date();
       return this.prisma.scheduledJobRun.update({
-        where: {id: run.id},
+        where: { id: run.id },
         data: {
-          status: 'success',
+          status: "success",
           finishedAt,
           durationMs: finishedAt.getTime() - startedAt.getTime(),
         },
@@ -247,12 +235,12 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
       this.logger.error(
         `Scheduled job ${job.key} ${trigger} run failed after ${
           finishedAt.getTime() - startedAt.getTime()
-        }ms: ${errorMessage}`
+        }ms: ${errorMessage}`,
       );
       return this.prisma.scheduledJobRun.update({
-        where: {id: run.id},
+        where: { id: run.id },
         data: {
-          status: 'failed',
+          status: "failed",
           finishedAt,
           durationMs: finishedAt.getTime() - startedAt.getTime(),
           error: errorMessage.slice(0, 2000),
