@@ -856,6 +856,9 @@ export class AwsAuditService {
     for (const securityGroup of securityGroups) {
       findings.push(...this.collectSecurityGroupFindings(securityGroup, region));
     }
+    // Cross-rule: a public IP alone is not a risk, but a public IP combined with
+    // any internet-open ingress on an attached security group exposes the instance.
+    findings.push(...this.collectPublicInstanceFindings(instances, securityGroups, region));
 
     return {
       findings,
@@ -1036,6 +1039,56 @@ export class AwsAuditService {
           }),
         );
       }
+    }
+
+    return findings;
+  }
+
+  /**
+   * Raise a high finding when an instance has a public IP and is attached to at
+   * least one security group that allows ingress from 0.0.0.0/0 or ::/0.
+   * Stopped instances report no public IP, so they are naturally excluded.
+   */
+  private collectPublicInstanceFindings(instances: any[], securityGroups: SecurityGroup[], region: string) {
+    const publicIngressByGroup = new Map<string, boolean>();
+    for (const group of securityGroups) {
+      if (!group.GroupId) {
+        continue;
+      }
+      const hasPublicIngress = (group.IpPermissions || []).some(
+        (permission) =>
+          (permission.IpRanges || []).some((item) => item.CidrIp === "0.0.0.0/0") ||
+          (permission.Ipv6Ranges || []).some((item) => item.CidrIpv6 === "::/0"),
+      );
+      publicIngressByGroup.set(group.GroupId, hasPublicIngress);
+    }
+
+    const findings: AuditFinding[] = [];
+    for (const instance of instances) {
+      if (!instance.instanceId || !instance.publicIpAddress) {
+        continue;
+      }
+      const exposedGroupIds = (instance.securityGroupIds || []).filter((groupId: string) =>
+        publicIngressByGroup.get(groupId),
+      );
+      if (!exposedGroupIds.length) {
+        continue;
+      }
+
+      findings.push(
+        this.createFinding({
+          service: "ec2",
+          severity: "high",
+          resourceType: "Ec2Instance",
+          resourceId: instance.instanceId,
+          ruleId: "ec2.public-ip-with-public-ingress",
+          title: "Public EC2 instance attached to an internet-open security group",
+          detail: `Instance ${instance.name} (${instance.instanceId}) has public IP ${instance.publicIpAddress} and is attached to security group(s) ${exposedGroupIds.join(", ")} that allow ingress from 0.0.0.0/0 or ::/0.`,
+          recommendation:
+            "Move the instance to a private subnet behind a load balancer or NAT gateway, or restrict security group ingress to trusted CIDR ranges.",
+          region,
+        }),
+      );
     }
 
     return findings;
