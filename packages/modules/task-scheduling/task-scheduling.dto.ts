@@ -1,16 +1,16 @@
-import {ApiProperty} from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
 
 export class ScheduledJobDto {
   @ApiProperty()
   id: number;
 
-  @ApiProperty({description: 'Unique job key, e.g. daily-aws-audit-scan'})
+  @ApiProperty({ description: "Unique job key, e.g. daily-aws-audit-scan" })
   key: string;
 
-  @ApiProperty({description: 'Key of the in-process handler that executes the job'})
+  @ApiProperty({ description: "Key of the in-process handler that executes the job" })
   handlerKey: string;
 
-  @ApiProperty({description: 'Cron expression, e.g. 0 3 * * *'})
+  @ApiProperty({ description: "Cron expression, e.g. 0 3 * * *" })
   cronExpr: string;
 
   @ApiProperty()
@@ -19,10 +19,10 @@ export class ScheduledJobDto {
   @ApiProperty()
   enabled: boolean;
 
-  @ApiProperty({type: 'object', nullable: true, required: false})
+  @ApiProperty({ type: Object, required: false, nullable: true })
   payload?: unknown;
 
-  @ApiProperty({description: 'How the job was created', example: 'declaration'})
+  @ApiProperty({ description: "How the job was created", example: "declaration" })
   createdVia: string;
 
   @ApiProperty()
@@ -39,26 +39,26 @@ export class ScheduledJobRunDto {
   @ApiProperty()
   jobId: number;
 
-  @ApiProperty({enum: ['schedule', 'manual']})
+  @ApiProperty({ enum: ["schedule", "manual"] })
   trigger: string;
 
-  @ApiProperty({enum: ['running', 'success', 'failed', 'skipped']})
+  @ApiProperty({ enum: ["running", "success", "failed", "skipped"] })
   status: string;
 
   @ApiProperty()
   startedAt: Date;
 
-  @ApiProperty({nullable: true})
+  @ApiProperty({ nullable: true })
   finishedAt: Date | null;
 
-  @ApiProperty({nullable: true})
+  @ApiProperty({ nullable: true })
   durationMs: number | null;
 
-  @ApiProperty({nullable: true})
+  @ApiProperty({ nullable: true })
   error: string | null;
 }
 
 export class ListScheduledJobRunsDto {
-  @ApiProperty({required: false, default: 50, description: 'Maximum runs to return (1-200)'})
+  @ApiProperty({ required: false, default: 50, description: "Maximum runs to return (1-200)" })
   limit?: string;
 }
