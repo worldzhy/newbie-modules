@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { IsBoolean, IsOptional, IsString } from "class-validator";
 
 export class ScheduledJobDto {
   @ApiProperty()
@@ -60,12 +61,18 @@ export class ScheduledJobRunDto {
 
 export class UpdateScheduledJobDto {
   @ApiProperty({ required: false, description: "Enable or pause the job" })
+  @IsOptional()
+  @IsBoolean()
   enabled?: boolean;
 
   @ApiProperty({ required: false, description: "Cron expression, e.g. 0 3 * * *" })
+  @IsOptional()
+  @IsString()
   cronExpr?: string;
 
   @ApiProperty({ required: false, description: "IANA timezone, e.g. Asia/Shanghai" })
+  @IsOptional()
+  @IsString()
   timezone?: string;
 }
 
