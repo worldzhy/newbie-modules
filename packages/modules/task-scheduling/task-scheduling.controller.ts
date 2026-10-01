@@ -1,7 +1,12 @@
-import { Controller, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { TaskSchedulerService } from "./scheduler/task-scheduler.service";
-import { ListScheduledJobRunsDto, ScheduledJobDto, ScheduledJobRunDto } from "./task-scheduling.dto";
+import {
+  ListScheduledJobRunsDto,
+  ScheduledJobDto,
+  ScheduledJobRunDto,
+  UpdateScheduledJobDto,
+} from "./task-scheduling.dto";
 
 @ApiTags("Task Scheduling")
 @ApiBearerAuth()
@@ -21,6 +26,13 @@ export class TaskSchedulingController {
   @ApiResponse({ status: 200, type: [ScheduledJobRunDto] })
   listJobRuns(@Param("key") key: string, @Query() query: ListScheduledJobRunsDto): Promise<ScheduledJobRunDto[]> {
     return this.taskScheduler.listJobRuns(key, query.limit) as Promise<ScheduledJobRunDto[]>;
+  }
+
+  @Patch("jobs/:key")
+  @ApiOperation({ summary: "Update runtime-editable fields (enabled, cronExpr, timezone) of a scheduled job" })
+  @ApiResponse({ status: 200, type: ScheduledJobDto })
+  updateJob(@Param("key") key: string, @Body() body: UpdateScheduledJobDto): Promise<ScheduledJobDto> {
+    return this.taskScheduler.updateJob(key, body ?? {}) as Promise<ScheduledJobDto>;
   }
 
   @Post("jobs/:key/trigger")

@@ -58,6 +58,17 @@ export class ScheduledJobRunDto {
   error: string | null;
 }
 
+export class UpdateScheduledJobDto {
+  @ApiProperty({ required: false, description: "Enable or pause the job" })
+  enabled?: boolean;
+
+  @ApiProperty({ required: false, description: "Cron expression, e.g. 0 3 * * *" })
+  cronExpr?: string;
+
+  @ApiProperty({ required: false, description: "IANA timezone, e.g. Asia/Shanghai" })
+  timezone?: string;
+}
+
 export class ListScheduledJobRunsDto {
   @ApiProperty({ required: false, default: 50, description: "Maximum runs to return (1-200)" })
   limit?: string;

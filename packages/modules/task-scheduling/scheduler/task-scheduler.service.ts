@@ -1,4 +1,11 @@
-import { Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from "@nestjs/common";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -142,6 +149,40 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /// Update the runtime-editable fields of a job definition, then reconcile
+  /// immediately so the change takes effect without waiting for the next
+  /// 30s reconcile tick. Only enabled/cronExpr/timezone are editable here;
+  /// key, handlerKey and payload stay declaration-owned.
+  async updateJob(key: string, updates: { enabled?: boolean; cronExpr?: string; timezone?: string }) {
+    const job = await this.prisma.scheduledJob.findUnique({ where: { key } });
+    if (!job) {
+      throw new NotFoundException(`Scheduled job not found: ${key}`);
+    }
+
+    const hasUpdate = updates.enabled !== undefined || updates.cronExpr !== undefined || updates.timezone !== undefined;
+    if (!hasUpdate) {
+      throw new BadRequestException("No updatable fields provided. Supported fields: enabled, cronExpr, timezone.");
+    }
+
+    const nextCronExpr = updates.cronExpr ?? job.cronExpr;
+    const nextTimezone = updates.timezone ?? job.timezone;
+    if (updates.cronExpr !== undefined || updates.timezone !== undefined) {
+      this.assertValidCron(nextCronExpr, nextTimezone);
+    }
+
+    const updated = await this.prisma.scheduledJob.update({
+      where: { key },
+      data: {
+        ...(updates.enabled !== undefined ? { enabled: updates.enabled } : {}),
+        ...(updates.cronExpr !== undefined ? { cronExpr: updates.cronExpr } : {}),
+        ...(updates.timezone !== undefined ? { timezone: updates.timezone } : {}),
+      },
+    });
+
+    await this.reconcile();
+    return updated;
+  }
+
   listJobs() {
     return this.prisma.scheduledJob.findMany({ orderBy: { key: "asc" } });
   }
@@ -161,6 +202,18 @@ export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
       orderBy: { startedAt: "desc" },
       take: limit,
     });
+  }
+
+  /// Constructing a CronJob (without starting it) validates both the cron
+  /// expression and the timezone synchronously; invalid values throw.
+  private assertValidCron(cronExpr: string, timezone: string) {
+    try {
+      new CronJob(cronExpr, () => {}, null, false, timezone);
+    } catch (error) {
+      throw new BadRequestException(
+        `Invalid cron expression or timezone: "${cronExpr}" (${timezone}) — ${this.getErrorMessage(error)}`,
+      );
+    }
   }
 
   private addCronJob(job: ScheduledJobRecord, cronJobName: string) {

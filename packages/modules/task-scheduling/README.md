@@ -8,7 +8,8 @@
 2. **声明默认任务**：注入 `TaskSchedulerService`，调用 `upsertJobDeclaration({ key, handlerKey, cronExpr, timezone })`。声明只创建缺失行，运行后可在数据库中暂停任务、修改 cron，重新启动不会被覆盖。
 3. **reconcile**：调度器每 30 秒把启用的任务同步为动态 cron 作业（`@nestjs/schedule` + `cron`），停用或删除的任务会被移除。
 4. **执行与防重入**：到点触发对应 handler；同一任务上次运行未结束时本次记为 `skipped`（进程内防重入，不做分布式锁）。手动触发走 `POST /task-scheduling/jobs/:key/trigger`。
-5. **执行历史**：`ScheduledJobRun` 记录 trigger（schedule/manual）、status（running/success/failed/skipped）、耗时与错误信息。
+5. **运行时编辑**：`PATCH /task-scheduling/jobs/:key` 可改 `enabled` / `cronExpr` / `timezone`（非法 cron/时区返回 400），保存后立即 reconcile 生效，无需等下一个 30s tick；`key`/`handlerKey`/`payload` 仍归声明侧所有。
+6. **执行历史**：`ScheduledJobRun` 记录 trigger（schedule/manual）、status（running/success/failed/skipped）、耗时与错误信息。
 
 ## 装配约定
 
