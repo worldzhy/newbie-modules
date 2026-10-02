@@ -7,17 +7,34 @@ import { generateRandomString } from "@devbie/newbie/utilities/random.util";
 import { Expose, expose } from "../../helpers/expose";
 import { LRUCache } from "lru-cache";
 
+/** An API key belongs to either a user (personal key) or an organization. */
+type ApiKeyOwner = { userId: string } | { organizationId: string };
+
+type ApiKeyListQuery = {
+  skip?: number;
+  take?: number;
+  cursor?: Prisma.ApiKeyWhereUniqueInput;
+  where?: Prisma.ApiKeyWhereInput;
+  orderBy?: Prisma.ApiKeyOrderByWithAggregationInput;
+};
+
+type ApiKeyLogsQuery = {
+  take?: number;
+  cursor?: { id?: number };
+  where?: { after?: string };
+};
+
 @Injectable()
 export class ApiKeyService {
-  private lru: LRUCache<{}, {}, unknown>;
+  private lru: LRUCache<string, ApiKey>;
 
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
   ) {
-    this.lru = new LRUCache({
+    this.lru = new LRUCache<string, ApiKey>({
       maxSize: this.configService.getOrThrow<number>("modules.account.cache.apiKeyLruSize"),
-      sizeCalculation: (value, key) => JSON.stringify(value).length,
+      sizeCalculation: (value) => JSON.stringify(value).length,
     });
   }
 
@@ -39,68 +56,25 @@ export class ApiKeyService {
     });
   }
 
-  async getApiKeysForOrganization(
-    organizationId: string,
-    params: {
-      skip?: number;
-      take?: number;
-      cursor?: Prisma.ApiKeyWhereUniqueInput;
-      where?: Prisma.ApiKeyWhereInput;
-      orderBy?: Prisma.ApiKeyOrderByWithAggregationInput;
-    },
-  ): Promise<Expose<ApiKey>[]> {
-    const { skip, take, cursor, where, orderBy } = params;
-    const apiKey = await this.prisma.apiKey.findMany({
-      skip,
-      take,
-      cursor,
-      where: { ...where, organizationId },
-      orderBy,
-    });
-    return apiKey.map((organization) => expose<ApiKey>(organization));
+  async getApiKeysForOrganization(organizationId: string, params: ApiKeyListQuery): Promise<Expose<ApiKey>[]> {
+    return await this.listApiKeys({ organizationId }, params);
   }
 
-  async getApiKeysForUser(
-    userId: string,
-    params: {
-      skip?: number;
-      take?: number;
-      cursor?: Prisma.ApiKeyWhereUniqueInput;
-      where?: Prisma.ApiKeyWhereInput;
-      orderBy?: Prisma.ApiKeyOrderByWithAggregationInput;
-    },
-  ): Promise<Expose<ApiKey>[]> {
-    const { skip, take, cursor, where, orderBy } = params;
-    const apiKey = await this.prisma.apiKey.findMany({
-      skip,
-      take,
-      cursor,
-      where: { ...where, user: { id: userId }, organizationId: null },
-      orderBy,
-    });
-    return apiKey.map((user) => expose<ApiKey>(user));
+  async getApiKeysForUser(userId: string, params: ApiKeyListQuery): Promise<Expose<ApiKey>[]> {
+    return await this.listApiKeys({ userId }, params);
   }
 
   async getApiKeyForOrganization(organizationId: string, id: number): Promise<Expose<ApiKey>> {
-    const apiKey = await this.prisma.apiKey.findUnique({
-      where: { id },
-    });
-    if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (apiKey.organizationId !== organizationId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    return expose<ApiKey>(apiKey);
+    return expose<ApiKey>(await this.getOwnedApiKey({ organizationId }, id));
   }
 
   async getApiKeyForUser(userId: string, id: number): Promise<Expose<ApiKey>> {
-    const apiKey = await this.prisma.apiKey.findUnique({
-      where: { id },
-    });
-    if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (apiKey.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    return expose<ApiKey>(apiKey);
+    return expose<ApiKey>(await this.getOwnedApiKey({ userId }, id));
   }
 
   async getApiKeyFromKey(key: string) {
-    if (this.lru.has(key)) return this.lru.get(key);
+    const cached = this.lru.get(key);
+    if (cached) return cached;
     const apiKey = await this.prisma.apiKey.findFirst({
       where: { key },
     });
@@ -110,30 +84,11 @@ export class ApiKeyService {
   }
 
   async updateApiKey(userId: string, id: number, data: Prisma.ApiKeyUpdateInput): Promise<Expose<ApiKey>> {
-    const testApiKey = await this.prisma.apiKey.findUnique({
-      where: { id },
-    });
-    if (!testApiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (testApiKey.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    const apiKey = await this.prisma.apiKey.update({
-      where: { id },
-      data,
-    });
-    this.lru.delete(testApiKey.key);
-    return expose<ApiKey>(apiKey);
+    return await this.updateOwnedApiKey({ userId }, id, data);
   }
 
   async deleteApiKey(userId: string, id: number): Promise<Expose<ApiKey>> {
-    const testApiKey = await this.prisma.apiKey.findUnique({
-      where: { id },
-    });
-    if (!testApiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (testApiKey.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    const apiKey = await this.prisma.apiKey.delete({
-      where: { id },
-    });
-    this.lru.delete(testApiKey.key);
-    return expose<ApiKey>(apiKey);
+    return await this.deleteOwnedApiKey({ userId }, id);
   }
 
   async updateApiKeyForOrganization(
@@ -141,73 +96,81 @@ export class ApiKeyService {
     id: number,
     data: Prisma.ApiKeyUpdateInput,
   ): Promise<Expose<ApiKey>> {
-    const testApiKey = await this.prisma.apiKey.findUnique({
+    return await this.updateOwnedApiKey({ organizationId }, id, data);
+  }
+
+  async deleteApiKeyForOrganization(organizationId: string, id: number): Promise<Expose<ApiKey>> {
+    return await this.deleteOwnedApiKey({ organizationId }, id);
+  }
+
+  async getApiKeyLogsForOrganization(organizationId: string, id: number, params: ApiKeyLogsQuery) {
+    return await this.getOwnedApiKeyLogs({ organizationId }, id, params);
+  }
+
+  async getApiKeyLogs(userId: string, id: number, params: ApiKeyLogsQuery) {
+    return await this.getOwnedApiKeyLogs({ userId }, id, params);
+  }
+
+  private async listApiKeys(owner: ApiKeyOwner, params: ApiKeyListQuery): Promise<Expose<ApiKey>[]> {
+    const { skip, take, cursor, where, orderBy } = params;
+    const apiKeys = await this.prisma.apiKey.findMany({
+      skip,
+      take,
+      cursor,
+      where: { ...where, ...this.ownerWhere(owner) },
+      orderBy,
+    });
+    return apiKeys.map((apiKey) => expose<ApiKey>(apiKey));
+  }
+
+  private async getOwnedApiKey(owner: ApiKeyOwner, id: number): Promise<ApiKey> {
+    const apiKey = await this.prisma.apiKey.findUnique({
       where: { id },
     });
-    if (!testApiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (testApiKey.organizationId !== organizationId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
+    const owned =
+      "organizationId" in owner ? apiKey.organizationId === owner.organizationId : apiKey.userId === owner.userId;
+    if (!owned) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    return apiKey;
+  }
+
+  private async updateOwnedApiKey(
+    owner: ApiKeyOwner,
+    id: number,
+    data: Prisma.ApiKeyUpdateInput,
+  ): Promise<Expose<ApiKey>> {
+    const ownedApiKey = await this.getOwnedApiKey(owner, id);
     const apiKey = await this.prisma.apiKey.update({
       where: { id },
       data,
     });
-    this.lru.delete(testApiKey.key);
+    this.lru.delete(ownedApiKey.key);
     return expose<ApiKey>(apiKey);
   }
 
-  async deleteApiKeyForOrganization(organizationId: string, id: number): Promise<Expose<ApiKey>> {
-    const testApiKey = await this.prisma.apiKey.findUnique({
-      where: { id },
-    });
-    if (!testApiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (testApiKey.organizationId !== organizationId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+  private async deleteOwnedApiKey(owner: ApiKeyOwner, id: number): Promise<Expose<ApiKey>> {
+    const ownedApiKey = await this.getOwnedApiKey(owner, id);
     const apiKey = await this.prisma.apiKey.delete({
       where: { id },
     });
-    this.lru.delete(testApiKey.key);
+    this.lru.delete(ownedApiKey.key);
     return expose<ApiKey>(apiKey);
   }
 
-  async getApiKeyLogsForOrganization(
-    organizationId: string,
-    id: number,
-    params: {
-      take?: number;
-      cursor?: { id?: number };
-      where?: { after?: string };
-    },
-  ) {
-    const testApiKey = await this.prisma.apiKey.findUnique({
-      where: { id },
-    });
-    if (!testApiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (testApiKey.organizationId !== organizationId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    return await this.getApiLogsFromKey(testApiKey.key, params);
-  }
-  async getApiKeyLogs(
-    userId: string,
-    id: number,
-    params: {
-      take?: number;
-      cursor?: { id?: number };
-      where?: { after?: string };
-    },
-  ) {
-    const testApiKey = await this.prisma.apiKey.findUnique({
-      where: { id },
-    });
-    if (!testApiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (testApiKey.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    return await this.getApiLogsFromKey(testApiKey.key, params);
+  private async getOwnedApiKeyLogs(owner: ApiKeyOwner, id: number, params: ApiKeyLogsQuery) {
+    const apiKey = await this.getOwnedApiKey(owner, id);
+    return await this.getApiLogsFromKey(apiKey.key, params);
   }
 
-  private async getApiLogsFromKey(
-    apiKey: string,
-    params: {
-      take?: number;
-      cursor?: { id?: number };
-      where?: { after?: string };
-    },
-  ): Promise<Record<string, any>[]> {
+  private ownerWhere(owner: ApiKeyOwner): Prisma.ApiKeyWhereInput {
+    if ("organizationId" in owner) {
+      return { organizationId: owner.organizationId };
+    }
+    // Personal API keys are those without an organization.
+    return { user: { id: owner.userId }, organizationId: null };
+  }
+
+  private async getApiLogsFromKey(apiKey: string, params: ApiKeyLogsQuery): Promise<Record<string, unknown>[]> {
     // API key usage logs are not wired to a log store yet; return empty until
     // a backend (previously elasticsearch) is integrated again.
     return [];
