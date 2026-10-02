@@ -55,7 +55,7 @@ export class TaskController {
   @ApiOperation({summary: 'Get the TaskUser linked to the current Nightwatch user'})
   @ApiResponse({status: 200, type: TaskUserDataResponseDto})
   async getLinkedTaskUser(@Req() req: UserRequest): Promise<TaskUserDataResponseDto> {
-    const userId = (req.user as any).id || req.user.userId;
+    const userId = req.user.userId;
     if (!userId) {
       throw new BadRequestException('User ID not found in request');
     }
@@ -68,7 +68,7 @@ export class TaskController {
   @ApiResponse({status: 200, type: LinkTaskUserResponseDto})
   async linkTaskUser(@Body() dto: LinkTaskUserDto, @Req() req: UserRequest): Promise<LinkTaskUserResponseDto> {
     try {
-      const userId = (req.user as any).id || req.user.userId;
+      const userId = req.user.userId;
       const result = await this.taskService.linkTaskUser(userId, dto.taskUserId);
       return {success: true, data: result};
     } catch (error) {
@@ -82,7 +82,7 @@ export class TaskController {
   @ApiResponse({status: 200, type: LinkTaskUserResponseDto})
   async unlinkTaskUser(@Req() req: UserRequest): Promise<LinkTaskUserResponseDto> {
     try {
-      const userId = (req.user as any).id || req.user.userId;
+      const userId = req.user.userId;
       const result = await this.taskService.unlinkTaskUser(userId);
       return {success: true, data: result};
     } catch (error) {
@@ -216,7 +216,7 @@ export class TaskController {
     if (!taskProject) {
       throw new BadRequestException('Project not linked to any TaskProject');
     }
-    const creatorId = (req.user as any).id || req.user.userId;
+    const creatorId = req.user.userId;
     const taskUser = await this.taskService.getTaskUserByUserId(creatorId);
 
     const result = await this.taskService.createTask({
