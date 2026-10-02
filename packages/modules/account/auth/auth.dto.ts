@@ -1,3 +1,4 @@
+import {Type} from 'class-transformer';
 import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
 import {UserRole, VerificationCodeUse} from '@generated/prisma/client';
 import {
