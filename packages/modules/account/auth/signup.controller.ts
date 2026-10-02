@@ -1,11 +1,11 @@
-import {Controller, Post, Body, Ip} from '@nestjs/common';
-import {ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {AuthService} from '@modules/account/auth/auth.service';
-import {SignUpDto} from '@modules/account/auth/auth.dto';
-import {NoGuard} from '@modules/account/security/passport/public/public.decorator';
+import { Controller, Post, Body, Ip } from "@nestjs/common";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { AuthService } from "@modules/account/auth/auth.service";
+import { SignUpDto } from "@modules/account/auth/auth.dto";
+import { NoGuard } from "@modules/account/security/passport/public/public.decorator";
 
-@ApiTags('Account / Auth')
-@Controller('auth')
+@ApiTags("Account / Auth")
+@Controller("auth")
 export class SignupController {
   constructor(private readonly authService: AuthService) {}
 
@@ -17,11 +17,11 @@ export class SignupController {
    * [Constraint] 'password' is required if neither email nor phone is provided.
    */
   @NoGuard()
-  @Post('signup')
-  @ApiOperation({summary: 'Sign up a new user'})
-  @ApiResponse({status: 201, description: 'User signed up successfully.'})
+  @Post("signup")
+  @ApiOperation({ summary: "Sign up a new user" })
+  @ApiResponse({ status: 201, description: "User signed up successfully." })
   async signup(@Ip() ipAddress: string, @Body() body: SignUpDto) {
-    await this.authService.signup({userData: body, ipAddress});
+    await this.authService.signup({ userData: body, ipAddress });
   }
 
   /* End */
