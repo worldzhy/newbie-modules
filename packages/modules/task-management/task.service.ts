@@ -1,13 +1,13 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {TaskStatus} from '@generated/prisma/enums';
-import dayjs from 'dayjs';
-import isoWeek from 'dayjs/plugin/isoWeek';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { TaskStatus } from "@generated/prisma/enums";
+import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
 
 dayjs.extend(isoWeek);
 
 // Re-export the Prisma-generated enum so callers can keep importing it from the service module.
-export {TaskStatus};
+export { TaskStatus };
 
 export interface TaskItem {
   id: string;
@@ -46,7 +46,7 @@ export class TaskService {
 
   async getTaskUserByUserId(userId: string) {
     return await this.prisma.taskUser.findUnique({
-      where: {userId},
+      where: { userId },
     });
   }
 
@@ -59,7 +59,7 @@ export class TaskService {
         name: true,
         avatarUrl: true,
       },
-      orderBy: {name: 'asc'},
+      orderBy: { name: "asc" },
     });
   }
 
@@ -73,39 +73,39 @@ export class TaskService {
     const users = await this.prisma.taskUser.findMany({
       where: {
         OR: [
-          {createdTasks: {some: {taskProjectId, deletedAt: null}}},
-          {assignedTasks: {some: {taskProjectId, deletedAt: null}}},
+          { createdTasks: { some: { taskProjectId, deletedAt: null } } },
+          { assignedTasks: { some: { taskProjectId, deletedAt: null } } },
         ],
       },
       include: {
         assignedTasks: {
-          where: {taskProjectId, deletedAt: null},
-          select: {status: true},
+          where: { taskProjectId, deletedAt: null },
+          select: { status: true },
         },
         createdTasks: {
-          where: {taskProjectId, deletedAt: null},
-          select: {id: true},
+          where: { taskProjectId, deletedAt: null },
+          select: { id: true },
         },
       },
-      orderBy: {name: 'asc'},
+      orderBy: { name: "asc" },
     });
 
-    const userIds = users.map(u => u.userId).filter(Boolean) as string[];
+    const userIds = users.map((u) => u.userId).filter(Boolean) as string[];
     let systemUserMap = new Map<string, any>();
     if (userIds.length > 0) {
       const systemUsers = await this.prisma.user.findMany({
-        where: {id: {in: userIds}},
-        select: {id: true, name: true, username: true, email: true},
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
       });
-      systemUserMap = new Map(systemUsers.map(u => [u.id, u]));
+      systemUserMap = new Map(systemUsers.map((u) => [u.id, u]));
     }
 
-    return users.map(user => {
+    return users.map((user) => {
       const tasks = user.assignedTasks;
       const total = tasks.length;
-      const completed = tasks.filter(t => t.status === TaskStatus.COMPLETED).length;
+      const completed = tasks.filter((t) => t.status === TaskStatus.COMPLETED).length;
       const inProgress = tasks.filter(
-        t => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED
+        (t) => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED,
       ).length;
 
       const systemUser = user.userId ? systemUserMap.get(user.userId) : null;
@@ -115,8 +115,8 @@ export class TaskService {
         name: user.name,
         avatarUrl: user.avatarUrl,
         email: systemUser?.email || null,
-        systemUsername: systemUser?.name || systemUser?.username || null,
-        taskStats: {total, completed, inProgress},
+        systemUsername: systemUser?.name || null,
+        taskStats: { total, completed, inProgress },
         createdAt: user.createdAt,
       };
     });
@@ -124,7 +124,7 @@ export class TaskService {
 
   async getTaskProjectByProjectId(projectId: string) {
     return await this.prisma.taskProject.findUnique({
-      where: {projectId},
+      where: { projectId },
     });
   }
 
@@ -137,85 +137,85 @@ export class TaskService {
         description: true,
         groupId: true,
       },
-      orderBy: {name: 'asc'},
+      orderBy: { name: "asc" },
     });
   }
 
   async linkTaskProject(projectId: string, taskProjectId: string) {
     const existingLink = await this.prisma.taskProject.findUnique({
-      where: {projectId},
+      where: { projectId },
     });
     if (existingLink && existingLink.id !== taskProjectId) {
-      throw new Error('This project is already linked to a TaskProject. Please unlink first.');
+      throw new Error("This project is already linked to a TaskProject. Please unlink first.");
     }
 
     const targetTaskProject = await this.prisma.taskProject.findUnique({
-      where: {id: taskProjectId},
+      where: { id: taskProjectId },
     });
     if (!targetTaskProject) {
-      throw new Error('TaskProject not found.');
+      throw new Error("TaskProject not found.");
     }
     if (targetTaskProject.projectId && targetTaskProject.projectId !== projectId) {
-      throw new Error('This TaskProject is already linked to another project.');
+      throw new Error("This TaskProject is already linked to another project.");
     }
 
     return await this.prisma.taskProject.update({
-      where: {id: taskProjectId},
-      data: {projectId},
+      where: { id: taskProjectId },
+      data: { projectId },
     });
   }
 
   async unlinkTaskProject(projectId: string) {
     const existingLink = await this.prisma.taskProject.findUnique({
-      where: {projectId},
+      where: { projectId },
     });
     if (!existingLink) {
-      throw new Error('No TaskProject linked to this project.');
+      throw new Error("No TaskProject linked to this project.");
     }
 
     return await this.prisma.taskProject.update({
-      where: {id: existingLink.id},
-      data: {projectId: null},
+      where: { id: existingLink.id },
+      data: { projectId: null },
     });
   }
 
   async linkTaskUser(userId: string, taskUserId: string) {
     // 检查该 nightwatch user 是否已经关联了某个 TaskUser
     const existingLink = await this.prisma.taskUser.findUnique({
-      where: {userId},
+      where: { userId },
     });
     if (existingLink) {
-      throw new Error('This user is already linked to a TaskUser. Please unlink first.');
+      throw new Error("This user is already linked to a TaskUser. Please unlink first.");
     }
 
     // 检查目标 TaskUser 是否已经被别人关联
     const targetTaskUser = await this.prisma.taskUser.findUnique({
-      where: {id: taskUserId},
+      where: { id: taskUserId },
     });
     if (!targetTaskUser) {
-      throw new Error('TaskUser not found.');
+      throw new Error("TaskUser not found.");
     }
     if (targetTaskUser.userId) {
-      throw new Error('This TaskUser is already linked to another user.');
+      throw new Error("This TaskUser is already linked to another user.");
     }
 
     return await this.prisma.taskUser.update({
-      where: {id: taskUserId},
-      data: {userId},
+      where: { id: taskUserId },
+      data: { userId },
     });
   }
 
   async unlinkTaskUser(userId: string) {
     const existingLink = await this.prisma.taskUser.findUnique({
-      where: {userId},
+      where: { userId },
     });
     if (!existingLink) {
-      throw new Error('No TaskUser linked to this user.');
+      throw new Error("No TaskUser linked to this user.");
     }
 
     return await this.prisma.taskUser.update({
-      where: {id: existingLink.id},
-      data: {userId: null},
+      where: { id: existingLink.id },
+      data: { userId: null },
     });
   }
 
@@ -223,9 +223,9 @@ export class TaskService {
 
   async createOrUpdateGroup(dto: CreateTaskGroupDto) {
     return await this.prisma.taskGroup.upsert({
-      where: {chatId: dto.chatId},
-      update: {name: dto.name, description: dto.description, projectId: dto.projectId},
-      create: {chatId: dto.chatId, name: dto.name, description: dto.description, projectId: dto.projectId},
+      where: { chatId: dto.chatId },
+      update: { name: dto.name, description: dto.description, projectId: dto.projectId },
+      create: { chatId: dto.chatId, name: dto.name, description: dto.description, projectId: dto.projectId },
     });
   }
 
@@ -233,21 +233,21 @@ export class TaskService {
     const normalizedChatId = this.normalizeChatId(chatId);
     if (!normalizedChatId) return null;
     return await this.prisma.taskGroup.findUnique({
-      where: {chatId: normalizedChatId},
+      where: { chatId: normalizedChatId },
     });
   }
 
   async ensureGroupByChatId(chatId: string, name?: string) {
     const normalizedChatId = this.normalizeChatId(chatId);
     if (!normalizedChatId) {
-      throw new Error('chatId is required');
+      throw new Error("chatId is required");
     }
 
     const existing = await this.getGroupByChatId(normalizedChatId);
     if (existing) return existing;
 
     try {
-      const groupName = (name || '').trim() || `Group ${normalizedChatId.slice(-4)}`;
+      const groupName = (name || "").trim() || `Group ${normalizedChatId.slice(-4)}`;
       return await this.prisma.taskGroup.create({
         data: {
           chatId: normalizedChatId,
@@ -262,19 +262,19 @@ export class TaskService {
   }
 
   private normalizeChatId(chatId: string) {
-    const trimmed = (chatId || '').trim();
-    if (!trimmed) return '';
-    return trimmed.replace(/^['"]+|['"]+$/g, '');
+    const trimmed = (chatId || "").trim();
+    if (!trimmed) return "";
+    return trimmed.replace(/^['"]+|['"]+$/g, "");
   }
 
   async listGroups() {
     return await this.prisma.taskGroup.findMany({
       include: {
         _count: {
-          select: {tasks: {where: {deletedAt: null}}},
+          select: { tasks: { where: { deletedAt: null } } },
         },
       },
-      orderBy: {updatedAt: 'desc'},
+      orderBy: { updatedAt: "desc" },
     });
   }
 
@@ -298,8 +298,8 @@ export class TaskService {
 
   async updateRequirementScore(requirementId: number, score: number) {
     return await this.prisma.requirement.update({
-      where: {id: requirementId},
-      data: {score},
+      where: { id: requirementId },
+      data: { score },
     });
   }
 
@@ -321,7 +321,7 @@ export class TaskService {
         groupId,
         name: {
           contains: name,
-          mode: 'insensitive',
+          mode: "insensitive",
         },
         deletedAt: null,
       },
@@ -334,7 +334,7 @@ export class TaskService {
         groupId,
         deletedAt: null,
       },
-      orderBy: {createdAt: 'desc'},
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -343,7 +343,7 @@ export class TaskService {
       where: {
         groupId,
         deletedAt: null,
-        OR: [{id: identifier}, {name: identifier}],
+        OR: [{ id: identifier }, { name: identifier }],
       },
     });
   }
@@ -351,12 +351,12 @@ export class TaskService {
   async updateProjectName(groupId: string, oldNameOrId: string, newName: string) {
     const project = await this.getProjectByNameOrId(groupId, oldNameOrId);
     if (!project) {
-      throw new Error('Project not found');
+      throw new Error("Project not found");
     }
 
     return await this.prisma.taskProject.update({
-      where: {id: project.id},
-      data: {name: newName},
+      where: { id: project.id },
+      data: { name: newName },
     });
   }
 
@@ -364,7 +364,7 @@ export class TaskService {
 
   async upsertUser(openId: string, name?: string, avatarUrl?: string) {
     return await this.prisma.taskUser.upsert({
-      where: {openId},
+      where: { openId },
       update: {
         name: name || undefined,
         avatarUrl: avatarUrl || undefined,
@@ -379,18 +379,18 @@ export class TaskService {
 
   async getUserByOpenId(openId: string) {
     return await this.prisma.taskUser.findUnique({
-      where: {openId},
+      where: { openId },
     });
   }
 
   async getUserByName(name: string) {
     // If the name starts with @, remove it for searching
-    const cleanName = name.replace(/^@/, '').trim();
+    const cleanName = name.replace(/^@/, "").trim();
     return await this.prisma.taskUser.findFirst({
       where: {
         name: {
           contains: cleanName,
-          mode: 'insensitive',
+          mode: "insensitive",
         },
       },
     });
@@ -400,16 +400,16 @@ export class TaskService {
 
   async listWeeklyReports(groupId: string, skip?: number, take?: number) {
     const total = await this.prisma.weeklyReport.count({
-      where: {groupId},
+      where: { groupId },
     });
     const records = await this.prisma.weeklyReport.findMany({
-      where: {groupId},
-      include: {user: true},
-      orderBy: [{year: 'desc'}, {week: 'desc'}],
+      where: { groupId },
+      include: { user: true },
+      orderBy: [{ year: "desc" }, { week: "desc" }],
       skip,
       take,
     });
-    return {records, total};
+    return { records, total };
   }
 
   async upsertWeeklyReport(groupId: string, userId: string, content: string) {
@@ -440,7 +440,7 @@ export class TaskService {
   }
 
   async getWeeklyReport(groupId: string, userId: string, weekOffset: number = 0) {
-    const targetDate = dayjs().add(weekOffset, 'week');
+    const targetDate = dayjs().add(weekOffset, "week");
     const year = targetDate.year();
     const week = targetDate.isoWeek();
 
@@ -463,21 +463,21 @@ export class TaskService {
 
   async listMonthlyReports(projectId: string, skip?: number, take?: number) {
     const total = await this.prisma.monthlyReport.count({
-      where: {projectId},
+      where: { projectId },
     });
     const records = await this.prisma.monthlyReport.findMany({
-      where: {projectId},
-      orderBy: [{year: 'desc'}, {month: 'desc'}],
+      where: { projectId },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
       skip,
       take,
     });
-    return {records, total};
+    return { records, total };
   }
 
   async updateMonthlyReportContent(reportId: string, content: string) {
     return await this.prisma.monthlyReport.update({
-      where: {id: reportId},
-      data: {content},
+      where: { id: reportId },
+      data: { content },
     });
   }
 
@@ -542,7 +542,7 @@ export class TaskService {
         creator: true,
       },
       orderBy: {
-        updatedAt: 'desc',
+        updatedAt: "desc",
       },
     });
   }
@@ -564,26 +564,26 @@ export class TaskService {
     chatId: string,
     userId: string | undefined,
     tasks: TaskItem[],
-    operator?: {id: string; name?: string; source: string},
+    operator?: { id: string; name?: string; source: string },
     requirementId?: number,
-    taskProjectId?: string
+    taskProjectId?: string,
   ) {
     try {
       // 1. Ensure Group exists or use Default
       let groupId: string;
       if (chatId) {
-        let group = await this.prisma.taskGroup.findUnique({where: {chatId}});
+        let group = await this.prisma.taskGroup.findUnique({ where: { chatId } });
         if (!group) {
           group = await this.prisma.taskGroup.create({
-            data: {chatId, name: `Project Group ${chatId.slice(-4)}`},
+            data: { chatId, name: `Project Group ${chatId.slice(-4)}` },
           });
         }
         groupId = group.id;
       } else {
         const defaultGroup = await this.prisma.taskGroup.upsert({
-          where: {chatId: 'DEFAULT_GROUP'},
+          where: { chatId: "DEFAULT_GROUP" },
           update: {},
-          create: {chatId: 'DEFAULT_GROUP', name: 'Default Task Group'},
+          create: { chatId: "DEFAULT_GROUP", name: "Default Task Group" },
         });
         groupId = defaultGroup.id;
       }
@@ -591,10 +591,10 @@ export class TaskService {
       // 2. Ensure User exists (if userId is provided)
       let dbUserId: string | undefined;
       if (userId) {
-        let user = await this.prisma.taskUser.findUnique({where: {openId: userId}});
+        let user = await this.prisma.taskUser.findUnique({ where: { openId: userId } });
         if (!user) {
           user = await this.prisma.taskUser.create({
-            data: {openId: userId, name: `User ${userId.slice(-4)}`},
+            data: { openId: userId, name: `User ${userId.slice(-4)}` },
           });
         }
         dbUserId = user.id;
@@ -602,7 +602,7 @@ export class TaskService {
 
       // 3. Create Tasks
       await this.prisma.task.createMany({
-        data: tasks.map(t => ({
+        data: tasks.map((t) => ({
           title: t.title,
           description: t.description,
           status: t.status,
@@ -617,11 +617,11 @@ export class TaskService {
         })),
       });
 
-      this.logger.log(`Tasks saved to DB for ${chatId || 'DEFAULT'}:`, tasks);
-      const group = await this.prisma.taskGroup.findUnique({where: {id: groupId}});
-      return {count: tasks.length, groupName: group?.name || 'Default Group'};
+      this.logger.log(`Tasks saved to DB for ${chatId || "DEFAULT"}:`, tasks);
+      const group = await this.prisma.taskGroup.findUnique({ where: { id: groupId } });
+      return { count: tasks.length, groupName: group?.name || "Default Group" };
     } catch (error) {
-      this.logger.error('Failed to save tasks to database', error);
+      this.logger.error("Failed to save tasks to database", error);
       throw error;
     }
   }
@@ -634,7 +634,7 @@ export class TaskService {
     taskProjectId?: string,
     includeCompleted?: boolean,
     skip?: number,
-    take?: number
+    take?: number,
   ) {
     const whereClause: any = {
       groupId,
@@ -653,16 +653,16 @@ export class TaskService {
     if (title) {
       whereClause.title = {
         contains: title,
-        mode: 'insensitive', // PostgreSQL only, ignore if using SQLite/MySQL without support
+        mode: "insensitive", // PostgreSQL only, ignore if using SQLite/MySQL without support
       };
     }
 
     if (assigneeName) {
-      const cleanName = assigneeName.replace(/^@/, '').trim();
+      const cleanName = assigneeName.replace(/^@/, "").trim();
       whereClause.assignee = {
         name: {
           contains: cleanName,
-          mode: 'insensitive',
+          mode: "insensitive",
         },
       };
     }
@@ -671,30 +671,30 @@ export class TaskService {
       whereClause.taskProjectId = taskProjectId;
     }
 
-    const total = await this.prisma.task.count({where: whereClause});
+    const total = await this.prisma.task.count({ where: whereClause });
 
     const tasks = await this.prisma.task.findMany({
       where: whereClause,
-      include: {creator: true, assignee: true, taskProject: true},
-      orderBy: {createdAt: 'desc'},
+      include: { creator: true, assignee: true, taskProject: true },
+      orderBy: { createdAt: "desc" },
       skip,
       take,
     });
 
-    return {tasks, total};
+    return { tasks, total };
   }
 
   async getTaskById(taskId: string) {
     return await this.prisma.task.findUnique({
-      where: {id: taskId},
-      include: {creator: true, assignee: true, taskProject: true},
+      where: { id: taskId },
+      include: { creator: true, assignee: true, taskProject: true },
     });
   }
 
   async updateTask(taskId: string, dto: UpdateTaskDto) {
     return await this.prisma.task.update({
-      where: {id: taskId},
-      data: {...dto},
+      where: { id: taskId },
+      data: { ...dto },
     });
   }
 
@@ -722,9 +722,9 @@ export class TaskService {
     });
   }
 
-  async deleteTask(taskId: string, operator?: {id: string; name?: string; source: string}) {
+  async deleteTask(taskId: string, operator?: { id: string; name?: string; source: string }) {
     return await this.prisma.task.update({
-      where: {id: taskId},
+      where: { id: taskId },
       data: {
         deletedAt: new Date(),
         lastOperatorId: operator?.id,

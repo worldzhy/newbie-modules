@@ -9,14 +9,13 @@ export function buildUiAvatarsUrl(params: {
   name?: string | null;
   firstName?: string | null;
   lastName?: string | null;
-  username?: string | null;
   fallback: string;
 }): string {
   const avatarName =
     params.name ??
     (params.firstName && params.lastName
       ? `${params.firstName} ${params.lastName}`
-      : (params.firstName ?? params.lastName ?? params.username)) ??
+      : (params.firstName ?? params.lastName)) ??
     params.fallback;
   const background = randomColor({ luminosity: "light" }).replace("#", "");
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(avatarName)}&background=${background}&color=000000`;

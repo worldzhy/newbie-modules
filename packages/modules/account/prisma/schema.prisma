@@ -22,7 +22,6 @@ model User {
   id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   checkLocationOnLogin Boolean          @default(false)
   status               UserStatus       @default(ACTIVE)
-  username             String?          @unique
   email                String?          @unique
   phone                String?          @unique
   password             String? // automatic hashing

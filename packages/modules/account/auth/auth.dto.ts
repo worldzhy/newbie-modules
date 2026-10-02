@@ -13,11 +13,6 @@ import {
 } from "class-validator";
 
 export class SignUpDto {
-  @ApiProperty({ type: String, required: false })
-  @IsString()
-  @IsOptional()
-  username?: string;
-
   @ApiProperty({ type: String, required: true })
   @IsEmail()
   @IsNotEmpty()

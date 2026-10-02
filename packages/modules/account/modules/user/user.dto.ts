@@ -22,11 +22,6 @@ import {
  */
 export class CreateUserDto {
   @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  username?: string | null;
-
-  @ApiPropertyOptional({ type: String })
   @IsEmail()
   @IsOptional()
   email?: string | null;
@@ -145,11 +140,6 @@ export class CreateUserDto {
  * {set: roles} in the controller, as required by Prisma for scalar lists.
  */
 export class UpdateUserDto {
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  username?: string | null;
-
   @ApiPropertyOptional({ type: String })
   @IsEmail()
   @IsOptional()
@@ -293,9 +283,6 @@ export class UserResponseDto {
 
   @ApiProperty({ enum: UserStatus })
   status: UserStatus;
-
-  @ApiPropertyOptional({ type: String })
-  username?: string | null;
 
   @ApiPropertyOptional({ type: String })
   email?: string | null;

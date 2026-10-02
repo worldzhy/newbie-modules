@@ -11,7 +11,8 @@ export class UserService {
   }
 
   /**
-   * The account supports username / email / phone.
+   * Resolve an account identifier. Only email and phone are supported;
+   * any other value resolves to no user so callers reject the login.
    */
   async findByAccount(account: string) {
     if (verifyEmail(account)) {
@@ -19,15 +20,8 @@ export class UserService {
     } else if (verifyPhone(account)) {
       return await this.prisma.user.findUnique({ where: { phone: account } });
     } else {
-      return await this.prisma.user.findUnique({ where: { username: account } });
+      return null;
     }
-  }
-
-  async checkExistence(id: string) {
-    const count = await this.prisma.user.count({
-      where: { id },
-    });
-    return count > 0 ? true : false;
   }
 
   withoutPassword(user: User) {

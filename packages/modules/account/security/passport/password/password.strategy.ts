@@ -16,9 +16,8 @@ export class PasswordStrategy extends PassportStrategy(Strategy, "local.password
    * 'vaidate' function must be implemented.
    *
    * The 'account' parameter accepts:
-   * [1] username
-   * [2] email
-   * [3] phone
+   * [1] email
+   * [2] phone
    *
    */
   async validate(account: string, password: string): Promise<{ userId: string }> {

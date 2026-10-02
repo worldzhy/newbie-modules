@@ -105,7 +105,6 @@ export class AuthService {
       name: data.name,
       firstName: data.firstName,
       lastName: data.lastName,
-      username: data.username,
       fallback: email.split("@")[0],
     });
 

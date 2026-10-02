@@ -34,9 +34,6 @@ export class WechatUserResponseDto {
   status: UserStatus;
 
   @ApiPropertyOptional({ type: String })
-  username?: string | null;
-
-  @ApiPropertyOptional({ type: String })
   email?: string | null;
 
   @ApiPropertyOptional({ type: String })
