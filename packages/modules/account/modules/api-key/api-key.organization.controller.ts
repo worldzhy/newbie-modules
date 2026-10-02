@@ -42,7 +42,6 @@ export class OrganizationApiKeyController {
     @Param('organizationId') organizationId: string,
     @Body() data: CreateApiKeyDto
   ): Promise<Expose<ApiKey>> {
-    console.log('req.user', req.user);
     const token = this.tokenService.getTokenFromHttpRequest(req);
     if (!token) {
       throw new UnauthorizedException();

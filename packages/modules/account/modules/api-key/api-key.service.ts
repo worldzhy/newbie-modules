@@ -4,6 +4,7 @@ import { ApiKey, Prisma } from "@generated/prisma/client";
 import { API_KEY_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { generateRandomString } from "@devbie/newbie/utilities/random.util";
+import { generateHash } from "@devbie/newbie/utilities/common.util";
 import { Expose, expose } from "../../helpers/expose";
 import { LRUCache } from "lru-cache";
 
@@ -42,18 +43,20 @@ export class ApiKeyService {
     userId: string;
     organizationId?: string;
     data: Omit<Omit<Prisma.ApiKeyCreateInput, "key" | "secret">, "user" | "organization">;
-  }): Promise<ApiKey> {
+  }): Promise<Expose<ApiKey> & { secret: string }> {
     const key = await generateRandomString();
+    // The plaintext secret is returned to the caller exactly once, on creation.
     const secret = await generateRandomString();
-    return await this.prisma.apiKey.create({
+    const apiKey = await this.prisma.apiKey.create({
       data: {
         key,
-        secret,
+        secret: await generateHash(secret),
         ...params.data,
         user: { connect: { id: params.userId } },
         organizationId: params.organizationId,
       },
     });
+    return { ...expose<ApiKey>({ ...apiKey }), secret };
   }
 
   async getApiKeysForOrganization(organizationId: string, params: ApiKeyListQuery): Promise<Expose<ApiKey>[]> {
@@ -74,13 +77,14 @@ export class ApiKeyService {
 
   async getApiKeyFromKey(key: string) {
     const cached = this.lru.get(key);
-    if (cached) return cached;
+    // expose() mutates its argument, so hand it a copy to keep the cached row intact.
+    if (cached) return expose<ApiKey>({ ...cached });
     const apiKey = await this.prisma.apiKey.findFirst({
       where: { key },
     });
     if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
     this.lru.set(key, apiKey);
-    return expose<ApiKey>(apiKey);
+    return expose<ApiKey>({ ...apiKey });
   }
 
   async updateApiKey(userId: string, id: number, data: Prisma.ApiKeyUpdateInput): Promise<Expose<ApiKey>> {

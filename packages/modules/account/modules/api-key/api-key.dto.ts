@@ -82,8 +82,8 @@ export class ReplaceApiKeyDto {
 
 /**
  * Response DTO for API key operations.
- * Note: 'secret' is only returned on creation; subsequent GETs also return it
- * via the existing expose() helper which does not strip it.
+ * 'secret' is included only in the create response, shown once.
+ * List and detail responses never contain the secret (it is stored hashed).
  */
 export class ApiKeyResponseDto {
   @ApiProperty({type: Number})
@@ -92,8 +92,8 @@ export class ApiKeyResponseDto {
   @ApiProperty({type: String})
   key: string;
 
-  @ApiProperty({type: String})
-  secret: string;
+  @ApiPropertyOptional({type: String, description: 'Plaintext secret, returned only once on creation.'})
+  secret?: string;
 
   @ApiPropertyOptional({type: String})
   description?: string | null;

@@ -4,6 +4,7 @@ import {Strategy} from 'passport-custom';
 import {Request} from 'express';
 import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {API_KEY_NOT_FOUND, INVALID_CREDENTIALS} from '@devbie/newbie/exceptions/errors.constants';
+import {compareHash} from '@devbie/newbie/utilities/common.util';
 
 @Injectable()
 export class ApiKeyStrategy extends PassportStrategy(Strategy, 'custom.api-key') {
@@ -33,12 +34,9 @@ export class ApiKeyStrategy extends PassportStrategy(Strategy, 'custom.api-key')
       throw new UnauthorizedException(API_KEY_NOT_FOUND);
     }
 
-    // [step 3] Validate secret.
-    // const match = await compareHash(secret, apiKey.secret);
-    // if (match !== true) {
-    //   throw new UnauthorizedException(INVALID_CREDENTIALS);
-    // }
-    if (secret !== apiKey.secret) {
+    // [step 3] Validate the presented secret against the stored hash.
+    const match = await compareHash(secret, apiKey.secret);
+    if (match !== true) {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
