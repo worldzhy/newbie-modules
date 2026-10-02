@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { GeolocationService } from "@modules/account/helpers/geolocation.service";
@@ -51,19 +51,28 @@ export class SessionService {
     // [step 1] Validate refresh token
     const refreshTokenInfo = this.tokenService.verifyUserRefreshToken(refreshToken);
 
-    // [step 2] Update tokens.
-    return await this.prisma.session.update({
-      where: { refreshToken },
-      data: {
-        accessToken: this.tokenService.signUserAccessToken({
-          userId: refreshTokenInfo.userId,
-        }),
-        refreshToken: this.tokenService.signUserRefreshToken(
-          { userId: refreshTokenInfo.userId },
-          { expiresIn: secondsUntilUnixTimestamp(refreshTokenInfo.exp) },
-        ),
-      },
-    });
+    // [step 2] Rotate tokens. A concurrent or replayed refresh loses the race
+    // because the first rotation already replaced the stored refresh token;
+    // turn that missing-row error into a 401 instead of a 500.
+    try {
+      return await this.prisma.session.update({
+        where: { refreshToken },
+        data: {
+          accessToken: this.tokenService.signUserAccessToken({
+            userId: refreshTokenInfo.userId,
+          }),
+          refreshToken: this.tokenService.signUserRefreshToken(
+            { userId: refreshTokenInfo.userId },
+            { expiresIn: secondsUntilUnixTimestamp(refreshTokenInfo.exp) },
+          ),
+        },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        throw new UnauthorizedException(SESSION_NOT_FOUND);
+      }
+      throw error;
+    }
   }
 
   async destroy(token: string) {

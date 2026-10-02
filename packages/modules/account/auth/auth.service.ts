@@ -51,9 +51,8 @@ export class AuthService {
   }
 
   async login(params: { ipAddress: string; userAgent: string; userId: string; response: Response }) {
-    // [step 0] Check email and location.
-    await this.checkEmailOnLogin({ userId: params.userId });
-    await this.checkLocationOnLogin({
+    // [step 0] Load the user once and check email verification plus login location.
+    await this.checkLoginEligibility({
       userId: params.userId,
       ipAddress: params.ipAddress,
     });
@@ -164,22 +163,19 @@ export class AuthService {
     };
   }
 
-  private async checkEmailOnLogin(params: { userId: string }) {
+  /**
+   * Single-query login gate: email verification and (when enabled) location
+   * approval are both evaluated from one user load.
+   */
+  private async checkLoginEligibility(params: { userId: string; ipAddress: string }): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: params.userId },
-      select: { email: true, name: true, emails: true },
+      select: { email: true, name: true, emails: true, checkLocationOnLogin: true },
     });
     if (!user) throw new NotFoundException(USER_NOT_FOUND);
 
     if (!user.emails.find((i) => i.email === user.email)?.isVerified) throw new UnauthorizedException(UNVERIFIED_EMAIL);
-  }
 
-  private async checkLocationOnLogin(params: { userId: string; ipAddress: string }): Promise<void> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: params.userId },
-      select: { email: true, name: true, checkLocationOnLogin: true },
-    });
-    if (!user) throw new NotFoundException(USER_NOT_FOUND);
     if (!user.checkLocationOnLogin) return;
 
     const subnet = anonymize(params.ipAddress);
