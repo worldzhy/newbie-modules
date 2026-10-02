@@ -8,6 +8,7 @@ import { UserRequest } from "@modules/account/account.interface";
 import { AccountService } from "@modules/account/account.service";
 import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
 import { VerificationCodeService } from "@modules/account/modules/verification-code/verification-code.service";
+import { AuditLogService, AuditEvent } from "@modules/account/modules/audit-logs/audit-log.service";
 import { LimitLoginByIp } from "@modules/account/security/rate-limiter/rate-limiter.decorator";
 import { NoGuard } from "@modules/account/security/passport/public/public.decorator";
 import {
@@ -25,6 +26,7 @@ export class AccountController {
     private readonly prisma: PrismaService,
     private readonly accountService: AccountService,
     private readonly verificationCodeService: VerificationCodeService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   @Get("me")
@@ -89,6 +91,8 @@ export class AccountController {
       },
     });
 
+    await this.auditLogService.record(AuditEvent.PASSWORD_CHANGED, { userId });
+
     return updatedUser;
   }
 
@@ -142,6 +146,7 @@ export class AccountController {
         // The reset often happens after account takeover: revoke every session
         // of the user, including any session held by an attacker.
         await this.prisma.session.deleteMany({ where: { userId: updated.id } });
+        await this.auditLogService.record(AuditEvent.PASSWORD_RESET, { userId: updated.id });
         return updated;
       } else {
         throw new NewbieException(NewbieExceptionType.ResetPassword_InvalidCode);
@@ -164,6 +169,7 @@ export class AccountController {
         await this.verificationCodeService.inactivateForPhone(body.phone, VerificationCodeUse.RESET_PASSWORD);
         // Revoke every session of the user after a successful reset.
         await this.prisma.session.deleteMany({ where: { userId: updated.id } });
+        await this.auditLogService.record(AuditEvent.PASSWORD_RESET, { userId: updated.id });
         return updated;
       } else {
         throw new NewbieException(NewbieExceptionType.ResetPassword_InvalidCode);

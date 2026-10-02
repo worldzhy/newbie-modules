@@ -23,6 +23,7 @@ import { Expose, expose } from "@modules/account/helpers/expose";
 import { verifyEmail } from "@modules/account/helpers/validator";
 import { GeolocationService } from "@modules/account/helpers/geolocation.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
+import { AuditLogService, AuditEvent } from "@modules/account/modules/audit-logs/audit-log.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { CookieService } from "@modules/account/security/cookie/cookie.service";
 import { TokenService } from "@modules/account/security/token/token.service";
@@ -43,6 +44,7 @@ export class AuthService {
     private readonly tokenService: TokenService,
     private readonly cookieService: CookieService,
     private readonly approvedSubnetService: ApprovedSubnetService,
+    private readonly auditLogService: AuditLogService,
     private readonly geolocationService: GeolocationService,
     private readonly ses: AwsSesService,
     private readonly limitLoginByUserService: LimitLoginByUserService,
@@ -80,7 +82,14 @@ export class AuthService {
     // [step 4] Set refresh token in cookie.
     this.cookieService.set(params.response, this.cookieService.generateForRefreshToken(session.refreshToken));
 
-    // [step 5] Return access token.
+    // [step 5] Record the login.
+    await this.auditLogService.record(AuditEvent.LOGIN, {
+      userId: params.userId,
+      ipAddress: params.ipAddress,
+      userAgent: params.userAgent,
+    });
+
+    // [step 6] Return access token.
     const accessTokenInfo = this.tokenService.verifyUserAccessToken(session.accessToken);
     return {
       token: session.accessToken,
@@ -145,6 +154,10 @@ export class AuthService {
     }
 
     await this.approvedSubnetService.approveNewSubnet(user.id, params.ipAddress);
+    await this.auditLogService.record(AuditEvent.SIGNUP, {
+      userId: user.id,
+      ipAddress: params.ipAddress,
+    });
     return expose(user);
   }
 

@@ -6,6 +6,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { generateRandomString } from "@devbie/newbie/utilities/random.util";
 import { generateHash } from "@devbie/newbie/utilities/common.util";
 import { Expose, expose } from "../../helpers/expose";
+import { AuditLogService, AuditEvent } from "../audit-logs/audit-log.service";
 import { LRUCache } from "lru-cache";
 
 /** An API key belongs to either a user (personal key) or an organization. */
@@ -32,6 +33,7 @@ export class ApiKeyService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private auditLogService: AuditLogService,
   ) {
     // The configured size is the maximum number of cached entries.
     this.lru = new LRUCache<string, ApiKey>({
@@ -55,6 +57,12 @@ export class ApiKeyService {
         user: { connect: { id: params.userId } },
         organizationId: params.organizationId,
       },
+    });
+    await this.auditLogService.record(AuditEvent.API_KEY_CREATED, {
+      userId: params.userId,
+      apiKeyId: apiKey.id,
+      organizationId: params.organizationId,
+      detail: { description: apiKey.description },
     });
     return { ...expose<ApiKey>({ ...apiKey }), secret };
   }
@@ -158,6 +166,11 @@ export class ApiKeyService {
       where: { id },
     });
     this.lru.delete(ownedApiKey.key);
+    await this.auditLogService.record(AuditEvent.API_KEY_DELETED, {
+      userId: "organizationId" in owner ? undefined : owner.userId,
+      apiKeyId: id,
+      organizationId: "organizationId" in owner ? owner.organizationId : undefined,
+    });
     return expose<ApiKey>(apiKey);
   }
 

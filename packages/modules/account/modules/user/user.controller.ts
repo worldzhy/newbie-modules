@@ -5,6 +5,7 @@ import { RequirePermission } from "@modules/account/security/authorization/autho
 import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TokenService } from "@modules/account/security/token/token.service";
+import { AuditLogService, AuditEvent } from "@modules/account/modules/audit-logs/audit-log.service";
 import { UserService } from "./user.service";
 import {
   ChangeUserPasswordDto,
@@ -25,6 +26,7 @@ export class UserController {
     private readonly prisma: PrismaService,
     private readonly userService: UserService,
     private readonly tokenService: TokenService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   @Post("")
@@ -149,6 +151,13 @@ export class UserController {
       where: { id: userId },
       data,
     });
+
+    if (roles !== undefined) {
+      await this.auditLogService.record(AuditEvent.ROLES_CHANGED, {
+        userId,
+        detail: { roles },
+      });
+    }
 
     // Strip the password hash from the response to prevent sensitive data leakage.
     return this.userService.withoutPassword(user);
