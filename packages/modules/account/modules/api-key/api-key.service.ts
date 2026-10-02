@@ -32,9 +32,9 @@ export class ApiKeyService {
     private prisma: PrismaService,
     private configService: ConfigService,
   ) {
+    // The configured size is the maximum number of cached entries.
     this.lru = new LRUCache<string, ApiKey>({
-      maxSize: this.configService.getOrThrow<number>("modules.account.cache.apiKeyLruSize"),
-      sizeCalculation: (value) => JSON.stringify(value).length,
+      max: this.configService.getOrThrow<number>("modules.account.cache.apiKeyLruSize"),
     });
   }
 

@@ -10,9 +10,9 @@ export class GeolocationService implements OnModuleDestroy {
   private lru: LRUCache<string, Partial<CityResponse>>;
 
   constructor(private config: ConfigService) {
+    // The configured size is the maximum number of cached entries.
     this.lru = new LRUCache({
-      maxSize: this.config.getOrThrow<number>('modules.account.cache.geolocationLruSize'),
-      sizeCalculation: (value, key) => JSON.stringify(value).length,
+      max: this.config.getOrThrow<number>('modules.account.cache.geolocationLruSize'),
     });
   }
 
