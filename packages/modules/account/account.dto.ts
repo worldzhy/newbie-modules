@@ -1,33 +1,33 @@
-import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
-import {UserRole} from '@generated/prisma/client';
-import {IsEmail, IsNotEmpty, IsOptional, IsString, MinLength} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { UserGender, UserRole } from "@generated/prisma/client";
+import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
 
 export class GetCurrentUserResponseDto {
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   id: string;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   email?: string | null;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   phone?: string | null;
 
-  @ApiProperty({type: String, isArray: true})
+  @ApiProperty({ type: String, isArray: true })
   roles: UserRole[];
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   name?: string | null;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   firstName?: string | null;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   middleName?: string | null;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   lastName?: string | null;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   avatarFileId?: string | null;
 }
 
@@ -36,13 +36,13 @@ export class GetCurrentUserResponseDto {
  * Only returns non-sensitive identity fields.
  */
 export class PasswordChangeResponseDto {
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   id: string;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   email?: string | null;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   phone?: string | null;
 }
 
@@ -67,22 +67,22 @@ export class ForgotPasswordDto {
 }
 
 export class ResetPasswordDto {
-  @ApiPropertyOptional({type: String, description: 'The email of the account to reset password for.'})
+  @ApiPropertyOptional({ type: String, description: "The email of the account to reset password for." })
   @IsEmail()
   @IsOptional()
   email?: string;
 
-  @ApiPropertyOptional({type: String, description: 'The phone of the account to reset password for.'})
+  @ApiPropertyOptional({ type: String, description: "The phone of the account to reset password for." })
   @IsString()
   @IsOptional()
   phone?: string;
 
-  @ApiProperty({type: String, description: 'The verification code received via email or phone.'})
+  @ApiProperty({ type: String, description: "The verification code received via email or phone." })
   @IsString()
   @IsNotEmpty()
   verificationCode!: string;
 
-  @ApiProperty({type: String, description: 'The new password.'})
+  @ApiProperty({ type: String, description: "The new password." })
   @IsString()
   @MinLength(8)
   @IsNotEmpty()
@@ -93,7 +93,7 @@ export class ChangePasswordDto {
   @ApiProperty({
     type: String,
     required: true,
-    description: 'The user ID of the account to change the password for.',
+    description: "The user ID of the account to change the password for.",
   })
   @IsString()
   @IsNotEmpty()
@@ -102,7 +102,7 @@ export class ChangePasswordDto {
   @ApiProperty({
     type: String,
     required: true,
-    description: 'The current password of the account.',
+    description: "The current password of the account.",
   })
   @IsString()
   @IsNotEmpty()
@@ -111,7 +111,7 @@ export class ChangePasswordDto {
   @ApiProperty({
     type: String,
     required: true,
-    description: 'The new password for the account.',
+    description: "The new password for the account.",
   })
   @IsString()
   @IsNotEmpty()
@@ -126,4 +126,52 @@ export class VerifyEmailDto {
   @IsString()
   @IsOptional()
   origin?: string;
+}
+
+/**
+ * Whitelist of profile fields a user may change on themselves.
+ * Sensitive fields (roles, status, password, email, phone, two-factor
+ * settings) are intentionally absent: the global ValidationPipe strips
+ * undeclared properties, so they cannot be smuggled through this endpoint.
+ */
+export class UpdateMeDto {
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  firstName?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  middleName?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  lastName?: string;
+
+  @ApiPropertyOptional({ type: String, enum: UserGender })
+  @IsEnum(UserGender)
+  @IsOptional()
+  gender?: UserGender;
+
+  @ApiPropertyOptional({ type: String, format: "date", description: "ISO 8601 date string." })
+  @IsDateString()
+  @IsOptional()
+  dateOfBirth?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  timezone?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  avatarFileId?: string;
 }

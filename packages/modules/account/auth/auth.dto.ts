@@ -178,46 +178,6 @@ export class LoginByApiKeyRequestDto {
 }
 
 /**
- * Request DTO for logging in with a user profile.
- * The Profile guard runs before the validation pipe and reads the raw body.
- */
-export class LoginByProfileRequestDto {
-  @ApiProperty({ type: String, required: true })
-  @IsString()
-  @IsNotEmpty()
-  firstName: string;
-
-  @ApiProperty({ type: String, required: true })
-  @IsString()
-  @IsNotEmpty()
-  middleName: string;
-
-  @ApiProperty({ type: String, required: true })
-  @IsString()
-  @IsNotEmpty()
-  lastName: string;
-
-  @ApiPropertyOptional({ type: String, description: "Optional name suffix, e.g. PhD." })
-  @IsString()
-  @IsOptional()
-  suffix?: string;
-
-  @ApiProperty({ type: Date, required: true, description: "ISO 8601 date string." })
-  @IsDate()
-  @Type(() => Date)
-  dateOfBirth: Date;
-}
-
-/**
- * Request DTO for logging in with a user UUID.
- */
-export class LoginByUuidRequestDto {
-  @ApiProperty({ type: String, required: true, description: "The UUID (user id)." })
-  @IsUUID()
-  uuid: string;
-}
-
-/**
  * Response DTO for logout operation.
  */
 export class LogoutResponseDto {

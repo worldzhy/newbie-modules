@@ -1,22 +1,23 @@
-import {Injectable, UnauthorizedException} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {PassportStrategy} from '@nestjs/passport';
-import {ExtractJwt, Strategy} from 'passport-jwt';
-import {Request} from 'express';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {TokenService} from '../../token/token.service';
+import { ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PassportStrategy } from "@nestjs/passport";
+import { ExtractJwt, Strategy } from "passport-jwt";
+import { Request } from "express";
+import { UserStatus } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { TokenService } from "../../token/token.service";
 
 @Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
+export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly tokenService: TokenService
+    private readonly tokenService: TokenService,
   ) {
     const tokenConfig = config.getOrThrow<{
       defaultSecret: string;
-      userAccess: {secret: string; expiresIn: string | number};
-    }>('modules.account.token');
+      userAccess: { secret: string; expiresIn: string | number };
+    }>("modules.account.token");
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -32,23 +33,28 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
    * For the jwt-strategy, Passport first verifies the JWT's signature and decodes the JSON.
    * Then it invokes our validate() method passing the decoded JSON as its single parameter
    */
-  async validate(req: Request, payload: {userId: string; sub: string; iat: number; exp: number}) {
+  async validate(req: Request, payload: { userId: string; sub: string; iat: number; exp: number }) {
     const accessToken = this.tokenService.getTokenFromHttpRequest(req);
     if (!accessToken) {
-      throw new UnauthorizedException('No access token');
+      throw new UnauthorizedException("No access token");
     }
 
     const accessTokenInfo = this.tokenService.verifyUserAccessToken(accessToken);
 
     const session = await this.prisma.session.findFirst({
-      where: {accessToken},
-      select: {user: {select: {id: true, roles: true}}},
+      where: { accessToken },
+      select: { user: { select: { id: true, roles: true, status: true } } },
     });
 
     if (session) {
-      return {id: accessTokenInfo.userId, roles: session.user.roles};
+      // Disabled/deleted users keep no valid access until re-enabled,
+      // regardless of unexpired tokens issued earlier.
+      if (session.user.status !== UserStatus.ACTIVE) {
+        throw new ForbiddenException("The account is not active.");
+      }
+      return { id: accessTokenInfo.userId, roles: session.user.roles };
     } else {
-      throw new UnauthorizedException('Invalid access token');
+      throw new UnauthorizedException("Invalid access token");
     }
   }
 }

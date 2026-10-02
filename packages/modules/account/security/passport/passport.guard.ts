@@ -1,29 +1,25 @@
-import {Injectable, ExecutionContext} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {Reflector} from '@nestjs/core';
-import {AuthGuard} from '@nestjs/passport';
-import {NoAuthGuard} from './public/public.guard';
-import {ApiKeyAuthGuard} from './api-key/api-key.guard';
-import {JwtAuthGuard} from './jwt/jwt.guard';
-import {PasswordAuthGuard} from './password/password.guard';
-import {ProfileAuthGuard} from './profile/profile.guard';
-import {RefreshTokenAuthGuard} from './refresh-token/refresh-token.guard';
-import {UuidAuthGuard} from './uuid/uuid.guard';
-import {VerificationCodeAuthGuard} from './verification-code/verification-code.guard';
-import {GoogleAuthGuard} from './google-oauth/google.guard';
-import {IS_PUBLIC_KEY} from './public/public.decorator';
-import {IS_LOGGING_IN_PASSWORD_KEY} from './password/password.decorator';
-import {IS_LOGGING_IN_PROFILE_KEY} from './profile/profile.decorator';
-import {IS_LOGGING_IN_UUID_KEY} from './uuid/uuid.decorator';
-import {IS_LOGGING_IN_VERIFICATION_CODE_KEY} from './verification-code/verification-code.decorator';
-import {IS_REFRESHING_ACCESS_TOKEN_KEY} from './refresh-token/refresh-token.decorator';
-import {IS_LOGGING_IN_APIKEY_KEY} from './api-key/api-key.decorator';
-import {IS_LOGGING_IN_GOOGLE_KEY} from './google-oauth/google.decorator';
-import {RouteAuthenticationService} from '../route-authentication/route-authentication.service';
-import {GuardType} from './guard.types';
+import { Injectable, ExecutionContext } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Reflector } from "@nestjs/core";
+import { AuthGuard } from "@nestjs/passport";
+import { NoAuthGuard } from "./public/public.guard";
+import { ApiKeyAuthGuard } from "./api-key/api-key.guard";
+import { JwtAuthGuard } from "./jwt/jwt.guard";
+import { PasswordAuthGuard } from "./password/password.guard";
+import { RefreshTokenAuthGuard } from "./refresh-token/refresh-token.guard";
+import { VerificationCodeAuthGuard } from "./verification-code/verification-code.guard";
+import { GoogleAuthGuard } from "./google-oauth/google.guard";
+import { IS_PUBLIC_KEY } from "./public/public.decorator";
+import { IS_LOGGING_IN_PASSWORD_KEY } from "./password/password.decorator";
+import { IS_LOGGING_IN_VERIFICATION_CODE_KEY } from "./verification-code/verification-code.decorator";
+import { IS_REFRESHING_ACCESS_TOKEN_KEY } from "./refresh-token/refresh-token.decorator";
+import { IS_LOGGING_IN_APIKEY_KEY } from "./api-key/api-key.decorator";
+import { IS_LOGGING_IN_GOOGLE_KEY } from "./google-oauth/google.decorator";
+import { RouteAuthenticationService } from "../route-authentication/route-authentication.service";
+import { GuardType } from "./guard.types";
 
 @Injectable()
-export class PassportGuard extends AuthGuard('authentication') {
+export class PassportGuard extends AuthGuard("authentication") {
   constructor(
     private readonly config: ConfigService,
     private readonly routeAuthenticationService: RouteAuthenticationService,
@@ -31,12 +27,10 @@ export class PassportGuard extends AuthGuard('authentication') {
     private noAuthGuard: NoAuthGuard,
     private passwordAuthGuard: PasswordAuthGuard,
     private apiKeyAuthGuard: ApiKeyAuthGuard,
-    private profileAuthGuard: ProfileAuthGuard,
-    private uuidAuthGuard: UuidAuthGuard,
     private verificationCodeAuthGuard: VerificationCodeAuthGuard,
     private refreshTokenAuthGuard: RefreshTokenAuthGuard,
     private googleAuthGuard: GoogleAuthGuard,
-    private jwtAuthGuard: JwtAuthGuard
+    private jwtAuthGuard: JwtAuthGuard,
   ) {
     super();
   }
@@ -75,28 +69,10 @@ export class PassportGuard extends AuthGuard('authentication') {
       return this.apiKeyAuthGuard.canActivate(context);
     }
 
-    // Use @GuardByProfile() for custom.profile strategy authentication
-    const isLoggingInByProfile = this.reflector.getAllAndOverride<boolean>(IS_LOGGING_IN_PROFILE_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (isLoggingInByProfile) {
-      return this.profileAuthGuard.canActivate(context);
-    }
-
-    // Use @GuardByUuid() for custom.uuid strategy authentication
-    const isLoggingInByUuid = this.reflector.getAllAndOverride<boolean>(IS_LOGGING_IN_UUID_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (isLoggingInByUuid) {
-      return this.uuidAuthGuard.canActivate(context);
-    }
-
     // Use @GuardByVerificationCode() for local.verification-code strategy authentication
     const isLoggingInByVerificationCode = this.reflector.getAllAndOverride<boolean>(
       IS_LOGGING_IN_VERIFICATION_CODE_KEY,
-      [context.getHandler(), context.getClass()]
+      [context.getHandler(), context.getClass()],
     );
     if (isLoggingInByVerificationCode) {
       return this.verificationCodeAuthGuard.canActivate(context);
@@ -122,7 +98,7 @@ export class PassportGuard extends AuthGuard('authentication') {
 
     // JWT guard is the default guard.
     const defaultGuard =
-      (this.config.get<string>('modules.account.security.defaultGuard') as GuardType) || GuardType.JWT;
+      (this.config.get<string>("modules.account.security.defaultGuard") as GuardType) || GuardType.JWT;
 
     switch (defaultGuard) {
       case GuardType.NONE:
@@ -131,10 +107,6 @@ export class PassportGuard extends AuthGuard('authentication') {
         return this.passwordAuthGuard.canActivate(context);
       case GuardType.API_KEY:
         return this.apiKeyAuthGuard.canActivate(context);
-      case GuardType.PROFILE:
-        return this.profileAuthGuard.canActivate(context);
-      case GuardType.UUID:
-        return this.uuidAuthGuard.canActivate(context);
       case GuardType.VERIFICATION_CODE:
         return this.verificationCodeAuthGuard.canActivate(context);
       case GuardType.REFRESH_TOKEN:
