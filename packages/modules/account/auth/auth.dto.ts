@@ -1,6 +1,5 @@
 import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
 import {UserRole, VerificationCodeUse} from '@generated/prisma/client';
-import {Type} from 'class-transformer';
 import {
   IsArray,
   IsDate,
@@ -89,10 +88,6 @@ export class LoginByPasswordRequestDto {
   @MinLength(8)
   password: string;
 
-  @ApiProperty({type: Boolean, required: false, default: false})
-  @IsOptional()
-  @Type(() => Boolean)
-  skipEmailCheck?: boolean;
 }
 
 export class LoginByPasswordResponseDto {

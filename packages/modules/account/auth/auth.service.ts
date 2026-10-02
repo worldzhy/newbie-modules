@@ -49,24 +49,13 @@ export class AuthService {
     this.appFrontendUrl = this.config.getOrThrow("framework.app.frontendUrl");
   }
 
-  async login(params: {
-    ipAddress: string;
-    userAgent: string;
-    userId: string;
-    skipEmailCheck?: boolean;
-    skipLocationCheck?: boolean;
-    response: Response;
-  }) {
+  async login(params: { ipAddress: string; userAgent: string; userId: string; response: Response }) {
     // [step 0] Check email and location.
-    if (!params.skipEmailCheck) {
-      await this.checkEmailOnLogin({ userId: params.userId });
-    }
-    if (!params.skipLocationCheck) {
-      await this.checkLocationOnLogin({
-        userId: params.userId,
-        ipAddress: params.ipAddress,
-      });
-    }
+    await this.checkEmailOnLogin({ userId: params.userId });
+    await this.checkLocationOnLogin({
+      userId: params.userId,
+      ipAddress: params.ipAddress,
+    });
 
     // [step 1] Disable active sessions, update last login time, and generate new tokens atomically.
     const session = await this.prisma.$transaction(async (tx) => {
@@ -135,8 +124,10 @@ export class AuthService {
       include: { emails: { select: { id: true } } },
     });
 
-    // In testing, we auto-approve the email
-    if (process.env.ENVIRONMENT !== "production") {
+    // Auto-approve the email only in explicit non-production environments; an
+    // unset or unexpected ENVIRONMENT must fail closed and send the email.
+    const environment = process.env.ENVIRONMENT;
+    if (environment === "development" || environment === "test") {
       const emailId = user.emails[0]?.id;
       if (emailId)
         await this.prisma.email.update({
@@ -205,10 +196,8 @@ export class AuthService {
     const previousSubnets = await this.prisma.approvedSubnet.findMany({
       where: { user: { id: params.userId } },
     });
-    let isApproved = false;
-    for await (const item of previousSubnets) {
-      if (!isApproved) if (await compareHash(subnet, item.subnet)) isApproved = true;
-    }
+    const subnetMatches = await Promise.all(previousSubnets.map((item) => compareHash(subnet, item.subnet)));
+    const isApproved = subnetMatches.some((match) => match);
 
     if (!isApproved) {
       const location = await this.geolocationService.getLocation(params.ipAddress);

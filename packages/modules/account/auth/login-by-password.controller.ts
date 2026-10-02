@@ -44,7 +44,6 @@ export class LoginByPasswordController {
       userAgent,
       userId: request.user.userId,
       response,
-      skipEmailCheck: body.skipEmailCheck,
     });
 
     // Reset the per-IP login rate limit counted by the rate limiter guard.
