@@ -12,7 +12,6 @@
 // * ApprovedSubnet                                               //
 // * AuditLog                                                     //
 // * ApiKey                                                       //
-// * ApiKeyAccessToken                                            //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 model User {
@@ -178,16 +177,6 @@ model ApiKey {
   organizationId       String?    @db.Uuid
 
   @@index([userId])
-  @@schema("module/account")
-}
-
-model ApiKeyAccessToken {
-  id        Int      @id @default(autoincrement())
-  apiKey    String
-  token     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
   @@schema("module/account")
 }
 
