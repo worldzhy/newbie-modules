@@ -98,7 +98,12 @@ export class AuthService {
   }
 
   async signup(params: { ipAddress: string; userData: SignUpDto }): Promise<Expose<User>> {
-    const { email, ...data } = params.userData;
+    // Normalize the email up front: the conflict check below must compare
+    // against the lower-cased form the Prisma extension stores, otherwise a
+    // case-variant duplicate slips past count() and fails as a raw unique
+    // constraint error instead of a clean 409.
+    const { email: rawEmail, ...data } = params.userData;
+    const email = rawEmail.trim().toLowerCase();
 
     if (!verifyEmail(email)) {
       throw new BadRequestException(INVALID_EMAIL);

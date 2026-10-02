@@ -13,12 +13,15 @@ export class UserService {
   /**
    * Resolve an account identifier. Only email and phone are supported;
    * any other value resolves to no user so callers reject the login.
+   * Emails are normalized to lower case to match the write-side normalization
+   * in userPrismaExtension, otherwise a case-variant spelling would miss the row.
    */
   async findByAccount(account: string) {
-    if (verifyEmail(account)) {
-      return await this.prisma.user.findUnique({ where: { email: account } });
-    } else if (verifyPhone(account)) {
-      return await this.prisma.user.findUnique({ where: { phone: account } });
+    const trimmed = account.trim();
+    if (verifyEmail(trimmed)) {
+      return await this.prisma.user.findUnique({ where: { email: trimmed.toLowerCase() } });
+    } else if (verifyPhone(trimmed)) {
+      return await this.prisma.user.findUnique({ where: { phone: trimmed } });
     } else {
       return null;
     }

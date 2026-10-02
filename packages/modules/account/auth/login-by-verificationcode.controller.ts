@@ -1,6 +1,6 @@
 import { Body, Controller, Headers, Ip, NotFoundException, Post, Req, Res } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { VerificationCodeUse } from "@generated/prisma/client";
+import { VerificationCodeUse, UserStatus } from "@generated/prisma/client";
 import { Response } from "express";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { UserRequest } from "@modules/account/account.interface";
@@ -68,10 +68,14 @@ export class LoginByVerificationCodeController {
   })
   async sendVerificationCode(@Body() body: SendVerificationCodeRequestDto): Promise<{ secondsOfCountdown: number }> {
     if (body.email && verifyEmail(body.email)) {
-      // [step 1] Check if the account exists.
+      // [step 1] Check if the account exists. An inactive account must not
+      // receive codes: it can neither log in nor reset its password.
       const user = await this.userService.findByAccount(body.email);
       if (!user) {
         throw new NotFoundException("Your account is not registered.");
+      }
+      if (user.status === UserStatus.INACTIVE) {
+        throw new NewbieException(NewbieExceptionType.Login_InactiveUser);
       }
 
       // [step 2] Generate verification code.
@@ -90,10 +94,14 @@ export class LoginByVerificationCodeController {
         },
       });
     } else if (body.phone && verifyPhone(body.phone)) {
-      // [step 1] Check if the account exists.
+      // [step 1] Check if the account exists. An inactive account must not
+      // receive codes: it can neither log in nor reset its password.
       const user = await this.userService.findByAccount(body.phone);
       if (!user) {
         throw new NotFoundException("Your account is not registered.");
+      }
+      if (user.status === UserStatus.INACTIVE) {
+        throw new NewbieException(NewbieExceptionType.Login_InactiveUser);
       }
 
       // [step 2] Generate verification code.

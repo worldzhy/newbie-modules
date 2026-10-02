@@ -1,7 +1,8 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-local";
-import { VerificationCodeUse } from "@generated/prisma/client";
+import { UserStatus, VerificationCodeUse } from "@generated/prisma/client";
+import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { VerificationCodeService } from "@modules/account/modules/verification-code/verification-code.service";
 import { UserService } from "@modules/account/modules/user/user.service";
 import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
@@ -30,12 +31,17 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
       throw new UnauthorizedException("The user does not exist.");
     }
 
-    // [step 2] Handle invalid account situation.
+    // [step 2] Check if the account is active, mirroring the password strategy.
+    if (user.status === UserStatus.INACTIVE) {
+      throw new NewbieException(NewbieExceptionType.Login_InactiveUser);
+    }
+
+    // [step 3] Handle invalid account situation.
     if (!verifyEmail(account) && !verifyPhone(account)) {
       throw new UnauthorizedException("Invalid account.");
     }
 
-    // [step 3] Validate verification code.
+    // [step 4] Validate verification code.
     // Only a code issued for the login purpose can complete the login.
     const isCodeValid = verifyEmail(account)
       ? await this.verificationCodeService.validateForEmail(
@@ -52,14 +58,14 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
       throw new UnauthorizedException("Invalid code.");
     }
 
-    // [step 4] Inactivate the used code to prevent replay attacks.
+    // [step 5] Inactivate the used code to prevent replay attacks.
     if (verifyEmail(account)) {
       await this.verificationCodeService.inactivateForEmail(account, VerificationCodeUse.LOGIN_BY_EMAIL);
     } else {
       await this.verificationCodeService.inactivateForPhone(account, VerificationCodeUse.LOGIN_BY_PHONE);
     }
 
-    // [Step 5] OK.
+    // [step 6] OK.
     return { userId: user.id };
   }
 }
