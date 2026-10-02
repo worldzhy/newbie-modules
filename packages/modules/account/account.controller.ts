@@ -1,6 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Patch, Post, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { Request } from "express";
 import { VerificationCodeUse } from "@generated/prisma/client";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -32,7 +31,7 @@ export class AccountController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Get current user information" })
   @ApiResponse({ type: GetCurrentUserResponseDto })
-  async getCurrentUser(@Req() request: Request) {
+  async getCurrentUser(@Req() request: UserRequest) {
     return await this.accountService.me(request);
   }
 
@@ -40,7 +39,7 @@ export class AccountController {
   @ApiBearerAuth()
   @ApiOperation({ summary: "Update current user information" })
   @ApiResponse({ type: GetCurrentUserResponseDto })
-  async updateCurrentUser(@Req() request: Request, @Body() body: UpdateMeDto) {
+  async updateCurrentUser(@Req() request: UserRequest, @Body() body: UpdateMeDto) {
     return await this.accountService.updateMe(request, body);
   }
 

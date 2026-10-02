@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import cryptoRandomString from "crypto-random-string";
-import { decode, DecodeOptions, sign, verify } from "jsonwebtoken";
+import { sign, verify } from "jsonwebtoken";
 import { v4 } from "uuid";
 import { INVALID_TOKEN } from "@devbie/newbie/exceptions/errors.constants";
 import { TokenSubject } from "./token.constants";
@@ -41,14 +41,6 @@ export class TokenService {
     } catch (error) {
       throw new UnauthorizedException(INVALID_TOKEN);
     }
-  }
-
-  /**
-   * Decode a JWT without verifying it
-   * @deprecated Use verify() instead
-   */
-  decode<T>(token: string, options?: DecodeOptions) {
-    return decode(token, options) as T;
   }
 
   /**

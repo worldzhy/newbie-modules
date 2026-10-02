@@ -6,7 +6,7 @@ import anonymize from "ip-anonymize";
 import { APPROVED_SUBNET_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
 import { Expose, expose } from "../../helpers/expose";
 import { GeolocationService } from "../../helpers/geolocation.service";
-import { compareHash, generateHash } from "@devbie/newbie/utilities/common.util";
+import { generateHash } from "@devbie/newbie/utilities/common.util";
 
 @Injectable()
 export class ApprovedSubnetService {
@@ -26,46 +26,42 @@ export class ApprovedSubnetService {
     },
   ): Promise<Expose<ApprovedSubnet>[]> {
     const { skip, take, cursor, where, orderBy } = params;
-    try {
-      const ApprovedSubnet = await this.prisma.approvedSubnet.findMany({
-        skip,
-        take,
-        cursor,
-        where: { ...where, user: { id: userId } },
-        orderBy,
-      });
-      return ApprovedSubnet.map((user) => expose<ApprovedSubnet>(user));
-    } catch (error) {
-      return [];
-    }
+    const approvedSubnets = await this.prisma.approvedSubnet.findMany({
+      skip,
+      take,
+      cursor,
+      where: { ...where, user: { id: userId } },
+      orderBy,
+    });
+    return approvedSubnets.map((approvedSubnet) => expose<ApprovedSubnet>(approvedSubnet));
   }
 
   async getApprovedSubnet(userId: string, id: number): Promise<Expose<ApprovedSubnet>> {
-    const ApprovedSubnet = await this.prisma.approvedSubnet.findUnique({
+    const approvedSubnet = await this.prisma.approvedSubnet.findUnique({
       where: { id },
     });
-    if (!ApprovedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
+    if (!approvedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
     // Defense in depth: the route guard already performed this same check.
-    if (ApprovedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    return expose<ApprovedSubnet>(ApprovedSubnet);
+    if (approvedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    return expose<ApprovedSubnet>(approvedSubnet);
   }
 
   async deleteApprovedSubnet(userId: string, id: number): Promise<Expose<ApprovedSubnet>> {
-    const testApprovedSubnet = await this.prisma.approvedSubnet.findUnique({
+    const approvedSubnet = await this.prisma.approvedSubnet.findUnique({
       where: { id },
     });
-    if (!testApprovedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
-    if (testApprovedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    const ApprovedSubnet = await this.prisma.approvedSubnet.delete({
+    if (!approvedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
+    if (approvedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    const deletedSubnet = await this.prisma.approvedSubnet.delete({
       where: { id },
     });
-    return expose<ApprovedSubnet>(ApprovedSubnet);
+    return expose<ApprovedSubnet>(deletedSubnet);
   }
 
   async approveNewSubnet(userId: string, ipAddress: string) {
     const subnet = await generateHash(anonymize(ipAddress));
     const location = await this.geolocationService.getLocation(ipAddress);
-    const approved = await this.prisma.approvedSubnet.create({
+    const approvedSubnet = await this.prisma.approvedSubnet.create({
       data: {
         user: { connect: { id: userId } },
         subnet,
@@ -75,21 +71,6 @@ export class ApprovedSubnetService {
         countryCode: location?.country?.iso_code,
       },
     });
-    return expose<ApprovedSubnet>(approved);
-  }
-
-  /**
-   * Upsert a new subnet
-   * If this subnet already exists, skip; otherwise add it
-   */
-  async upsertNewSubnet(userId: string, ipAddress: string): Promise<Expose<ApprovedSubnet>> {
-    const subnet = anonymize(ipAddress);
-    const previousSubnets = await this.prisma.approvedSubnet.findMany({
-      where: { user: { id: userId } },
-    });
-    for await (const item of previousSubnets) {
-      if (await compareHash(subnet, item.subnet)) return expose<ApprovedSubnet>(item);
-    }
-    return await this.approveNewSubnet(userId, ipAddress);
+    return expose<ApprovedSubnet>(approvedSubnet);
   }
 }

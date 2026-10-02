@@ -5,7 +5,6 @@ import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OrderByPipe } from "@devbie/newbie/pipes/order-by.pipe";
 import { WherePipe } from "@devbie/newbie/pipes/where.pipe";
 import { Expose } from "../../helpers/expose";
-import { AuditLog } from "../audit-logs/audit-log.decorator";
 import { SelfOnlyGuard } from "../../security/self-only/self-only.guard";
 import { ApiKeyResponseDto, CreateApiKeyDto, ReplaceApiKeyDto, UpdateApiKeyDto } from "./api-key.dto";
 import { ApiKeyService } from "./api-key.service";
@@ -19,7 +18,6 @@ export class ApiKeyController {
 
   /** Create an API key for the current user */
   @Post()
-  @AuditLog("create-api-key")
   @ApiOperation({ summary: "Create an API key for a user" })
   @ApiResponse({ type: ApiKeyResponseDto })
   async create(
@@ -60,7 +58,6 @@ export class ApiKeyController {
 
   /** Update an API key */
   @Patch(":id")
-  @AuditLog("update-api-key")
   @ApiOperation({ summary: "Update an API key" })
   @ApiResponse({ type: ApiKeyResponseDto })
   async update(
@@ -73,7 +70,6 @@ export class ApiKeyController {
 
   /** Replace an API key */
   @Put(":id")
-  @AuditLog("update-api-key")
   @ApiOperation({ summary: "Replace an API key" })
   @ApiResponse({ type: ApiKeyResponseDto })
   async replace(
@@ -86,7 +82,6 @@ export class ApiKeyController {
 
   /** Delete an API key */
   @Delete(":id")
-  @AuditLog("delete-api-key")
   @ApiOperation({ summary: "Delete an API key" })
   @ApiResponse({ type: ApiKeyResponseDto })
   async remove(@Param("userId") userId: string, @Param("id") id: number): Promise<Expose<ApiKey>> {

@@ -150,23 +150,6 @@ export class LoginByVerificationCodeRequestDto {
 }
 
 /**
- * Request DTO for logging in with an API key and secret.
- * Note: the ApiKey guard actually reads key/secret from request headers;
- * this DTO only documents the request body contract for OpenAPI clients.
- */
-export class LoginByApiKeyRequestDto {
-  @ApiProperty({ type: String, required: true, description: "The API key." })
-  @IsString()
-  @IsNotEmpty()
-  key: string;
-
-  @ApiProperty({ type: String, required: true, description: "The API secret." })
-  @IsString()
-  @IsNotEmpty()
-  secret: string;
-}
-
-/**
  * Response DTO for logout operation.
  */
 export class LogoutResponseDto {
