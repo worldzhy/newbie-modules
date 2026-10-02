@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Param, Query } from "@nestjs/common";
+import { Controller, Delete, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { ApprovedSubnet, Prisma } from "@generated/prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
@@ -7,9 +7,11 @@ import { WherePipe } from "@devbie/newbie/pipes/where.pipe";
 import { Expose } from "../../helpers/expose";
 import { ApprovedSubnetResponseDto } from "./approved-subnet.dto";
 import { ApprovedSubnetService } from "./approved-subnet.service";
+import { SelfOnlyGuard } from "../../security/self-only/self-only.guard";
 
 @ApiTags("Account / Approved Subnet")
 @ApiBearerAuth()
+@UseGuards(SelfOnlyGuard)
 @Controller("users/:userId/approved-subnets")
 export class ApprovedSubnetController {
   constructor(private approvedSubnetsService: ApprovedSubnetService) {}

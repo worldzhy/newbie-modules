@@ -1,39 +1,50 @@
-import { Controller, Get, NotFoundException, Req } from "@nestjs/common";
+import { Controller, Get, Ip, Req, Res } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Request, Response } from "express";
 import { GuardByGoogle } from "@modules/account/security/passport/google-oauth/google.decorator";
+import { GoogleUserResDto } from "@modules/account/security/passport/google-oauth/dto/google-user.dto";
+import { AuthService } from "@modules/account/auth/auth.service";
 import { GoogleOAuthRedirectResponseDto } from "@modules/account/auth/auth.dto";
 
 /**
- * local dev, to change file node_modules/oauth/lib/oauth2.js
- *var HPA = require('https-proxy-agent');
-  let httpsProxyAgent = null
-  // fill in your proxy agent ip and port
-  httpsProxyAgent = new HPA.HttpsProxyAgent("http://127.0.0.1:54960");
-  // line codes to add
-  options.agent = httpsProxyAgent;
-  this._executeRequest( http_library, options, post_body, callback );
+ * Google OAuth login endpoints.
+ *
+ * The handshake spans two requests:
+ *   1. GET /auth/login-by-google
+ *      GoogleAuthGuard sets a state cookie and redirects the browser to Google.
+ *   2. GET /auth/login-by-google/redirect?code=...&state=...
+ *      The guard verifies the state, Passport exchanges the code for the
+ *      Google profile, and AuthService issues the platform session.
  */
 @ApiTags("Account / Auth")
 @Controller("auth")
 export class LoginByGoogleController {
-  constructor() {}
+  constructor(private readonly authService: AuthService) {}
 
   @GuardByGoogle()
   @Get("login-by-google")
-  @ApiOperation({ summary: "Initiate Google OAuth login (redirect)" })
-  @ApiResponse({ type: String })
-  async signinWithGoogle() {}
+  @ApiOperation({ summary: "Initiate Google OAuth login (redirects to Google)" })
+  async signinWithGoogle(): Promise<void> {
+    // GoogleAuthGuard performs the redirect; the body is intentionally empty.
+  }
 
   @GuardByGoogle()
   @Get("login-by-google/redirect")
   @ApiOperation({ summary: "Google OAuth redirect callback" })
   @ApiResponse({ type: GoogleOAuthRedirectResponseDto })
-  async googleOAuthredirect(@Req() req) {
-    if (!req.user) return new NotFoundException("User google account not found");
-    return {
-      status: "success",
-      message: "Login successfully",
-      data: req.user,
-    };
+  async googleOAuthredirect(
+    @Req() request: Request & { user: GoogleUserResDto },
+    @Res({ passthrough: true }) response: Response,
+    @Ip() ipAddress: string,
+  ): Promise<GoogleOAuthRedirectResponseDto> {
+    // The Google profile alone is not a session: issue platform tokens and the
+    // refresh-token cookie through the shared login path.
+    return await this.authService.loginByGoogle({
+      email: request.user.email,
+      displayName: request.user.displayName,
+      ipAddress,
+      userAgent: request.headers["user-agent"] ?? "",
+      response,
+    });
   }
 }

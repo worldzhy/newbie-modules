@@ -1,11 +1,11 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, TooManyRequestsException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma, VerificationCode, VerificationCodeStatus, VerificationCodeUse } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { currentPlusMinutes } from "@devbie/newbie/utilities/datetime.util";
 import { generateRandomNumbers } from "@devbie/newbie/utilities/common.util";
-
-// Todo: We do not support inactivate verification code automatically now.
+import { RateLimiterMemory, RateLimiterRedis } from "rate-limiter-flexible";
+import { Redis } from "ioredis";
 
 /** A verification code is bound to either an email address or a phone number. */
 type VerificationCodeTarget = { email: string } | { phone: string };
@@ -14,6 +14,7 @@ type VerificationCodeTarget = { email: string } | { phone: string };
 export class VerificationCodeService {
   public timeoutMinutes: number; // The verification code will be invalid after x minutes.
   public resendMinutes: number; // The verification code can be resend after y minute.
+  private attemptLimiter: RateLimiterMemory | RateLimiterRedis;
 
   constructor(
     private readonly config: ConfigService,
@@ -21,6 +22,24 @@ export class VerificationCodeService {
   ) {
     this.timeoutMinutes = this.config.getOrThrow<number>("modules.account.verificationCode.timeoutMinutes");
     this.resendMinutes = this.config.getOrThrow<number>("modules.account.verificationCode.resendMinutes");
+    const maxAttempts = this.config.getOrThrow<number>("modules.account.verificationCode.maxAttempts");
+
+    // Bound the number of wrong codes accepted against one target, otherwise
+    // the 6-digit code could be brute forced online within its validity window.
+    const limiterOptions = {
+      keyPrefix: "verification-code-attempt-",
+      points: maxAttempts,
+      duration: this.timeoutMinutes * 60,
+    };
+    const redisHost = this.config.get<string>("modules.account.redis.host");
+    const redisPort = this.config.get<number>("modules.account.redis.port");
+    this.attemptLimiter =
+      redisHost && redisPort
+        ? new RateLimiterRedis({
+            storeClient: new Redis({ host: redisHost, port: redisPort }),
+            ...limiterOptions,
+          })
+        : new RateLimiterMemory(limiterOptions);
   }
 
   async generateForEmail(email: string, use: VerificationCodeUse): Promise<VerificationCode> {
@@ -69,7 +88,7 @@ export class VerificationCodeService {
 
     // [step 3] Generate and save a new verification code.
     const newCode = generateRandomNumbers(6);
-    return await this.prisma.verificationCode.create({
+    const createdCode = await this.prisma.verificationCode.create({
       data: {
         ...target,
         code: newCode,
@@ -78,9 +97,24 @@ export class VerificationCodeService {
         expiredAt: currentPlusMinutes(this.timeoutMinutes),
       },
     });
+
+    // A fresh code restores the full attempt budget.
+    await this.attemptLimiter.delete(this.attemptKey(target, use));
+    return createdCode;
   }
 
   private async validate(code: string, target: VerificationCodeTarget, use: VerificationCodeUse): Promise<boolean> {
+    const targetAttemptKey = this.attemptKey(target, use);
+
+    // Once the wrong-attempt budget is spent, fail closed before any lookup.
+    const previousAttempts = await this.attemptLimiter.get(targetAttemptKey);
+    if (previousAttempts !== null && previousAttempts.remainingPoints <= 0) {
+      await this.inactivate(target, use);
+      throw new TooManyRequestsException(
+        "Too many incorrect verification attempts. The code has been invalidated; please request a new one.",
+      );
+    }
+
     const existedCode = await this.prisma.verificationCode.findFirst({
       where: {
         ...this.targetWhere(target),
@@ -92,7 +126,23 @@ export class VerificationCodeService {
         },
       },
     });
-    return existedCode ? true : false;
+
+    if (existedCode) {
+      await this.attemptLimiter.delete(targetAttemptKey);
+      return true;
+    }
+
+    // Wrong code: spend one attempt. Consuming the final point invalidates the
+    // code so guessing cannot continue against it.
+    try {
+      await this.attemptLimiter.consume(targetAttemptKey);
+    } catch {
+      await this.inactivate(target, use);
+      throw new TooManyRequestsException(
+        "Too many incorrect verification attempts. The code has been invalidated; please request a new one.",
+      );
+    }
+    return false;
   }
 
   private async inactivate(target: VerificationCodeTarget, use: VerificationCodeUse): Promise<void> {
@@ -106,6 +156,11 @@ export class VerificationCodeService {
       },
       data: { status: VerificationCodeStatus.INACTIVE },
     });
+  }
+
+  private attemptKey(target: VerificationCodeTarget, use: VerificationCodeUse): string {
+    // Emails are normalized to lower case so the counter cannot be split by case.
+    return "email" in target ? `email:${target.email.toLowerCase()}:${use}` : `phone:${target.phone}:${use}`;
   }
 
   private targetWhere(target: VerificationCodeTarget): Prisma.VerificationCodeWhereInput {

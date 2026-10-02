@@ -45,7 +45,8 @@
       },
       "verificationCode": {
         "timeoutMinutes": 10,
-        "resendMinutes": 1
+        "resendMinutes": 1,
+        "maxAttempts": 5
       },
       "googleAuth": {
         "clientId": "process.env.GOOGLE_AUTH_CLIENT_ID || 'your-client-id'",

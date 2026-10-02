@@ -1,12 +1,13 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { User } from "@generated/prisma/client";
+import { User, UserStatus } from "@generated/prisma/client";
 import { Response } from "express";
 import {
   EMAIL_USER_CONFLICT,
@@ -99,24 +100,14 @@ export class AuthService {
       throw new ConflictException(EMAIL_USER_CONFLICT);
     }
 
-    // Generate profile picture
-    let uiAvatarsName: string | undefined = undefined;
-    if (data.name) {
-      uiAvatarsName = data.name;
-    } else if (data.firstName && data.lastName) {
-      uiAvatarsName = `${data.firstName} ${data.lastName}`;
-    } else if (data.firstName) {
-      uiAvatarsName = data.firstName;
-    } else if (data.lastName) {
-      uiAvatarsName = data.lastName;
-    } else if (data.username) {
-      uiAvatarsName = data.username;
-    } else {
-      uiAvatarsName = email.split("@")[0];
-    }
-    const uiAvatarsUrl = `https://ui-avatars.com/api/?name=${uiAvatarsName}&background=${randomColor({
-      luminosity: "light",
-    }).replace("#", "")}&color=000000`;
+    // Generate profile picture.
+    const uiAvatarsUrl = this.buildUiAvatarsUrl({
+      name: data.name,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      username: data.username,
+      fallback: email.split("@")[0],
+    });
 
     // Create user
     const user = await this.prisma.user.create({
@@ -227,6 +218,76 @@ export class AuthService {
 
       throw new UnauthorizedException(UNVERIFIED_LOCATION);
     }
+  }
+
+  /**
+   * Complete a Google OAuth login after Passport has verified the Google
+   * profile. A first-time Google account is provisioned as a platform user;
+   * an existing user goes through the same login flow as every other method.
+   */
+  async loginByGoogle(params: {
+    email: string;
+    displayName: string;
+    ipAddress: string;
+    userAgent: string;
+    response: Response;
+  }): Promise<{ token: string; tokenExpiresInSeconds: number }> {
+    const email = params.email.toLowerCase();
+    let user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      // Google has already verified ownership of the email, so the Email
+      // record is created pre-verified and no verification email is sent.
+      const uiAvatarsUrl = this.buildUiAvatarsUrl({
+        name: params.displayName || undefined,
+        fallback: email.split("@")[0],
+      });
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          name: params.displayName || null,
+          uiAvatarsUrl,
+          emails: { create: { email, isVerified: true } },
+        },
+      });
+      // Approving the current subnet lets the location check inside login()
+      // pass, mirroring the password signup path.
+      await this.approvedSubnetService.approveNewSubnet(user.id, params.ipAddress);
+    } else {
+      if (user.status === UserStatus.INACTIVE) {
+        throw new ForbiddenException("The account is not active.");
+      }
+      // Sync the verification state: Google proved control of the email.
+      await this.prisma.email.updateMany({
+        where: { email, isVerified: false },
+        data: { isVerified: true },
+      });
+    }
+
+    return await this.login({
+      userId: user.id,
+      ipAddress: params.ipAddress,
+      userAgent: params.userAgent,
+      response: params.response,
+    });
+  }
+
+  /** Build a ui-avatars URL following the same name precedence as signup. */
+  private buildUiAvatarsUrl(params: {
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    username?: string;
+    fallback: string;
+  }): string {
+    const avatarName =
+      params.name ??
+      (params.firstName && params.lastName
+        ? `${params.firstName} ${params.lastName}`
+        : (params.firstName ?? params.lastName ?? params.username)) ??
+      params.fallback;
+    const background = randomColor({ luminosity: "light" }).replace("#", "");
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(avatarName)}&background=${background}&color=000000`;
   }
 
   /* End */

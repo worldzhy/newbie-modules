@@ -72,11 +72,25 @@ export class AccountController {
     }
 
     // [step 4] Change password.
-    return await this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: { password: body.newPassword },
       select: { id: true, email: true, phone: true },
     });
+
+    // [step 5] Revoke every other session of this user. A password change
+    // commonly follows a compromise, so any session an attacker may hold must
+    // stop working. The current session stays alive to avoid forcing an
+    // immediate re-login of the user who just changed the password.
+    const currentSessionId = request.user.sessionId;
+    await this.prisma.session.deleteMany({
+      where: {
+        userId,
+        ...(currentSessionId ? { NOT: { id: currentSessionId } } : {}),
+      },
+    });
+
+    return updatedUser;
   }
 
   @NoGuard()
@@ -126,6 +140,9 @@ export class AccountController {
         });
         // Consume the code so it cannot be replayed for another reset.
         await this.verificationCodeService.inactivateForEmail(body.email, VerificationCodeUse.RESET_PASSWORD);
+        // The reset often happens after account takeover: revoke every session
+        // of the user, including any session held by an attacker.
+        await this.prisma.session.deleteMany({ where: { userId: updated.id } });
         return updated;
       } else {
         throw new NewbieException(NewbieExceptionType.ResetPassword_InvalidCode);
@@ -146,6 +163,8 @@ export class AccountController {
         });
         // Consume the code so it cannot be replayed for another reset.
         await this.verificationCodeService.inactivateForPhone(body.phone, VerificationCodeUse.RESET_PASSWORD);
+        // Revoke every session of the user after a successful reset.
+        await this.prisma.session.deleteMany({ where: { userId: updated.id } });
         return updated;
       } else {
         throw new NewbieException(NewbieExceptionType.ResetPassword_InvalidCode);

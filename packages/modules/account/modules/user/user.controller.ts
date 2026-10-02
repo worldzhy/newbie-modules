@@ -48,25 +48,10 @@ export class UserController {
       },
     });
 
-    // [step 2] Automatically create Permission records for the new user so that
-    // they can pass the @RequirePermission checks on User resource endpoints.
-    // A Manage-level permission on a resource matches any action (Create, List,
-    // Get, Update, Delete), giving the user full access to their own resource.
-    //
-    // The ADMIN role already bypasses all permission checks in AuthorizationGuard,
-    // so these records are primarily useful for non-ADMIN (USER role) users.
-
-    const permissionData: Prisma.PermissionCreateInput[] = [
-      {
-        action: PermissionAction.Manage,
-        resource: Prisma.ModelName.User,
-        trustedUserId: user.id,
-      },
-    ];
-
-    for (const p of permissionData) {
-      await this.prisma.permission.create({ data: p });
-    }
+    // [step 2] No Permission records are created here. A permission row has no
+    // owner scope, so a Manage/User record granted the new user global control
+    // over every user. Self-service profile access goes through /account/me;
+    // the /users management endpoints are an ADMIN capability.
 
     return user;
   }

@@ -45,8 +45,8 @@ export class ApprovedSubnetService {
       where: { id },
     });
     if (!ApprovedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
+    // Defense in depth: the route guard already performed this same check.
     if (ApprovedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    if (!ApprovedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
     return expose<ApprovedSubnet>(ApprovedSubnet);
   }
 

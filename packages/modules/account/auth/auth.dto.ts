@@ -1,8 +1,6 @@
-import { Type } from "class-transformer";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { UserRole, VerificationCodeUse } from "@generated/prisma/client";
+import { VerificationCodeUse } from "@generated/prisma/client";
 import {
-  IsArray,
   IsDate,
   IsEmail,
   IsIn,
@@ -10,7 +8,6 @@ import {
   IsOptional,
   IsPhoneNumber,
   IsString,
-  IsUUID,
   Length,
   MinLength,
 } from "class-validator";
@@ -36,10 +33,9 @@ export class SignUpDto {
   @IsOptional()
   password?: string | null;
 
-  @ApiProperty({ type: String, isArray: true, required: false })
-  @IsArray()
-  @IsOptional()
-  roles?: UserRole[];
+  // Roles are intentionally absent: self-service sign-up always receives the
+  // default USER role. Letting clients choose roles would allow instant
+  // privilege escalation to ADMIN.
 
   @ApiProperty({ type: String, required: false })
   @IsString()
@@ -99,18 +95,11 @@ export class LoginByPasswordResponseDto {
 }
 
 /**
- * Response DTO for Google OAuth redirect callback.
+ * Response DTO for Google OAuth redirect callback. A successful handshake
+ * returns the platform access token, identical to password login; the refresh
+ * token is delivered through an HttpOnly cookie.
  */
-export class GoogleOAuthRedirectResponseDto {
-  @ApiProperty({ type: String })
-  status: string;
-
-  @ApiProperty({ type: String })
-  message: string;
-
-  @ApiProperty({ type: Object })
-  data: object;
-}
+export class GoogleOAuthRedirectResponseDto extends LoginByPasswordResponseDto {}
 
 /**
  * Response DTO for sending verification code.

@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestj
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Permission, PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { RequirePermission } from "../../security/authorization/authorization.decorator";
 import {
   PermissionListResponseDto,
   PermissionResponseDto,
@@ -30,6 +31,7 @@ export class PermissionController {
   }
 
   @Post("")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.Permission)
   @ApiOperation({ summary: "Create a permission" })
   @ApiResponse({ type: PermissionResponseDto })
   @ApiBody({
@@ -94,6 +96,7 @@ export class PermissionController {
   }
 
   @Patch(":permissionId")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Permission)
   @ApiOperation({ summary: "Update a permission" })
   @ApiResponse({ type: PermissionResponseDto })
   @ApiBody({
@@ -123,6 +126,7 @@ export class PermissionController {
   }
 
   @Delete(":permissionId")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Permission)
   @ApiOperation({ summary: "Delete a permission" })
   @ApiResponse({ type: PermissionResponseDto })
   async deletePermission(@Param("permissionId") permissionId: number): Promise<Permission> {

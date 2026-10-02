@@ -1,31 +1,21 @@
-import { Body, Controller, Delete, ForbiddenException, Get, Param, Patch, Post, Put, Query, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { ApiKey, Prisma } from "@generated/prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OrderByPipe } from "@devbie/newbie/pipes/order-by.pipe";
 import { WherePipe } from "@devbie/newbie/pipes/where.pipe";
-import { UserRequest } from "@modules/account/account.interface";
 import { Expose } from "../../helpers/expose";
 import { AuditLog } from "../audit-logs/audit-log.decorator";
+import { SelfOnlyGuard } from "../../security/self-only/self-only.guard";
 import { ApiKeyResponseDto, CreateApiKeyDto, ReplaceApiKeyDto, UpdateApiKeyDto } from "./api-key.dto";
 import { ApiKeyService } from "./api-key.service";
 
 @ApiTags("Account / Api Key")
 @ApiBearerAuth()
+@UseGuards(SelfOnlyGuard)
 @Controller("users/:userId/api-keys")
 export class ApiKeyController {
   constructor(private apiKeyService: ApiKeyService) {}
-
-  /**
-   * The authenticated session identity is the only authority on whose keys
-   * are managed; the path parameter must match it.
-   */
-  private resolveSelfUserId(request: UserRequest, pathUserId: string): string {
-    if (request.user.userId !== pathUserId) {
-      throw new ForbiddenException("You can only manage your own API keys.");
-    }
-    return pathUserId;
-  }
 
   /** Create an API key for the current user */
   @Post()
@@ -33,11 +23,9 @@ export class ApiKeyController {
   @ApiOperation({ summary: "Create an API key for a user" })
   @ApiResponse({ type: ApiKeyResponseDto })
   async create(
-    @Req() request: UserRequest,
     @Param("userId") userId: string,
     @Body() data: CreateApiKeyDto,
   ): Promise<Expose<ApiKey> & { secret: string }> {
-    this.resolveSelfUserId(request, userId);
     return await this.apiKeyService.createApiKey({ userId, data });
   }
 
@@ -46,7 +34,6 @@ export class ApiKeyController {
   @ApiOperation({ summary: "Get API keys for a user" })
   @ApiResponse({ type: ApiKeyResponseDto, isArray: true })
   async getAll(
-    @Req() request: UserRequest,
     @Param("userId") userId: string,
     @Query("skip") skip?: number,
     @Query("take") take?: number,
@@ -54,7 +41,6 @@ export class ApiKeyController {
     @Query("where", WherePipe) where?: Record<string, number | string>,
     @Query("orderBy", OrderByPipe) orderBy?: Record<string, "asc" | "desc">,
   ): Promise<Expose<ApiKey>[]> {
-    this.resolveSelfUserId(request, userId);
     return await this.apiKeyService.getApiKeysForUser(userId, {
       skip,
       take,
@@ -68,12 +54,7 @@ export class ApiKeyController {
   @Get(":id")
   @ApiOperation({ summary: "Get an API key by id" })
   @ApiResponse({ type: ApiKeyResponseDto })
-  async get(
-    @Req() request: UserRequest,
-    @Param("userId") userId: string,
-    @Param("id") id: number,
-  ): Promise<Expose<ApiKey>> {
-    this.resolveSelfUserId(request, userId);
+  async get(@Param("userId") userId: string, @Param("id") id: number): Promise<Expose<ApiKey>> {
     return await this.apiKeyService.getApiKeyForUser(userId, id);
   }
 
@@ -83,12 +64,10 @@ export class ApiKeyController {
   @ApiOperation({ summary: "Update an API key" })
   @ApiResponse({ type: ApiKeyResponseDto })
   async update(
-    @Req() request: UserRequest,
-    @Body() data: UpdateApiKeyDto,
     @Param("userId") userId: string,
+    @Body() data: UpdateApiKeyDto,
     @Param("id") id: number,
   ): Promise<Expose<ApiKey>> {
-    this.resolveSelfUserId(request, userId);
     return await this.apiKeyService.updateApiKey(userId, id, data);
   }
 
@@ -98,12 +77,10 @@ export class ApiKeyController {
   @ApiOperation({ summary: "Replace an API key" })
   @ApiResponse({ type: ApiKeyResponseDto })
   async replace(
-    @Req() request: UserRequest,
-    @Body() data: ReplaceApiKeyDto,
     @Param("userId") userId: string,
+    @Body() data: ReplaceApiKeyDto,
     @Param("id") id: number,
   ): Promise<Expose<ApiKey>> {
-    this.resolveSelfUserId(request, userId);
     return await this.apiKeyService.updateApiKey(userId, id, data);
   }
 
@@ -112,12 +89,7 @@ export class ApiKeyController {
   @AuditLog("delete-api-key")
   @ApiOperation({ summary: "Delete an API key" })
   @ApiResponse({ type: ApiKeyResponseDto })
-  async remove(
-    @Req() request: UserRequest,
-    @Param("userId") userId: string,
-    @Param("id") id: number,
-  ): Promise<Expose<ApiKey>> {
-    this.resolveSelfUserId(request, userId);
+  async remove(@Param("userId") userId: string, @Param("id") id: number): Promise<Expose<ApiKey>> {
     return await this.apiKeyService.deleteApiKey(userId, id);
   }
 
@@ -126,14 +98,12 @@ export class ApiKeyController {
   @ApiOperation({ summary: "Get logs for an API key" })
   @ApiResponse({ type: Object, isArray: true })
   async getLogs(
-    @Req() request: UserRequest,
     @Param("userId") userId: string,
     @Param("id") id: number,
     @Query("take") take?: number,
     @Query("cursor", CursorPipe) cursor?: Record<string, number | string>,
     @Query("where", WherePipe) where?: Record<string, number | string>,
   ): Promise<Record<string, unknown>[]> {
-    this.resolveSelfUserId(request, userId);
     return await this.apiKeyService.getApiKeyLogs(userId, id, {
       take,
       cursor,

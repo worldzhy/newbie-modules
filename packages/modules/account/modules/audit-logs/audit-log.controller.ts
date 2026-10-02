@@ -1,8 +1,9 @@
-import { Controller, Get, Param, Query } from "@nestjs/common";
+import { Controller, Get, Param, Query, UseGuards } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { AuditLogListResponseDto } from "./audit-log.dto";
+import { SelfOnlyGuard } from "../../security/self-only/self-only.guard";
 
 @ApiTags("Account / Audit Log")
 @ApiBearerAuth()
@@ -12,6 +13,7 @@ export class AuditLogController {
 
   /** Get audit logs for a team */
   @Get("organizations/:organizationId/audit-logs")
+  @UseGuards(SelfOnlyGuard)
   @ApiOperation({ summary: "Get audit logs for an organization" })
   @ApiResponse({ type: AuditLogListResponseDto })
   async getAuditLogsByOrganization(
@@ -28,6 +30,7 @@ export class AuditLogController {
 
   /** Get audit logs for a user */
   @Get("users/:userId/audit-logs")
+  @UseGuards(SelfOnlyGuard)
   @ApiOperation({ summary: "Get audit logs for a user" })
   @ApiResponse({ type: AuditLogListResponseDto })
   async getAuditLogsByUser(
