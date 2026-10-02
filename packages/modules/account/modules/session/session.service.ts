@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { GeolocationService } from "@modules/account/helpers/geolocation.service";
@@ -80,10 +80,18 @@ export class SessionService {
       where: { OR: [{ accessToken: token }, { refreshToken: token }] },
       select: { id: true, user: { select: { id: true } } },
     });
-    if (!session) throw new NotFoundException(SESSION_NOT_FOUND);
+    // Destroy is idempotent: a missing session is already in the desired end
+    // state, and a concurrent destroy may win the race between findFirst and
+    // delete, so a missing-row error (P2025) is also a success.
+    if (!session) return;
 
-    await this.prisma.session.delete({
-      where: { id: session.id },
-    });
+    try {
+      await this.prisma.session.delete({
+        where: { id: session.id },
+      });
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return;
+      throw error;
+    }
   }
 }
