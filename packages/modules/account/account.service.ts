@@ -5,6 +5,8 @@ import { UpdateMeDto } from "./account.dto";
 import { UserRequest } from "./account.interface";
 import { buildUiAvatarsUrl } from "./helpers/ui-avatar";
 
+const nameFields = ["name", "firstName", "middleName", "lastName"] as const;
+
 @Injectable()
 export class AccountService {
   constructor(private readonly prisma: PrismaService) {}
@@ -29,7 +31,19 @@ export class AccountService {
   }
 
   async updateMe(request: UserRequest, body: UpdateMeDto) {
-    const { dateOfBirth, avatarFileId: requestedAvatarFileId, ...scalarFields } = body;
+    // The transformed DTO instance carries every declared field as an own
+    // property even when the client omitted it (it is undefined then), so a
+    // name change must be detected by value, never with the `in` operator or
+    // Object.keys.
+    const changedName = nameFields.some((field) => body[field] !== undefined);
+    const requestedAvatarFileId = body.avatarFileId;
+
+    const { dateOfBirth, ...restFields } = body;
+    // Keep only values the client actually sent, so the update does not carry
+    // a set of undefined DTO fields.
+    const scalarFields = Object.fromEntries(
+      Object.entries(restFields).filter(([, value]) => value !== undefined),
+    ) as Prisma.UserUpdateInput;
 
     // Current state is needed to merge the name fields and to tell whether a
     // real uploaded avatar already exists.
@@ -46,22 +60,20 @@ export class AccountService {
 
     const updateData: Prisma.UserUpdateInput = {
       ...scalarFields,
-      ...(dateOfBirth ? { dateOfBirth: new Date(dateOfBirth) } : {}),
-      ...(requestedAvatarFileId ? { avatarFileId: requestedAvatarFileId } : {}),
+      ...(dateOfBirth !== undefined ? { dateOfBirth: new Date(dateOfBirth) } : {}),
+      ...(requestedAvatarFileId !== undefined ? { avatarFileId: requestedAvatarFileId } : {}),
     };
 
     // A name change must also refresh the generated initial-avatar; the URL
     // encodes the name, so leaving it stale would keep showing the old name.
     // Never overwrite an uploaded avatar, including one set in this same
     // request.
-    const nameFields = ["name", "firstName", "middleName", "lastName"] as const;
-    const changedName = nameFields.some((field) => field in scalarFields);
     const effectiveAvatarFileId = requestedAvatarFileId ?? existingUser.avatarFileId;
     if (changedName && !effectiveAvatarFileId) {
       updateData.uiAvatarsUrl = buildUiAvatarsUrl({
-        name: scalarFields.name ?? existingUser.name,
-        firstName: scalarFields.firstName ?? existingUser.firstName,
-        lastName: scalarFields.lastName ?? existingUser.lastName,
+        name: (scalarFields.name as string | undefined) ?? existingUser.name,
+        firstName: (scalarFields.firstName as string | undefined) ?? existingUser.firstName,
+        lastName: (scalarFields.lastName as string | undefined) ?? existingUser.lastName,
         fallback: existingUser.email?.split("@")[0] ?? "user",
       });
     }
