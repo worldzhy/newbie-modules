@@ -2,13 +2,11 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
-  Logger,
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { User, UserGender } from "@generated/prisma/client";
-import axios from "axios";
+import { User } from "@generated/prisma/client";
 import { Response } from "express";
 import {
   EMAIL_USER_CONFLICT,
@@ -35,7 +33,6 @@ import randomColor from "randomcolor";
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
   private appFrontendUrl: string;
 
   constructor(
@@ -131,25 +128,6 @@ export class AuthService {
     const uiAvatarsUrl = `https://ui-avatars.com/api/?name=${uiAvatarsName}&background=${randomColor({
       luminosity: "light",
     }).replace("#", "")}&color=000000`;
-
-    // Generate user gender
-    if (!data.gender) {
-      if (data.name) {
-        try {
-          const prediction = await axios.get<{
-            name: string;
-            gender: "male" | "female";
-            probability: number;
-            count: number;
-          }>(`https://api.genderize.io/?name=${data.name.split(" ")[0]}`);
-          if (prediction.data.probability > 0.5 && prediction.data.gender === "male") data.gender = UserGender.MALE;
-          if (prediction.data.probability > 0.5 && prediction.data.gender === "female") data.gender = UserGender.FEMALE;
-        } catch (error) {
-          // Best-effort enrichment: gender prediction is optional and must not block sign-up.
-          this.logger.debug(`Gender prediction failed for name "${data.name}": ${error}`);
-        }
-      }
-    }
 
     // Create user
     const user = await this.prisma.user.create({
