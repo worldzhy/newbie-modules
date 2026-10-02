@@ -65,8 +65,11 @@ export class GeolocationService implements OnModuleDestroy {
 
   private getCachedDatabasePath(): string | null {
     try {
-      const packagePath = require.resolve("geolite2-redist/package.json");
-      return path.join(path.dirname(packagePath), "dbs", "GeoLite2-City.mmdb");
+      // The package's exports map blocks direct access to package.json, so
+      // resolve the entry point (<root>/dist/index.js) and walk to the dbs
+      // directory from there.
+      const entryPath = require.resolve("geolite2-redist");
+      return path.join(path.dirname(entryPath), "..", "dbs", "GeoLite2-City.mmdb");
     } catch {
       return null;
     }
