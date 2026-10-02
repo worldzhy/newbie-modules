@@ -1,4 +1,5 @@
 import { Controller, Get, Ip, Req, Res } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request, Response } from "express";
 import { GuardByGoogle } from "@modules/account/security/passport/google-oauth/google.decorator";
@@ -19,7 +20,10 @@ import { GoogleOAuthRedirectResponseDto } from "@modules/account/auth/auth.dto";
 @ApiTags("Account / Auth")
 @Controller("auth")
 export class LoginByGoogleController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly config: ConfigService,
+  ) {}
 
   @GuardByGoogle()
   @Get("login-by-google")
@@ -34,17 +38,21 @@ export class LoginByGoogleController {
   @ApiResponse({ type: GoogleOAuthRedirectResponseDto })
   async googleOAuthredirect(
     @Req() request: Request & { user: GoogleUserResDto },
-    @Res({ passthrough: true }) response: Response,
+    @Res() response: Response,
     @Ip() ipAddress: string,
-  ): Promise<GoogleOAuthRedirectResponseDto> {
-    // The Google profile alone is not a session: issue platform tokens and the
-    // refresh-token cookie through the shared login path.
-    return await this.authService.loginByGoogle({
+  ): Promise<void> {
+    const { token, tokenExpiresInSeconds } = await this.authService.loginByGoogle({
       email: request.user.email,
       displayName: request.user.displayName,
       ipAddress,
       userAgent: request.headers["user-agent"] ?? "",
       response,
     });
+
+    // Redirect to the frontend landing page; the token travels in the URL hash
+    // fragment, which browsers never send to servers and never write to logs.
+    const frontendUrl = this.config.getOrThrow<string>("framework.app.frontendUrl");
+    const hash = `#token=${encodeURIComponent(token)}&expiresIn=${tokenExpiresInSeconds}`;
+    response.redirect(`${frontendUrl}/account/login/google-callback${hash}`);
   }
 }
