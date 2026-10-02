@@ -1,4 +1,4 @@
-import {Session, User} from '@generated/prisma/client';
+import { Session, User } from "@generated/prisma/client";
 
 /** Delete sensitive keys from an object */
 export function expose<T>(item: T): Expose<T> {
@@ -8,12 +8,12 @@ export function expose<T>(item: T): Expose<T> {
   delete (item as any as Partial<User>).password;
   delete (item as any as Partial<Session>).refreshToken;
   // API key secrets are stored hashed and must never be serialized to clients.
-  delete (item as {secret?: unknown}).secret;
+  delete (item as { secret?: unknown }).secret;
 
   return item;
 }
 
 export type Expose<T> = Omit<
-  Omit<Omit<Omit<Omit<Omit<T, 'password'>, 'twoFactorSecret'>, 'token'>, 'emailSafe'>, 'subnet'>,
-  'secret'
+  Omit<Omit<Omit<Omit<Omit<T, "password">, "twoFactorSecret">, "token">, "emailSafe">, "subnet">,
+  "secret"
 >;

@@ -1,81 +1,81 @@
-import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
-import {IsArray, IsNotEmpty, IsOptional, IsString} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsArray, IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 export class CreateApiKeyDto {
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({type: [String]})
+  @ApiPropertyOptional({ type: [String] })
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   ipRestrictions?: string[];
 
-  @ApiPropertyOptional({type: [String]})
+  @ApiPropertyOptional({ type: [String] })
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   referrerRestrictions?: string[];
 }
 
 export class UpdateApiKeyDto {
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   name?: string;
 
-  @ApiPropertyOptional({type: [String]})
+  @ApiPropertyOptional({ type: [String] })
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   scopes?: string[];
 
-  @ApiPropertyOptional({type: [String]})
+  @ApiPropertyOptional({ type: [String] })
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   ipRestrictions?: string[];
 
-  @ApiPropertyOptional({type: [String]})
+  @ApiPropertyOptional({ type: [String] })
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   referrerRestrictions?: string[];
 }
 
 export class ReplaceApiKeyDto {
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
   description!: string;
 
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
   name!: string;
 
-  @ApiProperty({type: [String]})
+  @ApiProperty({ type: [String] })
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsNotEmpty()
   scopes!: string[];
 
-  @ApiProperty({type: [String]})
+  @ApiProperty({ type: [String] })
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsNotEmpty()
   ipRestrictions!: string[];
 
-  @ApiProperty({type: [String]})
+  @ApiProperty({ type: [String] })
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsNotEmpty()
   referrerRestrictions!: string[];
 }
@@ -86,34 +86,34 @@ export class ReplaceApiKeyDto {
  * List and detail responses never contain the secret (it is stored hashed).
  */
 export class ApiKeyResponseDto {
-  @ApiProperty({type: Number})
+  @ApiProperty({ type: Number })
   id: number;
 
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   key: string;
 
-  @ApiPropertyOptional({type: String, description: 'Plaintext secret, returned only once on creation.'})
+  @ApiPropertyOptional({ type: String, description: "Plaintext secret, returned only once on creation." })
   secret?: string;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   description?: string | null;
 
-  @ApiPropertyOptional({type: Object})
+  @ApiPropertyOptional({ type: Object })
   ipRestrictions?: object | null;
 
-  @ApiPropertyOptional({type: Object})
+  @ApiPropertyOptional({ type: Object })
   referrerRestrictions?: object | null;
 
-  @ApiProperty({type: Date})
+  @ApiProperty({ type: Date })
   createdAt: Date;
 
-  @ApiProperty({type: Date})
+  @ApiProperty({ type: Date })
   updatedAt: Date;
 
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   userId: string;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   organizationId?: string | null;
 }
 
@@ -122,6 +122,6 @@ export class ApiKeyResponseDto {
  * Each record is an arbitrary object from the log backend.
  */
 export class ApiKeyLogResponseDto {
-  @ApiProperty({type: Object})
+  @ApiProperty({ type: Object })
   data: object;
 }
