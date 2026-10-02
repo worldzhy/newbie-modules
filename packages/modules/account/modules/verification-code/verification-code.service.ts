@@ -1,4 +1,4 @@
-import { Injectable, TooManyRequestsException } from "@nestjs/common";
+import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma, VerificationCode, VerificationCodeStatus, VerificationCodeUse } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -110,9 +110,7 @@ export class VerificationCodeService {
     const previousAttempts = await this.attemptLimiter.get(targetAttemptKey);
     if (previousAttempts !== null && previousAttempts.remainingPoints <= 0) {
       await this.inactivate(target, use);
-      throw new TooManyRequestsException(
-        "Too many incorrect verification attempts. The code has been invalidated; please request a new one.",
-      );
+      throw this.codeAttemptsExhaustedException();
     }
 
     const existedCode = await this.prisma.verificationCode.findFirst({
@@ -138,11 +136,17 @@ export class VerificationCodeService {
       await this.attemptLimiter.consume(targetAttemptKey);
     } catch {
       await this.inactivate(target, use);
-      throw new TooManyRequestsException(
-        "Too many incorrect verification attempts. The code has been invalidated; please request a new one.",
-      );
+      throw this.codeAttemptsExhaustedException();
     }
     return false;
+  }
+
+  private codeAttemptsExhaustedException(): HttpException {
+    // 429 instead of 400: the client must stop guessing and request a new code.
+    return new HttpException(
+      "Too many incorrect verification attempts. The code has been invalidated; please request a new one.",
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
   }
 
   private async inactivate(target: VerificationCodeTarget, use: VerificationCodeUse): Promise<void> {
