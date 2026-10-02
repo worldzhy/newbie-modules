@@ -39,7 +39,14 @@ export class GoogleDriveFileService {
     });
 
     this.client = drive({version: 'v3', auth: authObj});
-    this.googleSharedDriveId = this.config.getOrThrow<string>('modules.googleapis.googleSharedDriveId');
+    const sharedDriveId = this.config.getOrThrow<string>('modules.googleapis.googleSharedDriveId');
+    if (!sharedDriveId) {
+      // getOrThrow only rejects undefined — an empty GOOGLE_SHARED_DRIVE_ID
+      // would slip through and later surface as a confusing Google 404
+      // ("File not found: .") caused by parents: [""].
+      throw new Error('modules.googleapis.googleSharedDriveId must not be empty (set GOOGLE_SHARED_DRIVE_ID)');
+    }
+    this.googleSharedDriveId = sharedDriveId;
   }
 
   async getFile(name: string) {
