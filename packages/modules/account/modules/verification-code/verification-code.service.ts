@@ -130,13 +130,13 @@ export class VerificationCodeService {
       return true;
     }
 
-    // Wrong code: spend one attempt. Consuming the final point invalidates the
-    // code so guessing cannot continue against it.
-    try {
-      await this.attemptLimiter.consume(targetAttemptKey);
-    } catch {
+    // Wrong code: spend one attempt. Unlike consume(), penalty() records the
+    // failure without rejecting at the threshold, so the caller still gets a
+    // normal "invalid code" answer on the fifth miss; the next request is what
+    // fails closed via the get() check above.
+    const attemptRecord = await this.attemptLimiter.penalty(targetAttemptKey);
+    if (attemptRecord.remainingPoints <= 0) {
       await this.inactivate(target, use);
-      throw this.codeAttemptsExhaustedException();
     }
     return false;
   }
