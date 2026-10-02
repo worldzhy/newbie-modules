@@ -19,15 +19,12 @@ export class ApiKeyController {
   /**
    * The authenticated session identity is the only authority on whose keys
    * are managed; the path parameter must match it.
-   * TODO(batch-2): read req.user.userId only once the JWT strategy field is
-   * unified across all guards.
    */
   private resolveSelfUserId(request: UserRequest, pathUserId: string): string {
-    const identity = request.user?.userId ?? (request.user as unknown as { id?: string })?.id;
-    if (!identity || identity !== pathUserId) {
+    if (request.user.userId !== pathUserId) {
       throw new ForbiddenException("You can only manage your own API keys.");
     }
-    return identity;
+    return pathUserId;
   }
 
   /** Create an API key for the current user */

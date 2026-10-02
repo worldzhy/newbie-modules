@@ -43,7 +43,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
 
     const session = await this.prisma.session.findFirst({
       where: { accessToken },
-      select: { user: { select: { id: true, roles: true, status: true } } },
+      select: { id: true, user: { select: { roles: true, status: true } } },
     });
 
     if (session) {
@@ -52,7 +52,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       if (session.user.status !== UserStatus.ACTIVE) {
         throw new ForbiddenException("The account is not active.");
       }
-      return { id: accessTokenInfo.userId, roles: session.user.roles };
+      // Unified request.user shape across every authenticated strategy:
+      // { userId, sessionId, roles }.
+      return { userId: accessTokenInfo.userId, sessionId: session.id, roles: session.user.roles };
     } else {
       throw new UnauthorizedException("Invalid access token");
     }

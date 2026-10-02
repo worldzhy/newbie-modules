@@ -93,15 +93,6 @@ export class ChangePasswordDto {
   @ApiProperty({
     type: String,
     required: true,
-    description: "The user ID of the account to change the password for.",
-  })
-  @IsString()
-  @IsNotEmpty()
-  userId!: string;
-
-  @ApiProperty({
-    type: String,
-    required: true,
     description: "The current password of the account.",
   })
   @IsString()

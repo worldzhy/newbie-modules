@@ -5,6 +5,7 @@ import { VerificationCodeUse } from "@generated/prisma/client";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { compareHash } from "@devbie/newbie/utilities/common.util";
+import { UserRequest } from "@modules/account/account.interface";
 import { AccountService } from "@modules/account/account.service";
 import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
 import { VerificationCodeService } from "@modules/account/modules/verification-code/verification-code.service";
@@ -47,7 +48,7 @@ export class AccountController {
   @Post("change-password")
   @ApiOperation({ summary: "Change the password of the current user" })
   @ApiResponse({ type: PasswordChangeResponseDto })
-  async changePassword(@Body() body: ChangePasswordDto) {
+  async changePassword(@Req() request: UserRequest, @Body() body: ChangePasswordDto) {
     // [step 1] Guard statement.
     if (!("currentPassword" in body) || !("newPassword" in body)) {
       throw new BadRequestException("Please carry 'currentPassword' and 'newPassword' in the request body.");
@@ -58,9 +59,12 @@ export class AccountController {
       throw new BadRequestException("The new password is same with the current password.");
     }
 
-    // [step 3] Verify the current password.
+    // [step 3] The identity always comes from the authenticated session,
+    // never from the request body, so one user cannot reset another's
+    // password by smuggling a different userId.
+    const userId = request.user.userId;
     const user = await this.prisma.user.findUniqueOrThrow({
-      where: { id: body.userId },
+      where: { id: userId },
     });
     const match = await compareHash(body.currentPassword, user.password);
     if (match === false) {
@@ -69,7 +73,7 @@ export class AccountController {
 
     // [step 4] Change password.
     return await this.prisma.user.update({
-      where: { id: body.userId },
+      where: { id: userId },
       data: { password: body.newPassword },
       select: { id: true, email: true, phone: true },
     });

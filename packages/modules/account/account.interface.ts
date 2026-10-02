@@ -1,25 +1,6 @@
 import type { Request as NestRequest } from "@nestjs/common";
-import { MfaMethod } from "@generated/prisma/client";
+import { MfaMethod, UserRole } from "@generated/prisma/client";
 import type { Request as ExpressRequest } from "express";
-
-export enum AccessTokenType {
-  user = "user",
-  apiKey = "api-key",
-}
-
-export interface AccessTokenClaims {
-  userId: string;
-  sessionId: number;
-  role?: string;
-}
-
-export interface AccessTokenParsed {
-  /** 'userId' or 'apiKeyId depends on the type */
-  userId: string;
-  sessionId?: number;
-  role?: string;
-  type: AccessTokenType;
-}
 
 export interface TokenResponse {
   accessToken: string;
@@ -35,6 +16,18 @@ export interface TotpTokenResponse {
 export interface MfaTokenPayload {
   userId: string;
   type: MfaMethod;
+}
+
+/**
+ * The single authenticated identity shape attached to `request.user` by
+ * every authenticated passport strategy (JWT, password login,
+ * verification-code login). Login strategies only know { userId }; the JWT
+ * strategy additionally resolves the live session and its roles.
+ */
+export interface AccessTokenParsed {
+  userId: string;
+  sessionId?: number;
+  roles?: UserRole[];
 }
 
 type CombinedRequest = ExpressRequest & typeof NestRequest;
