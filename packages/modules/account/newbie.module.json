@@ -43,12 +43,6 @@
           "secret": "process.env.ACCOUNT_APIKEY_ACCESS_TOKEN_SECRET"
         }
       },
-      "tracking": {
-        "mode": "process.env.TRACKING_MODE || 'api-key'",
-        "index": "process.env.TRACKING_INDEX || 'saas-logs'",
-        "deleteOldLogs": "bool(process.env.TRACKING_DELETE_OLD_LOGS, true)",
-        "deleteOldLogsDays": "int(process.env.TRACKING_DELETE_OLD_LOGS_DAYS, 90)"
-      },
       "verificationCode": {
         "timeoutMinutes": 10,
         "resendMinutes": 1
@@ -77,10 +71,6 @@
     "ACCOUNT_DEFAULT_GUARD": "",
     "CACHE_GEOLOCATION_LRU_SIZE": "",
     "CACHE_APIKEY_LRU_SIZE": "",
-    "TRACKING_MODE": "",
-    "TRACKING_INDEX": "",
-    "TRACKING_DELETE_OLD_LOGS": "",
-    "TRACKING_DELETE_OLD_LOGS_DAYS": "",
     "GOOGLE_AUTH_CLIENT_ID": "",
     "GOOGLE_AUTH_CLIENT_SECRET": "",
     "GOOGLE_AUTH_CALLBACK_URL": "",
