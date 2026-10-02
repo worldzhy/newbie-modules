@@ -69,20 +69,20 @@ export class AuthService {
       });
     }
 
-    // [step 1] Disable active session if existed.
-    await this.prisma.session.deleteMany({where: {userId: params.userId}});
+    // [step 1] Disable active sessions, update last login time, and generate new tokens atomically.
+    const session = await this.prisma.$transaction(async tx => {
+      await tx.session.deleteMany({where: {userId: params.userId}});
 
-    // [step 2] Update last login time.
-    await this.prisma.user.update({
-      where: {id: params.userId},
-      data: {lastLoginAt: new Date()},
-    });
+      await tx.user.update({
+        where: {id: params.userId},
+        data: {lastLoginAt: new Date()},
+      });
 
-    // [step 3] Generate new tokens.
-    const session = await this.sessionService.generate({
-      ipAddress: params.ipAddress,
-      userAgent: params.userAgent,
-      userId: params.userId,
+      return await this.sessionService.generateWithTransaction(tx, {
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        userId: params.userId,
+      });
     });
 
     // [step 4] Set refresh token in cookie.

@@ -129,4 +129,26 @@ export class VerificationCodeService {
     });
     return existedCode ? true : false;
   }
+
+  async inactivateForEmail(email: string, use: VerificationCodeUse): Promise<void> {
+    await this.prisma.verificationCode.updateMany({
+      where: {
+        email: {equals: email, mode: 'insensitive'},
+        use: use,
+        status: VerificationCodeStatus.ACTIVE,
+      },
+      data: {status: VerificationCodeStatus.INACTIVE},
+    });
+  }
+
+  async inactivateForPhone(phone: string, use: VerificationCodeUse): Promise<void> {
+    await this.prisma.verificationCode.updateMany({
+      where: {
+        phone: phone,
+        use: use,
+        status: VerificationCodeStatus.ACTIVE,
+      },
+      data: {status: VerificationCodeStatus.INACTIVE},
+    });
+  }
 }

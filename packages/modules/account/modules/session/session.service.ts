@@ -1,23 +1,31 @@
-import {Injectable, NotFoundException} from '@nestjs/common';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {GeolocationService} from '@modules/account/helpers/geolocation.service';
-import {UAParser} from 'ua-parser-js';
-import {SESSION_NOT_FOUND} from '@devbie/newbie/exceptions/errors.constants';
-import {secondsUntilUnixTimestamp} from '@devbie/newbie/utilities/datetime.util';
-import {TokenService} from '../../security/token/token.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { GeolocationService } from "@modules/account/helpers/geolocation.service";
+import { UAParser } from "ua-parser-js";
+import { SESSION_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
+import { secondsUntilUnixTimestamp } from "@devbie/newbie/utilities/datetime.util";
+import { TokenService } from "../../security/token/token.service";
 
 @Injectable()
 export class SessionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geolocationService: GeolocationService,
-    private readonly tokenService: TokenService
+    private readonly tokenService: TokenService,
   ) {}
 
-  async generate(params: {ipAddress: string; userAgent: string; userId: string}) {
+  async generate(params: { ipAddress: string; userAgent: string; userId: string }) {
+    return this.generateWithTransaction(this.prisma, params);
+  }
+
+  async generateWithTransaction(
+    tx: Prisma.TransactionClient,
+    params: { ipAddress: string; userAgent: string; userId: string },
+  ) {
     const ua = new UAParser(params.userAgent);
     const location = await this.geolocationService.getLocation(params.ipAddress);
-    return await this.prisma.session.create({
+    return await tx.session.create({
       data: {
         accessToken: this.tokenService.signUserAccessToken({
           userId: params.userId,
@@ -31,9 +39,9 @@ export class SessionService {
         timezone: location?.location?.time_zone,
         countryCode: location?.country?.iso_code,
         userAgent: params.userAgent,
-        browser: `${ua.getBrowser().name ?? ''} ${ua.getBrowser().version ?? ''}`.trim() || undefined,
+        browser: `${ua.getBrowser().name ?? ""} ${ua.getBrowser().version ?? ""}`.trim() || undefined,
         operatingSystem:
-          `${ua.getOS().name ?? ''} ${ua.getOS().version ?? ''}`.replace('Mac OS', 'macOS').trim() || undefined,
+          `${ua.getOS().name ?? ""} ${ua.getOS().version ?? ""}`.replace("Mac OS", "macOS").trim() || undefined,
         userId: params.userId,
       },
     });
@@ -45,14 +53,14 @@ export class SessionService {
 
     // [step 2] Update tokens.
     return await this.prisma.session.update({
-      where: {refreshToken},
+      where: { refreshToken },
       data: {
         accessToken: this.tokenService.signUserAccessToken({
           userId: refreshTokenInfo.userId,
         }),
         refreshToken: this.tokenService.signUserRefreshToken(
-          {userId: refreshTokenInfo.userId},
-          {expiresIn: secondsUntilUnixTimestamp(refreshTokenInfo.exp)}
+          { userId: refreshTokenInfo.userId },
+          { expiresIn: secondsUntilUnixTimestamp(refreshTokenInfo.exp) },
         ),
       },
     });
@@ -60,13 +68,13 @@ export class SessionService {
 
   async destroy(token: string) {
     const session = await this.prisma.session.findFirst({
-      where: {OR: [{accessToken: token}, {refreshToken: token}]},
-      select: {id: true, user: {select: {id: true}}},
+      where: { OR: [{ accessToken: token }, { refreshToken: token }] },
+      select: { id: true, user: { select: { id: true } } },
     });
     if (!session) throw new NotFoundException(SESSION_NOT_FOUND);
 
     await this.prisma.session.delete({
-      where: {id: session.id},
+      where: { id: session.id },
     });
   }
 }

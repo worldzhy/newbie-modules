@@ -52,7 +52,14 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, 'local.
       throw new UnauthorizedException('Invalid code.');
     }
 
-    // [Step 4] OK.
+    // [step 4] Inactivate the used code to prevent replay attacks.
+    if (verifyEmail(account)) {
+      await this.verificationCodeService.inactivateForEmail(account, VerificationCodeUse.LOGIN_BY_EMAIL);
+    } else {
+      await this.verificationCodeService.inactivateForPhone(account, VerificationCodeUse.LOGIN_BY_PHONE);
+    }
+
+    // [Step 5] OK.
     return {userId: user.id};
   }
 }
