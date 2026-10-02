@@ -28,6 +28,7 @@ import {SessionService} from '@modules/account/modules/session/session.service';
 import {CookieService} from '@modules/account/security/cookie/cookie.service';
 import {TokenService} from '@modules/account/security/token/token.service';
 import {TokenSubject} from '@modules/account/security/token/token.constants';
+import {LimitLoginByUserService} from '@modules/account/security/rate-limiter/rate-limiter.service';
 import {AwsSesService} from '@modules/aws-ses/aws-ses.service';
 import anonymize from 'ip-anonymize';
 import randomColor from 'randomcolor';
@@ -45,7 +46,8 @@ export class AuthService {
     private readonly cookieService: CookieService,
     private readonly approvedSubnetService: ApprovedSubnetService,
     private readonly geolocationService: GeolocationService,
-    private readonly ses: AwsSesService
+    private readonly ses: AwsSesService,
+    private readonly limitLoginByUserService: LimitLoginByUserService
   ) {
     this.appFrontendUrl = this.config.getOrThrow('framework.app.frontendUrl');
   }
@@ -84,6 +86,10 @@ export class AuthService {
         userId: params.userId,
       });
     });
+
+    // [step 2] Reset the per-user login rate limit so earlier failed attempts
+    // do not lock out a user who finally authenticated successfully.
+    await this.limitLoginByUserService.delete(params.userId);
 
     // [step 4] Set refresh token in cookie.
     this.cookieService.set(params.response, this.cookieService.generateForRefreshToken(session.refreshToken));

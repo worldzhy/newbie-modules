@@ -5,12 +5,16 @@ import {AuthService} from '@modules/account/auth/auth.service';
 import {GuardByPassword} from '@modules/account/security/passport/password/password.decorator';
 import {UserRequest} from '@modules/account/account.interface';
 import {LimitLoginByIp, LimitLoginByUser} from '@modules/account/security/rate-limiter/rate-limiter.decorator';
+import {LimitLoginByIpService} from '@modules/account/security/rate-limiter/rate-limiter.service';
 import {LoginByPasswordRequestDto, LoginByPasswordResponseDto} from '@modules/account/auth/auth.dto';
 
 @ApiTags('Account / Auth')
 @Controller('auth')
 export class LoginByPasswordController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly limitLoginByIpService: LimitLoginByIpService
+  ) {}
 
   /**
    * After a user is verified by auth guard, this 'login' function returns
@@ -42,6 +46,9 @@ export class LoginByPasswordController {
       response,
       skipEmailCheck: body.skipEmailCheck,
     });
+
+    // Reset the per-IP login rate limit counted by the rate limiter guard.
+    await this.limitLoginByIpService.delete(ipAddress);
 
     return loginResult;
   }

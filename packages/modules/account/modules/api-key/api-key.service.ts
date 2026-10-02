@@ -50,18 +50,14 @@ export class ApiKeyService {
     }
   ): Promise<Expose<ApiKey>[]> {
     const {skip, take, cursor, where, orderBy} = params;
-    try {
-      const apiKey = await this.prisma.apiKey.findMany({
-        skip,
-        take,
-        cursor,
-        where: {...where, organizationId},
-        orderBy,
-      });
-      return apiKey.map(organization => expose<ApiKey>(organization));
-    } catch (error) {
-      return [];
-    }
+    const apiKey = await this.prisma.apiKey.findMany({
+      skip,
+      take,
+      cursor,
+      where: {...where, organizationId},
+      orderBy,
+    });
+    return apiKey.map(organization => expose<ApiKey>(organization));
   }
 
   async getApiKeysForUser(
@@ -75,18 +71,14 @@ export class ApiKeyService {
     }
   ): Promise<Expose<ApiKey>[]> {
     const {skip, take, cursor, where, orderBy} = params;
-    try {
-      const apiKey = await this.prisma.apiKey.findMany({
-        skip,
-        take,
-        cursor,
-        where: {...where, user: {id: userId}, organizationId: null},
-        orderBy,
-      });
-      return apiKey.map(user => expose<ApiKey>(user));
-    } catch (error) {
-      return [];
-    }
+    const apiKey = await this.prisma.apiKey.findMany({
+      skip,
+      take,
+      cursor,
+      where: {...where, user: {id: userId}, organizationId: null},
+      orderBy,
+    });
+    return apiKey.map(user => expose<ApiKey>(user));
   }
 
   async getApiKeyForOrganization(organizationId: string, id: number): Promise<Expose<ApiKey>> {
@@ -216,56 +208,8 @@ export class ApiKeyService {
       where?: {after?: string};
     }
   ): Promise<Record<string, any>[]> {
-    const now = new Date();
-    now.setDate(
-      now.getDate() - this.configService.getOrThrow<number>('modules.account.tracking.deleteOldLogsDays')
-    );
-
-    /*
-    const result = await this.elasticsearch.search({
-      index: this.configService.get<string>(
-        'modules.account.tracking.index'
-      ),
-      from: params.cursor?.id,
-      body: {
-        query: {
-          bool: {
-            must: [
-              {match: {authorization: apiKey}},
-              {
-                range: {
-                  date: {
-                    gte: params.where?.after
-                      ? new Date(
-                          new Date().getTime() -
-                            new Date(params.where?.after).getTime()
-                        )
-                      : now,
-                  },
-                },
-              },
-            ],
-          },
-        },
-        sort: [{date: {order: 'desc'}}],
-        size: params.take ?? 100,
-      },
-    });
-    if (result) {
-      try {
-        return result.body.hits.hits.map(
-          (item: {
-            _index: string;
-            _type: '_doc';
-            _id: string;
-            _score: any;
-            _source: Record<string, any>;
-          }) => ({...item._source, id: item._id})
-        );
-      } catch (error) {}
-    }
-    */
-
+    // API key usage logs are not wired to a log store yet; return empty until
+    // a backend (previously elasticsearch) is integrated again.
     return [];
   }
 }
