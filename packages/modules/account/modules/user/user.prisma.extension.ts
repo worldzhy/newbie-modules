@@ -1,6 +1,7 @@
 import { Prisma } from "@generated/prisma/client";
 import { generateHash } from "@devbie/newbie/utilities/common.util";
 import { verifyEmail, verifyPassword } from "@modules/account/helpers/validator";
+import { PASSWORD_RULE_MESSAGE } from "@modules/account/helpers/password.validator";
 import { BadRequestException } from "@nestjs/common";
 
 export const userPrismaExtension = Prisma.defineExtension((prisma) =>
@@ -24,9 +25,7 @@ export const userPrismaExtension = Prisma.defineExtension((prisma) =>
 
               if (password && typeof password === "string") {
                 if (!verifyPassword(password)) {
-                  throw new BadRequestException(
-                    "The password is not strong enough. (length >= 8, lowercase >= 1, uppercase >= 1, numbers >= 1, symbols >= 1)",
-                  );
+                  throw new BadRequestException(PASSWORD_RULE_MESSAGE);
                 }
                 const hash = await generateHash(password);
                 args.data = {

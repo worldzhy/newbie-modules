@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { VerificationCodeUse } from "@generated/prisma/client";
+import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 import {
   IsDate,
   IsEmail,
@@ -25,6 +26,7 @@ export class SignUpDto {
 
   @ApiProperty({ type: String, required: false })
   @IsString()
+  @IsStrongPassword()
   @IsOptional()
   password?: string | null;
 

@@ -14,6 +14,7 @@ import {
   IsString,
   MinLength,
 } from "class-validator";
+import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 
 /**
  * Request DTO for creating a user (admin endpoint).
@@ -33,6 +34,7 @@ export class CreateUserDto {
 
   @ApiPropertyOptional({ type: String, description: "Plain password; hashed automatically by the Prisma extension." })
   @IsString()
+  @IsStrongPassword()
   @IsOptional()
   password?: string | null;
 
@@ -152,6 +154,7 @@ export class UpdateUserDto {
 
   @ApiPropertyOptional({ type: String, description: "Plain password; hashed automatically by the Prisma extension." })
   @IsString()
+  @IsStrongPassword()
   @IsOptional()
   password?: string | null;
 
@@ -266,6 +269,7 @@ export class ChangeUserPasswordDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(8)
+  @IsStrongPassword()
   newPassword: string;
 }
 

@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { UserGender, UserRole } from "@generated/prisma/client";
 import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
+import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 
 export class GetCurrentUserResponseDto {
   @ApiProperty({ type: String })
@@ -85,6 +86,7 @@ export class ResetPasswordDto {
   @ApiProperty({ type: String, description: "The new password." })
   @IsString()
   @MinLength(8)
+  @IsStrongPassword()
   @IsNotEmpty()
   newPassword!: string;
 }
@@ -105,6 +107,7 @@ export class ChangePasswordDto {
     description: "The new password for the account.",
   })
   @IsString()
+  @IsStrongPassword()
   @IsNotEmpty()
   newPassword!: string;
 }
