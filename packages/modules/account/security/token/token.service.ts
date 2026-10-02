@@ -21,7 +21,7 @@ export class TokenService {
   sign(params: {
     payload: number | string | object | Buffer;
     secret?: string | null;
-    options: { subject: string; expiresIn: string | number };
+    options: { subject: string; expiresIn: string | number; jwtid?: string };
   }) {
     let { payload, secret, options } = params;
     if (typeof payload === "number") payload = payload.toString();
@@ -87,6 +87,9 @@ export class TokenService {
       options: {
         subject: TokenSubject.USER_ACCESS_TOKEN,
         expiresIn: this.tokenConfig.userAccess.expiresIn,
+        // Unique per issuance so repeated signings in the same second still
+        // produce distinct tokens (sessions are keyed by the token string).
+        jwtid: this.generateUuid(),
       },
     });
   }
@@ -116,6 +119,10 @@ export class TokenService {
       options: {
         subject: TokenSubject.USER_REFRESH_TOKEN,
         expiresIn: options ? options.expiresIn : this.tokenConfig.userRefresh.expiresIn,
+        // Unique per issuance: within the same second, iat/exp would otherwise
+        // be identical and rotation would store the same token string, which
+        // makes reuse detection impossible.
+        jwtid: this.generateUuid(),
       },
     });
   }
