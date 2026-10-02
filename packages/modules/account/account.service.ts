@@ -1,7 +1,9 @@
 import { Injectable } from "@nestjs/common";
+import type { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { UpdateMeDto } from "./account.dto";
 import { UserRequest } from "./account.interface";
+import { buildUiAvatarsUrl } from "./helpers/ui-avatar";
 
 @Injectable()
 export class AccountService {
@@ -27,16 +29,49 @@ export class AccountService {
   }
 
   async updateMe(request: UserRequest, body: UpdateMeDto) {
-    // Update only whitelisted fields. The DTO has already been stripped of
+    const { dateOfBirth, avatarFileId: requestedAvatarFileId, ...scalarFields } = body;
+
+    // Current state is needed to merge the name fields and to tell whether a
+    // real uploaded avatar already exists.
+    const existingUser = await this.prisma.user.findUniqueOrThrow({
+      where: { id: request.user.userId },
+      select: {
+        email: true,
+        name: true,
+        firstName: true,
+        lastName: true,
+        avatarFileId: true,
+      },
+    });
+
+    const updateData: Prisma.UserUpdateInput = {
+      ...scalarFields,
+      ...(dateOfBirth ? { dateOfBirth: new Date(dateOfBirth) } : {}),
+      ...(requestedAvatarFileId ? { avatarFileId: requestedAvatarFileId } : {}),
+    };
+
+    // A name change must also refresh the generated initial-avatar; the URL
+    // encodes the name, so leaving it stale would keep showing the old name.
+    // Never overwrite an uploaded avatar, including one set in this same
+    // request.
+    const nameFields = ["name", "firstName", "middleName", "lastName"] as const;
+    const changedName = nameFields.some((field) => field in scalarFields);
+    const effectiveAvatarFileId = requestedAvatarFileId ?? existingUser.avatarFileId;
+    if (changedName && !effectiveAvatarFileId) {
+      updateData.uiAvatarsUrl = buildUiAvatarsUrl({
+        name: scalarFields.name ?? existingUser.name,
+        firstName: scalarFields.firstName ?? existingUser.firstName,
+        lastName: scalarFields.lastName ?? existingUser.lastName,
+        fallback: existingUser.email?.split("@")[0] ?? "user",
+      });
+    }
+
+    // Only whitelisted fields reach here: the DTO has been stripped of
     // unknown properties by the global ValidationPipe, and the identity comes
     // from the authenticated session (request.user), never from the body.
-    const { dateOfBirth, ...scalarFields } = body;
     return await this.prisma.user.update({
       where: { id: request.user.userId },
-      data: {
-        ...scalarFields,
-        ...(dateOfBirth ? { dateOfBirth: new Date(dateOfBirth) } : {}),
-      },
+      data: updateData,
     });
   }
 

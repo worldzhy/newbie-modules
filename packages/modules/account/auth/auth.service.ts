@@ -30,7 +30,7 @@ import { TokenSubject } from "@modules/account/security/token/token.constants";
 import { LimitLoginByUserService } from "@modules/account/security/rate-limiter/rate-limiter.service";
 import { AwsSesService } from "@modules/aws-ses/aws-ses.service";
 import anonymize from "ip-anonymize";
-import randomColor from "randomcolor";
+import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
 
 @Injectable()
 export class AuthService {
@@ -101,7 +101,7 @@ export class AuthService {
     }
 
     // Generate profile picture.
-    const uiAvatarsUrl = this.buildUiAvatarsUrl({
+    const uiAvatarsUrl = buildUiAvatarsUrl({
       name: data.name,
       firstName: data.firstName,
       lastName: data.lastName,
@@ -238,7 +238,7 @@ export class AuthService {
     if (!user) {
       // Google has already verified ownership of the email, so the Email
       // record is created pre-verified and no verification email is sent.
-      const uiAvatarsUrl = this.buildUiAvatarsUrl({
+      const uiAvatarsUrl = buildUiAvatarsUrl({
         name: params.displayName || undefined,
         fallback: email.split("@")[0],
       });
@@ -270,24 +270,6 @@ export class AuthService {
       userAgent: params.userAgent,
       response: params.response,
     });
-  }
-
-  /** Build a ui-avatars URL following the same name precedence as signup. */
-  private buildUiAvatarsUrl(params: {
-    name?: string;
-    firstName?: string;
-    lastName?: string;
-    username?: string;
-    fallback: string;
-  }): string {
-    const avatarName =
-      params.name ??
-      (params.firstName && params.lastName
-        ? `${params.firstName} ${params.lastName}`
-        : (params.firstName ?? params.lastName ?? params.username)) ??
-      params.fallback;
-    const background = randomColor({ luminosity: "light" }).replace("#", "");
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(avatarName)}&background=${background}&color=000000`;
   }
 
   /* End */
