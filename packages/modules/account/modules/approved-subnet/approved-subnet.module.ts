@@ -1,6 +1,6 @@
-import {Global, Module} from '@nestjs/common';
-import {ApprovedSubnetController} from './approved-subnet.controller';
-import {ApprovedSubnetService} from './approved-subnet.service';
+import { Global, Module } from "@nestjs/common";
+import { ApprovedSubnetController } from "./approved-subnet.controller";
+import { ApprovedSubnetService } from "./approved-subnet.service";
 
 @Global()
 @Module({

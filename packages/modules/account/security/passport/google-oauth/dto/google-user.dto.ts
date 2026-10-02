@@ -5,15 +5,15 @@ export class GoogleUserReqDto {
     verified: boolean;
   }[];
   id: string;
-  name: {familyName: string; givenName: string};
-  photos: {value: string}[];
-  provider: 'google';
+  name: { familyName: string; givenName: string };
+  photos: { value: string }[];
+  provider: "google";
 }
 
 export class GoogleUserResDto {
   id: string;
   email: string;
   picture: string;
-  provider: 'google';
+  provider: "google";
   displayName: string;
 }

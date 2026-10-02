@@ -1,9 +1,9 @@
-import {Injectable} from '@nestjs/common';
-import {PassportStrategy} from '@nestjs/passport';
-import {Strategy} from 'passport-custom';
+import { Injectable } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy } from "passport-custom";
 
 @Injectable()
-export class NoStrategy extends PassportStrategy(Strategy, 'custom.no-auth') {
+export class NoStrategy extends PassportStrategy(Strategy, "custom.no-auth") {
   constructor() {
     super();
   }

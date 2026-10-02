@@ -1,16 +1,16 @@
-import {CanActivate, ExecutionContext, Injectable} from '@nestjs/common';
-import {Reflector} from '@nestjs/core';
-import {PermissionAction, Prisma, UserRole} from '@generated/prisma/client';
-import {PERMISSION_KEY} from './authorization.decorator';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {TokenService} from '../token/token.service';
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { PermissionAction, Prisma, UserRole } from "@generated/prisma/client";
+import { PERMISSION_KEY } from "./authorization.decorator";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { TokenService } from "../token/token.service";
 
 @Injectable()
 export class AuthorizationGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private readonly prisma: PrismaService,
-    private readonly tokenService: TokenService
+    private readonly tokenService: TokenService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -34,7 +34,7 @@ export class AuthorizationGuard implements CanActivate {
 
     // [step 3] Get user with organization and roles.
     const user = await this.prisma.user.findUniqueOrThrow({
-      where: {id: payload.userId},
+      where: { id: payload.userId },
     });
 
     // ! Open below code when organization microservice is implemented.
@@ -69,7 +69,7 @@ export class AuthorizationGuard implements CanActivate {
       }
 
       const rolePermissions = await this.prisma.permission.findMany({
-        where: {trustedUserRole: {in: user.roles}},
+        where: { trustedUserRole: { in: user.roles } },
       });
 
       for (let i = 0; i < rolePermissions.length; i++) {
@@ -85,7 +85,7 @@ export class AuthorizationGuard implements CanActivate {
 
     // [step 4-3] Get user's permissions.
     const userPermissions = await this.prisma.permission.findMany({
-      where: {trustedUserId: user.id},
+      where: { trustedUserId: user.id },
     });
 
     for (let i = 0; i < userPermissions.length; i++) {

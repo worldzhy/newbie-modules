@@ -1,18 +1,18 @@
-import {Injectable, UnauthorizedException} from '@nestjs/common';
-import {PassportStrategy} from '@nestjs/passport';
-import {Strategy} from 'passport-local';
-import {VerificationCodeUse} from '@generated/prisma/client';
-import {VerificationCodeService} from '@modules/account/modules/verification-code/verification-code.service';
-import {UserService} from '@modules/account/modules/user/user.service';
-import {verifyEmail, verifyPhone} from '@modules/account/helpers/validator';
+import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy } from "passport-local";
+import { VerificationCodeUse } from "@generated/prisma/client";
+import { VerificationCodeService } from "@modules/account/modules/verification-code/verification-code.service";
+import { UserService } from "@modules/account/modules/user/user.service";
+import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
 
 @Injectable()
-export class VerificationCodeStrategy extends PassportStrategy(Strategy, 'local.verification-code') {
+export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.verification-code") {
   constructor(
     private readonly verificationCodeService: VerificationCodeService,
-    private readonly userService: UserService
+    private readonly userService: UserService,
   ) {
-    super({usernameField: 'account', passwordField: 'verificationCode'});
+    super({ usernameField: "account", passwordField: "verificationCode" });
   }
 
   /**
@@ -23,16 +23,16 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, 'local.
    * [2] phone
    *
    */
-  async validate(account: string, verificationCode: string): Promise<{userId: string}> {
+  async validate(account: string, verificationCode: string): Promise<{ userId: string }> {
     // [step 1] Get the user.
     const user = await this.userService.findByAccount(account);
     if (!user) {
-      throw new UnauthorizedException('The user does not exist.');
+      throw new UnauthorizedException("The user does not exist.");
     }
 
     // [step 2] Handle invalid account situation.
     if (!verifyEmail(account) && !verifyPhone(account)) {
-      throw new UnauthorizedException('Invalid account.');
+      throw new UnauthorizedException("Invalid account.");
     }
 
     // [step 3] Validate verification code.
@@ -41,15 +41,15 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, 'local.
       ? await this.verificationCodeService.validateForEmail(
           verificationCode,
           account,
-          VerificationCodeUse.LOGIN_BY_EMAIL
+          VerificationCodeUse.LOGIN_BY_EMAIL,
         )
       : await this.verificationCodeService.validateForPhone(
           verificationCode,
           account,
-          VerificationCodeUse.LOGIN_BY_PHONE
+          VerificationCodeUse.LOGIN_BY_PHONE,
         );
     if (!isCodeValid) {
-      throw new UnauthorizedException('Invalid code.');
+      throw new UnauthorizedException("Invalid code.");
     }
 
     // [step 4] Inactivate the used code to prevent replay attacks.
@@ -60,6 +60,6 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, 'local.
     }
 
     // [Step 5] OK.
-    return {userId: user.id};
+    return { userId: user.id };
   }
 }

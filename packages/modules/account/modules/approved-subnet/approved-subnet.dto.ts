@@ -1,4 +1,4 @@
-import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 /**
  * Response DTO for ApprovedSubnet.
@@ -6,30 +6,30 @@ import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
  * by the existing expose() helper (which only strips password & refreshToken).
  */
 export class ApprovedSubnetResponseDto {
-  @ApiProperty({type: Number})
+  @ApiProperty({ type: Number })
   id: number;
 
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   subnet: string;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   city?: string | null;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   region?: string | null;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   timezone?: string | null;
 
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   countryCode?: string | null;
 
-  @ApiProperty({type: Date})
+  @ApiProperty({ type: Date })
   createdAt: Date;
 
-  @ApiProperty({type: Date})
+  @ApiProperty({ type: Date })
   updatedAt: Date;
 
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   userId: string;
 }

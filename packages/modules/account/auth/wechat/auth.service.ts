@@ -1,37 +1,37 @@
-import {Injectable} from '@nestjs/common';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {SessionService} from '@modules/account/modules/session/session.service';
-import {TokenService} from '@modules/account/security/token/token.service';
-import {expose} from '@modules/account/helpers/expose';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { SessionService } from "@modules/account/modules/session/session.service";
+import { TokenService } from "@modules/account/security/token/token.service";
+import { expose } from "@modules/account/helpers/expose";
 
 @Injectable()
 export class WechatAuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly sessionService: SessionService,
-    private readonly tokenService: TokenService
+    private readonly tokenService: TokenService,
   ) {}
 
-  async login(params: {ipAddress: string; userAgent: string; phone: string; openId: string}) {
-    const {ipAddress, userAgent, phone, openId} = params;
+  async login(params: { ipAddress: string; userAgent: string; phone: string; openId: string }) {
+    const { ipAddress, userAgent, phone, openId } = params;
 
     // [step 1] Get user
-    let user = await this.prisma.user.findUnique({where: {phone}});
+    let user = await this.prisma.user.findUnique({ where: { phone } });
 
     if (user) {
       await this.prisma.user.update({
-        where: {wechatOpenId: params.openId},
-        data: {lastLoginAt: new Date()},
+        where: { wechatOpenId: params.openId },
+        data: { lastLoginAt: new Date() },
       });
     } else {
       // Create new user if not exists
       user = await this.prisma.user.create({
-        data: {phone, wechatOpenId: openId, lastLoginAt: new Date()},
+        data: { phone, wechatOpenId: openId, lastLoginAt: new Date() },
       });
     }
 
     // [step 2] Disable active session if existed.
-    await this.prisma.session.deleteMany({where: {userId: user.id}});
+    await this.prisma.session.deleteMany({ where: { userId: user.id } });
 
     // [step 3] Generate new tokens.
     const session = await this.sessionService.generate({
@@ -51,7 +51,7 @@ export class WechatAuthService {
     };
   }
 
-  async refreshAccessToken(params: {refreshToken: string}) {
+  async refreshAccessToken(params: { refreshToken: string }) {
     // [step 1]  Refresh
     const session = await this.sessionService.refresh(params.refreshToken);
 

@@ -1,7 +1,7 @@
-import {Controller, Get, NotFoundException, Req} from '@nestjs/common';
-import {ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {GuardByGoogle} from '@modules/account/security/passport/google-oauth/google.decorator';
-import {GoogleOAuthRedirectResponseDto} from '@modules/account/auth/auth.dto';
+import { Controller, Get, NotFoundException, Req } from "@nestjs/common";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { GuardByGoogle } from "@modules/account/security/passport/google-oauth/google.decorator";
+import { GoogleOAuthRedirectResponseDto } from "@modules/account/auth/auth.dto";
 
 /**
  * local dev, to change file node_modules/oauth/lib/oauth2.js
@@ -13,26 +13,26 @@ import {GoogleOAuthRedirectResponseDto} from '@modules/account/auth/auth.dto';
   options.agent = httpsProxyAgent;
   this._executeRequest( http_library, options, post_body, callback );
  */
-@ApiTags('Account / Auth')
-@Controller('auth')
+@ApiTags("Account / Auth")
+@Controller("auth")
 export class LoginByGoogleController {
   constructor() {}
 
   @GuardByGoogle()
-  @Get('login-by-google')
-  @ApiOperation({summary: 'Initiate Google OAuth login (redirect)'})
-  @ApiResponse({type: String})
+  @Get("login-by-google")
+  @ApiOperation({ summary: "Initiate Google OAuth login (redirect)" })
+  @ApiResponse({ type: String })
   async signinWithGoogle() {}
 
   @GuardByGoogle()
-  @Get('login-by-google/redirect')
-  @ApiOperation({summary: 'Google OAuth redirect callback'})
-  @ApiResponse({type: GoogleOAuthRedirectResponseDto})
+  @Get("login-by-google/redirect")
+  @ApiOperation({ summary: "Google OAuth redirect callback" })
+  @ApiResponse({ type: GoogleOAuthRedirectResponseDto })
   async googleOAuthredirect(@Req() req) {
-    if (!req.user) return new NotFoundException('User google account not found');
+    if (!req.user) return new NotFoundException("User google account not found");
     return {
-      status: 'success',
-      message: 'Login successfully',
+      status: "success",
+      message: "Login successfully",
       data: req.user,
     };
   }

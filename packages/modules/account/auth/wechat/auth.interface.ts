@@ -1,5 +1,5 @@
-import type {Request as NestRequest} from '@nestjs/common';
-import type {Request as ExpressRequest} from 'express';
+import type { Request as NestRequest } from "@nestjs/common";
+import type { Request as ExpressRequest } from "express";
 
 export interface WechatAccessTokenParsed {
   userId: string;

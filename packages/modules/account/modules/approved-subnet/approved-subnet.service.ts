@@ -1,18 +1,18 @@
-import {Injectable, NotFoundException, UnauthorizedException} from '@nestjs/common';
-import type {Prisma} from '@generated/prisma/client';
-import {ApprovedSubnet} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import anonymize from 'ip-anonymize';
-import {APPROVED_SUBNET_NOT_FOUND, UNAUTHORIZED_RESOURCE} from '@devbie/newbie/exceptions/errors.constants';
-import {Expose, expose} from '../../helpers/expose';
-import {GeolocationService} from '../../helpers/geolocation.service';
-import {compareHash, generateHash} from '@devbie/newbie/utilities/common.util';
+import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import type { Prisma } from "@generated/prisma/client";
+import { ApprovedSubnet } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import anonymize from "ip-anonymize";
+import { APPROVED_SUBNET_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
+import { Expose, expose } from "../../helpers/expose";
+import { GeolocationService } from "../../helpers/geolocation.service";
+import { compareHash, generateHash } from "@devbie/newbie/utilities/common.util";
 
 @Injectable()
 export class ApprovedSubnetService {
   constructor(
     private prisma: PrismaService,
-    private geolocationService: GeolocationService
+    private geolocationService: GeolocationService,
   ) {}
 
   async getApprovedSubnets(
@@ -23,18 +23,18 @@ export class ApprovedSubnetService {
       cursor?: Prisma.ApprovedSubnetWhereUniqueInput;
       where?: Prisma.ApprovedSubnetWhereInput;
       orderBy?: Prisma.ApprovedSubnetOrderByWithAggregationInput;
-    }
+    },
   ): Promise<Expose<ApprovedSubnet>[]> {
-    const {skip, take, cursor, where, orderBy} = params;
+    const { skip, take, cursor, where, orderBy } = params;
     try {
       const ApprovedSubnet = await this.prisma.approvedSubnet.findMany({
         skip,
         take,
         cursor,
-        where: {...where, user: {id: userId}},
+        where: { ...where, user: { id: userId } },
         orderBy,
       });
-      return ApprovedSubnet.map(user => expose<ApprovedSubnet>(user));
+      return ApprovedSubnet.map((user) => expose<ApprovedSubnet>(user));
     } catch (error) {
       return [];
     }
@@ -42,7 +42,7 @@ export class ApprovedSubnetService {
 
   async getApprovedSubnet(userId: string, id: number): Promise<Expose<ApprovedSubnet>> {
     const ApprovedSubnet = await this.prisma.approvedSubnet.findUnique({
-      where: {id},
+      where: { id },
     });
     if (!ApprovedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
     if (ApprovedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
@@ -52,12 +52,12 @@ export class ApprovedSubnetService {
 
   async deleteApprovedSubnet(userId: string, id: number): Promise<Expose<ApprovedSubnet>> {
     const testApprovedSubnet = await this.prisma.approvedSubnet.findUnique({
-      where: {id},
+      where: { id },
     });
     if (!testApprovedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
     if (testApprovedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
     const ApprovedSubnet = await this.prisma.approvedSubnet.delete({
-      where: {id},
+      where: { id },
     });
     return expose<ApprovedSubnet>(ApprovedSubnet);
   }
@@ -67,7 +67,7 @@ export class ApprovedSubnetService {
     const location = await this.geolocationService.getLocation(ipAddress);
     const approved = await this.prisma.approvedSubnet.create({
       data: {
-        user: {connect: {id: userId}},
+        user: { connect: { id: userId } },
         subnet,
         city: location?.city?.names?.en,
         region: location?.subdivisions?.pop()?.names?.en,
@@ -85,7 +85,7 @@ export class ApprovedSubnetService {
   async upsertNewSubnet(userId: string, ipAddress: string): Promise<Expose<ApprovedSubnet>> {
     const subnet = anonymize(ipAddress);
     const previousSubnets = await this.prisma.approvedSubnet.findMany({
-      where: {user: {id: userId}},
+      where: { user: { id: userId } },
     });
     for await (const item of previousSubnets) {
       if (await compareHash(subnet, item.subnet)) return expose<ApprovedSubnet>(item);

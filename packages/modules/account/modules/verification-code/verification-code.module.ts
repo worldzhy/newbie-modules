@@ -1,5 +1,5 @@
-import {Global, Module} from '@nestjs/common';
-import {VerificationCodeService} from './verification-code.service';
+import { Global, Module } from "@nestjs/common";
+import { VerificationCodeService } from "./verification-code.service";
 
 @Global()
 @Module({

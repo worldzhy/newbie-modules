@@ -1,20 +1,20 @@
-import {Prisma} from '@generated/prisma/client';
-import {generateHash} from '@devbie/newbie/utilities/common.util';
-import {verifyEmail, verifyPassword} from '@modules/account/helpers/validator';
-import {BadRequestException} from '@nestjs/common';
+import { Prisma } from "@generated/prisma/client";
+import { generateHash } from "@devbie/newbie/utilities/common.util";
+import { verifyEmail, verifyPassword } from "@modules/account/helpers/validator";
+import { BadRequestException } from "@nestjs/common";
 
-export const userPrismaExtension = Prisma.defineExtension(prisma =>
+export const userPrismaExtension = Prisma.defineExtension((prisma) =>
   prisma.$extends({
     query: {
       user: {
-        async $allOperations({model, operation, args, query}) {
-          if (operation === 'create' || operation === 'update') {
+        async $allOperations({ model, operation, args, query }) {
+          if (operation === "create" || operation === "update") {
             if (args.data) {
-              const {email, password, firstName, lastName, middleName, dateOfBirth} = args.data;
+              const { email, password, firstName, lastName, middleName, dateOfBirth } = args.data;
 
-              if (email && typeof email === 'string') {
+              if (email && typeof email === "string") {
                 if (!verifyEmail(email)) {
-                  throw new BadRequestException('Your email is not valid.');
+                  throw new BadRequestException("Your email is not valid.");
                 }
                 args.data = {
                   ...args.data,
@@ -22,10 +22,10 @@ export const userPrismaExtension = Prisma.defineExtension(prisma =>
                 };
               }
 
-              if (password && typeof password === 'string') {
+              if (password && typeof password === "string") {
                 if (!verifyPassword(password)) {
                   throw new BadRequestException(
-                    'The password is not strong enough. (length >= 8, lowercase >= 1, uppercase >= 1, numbers >= 1, symbols >= 1)'
+                    "The password is not strong enough. (length >= 8, lowercase >= 1, uppercase >= 1, numbers >= 1, symbols >= 1)",
                   );
                 }
                 const hash = await generateHash(password);
@@ -35,9 +35,9 @@ export const userPrismaExtension = Prisma.defineExtension(prisma =>
                 };
               }
 
-              if (firstName && lastName && typeof firstName === 'string' && typeof lastName === 'string') {
+              if (firstName && lastName && typeof firstName === "string" && typeof lastName === "string") {
                 const name =
-                  firstName + ' ' + (middleName && typeof middleName === 'string' ? middleName + ' ' : '') + lastName;
+                  firstName + " " + (middleName && typeof middleName === "string" ? middleName + " " : "") + lastName;
                 args.data = {
                   ...args.data,
                   name,
@@ -56,5 +56,5 @@ export const userPrismaExtension = Prisma.defineExtension(prisma =>
         },
       },
     },
-  })
+  }),
 );

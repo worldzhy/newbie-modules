@@ -1,15 +1,15 @@
-import {Injectable} from '@nestjs/common';
-import {PassportStrategy} from '@nestjs/passport';
-import {Strategy} from 'passport-local';
-import {compareHash} from '@devbie/newbie/utilities/common.util';
-import {UserService} from '@modules/account/modules/user/user.service';
-import {NewbieException, NewbieExceptionType} from '@devbie/newbie/exceptions/newbie.exception';
-import {UserStatus} from '@generated/prisma/client';
+import { Injectable } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy } from "passport-local";
+import { compareHash } from "@devbie/newbie/utilities/common.util";
+import { UserService } from "@modules/account/modules/user/user.service";
+import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
+import { UserStatus } from "@generated/prisma/client";
 
 @Injectable()
-export class PasswordStrategy extends PassportStrategy(Strategy, 'local.password') {
+export class PasswordStrategy extends PassportStrategy(Strategy, "local.password") {
   constructor(private readonly userService: UserService) {
-    super({usernameField: 'account', passwordField: 'password'});
+    super({ usernameField: "account", passwordField: "password" });
   }
 
   /**
@@ -21,7 +21,7 @@ export class PasswordStrategy extends PassportStrategy(Strategy, 'local.password
    * [3] phone
    *
    */
-  async validate(account: string, password: string): Promise<{userId: string}> {
+  async validate(account: string, password: string): Promise<{ userId: string }> {
     // [step 1] Get the user.
     const user = await this.userService.findByAccount(account);
     if (!user) {
@@ -45,6 +45,6 @@ export class PasswordStrategy extends PassportStrategy(Strategy, 'local.password
     }
 
     // [step 5] OK.
-    return {userId: user.id};
+    return { userId: user.id };
   }
 }

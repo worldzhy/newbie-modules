@@ -1,5 +1,5 @@
-import {Global, Module} from '@nestjs/common';
-import {AuditLogController} from './audit-log.controller';
+import { Global, Module } from "@nestjs/common";
+import { AuditLogController } from "./audit-log.controller";
 
 @Global()
 @Module({

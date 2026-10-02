@@ -1,15 +1,15 @@
-import {CanActivate, ExecutionContext, Injectable} from '@nestjs/common';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {TokenService} from '../token/token.service';
-import {RouteAuthorizationService} from './route-authorization.service';
-import {PermissionAction, UserRole} from '@generated/prisma/client';
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { TokenService } from "../token/token.service";
+import { RouteAuthorizationService } from "./route-authorization.service";
+import { PermissionAction, UserRole } from "@generated/prisma/client";
 
 @Injectable()
 export class RouteAuthorizationGuard implements CanActivate {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
-    private readonly routeAuthorizationService: RouteAuthorizationService
+    private readonly routeAuthorizationService: RouteAuthorizationService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -31,7 +31,7 @@ export class RouteAuthorizationGuard implements CanActivate {
     const payload = this.tokenService.verifyUserAccessToken(accessToken);
 
     const user = await this.prisma.user.findUniqueOrThrow({
-      where: {id: payload.userId},
+      where: { id: payload.userId },
     });
 
     if (user.roles.length > 0) {
@@ -39,7 +39,7 @@ export class RouteAuthorizationGuard implements CanActivate {
         return true;
       }
       const rolePermissions = await this.prisma.permission.findMany({
-        where: {trustedUserRole: {in: user.roles}},
+        where: { trustedUserRole: { in: user.roles } },
       });
       for (let i = 0; i < rolePermissions.length; i++) {
         const permission = rolePermissions[i];
@@ -53,7 +53,7 @@ export class RouteAuthorizationGuard implements CanActivate {
     }
 
     const userPermissions = await this.prisma.permission.findMany({
-      where: {trustedUserId: user.id},
+      where: { trustedUserId: user.id },
     });
     for (let i = 0; i < userPermissions.length; i++) {
       const permission = userPermissions[i];

@@ -1,12 +1,12 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {RateLimiterMemory, RateLimiterRedis} from 'rate-limiter-flexible';
-import {Redis} from 'ioredis';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { RateLimiterMemory, RateLimiterRedis } from "rate-limiter-flexible";
+import { Redis } from "ioredis";
 
 enum LimiterType {
-  IP_ACCESS = 'ip-access',
-  IP_LOGIN = 'ip-login',
-  USER_LOGIN = 'user-login',
+  IP_ACCESS = "ip-access",
+  IP_LOGIN = "ip-login",
+  USER_LOGIN = "user-login",
 }
 
 abstract class RateLimiterService {
@@ -16,37 +16,31 @@ abstract class RateLimiterService {
 
   constructor(
     private readonly config: ConfigService,
-    limiterType: LimiterType
+    limiterType: LimiterType,
   ) {
     switch (limiterType) {
       case LimiterType.IP_ACCESS:
-        this.points = this.config.getOrThrow<number>('modules.account.ratelimiter.ipAccessLimiter.points');
-        this.duration = this.config.getOrThrow<number>(
-          'modules.account.ratelimiter.ipAccessLimiter.durationSeconds'
-        );
+        this.points = this.config.getOrThrow<number>("modules.account.ratelimiter.ipAccessLimiter.points");
+        this.duration = this.config.getOrThrow<number>("modules.account.ratelimiter.ipAccessLimiter.durationSeconds");
         break;
       case LimiterType.IP_LOGIN:
-        this.points = this.config.getOrThrow<number>('modules.account.ratelimiter.ipLoginLimiter.points');
-        this.duration = this.config.getOrThrow<number>(
-          'modules.account.ratelimiter.ipLoginLimiter.durationSeconds'
-        );
+        this.points = this.config.getOrThrow<number>("modules.account.ratelimiter.ipLoginLimiter.points");
+        this.duration = this.config.getOrThrow<number>("modules.account.ratelimiter.ipLoginLimiter.durationSeconds");
         break;
       case LimiterType.USER_LOGIN:
-        this.points = this.config.getOrThrow<number>('modules.account.ratelimiter.userLoginLimiter.points');
-        this.duration = this.config.getOrThrow<number>(
-          'modules.account.ratelimiter.userLoginLimiter.durationSeconds'
-        );
+        this.points = this.config.getOrThrow<number>("modules.account.ratelimiter.userLoginLimiter.points");
+        this.duration = this.config.getOrThrow<number>("modules.account.ratelimiter.userLoginLimiter.durationSeconds");
         break;
     }
 
-    const redisHost = this.config.get<string>('modules.account.redis.host');
-    const redisPort = this.config.get<number>('modules.account.redis.port');
+    const redisHost = this.config.get<string>("modules.account.redis.host");
+    const redisPort = this.config.get<number>("modules.account.redis.port");
     if (redisHost && redisPort) {
       this.limiter = new RateLimiterRedis({
         storeClient: new Redis({
           host: redisHost,
           port: redisPort,
-          keyPrefix: limiterType + '-',
+          keyPrefix: limiterType + "-",
         }),
         points: this.points,
         duration: this.duration,

@@ -1,18 +1,18 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {CookieOptions, Response} from 'express';
-import {TokenService} from '../token/token.service';
-import {dateOfUnixTimestamp} from '@devbie/newbie/utilities/datetime.util';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { CookieOptions, Response } from "express";
+import { TokenService } from "../token/token.service";
+import { dateOfUnixTimestamp } from "@devbie/newbie/utilities/datetime.util";
 
 export enum CookieName {
-  REFRESH_TOKEN = 'refreshToken',
+  REFRESH_TOKEN = "refreshToken",
 }
 
 @Injectable()
 export class CookieService {
   constructor(
     private readonly config: ConfigService,
-    private readonly tokenService: TokenService
+    private readonly tokenService: TokenService,
   ) {}
 
   generateForRefreshToken(refreshToken: string) {
@@ -25,7 +25,7 @@ export class CookieService {
     });
   }
 
-  generate(params: {name: CookieName; value: string; expires: Date}) {
+  generate(params: { name: CookieName; value: string; expires: Date }) {
     return {
       name: params.name,
       value: params.value,
@@ -36,7 +36,7 @@ export class CookieService {
     };
   }
 
-  set(response: Response, cookie: {name: string; value: string; options: CookieOptions}) {
+  set(response: Response, cookie: { name: string; value: string; options: CookieOptions }) {
     response.cookie(cookie.name, cookie.value, cookie.options);
   }
 
@@ -45,12 +45,12 @@ export class CookieService {
   }
 
   defaultCookieOptions(): CookieOptions {
-    const frontendUrl = this.config.getOrThrow<string>('framework.app.frontendUrl');
+    const frontendUrl = this.config.getOrThrow<string>("framework.app.frontendUrl");
 
     return {
       httpOnly: true,
-      sameSite: 'strict',
-      secure: frontendUrl.startsWith('https') ? true : false,
+      sameSite: "strict",
+      secure: frontendUrl.startsWith("https") ? true : false,
     };
   }
 }
