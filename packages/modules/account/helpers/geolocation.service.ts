@@ -1,5 +1,7 @@
 import { Injectable, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import geolite2, { GeoIpDbName } from "geolite2-redist";
 import maxmind, { CityResponse, Reader } from "maxmind";
 import { LRUCache } from "lru-cache";
@@ -31,12 +33,42 @@ export class GeolocationService implements OnModuleDestroy {
   private async getSafeLocation(ipAddress: string): Promise<Partial<CityResponse>> {
     try {
       if (!this.reader) {
-        this.reader = await geolite2.open(GeoIpDbName.City, (path) => maxmind.open<CityResponse>(path));
+        this.reader = await this.openReader();
       }
-      return this.reader.get(ipAddress) ?? {};
+      return this.reader?.get(ipAddress) ?? {};
     } catch (error) {
       console.error(error);
       return {};
+    }
+  }
+
+  /**
+   * Open the GeoLite city database. Prefer the locally cached copy opened
+   * directly with maxmind: geolite2.open() spawns a background auto-updater
+   * whose network failures surface as unhandled rejections and can kill the
+   * whole process (the update endpoint is unreachable in this deployment).
+   * Fall back to the managed open only when no cached copy exists yet.
+   */
+  private async openReader(): Promise<Reader<CityResponse> | null> {
+    const cachedDatabasePath = this.getCachedDatabasePath();
+    if (cachedDatabasePath && existsSync(cachedDatabasePath)) {
+      return await maxmind.open<CityResponse>(cachedDatabasePath);
+    }
+
+    try {
+      return await geolite2.open(GeoIpDbName.City, (databasePath) => maxmind.open<CityResponse>(databasePath));
+    } catch (error) {
+      console.error("GeoLite database is unavailable:", error);
+      return null;
+    }
+  }
+
+  private getCachedDatabasePath(): string | null {
+    try {
+      const packagePath = require.resolve("geolite2-redist/package.json");
+      return path.join(path.dirname(packagePath), "dbs", "GeoLite2-City.mmdb");
+    } catch {
+      return null;
     }
   }
 }
