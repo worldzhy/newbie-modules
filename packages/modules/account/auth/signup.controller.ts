@@ -19,7 +19,7 @@ export class SignupController {
   @NoGuard()
   @Post('signup')
   @ApiOperation({summary: 'Sign up a new user'})
-  @ApiResponse({type: String})
+  @ApiResponse({status: 201, description: 'User signed up successfully.'})
   async signup(@Ip() ipAddress: string, @Body() body: SignUpDto) {
     await this.authService.signup({userData: body, ipAddress});
   }
