@@ -5,33 +5,33 @@ import {
   Logger,
   NotFoundException,
   UnauthorizedException,
-} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {User, UserGender} from '@generated/prisma/client';
-import axios from 'axios';
-import {Response} from 'express';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { User, UserGender } from "@generated/prisma/client";
+import axios from "axios";
+import { Response } from "express";
 import {
   EMAIL_USER_CONFLICT,
   INVALID_EMAIL,
   UNVERIFIED_EMAIL,
   UNVERIFIED_LOCATION,
   USER_NOT_FOUND,
-} from '@devbie/newbie/exceptions/errors.constants';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {compareHash} from '@devbie/newbie/utilities/common.util';
-import {SignUpDto} from '@modules/account/auth/auth.dto';
-import {Expose, expose} from '@modules/account/helpers/expose';
-import {verifyEmail} from '@modules/account/helpers/validator';
-import {GeolocationService} from '@modules/account/helpers/geolocation.service';
-import {ApprovedSubnetService} from '@modules/account/modules/approved-subnet/approved-subnet.service';
-import {SessionService} from '@modules/account/modules/session/session.service';
-import {CookieService} from '@modules/account/security/cookie/cookie.service';
-import {TokenService} from '@modules/account/security/token/token.service';
-import {TokenSubject} from '@modules/account/security/token/token.constants';
-import {LimitLoginByUserService} from '@modules/account/security/rate-limiter/rate-limiter.service';
-import {AwsSesService} from '@modules/aws-ses/aws-ses.service';
-import anonymize from 'ip-anonymize';
-import randomColor from 'randomcolor';
+} from "@devbie/newbie/exceptions/errors.constants";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { compareHash } from "@devbie/newbie/utilities/common.util";
+import { SignUpDto } from "@modules/account/auth/auth.dto";
+import { Expose, expose } from "@modules/account/helpers/expose";
+import { verifyEmail } from "@modules/account/helpers/validator";
+import { GeolocationService } from "@modules/account/helpers/geolocation.service";
+import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
+import { SessionService } from "@modules/account/modules/session/session.service";
+import { CookieService } from "@modules/account/security/cookie/cookie.service";
+import { TokenService } from "@modules/account/security/token/token.service";
+import { TokenSubject } from "@modules/account/security/token/token.constants";
+import { LimitLoginByUserService } from "@modules/account/security/rate-limiter/rate-limiter.service";
+import { AwsSesService } from "@modules/aws-ses/aws-ses.service";
+import anonymize from "ip-anonymize";
+import randomColor from "randomcolor";
 
 @Injectable()
 export class AuthService {
@@ -47,9 +47,9 @@ export class AuthService {
     private readonly approvedSubnetService: ApprovedSubnetService,
     private readonly geolocationService: GeolocationService,
     private readonly ses: AwsSesService,
-    private readonly limitLoginByUserService: LimitLoginByUserService
+    private readonly limitLoginByUserService: LimitLoginByUserService,
   ) {
-    this.appFrontendUrl = this.config.getOrThrow('framework.app.frontendUrl');
+    this.appFrontendUrl = this.config.getOrThrow("framework.app.frontendUrl");
   }
 
   async login(params: {
@@ -62,7 +62,7 @@ export class AuthService {
   }) {
     // [step 0] Check email and location.
     if (!params.skipEmailCheck) {
-      await this.checkEmailOnLogin({userId: params.userId});
+      await this.checkEmailOnLogin({ userId: params.userId });
     }
     if (!params.skipLocationCheck) {
       await this.checkLocationOnLogin({
@@ -72,12 +72,12 @@ export class AuthService {
     }
 
     // [step 1] Disable active sessions, update last login time, and generate new tokens atomically.
-    const session = await this.prisma.$transaction(async tx => {
-      await tx.session.deleteMany({where: {userId: params.userId}});
+    const session = await this.prisma.$transaction(async (tx) => {
+      await tx.session.deleteMany({ where: { userId: params.userId } });
 
       await tx.user.update({
-        where: {id: params.userId},
-        data: {lastLoginAt: new Date()},
+        where: { id: params.userId },
+        data: { lastLoginAt: new Date() },
       });
 
       return await this.sessionService.generateWithTransaction(tx, {
@@ -102,14 +102,14 @@ export class AuthService {
     };
   }
 
-  async signup(params: {ipAddress: string; userData: SignUpDto}): Promise<Expose<User>> {
-    const {email, ...data} = params.userData;
+  async signup(params: { ipAddress: string; userData: SignUpDto }): Promise<Expose<User>> {
+    const { email, ...data } = params.userData;
 
     if (!verifyEmail(email)) {
       throw new BadRequestException(INVALID_EMAIL);
     }
 
-    if ((await this.prisma.user.count({where: {email}})) > 0) {
+    if ((await this.prisma.user.count({ where: { email } })) > 0) {
       throw new ConflictException(EMAIL_USER_CONFLICT);
     }
 
@@ -126,11 +126,11 @@ export class AuthService {
     } else if (data.username) {
       uiAvatarsName = data.username;
     } else {
-      uiAvatarsName = email.split('@')[0];
+      uiAvatarsName = email.split("@")[0];
     }
     const uiAvatarsUrl = `https://ui-avatars.com/api/?name=${uiAvatarsName}&background=${randomColor({
-      luminosity: 'light',
-    }).replace('#', '')}&color=000000`;
+      luminosity: "light",
+    }).replace("#", "")}&color=000000`;
 
     // Generate user gender
     if (!data.gender) {
@@ -138,12 +138,12 @@ export class AuthService {
         try {
           const prediction = await axios.get<{
             name: string;
-            gender: 'male' | 'female';
+            gender: "male" | "female";
             probability: number;
             count: number;
-          }>(`https://api.genderize.io/?name=${data.name.split(' ')[0]}`);
-          if (prediction.data.probability > 0.5 && prediction.data.gender === 'male') data.gender = UserGender.MALE;
-          if (prediction.data.probability > 0.5 && prediction.data.gender === 'female') data.gender = UserGender.FEMALE;
+          }>(`https://api.genderize.io/?name=${data.name.split(" ")[0]}`);
+          if (prediction.data.probability > 0.5 && prediction.data.gender === "male") data.gender = UserGender.MALE;
+          if (prediction.data.probability > 0.5 && prediction.data.gender === "female") data.gender = UserGender.FEMALE;
         } catch (error) {
           // Best-effort enrichment: gender prediction is optional and must not block sign-up.
           this.logger.debug(`Gender prediction failed for name "${data.name}": ${error}`);
@@ -153,31 +153,31 @@ export class AuthService {
 
     // Create user
     const user = await this.prisma.user.create({
-      data: {...data, email, emails: {create: {email}}, uiAvatarsUrl},
-      include: {emails: {select: {id: true}}},
+      data: { ...data, email, emails: { create: { email } }, uiAvatarsUrl },
+      include: { emails: { select: { id: true } } },
     });
 
     // In testing, we auto-approve the email
-    if (process.env.ENVIRONMENT !== 'production') {
+    if (process.env.ENVIRONMENT !== "production") {
       const emailId = user.emails[0]?.id;
       if (emailId)
         await this.prisma.email.update({
-          where: {id: emailId},
-          data: {isVerified: true},
+          where: { id: emailId },
+          data: { isVerified: true },
         });
     } else {
       await this.ses.sendEmailWithTemplate({
         toAddress: `"${user.name}" <${email}>`,
         template: {
-          'auth/verify-email': {
-            userName: user.name || 'Dear',
+          "auth/verify-email": {
+            userName: user.name || "Dear",
             link: `${this.config.get<string>(
-              'framework.app.frontendUrl'
+              "framework.app.frontendUrl",
             )}/auth/link/verify-email?token=${this.tokenService.sign({
-              payload: {id: user.emails[0].id},
+              payload: { id: user.emails[0].id },
               options: {
                 subject: TokenSubject.APPROVE_EMAIL_TOKEN,
-                expiresIn: '7d',
+                expiresIn: "7d",
               },
             })}`,
             linkValidDays: 7,
@@ -190,7 +190,7 @@ export class AuthService {
     return expose(user);
   }
 
-  async refreshAccessToken(params: {refreshToken: string; response: Response}) {
+  async refreshAccessToken(params: { refreshToken: string; response: Response }) {
     // [step 1]  Refresh
     const session = await this.sessionService.refresh(params.refreshToken);
 
@@ -205,27 +205,27 @@ export class AuthService {
     };
   }
 
-  private async checkEmailOnLogin(params: {userId: string}) {
+  private async checkEmailOnLogin(params: { userId: string }) {
     const user = await this.prisma.user.findUnique({
-      where: {id: params.userId},
-      select: {email: true, name: true, emails: true},
+      where: { id: params.userId },
+      select: { email: true, name: true, emails: true },
     });
     if (!user) throw new NotFoundException(USER_NOT_FOUND);
 
-    if (!user.emails.find(i => i.email === user.email)?.isVerified) throw new UnauthorizedException(UNVERIFIED_EMAIL);
+    if (!user.emails.find((i) => i.email === user.email)?.isVerified) throw new UnauthorizedException(UNVERIFIED_EMAIL);
   }
 
-  private async checkLocationOnLogin(params: {userId: string; ipAddress: string}): Promise<void> {
+  private async checkLocationOnLogin(params: { userId: string; ipAddress: string }): Promise<void> {
     const user = await this.prisma.user.findUnique({
-      where: {id: params.userId},
-      select: {email: true, name: true, checkLocationOnLogin: true},
+      where: { id: params.userId },
+      select: { email: true, name: true, checkLocationOnLogin: true },
     });
     if (!user) throw new NotFoundException(USER_NOT_FOUND);
     if (!user.checkLocationOnLogin) return;
 
     const subnet = anonymize(params.ipAddress);
     const previousSubnets = await this.prisma.approvedSubnet.findMany({
-      where: {user: {id: params.userId}},
+      where: { user: { id: params.userId } },
     });
     let isApproved = false;
     for await (const item of previousSubnets) {
@@ -236,20 +236,20 @@ export class AuthService {
       const location = await this.geolocationService.getLocation(params.ipAddress);
       const locationName =
         [location?.city?.names?.en, (location?.subdivisions ?? [])[0]?.names?.en, location?.country?.names?.en]
-          .filter(i => i)
-          .join(', ') || 'Unknown location';
+          .filter((i) => i)
+          .join(", ") || "Unknown location";
       if (user.email) {
         this.ses.sendEmailWithTemplate({
           toAddress: user.email,
           template: {
-            'auth/verify-subnet': {
-              userName: user.name ?? 'friend',
+            "auth/verify-subnet": {
+              userName: user.name ?? "friend",
               locationName,
               link: `${this.appFrontendUrl}/auth/link/approve-subnet?token=${this.tokenService.sign({
-                payload: {userId: params.userId},
+                payload: { userId: params.userId },
                 options: {
                   subject: TokenSubject.APPROVE_SUBNET_TOKEN,
-                  expiresIn: '30m',
+                  expiresIn: "30m",
                 },
               })}`,
               linkValidMinutes: 30,

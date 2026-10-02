@@ -1,19 +1,19 @@
-import {Body, Controller, Headers, Ip, Post, Req, Res} from '@nestjs/common';
-import {ApiBearerAuth, ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {Response} from 'express';
-import {AuthService} from '@modules/account/auth/auth.service';
-import {GuardByPassword} from '@modules/account/security/passport/password/password.decorator';
-import {UserRequest} from '@modules/account/account.interface';
-import {LimitLoginByIp, LimitLoginByUser} from '@modules/account/security/rate-limiter/rate-limiter.decorator';
-import {LimitLoginByIpService} from '@modules/account/security/rate-limiter/rate-limiter.service';
-import {LoginByPasswordRequestDto, LoginByPasswordResponseDto} from '@modules/account/auth/auth.dto';
+import { Body, Controller, Headers, Ip, Post, Req, Res } from "@nestjs/common";
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Response } from "express";
+import { AuthService } from "@modules/account/auth/auth.service";
+import { GuardByPassword } from "@modules/account/security/passport/password/password.decorator";
+import { UserRequest } from "@modules/account/account.interface";
+import { LimitLoginByIp, LimitLoginByUser } from "@modules/account/security/rate-limiter/rate-limiter.decorator";
+import { LimitLoginByIpService } from "@modules/account/security/rate-limiter/rate-limiter.service";
+import { LoginByPasswordRequestDto, LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
 
-@ApiTags('Account / Auth')
-@Controller('auth')
+@ApiTags("Account / Auth")
+@Controller("auth")
 export class LoginByPasswordController {
   constructor(
     private readonly authService: AuthService,
-    private readonly limitLoginByIpService: LimitLoginByIpService
+    private readonly limitLoginByIpService: LimitLoginByIpService,
   ) {}
 
   /**
@@ -25,19 +25,19 @@ export class LoginByPasswordController {
    * [2] email
    * [3] phone
    */
-  @Post('login-by-password')
+  @Post("login-by-password")
   @LimitLoginByIp()
   @LimitLoginByUser()
   @GuardByPassword()
   @ApiBearerAuth()
-  @ApiOperation({summary: 'Login with account and password'})
-  @ApiResponse({type: LoginByPasswordResponseDto})
+  @ApiOperation({ summary: "Login with account and password" })
+  @ApiResponse({ type: LoginByPasswordResponseDto })
   async loginByPassword(
     @Body() body: LoginByPasswordRequestDto, // Is it required for guard?
     @Ip() ipAddress: string,
-    @Headers('User-Agent') userAgent: string,
+    @Headers("User-Agent") userAgent: string,
     @Req() request: UserRequest,
-    @Res({passthrough: true}) response: Response
+    @Res({ passthrough: true }) response: Response,
   ): Promise<LoginByPasswordResponseDto> {
     const loginResult = await this.authService.login({
       ipAddress,
