@@ -1,5 +1,4 @@
 import { Global, Module } from "@nestjs/common";
-import { SecurityModule } from "@modules/security/security.module";
 import { TwoFactorModule } from "../modules/two-factor/two-factor.module";
 
 import { LoginByApprovedSubnetController } from "./login-by-approved-subnet.controller";
@@ -26,7 +25,7 @@ import { GoogleStrategy } from "./strategies/google.strategy";
 
 @Global()
 @Module({
-  imports: [SecurityModule, TwoFactorModule],
+  imports: [TwoFactorModule],
   controllers: [
     LoginByApprovedSubnetController,
     LoginByGoogleController,

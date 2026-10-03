@@ -1,5 +1,4 @@
 import { Global, Module } from "@nestjs/common";
-import { SecurityModule } from "@modules/security/security.module";
 import { ACCESS_TOKEN_SESSION_RESOLVER } from "@modules/security/ports/access-token-session.resolver";
 import { API_KEY_VERIFIER } from "@modules/security/ports/api-key.verifier";
 import { PERMISSION_AUTHORIZER } from "@modules/security/ports/permission.authorizer";
@@ -28,7 +27,6 @@ import { AccountLoginAccountResolver } from "./security-ports/login-account.reso
 @Module({
   imports: [
     AuthModule,
-    SecurityModule,
 
     ApiKeyModule,
     ApprovedSubnetModule,
