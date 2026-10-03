@@ -126,7 +126,7 @@ export class SecurityAlertService {
         return;
       }
 
-      const [project, scan, application] = await this.loadScope(scope);
+      const { project, scan, application } = await this.loadScope(scope);
       if (!project || !scan || scan.status !== "SUCCESS") {
         return;
       }
@@ -187,7 +187,7 @@ export class SecurityAlertService {
               spike,
               scopeLabel,
               sourceLabel,
-            },
+            } as Prisma.InputJsonValue,
             sourceModule: scope.sourceModule,
             scanId: scope.scanId,
             projectId: scope.projectId,
