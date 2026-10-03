@@ -1,17 +1,15 @@
 # task-scheduling
 
-通用进程内调度平台。业务代码注册 handler、声明默认任务；调度器以数据库行为准，将任务定义同步为 cron 作业，并记录每次执行历史。
+General-purpose in-process scheduling platform. Business code registers handlers and declares default jobs; the scheduler treats database rows as the source of truth, syncing job declarations into cron jobs and recording every execution history.
 
-## 工作模型
+## Working model
 
-1. **注册 handler**：业务模块注入 `HandlerRegistryService`，在启动时 `registerHandler(key, fn)`，`fn` 签名为 `(payload?: unknown) => Promise<void>`。
-2. **声明默认任务**：注入 `TaskSchedulerService`，调用 `upsertJobDeclaration({ key, handlerKey, cronExpr, timezone })`。声明只创建缺失行，运行后可在数据库中暂停任务、修改 cron，重新启动不会被覆盖。
-3. **reconcile**：调度器每 30 秒把启用的任务同步为动态 cron 作业（`@nestjs/schedule` + `cron`），停用或删除的任务会被移除。
-4. **执行与防重入**：到点触发对应 handler；同一任务上次运行未结束时本次记为 `skipped`（进程内防重入，不做分布式锁）。手动触发走 `POST /task-scheduling/jobs/:key/trigger`。
-5. **运行时编辑**：`PATCH /task-scheduling/jobs/:key` 可改 `enabled` / `cronExpr` / `timezone`（非法 cron/时区返回 400），保存后立即 reconcile 生效，无需等下一个 30s tick；`key`/`handlerKey`/`payload` 仍归声明侧所有。
-6. **执行历史**：`ScheduledJobRun` 记录 trigger（schedule/manual）、status（running/success/failed/skipped）、耗时与错误信息。
+1. **Register handlers**: business modules inject `HandlerRegistryService` and call `registerHandler(key, fn)` at startup; `fn` has signature `(payload?: unknown) => Promise<void>`.
+2. **Declare default jobs**: inject `TaskSchedulerService` and call `upsertJobDeclaration({ key, handlerKey, cronExpr, timezone })`. Declarations only create missing rows. At runtime jobs can be paused or their cron changed in the database; restarts do not overwrite them.
 
-## 装配约定
+As a convenience, a concrete job can instead extend the abstract `ScheduledTask` base class (from `scheduler/scheduled-task.ts`): declare `jobKey`/`cronExpr`/`timezone`/`enabled` and implement `handle()`; the base class registers the handler and declares the job on module init. 3. **Reconcile**: every 30 seconds the scheduler syncs enabled jobs into dynamic cron jobs (`@nestjs/schedule` + `cron`); disabled or deleted jobs are removed. 4. **Execution and reentrancy guard**: when due, the corresponding handler fires; if the previous run of the same job has not finished, the current run is recorded as `skipped` (in-process reentrancy guard, no distributed lock). Manual triggers go through `POST /task-scheduling/jobs/:key/trigger`. 5. **Runtime editing**: `PATCH /task-scheduling/jobs/:key` can change `enabled` / `cronExpr` / `timezone` (invalid cron/timezone returns 400). Changes trigger an immediate reconcile without waiting for the next 30s tick; `key`/`handlerKey`/`payload` remain owned by the declaration side. 6. **Execution history**: `ScheduledJobRun` records trigger (schedule/manual), status (running/success/failed/skipped), duration, and error message.
 
-- 本模块唯一持有 `ScheduleModule.forRoot()` 并将其 re-export；同一应用内不要再导入第二个 forRoot，否则 `@Cron` 处理器会被注册两次。
-- 默认时区 `Asia/Shanghai`。
+## Assembly conventions
+
+- This module is the sole owner of `ScheduleModule.forRoot()` and re-exports it; do not import a second forRoot in the same application, otherwise `@Cron` handlers will be registered twice.
+- Default timezone is `Asia/Shanghai`.
