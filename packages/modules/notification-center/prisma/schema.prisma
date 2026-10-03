@@ -1,0 +1,83 @@
+// !! ------------------------------------------------------------ //
+// !!            [Module] Notification Center models         //
+// !! ------------------------------------------------------------ //
+// * Notification                                                 //
+// * NotificationReceipt                                          //
+// * NotificationSetting                                          //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+// One platform-wide row per notification event (e.g. one digest per completed
+// scan). Per-user read state lives in NotificationReceipt, so fan-out needs
+// no writes: a missing receipt simply means "unread" for that user.
+model Notification {
+  id            String    @id @default(uuid()) @db.Uuid
+  // security-scan-digest | security-spike
+  type          String    @db.VarChar(40)
+  // critical | high | medium | low | unknown — highest severity covered by
+  // this notification.
+  severity      String    @db.VarChar(10)
+  title         String    @db.VarChar(512)
+  detail        String?   @db.Text
+  // Structured context: new/open severity counts, top new findings, spike
+  // statistics, and the scope label (application name for dependency scans).
+  payload       Json?
+  sourceModule  String    @db.VarChar(40)
+  scanId        String?   @db.Uuid
+  projectId     String?   @db.Uuid
+  applicationId String?   @db.Uuid
+  // Frontend relative path the notification deep-links to.
+  link          String?   @db.VarChar(512)
+  createdAt     DateTime  @default(now())
+
+  receipts NotificationReceipt[]
+
+  // Idempotency: at most one digest per (source module, scan), so a re-fired
+  // scan-completed event never produces a duplicate notification.
+  @@unique([sourceModule, scanId])
+  @@index([createdAt])
+  @@index([projectId])
+  @@schema("module/notification-center")
+}
+
+// Lazy per-user read marker, created only when a user opens / marks a
+// notification. Deleting a notification removes its markers.
+model NotificationReceipt {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @db.Uuid
+  notificationId String       @db.Uuid
+  readAt         DateTime     @default(now())
+  createdAt      DateTime     @default(now())
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, notificationId])
+  @@index([userId])
+  @@schema("module/notification-center")
+}
+
+// Singleton (fixed id) platform notification settings; the row is created on
+// first read with the defaults below.
+model NotificationSetting {
+  id      Int @id
+
+  inAppEnabled Boolean @default(true)
+  // Master switch for Lark/Slack push through the message-bot module.
+  pushEnabled Boolean @default(false)
+  // New findings below this severity do not produce any notification.
+  minimumSeverity String @default("high") @db.VarChar(10)
+  // Scalar id of a message-bot channel group; no cross-schema relation. Every
+  // channel (Lark/Slack) in the group receives the push.
+  channelGroupId String? @db.Uuid
+
+  // Spike (sudden increase) rule: flag a scan when the number of new
+  // high+ findings is at least max(spikeThreshold, 2 x trailing daily
+  // average) and strictly above that average.
+  spikeEnabled      Boolean @default(true)
+  spikeThreshold    Int     @default(5)
+  spikeBaselineDays Int     @default(7)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/notification-center")
+}

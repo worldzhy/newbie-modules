@@ -1,0 +1,11 @@
+{
+  "key": "notification-center",
+  "module": {
+    "file": "notification-center.module",
+    "className": "NotificationCenterModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {},
+  "env": {},
+  "dependencies": {}
+}
