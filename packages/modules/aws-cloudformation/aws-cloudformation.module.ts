@@ -6,7 +6,7 @@ import {AwsCloudformationStackService} from './stack/stack.service';
 import {AwsEnvironmentController} from './environment/environment.controller';
 import {AwsEnvironmentService} from './environment/environment.service';
 import {AwsSecretKeyTokenService} from './token/secretkey-token.service';
-import {AwsCloudformationService} from './cloudformation.service';
+import {AwsCloudformationService} from './aws-cloudformation.service';
 
 @Global()
 @Module({
@@ -14,7 +14,7 @@ import {AwsCloudformationService} from './cloudformation.service';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow<string>('modules.cloudformation.token.secret'),
+        secret: config.getOrThrow<string>('modules.aws-cloudformation.token.secret'),
       }),
     }),
   ],
