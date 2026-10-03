@@ -43,10 +43,10 @@ model User {
   emails               Email[]
   sessions             Session[]
 
-  // 微信小程序相关字段
-  wechatOpenId     String? @unique // 微信用户唯一标识
-  wechatUnionId    String? // 微信开放平台唯一标识
-  wechatSessionKey String? // 微信会话密钥
+  // WeChat mini-program fields
+  wechatOpenId     String? @unique // Unique WeChat user identifier
+  wechatUnionId    String? // Unique WeChat Open Platform identifier
+  wechatSessionKey String? // WeChat session key
 
   @@schema("module/account")
 }

@@ -16,8 +16,9 @@
 model NotificationType {
   key            String    @id @db.VarChar(100)
   name           String    @db.VarChar(255)
-  // Handlebars-style template rendered with the notify() context, e.g.
-  // "{{project}} {{source}} 新增 {{count}} 个风险".
+  // Handlebars-style template rendered with the notify() context.
+  // Chinese example of a seeded default:
+  // "{{project}} {{source}} 新增 {{count}} 个风险"
   titleTemplate  String    @db.VarChar(512)
   // Optional multi-line detail template.
   detailTemplate String?   @db.Text
