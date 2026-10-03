@@ -1,6 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsBoolean, IsIn, IsObject, IsOptional, IsString, ValidateNested } from "class-validator";
-import { Type } from "class-transformer";
+import { IsBoolean, IsIn, IsObject, IsOptional, IsString } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { SEVERITIES } from "./notification-center.constants";
 
@@ -56,8 +55,6 @@ export class NotifyDto {
   @ApiProperty({ type: Object, required: false, description: "Values interpolated into the type templates" })
   @IsOptional()
   @IsObject()
-  @ValidateNested()
-  @Type(() => Object)
   context?: Record<string, unknown>;
 
   @ApiProperty({ enum: SEVERITIES, required: false, description: "Override the type default severity" })
