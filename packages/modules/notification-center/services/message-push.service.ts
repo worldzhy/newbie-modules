@@ -47,8 +47,11 @@ export class MessagePushService {
   ): Promise<MessagePushResult> {
     const result: MessagePushResult = { succeeded: 0, failed: 0 };
     for (const channel of channels) {
+      // Platform values are stored as "Lark"/"Slack" (MessageBotPlatform enum);
+      // compare case-insensitively to tolerate legacy lowercase rows.
+      const platform = channel.platform.toLowerCase();
       try {
-        if (channel.platform === "lark") {
+        if (platform === "lark") {
           if (!this.larkMessageBotService) {
             throw new Error("Lark message bot service is unavailable");
           }
@@ -58,7 +61,7 @@ export class MessagePushService {
               typeof response.error === "object" ? JSON.stringify(response.error) : String(response.error),
             );
           }
-        } else if (channel.platform === "slack") {
+        } else if (platform === "slack") {
           if (!this.slackMessageBotService) {
             throw new Error("Slack message bot service is unavailable");
           }
