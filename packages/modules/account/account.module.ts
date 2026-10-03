@@ -49,6 +49,15 @@ import { AccountLoginAccountResolver } from "./security-ports/login-account.reso
     { provide: PERMISSION_AUTHORIZER, useClass: AccountPermissionAuthorizer },
     { provide: LOGIN_ACCOUNT_RESOLVER, useClass: AccountLoginAccountResolver },
   ],
-  exports: [AccountService, GeolocationService],
+  exports: [
+    AccountService,
+    GeolocationService,
+    // Re-export the SPI bindings so the security foundation module can inject
+    // them (cross-module Symbol-token providers require explicit export).
+    ACCESS_TOKEN_SESSION_RESOLVER,
+    API_KEY_VERIFIER,
+    PERMISSION_AUTHORIZER,
+    LOGIN_ACCOUNT_RESOLVER,
+  ],
 })
 export class AccountModule {}
