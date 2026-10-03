@@ -1,6 +1,6 @@
 import { Body, Controller, Post, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { UserRequest } from "../../account.interface";
+import { UserRequest } from "@modules/security/security.interface";
 import { AuditLogService, AuditEvent } from "../audit-logs/audit-log.service";
 import { DisableTwoFactorDto, EnableTwoFactorDto } from "./two-factor.dto";
 import { TwoFactorService } from "./two-factor.service";

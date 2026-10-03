@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import type { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { UpdateMeDto } from "./account.dto";
-import { UserRequest } from "./account.interface";
+import { UserRequest } from "@modules/security/security.interface";
 import { buildUiAvatarsUrl } from "./helpers/ui-avatar";
 
 const nameFields = ["name", "firstName", "middleName", "lastName"] as const;

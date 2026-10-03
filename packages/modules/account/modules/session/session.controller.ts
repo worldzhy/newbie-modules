@@ -5,7 +5,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Expose, expose } from "../../helpers/expose";
 import { SessionResponseDto, SessionsListRequestDto, SessionsListResponseDto } from "./session.dto";
 import { SESSION_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
-import { UserRequest } from "../../account.interface";
+import { UserRequest } from "@modules/security/security.interface";
 import { SelfOnlyGuard } from "@modules/security/self-only/self-only.guard";
 
 @ApiTags("Account / Session")

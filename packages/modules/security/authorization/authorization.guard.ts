@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, InternalServerErrorException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
+import { PERMISSION_KEY } from "./authorization.decorator";
 import { TokenService } from "../token/token.service";
 import { PERMISSION_AUTHORIZER, PermissionAuthorizer } from "../ports/permission.authorizer";
 import { Optional } from "@nestjs/common";
