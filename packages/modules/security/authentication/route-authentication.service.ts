@@ -1,7 +1,7 @@
 import { Injectable, MiddlewareConsumer, RequestMethod } from "@nestjs/common";
 import * as passport from "passport";
 import { RouteInfo } from "@nestjs/common/interfaces";
-import { GuardType } from "../passport/guard.types";
+import { GuardType } from "./guard.types";
 
 export interface RouteMethodConfig {
   POST?: string[];
@@ -12,7 +12,7 @@ export interface RouteMethodConfig {
   ALL?: string[];
 }
 
-export interface SecurityMiddlewareConfig {
+export interface RouteAuthenticationConfig {
   guard: GuardType;
   routes: RouteMethodConfig;
 }
@@ -66,7 +66,7 @@ export class RouteAuthenticationService {
     guard: GuardType;
   }[] = [];
 
-  configureRouteAuthentication(configs: SecurityMiddlewareConfig[]) {
+  configureRouteAuthentication(configs: RouteAuthenticationConfig[]) {
     configs.forEach((config) => {
       if (config.routes.POST) {
         config.routes.POST.forEach((path) => {

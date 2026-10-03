@@ -1,6 +1,6 @@
 import {Controller, Get, Post, Patch, Param, Body, UseGuards, Req, BadRequestException, Query} from '@nestjs/common';
 import {ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiParam} from '@nestjs/swagger';
-import {JwtAuthGuard} from '@modules/security/passport/jwt/jwt.guard';
+import {JwtAuthGuard} from '@modules/security/authentication/jwt/jwt.guard';
 import {TaskService} from './task.service';
 import {UserRequest} from '@modules/security/security.interface';
 import {TaskCronService} from './task-cron.service';

@@ -4,7 +4,7 @@ import { MfaMethod } from "@generated/prisma/client";
 import { Response } from "express";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { TwoFactorService } from "@modules/account/modules/two-factor/two-factor.service";
-import { GuardByPassword } from "@modules/security/passport/password/password.decorator";
+import { GuardByPassword } from "@modules/security/authentication/password/password.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { LimitLoginByIp, LimitLoginByUser } from "@modules/security/rate-limiter/rate-limiter.decorator";
 import { LimitLoginByIpService } from "@modules/security/rate-limiter/rate-limiter.service";

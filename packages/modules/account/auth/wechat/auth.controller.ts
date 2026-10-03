@@ -1,7 +1,7 @@
 import { Controller, Post, Body, Ip, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { NoGuard } from "@modules/security/passport/public/public.decorator";
-import { GuardByRefreshToken } from "@modules/security/passport/refresh-token/refresh-token.decorator";
+import { NoGuard } from "@modules/security/authentication/public/public.decorator";
+import { GuardByRefreshToken } from "@modules/security/authentication/refresh-token/refresh-token.decorator";
 import { TokenService } from "@modules/security/token/token.service";
 import { LimitLoginByUserService } from "@modules/security/rate-limiter/rate-limiter.service";
 import { SessionService } from "@modules/account/modules/session/session.service";

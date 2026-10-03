@@ -15,11 +15,11 @@ import { IS_LOGGING_IN_VERIFICATION_CODE_KEY } from "./verification-code/verific
 import { IS_REFRESHING_ACCESS_TOKEN_KEY } from "./refresh-token/refresh-token.decorator";
 import { IS_LOGGING_IN_APIKEY_KEY } from "./api-key/api-key.decorator";
 import { IS_LOGGING_IN_GOOGLE_KEY } from "./google-oauth/google.decorator";
-import { RouteAuthenticationService } from "../route-authentication/route-authentication.service";
+import { RouteAuthenticationService } from "./route-authentication.service";
 import { GuardType } from "./guard.types";
 
 @Injectable()
-export class PassportGuard extends AuthGuard("authentication") {
+export class AuthenticationGuard extends AuthGuard("authentication") {
   constructor(
     private readonly config: ConfigService,
     private readonly routeAuthenticationService: RouteAuthenticationService,
@@ -97,8 +97,7 @@ export class PassportGuard extends AuthGuard("authentication") {
     }
 
     // JWT guard is the default guard.
-    const defaultGuard =
-      (this.config.get<string>("modules.security.defaultGuard") as GuardType) || GuardType.JWT;
+    const defaultGuard = (this.config.get<string>("modules.security.defaultGuard") as GuardType) || GuardType.JWT;
 
     switch (defaultGuard) {
       case GuardType.NONE:

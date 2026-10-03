@@ -1,7 +1,7 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-google-oauth20";
-import { GoogleUserReqDto, GoogleUserResDto } from "@modules/security/passport/google-oauth/dto/google-user.dto";
+import { GoogleUserReqDto, GoogleUserResDto } from "@modules/security/authentication/google-oauth/dto/google-user.dto";
 import { ConfigService } from "@nestjs/config";
 
 @Injectable()

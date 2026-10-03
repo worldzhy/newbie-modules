@@ -1,6 +1,6 @@
 import { Body, Controller, Headers, Post, UnauthorizedException } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { NoGuard } from "@modules/security/passport/public/public.decorator";
+import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 
 import { HeartbeatPingDto, HeartbeatPingResponseDto } from "../heartbeat.dto";
 import { HeartbeatInstallationService } from "../services/installation.service";

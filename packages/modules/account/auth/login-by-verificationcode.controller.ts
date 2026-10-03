@@ -6,9 +6,9 @@ import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/
 import { UserRequest } from "@modules/security/security.interface";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
-import { NoGuard } from "@modules/security/passport/public/public.decorator";
+import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 import { LimitLoginByIp, LimitLoginByUser } from "@modules/security/rate-limiter/rate-limiter.decorator";
-import { GuardByVerificationCode } from "@modules/security/passport/verification-code/verification-code.decorator";
+import { GuardByVerificationCode } from "@modules/security/authentication/verification-code/verification-code.decorator";
 import { UserService } from "@modules/account/modules/user/user.service";
 import { VerificationCodeService } from "@modules/account/modules/verification-code/verification-code.service";
 import { AwsSesService } from "@modules/aws-ses/aws-ses.service";

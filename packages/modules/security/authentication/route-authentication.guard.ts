@@ -1,12 +1,12 @@
 import { Injectable, ExecutionContext } from "@nestjs/common";
 import { RouteAuthenticationService } from "./route-authentication.service";
-import { GuardType } from "../passport/guard.types";
-import { ApiKeyAuthGuard } from "../passport/api-key/api-key.guard";
-import { JwtAuthGuard } from "../passport/jwt/jwt.guard";
-import { PasswordAuthGuard } from "../passport/password/password.guard";
-import { VerificationCodeAuthGuard } from "../passport/verification-code/verification-code.guard";
-import { RefreshTokenAuthGuard } from "../passport/refresh-token/refresh-token.guard";
-import { GoogleAuthGuard } from "../passport/google-oauth/google.guard";
+import { GuardType } from "./guard.types";
+import { ApiKeyAuthGuard } from "./api-key/api-key.guard";
+import { JwtAuthGuard } from "./jwt/jwt.guard";
+import { PasswordAuthGuard } from "./password/password.guard";
+import { VerificationCodeAuthGuard } from "./verification-code/verification-code.guard";
+import { RefreshTokenAuthGuard } from "./refresh-token/refresh-token.guard";
+import { GoogleAuthGuard } from "./google-oauth/google.guard";
 
 @Injectable()
 export class RouteAuthenticationGuard {

@@ -16,7 +16,7 @@ import { AuthService } from "@modules/account/auth/auth.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
 import { TokenService } from "@modules/security/token/token.service";
 import { TokenSubject } from "@modules/security/token/token.constants";
-import { NoGuard } from "@modules/security/passport/public/public.decorator";
+import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 import { LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
 
 @ApiTags("Account / Auth")

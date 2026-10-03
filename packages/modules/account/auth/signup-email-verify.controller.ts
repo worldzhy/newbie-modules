@@ -4,7 +4,7 @@ import { NO_TOKEN_PROVIDED, EMAIL_NOT_FOUND } from "@devbie/newbie/exceptions/er
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TokenService } from "@modules/security/token/token.service";
 import { TokenSubject } from "@modules/security/token/token.constants";
-import { NoGuard } from "@modules/security/passport/public/public.decorator";
+import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 
 @ApiTags("Account / Auth")
 @Controller("auth")

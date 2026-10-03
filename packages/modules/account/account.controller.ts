@@ -10,7 +10,7 @@ import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
 import { VerificationCodeService } from "@modules/account/modules/verification-code/verification-code.service";
 import { AuditLogService, AuditEvent } from "@modules/account/modules/audit-logs/audit-log.service";
 import { LimitLoginByIp } from "@modules/security/rate-limiter/rate-limiter.decorator";
-import { NoGuard } from "@modules/security/passport/public/public.decorator";
+import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 import {
   ChangePasswordDto,
   GetCurrentUserResponseDto,

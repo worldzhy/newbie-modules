@@ -3,7 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags, ApiCookieAuth } from "@nestjs/swagg
 import { Response } from "express";
 import { Cookies } from "@devbie/newbie/decorators/cookie.decorator";
 import { CookieName } from "@modules/security/cookie/cookie.service";
-import { GuardByRefreshToken } from "@modules/security/passport/refresh-token/refresh-token.decorator";
+import { GuardByRefreshToken } from "@modules/security/authentication/refresh-token/refresh-token.decorator";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
 
