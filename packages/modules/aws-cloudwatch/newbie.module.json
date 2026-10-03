@@ -9,23 +9,18 @@
   "config-service": {
     "cloudwatch": {
       "cryptoEncryptKey": "process.env.AWS_CLOUDWATCH_CRYPTO_ENCRYPT_KEY",
-      "cryptoEncryptIV": "process.env.AWS_CLOUDWATCH_CRYPTO_ENCRYPT_IV",
-      "ai": {
-        "deepseekKey": "process.env.AWS_CLOUDWATCH_AI_DEEPSEEK_KEY"
-      }
+      "cryptoEncryptIV": "process.env.AWS_CLOUDWATCH_CRYPTO_ENCRYPT_IV"
     }
   },
   "env": {
     "AWS_CLOUDWATCH_CRYPTO_ENCRYPT_KEY": "",
-    "AWS_CLOUDWATCH_CRYPTO_ENCRYPT_IV": "",
-    "AWS_CLOUDWATCH_AI_DEEPSEEK_KEY": ""
+    "AWS_CLOUDWATCH_CRYPTO_ENCRYPT_IV": ""
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "latest",
     "@aws-sdk/client-ec2": "latest",
     "@aws-sdk/client-rds": "latest",
-    "dayjs": "latest",
-    "openai": "^6.34.0"
+    "dayjs": "latest"
   },
   "devDependencies": {}
 }

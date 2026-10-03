@@ -49,10 +49,10 @@ export class AiAnalysisService {
   ) {
     // DeepSeek exposes an OpenAI-compatible API. A missing key must not crash
     // the whole application at startup — AI analysis is an optional feature.
-    const apiKey = this.configService.get<string>('modules.cloudwatch.ai.deepseekKey');
+    const apiKey = this.configService.get<string>('modules.backendMonitor.deepseekKey');
     if (!apiKey) {
       this.logger.warn(
-        'modules.cloudwatch.ai.deepseekKey is not configured; AI analysis endpoints will be unavailable.'
+        'modules.backendMonitor.deepseekKey is not configured; AI analysis endpoints will be unavailable.'
       );
       return;
     }
