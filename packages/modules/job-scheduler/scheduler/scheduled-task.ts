@@ -1,5 +1,5 @@
 import { Inject, Logger, OnModuleInit } from "@nestjs/common";
-import { TaskSchedulerService } from "./task-scheduler.service";
+import { JobSchedulerService } from "./job-scheduler.service";
 import { HandlerRegistryService } from "./handler-registry.service";
 
 /**
@@ -17,15 +17,15 @@ export abstract class ScheduledTask implements OnModuleInit {
   protected abstract readonly enabled: boolean;
   protected abstract readonly logger: Logger;
 
-  @Inject(TaskSchedulerService)
-  protected readonly taskScheduler!: TaskSchedulerService;
+  @Inject(JobSchedulerService)
+  protected readonly jobScheduler!: JobSchedulerService;
 
   @Inject(HandlerRegistryService)
   protected readonly handlerRegistry!: HandlerRegistryService;
 
   async onModuleInit(): Promise<void> {
     this.handlerRegistry.registerHandler(this.jobKey, (payload) => this.handle(payload));
-    await this.taskScheduler.upsertJobDeclaration({
+    await this.jobScheduler.upsertJobDeclaration({
       key: this.jobKey,
       handlerKey: this.jobKey,
       cronExpr: this.cronExpr,

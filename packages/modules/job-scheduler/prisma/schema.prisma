@@ -1,5 +1,5 @@
 // ! ------------------------------------------------------------ //
-// !           [Module] Task scheduling models              //
+// !           [Module] Job scheduler models              //
 // ! ------------------------------------------------------------ //
 // * ScheduledJob                                                 //
 // * ScheduledJobRun                                              //
@@ -22,7 +22,7 @@ model ScheduledJob {
 
   runs ScheduledJobRun[]
 
-  @@schema("module/task-scheduling")
+  @@schema("module/job-scheduler")
 }
 
 /// Execution history for one job run. `status="skipped"` records a reentry
@@ -42,5 +42,5 @@ model ScheduledJobRun {
   job ScheduledJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId, startedAt])
-  @@schema("module/task-scheduling")
+  @@schema("module/job-scheduler")
 }

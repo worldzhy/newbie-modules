@@ -16,7 +16,7 @@ export interface NotificationSettingListItem {
 
 /**
  * Database-side declaration lifecycle for notifications. Mirrors
- * task-scheduling's TaskSchedulerService.upsertJobDeclaration: declarations
+ * job-scheduler's JobSchedulerService.upsertJobDeclaration: declarations
  * only create missing rows, never override runtime edits made by operators in
  * the settings UI.
  */

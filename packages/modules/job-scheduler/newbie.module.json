@@ -1,9 +1,9 @@
 {
-  "key": "task-scheduling",
+  "key": "job-scheduler",
   "layer": "capability",
   "module": {
-    "file": "task-scheduling.module",
-    "className": "TaskSchedulingModule"
+    "file": "job-scheduler.module",
+    "className": "JobSchedulerModule"
   },
   "schema": "prisma/schema.prisma",
   "dependencies": {

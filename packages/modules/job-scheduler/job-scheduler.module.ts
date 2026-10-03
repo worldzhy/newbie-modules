@@ -1,8 +1,8 @@
 import { Global, Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
 import { HandlerRegistryService } from "./scheduler/handler-registry.service";
-import { TaskSchedulerService } from "./scheduler/task-scheduler.service";
-import { TaskSchedulingController } from "./task-scheduling.controller";
+import { JobSchedulerService } from "./scheduler/job-scheduler.service";
+import { JobSchedulerController } from "./job-scheduler.controller";
 
 @Global()
 @Module({
@@ -10,8 +10,8 @@ import { TaskSchedulingController } from "./task-scheduling.controller";
   // forRoot more than once in one application registers every @Cron handler
   // twice. The re-export below makes SchedulerRegistry globally injectable.
   imports: [ScheduleModule.forRoot()],
-  controllers: [TaskSchedulingController],
-  providers: [HandlerRegistryService, TaskSchedulerService],
-  exports: [ScheduleModule, HandlerRegistryService, TaskSchedulerService],
+  controllers: [JobSchedulerController],
+  providers: [HandlerRegistryService, JobSchedulerService],
+  exports: [ScheduleModule, HandlerRegistryService, JobSchedulerService],
 })
-export class TaskSchedulingModule {}
+export class JobSchedulerModule {}

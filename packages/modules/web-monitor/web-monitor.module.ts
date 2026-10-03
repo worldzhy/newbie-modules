@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-// ScheduleModule.forRoot() is owned by the task-scheduling module when both
+// ScheduleModule.forRoot() is owned by the job-scheduler module when both
 // modules are assembled: a second forRoot would register every @Cron twice.
 // Shared MongoDB connection module, consumed via the microservices path alias.
 import { MongoModule } from "@modules/mongo/mongo.module";

@@ -12,7 +12,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { HandlerRegistryService, ScheduledHandler } from "./handler-registry.service";
 
 const RECONCILE_INTERVAL_MS = 30_000;
-const CRON_JOB_NAME_PREFIX = "task-scheduling:";
+const CRON_JOB_NAME_PREFIX = "job-scheduler:";
 const DEFAULT_TIMEZONE = "Asia/Shanghai";
 const DEFAULT_RUN_LIMIT = 50;
 const MAX_RUN_LIMIT = 200;
@@ -40,8 +40,8 @@ interface ScheduledJobRecord {
 }
 
 @Injectable()
-export class TaskSchedulerService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(TaskSchedulerService.name);
+export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(JobSchedulerService.name);
   /// Per-process reentry guard: keys of jobs whose run is still in progress.
   private readonly runningJobKeys = new Set<string>();
   /// What the in-memory cron jobs were built from, so reconcile can detect
