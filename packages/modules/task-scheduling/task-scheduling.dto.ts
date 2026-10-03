@@ -5,7 +5,7 @@ export class ScheduledJobDto {
   @ApiProperty()
   id: number;
 
-  @ApiProperty({ description: "Unique job key, e.g. daily-aws-audit-scan" })
+  @ApiProperty({ description: "Unique job key, e.g. aws-audit" })
   key: string;
 
   @ApiProperty({ description: "Key of the in-process handler that executes the job" })
