@@ -1,7 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import { PermissionAction, UserRole } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { PermissionAuthorizer } from "@modules/security/ports/permission.authorizer";
+import {
+  PermissionAuthorizer,
+  PermissionRequirement,
+} from "@modules/security/ports/permission.authorizer";
 
 /**
  * Account-side binding of security's PermissionAuthorizer port. Encapsulates
@@ -12,7 +15,7 @@ import { PermissionAuthorizer } from "@modules/security/ports/permission.authori
 export class AccountPermissionAuthorizer implements PermissionAuthorizer {
   constructor(private readonly prisma: PrismaService) {}
 
-  async authorize(userId: string, resource: string, action: string): Promise<boolean> {
+  async authorize(userId: string, { resource, action }: PermissionRequirement): Promise<boolean> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
     });

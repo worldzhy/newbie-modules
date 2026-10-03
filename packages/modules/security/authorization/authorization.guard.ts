@@ -2,7 +2,7 @@ import { CanActivate, ExecutionContext, Inject, Injectable, InternalServerErrorE
 import { Reflector } from "@nestjs/core";
 import { PERMISSION_KEY } from "./authorization.decorator";
 import { TokenService } from "../token/token.service";
-import { PERMISSION_AUTHORIZER, PermissionAuthorizer } from "../ports/permission.authorizer";
+import { PERMISSION_AUTHORIZER, PermissionAuthorizer, PermissionRequirement } from "../ports/permission.authorizer";
 import { Optional } from "@nestjs/common";
 
 @Injectable()
@@ -17,10 +17,10 @@ export class AuthorizationGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // [step 1] Get required permission.
-    const requiredPermission = this.reflector.getAllAndOverride<{
-      resource: string;
-      action: string;
-    }>(PERMISSION_KEY, [context.getHandler(), context.getClass()]);
+    const requiredPermission = this.reflector.getAllAndOverride<PermissionRequirement>(PERMISSION_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
 
     if (!requiredPermission) {
       return true;
@@ -41,6 +41,6 @@ export class AuthorizationGuard implements CanActivate {
       );
     }
 
-    return this.permissionAuthorizer.authorize(payload.userId, requiredPermission.resource, requiredPermission.action);
+    return this.permissionAuthorizer.authorize(payload.userId, requiredPermission);
   }
 }

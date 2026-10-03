@@ -38,6 +38,6 @@ export class RouteAuthorizationGuard implements CanActivate {
       );
     }
 
-    return this.permissionAuthorizer.authorize(payload.userId, requiredPermission.resource, requiredPermission.action);
+    return this.permissionAuthorizer.authorize(payload.userId, requiredPermission);
   }
 }

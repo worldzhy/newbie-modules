@@ -9,10 +9,19 @@
 
 export const PERMISSION_AUTHORIZER = Symbol("PERMISSION_AUTHORIZER");
 
+/**
+ * The single permission shape shared by the decorator metadata, the route
+ * authorization configuration and the SPI call boundary.
+ */
+export interface PermissionRequirement {
+  resource: string;
+  action: string;
+}
+
 export interface PermissionAuthorizer {
   /**
    * Returns true when the user (or one of their roles) holds the required
    * permission for the resource/action pair.
    */
-  authorize(userId: string, resource: string, action: string): Promise<boolean>;
+  authorize(userId: string, requirement: PermissionRequirement): Promise<boolean>;
 }

@@ -1,5 +1,6 @@
 import { Injectable, RequestMethod } from "@nestjs/common";
 import type { Request } from "express";
+import { PermissionRequirement } from "../ports/permission.authorizer";
 
 export interface RouteMethodConfig {
   POST?: string[];
@@ -10,15 +11,10 @@ export interface RouteMethodConfig {
   ALL?: string[];
 }
 
-export interface RoutePermissionRequirement {
-  action: string;
-  resource: string;
-}
-
 export type RouteAuthorizationPolicy = (req: Request) => boolean | Promise<boolean>;
 
 export interface RouteAuthorizationConfig {
-  permission?: RoutePermissionRequirement;
+  permission?: PermissionRequirement;
   policy?: RouteAuthorizationPolicy;
   routes: RouteMethodConfig;
 }
@@ -28,7 +24,7 @@ export class RouteAuthorizationService {
   private routeConfigs: {
     path: string;
     method: RequestMethod | "ALL";
-    permission?: RoutePermissionRequirement;
+    permission?: PermissionRequirement;
     policy?: RouteAuthorizationPolicy;
   }[] = [];
 
@@ -73,13 +69,13 @@ export class RouteAuthorizationService {
   private addRouteConfig(
     path: string,
     method: RequestMethod | "ALL",
-    permission?: RoutePermissionRequirement,
+    permission?: PermissionRequirement,
     policy?: RouteAuthorizationPolicy,
   ) {
     this.routeConfigs.push({ path, method, permission, policy });
   }
 
-  getPermissionForRoute(url: string, method: string): RoutePermissionRequirement | null {
+  getPermissionForRoute(url: string, method: string): PermissionRequirement | null {
     const config = this.routeConfigs.find((config) => {
       if (!url.includes(config.path)) {
         return false;
