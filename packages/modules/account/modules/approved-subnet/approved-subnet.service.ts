@@ -23,7 +23,7 @@ export class ApprovedSubnetService {
     // extra configuration in development.
     this.hmacSecret =
       config.get<string>("modules.account.approvedSubnet.hmacSecret") ||
-      config.getOrThrow<string>("modules.account.token.defaultSecret");
+      config.getOrThrow<string>("modules.security.token.defaultSecret");
   }
 
   async getApprovedSubnets(

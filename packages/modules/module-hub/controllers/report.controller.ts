@@ -1,6 +1,6 @@
 import { Body, Controller, Headers, Post, UnauthorizedException } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { NoGuard } from "@modules/account/security/passport/public/public.decorator";
+import { NoGuard } from "@modules/security/passport/public/public.decorator";
 
 import { HubReportDto, HubReportResponseDto } from "../module-hub.dto";
 import { ModuleHubInstallationService } from "../services/installation.service";

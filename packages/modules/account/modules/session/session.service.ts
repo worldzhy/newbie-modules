@@ -5,7 +5,7 @@ import { GeolocationService } from "@modules/account/helpers/geolocation.service
 import { UAParser } from "ua-parser-js";
 import { SESSION_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { secondsUntilUnixTimestamp } from "@devbie/newbie/utilities/datetime.util";
-import { TokenService } from "../../security/token/token.service";
+import { TokenService } from "@modules/security/token/token.service";
 
 @Injectable()
 export class SessionService {

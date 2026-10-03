@@ -1,9 +1,9 @@
 import { Controller, Post, Body, Ip, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { NoGuard } from "@modules/account/security/passport/public/public.decorator";
-import { GuardByRefreshToken } from "@modules/account/security/passport/refresh-token/refresh-token.decorator";
-import { TokenService } from "@modules/account/security/token/token.service";
-import { LimitLoginByUserService } from "@modules/account/security/rate-limiter/rate-limiter.service";
+import { NoGuard } from "@modules/security/passport/public/public.decorator";
+import { GuardByRefreshToken } from "@modules/security/passport/refresh-token/refresh-token.decorator";
+import { TokenService } from "@modules/security/token/token.service";
+import { LimitLoginByUserService } from "@modules/security/rate-limiter/rate-limiter.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { WechatAuthService } from "@modules/account/auth/wechat/auth.service";
 import {

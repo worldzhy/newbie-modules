@@ -25,10 +25,10 @@ import { GeolocationService } from "@modules/account/helpers/geolocation.service
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
 import { AuditLogService, AuditEvent } from "@modules/account/modules/audit-logs/audit-log.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
-import { CookieService } from "@modules/account/security/cookie/cookie.service";
-import { TokenService } from "@modules/account/security/token/token.service";
-import { TokenSubject } from "@modules/account/security/token/token.constants";
-import { LimitLoginByUserService } from "@modules/account/security/rate-limiter/rate-limiter.service";
+import { CookieService } from "@modules/security/cookie/cookie.service";
+import { TokenService } from "@modules/security/token/token.service";
+import { TokenSubject } from "@modules/security/token/token.constants";
+import { LimitLoginByUserService } from "@modules/security/rate-limiter/rate-limiter.service";
 import { AwsSesService } from "@modules/aws-ses/aws-ses.service";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
 

@@ -5,8 +5,8 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { MfaMethod } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { compareHash } from "@devbie/newbie/utilities/common.util";
-import { TokenService } from "../../security/token/token.service";
-import { TokenSubject } from "../../security/token/token.constants";
+import { TokenService } from "@modules/security/token/token.service";
+import { TokenSubject } from "@modules/security/token/token.constants";
 import { MfaTokenPayload } from "../../account.interface";
 
 const MULTI_FACTOR_TOKEN_TTL_SECONDS = 5 * 60;

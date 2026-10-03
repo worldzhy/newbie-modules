@@ -3,12 +3,12 @@ import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nes
 import { VerificationCodeUse, UserStatus } from "@generated/prisma/client";
 import { Response } from "express";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
-import { UserRequest } from "@modules/account/account.interface";
+import { UserRequest } from "@modules/security/security.interface";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
-import { NoGuard } from "@modules/account/security/passport/public/public.decorator";
-import { LimitLoginByIp, LimitLoginByUser } from "@modules/account/security/rate-limiter/rate-limiter.decorator";
-import { GuardByVerificationCode } from "@modules/account/security/passport/verification-code/verification-code.decorator";
+import { NoGuard } from "@modules/security/passport/public/public.decorator";
+import { LimitLoginByIp, LimitLoginByUser } from "@modules/security/rate-limiter/rate-limiter.decorator";
+import { GuardByVerificationCode } from "@modules/security/passport/verification-code/verification-code.decorator";
 import { UserService } from "@modules/account/modules/user/user.service";
 import { VerificationCodeService } from "@modules/account/modules/verification-code/verification-code.service";
 import { AwsSesService } from "@modules/aws-ses/aws-ses.service";

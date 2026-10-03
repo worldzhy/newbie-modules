@@ -1,0 +1,71 @@
+{
+  "key": "security",
+  "module": {
+    "file": "security.module",
+    "className": "SecurityModule"
+  },
+  "config-service": {
+    "security": {
+      "ratelimiter": {
+        "ipLoginLimiter": {
+          "points": 10,
+          "durationSeconds": 600
+        },
+        "userLoginLimiter": {
+          "points": 5,
+          "durationSeconds": 600
+        },
+        "ipAccessLimiter": {
+          "points": 20,
+          "durationSeconds": 60
+        },
+        "redis": {
+          "host": "process.env.SECURITY_REDIS_HOST",
+          "port": "int(process.env.SECURITY_REDIS_PORT, 6379)"
+        }
+      },
+      "redis": {
+        "host": "process.env.SECURITY_REDIS_HOST",
+        "port": "int(process.env.SECURITY_REDIS_PORT, 6379)"
+      },
+      "token": {
+        "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET || 'your-default-token-secret'",
+        "userAccess": {
+          "expiresIn": "10m",
+          "secret": "process.env.SECURITY_USER_ACCESS_TOKEN_SECRET"
+        },
+        "userRefresh": {
+          "expiresIn": "30d",
+          "secret": "process.env.SECURITY_USER_REFRESH_TOKEN_SECRET"
+        },
+        "apiKeyAccess": {
+          "secret": "process.env.SECURITY_APIKEY_ACCESS_TOKEN_SECRET"
+        }
+      },
+      "defaultGuard": "process.env.SECURITY_DEFAULT_GUARD || 'jwt'"
+    }
+  },
+  "env": {
+    "SECURITY_REDIS_HOST": "",
+    "SECURITY_REDIS_PORT": "",
+    "SECURITY_DEFAULT_TOKEN_SECRET": "",
+    "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
+    "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
+    "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": "",
+    "SECURITY_DEFAULT_GUARD": ""
+  },
+  "dependencies": {
+    "@nestjs/passport": "latest",
+    "crypto-random-string": "^5.0.0",
+    "ioredis": "latest",
+    "jsonwebtoken": "latest",
+    "passport": "latest",
+    "passport-custom": "latest",
+    "passport-jwt": "latest",
+    "rate-limiter-flexible": "latest",
+    "uuid": "^14.0.0"
+  },
+  "devDependencies": {
+    "@types/passport-jwt": "latest"
+  }
+}

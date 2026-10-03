@@ -1,6 +1,6 @@
 import {Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query} from '@nestjs/common';
 import {ApiHeader, ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {NoGuard} from '@modules/account/security/passport/public/public.decorator';
+import {NoGuard} from '@modules/security/passport/public/public.decorator';
 import {BackendMonitorService} from './backend-monitor.service';
 import {
   BackendMonitorErrorLogListResponseDto,

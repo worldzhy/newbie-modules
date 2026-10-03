@@ -3,7 +3,7 @@ import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { AuditLogListResponseDto } from "./audit-log.dto";
-import { SelfOnlyGuard } from "../../security/self-only/self-only.guard";
+import { SelfOnlyGuard } from "@modules/security/self-only/self-only.guard";
 
 @ApiTags("Account / Audit Log")
 @ApiBearerAuth()

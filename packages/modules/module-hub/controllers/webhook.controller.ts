@@ -12,7 +12,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiTags } from "@nestjs/swagger";
-import { NoGuard } from "@modules/account/security/passport/public/public.decorator";
+import { NoGuard } from "@modules/security/passport/public/public.decorator";
 import { Request } from "express";
 
 import { ModuleHubReleaseService } from "../services/release.service";

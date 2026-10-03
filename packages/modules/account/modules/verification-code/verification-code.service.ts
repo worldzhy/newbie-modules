@@ -31,8 +31,8 @@ export class VerificationCodeService {
       points: maxAttempts,
       duration: this.timeoutMinutes * 60,
     };
-    const redisHost = this.config.get<string>("modules.account.redis.host");
-    const redisPort = this.config.get<number>("modules.account.redis.port");
+    const redisHost = this.config.get<string>("modules.security.redis.host");
+    const redisPort = this.config.get<number>("modules.security.redis.port");
     this.attemptLimiter =
       redisHost && redisPort
         ? new RateLimiterRedis({

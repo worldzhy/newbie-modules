@@ -6,7 +6,7 @@ import { Expose, expose } from "../../helpers/expose";
 import { SessionResponseDto, SessionsListRequestDto, SessionsListResponseDto } from "./session.dto";
 import { SESSION_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { UserRequest } from "../../account.interface";
-import { SelfOnlyGuard } from "../../security/self-only/self-only.guard";
+import { SelfOnlyGuard } from "@modules/security/self-only/self-only.guard";
 
 @ApiTags("Account / Session")
 @ApiBearerAuth()

@@ -4,13 +4,13 @@ import { VerificationCodeUse } from "@generated/prisma/client";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { compareHash } from "@devbie/newbie/utilities/common.util";
-import { UserRequest } from "@modules/account/account.interface";
+import { UserRequest } from "@modules/security/security.interface";
 import { AccountService } from "@modules/account/account.service";
 import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
 import { VerificationCodeService } from "@modules/account/modules/verification-code/verification-code.service";
 import { AuditLogService, AuditEvent } from "@modules/account/modules/audit-logs/audit-log.service";
-import { LimitLoginByIp } from "@modules/account/security/rate-limiter/rate-limiter.decorator";
-import { NoGuard } from "@modules/account/security/passport/public/public.decorator";
+import { LimitLoginByIp } from "@modules/security/rate-limiter/rate-limiter.decorator";
+import { NoGuard } from "@modules/security/passport/public/public.decorator";
 import {
   ChangePasswordDto,
   GetCurrentUserResponseDto,

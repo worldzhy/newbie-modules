@@ -5,7 +5,7 @@ import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OrderByPipe } from "@devbie/newbie/pipes/order-by.pipe";
 import { WherePipe } from "@devbie/newbie/pipes/where.pipe";
 import { Expose } from "../../helpers/expose";
-import { SelfOnlyGuard } from "../../security/self-only/self-only.guard";
+import { SelfOnlyGuard } from "@modules/security/self-only/self-only.guard";
 import { ApiKeyResponseDto, CreateApiKeyDto, ReplaceApiKeyDto, UpdateApiKeyDto } from "./api-key.dto";
 import { ApiKeyService } from "./api-key.service";
 

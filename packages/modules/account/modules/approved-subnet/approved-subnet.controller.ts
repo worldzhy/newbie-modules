@@ -7,7 +7,7 @@ import { WherePipe } from "@devbie/newbie/pipes/where.pipe";
 import { Expose } from "../../helpers/expose";
 import { ApprovedSubnetResponseDto } from "./approved-subnet.dto";
 import { ApprovedSubnetService } from "./approved-subnet.service";
-import { SelfOnlyGuard } from "../../security/self-only/self-only.guard";
+import { SelfOnlyGuard } from "@modules/security/self-only/self-only.guard";
 
 @ApiTags("Account / Approved Subnet")
 @ApiBearerAuth()

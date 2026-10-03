@@ -2,8 +2,8 @@ import { Controller, Get, Ip, Req, Res } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request, Response } from "express";
-import { GuardByGoogle } from "@modules/account/security/passport/google-oauth/google.decorator";
-import { GoogleUserResDto } from "@modules/account/security/passport/google-oauth/dto/google-user.dto";
+import { GuardByGoogle } from "@modules/security/passport/google-oauth/google.decorator";
+import { GoogleUserResDto } from "@modules/security/passport/google-oauth/dto/google-user.dto";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { GoogleOAuthRedirectResponseDto } from "@modules/account/auth/auth.dto";
 

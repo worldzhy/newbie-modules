@@ -1,5 +1,5 @@
 import { Global, Module } from "@nestjs/common";
-import { SecurityModule } from "../security/security.module";
+import { SecurityModule } from "@modules/security/security.module";
 import { TwoFactorModule } from "../modules/two-factor/two-factor.module";
 
 import { LoginByApprovedSubnetController } from "./login-by-approved-subnet.controller";
@@ -16,6 +16,14 @@ import { WechatAuthController } from "./wechat/auth.controller";
 import { AuthService } from "./auth.service";
 import { WechatAuthService } from "./wechat/auth.service";
 
+// Login-flow passport strategies. They live in account (not in the security
+// foundation module) because they orchestrate account data: users, sessions,
+// verification codes. They register globally with passport by being providers.
+import { PasswordStrategy } from "./strategies/password.strategy";
+import { VerificationCodeStrategy } from "./strategies/verification-code.strategy";
+import { RefreshTokenStrategy } from "./strategies/refresh-token.strategy";
+import { GoogleStrategy } from "./strategies/google.strategy";
+
 @Global()
 @Module({
   imports: [SecurityModule, TwoFactorModule],
@@ -31,7 +39,14 @@ import { WechatAuthService } from "./wechat/auth.service";
     SignupController,
     WechatAuthController,
   ],
-  providers: [AuthService, WechatAuthService],
+  providers: [
+    AuthService,
+    WechatAuthService,
+    PasswordStrategy,
+    VerificationCodeStrategy,
+    RefreshTokenStrategy,
+    GoogleStrategy,
+  ],
   exports: [AuthService, WechatAuthService],
 })
 export class AuthModule {}

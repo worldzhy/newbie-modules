@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestj
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Permission, PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { RequirePermission } from "../../security/authorization/authorization.decorator";
+import { RequirePermission } from "@modules/security/authorization/authorization.decorator";
 import {
   PermissionListResponseDto,
   PermissionResponseDto,

@@ -14,9 +14,9 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { NO_TOKEN_PROVIDED, USER_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
-import { TokenService } from "@modules/account/security/token/token.service";
-import { TokenSubject } from "@modules/account/security/token/token.constants";
-import { NoGuard } from "@modules/account/security/passport/public/public.decorator";
+import { TokenService } from "@modules/security/token/token.service";
+import { TokenSubject } from "@modules/security/token/token.constants";
+import { NoGuard } from "@modules/security/passport/public/public.decorator";
 import { LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
 
 @ApiTags("Account / Auth")
