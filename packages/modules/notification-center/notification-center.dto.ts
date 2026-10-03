@@ -25,7 +25,7 @@ export class NotificationDto {
   detail: string | null;
 
   @ApiProperty({
-    type: "object",
+    type: Object,
     required: false,
     nullable: true,
     description: "Context values passed to notify(), preserved for detail panels",
@@ -53,7 +53,7 @@ export class NotifyDto {
   @IsString()
   typeKey: string;
 
-  @ApiProperty({ type: "object", required: false, description: "Values interpolated into the type templates" })
+  @ApiProperty({ type: Object, required: false, description: "Values interpolated into the type templates" })
   @IsOptional()
   @IsObject()
   @ValidateNested()
