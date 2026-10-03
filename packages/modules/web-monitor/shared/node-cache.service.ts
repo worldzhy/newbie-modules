@@ -6,12 +6,12 @@ export class NodeCacheService {
   private appInfo = new Map<string, SystemDocument>();
 
   getAppInfo(appId: string) {
-    if (!appId) throw new Error('查询应用信息：appId不能为空');
+    if (!appId) throw new Error('Get app info: appId must not be empty');
     return this.appInfo.get(appId);
   }
 
   setAppInfo(appId: string, system: SystemDocument) {
-    if (!appId) throw new Error('设置应用信息：appId不能为空');
+    if (!appId) throw new Error('Set app info: appId must not be empty');
     this.appInfo.set(appId, system);
   }
 

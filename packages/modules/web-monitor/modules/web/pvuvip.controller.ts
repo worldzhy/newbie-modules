@@ -24,7 +24,7 @@ export class PvuvipController {
   @ApiResponse({type: Object})
   async getPvUvIpSurveyToday(@Query() q: any) {
     const {appId} = q;
-    if (!appId) throw new Error('pvuvip概况统计：appId不能为空');
+    if (!appId) throw new Error('PV/UV/IP overview: appId must not be empty');
     const interval = parser.parseExpression(this.cfg.pvuvip_task_minute_cron_time);
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
@@ -43,9 +43,9 @@ export class PvuvipController {
   @ApiResponse({type: WebMonitorPvUvIpResponseDto})
   async getPvUvIpSurveyOne(@Query() q: any) {
     const {appId, beginTime, endTime} = q;
-    if (!appId) throw new Error('pvuvip概况统计：appId不能为空');
-    if (!beginTime) throw new Error('pvuvip概况统计：beginTime不能为空');
-    if (!endTime) throw new Error('pvuvip概况统计：endTime不能为空');
+    if (!appId) throw new Error('PV/UV/IP overview: appId must not be empty');
+    if (!beginTime) throw new Error('PV/UV/IP overview: beginTime must not be empty');
+    if (!endTime) throw new Error('PV/UV/IP overview: endTime must not be empty');
     const result = await this.pvuvipSrv.getPvUvIpSurveyOne(appId, new Date(beginTime), new Date(endTime));
     return func.result({data: result});
   }
@@ -55,9 +55,9 @@ export class PvuvipController {
   @ApiResponse({type: WebMonitorPvUvIpResponseDto, isArray: true})
   async getHistoryPvUvIplist(@Query() q: any) {
     const {appId, beginTime, endTime} = q;
-    if (!appId) throw new Error('pvuvip获得历史概况：appId不能为空');
-    if (!beginTime) throw new Error('pvuvip获得历史概况：beginTime不能为空');
-    if (!endTime) throw new Error('pvuvip获得历史概况：endTime不能为空');
+    if (!appId) throw new Error('PV/UV/IP historical overview: appId must not be empty');
+    if (!beginTime) throw new Error('PV/UV/IP historical overview: beginTime must not be empty');
+    if (!endTime) throw new Error('PV/UV/IP historical overview: endTime must not be empty');
     const rows = await this.pvuvipSrv.getHistoryPvUvIplistByRange(
       appId,
       new Date(Number(beginTime)),
@@ -71,7 +71,7 @@ export class PvuvipController {
   @ApiResponse({type: Object})
   async getPvUvIpList(@Query() q: any) {
     const {appId, beginTime, endTime} = q;
-    if (!appId) throw new Error('界面查询pvuvip：appId不能为空');
+    if (!appId) throw new Error('UI PV/UV/IP query: appId must not be empty');
     const interval = parser.parseExpression(this.cfg.pvuvip_task_minute_cron_time);
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
@@ -87,7 +87,7 @@ export class PvuvipController {
   @ApiResponse({type: Object})
   async getPvUvIpOne(@Query() q: any) {
     const {appId, beginTime, endTime} = q;
-    if (!appId) throw new Error('界面查询pvuvip：appId不能为空');
+    if (!appId) throw new Error('UI PV/UV/IP query: appId must not be empty');
     const interval = parser.parseExpression(this.cfg.pvuvip_task_minute_cron_time);
     interval.prev();
     let et: Date;

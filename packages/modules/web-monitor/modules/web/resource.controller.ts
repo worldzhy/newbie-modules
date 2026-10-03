@@ -13,8 +13,8 @@ export class ResourceController {
   @ApiResponse({type: Object})
   async getResourceForType(@Query() q: any) {
     const {appId, url, type = 1, pageNo = 1, pageSize = 15, beginTime, endTime} = q;
-    if (!appId) throw new Error('单个页面资源性能列表：appId不能为空');
-    if (!url) throw new Error('单个页面资源性能列表：url不能为空');
+    if (!appId) throw new Error('Single page resource performance list: appId must not be empty');
+    if (!url) throw new Error('Single page resource performance list: url must not be empty');
     const result = await this.resourceSrv.getResourceForType(
       appId,
       url,
@@ -32,7 +32,7 @@ export class ResourceController {
   @ApiResponse({type: Object})
   async getAverageResourceList(@Query() q: any) {
     const {appId} = q;
-    if (!appId) throw new Error('获得resource平均性能列表：appId不能为空');
+    if (!appId) throw new Error('Get resource average performance list: appId must not be empty');
     const result = await this.resourceSrv.getAverageResourceList(q);
     return func.result({data: result});
   }
@@ -42,8 +42,8 @@ export class ResourceController {
   @ApiResponse({type: Object})
   async getOneResourceAvg(@Query() q: any) {
     const {appId, url, beginTime, endTime} = q;
-    if (!appId) throw new Error('单个Resource平均性能数据：appId不能为空');
-    if (!url) throw new Error('单个Resource平均性能数据：api地址不能为空');
+    if (!appId) throw new Error('Single resource average performance data: appId must not be empty');
+    if (!url) throw new Error('Single resource average performance data: api url must not be empty');
     const result = await this.resourceSrv.getOneResourceAvg(appId, url, beginTime, endTime);
     return func.result({data: result});
   }
@@ -53,8 +53,8 @@ export class ResourceController {
   @ApiResponse({type: Object})
   async getOneResourceList(@Query() q: any) {
     const {appId, url, pageNo = 1, pageSize = 15, beginTime, endTime} = q;
-    if (!appId) throw new Error('单个Resource性能列表数据：appId不能为空');
-    if (!url) throw new Error('单个Resource性能列表数据：api地址不能为空');
+    if (!appId) throw new Error('Single resource performance list data: appId must not be empty');
+    if (!url) throw new Error('Single resource performance list data: api url must not be empty');
     const result = await this.resourceSrv.getOneResourceList(
       appId,
       url,
@@ -71,8 +71,8 @@ export class ResourceController {
   @ApiResponse({type: Object})
   async getOneResourceDetail(@Query() q: any) {
     const {appId, id} = q;
-    if (!id) throw new Error('获得单个Resource详情信息：id不能为空');
-    if (!appId) throw new Error('获得单个Resource详情信息：appId不能为空');
+    if (!id) throw new Error('Get single resource details: id must not be empty');
+    if (!appId) throw new Error('Get single resource details: appId must not be empty');
     const row = await this.resourceSrv.getOneResourceDetail(appId, id);
     return func.result({data: row || {}});
   }

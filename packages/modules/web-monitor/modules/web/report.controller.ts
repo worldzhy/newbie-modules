@@ -54,7 +54,7 @@ export class WebReportController {
     query.userAgent = headers['user-agent'];
 
     const system = await this.system.getSystemForAppId(query.appId);
-    if (!system?.appId) throw new Error(`appId:${query.appId} 不存在`);
+    if (!system?.appId) throw new Error(`appId:${query.appId} does not exist`);
 
     // Anti-regression touch: never move lastSeenAt backwards; flips
     // PENDING -> ACTIVE on first contact. Fire-and-forget would lose
@@ -76,7 +76,7 @@ export class WebReportController {
     const limit = this.config.redis_consumption?.total_limit_web;
     if (limit) {
       const length = await this.redis.llen(RedisKeys.WEB_REPORT_DATAS);
-      if (length >= limit) throw new Error(`reids: ${RedisKeys.WEB_REPORT_DATAS}:达到限流（${limit}）`);
+      if (length >= limit) throw new Error(`redis: ${RedisKeys.WEB_REPORT_DATAS}: rate limit reached (${limit})`);
     }
     await this.redis.lpush(RedisKeys.WEB_REPORT_DATAS, JSON.stringify(query));
     await this.dayReportNum.redisCount(query.appId);

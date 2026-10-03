@@ -96,7 +96,7 @@ export const handler: SQSHandler = async event => {
   }
 };
 
-// 生成告警邮件的 HTML 内容
+// Generate the HTML content of the alert email
 function generateAlarmEmailHTML(
   emailMessages: Array<{
     toAddress: string;

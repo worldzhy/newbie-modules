@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 import { GitHubService, RepoNameConflictError } from "./github.service";
 
 /**
- * M8 验证: GithubAdapter 注入 mock Octokit — 验证 ensureRepoExists 幂等、
- * upsertEnvExample 合并不覆盖、deleteRepo best-effort。
+ * M8 verification: GithubAdapter with an injected mock Octokit - verifies ensureRepoExists idempotency,
+ * upsertEnvExample merges without overwriting, deleteRepo is best-effort.
  *
- * 运行: 容器内 `npm test` 或 `node --import tsx --test src/modules/github/github.service.test.ts`
+ * Run: `npm test` in the container, or `node --import tsx --test src/modules/github/github.service.test.ts`
  */
 
 // --- helpers ---
@@ -55,12 +55,12 @@ function httpError(status: number, message?: string) {
   return e;
 }
 
-// 加速 sleep: 把 setTimeout 0 化仅在 ensureRepoExists 的 generate 重试循环里。
-// 全局替换有副作用，这里用一个 isolate 模式：把 service 的内部 sleep 直接跳过
-// 通过 monkey-patch global.setTimeout 仅在需要加速的 it 内使用。
+// Speed up sleeps: zero out setTimeout only inside the generate retry loop of ensureRepoExists.
+// A global replacement has side effects, so use an isolated approach here: skip the service's internal sleep directly
+// Applied via monkey-patching global.setTimeout only within the it blocks that need speeding up.
 function withNoSleep<T>(fn: () => Promise<T>): Promise<T> {
   const original = global.setTimeout;
-  // 替换为立即触发的同步版本（保留 timer id 形态）。
+  // Replace with a synchronous version that fires immediately (keeping the timer id shape).
   (global as any).setTimeout = ((fn: any) => {
     fn();
     return 0 as any;

@@ -18,8 +18,8 @@ export class AjaxController {
   @ApiResponse({type: WebMonitorAjaxAverageListResponseDto})
   async getPageAjaxsAvg(@Query() q: any) {
     const {appId, url, beginTime, endTime} = q;
-    if (!appId) throw new Error('页面ajax信息：appId不能为空');
-    if (!url) throw new Error('页面ajax信息：url不能为空');
+    if (!appId) throw new Error('Page ajax info: appId must not be empty');
+    if (!url) throw new Error('Page ajax info: url must not be empty');
     const result = await this.ajax.getPageAjaxsAvg(appId, url, beginTime, endTime);
     return func.result({data: result});
   }
@@ -29,7 +29,7 @@ export class AjaxController {
   @ApiResponse({type: WebMonitorAjaxAverageListResponseDto})
   async getAverageAjaxList(@Query() q: any) {
     const {appId} = q;
-    if (!appId) throw new Error('平均AJAX性能列表：appId不能为空');
+    if (!appId) throw new Error('Average AJAX performance list: appId must not be empty');
     const result = await this.ajax.getAverageAjaxList(q);
     return func.result({data: result});
   }
@@ -39,8 +39,8 @@ export class AjaxController {
   @ApiResponse({type: WebMonitorAjaxOneListResponseDto})
   async getOneAjaxList(@Query() q: any) {
     const {appId, url, pageNo = 1, pageSize = 15, beginTime, endTime, type} = q;
-    if (!appId) throw new Error('单个AJAX平均性能数据：appId不能为空');
-    if (!url) throw new Error('单个AJAX平均性能数据：api地址不能为空');
+    if (!appId) throw new Error('Single AJAX average performance data: appId must not be empty');
+    if (!url) throw new Error('Single AJAX average performance data: api url must not be empty');
     const result = await this.ajax.getOneAjaxList(appId, url, pageNo, pageSize, beginTime, endTime, type);
     return func.result({data: result});
   }
@@ -50,8 +50,8 @@ export class AjaxController {
   @ApiResponse({type: WebMonitorAjaxMarkUserListResponseDto})
   async getMarkUserAjaxList(@Query() q: any) {
     const {appId, markUser, beginTime, endTime} = q;
-    if (!markUser) throw new Error('markUser不能为空');
-    if (!appId) throw new Error('获得单个ajax详情信息：appId不能为空');
+    if (!markUser) throw new Error('markUser must not be empty');
+    if (!appId) throw new Error('Get single ajax details: appId must not be empty');
     const result = await this.ajax.getMarkUserAjaxList(appId, {markUser, beginTime, endTime});
     return func.result({data: result});
   }

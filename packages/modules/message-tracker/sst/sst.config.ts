@@ -9,7 +9,7 @@ export default {
   },
   stacks(app) {
     app.stack(function Stack({stack}) {
-      // 环境变量配置
+      // Environment variable configuration
       const environment = {
         DB_HOST: process.env.DB_HOST || 'localhost',
         DB_PORT: process.env.DB_PORT || '5432',

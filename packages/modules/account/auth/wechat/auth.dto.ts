@@ -14,7 +14,7 @@ export class WechatLoginDto {
 
 export class WechatCodeLoginDto {
   /**
-   * 微信登录临时凭证
+   * Temporary credential for WeChat login
    */
   @IsString()
   code: string;

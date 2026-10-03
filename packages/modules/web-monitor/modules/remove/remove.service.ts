@@ -15,7 +15,7 @@ export class RemoveService {
     const query: any = {};
     let result: any = null;
     if (!time.length) {
-      throw new Error('必须选择时间');
+      throw new Error('A time must be selected');
     }
     const startTime = dayjs(new Date(time[0]).valueOf()).format('YYYY-MM-DD 00:00:00');
     const endTime = dayjs(new Date(time[1]).valueOf()).format('YYYY-MM-DD 23:59:59');
@@ -26,7 +26,7 @@ export class RemoveService {
       if (resource && resource.length > 0) {
         const arr: any = [];
         for (const item of resource) {
-          // todo 因clickhouse改造，需要重构
+          // TODO needs refactoring due to the ClickHouse migration
           switch (item) {
             case 'ajax': {
               const ajaxModel = await this.clickhouse.WebAjax(appId);

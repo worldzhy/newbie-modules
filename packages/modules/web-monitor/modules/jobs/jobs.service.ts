@@ -101,7 +101,7 @@ export class JobsService implements OnModuleInit {
       const systems = await this.system.getSystemList();
       this.nodeCache.updateAllSystemCache(systems as any);
     } catch (e) {
-      console.error('IO错误：更新缓存appid信息出错', e?.message || e);
+      console.error('IO error: failed to update cached appId info', e?.message || e);
     }
   }
 
@@ -134,13 +134,13 @@ export class JobsService implements OnModuleInit {
   }
 
   async consumeReportQueues() {
-    // 使用配置中的时间表达式
+    // Use the cron expression from configuration
     try {
       if (this.cfg.is_web_consume_task_run) await this.consumeWebQueue();
     } catch (e) {
-      console.error('消费队列异常', e?.message || e);
+      console.error('Consumer queue exception', e?.message || e);
     }
-    // 后续可按需拆分到独立 Cron 任务
+    // Can later be split into a standalone cron job if needed
   }
 
   private async consumeWebQueue() {

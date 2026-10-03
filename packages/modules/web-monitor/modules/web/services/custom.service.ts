@@ -16,12 +16,12 @@ export class WebCustomService {
   }
 
   async addCustomFilter(appId: string, filterKey: string, filterDesc: string) {
-    if (!filterKey) throw new Error('新增过滤条件：filterKey不能为空');
-    if (!appId) throw new Error('新增过滤条件：appId不能为空');
-    if (!filterDesc) throw new Error('新增过滤条件：filterDesc不能为空');
+    if (!filterKey) throw new Error('Add filter: filterKey must not be empty');
+    if (!appId) throw new Error('Add filter: appId must not be empty');
+    if (!filterDesc) throw new Error('Add filter: filterDesc must not be empty');
     const model = this.models.WebCustomFilter(appId);
     const exists = await model.findOne({filterKey}).exec();
-    if (exists && exists.filterKey) throw new Error('新增过滤条件：filterKey已存在');
+    if (exists && exists.filterKey) throw new Error('Add filter: filterKey already exists');
     const doc = new model();
     doc.appId = appId;
     doc.filterKey = filterKey;
@@ -31,19 +31,19 @@ export class WebCustomService {
   }
 
   async delCustomFilter(appId: string, id: string) {
-    if (!id) throw new Error('删除过滤条件：_id不能为空');
-    if (!appId) throw new Error('删除过滤条件：appId不能为空');
+    if (!id) throw new Error('Delete filter: _id must not be empty');
+    if (!appId) throw new Error('Delete filter: appId must not be empty');
     const model = this.models.WebCustomFilter(appId);
     try {
       await model.findOne({_id: id}).exec();
     } catch {
-      throw new Error('删除过滤条件：_id不存在');
+      throw new Error('Delete filter: _id does not exist');
     }
     try {
       await model.deleteOne({_id: id}).exec();
       return true;
     } catch {
-      throw new Error('删除过滤条件：删除失败');
+      throw new Error('Delete filter: deletion failed');
     }
   }
 

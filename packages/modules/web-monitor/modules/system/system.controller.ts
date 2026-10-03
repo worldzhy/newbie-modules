@@ -55,8 +55,8 @@ export class SystemController {
   async deleteWebSystemUser(@Body() body: any) {
     const appId = body.appId;
     const userToken = body.userToken;
-    if (!appId) throw new Error('删除系统中某个用户：appId不能为空');
-    if (!userToken) throw new Error('删除系统中某个用户：用户Token不能为空');
+    if (!appId) throw new Error('Delete a user from the system: appId must not be empty');
+    if (!userToken) throw new Error('Delete a user from the system: user token must not be empty');
     const result = await this.system.deleteWebSystemUser(appId, userToken);
     return func.result({data: result});
   }
@@ -67,8 +67,8 @@ export class SystemController {
   async addWebSystemUser(@Body() body: any) {
     const appId = body.appId;
     const userToken = body.userToken;
-    if (!appId) throw new Error('系统中新增某个用户：appId不能为空');
-    if (!userToken) throw new Error('系统中新增某个用户：用户Token不能为空');
+    if (!appId) throw new Error('Add a user to the system: appId must not be empty');
+    if (!userToken) throw new Error('Add a user to the system: user token must not be empty');
     const result = await this.system.addWebSystemUser(appId, userToken);
     return func.result({data: result});
   }
@@ -79,7 +79,7 @@ export class SystemController {
   async deleteSystem(@Body() body: any): Promise<any> {
     const appId = body.appId;
     const type = body.type;
-    if (!appId) throw new Error('删除某个系统：appId不能为空');
+    if (!appId) throw new Error('Delete a system: appId must not be empty');
     const result = await this.system.deleteSystem(appId, type);
     return func.result({data: result});
   }
@@ -92,7 +92,7 @@ export class SystemController {
     const email = body.email;
     const type = body.type || 1;
     const item = body.item || 1;
-    if (!appId) throw new Error('appId不能为空');
+    if (!appId) throw new Error('appId must not be empty');
     const result = await this.system.handleDaliyEmail(appId, email, type, true, item);
     return func.result({data: result});
   }

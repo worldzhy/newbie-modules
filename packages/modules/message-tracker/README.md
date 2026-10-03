@@ -12,29 +12,29 @@ A microservice for tracking and managing message delivery status across multiple
 ## File structure
 
 message-tracker/
-├── message-tracker.controller.ts # 控制器
-├── message-tracker.module.ts # 模块定义
-├── message-tracker.service.ts # 服务层
-├── cloudformation/ # AWS CloudFormation模板
-├── sample-data/ # 示例数据
+├── message-tracker.controller.ts # Controller
+├── message-tracker.module.ts # Module definition
+├── message-tracker.service.ts # Service layer
+├── cloudformation/ # AWS CloudFormation templates
+├── sample-data/ # Sample data
 │ └── message-event-samples  
-├── sst/ # Serverless Stack (SST)实现
-│ ├── sst.config.ts # SST配置
+├── sst/ # Serverless Stack (SST) implementation
+│ ├── sst.config.ts # SST configuration
 │ ├── packages/
-│ │ ├── core/ # 共享核心代码
+│ │ ├── core/ # Shared core code
 │ │ │ ├── src/
-│ │ │ │ ├── database/ # 数据库操作
-│ │ │ │ ├── pinpoint/ # 邮件和短信服务
-│ │ │ │ ├── s3/ # 存储服务
+│ │ │ │ ├── database/ # Database access
+│ │ │ │ ├── pinpoint/ # Email and SMS services
+│ │ │ │ ├── s3/ # Storage service
 │ │ │ └── package.json
-│ │ ├── functions/ # Lambda函数
+│ │ ├── functions/ # Lambda functions
 │ │ │ ├── src/
-│ │ │ │ ├── message-sender/ # 消息发送
-│ │ │ │ ├── message-event-processor/ # 事件处理
-│ │ │ │ └── failed-message-processor/ # 失败消息处理
+│ │ │ │ ├── message-sender/ # Message sending
+│ │ │ │ ├── message-event-processor/ # Event processing
+│ │ │ │ └── failed-message-processor/ # Failed message handling
 │ │ │ └── package.json
-│ └── .sst/ # SST构建文件
-└── .newbie/ # 项目配置
+│ └── .sst/ # SST build files
+└── .newbie/ # Project configuration
 
 ## Getting Started
 

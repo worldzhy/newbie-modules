@@ -123,7 +123,7 @@ export class TaskCronService {
 
       this.logger.log(`Successfully generated monthly report for project: ${project.name} (${year}-${month})`);
 
-      // 自动发送卡片到对应的群组
+      // Automatically send the card to the corresponding group
       if (project.group && project.group.chatId) {
         await this.sendMonthlyReportCard(project.group.chatId, {
           projectName: project.name,

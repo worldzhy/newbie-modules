@@ -26,11 +26,11 @@ export const func = {
     return pwd + Date.now();
   },
   result<T>(jn: Partial<{code: number; desc: string; data: T; time?: number}> = {}) {
-    // return Object.assign({ code: 1000, desc: '成功', data: '' }, jn);
+    // return Object.assign({ code: 1000, desc: 'Success', data: '' }, jn);
     return jn.data;
   },
   errResult<T>(jn: Partial<{code: number; desc: string; data: T; time?: number}> = {}) {
-    // return Object.assign({ code: 1010, desc: '请求失败', data: '' }, jn);
+    // return Object.assign({ code: 1010, desc: 'Request failed', data: '' }, jn);
     return jn.data;
   },
   format(date: Date, fmt: string) {
@@ -53,7 +53,7 @@ export const func = {
   getRealIp(headers: Record<string, any>, ip?: string) {
     return headers['x-real-ip'] || headers['x-forwarded-for'] || ip;
   },
-  // 简化：将路径段中的纯数字替换为 *
+  // Simplified: replace pure numeric path segments with *
   urlHelper(input: string) {
     try {
       const schemeIdx = input.indexOf('://');
@@ -69,7 +69,7 @@ export const func = {
       return input;
     }
   },
-  // 新增：对象判断（包含数组）
+  // Added: object check (arrays included)
   isObject(input: any) {
     return input !== null && typeof input === 'object';
   },

@@ -1,39 +1,39 @@
 # newbie.github
 
-GitHub API 封装 module。提供双模式鉴权与仓库编排所需的通用方法（建仓 / 写 `.env.example` / 删仓），供宿主（如 nightwatch-backend 的建仓编排服务）装配后注入 `GitHubService` 调用。
+GitHub API wrapper module. Provides dual-mode authentication and the common methods needed for repository orchestration (create repo / write `.env.example` / delete repo). Hosts (e.g. the repository provisioning service in nightwatch-backend) install it and inject `GitHubService`.
 
-## 鉴权（双模式）
+## Authentication (dual mode)
 
-构造时按 config 优先级选择鉴权方式：
+The authentication method is selected at construction time by config priority:
 
-1. **GitHub App 模式**：`appId` + `privateKey` + `installationId` 三件套齐全 → `@octokit/auth-app` 的 `createAppAuth`，每个请求 mint 一个 installation token。推荐生产环境使用（可限制 scope、可吊销、不绑定个人账号）。
-2. **PAT 模式**：仅 `auth`（PAT / personal token）存在 → `auth: token`。用于过渡 / 单用户场景。
+1. **GitHub App mode**: when `appId` + `privateKey` + `installationId` are all present, uses `createAppAuth` from `@octokit/auth-app` and mints an installation token per request. Recommended for production (scoped, revocable, not tied to a personal account).
+2. **PAT mode**: when only `auth` (PAT / personal token) is present, uses `auth: token`. For migration / single-user scenarios.
 
-两者都不存在时，`octokit` 仍构造但会 warn；调用方法会因无凭证而失败。`isConfigured()` 用于前置检查。
+When neither is present, `octokit` is still constructed but logs a warning; method calls will fail due to missing credentials. Use `isConfigured()` for an upfront check.
 
 ## env
 
-| env                      | 必填         | 说明                                               |
-| ------------------------ | ------------ | -------------------------------------------------- |
-| `GITHUB_USER_AGENT`      | 否           | User-Agent，默认 `saas-starter`                    |
-| `GITHUB_AUTH`            | App 模式可空 | PAT / personal token                               |
-| `GITHUB_APP_ID`          | PAT 模式可空 | GitHub App ID                                      |
-| `GITHUB_PRIVATE_KEY`     | PAT 模式可空 | App PEM 私钥，换行用 `\n` 字面量存储（构造时还原） |
-| `GITHUB_INSTALLATION_ID` | PAT 模式可空 | App installation ID（数字字符串）                  |
+| env                      | Required        | Description                                                                     |
+| ------------------------ | --------------- | ------------------------------------------------------------------------------- |
+| `GITHUB_USER_AGENT`      | No              | User-Agent, defaults to `saas-starter`                                          |
+| `GITHUB_AUTH`            | Optional in App mode | PAT / personal token                                                      |
+| `GITHUB_APP_ID`          | Optional in PAT mode | GitHub App ID                                                             |
+| `GITHUB_PRIVATE_KEY`     | Optional in PAT mode | App PEM private key; newlines stored as literal `\n` (restored at construction) |
+| `GITHUB_INSTALLATION_ID` | Optional in PAT mode | App installation ID (numeric string)                                     |
 
-## 方法
+## Methods
 
-| 方法                                                           | 语义                                                                                                                                                                                  |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `isConfigured()`                                               | 是否有足够凭证执行编排（App 三件套或 PAT 至少其一）                                                                                                                                   |
-| `ensureRepoExists(org, name, tplOwner, tplRepo, description?)` | 幂等建仓：GET 200 跳过；404 → 从模板 generate（private:true）；422 → 抛 `RepoNameConflictError`。generate 返回 202 后内部重试 3 次（每次 2s）等仓库可读。返回 `{cloneUrl, generated}` |
-| `upsertEnvExample(org, repo, placeholderLines)`                | 幂等写 `.env.example`：GET 取 sha + 现有内容，按 env-var key 去重，仅追加缺失的占位行（注释格式，不含真实值），PUT 带 sha；404 → 创建。**不覆盖模板内容**                             |
-| `deleteRepo(org, repo)`                                        | best-effort 删仓，404 忽略。用于 teardown 清理                                                                                                                                        |
+| Method                                                         | Semantics                                                                                                                                                                                                                                                              |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isConfigured()`                                               | Whether enough credentials exist for orchestration (the App triplet or a PAT)                                                                                                                                                                                          |
+| `ensureRepoExists(org, name, tplOwner, tplRepo, description?)` | Idempotent repo creation: GET 200 skips; 404 generates from the template (private:true); 422 throws `RepoNameConflictError`. After generate returns 202, retries 3 times internally (2s each) until the repo is readable. Returns `{cloneUrl, generated}`             |
+| `upsertEnvExample(org, repo, placeholderLines)`                | Idempotently writes `.env.example`: GET fetches sha + current content, dedupes by env-var key, appends only missing placeholder lines (comment format, no real values), PUT with sha; 404 creates. **Does not overwrite template content**                            |
+| `deleteRepo(org, repo)`                                        | best-effort repo deletion; 404 is ignored. Used for teardown cleanup                                                                                                                                                                                                   |
 
-`RepoNameConflictError` 在 `ensureRepoExists` 的 generate 返回 422 时抛出，表示仓库名被不属于自己的仓库占用。
+`RepoNameConflictError` is thrown when the generate call in `ensureRepoExists` returns 422, meaning the repository name is occupied by a repository not owned by the caller.
 
-## 不做
+## Out of scope
 
-- 不写 GitHub Secrets（方案 B：凭证只写 `.env.example` 占位行，明文在宿主 create/retry 响应一次性返回）
-- 不含 `libsodium-wrappers` 依赖
-- 不含 nightwatch 业务概念（Application / ProvisioningStatus / 凭证组装那些在宿主编排服务里）
+- Does not write GitHub Secrets (plan B: credentials are written only as `.env.example` placeholder lines; plaintext is returned once in the host's create/retry responses)
+- Does not include a `libsodium-wrappers` dependency
+- Contains no nightwatch business concepts (Application / ProvisioningStatus / credential assembly live in the host orchestration service)

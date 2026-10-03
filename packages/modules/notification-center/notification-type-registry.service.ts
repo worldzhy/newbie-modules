@@ -11,7 +11,7 @@ export interface NotificationTypeDeclaration {
   key: string;
   /** Human-readable name shown in the settings UI. */
   name: string;
-  /** Title template, e.g. "{{project}} 新增 {{count}} 个风险". */
+  /** Title template, e.g. "{{project}} added {{count}} risks" (runtime templates may be localized data). */
   titleTemplate: string;
   /** Optional multi-line detail template. */
   detailTemplate?: string;

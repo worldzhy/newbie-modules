@@ -180,7 +180,7 @@ export class TaskService {
   }
 
   async linkTaskUser(userId: string, taskUserId: string) {
-    // 检查该 nightwatch user 是否已经关联了某个 TaskUser
+    // Check whether this nightwatch user is already linked to a TaskUser
     const existingLink = await this.prisma.taskUser.findUnique({
       where: { userId },
     });
@@ -188,7 +188,7 @@ export class TaskService {
       throw new Error("This user is already linked to a TaskUser. Please unlink first.");
     }
 
-    // 检查目标 TaskUser 是否已经被别人关联
+    // Check whether the target TaskUser is already linked by someone else
     const targetTaskUser = await this.prisma.taskUser.findUnique({
       where: { id: taskUserId },
     });
@@ -608,7 +608,7 @@ export class TaskService {
           status: t.status,
           groupId: groupId,
           creatorId: dbUserId,
-          assigneeId: dbUserId, // 默认分配给当前操作者（拆解人）
+          assigneeId: dbUserId, // Default assignee is the current operator (the person who requested the breakdown)
           lastOperatorId: operator?.id,
           lastOperatorName: operator?.name,
           lastOperatorSource: operator?.source,

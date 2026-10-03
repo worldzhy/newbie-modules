@@ -14,7 +14,7 @@ export class CustomController {
   @ApiResponse({type: WebMonitorCustomFilterListResponseDto})
   async getCustomFilterList(@Query() q: any) {
     const {appId} = q;
-    if (!appId) throw new Error('获取自定义filter：appId不能为空');
+    if (!appId) throw new Error('Get custom filters: appId must not be empty');
     const result = await this.webCustom.getCustomFilterList(appId);
     return func.result({data: result});
   }
@@ -42,7 +42,7 @@ export class CustomController {
   @ApiResponse({type: WebMonitorCustomAverageListResponseDto})
   async getAverageCustomList(@Query() q: any) {
     const {appId, pageNo = 1, pageSize = 15, beginTime, endTime, customName, customFilter} = q;
-    if (!appId) throw new Error('获取custom分类列表：appId不能为空');
+    if (!appId) throw new Error('Get custom category list: appId must not be empty');
     const result = await this.webCustom.getAverageCustomList(
       appId,
       Number(pageNo),

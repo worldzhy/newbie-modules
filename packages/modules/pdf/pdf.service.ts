@@ -72,15 +72,15 @@ export class PdfService {
   // Get PDF page count
   private async getPdfPageCount(buffer: Buffer): Promise<number> {
     try {
-      // 这里使用pdf2pic的方式获取页数
-      // 注意：pdf2pic本身不直接提供获取页数的方法，这里是一个简化实现
-      // 实际项目中可能需要使用其他PDF库如pdf-lib或pdf.js来获取页数
+      // Get the page count via pdf2pic
+      // Note: pdf2pic does not provide a direct page-count API; this is a simplified implementation
+      // In a real project, another PDF library such as pdf-lib or pdf.js may be needed to get the page count
       const convert = fromBuffer(buffer, {density: 100, format: 'jpg'});
       const info = await convert.bulk(-1, {responseType: 'buffer'});
-      return info.length || 1; // 如果无法获取页数，默认为1页
+      return info.length || 1; // Fall back to 1 page when the count cannot be obtained
     } catch (error) {
-      console.error('获取PDF页数出错：', error);
-      return 1; // 出错时默认为1页
+      console.error('Failed to get PDF page count:', error);
+      return 1; // Fall back to 1 page on error
     }
   }
 }

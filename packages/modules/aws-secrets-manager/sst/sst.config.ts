@@ -9,7 +9,7 @@ export default $config({
     };
   },
   async run() {
-    // 创建 Secrets Manager 轮询 Lambda 函数
+    // Create the Secrets Manager polling Lambda function
     const rotationFunction = new sst.aws.Function('SecretsManagerRotation', {
       handler: 'function/index.handler',
       runtime: 'nodejs20.x',
@@ -32,7 +32,7 @@ export default $config({
       ],
     });
 
-    // 为 Lambda 添加资源策略，允许 Secrets Manager 调用
+    // Add a resource policy to the Lambda allowing Secrets Manager to invoke it
     new aws.lambda.Permission('SecretsManagerInvokePermission', {
       action: 'lambda:InvokeFunction',
       function: rotationFunction.name,

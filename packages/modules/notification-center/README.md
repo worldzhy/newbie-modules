@@ -1,21 +1,21 @@
 # newbie.notification-center
 
-平台通知中心。订阅扫描模块的 `*.scan-completed` 事件，把安全扫描结果转成**去噪后的摘要通知**，并可选通过 message-bot 模块推送到 Lark/Slack 群。
+Platform notification center. Subscribes to `*.scan-completed` events from scanning modules, turns security scan results into **denoised summary notifications**, and can optionally push them to Lark/Slack groups via the message-bot module.
 
-## v1 范围
+## v1 scope
 
-- 告警源：`aws-audit`、`dependency-scan` 的 scan-completed 事件（EventEmitter2，wildcard）。
-- 每次成功扫描最多一条通知（`(sourceModule, scanId)` 唯一幂等）；仅统计 `firstSeenAt` 落在本次扫描窗口的 open finding，重复出现的 finding 不再打扰；无新增（或低于最低严重度阈值）则静默。
-- 突增检测：本次新增 high+ 数量 ≥ max（`spikeThreshold`，近 `spikeBaselineDays` 天日均 × 2）且严格高于日均时，通知升级为 `security-spike`。
-- 站内信：全局一条 `Notification` + 惰性 `NotificationReceipt`（按用户记录已读），无扇出写入。
-- 推送：可选伴侣模块 message-bot（Lark/Slack）。服务以 `@Optional()` 注入；未装配/未配置 group 时站内信不受影响。
+- Alert sources: scan-completed events (EventEmitter2, wildcard) from `aws-audit` and `dependency-scan`.
+- At most one notification per successful scan (idempotent on the unique `(sourceModule, scanId)`); only open findings whose `firstSeenAt` falls inside the current scan window are counted, so recurring findings do not renotify; when there are no new findings (or they are below the minimum severity threshold) it stays silent.
+- Spike detection: when the number of new high+ findings this run is >= max(`spikeThreshold`, the daily average over the last `spikeBaselineDays` days x 2) and strictly above the average, the notification is upgraded to `security-spike`.
+- In-app messages: one global `Notification` plus lazy `NotificationReceipt` rows (read state per user); no fan-out writes.
+- Push: optional companion module message-bot (Lark/Slack). The service is injected with `@Optional()`; in-app notifications are unaffected when it is not installed or no group is configured.
 
-## 端点
+## Endpoints
 
-- `GET /notifications`、`GET /notifications/unread-count`
-- `POST /notifications/:id/read`、`POST /notifications/read-all`
-- `GET/PUT /notification-settings`、`POST /notification-settings/test-push`
+- `GET /notifications`, `GET /notifications/unread-count`
+- `POST /notifications/:id/read`, `POST /notifications/read-all`
+- `GET/PUT /notification-settings`, `POST /notification-settings/test-push`
 
-## 配置
+## Configuration
 
-无新增 env。推送消息中的绝对链接复用宿主既有的 `APP_FRONTEND_URL`。
+No new env vars. Absolute links in push messages reuse the host's existing `APP_FRONTEND_URL`.

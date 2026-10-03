@@ -116,7 +116,7 @@ export class WebIpTaskService {
       }
       return {};
     } catch (err) {
-      console.log(`调用腾讯api发现了错误${err}`);
+      console.log(`Tencent API call error: ${err}`);
       return {};
     }
   }

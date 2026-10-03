@@ -12,13 +12,13 @@ export class SystemService {
 
   async saveSystemData(body: any) {
     const type = body.type;
-    if (!body.projectId) return func.errResult({desc: '新增系统必须属于某个项目'});
-    if (!body.systemDomain && type === 'web') return func.errResult({desc: '新增系统信息操作：系统域名不能为空'});
-    if (!body.systemName) return func.errResult({desc: '新增系统信息操作：系统名称不能为空'});
+    if (!body.projectId) return func.errResult({desc: 'A new system must belong to a project'});
+    if (!body.systemDomain && type === 'web') return func.errResult({desc: 'Add system: system domain must not be empty'});
+    if (!body.systemName) return func.errResult({desc: 'Add system: system name must not be empty'});
 
     if (type === 'web') {
       const search = await this.models.System().findOne({systemDomain: body.systemDomain}).exec();
-      if (search && search.systemDomain) return func.errResult({desc: '新增系统信息操作：系统已存在'});
+      if (search && search.systemDomain) return func.errResult({desc: 'Add system: system already exists'});
     }
 
     const appId = body.appId ? body.appId : func.randomString();
@@ -51,7 +51,7 @@ export class SystemService {
 
   async updateSystemData(body: any) {
     const appId = body.appId;
-    if (!appId) return func.errResult({desc: '更新系统信息操作：appId不能为空'});
+    if (!appId) return func.errResult({desc: 'Update system: appId must not be empty'});
 
     const update = {
       $set: {
@@ -103,7 +103,7 @@ export class SystemService {
   }
 
   async getSystemForDb(appId: string) {
-    if (!appId) throw new Error('查询某个系统信：appId不能为空');
+    if (!appId) throw new Error('Query a system: appId must not be empty');
     return (await this.models.System().findOne({appId: appId}).exec()) || ({} as any);
   }
 
@@ -118,7 +118,7 @@ export class SystemService {
   }
 
   async getSystemForAppId(appId: string) {
-    if (!appId) throw new Error('查询某个系统信：appId不能为空');
+    if (!appId) throw new Error('Query a system: appId must not be empty');
     return this.nodeCache.getAppInfo(appId) || ({} as any);
   }
 
@@ -157,7 +157,7 @@ export class SystemService {
 
   async handleDaliyEmail(appId: string, email: string, type: number, _handleEmali = true, item = 1) {
     const system = await this.getSystemForDb(appId);
-    if (!system) throw new Error('appId无效');
+    if (!system) throw new Error('Invalid appId');
     const listKey: 'daliyList' | 'highestList' = item === 2 ? 'highestList' : 'daliyList';
     const update = type === 1 ? {$addToSet: {[listKey]: email}} : {$pull: {[listKey]: email}};
     return this.models.System().updateOne({appId: appId}, update, {multi: true}).exec();

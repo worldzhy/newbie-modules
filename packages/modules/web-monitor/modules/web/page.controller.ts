@@ -19,7 +19,7 @@ export class PageController {
   @ApiResponse({type: WebMonitorPageAverageListResponseDto})
   async getAveragePageList(@Query() q: any) {
     const {appId} = q;
-    if (!appId) throw new Error('平均页面性能列表：appId不能为空');
+    if (!appId) throw new Error('Average page performance list: appId must not be empty');
     const result = await this.pageSrv.getAveragePageList(q);
     return func.result({data: result});
   }
@@ -29,10 +29,10 @@ export class PageController {
   @ApiResponse({type: WebMonitorRealTimePageItemResponseDto, isArray: true})
   async getRealTimeAveragePageList(@Query() q: any) {
     const {appId} = q;
-    if (!appId) throw new Error('实时平均页面性能列表：appId不能为空');
-    if (!q.beginTime || !q.endTime) throw new Error('实时平均页面性能列表：beginTime或者endTime不能为空');
+    if (!appId) throw new Error('Realtime average page performance list: appId must not be empty');
+    if (!q.beginTime || !q.endTime) throw new Error('Realtime average page performance list: beginTime or endTime must not be empty');
     if (new Date(q.endTime).getTime() - new Date(q.beginTime).getTime() > 60000 * 60) {
-      throw new Error('实时平均页面性能列表：beginTime和endTime间隔不能大于一个小时');
+      throw new Error('Realtime average page performance list: the interval between beginTime and endTime must not exceed one hour');
     }
     const data = await this.pageSrv.getRealTimeAveragePageList(q);
     return func.result({data});
@@ -43,8 +43,8 @@ export class PageController {
   @ApiResponse({type: WebMonitorPageVisitListResponseDto})
   async getOnePageList(@Query() q: any) {
     const {appId, url} = q;
-    if (!appId) throw new Error('单个页面性能或访问列表：appId不能为空');
-    if (!url) throw new Error('单个页面性能或访问列表：url不能为空');
+    if (!appId) throw new Error('Single page performance or visit list: appId must not be empty');
+    if (!url) throw new Error('Single page performance or visit list: url must not be empty');
     const result = await this.pageSrv.getOnePageList(q);
     return func.result({data: result});
   }
@@ -54,8 +54,8 @@ export class PageController {
   @ApiResponse({type: WebMonitorPageDetailResponseDto})
   async getPageDetails(@Query() q: any) {
     const {appId, id} = q;
-    if (!id) throw new Error('单个页面详情：id不能为空');
-    if (!appId) throw new Error('单个页面详情：appId不能为空');
+    if (!id) throw new Error('Single page details: id must not be empty');
+    if (!appId) throw new Error('Single page details: appId must not be empty');
     const row = await this.pageSrv.getPageDetails(appId, id);
     return func.result({data: row || {}});
   }
