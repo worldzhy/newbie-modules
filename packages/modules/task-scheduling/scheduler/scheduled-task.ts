@@ -1,4 +1,4 @@
-import { Logger, OnModuleInit } from "@nestjs/common";
+import { Inject, Logger, OnModuleInit } from "@nestjs/common";
 import { TaskSchedulerService } from "./task-scheduler.service";
 import { HandlerRegistryService } from "./handler-registry.service";
 
@@ -7,8 +7,8 @@ import { HandlerRegistryService } from "./handler-registry.service";
  * identity and default schedule, implements `handle`, and the base class
  * wires registration plus job declaration on module init.
  *
- * `taskScheduler` and `handlerRegistry` are protected (not private) so
- * subclasses can keep using constructor parameter properties.
+ * Platform dependencies are property-injected by the framework so subclasses
+ * keep their constructor free of scheduling boilerplate.
  */
 export abstract class ScheduledTask implements OnModuleInit {
   protected abstract readonly jobKey: string;
@@ -17,10 +17,11 @@ export abstract class ScheduledTask implements OnModuleInit {
   protected abstract readonly enabled: boolean;
   protected abstract readonly logger: Logger;
 
-  constructor(
-    protected readonly taskScheduler: TaskSchedulerService,
-    protected readonly handlerRegistry: HandlerRegistryService,
-  ) {}
+  @Inject(TaskSchedulerService)
+  protected readonly taskScheduler!: TaskSchedulerService;
+
+  @Inject(HandlerRegistryService)
+  protected readonly handlerRegistry!: HandlerRegistryService;
 
   async onModuleInit(): Promise<void> {
     this.handlerRegistry.registerHandler(this.jobKey, (payload) => this.handle(payload));
