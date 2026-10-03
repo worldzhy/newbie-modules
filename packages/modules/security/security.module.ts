@@ -7,7 +7,7 @@ import { TokenModule } from "./token/token.module";
 import { RateLimiterGuard } from "./rate-limiter/rate-limiter.guard";
 import { PassportGuard } from "./passport/passport.guard";
 import { AuthorizationGuard } from "./authorization/authorization.guard";
-import { RouteAuthorizationService } from "./route-authorization/route-authorization.service";
+import { RouteAuthorizationService } from "./authorization/route-authorization.service";
 import { NoAuthGuard } from "./passport/public/public.guard";
 import { ApiKeyAuthGuard } from "./passport/api-key/api-key.guard";
 import { GoogleAuthGuard } from "./passport/google-oauth/google.guard";
@@ -28,7 +28,7 @@ import {
 import { RouteAuthenticationService } from "./route-authentication/route-authentication.service";
 
 import { RouteAuthenticationGuard } from "./route-authentication/route-authentication.guard";
-import { RouteAuthorizationGuard } from "./route-authorization/route-authorization.guard";
+import { RouteAuthorizationGuard } from "./authorization/route-authorization.guard";
 import { SelfOnlyGuard } from "./self-only/self-only.guard";
 
 /**

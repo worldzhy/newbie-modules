@@ -1,7 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma, User, UserRole } from "@generated/prisma/client";
-import { RequirePermission } from "@modules/security/authorization/authorization.decorator";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TokenService } from "@modules/security/token/token.service";
