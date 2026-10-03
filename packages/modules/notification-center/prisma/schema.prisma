@@ -1,32 +1,31 @@
 // !! ------------------------------------------------------------ //
 // !!            [Module] Notification Center models         //
 // !! ------------------------------------------------------------ //
-// * NotificationType                                             //
-// * NotificationTypeChannel                                      //
-// * Notification                                                 //
-// * NotificationReceipt                                          //
 // * NotificationSetting                                          //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+// * NotificationSettingChannel                                   //
+// * NotificationRecord                                           //
+// * NotificationReceipt                                          //
+// * NotificationCenterSetting                                    //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// A declared notification category. Business code registers a type at startup
-// (NotificationTypeRegistryService.register) and declares a database row
-// (NotificationTypeService.upsertDeclaration). The database row wins for
-// runtime-editable fields (defaultSeverity, pushEnabled, channelGroupId):
-// declarations only create missing rows, never override operator edits.
-model NotificationType {
+// Per-notification delivery settings. Business code declares a notification
+// at startup (a Notification subclass registering itself through
+// NotificationRegistryService) and NotificationSettingService persists one
+// row per key. The database row wins for runtime-editable fields
+// (defaultSeverity, pushEnabled, channelGroupId): declarations only create
+// missing rows, never override operator edits.
+model NotificationSetting {
   key            String    @id @db.VarChar(100)
   name           String    @db.VarChar(255)
   // Handlebars-style template rendered with the notify() context.
-  // Chinese example of a seeded default:
-  // "{{project}} {{source}} 新增 {{count}} 个风险"
   titleTemplate  String    @db.VarChar(512)
   // Optional multi-line detail template.
   detailTemplate String?   @db.Text
   defaultSeverity String   @db.VarChar(10)
-  // Per-type push master switch; falls back to the platform setting when the
-  // type row does not specify a channel group.
+  // Per-notification push master switch; falls back to the center setting
+  // when the row does not specify a channel group.
   pushEnabled    Boolean   @default(true)
-  // Optional message-bot channel group override for this type.
+  // Optional message-bot channel group override for this notification.
   channelGroupId String?   @db.Uuid
 
   createdAt DateTime @default(now())
@@ -35,32 +34,33 @@ model NotificationType {
   @@schema("module/notification-center")
 }
 
-// Explicit per-type channel selection (finer granularity than a channel
-// group). When a type has at least one row here, push delivery goes to these
-// channels directly, bypassing both the type group and the platform default.
+// Explicit per-notification channel selection (finer granularity than a
+// channel group). When a notification has at least one row here, push
+// delivery goes to these channels directly, bypassing both the notification
+// group and the center default.
 // Scalar ids only: no cross-schema relation to message-bot.
-model NotificationTypeChannel {
-  id                  String @id @default(uuid()) @db.Uuid
-  notificationTypeKey String @db.VarChar(100)
+model NotificationSettingChannel {
+  id              String @id @default(uuid()) @db.Uuid
+  notificationKey String @db.VarChar(100)
   // Scalar id of a message-bot channel.
-  channelId           String @db.Uuid
+  channelId       String @db.Uuid
 
   createdAt DateTime @default(now())
 
-  @@unique([notificationTypeKey, channelId])
-  @@index([notificationTypeKey])
+  @@unique([notificationKey, channelId])
+  @@index([notificationKey])
   @@schema("module/notification-center")
 }
 
 // One platform-wide row per delivered notification event. Per-user read state
 // lives in NotificationReceipt, so fan-out needs no writes: a missing receipt
 // simply means "unread" for that user.
-model Notification {
+model NotificationRecord {
   id        String   @id @default(uuid()) @db.Uuid
-  // Key of the NotificationType this notification was produced from.
-  typeKey   String   @db.VarChar(100)
-  // Resolved severity for this delivery (type default or an explicit override
-  // passed to notify()).
+  // Key of the notification this record was produced from.
+  notificationKey String @db.VarChar(100)
+  // Resolved severity for this delivery (notification default or an explicit
+  // override passed to notify()).
   severity  String   @db.VarChar(10)
   title     String   @db.VarChar(512)
   detail    String?  @db.Text
@@ -71,7 +71,7 @@ model Notification {
   // the same key already exists. Nullable unique allows multiple nulls.
   deduplicationKey String? @db.VarChar(255)
   // Generic scope identifier (project id, tenant id, ...). Meaning is owned by
-  // the registering type.
+  // the registering notification.
   projectId String?  @db.Uuid
   // Frontend relative path the notification deep-links to.
   link      String?  @db.VarChar(512)
@@ -81,13 +81,13 @@ model Notification {
 
   @@unique([deduplicationKey])
   @@index([createdAt])
-  @@index([typeKey])
+  @@index([notificationKey])
   @@index([projectId])
   @@schema("module/notification-center")
 }
 
 // Lazy per-user read marker, created only when a user opens / marks a
-// notification. Deleting a notification removes its markers.
+// notification. Deleting a record removes its markers.
 model NotificationReceipt {
   id             String       @id @default(uuid()) @db.Uuid
   userId         String       @db.Uuid
@@ -95,25 +95,27 @@ model NotificationReceipt {
   readAt         DateTime     @default(now())
   createdAt      DateTime     @default(now())
 
-  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  notification NotificationRecord @relation(fields: [notificationId], references: [id], onDelete: Cascade)
 
   @@unique([userId, notificationId])
   @@index([userId])
   @@schema("module/notification-center")
 }
 
-// Singleton (fixed id) platform notification settings; the row is created on
+// Singleton (fixed id) notification-center settings; the row is created on
 // first read with the defaults below.
-model NotificationSetting {
+model NotificationCenterSetting {
   id      Int @id
 
   inAppEnabled Boolean @default(true)
-  // Master switch for Lark/Slack push through the message-bot module. A type
-  // push only fires when both this switch and the type's own pushEnabled are on.
+  // Master switch for Lark/Slack push through the message-bot module. A
+  // notification push only fires when both this switch and the notification's
+  // own pushEnabled are on.
   pushEnabled Boolean @default(false)
   // Notifications below this severity are dropped before delivery.
   minimumSeverity String @default("high") @db.VarChar(10)
-  // Default message-bot channel group for types that do not declare their own.
+  // Default message-bot channel group for notifications that do not declare
+  // their own.
   channelGroupId String? @db.Uuid
 
   createdAt DateTime @default(now())

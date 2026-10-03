@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException, OnApplicationBootstrap } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { DEFAULT_TYPE_PUSH_ENABLED, PG_UNIQUE_VIOLATION, SEVERITIES } from "./notification-center.constants";
-import { NotificationTypeRegistryService } from "./notification-type-registry.service";
+import { DEFAULT_NOTIFICATION_PUSH_ENABLED, PG_UNIQUE_VIOLATION, SEVERITIES } from "./notification-center.constants";
+import { NotificationRegistryService } from "./notification-registry.service";
 
-export interface NotificationTypeListItem {
+export interface NotificationSettingListItem {
   key: string;
   name: string;
   titleTemplate: string;
@@ -15,48 +15,48 @@ export interface NotificationTypeListItem {
 }
 
 /**
- * Database-side declaration lifecycle for notification types. Mirrors
+ * Database-side declaration lifecycle for notifications. Mirrors
  * task-scheduling's TaskSchedulerService.upsertJobDeclaration: declarations
  * only create missing rows, never override runtime edits made by operators in
  * the settings UI.
  */
 @Injectable()
-export class NotificationTypeService implements OnApplicationBootstrap {
+export class NotificationSettingService implements OnApplicationBootstrap {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly registry: NotificationTypeRegistryService,
+    private readonly registry: NotificationRegistryService,
   ) {}
 
   /**
    * Runs after every module has finished its onModuleInit (where consumers
-   * register their types), so all declared types are persisted. Existing rows
-   * are left untouched to preserve runtime edits.
+   * register their notifications), so all declared notifications are
+   * persisted. Existing rows are left untouched to preserve runtime edits.
    */
   async onApplicationBootstrap(): Promise<void> {
     await this.reconcileDeclarations();
   }
 
   /**
-   * Persist default settings for every type registered in memory. Only rows
-   * that do not exist yet are created; existing rows (including their
+   * Persist default settings for every notification registered in memory. Only
+   * rows that do not exist yet are created; existing rows (including their
    * runtime-edited defaultSeverity / pushEnabled / channelGroupId) are left
    * untouched so operator edits survive restarts.
    */
   async reconcileDeclarations(): Promise<void> {
     for (const declared of this.registry.getAll()) {
-      const existing = await this.prisma.notificationType.findUnique({ where: { key: declared.key } });
+      const existing = await this.prisma.notificationSetting.findUnique({ where: { key: declared.key } });
       if (existing) {
         continue;
       }
       try {
-        await this.prisma.notificationType.create({
+        await this.prisma.notificationSetting.create({
           data: {
             key: declared.key,
             name: declared.name,
             titleTemplate: declared.titleTemplate,
             detailTemplate: declared.detailTemplate ?? null,
             defaultSeverity: declared.defaultSeverity,
-            pushEnabled: declared.defaultPushEnabled ?? DEFAULT_TYPE_PUSH_ENABLED,
+            pushEnabled: declared.defaultPushEnabled ?? DEFAULT_NOTIFICATION_PUSH_ENABLED,
             channelGroupId: declared.defaultChannelGroupId ?? null,
           },
         });
@@ -68,14 +68,14 @@ export class NotificationTypeService implements OnApplicationBootstrap {
     }
   }
 
-  async listTypes(): Promise<NotificationTypeListItem[]> {
-    const rows = await this.prisma.notificationType.findMany({ orderBy: { name: "asc" } });
-    const links = await this.prisma.notificationTypeChannel.findMany();
-    const channelIdsByType = new Map<string, string[]>();
+  async listSettings(): Promise<NotificationSettingListItem[]> {
+    const rows = await this.prisma.notificationSetting.findMany({ orderBy: { name: "asc" } });
+    const links = await this.prisma.notificationSettingChannel.findMany();
+    const channelIdsByNotification = new Map<string, string[]>();
     for (const link of links) {
-      const list = channelIdsByType.get(link.notificationTypeKey) ?? [];
+      const list = channelIdsByNotification.get(link.notificationKey) ?? [];
       list.push(link.channelId);
-      channelIdsByType.set(link.notificationTypeKey, list);
+      channelIdsByNotification.set(link.notificationKey, list);
     }
     return rows.map((row) => ({
       key: row.key,
@@ -85,11 +85,11 @@ export class NotificationTypeService implements OnApplicationBootstrap {
       defaultSeverity: row.defaultSeverity,
       pushEnabled: row.pushEnabled,
       channelGroupId: row.channelGroupId,
-      channelIds: channelIdsByType.get(row.key) ?? [],
+      channelIds: channelIdsByNotification.get(row.key) ?? [],
     }));
   }
 
-  async updateType(
+  async updateSetting(
     key: string,
     updates: {
       defaultSeverity?: string;
@@ -97,10 +97,10 @@ export class NotificationTypeService implements OnApplicationBootstrap {
       channelGroupId?: string | null;
       channelIds?: string[];
     },
-  ): Promise<NotificationTypeListItem> {
-    const row = await this.prisma.notificationType.findUnique({ where: { key } });
+  ): Promise<NotificationSettingListItem> {
+    const row = await this.prisma.notificationSetting.findUnique({ where: { key } });
     if (!row) {
-      throw new NotFoundException(`Notification type not found: ${key}`);
+      throw new NotFoundException(`Notification setting not found: ${key}`);
     }
 
     if (updates.defaultSeverity !== undefined && !SEVERITIES.includes(updates.defaultSeverity as any)) {
@@ -136,11 +136,11 @@ export class NotificationTypeService implements OnApplicationBootstrap {
         }
       }
       await this.prisma.$transaction([
-        this.prisma.notificationTypeChannel.deleteMany({ where: { notificationTypeKey: key } }),
+        this.prisma.notificationSettingChannel.deleteMany({ where: { notificationKey: key } }),
         ...(uniqueIds.length > 0
           ? [
-              this.prisma.notificationTypeChannel.createMany({
-                data: uniqueIds.map((channelId) => ({ notificationTypeKey: key, channelId })),
+              this.prisma.notificationSettingChannel.createMany({
+                data: uniqueIds.map((channelId) => ({ notificationKey: key, channelId })),
                 skipDuplicates: true,
               }),
             ]
@@ -148,7 +148,7 @@ export class NotificationTypeService implements OnApplicationBootstrap {
       ]);
     }
 
-    const updated = await this.prisma.notificationType.update({
+    const updated = await this.prisma.notificationSetting.update({
       where: { key },
       data: {
         ...(updates.defaultSeverity !== undefined ? { defaultSeverity: updates.defaultSeverity } : {}),
@@ -157,8 +157,8 @@ export class NotificationTypeService implements OnApplicationBootstrap {
       },
     });
 
-    const typeChannels = await this.prisma.notificationTypeChannel.findMany({
-      where: { notificationTypeKey: key },
+    const notificationChannels = await this.prisma.notificationSettingChannel.findMany({
+      where: { notificationKey: key },
       select: { channelId: true },
     });
 
@@ -170,7 +170,7 @@ export class NotificationTypeService implements OnApplicationBootstrap {
       defaultSeverity: updated.defaultSeverity,
       pushEnabled: updated.pushEnabled,
       channelGroupId: updated.channelGroupId,
-      channelIds: typeChannels.map((link) => link.channelId),
+      channelIds: notificationChannels.map((link) => link.channelId),
     };
   }
 }

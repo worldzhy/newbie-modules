@@ -2,20 +2,20 @@ import { Body, Controller, Get, Param, Post, Put, Query, Req } from "@nestjs/com
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 import { NotificationCenterService, NotifyInput, NotifyResult } from "./notification-center.service";
-import { NotificationTypeService } from "./notification-type.service";
+import { NotificationSettingService } from "./notification-setting.service";
 import {
   ListNotificationsRequestDto,
   ListNotificationsResponseDto,
   MarkAllNotificationsReadResponseDto,
   MarkNotificationReadResponseDto,
+  NotificationCenterSettingDto,
   NotificationSettingDto,
-  NotificationTypeDto,
   NotifyDto,
   NotifyResultDto,
   TestPushResultDto,
   UnreadCountResponseDto,
+  UpdateNotificationCenterSettingDto,
   UpdateNotificationSettingDto,
-  UpdateNotificationTypeDto,
 } from "./notification-center.dto";
 
 interface AuthenticatedRequest {
@@ -28,13 +28,13 @@ interface AuthenticatedRequest {
 export class NotificationCenterController {
   constructor(
     private readonly notificationCenter: NotificationCenterService,
-    private readonly notificationTypes: NotificationTypeService,
+    private readonly notificationSettings: NotificationSettingService,
   ) {}
 
   // --- Notification delivery ----------------------------------------------
 
   @Post("notifications")
-  @ApiOperation({ summary: "Deliver a notification from a registered type" })
+  @ApiOperation({ summary: "Deliver a notification from a registered notification" })
   @ApiResponse({ status: 201, type: NotifyResultDto })
   notify(@Body() body: NotifyDto): Promise<NotifyResult> {
     return this.notificationCenter.notify(body as NotifyInput);
@@ -76,39 +76,42 @@ export class NotificationCenterController {
     return this.notificationCenter.markAllRead(req.user.userId);
   }
 
-  // --- Notification types --------------------------------------------------
-
-  @Get("notification-types")
-  @ApiOperation({ summary: "List registered notification types with their runtime settings" })
-  @ApiResponse({ status: 200, type: [NotificationTypeDto] })
-  listTypes(): Promise<NotificationTypeDto[]> {
-    return this.notificationTypes.listTypes() as unknown as Promise<NotificationTypeDto[]>;
-  }
-
-  @Put("notification-types/:key")
-  @ApiOperation({ summary: "Update runtime settings for a notification type" })
-  @ApiResponse({ status: 200, type: NotificationTypeDto })
-  updateType(@Param("key") key: string, @Body() body: UpdateNotificationTypeDto): Promise<NotificationTypeDto> {
-    return this.notificationTypes.updateType(key, body ?? {}) as unknown as Promise<NotificationTypeDto>;
-  }
-
-  // --- Platform settings ---------------------------------------------------
+  // --- Per-notification settings -------------------------------------------
 
   @Get("notification-settings")
-  @ApiOperation({ summary: "Get platform notification settings" })
-  @ApiResponse({ status: 200, type: NotificationSettingDto })
-  getSettings(): Promise<NotificationSettingDto> {
-    return this.notificationCenter.getSettings();
+  @ApiOperation({ summary: "List registered notifications with their runtime settings" })
+  @ApiResponse({ status: 200, type: [NotificationSettingDto] })
+  listSettings(): Promise<NotificationSettingDto[]> {
+    return this.notificationSettings.listSettings() as unknown as Promise<NotificationSettingDto[]>;
   }
 
-  @Put("notification-settings")
-  @ApiOperation({ summary: "Update platform notification settings" })
+  @Put("notification-settings/:key")
+  @ApiOperation({ summary: "Update runtime settings for a notification" })
   @ApiResponse({ status: 200, type: NotificationSettingDto })
-  updateSettings(@Body() body: UpdateNotificationSettingDto): Promise<NotificationSettingDto> {
-    return this.notificationCenter.updateSettings(body ?? {});
+  updateSetting(
+    @Param("key") key: string,
+    @Body() body: UpdateNotificationSettingDto,
+  ): Promise<NotificationSettingDto> {
+    return this.notificationSettings.updateSetting(key, body ?? {}) as unknown as Promise<NotificationSettingDto>;
   }
 
-  @Post("notification-settings/test-push")
+  // --- Center settings -----------------------------------------------------
+
+  @Get("notification-center-setting")
+  @ApiOperation({ summary: "Get notification-center settings" })
+  @ApiResponse({ status: 200, type: NotificationCenterSettingDto })
+  getCenterSettings(): Promise<NotificationCenterSettingDto> {
+    return this.notificationCenter.getCenterSettings();
+  }
+
+  @Put("notification-center-setting")
+  @ApiOperation({ summary: "Update notification-center settings" })
+  @ApiResponse({ status: 200, type: NotificationCenterSettingDto })
+  updateCenterSettings(@Body() body: UpdateNotificationCenterSettingDto): Promise<NotificationCenterSettingDto> {
+    return this.notificationCenter.updateCenterSettings(body ?? {});
+  }
+
+  @Post("notification-center-setting/test-push")
   @ApiOperation({ summary: "Send a test message to the configured push channel group" })
   @ApiResponse({ status: 200, type: TestPushResultDto })
   testPush(): Promise<TestPushResultDto> {

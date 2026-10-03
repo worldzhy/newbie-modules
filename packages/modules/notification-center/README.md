@@ -1,20 +1,31 @@
 # newbie.notification-center
 
-Platform notification center. Subscribes to `*.scan-completed` events from scanning modules, turns security scan results into **denoised summary notifications**, and can optionally push them to Lark/Slack groups via the message-bot module.
+Platform notification center. Business modules declare notifications in code, the center persists per-notification delivery settings, renders templates into `NotificationRecord` rows, and can optionally push them to Lark/Slack groups via the message-bot module.
 
-## v1 scope
+## Concepts
 
-- Alert sources: scan-completed events (EventEmitter2, wildcard) from `aws-audit` and `dependency-scan`.
-- At most one notification per successful scan (idempotent on the unique `(sourceModule, scanId)`); only open findings whose `firstSeenAt` falls inside the current scan window are counted, so recurring findings do not renotify; when there are no new findings (or they are below the minimum severity threshold) it stays silent.
-- Spike detection: when the number of new high+ findings this run is >= max(`spikeThreshold`, the daily average over the last `spikeBaselineDays` days x 2) and strictly above the average, the notification is upgraded to `security-spike`.
-- In-app messages: one global `Notification` plus lazy `NotificationReceipt` rows (read state per user); no fan-out writes.
-- Push: optional companion module message-bot (Lark/Slack). The service is injected with `@Optional()`; in-app notifications are unaffected when it is not installed or no group is configured.
+- **Notification** (code): a notification declared by subclassing the abstract `Notification` base class (`notification.ts`). The subclass declares `key` / `name` / `titleTemplate` / `defaultSeverity` (plus optional `detailTemplate` / `defaultPushEnabled` / `defaultChannelGroupId`); the base class property-injects `NotificationRegistryService` and registers the declaration on module init, so consumer constructors stay free of platform boilerplate.
+- **NotificationSetting** (database): one row per registered notification key, owning the runtime-editable delivery fields (`defaultSeverity`, `pushEnabled`, `channelGroupId`). `NotificationSettingService` reconciles declarations on application bootstrap: missing rows are created, existing rows are never overridden.
+- **NotificationSettingChannel** (database): explicit per-notification push channels. When at least one row exists for a key, push delivery goes to these channels directly, bypassing both the notification group and the center default group.
+- **NotificationRecord** (database): one platform-wide row per delivered notification event. Per-user read state lives in `NotificationReceipt`, so fan-out needs no writes: a missing receipt simply means "unread" for that user.
+- **NotificationCenterSetting** (database): singleton row (fixed id) with center-wide switches: `inAppEnabled`, `pushEnabled` master switch, `minimumSeverity` floor, and the default message-bot channel group.
+
+## Delivery flow
+
+`NotificationCenterService.notify({ notificationKey, context, ... })`:
+
+1. Looks up the declaration in `NotificationRegistryService` and the row in `NotificationSetting`.
+2. Resolves severity (explicit override wins over the row default) and drops deliveries below the center `minimumSeverity` floor before any write.
+3. Renders the Handlebars-style title/detail templates with `context` and inserts a `NotificationRecord` (idempotent when a `deduplicationKey` is provided).
+4. Push routing, when both the notification's and the center's `pushEnabled` are on: explicit `NotificationSettingChannel` rows win, then the notification's `channelGroupId`, then the center default group.
 
 ## Endpoints
 
+- `POST /notifications`
 - `GET /notifications`, `GET /notifications/unread-count`
 - `POST /notifications/:id/read`, `POST /notifications/read-all`
-- `GET/PUT /notification-settings`, `POST /notification-settings/test-push`
+- `GET /notification-settings`, `PUT /notification-settings/:key`
+- `GET/PUT /notification-center-setting`, `POST /notification-center-setting/test-push`
 
 ## Configuration
 

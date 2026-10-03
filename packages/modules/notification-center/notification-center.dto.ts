@@ -4,15 +4,15 @@ import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/comm
 import { SEVERITIES } from "./notification-center.constants";
 
 // ---------------------------------------------------------------------------
-// Notification DTOs
+// Notification record DTOs
 // ---------------------------------------------------------------------------
 
-export class NotificationDto {
+export class NotificationRecordDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty({ description: "Key of the notification type this delivery was produced from" })
-  typeKey: string;
+  @ApiProperty({ description: "Key of the notification this record was produced from" })
+  notificationKey: string;
 
   @ApiProperty({ enum: SEVERITIES })
   severity: string;
@@ -48,16 +48,16 @@ export class NotificationDto {
 }
 
 export class NotifyDto {
-  @ApiProperty({ description: "Key of a registered notification type" })
+  @ApiProperty({ description: "Key of a registered notification" })
   @IsString()
-  typeKey: string;
+  notificationKey: string;
 
-  @ApiProperty({ type: Object, required: false, description: "Values interpolated into the type templates" })
+  @ApiProperty({ type: Object, required: false, description: "Values interpolated into the notification templates" })
   @IsOptional()
   @IsObject()
   context?: Record<string, unknown>;
 
-  @ApiProperty({ enum: SEVERITIES, required: false, description: "Override the type default severity" })
+  @ApiProperty({ enum: SEVERITIES, required: false, description: "Override the notification default severity" })
   @IsOptional()
   @IsString()
   @IsIn(SEVERITIES as unknown as string[])
@@ -98,8 +98,8 @@ export class ListNotificationsRequestDto extends CommonListRequestDto {
 }
 
 export class ListNotificationsResponseDto extends CommonListResponseDto {
-  @ApiProperty({ type: [NotificationDto] })
-  declare records: NotificationDto[];
+  @ApiProperty({ type: [NotificationRecordDto] })
+  declare records: NotificationRecordDto[];
 }
 
 export class UnreadCountResponseDto {
@@ -118,10 +118,10 @@ export class MarkAllNotificationsReadResponseDto {
 }
 
 // ---------------------------------------------------------------------------
-// Notification type DTOs
+// Per-notification setting DTOs
 // ---------------------------------------------------------------------------
 
-export class NotificationTypeDto {
+export class NotificationSettingDto {
   @ApiProperty()
   key: string;
 
@@ -146,12 +146,12 @@ export class NotificationTypeDto {
   @ApiProperty({
     type: [String],
     description:
-      "Explicit push channels for this type. When non-empty, delivery goes to these channels directly, bypassing the type group and the platform default group.",
+      "Explicit push channels for this notification. When non-empty, delivery goes to these channels directly, bypassing the notification group and the center default group.",
   })
   channelIds: string[];
 }
 
-export class UpdateNotificationTypeDto {
+export class UpdateNotificationSettingDto {
   @ApiProperty({ required: false, enum: SEVERITIES })
   @IsOptional()
   @IsString()
@@ -180,10 +180,10 @@ export class UpdateNotificationTypeDto {
 }
 
 // ---------------------------------------------------------------------------
-// Settings DTOs
+// Center settings DTOs
 // ---------------------------------------------------------------------------
 
-export class NotificationSettingDto {
+export class NotificationCenterSettingDto {
   @ApiProperty()
   inAppEnabled: boolean;
 
@@ -197,7 +197,7 @@ export class NotificationSettingDto {
     type: String,
     required: false,
     nullable: true,
-    description: "Default message-bot channel group for types without their own",
+    description: "Default message-bot channel group for notifications without their own",
   })
   channelGroupId: string | null;
 
@@ -205,7 +205,7 @@ export class NotificationSettingDto {
   availableChannelCount: number | null;
 }
 
-export class UpdateNotificationSettingDto {
+export class UpdateNotificationCenterSettingDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()

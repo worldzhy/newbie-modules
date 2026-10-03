@@ -10,12 +10,12 @@ export const SEVERITY_LEVEL: Record<string, number> = {
   unknown: 0,
 };
 
-export const SETTING_SINGLETON_ID = 1;
+export const CENTER_SETTING_SINGLETON_ID = 1;
 export const DEFAULT_IN_APP_ENABLED = true;
 export const DEFAULT_PUSH_ENABLED = false;
 export const DEFAULT_MINIMUM_SEVERITY = "high";
-export const DEFAULT_TYPE_PUSH_ENABLED = true;
+export const DEFAULT_NOTIFICATION_PUSH_ENABLED = true;
 
 // Postgres unique violation code, used to treat concurrent declaration of the
-// same notification type as a no-op.
+// same notification as a no-op.
 export const PG_UNIQUE_VIOLATION = "P2002";

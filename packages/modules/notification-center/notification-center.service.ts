@@ -2,33 +2,33 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
+  CENTER_SETTING_SINGLETON_ID,
   DEFAULT_IN_APP_ENABLED,
   DEFAULT_MINIMUM_SEVERITY,
   DEFAULT_PUSH_ENABLED,
   PG_UNIQUE_VIOLATION,
   SEVERITIES,
   SEVERITY_LEVEL,
-  SETTING_SINGLETON_ID,
 } from "./notification-center.constants";
 import {
   ListNotificationsRequestDto,
   ListNotificationsResponseDto,
   MarkAllNotificationsReadResponseDto,
   MarkNotificationReadResponseDto,
-  NotificationSettingDto,
+  NotificationCenterSettingDto,
   TestPushResultDto,
   UnreadCountResponseDto,
-  UpdateNotificationSettingDto,
+  UpdateNotificationCenterSettingDto,
 } from "./notification-center.dto";
-import { NotificationTypeRegistryService } from "./notification-type-registry.service";
+import { NotificationRegistryService } from "./notification-registry.service";
 import { MessagePushService } from "./services/message-push.service";
 
 export interface NotifyInput {
-  /** Key of a registered notification type. */
-  typeKey: string;
-  /** Values interpolated into the type's title/detail templates. */
+  /** Key of a registered notification. */
+  notificationKey: string;
+  /** Values interpolated into the notification's title/detail templates. */
   context?: Record<string, unknown>;
-  /** Override the type's default severity for this delivery. */
+  /** Override the notification's default severity for this delivery. */
   severity?: (typeof SEVERITIES)[number];
   /** Optional project/tenant scope used for filtering. */
   projectId?: string;
@@ -36,13 +36,13 @@ export interface NotifyInput {
   link?: string;
   /**
    * Optional idempotency key. When provided, a second notify() with the same
-   * key is a no-op (the existing notification is returned).
+   * key is a no-op (the existing record is returned).
    */
   deduplicationKey?: string;
 }
 
 export interface NotifyResult {
-  /** The created notification id, or the existing one when deduplicated. */
+  /** The created record id, or the existing one when deduplicated. */
   id: string;
   /** True when the deduplication key already existed and no row was created. */
   deduplicated: boolean;
@@ -73,34 +73,34 @@ export class NotificationCenterService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly messagePush: MessagePushService,
-    private readonly typeRegistry: NotificationTypeRegistryService,
+    private readonly registry: NotificationRegistryService,
   ) {}
 
   // --- Delivery ------------------------------------------------------------
 
   /**
-   * Produce one notification from a registered type. The type's templates are
-   * rendered with `context`, severity is resolved from the override or the
-   * type default, and delivery respects the platform minimum-severity floor.
-   * Push routing is driven by the type row's runtime settings, falling back to
-   * the platform default channel group.
+   * Produce one notification record from a registered notification. The
+   * notification's templates are rendered with `context`, severity is resolved
+   * from the override or the notification default, and delivery respects the
+   * center minimum-severity floor. Push routing is driven by the notification
+   * row's runtime settings, falling back to the center default channel group.
    */
   async notify(input: NotifyInput): Promise<NotifyResult> {
-    const declared = this.typeRegistry.get(input.typeKey);
+    const declared = this.registry.get(input.notificationKey);
     if (!declared) {
-      throw new NotFoundException(`Notification type is not registered: ${input.typeKey}`);
+      throw new NotFoundException(`Notification is not registered: ${input.notificationKey}`);
     }
 
-    const typeRow = await this.prisma.notificationType.findUnique({ where: { key: input.typeKey } });
-    if (!typeRow) {
-      throw new NotFoundException(`Notification type declaration missing in database: ${input.typeKey}`);
+    const setting = await this.prisma.notificationSetting.findUnique({ where: { key: input.notificationKey } });
+    if (!setting) {
+      throw new NotFoundException(`Notification declaration missing in database: ${input.notificationKey}`);
     }
 
-    const severity = input.severity ?? typeRow.defaultSeverity;
-    const platform = await this.ensureSetting();
+    const severity = input.severity ?? setting.defaultSeverity;
+    const center = await this.ensureCenterSetting();
 
-    // Drop deliveries below the platform severity floor before any write.
-    if (SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[platform.minimumSeverity] ?? SEVERITY_LEVEL.high)) {
+    // Drop deliveries below the center severity floor before any write.
+    if (SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high)) {
       return { id: "", deduplicated: false, dropped: true };
     }
 
@@ -108,7 +108,7 @@ export class NotificationCenterService {
     const detail = declared.detailTemplate ? renderTemplate(declared.detailTemplate, input.context) : null;
 
     const data = {
-      typeKey: input.typeKey,
+      notificationKey: input.notificationKey,
       severity,
       title,
       detail,
@@ -118,73 +118,73 @@ export class NotificationCenterService {
       link: input.link ?? null,
     };
 
-    let notificationId: string;
+    let recordId: string;
     let deduplicated = false;
 
     if (input.deduplicationKey) {
       try {
-        const created = await this.prisma.notification.create({ data, select: { id: true } });
-        notificationId = created.id;
+        const created = await this.prisma.notificationRecord.create({ data, select: { id: true } });
+        recordId = created.id;
       } catch (error) {
         if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === PG_UNIQUE_VIOLATION) {
-          const existing = await this.prisma.notification.findUnique({
+          const existing = await this.prisma.notificationRecord.findUnique({
             where: { deduplicationKey: input.deduplicationKey },
             select: { id: true },
           });
-          notificationId = existing?.id ?? "";
+          recordId = existing?.id ?? "";
           deduplicated = true;
         } else {
           throw error;
         }
       }
     } else {
-      const created = await this.prisma.notification.create({ data, select: { id: true } });
-      notificationId = created.id;
+      const created = await this.prisma.notificationRecord.create({ data, select: { id: true } });
+      recordId = created.id;
     }
 
     if (!deduplicated) {
-      // Explicit per-type channels take priority over the type group, which
-      // in turn takes priority over the platform default group.
-      const typeChannels = await this.prisma.notificationTypeChannel.findMany({
-        where: { notificationTypeKey: input.typeKey },
+      // Explicit per-notification channels take priority over the notification
+      // group, which in turn takes priority over the center default group.
+      const notificationChannels = await this.prisma.notificationSettingChannel.findMany({
+        where: { notificationKey: input.notificationKey },
         select: { channelId: true },
       });
-      const explicitChannelIds = typeChannels.map((link) => link.channelId);
-      await this.dispatchPush(explicitChannelIds, typeRow.channelGroupId, typeRow.pushEnabled, platform, title, detail);
+      const explicitChannelIds = notificationChannels.map((link) => link.channelId);
+      await this.dispatchPush(explicitChannelIds, setting.channelGroupId, setting.pushEnabled, center, title, detail);
     }
 
-    return { id: notificationId, deduplicated, dropped: false };
+    return { id: recordId, deduplicated, dropped: false };
   }
 
   private async dispatchPush(
     explicitChannelIds: string[],
-    typeChannelGroupId: string | null,
-    typePushEnabled: boolean,
-    platform: { pushEnabled: boolean; channelGroupId: string | null },
+    notificationChannelGroupId: string | null,
+    notificationPushEnabled: boolean,
+    center: { pushEnabled: boolean; channelGroupId: string | null },
     title: string,
     detail: string | null,
   ): Promise<void> {
-    if (!typePushEnabled || !platform.pushEnabled) {
+    if (!notificationPushEnabled || !center.pushEnabled) {
       return;
     }
     const text = detail ? `${title}\n${detail}` : title;
-    // 1) Explicit per-type channels win when at least one is selected.
+    // 1) Explicit per-notification channels win when at least one is selected.
     if (explicitChannelIds.length > 0) {
       await this.messagePush.dispatchToChannelIds(explicitChannelIds, text);
       return;
     }
-    // 2) Otherwise fall back to the type group, then the platform group.
-    const channelGroupId = typeChannelGroupId ?? platform.channelGroupId;
+    // 2) Otherwise fall back to the notification group, then the center group.
+    const channelGroupId = notificationChannelGroupId ?? center.channelGroupId;
     if (!channelGroupId) {
       return;
     }
     await this.messagePush.dispatchToGroup(channelGroupId, text);
   }
 
-  // --- Settings ------------------------------------------------------------
+  // --- Center settings -----------------------------------------------------
 
-  async getSettings(): Promise<NotificationSettingDto & { availableChannelCount: number | null }> {
-    const setting = await this.ensureSetting();
+  async getCenterSettings(): Promise<NotificationCenterSettingDto & { availableChannelCount: number | null }> {
+    const setting = await this.ensureCenterSetting();
     const availableChannelCount = setting.channelGroupId
       ? await this.messagePush.countChannels(setting.channelGroupId)
       : null;
@@ -197,8 +197,8 @@ export class NotificationCenterService {
     };
   }
 
-  async updateSettings(body: UpdateNotificationSettingDto): Promise<NotificationSettingDto> {
-    const setting = await this.ensureSetting();
+  async updateCenterSettings(body: UpdateNotificationCenterSettingDto): Promise<NotificationCenterSettingDto> {
+    const setting = await this.ensureCenterSetting();
 
     let channelGroupId = setting.channelGroupId;
     if (body.channelGroupId !== undefined) {
@@ -215,7 +215,7 @@ export class NotificationCenterService {
       throw new BadRequestException("A message channel group is required before push can be enabled.");
     }
 
-    const updated = await this.prisma.notificationSetting.update({
+    const updated = await this.prisma.notificationCenterSetting.update({
       where: { id: setting.id },
       data: {
         ...(body.inAppEnabled !== undefined ? { inAppEnabled: body.inAppEnabled } : {}),
@@ -237,21 +237,23 @@ export class NotificationCenterService {
   }
 
   async testPush(): Promise<TestPushResultDto> {
-    const setting = await this.ensureSetting();
+    const setting = await this.ensureCenterSetting();
     if (!setting.pushEnabled || !setting.channelGroupId) {
       throw new BadRequestException("Push is disabled or no message channel group is configured.");
     }
     return this.messagePush.dispatchToGroup(setting.channelGroupId, "Nightwatch 通知中心测试消息：推送通道工作正常。");
   }
 
-  private async ensureSetting() {
-    const existing = await this.prisma.notificationSetting.findUnique({ where: { id: SETTING_SINGLETON_ID } });
+  private async ensureCenterSetting() {
+    const existing = await this.prisma.notificationCenterSetting.findUnique({
+      where: { id: CENTER_SETTING_SINGLETON_ID },
+    });
     if (existing) {
       return existing;
     }
-    return this.prisma.notificationSetting.create({
+    return this.prisma.notificationCenterSetting.create({
       data: {
-        id: SETTING_SINGLETON_ID,
+        id: CENTER_SETTING_SINGLETON_ID,
         inAppEnabled: DEFAULT_IN_APP_ENABLED,
         pushEnabled: DEFAULT_PUSH_ENABLED,
         minimumSeverity: DEFAULT_MINIMUM_SEVERITY,
@@ -266,7 +268,7 @@ export class NotificationCenterService {
     const unreadOnly = query.unreadOnly === "true";
 
     const result = await this.prisma.findManyInManyPages({
-      model: Prisma.ModelName.Notification,
+      model: Prisma.ModelName.NotificationRecord,
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
         where: {
@@ -290,15 +292,15 @@ export class NotificationCenterService {
 
   async unreadCount(userId: string): Promise<UnreadCountResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
-    const count = await this.prisma.notification.count({
+    const count = await this.prisma.notificationRecord.count({
       where: { createdAt: { gte: visibleSince }, receipts: { none: { userId } } },
     });
     return { count };
   }
 
   async markRead(userId: string, id: string): Promise<MarkNotificationReadResponseDto> {
-    const notification = await this.prisma.notification.findUnique({ where: { id } });
-    if (!notification) {
+    const record = await this.prisma.notificationRecord.findUnique({ where: { id } });
+    if (!record) {
       throw new NotFoundException(`Notification not found: ${id}`);
     }
     await this.prisma.notificationReceipt.upsert({
@@ -311,13 +313,13 @@ export class NotificationCenterService {
 
   async markAllRead(userId: string): Promise<MarkAllNotificationsReadResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
-    const unread = await this.prisma.notification.findMany({
+    const unread = await this.prisma.notificationRecord.findMany({
       where: { createdAt: { gte: visibleSince }, receipts: { none: { userId } } },
       select: { id: true },
     });
     if (unread.length > 0) {
       await this.prisma.notificationReceipt.createMany({
-        data: unread.map((notification) => ({ userId, notificationId: notification.id })),
+        data: unread.map((record) => ({ userId, notificationId: record.id })),
         skipDuplicates: true,
       });
     }
