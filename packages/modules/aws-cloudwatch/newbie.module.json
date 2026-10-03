@@ -1,5 +1,6 @@
 {
   "key": "aws-cloudwatch",
+  "layer": "foundation",
   "module": {
     "file": "aws-cloudwatch.module",
     "className": "AwsCloudwatchModule"

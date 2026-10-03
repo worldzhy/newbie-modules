@@ -1,5 +1,6 @@
 {
   "key": "aws-s3",
+  "layer": "foundation",
   "module": {
     "file": "aws-s3.module",
     "className": "AwsS3Module"

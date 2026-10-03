@@ -1,5 +1,6 @@
 {
   "key": "aws-core",
+  "layer": "foundation",
   "module": {
     "file": "aws-core.module",
     "className": "AwsCoreModule"

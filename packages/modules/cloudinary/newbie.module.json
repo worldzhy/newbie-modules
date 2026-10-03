@@ -1,5 +1,6 @@
 {
   "key": "cloudinary",
+  "layer": "foundation",
   "module": {
     "file": "cloudinary.module",
     "className": "CloudinaryModule"

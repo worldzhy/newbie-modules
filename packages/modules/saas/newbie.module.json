@@ -1,5 +1,6 @@
 {
   "key": "saas",
+  "layer": "capability",
   "module": {
     "file": "saas.module",
     "className": "SaasModule"

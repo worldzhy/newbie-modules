@@ -1,5 +1,6 @@
 {
   "key": "dependency-scan",
+  "layer": "domain",
   "module": {
     "file": "dependency-scan.module",
     "className": "DependencyScanModule"

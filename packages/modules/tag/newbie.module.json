@@ -1,5 +1,6 @@
 {
   "key": "tag",
+  "layer": "capability",
   "module": {
     "file": "tag.module",
     "className": "TagModule"

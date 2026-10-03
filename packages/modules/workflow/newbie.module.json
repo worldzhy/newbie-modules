@@ -1,5 +1,6 @@
 {
   "key": "workflow",
+  "layer": "capability",
   "module": {
     "file": "workflow.module",
     "className": "WorkflowModule"

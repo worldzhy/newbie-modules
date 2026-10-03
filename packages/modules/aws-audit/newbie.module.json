@@ -1,5 +1,6 @@
 {
   "key": "aws-audit",
+  "layer": "domain",
   "module": {
     "file": "aws-audit.module",
     "className": "AwsAuditModule"

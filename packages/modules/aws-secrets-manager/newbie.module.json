@@ -1,5 +1,6 @@
 {
   "key": "aws-secrets-manager",
+  "layer": "foundation",
   "module": {
     "file": "aws-secrets-manager.module",
     "className": "AwsSecretsManagerModule"

@@ -1,5 +1,6 @@
 {
   "key": "aws-ses",
+  "layer": "foundation",
   "module": {
     "file": "aws-ses.module",
     "className": "AwsSesModule"

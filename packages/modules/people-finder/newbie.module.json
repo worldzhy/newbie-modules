@@ -1,5 +1,6 @@
 {
   "key": "people-finder",
+  "layer": "domain",
   "module": {
     "file": "people-finder.module",
     "className": "PeopleFinderModule"

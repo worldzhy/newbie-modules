@@ -1,5 +1,6 @@
 {
   "key": "task-scheduling",
+  "layer": "capability",
   "module": {
     "file": "task-scheduling.module",
     "className": "TaskSchedulingModule"

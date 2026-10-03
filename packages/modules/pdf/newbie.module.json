@@ -1,5 +1,6 @@
 {
   "key": "pdf",
+  "layer": "foundation",
   "module": {
     "file": "pdf.module",
     "className": "PdfModule"

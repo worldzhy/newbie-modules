@@ -1,5 +1,6 @@
 {
   "key": "engined",
+  "layer": "domain",
   "module": {
     "file": "engined.module",
     "className": "EnginedModule"

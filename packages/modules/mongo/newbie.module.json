@@ -1,5 +1,6 @@
 {
   "key": "mongo",
+  "layer": "foundation",
   "module": {
     "file": "mongo.module",
     "className": "MongoModule"

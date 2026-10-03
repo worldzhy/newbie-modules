@@ -1,5 +1,6 @@
 {
   "key": "stock-mgmt",
+  "layer": "domain",
   "module": {
     "file": "stock-mgmt.module",
     "className": "StockManagementModule"

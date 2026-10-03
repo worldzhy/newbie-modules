@@ -1,5 +1,6 @@
 {
   "key": "backend-monitor",
+  "layer": "capability",
   "module": {
     "file": "backend-monitor.module",
     "className": "BackendMonitorModule"

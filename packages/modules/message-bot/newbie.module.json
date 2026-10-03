@@ -1,5 +1,6 @@
 {
   "key": "message-bot",
+  "layer": "capability",
   "module": {
     "file": "message-bot.module",
     "className": "MessageBotModule"

@@ -1,5 +1,6 @@
 {
   "key": "account",
+  "layer": "capability",
   "module": {
     "file": "account.module",
     "className": "AccountModule"

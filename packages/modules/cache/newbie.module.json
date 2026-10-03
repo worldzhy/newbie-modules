@@ -1,5 +1,6 @@
 {
   "key": "cache",
+  "layer": "foundation",
   "module": {
     "file": "cache.module",
     "className": "NewbieCacheModule"

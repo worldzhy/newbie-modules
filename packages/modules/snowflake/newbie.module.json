@@ -1,5 +1,6 @@
 {
   "key": "snowflake",
+  "layer": "foundation",
   "module": {
     "file": "snowflake.module",
     "className": "SnowflakeModule"

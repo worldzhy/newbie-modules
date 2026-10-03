@@ -1,5 +1,6 @@
 {
   "key": "notification-center",
+  "layer": "capability",
   "module": {
     "file": "notification-center.module",
     "className": "NotificationCenterModule"

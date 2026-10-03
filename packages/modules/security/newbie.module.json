@@ -1,5 +1,6 @@
 {
   "key": "security",
+  "layer": "foundation",
   "module": {
     "file": "security.module",
     "className": "SecurityModule"

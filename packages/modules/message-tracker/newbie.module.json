@@ -1,5 +1,6 @@
 {
   "key": "message-tracker",
+  "layer": "capability",
   "module": {
     "file": "message-tracker.module",
     "className": "MessageTrackerModule"

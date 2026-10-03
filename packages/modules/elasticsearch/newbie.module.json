@@ -1,5 +1,6 @@
 {
   "key": "elasticsearch",
+  "layer": "foundation",
   "module": {
     "file": "elasticsearch.module",
     "className": "ElasticsearchModule"

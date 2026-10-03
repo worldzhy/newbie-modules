@@ -1,5 +1,6 @@
 {
   "key": "shortcut",
+  "layer": "capability",
   "module": {
     "file": "shortcut.module",
     "className": "ShortcutModule"

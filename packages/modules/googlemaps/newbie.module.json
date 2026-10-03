@@ -1,5 +1,6 @@
 {
   "key": "googlemaps",
+  "layer": "foundation",
   "module": {
     "file": "googlemaps.module",
     "className": "GoogleMapsModule"

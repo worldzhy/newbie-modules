@@ -1,5 +1,6 @@
 {
   "key": "googleapis",
+  "layer": "foundation",
   "module": {
     "file": "googleapis.module",
     "className": "GoogleAPIsModule"

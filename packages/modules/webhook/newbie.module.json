@@ -1,5 +1,6 @@
 {
   "key": "webhook",
+  "layer": "capability",
   "module": {
     "file": "webhook.module",
     "className": "WebhookModule"

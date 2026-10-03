@@ -1,5 +1,6 @@
 {
   "key": "heartbeat",
+  "layer": "capability",
   "module": {
     "file": "heartbeat.module",
     "className": "HeartbeatModule"

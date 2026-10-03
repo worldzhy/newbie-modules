@@ -1,5 +1,6 @@
 {
   "key": "lark-bot",
+  "layer": "foundation",
   "module": {
     "file": "lark-bot.module",
     "className": "LarkBotModule"

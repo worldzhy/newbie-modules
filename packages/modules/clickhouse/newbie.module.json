@@ -1,5 +1,6 @@
 {
   "key": "clickhouse",
+  "layer": "foundation",
   "module": {
     "file": "clickhouse.module",
     "className": "ClickhouseModule"
