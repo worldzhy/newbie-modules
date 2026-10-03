@@ -3,9 +3,9 @@ export enum LarkWebhookSendStatus {
 }
 
 export enum LarkWebhookMessageType {
-  Text = 'text',
-  Post = 'post',
-  ShareChat = 'share_chat',
-  Image = 'image',
-  Interactive = 'interactive',
+  Text = "text",
+  Post = "post",
+  ShareChat = "share_chat",
+  Image = "image",
+  Interactive = "interactive",
 }

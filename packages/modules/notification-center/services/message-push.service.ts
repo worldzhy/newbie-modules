@@ -42,16 +42,16 @@ export class MessagePushService {
   }
 
   private async dispatchToChannels(
-    channels: Array<{ id: string; platform: string }>,
+    channels: Array<{ id: string; provider: string }>,
     text: string,
   ): Promise<MessagePushResult> {
     const result: MessagePushResult = { succeeded: 0, failed: 0 };
     for (const channel of channels) {
-      // Platform values are stored as "Lark"/"Slack" (MessageBotPlatform enum);
+      // Provider values are stored as "Lark"/"Slack" (MessageBotProvider enum);
       // compare case-insensitively to tolerate legacy lowercase rows.
-      const platform = channel.platform.toLowerCase();
+      const provider = channel.provider.toLowerCase();
       try {
-        if (platform === "lark") {
+        if (provider === "lark") {
           if (!this.larkMessageBotService) {
             throw new Error("Lark message bot service is unavailable");
           }
@@ -61,7 +61,7 @@ export class MessagePushService {
               typeof response.error === "object" ? JSON.stringify(response.error) : String(response.error),
             );
           }
-        } else if (platform === "slack") {
+        } else if (provider === "slack") {
           if (!this.slackMessageBotService) {
             throw new Error("Slack message bot service is unavailable");
           }
@@ -72,14 +72,14 @@ export class MessagePushService {
             );
           }
         } else {
-          this.logger.warn(`Skip unsupported message platform "${channel.platform}" on channel ${channel.id}`);
+          this.logger.warn(`Skip unsupported message provider "${channel.provider}" on channel ${channel.id}`);
           continue;
         }
         result.succeeded += 1;
       } catch (error) {
         result.failed += 1;
         this.logger.error(
-          `Failed to push notification to ${channel.platform} channel ${channel.id}: ${
+          `Failed to push notification to ${channel.provider} channel ${channel.id}: ${
             error instanceof Error ? error.message : String(error)
           }`,
         );
