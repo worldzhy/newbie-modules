@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
-import { authenticator } from "otplib";
+import { generateSecret, generateURI, verify } from "otplib";
 import QRCode from "qrcode";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { MfaMethod } from "@generated/prisma/client";
@@ -10,10 +10,12 @@ import { TokenSubject } from "../../security/token/token.constants";
 import { MfaTokenPayload } from "../../account.interface";
 
 const MULTI_FACTOR_TOKEN_TTL_SECONDS = 5 * 60;
-// Accept one adjacent 30-second step so minor clock skew never locks users out.
-const TOTP_VERIFICATION_WINDOW = 1;
+// Accept one adjacent 30-second step (epochTolerance is in seconds) so minor
+// clock skew never locks users out.
+const TOTP_EPOCH_TOLERANCE_SECONDS = 30;
 const TOTP_LOGIN_MAX_ATTEMPTS = 5;
 const TOTP_LOGIN_ATTEMPT_WINDOW_SECONDS = 300;
+const TOTP_ISSUER = "NightWatch";
 
 @Injectable()
 export class TwoFactorService {
@@ -27,9 +29,7 @@ export class TwoFactorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
-  ) {
-    authenticator.options = { window: TOTP_VERIFICATION_WINDOW };
-  }
+  ) {}
 
   /**
    * Begin TOTP enrollment. Generates a fresh secret and stores it as pending
@@ -44,8 +44,8 @@ export class TwoFactorService {
       throw new BadRequestException("An email address is required to enroll an authenticator.");
     }
 
-    const secret = authenticator.generateSecret();
-    const otpauthUrl = authenticator.keyuri(user.email, "NightWatch", secret);
+    const secret = generateSecret();
+    const otpauthUrl = generateURI({ issuer: TOTP_ISSUER, label: user.email, secret });
     const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
     await this.prisma.user.update({
@@ -64,7 +64,13 @@ export class TwoFactorService {
     if (!user.twoFactorSecret) {
       throw new BadRequestException("Start enrollment before confirming a code.");
     }
-    if (!authenticator.check(code, user.twoFactorSecret)) {
+
+    const result = await verify({
+      token: code,
+      secret: user.twoFactorSecret,
+      epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
+    });
+    if (!result.valid) {
       throw new BadRequestException("The authenticator code is invalid.");
     }
 
@@ -85,7 +91,15 @@ export class TwoFactorService {
     const passwordMatches =
       params.password && user.password ? await compareHash(params.password, user.password) : false;
     const codeMatches =
-      params.code && user.twoFactorSecret ? authenticator.check(params.code, user.twoFactorSecret) : false;
+      params.code && user.twoFactorSecret
+        ? (
+            await verify({
+              token: params.code,
+              secret: user.twoFactorSecret,
+              epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
+            })
+          ).valid
+        : false;
     if (!passwordMatches && !codeMatches) {
       throw new BadRequestException("Provide your current password or a valid authenticator code.");
     }
@@ -132,7 +146,7 @@ export class TwoFactorService {
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, status: true, twoFactorSecret: true },
+      select: { id: true, twoFactorSecret: true },
     });
     if (!user) {
       throw new BadRequestException("The account no longer exists.");
@@ -141,7 +155,12 @@ export class TwoFactorService {
       throw new BadRequestException("Two-factor authentication is not enabled.");
     }
 
-    if (!authenticator.check(params.code, user.twoFactorSecret)) {
+    const result = await verify({
+      token: params.code,
+      secret: user.twoFactorSecret,
+      epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
+    });
+    if (!result.valid) {
       await this.totpAttemptLimiter.penalty(attemptKey);
       throw new BadRequestException("The authenticator code is invalid.");
     }

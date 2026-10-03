@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "@generated/prisma/client";
 import { ApprovedSubnet } from "@generated/prisma/client";
@@ -76,6 +76,7 @@ export class ApprovedSubnetService {
    */
   async approveNewSubnet(userId: string, ipAddress: string) {
     const anonymizedSubnet = anonymize(ipAddress);
+    if (!anonymizedSubnet) throw new BadRequestException("The IP address cannot be anonymized.");
     const subnetHmac = computeSubnetHmac({ subnet: anonymizedSubnet, secret: this.hmacSecret });
 
     const existingSubnet = await this.prisma.approvedSubnet.findUnique({
@@ -119,6 +120,7 @@ export class ApprovedSubnetService {
    */
   async isSubnetApproved(userId: string, ipAddress: string): Promise<boolean> {
     const anonymizedSubnet = anonymize(ipAddress);
+    if (!anonymizedSubnet) return false;
     const subnetHmac = computeSubnetHmac({ subnet: anonymizedSubnet, secret: this.hmacSecret });
 
     const hmacRow = await this.findByHmac(userId, subnetHmac);
