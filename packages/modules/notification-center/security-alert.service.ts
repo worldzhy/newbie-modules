@@ -187,7 +187,7 @@ export class SecurityAlertService {
               spike,
               scopeLabel,
               sourceLabel,
-            } as Prisma.InputJsonValue,
+            } as unknown as Prisma.InputJsonValue,
             sourceModule: scope.sourceModule,
             scanId: scope.scanId,
             projectId: scope.projectId,
