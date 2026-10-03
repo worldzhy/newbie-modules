@@ -1,5 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsBoolean, IsIn, IsObject, IsOptional, IsString } from "class-validator";
+import { IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { SEVERITIES } from "./notification-center.constants";
 
@@ -142,6 +142,13 @@ export class NotificationTypeDto {
 
   @ApiProperty({ type: String, required: false, nullable: true })
   channelGroupId: string | null;
+
+  @ApiProperty({
+    type: [String],
+    description:
+      "Explicit push channels for this type. When non-empty, delivery goes to these channels directly, bypassing the type group and the platform default group.",
+  })
+  channelIds: string[];
 }
 
 export class UpdateNotificationTypeDto {
@@ -160,6 +167,16 @@ export class UpdateNotificationTypeDto {
   @IsOptional()
   @IsString()
   channelGroupId?: string | null;
+
+  @ApiProperty({
+    type: [String],
+    required: false,
+    description: "Full-replace list of explicit channel ids; pass an empty array to clear",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID(4, { each: true })
+  channelIds?: string[];
 }
 
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ export interface NotificationTypeListItem {
   defaultSeverity: string;
   pushEnabled: boolean;
   channelGroupId: string | null;
+  channelIds: string[];
 }
 
 /**
@@ -69,6 +70,13 @@ export class NotificationTypeService implements OnApplicationBootstrap {
 
   async listTypes(): Promise<NotificationTypeListItem[]> {
     const rows = await this.prisma.notificationType.findMany({ orderBy: { name: "asc" } });
+    const links = await this.prisma.notificationTypeChannel.findMany();
+    const channelIdsByType = new Map<string, string[]>();
+    for (const link of links) {
+      const list = channelIdsByType.get(link.notificationTypeKey) ?? [];
+      list.push(link.channelId);
+      channelIdsByType.set(link.notificationTypeKey, list);
+    }
     return rows.map((row) => ({
       key: row.key,
       name: row.name,
@@ -77,12 +85,18 @@ export class NotificationTypeService implements OnApplicationBootstrap {
       defaultSeverity: row.defaultSeverity,
       pushEnabled: row.pushEnabled,
       channelGroupId: row.channelGroupId,
+      channelIds: channelIdsByType.get(row.key) ?? [],
     }));
   }
 
   async updateType(
     key: string,
-    updates: { defaultSeverity?: string; pushEnabled?: boolean; channelGroupId?: string | null },
+    updates: {
+      defaultSeverity?: string;
+      pushEnabled?: boolean;
+      channelGroupId?: string | null;
+      channelIds?: string[];
+    },
   ): Promise<NotificationTypeListItem> {
     const row = await this.prisma.notificationType.findUnique({ where: { key } });
     if (!row) {
@@ -106,6 +120,34 @@ export class NotificationTypeService implements OnApplicationBootstrap {
       }
     }
 
+    // Explicit channel selection is a full replace: validate every id exists,
+    // then swap the join rows in one transaction.
+    if (updates.channelIds !== undefined) {
+      const uniqueIds = [...new Set(updates.channelIds)];
+      if (uniqueIds.length > 0) {
+        const channels = await this.prisma.messageBotChannel.findMany({
+          where: { id: { in: uniqueIds } },
+          select: { id: true },
+        });
+        const existingIds = new Set(channels.map((channel) => channel.id));
+        const missing = uniqueIds.find((id) => !existingIds.has(id));
+        if (missing) {
+          throw new BadRequestException(`Message channel not found: ${missing}`);
+        }
+      }
+      await this.prisma.$transaction([
+        this.prisma.notificationTypeChannel.deleteMany({ where: { notificationTypeKey: key } }),
+        ...(uniqueIds.length > 0
+          ? [
+              this.prisma.notificationTypeChannel.createMany({
+                data: uniqueIds.map((channelId) => ({ notificationTypeKey: key, channelId })),
+                skipDuplicates: true,
+              }),
+            ]
+          : []),
+      ]);
+    }
+
     const updated = await this.prisma.notificationType.update({
       where: { key },
       data: {
@@ -113,6 +155,11 @@ export class NotificationTypeService implements OnApplicationBootstrap {
         ...(updates.pushEnabled !== undefined ? { pushEnabled: updates.pushEnabled } : {}),
         ...(updates.channelGroupId !== undefined ? { channelGroupId } : {}),
       },
+    });
+
+    const typeChannels = await this.prisma.notificationTypeChannel.findMany({
+      where: { notificationTypeKey: key },
+      select: { channelId: true },
     });
 
     return {
@@ -123,6 +170,7 @@ export class NotificationTypeService implements OnApplicationBootstrap {
       defaultSeverity: updated.defaultSeverity,
       pushEnabled: updated.pushEnabled,
       channelGroupId: updated.channelGroupId,
+      channelIds: typeChannels.map((link) => link.channelId),
     };
   }
 }

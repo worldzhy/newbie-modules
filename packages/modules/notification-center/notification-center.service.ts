@@ -143,15 +143,23 @@ export class NotificationCenterService {
     }
 
     if (!deduplicated) {
-      await this.dispatchPush(typeRow.pushEnabled, typeRow.channelGroupId, platform, title, detail);
+      // Explicit per-type channels take priority over the type group, which
+      // in turn takes priority over the platform default group.
+      const typeChannels = await this.prisma.notificationTypeChannel.findMany({
+        where: { notificationTypeKey: input.typeKey },
+        select: { channelId: true },
+      });
+      const explicitChannelIds = typeChannels.map((link) => link.channelId);
+      await this.dispatchPush(explicitChannelIds, typeRow.channelGroupId, typeRow.pushEnabled, platform, title, detail);
     }
 
     return { id: notificationId, deduplicated, dropped: false };
   }
 
   private async dispatchPush(
-    typePushEnabled: boolean,
+    explicitChannelIds: string[],
     typeChannelGroupId: string | null,
+    typePushEnabled: boolean,
     platform: { pushEnabled: boolean; channelGroupId: string | null },
     title: string,
     detail: string | null,
@@ -159,15 +167,18 @@ export class NotificationCenterService {
     if (!typePushEnabled || !platform.pushEnabled) {
       return;
     }
+    const text = detail ? `${title}\n${detail}` : title;
+    // 1) Explicit per-type channels win when at least one is selected.
+    if (explicitChannelIds.length > 0) {
+      await this.messagePush.dispatchToChannelIds(explicitChannelIds, text);
+      return;
+    }
+    // 2) Otherwise fall back to the type group, then the platform group.
     const channelGroupId = typeChannelGroupId ?? platform.channelGroupId;
     if (!channelGroupId) {
       return;
     }
-    const text = detail ? `${title}\n${detail}` : title;
-    const result = await this.messagePush.dispatchToGroup(channelGroupId, text);
-    if (result.failed > 0) {
-      // Push failures must never break the caller that produced the notification.
-    }
+    await this.messagePush.dispatchToGroup(channelGroupId, text);
   }
 
   // --- Settings ------------------------------------------------------------

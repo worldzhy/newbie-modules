@@ -2,6 +2,7 @@
 // !!            [Module] Notification Center models         //
 // !! ------------------------------------------------------------ //
 // * NotificationType                                             //
+// * NotificationTypeChannel                                      //
 // * Notification                                                 //
 // * NotificationReceipt                                          //
 // * NotificationSetting                                          //
@@ -30,6 +31,23 @@ model NotificationType {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@schema("module/notification-center")
+}
+
+// Explicit per-type channel selection (finer granularity than a channel
+// group). When a type has at least one row here, push delivery goes to these
+// channels directly, bypassing both the type group and the platform default.
+// Scalar ids only: no cross-schema relation to message-bot.
+model NotificationTypeChannel {
+  id                  String @id @default(uuid()) @db.Uuid
+  notificationTypeKey String @db.VarChar(100)
+  // Scalar id of a message-bot channel.
+  channelId           String @db.Uuid
+
+  createdAt DateTime @default(now())
+
+  @@unique([notificationTypeKey, channelId])
+  @@index([notificationTypeKey])
   @@schema("module/notification-center")
 }
 

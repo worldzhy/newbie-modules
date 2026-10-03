@@ -29,7 +29,22 @@ export class MessagePushService {
 
   async dispatchToGroup(channelGroupId: string, text: string): Promise<MessagePushResult> {
     const channels = await this.prisma.messageBotChannel.findMany({ where: { groupId: channelGroupId } });
+    return this.dispatchToChannels(channels, text);
+  }
 
+  // Push to an explicit list of channel ids (per-type direct selection).
+  async dispatchToChannelIds(channelIds: string[], text: string): Promise<MessagePushResult> {
+    if (channelIds.length === 0) {
+      return { succeeded: 0, failed: 0 };
+    }
+    const channels = await this.prisma.messageBotChannel.findMany({ where: { id: { in: channelIds } } });
+    return this.dispatchToChannels(channels, text);
+  }
+
+  private async dispatchToChannels(
+    channels: Array<{ id: string; platform: string }>,
+    text: string,
+  ): Promise<MessagePushResult> {
     const result: MessagePushResult = { succeeded: 0, failed: 0 };
     for (const channel of channels) {
       try {
