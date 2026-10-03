@@ -21,6 +21,7 @@ export class AccountService {
         email: true,
         phone: true,
         roles: true,
+        twoFactorMethod: true,
         name: true,
         firstName: true,
         middleName: true,

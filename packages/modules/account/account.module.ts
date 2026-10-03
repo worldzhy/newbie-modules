@@ -11,6 +11,7 @@ import { ApprovedSubnetModule } from "./modules/approved-subnet/approved-subnet.
 import { AuditLogModule } from "./modules/audit-logs/audit-log.module";
 import { PermissionModule } from "./modules/permission/permission.module";
 import { SessionModule } from "./modules/session/session.module";
+import { TwoFactorModule } from "./modules/two-factor/two-factor.module";
 import { UserModule } from "./modules/user/user.module";
 import { VerificationCodeModule } from "./modules/verification-code/verification-code.module";
 
@@ -25,6 +26,7 @@ import { VerificationCodeModule } from "./modules/verification-code/verification
     AuditLogModule,
     PermissionModule,
     SessionModule,
+    TwoFactorModule,
     UserModule,
     VerificationCodeModule,
   ],

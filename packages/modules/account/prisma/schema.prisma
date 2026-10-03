@@ -122,6 +122,10 @@ model Session {
 model ApprovedSubnet {
   id          Int      @id @default(autoincrement())
   subnet      String
+  // Deterministic keyed hash enabling an indexed, constant-time subnet
+  // lookup. Nullable: rows created before this column are kept as-is and
+  // matched through the legacy bcrypt `subnet` fallback.
+  subnetHmac  String?
   city        String?
   region      String?
   timezone    String?
@@ -131,6 +135,8 @@ model ApprovedSubnet {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String   @db.Uuid
 
+  // One row per (user, subnet): the deterministic HMAC doubles as a dedupe key.
+  @@unique([userId, subnetHmac])
   @@index([userId])
   @@schema("module/account")
 }

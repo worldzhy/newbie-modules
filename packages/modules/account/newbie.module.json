@@ -48,6 +48,9 @@
         "resendMinutes": 1,
         "maxAttempts": 5
       },
+      "approvedSubnet": {
+        "hmacSecret": "process.env.ACCOUNT_APPROVED_SUBNET_HMAC_SECRET"
+      },
       "googleAuth": {
         "clientId": "process.env.GOOGLE_AUTH_CLIENT_ID || 'your-client-id'",
         "clientSecret": "process.env.GOOGLE_AUTH_CLIENT_SECRET || 'your-client-secret'",
@@ -70,6 +73,7 @@
     "ACCOUNT_USER_REFRESH_TOKEN_SECRET": "",
     "ACCOUNT_APIKEY_ACCESS_TOKEN_SECRET": "",
     "ACCOUNT_DEFAULT_GUARD": "",
+    "ACCOUNT_APPROVED_SUBNET_HMAC_SECRET": "",
     "CACHE_GEOLOCATION_LRU_SIZE": "",
     "CACHE_APIKEY_LRU_SIZE": "",
     "GOOGLE_AUTH_CLIENT_ID": "",
@@ -89,11 +93,13 @@
     "jsonwebtoken": "latest",
     "lru-cache": "latest",
     "maxmind": "latest",
+    "otplib": "latest",
     "passport": "latest",
     "passport-custom": "latest",
     "passport-google-oauth20": "latest",
     "passport-jwt": "latest",
     "passport-local": "latest",
+    "qrcode": "latest",
     "randomcolor": "latest",
     "rate-limiter-flexible": "latest",
     "ua-parser-js": "latest",
@@ -104,6 +110,7 @@
     "@types/passport-google-oauth20": "latest",
     "@types/passport-jwt": "latest",
     "@types/passport-local": "latest",
+    "@types/qrcode": "latest",
     "@types/validator": "latest"
   }
 }

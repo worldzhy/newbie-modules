@@ -1,9 +1,11 @@
 import { Global, Module } from "@nestjs/common";
 import { SecurityModule } from "../security/security.module";
+import { TwoFactorModule } from "../modules/two-factor/two-factor.module";
 
 import { LoginByApprovedSubnetController } from "./login-by-approved-subnet.controller";
 import { LoginByGoogleController } from "./login-by-google.controller";
 import { LoginByPasswordController } from "./login-by-password.controller";
+import { LoginByTotpController } from "./login-by-totp.controller";
 import { LoginByVerificationCodeController } from "./login-by-verificationcode.controller";
 import { LogoutController } from "./logout.controller";
 import { RefreshAccessTokenController } from "./refresh-access-token.controller";
@@ -16,11 +18,12 @@ import { WechatAuthService } from "./wechat/auth.service";
 
 @Global()
 @Module({
-  imports: [SecurityModule],
+  imports: [SecurityModule, TwoFactorModule],
   controllers: [
     LoginByApprovedSubnetController,
     LoginByGoogleController,
     LoginByPasswordController,
+    LoginByTotpController,
     LoginByVerificationCodeController,
     LogoutController,
     RefreshAccessTokenController,

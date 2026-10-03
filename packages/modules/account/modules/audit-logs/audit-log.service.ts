@@ -14,6 +14,8 @@ export enum AuditEvent {
   API_KEY_CREATED = "api-key.created",
   API_KEY_DELETED = "api-key.deleted",
   SESSION_REVOKED = "session.revoked",
+  MFA_ENABLED = "mfa.enabled",
+  MFA_DISABLED = "mfa.disabled",
 }
 
 type AuditContext = {

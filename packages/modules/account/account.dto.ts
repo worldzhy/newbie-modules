@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { UserGender, UserRole } from "@generated/prisma/client";
+import { MfaMethod, UserGender, UserRole } from "@generated/prisma/client";
 import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 
@@ -15,6 +15,9 @@ export class GetCurrentUserResponseDto {
 
   @ApiProperty({ type: String, isArray: true })
   roles: UserRole[];
+
+  @ApiPropertyOptional({ enum: MfaMethod })
+  twoFactorMethod?: MfaMethod;
 
   @ApiPropertyOptional({ type: String })
   name?: string | null;

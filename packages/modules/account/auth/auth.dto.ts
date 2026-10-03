@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { VerificationCodeUse } from "@generated/prisma/client";
+import { MfaMethod, VerificationCodeUse } from "@generated/prisma/client";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 import {
   IsDate,
@@ -89,6 +89,17 @@ export class LoginByPasswordResponseDto {
 
   @ApiProperty({ type: Number, required: true })
   tokenExpiresInSeconds: number;
+
+  // Present instead of `token` when the account has TOTP enabled: the client
+  // collects the authenticator code and completes login at /auth/login-by-totp.
+  @ApiPropertyOptional({ description: "Short-lived MFA challenge token; returned only when MFA is required." })
+  totpToken?: string;
+
+  @ApiPropertyOptional({ enum: MfaMethod })
+  type?: MfaMethod;
+
+  @ApiPropertyOptional({ description: "True when a second authentication factor is required." })
+  multiFactorRequired?: boolean;
 }
 
 /**

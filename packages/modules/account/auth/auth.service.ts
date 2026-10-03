@@ -30,7 +30,6 @@ import { TokenService } from "@modules/account/security/token/token.service";
 import { TokenSubject } from "@modules/account/security/token/token.constants";
 import { LimitLoginByUserService } from "@modules/account/security/rate-limiter/rate-limiter.service";
 import { AwsSesService } from "@modules/aws-ses/aws-ses.service";
-import anonymize from "ip-anonymize";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
 
 @Injectable()
@@ -59,10 +58,10 @@ export class AuthService {
       ipAddress: params.ipAddress,
     });
 
-    // [step 1] Disable active sessions, update last login time, and generate new tokens atomically.
+    // [step 1] Update last login time and generate a new session atomically.
+    // Existing sessions are intentionally left intact: the platform supports
+    // concurrent sessions across multiple devices.
     const session = await this.prisma.$transaction(async (tx) => {
-      await tx.session.deleteMany({ where: { userId: params.userId } });
-
       await tx.user.update({
         where: { id: params.userId },
         data: { lastLoginAt: new Date() },
@@ -196,13 +195,7 @@ export class AuthService {
 
     if (!user.checkLocationOnLogin) return;
 
-    const subnet = anonymize(params.ipAddress);
-    const previousSubnets = await this.prisma.approvedSubnet.findMany({
-      where: { user: { id: params.userId } },
-    });
-    const subnetMatches = await Promise.all(previousSubnets.map((item) => compareHash(subnet, item.subnet)));
-    const isApproved = subnetMatches.some((match) => match);
-
+    const isApproved = await this.approvedSubnetService.isSubnetApproved(params.userId, params.ipAddress);
     if (!isApproved) {
       const location = await this.geolocationService.getLocation(params.ipAddress);
       const locationName =

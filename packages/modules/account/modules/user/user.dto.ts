@@ -105,20 +105,9 @@ export class CreateUserDto {
   @IsOptional()
   timezone?: string;
 
-  @ApiPropertyOptional({ enum: MfaMethod })
-  @IsEnum(MfaMethod)
-  @IsOptional()
-  twoFactorMethod?: MfaMethod;
-
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  twoFactorPhone?: string | null;
-
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  twoFactorSecret?: string | null;
+  // Two-factor fields are intentionally not writable through admin endpoints:
+  // users self-manage TOTP through /account/two-factor, and the secret must
+  // never be settable directly.
 
   @ApiPropertyOptional({ type: String })
   @IsString()
@@ -225,20 +214,9 @@ export class UpdateUserDto {
   @IsOptional()
   timezone?: string;
 
-  @ApiPropertyOptional({ enum: MfaMethod })
-  @IsEnum(MfaMethod)
-  @IsOptional()
-  twoFactorMethod?: MfaMethod;
-
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  twoFactorPhone?: string | null;
-
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  twoFactorSecret?: string | null;
+  // Two-factor fields are intentionally not writable through admin endpoints:
+  // users self-manage TOTP through /account/two-factor, and the secret must
+  // never be settable directly.
 
   @ApiPropertyOptional({ type: String })
   @IsString()
