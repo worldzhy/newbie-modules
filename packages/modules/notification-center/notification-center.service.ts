@@ -241,7 +241,10 @@ export class NotificationCenterService {
     if (!setting.pushEnabled || !setting.channelGroupId) {
       throw new BadRequestException("Push is disabled or no message channel group is configured.");
     }
-    return this.messagePush.dispatchToGroup(setting.channelGroupId, "Nightwatch 通知中心测试消息：推送通道工作正常。");
+    return this.messagePush.dispatchToGroup(
+      setting.channelGroupId,
+      "Notification center test message: the push channel is working.",
+    );
   }
 
   private async ensureCenterSetting() {
