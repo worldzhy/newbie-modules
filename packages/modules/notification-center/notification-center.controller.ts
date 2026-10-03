@@ -1,16 +1,21 @@
 import { Body, Controller, Get, Param, Post, Put, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
-import { NotificationCenterService } from "./notification-center.service";
+import { NotificationCenterService, NotifyInput, NotifyResult } from "./notification-center.service";
+import { NotificationTypeService } from "./notification-type.service";
 import {
   ListNotificationsRequestDto,
   ListNotificationsResponseDto,
   MarkAllNotificationsReadResponseDto,
   MarkNotificationReadResponseDto,
   NotificationSettingDto,
+  NotificationTypeDto,
+  NotifyDto,
+  NotifyResultDto,
   TestPushResultDto,
   UnreadCountResponseDto,
   UpdateNotificationSettingDto,
+  UpdateNotificationTypeDto,
 } from "./notification-center.dto";
 
 interface AuthenticatedRequest {
@@ -21,7 +26,21 @@ interface AuthenticatedRequest {
 @ApiBearerAuth()
 @Controller()
 export class NotificationCenterController {
-  constructor(private readonly notificationCenter: NotificationCenterService) {}
+  constructor(
+    private readonly notificationCenter: NotificationCenterService,
+    private readonly notificationTypes: NotificationTypeService,
+  ) {}
+
+  // --- Notification delivery ----------------------------------------------
+
+  @Post("notifications")
+  @ApiOperation({ summary: "Deliver a notification from a registered type" })
+  @ApiResponse({ status: 201, type: NotifyResultDto })
+  notify(@Body() body: NotifyDto): Promise<NotifyResult> {
+    return this.notificationCenter.notify(body as NotifyInput);
+  }
+
+  // --- Notification reads -------------------------------------------------
 
   @Get("notifications")
   @ApiOperation({ summary: "List notifications for the current user (newest first)" })
@@ -56,6 +75,24 @@ export class NotificationCenterController {
   markAllRead(@Req() req: AuthenticatedRequest): Promise<MarkAllNotificationsReadResponseDto> {
     return this.notificationCenter.markAllRead(req.user.userId);
   }
+
+  // --- Notification types --------------------------------------------------
+
+  @Get("notification-types")
+  @ApiOperation({ summary: "List registered notification types with their runtime settings" })
+  @ApiResponse({ status: 200, type: [NotificationTypeDto] })
+  listTypes(): Promise<NotificationTypeDto[]> {
+    return this.notificationTypes.listTypes() as unknown as Promise<NotificationTypeDto[]>;
+  }
+
+  @Put("notification-types/:key")
+  @ApiOperation({ summary: "Update runtime settings for a notification type" })
+  @ApiResponse({ status: 200, type: NotificationTypeDto })
+  updateType(@Param("key") key: string, @Body() body: UpdateNotificationTypeDto): Promise<NotificationTypeDto> {
+    return this.notificationTypes.updateType(key, body ?? {}) as unknown as Promise<NotificationTypeDto>;
+  }
+
+  // --- Platform settings ---------------------------------------------------
 
   @Get("notification-settings")
   @ApiOperation({ summary: "Get platform notification settings" })

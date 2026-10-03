@@ -1,95 +1,8 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsBoolean, IsIn, IsObject, IsOptional, IsString, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { SEVERITIES } from "./notification-center.constants";
-
-// ---------------------------------------------------------------------------
-// Payload DTOs (embedded in Notification.payload)
-// ---------------------------------------------------------------------------
-
-export class SeverityCountsDto {
-  @ApiProperty()
-  critical: number;
-
-  @ApiProperty()
-  high: number;
-
-  @ApiProperty()
-  medium: number;
-
-  @ApiProperty()
-  low: number;
-
-  @ApiProperty()
-  unknown: number;
-
-  @ApiProperty()
-  total: number;
-}
-
-export class TopFindingDto {
-  @ApiProperty({ enum: SEVERITIES })
-  severity: string;
-
-  @ApiProperty()
-  title: string;
-
-  @ApiProperty({ required: false, nullable: true })
-  service: string | null;
-
-  @ApiProperty({ required: false, nullable: true })
-  resourceType: string | null;
-
-  @ApiProperty({ required: false, nullable: true })
-  resourceId: string | null;
-
-  @ApiProperty({ required: false, nullable: true })
-  ruleId: string | null;
-
-  @ApiProperty({ required: false, nullable: true })
-  packageName: string | null;
-
-  @ApiProperty({ required: false, nullable: true })
-  packageVersion: string | null;
-
-  @ApiProperty({ required: false, nullable: true })
-  vulnId: string | null;
-
-  @ApiProperty({ required: false, nullable: true })
-  fixedVersion: string | null;
-}
-
-export class SpikeStatsDto {
-  @ApiProperty({ description: "New high+ findings in this scan" })
-  current: number;
-
-  @ApiProperty({ description: "Average daily new high+ findings over the trailing baseline window" })
-  averageDaily: number;
-
-  @ApiProperty({ description: "Threshold the scan reached to be flagged as a spike" })
-  threshold: number;
-}
-
-export class NotificationPayloadDto {
-  @ApiProperty({ type: SeverityCountsDto, description: "New findings first seen in this scan" })
-  new: SeverityCountsDto;
-
-  @ApiProperty({ type: SeverityCountsDto, description: "Open findings for the scope after this scan" })
-  open: SeverityCountsDto;
-
-  @ApiProperty({ type: [TopFindingDto], description: "Highest-severity new findings, capped at 5" })
-  topFindings: TopFindingDto[];
-
-  @ApiProperty({ type: SpikeStatsDto, required: false, nullable: true })
-  spike: SpikeStatsDto | null;
-
-  @ApiProperty({
-    required: false,
-    nullable: true,
-    description: "Human label of the scan scope (application name for dependency scans)",
-  })
-  scopeLabel: string | null;
-}
 
 // ---------------------------------------------------------------------------
 // Notification DTOs
@@ -99,8 +12,8 @@ export class NotificationDto {
   @ApiProperty()
   id: string;
 
-  @ApiProperty({ enum: ["security-scan-digest", "security-spike"] })
-  type: string;
+  @ApiProperty({ description: "Key of the notification type this delivery was produced from" })
+  typeKey: string;
 
   @ApiProperty({ enum: SEVERITIES })
   severity: string;
@@ -111,20 +24,19 @@ export class NotificationDto {
   @ApiProperty({ type: String, required: false, nullable: true })
   detail: string | null;
 
-  @ApiProperty({ type: NotificationPayloadDto, required: false, nullable: true })
-  payload: NotificationPayloadDto | null;
-
-  @ApiProperty()
-  sourceModule: string;
+  @ApiProperty({
+    type: "object",
+    required: false,
+    nullable: true,
+    description: "Context values passed to notify(), preserved for detail panels",
+  })
+  payload: Record<string, unknown> | null;
 
   @ApiProperty({ type: String, required: false, nullable: true })
-  scanId: string | null;
+  deduplicationKey: string | null;
 
   @ApiProperty({ type: String, required: false, nullable: true })
   projectId: string | null;
-
-  @ApiProperty({ type: String, required: false, nullable: true })
-  applicationId: string | null;
 
   @ApiProperty({ type: String, required: false, nullable: true })
   link: string | null;
@@ -134,6 +46,51 @@ export class NotificationDto {
 
   @ApiProperty()
   createdAt: Date;
+}
+
+export class NotifyDto {
+  @ApiProperty({ description: "Key of a registered notification type" })
+  @IsString()
+  typeKey: string;
+
+  @ApiProperty({ type: "object", required: false, description: "Values interpolated into the type templates" })
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => Object)
+  context?: Record<string, unknown>;
+
+  @ApiProperty({ enum: SEVERITIES, required: false, description: "Override the type default severity" })
+  @IsOptional()
+  @IsString()
+  @IsIn(SEVERITIES as unknown as string[])
+  severity?: string;
+
+  @ApiProperty({ type: String, required: false })
+  @IsOptional()
+  @IsString()
+  projectId?: string;
+
+  @ApiProperty({ type: String, required: false })
+  @IsOptional()
+  @IsString()
+  link?: string;
+
+  @ApiProperty({ type: String, required: false, description: "Optional idempotency key" })
+  @IsOptional()
+  @IsString()
+  deduplicationKey?: string;
+}
+
+export class NotifyResultDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty({ description: "True when the deduplication key already existed" })
+  deduplicated: boolean;
+
+  @ApiProperty({ description: "True when the delivery was dropped (below minimum severity)" })
+  dropped: boolean;
 }
 
 export class ListNotificationsRequestDto extends CommonListRequestDto {
@@ -164,6 +121,51 @@ export class MarkAllNotificationsReadResponseDto {
 }
 
 // ---------------------------------------------------------------------------
+// Notification type DTOs
+// ---------------------------------------------------------------------------
+
+export class NotificationTypeDto {
+  @ApiProperty()
+  key: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty()
+  titleTemplate: string;
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  detailTemplate: string | null;
+
+  @ApiProperty({ enum: SEVERITIES })
+  defaultSeverity: string;
+
+  @ApiProperty()
+  pushEnabled: boolean;
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  channelGroupId: string | null;
+}
+
+export class UpdateNotificationTypeDto {
+  @ApiProperty({ required: false, enum: SEVERITIES })
+  @IsOptional()
+  @IsString()
+  @IsIn(SEVERITIES as unknown as string[])
+  defaultSeverity?: string;
+
+  @ApiProperty({ required: false })
+  @IsOptional()
+  @IsBoolean()
+  pushEnabled?: boolean;
+
+  @ApiProperty({ required: false, nullable: true, type: String })
+  @IsOptional()
+  @IsString()
+  channelGroupId?: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Settings DTOs
 // ---------------------------------------------------------------------------
 
@@ -181,18 +183,9 @@ export class NotificationSettingDto {
     type: String,
     required: false,
     nullable: true,
-    description: "Id of the message-bot channel group that receives pushes",
+    description: "Default message-bot channel group for types without their own",
   })
   channelGroupId: string | null;
-
-  @ApiProperty()
-  spikeEnabled: boolean;
-
-  @ApiProperty({ description: "Absolute minimum new high+ findings that can flag a spike" })
-  spikeThreshold: number;
-
-  @ApiProperty({ description: "Trailing days used to compute the daily baseline for spike detection" })
-  spikeBaselineDays: number;
 
   @ApiProperty({ required: false, type: Number, nullable: true })
   availableChannelCount: number | null;
@@ -219,27 +212,6 @@ export class UpdateNotificationSettingDto {
   @IsOptional()
   @IsString()
   channelGroupId?: string | null;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  spikeEnabled?: boolean;
-
-  @ApiProperty({ required: false, minimum: 1, maximum: 100 })
-  @IsOptional()
-  @IsNumber()
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  spikeThreshold?: number;
-
-  @ApiProperty({ required: false, minimum: 1, maximum: 90 })
-  @IsOptional()
-  @IsNumber()
-  @IsInt()
-  @Min(1)
-  @Max(90)
-  spikeBaselineDays?: number;
 }
 
 export class TestPushResultDto {

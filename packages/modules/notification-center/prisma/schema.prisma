@@ -1,40 +1,68 @@
 // !! ------------------------------------------------------------ //
 // !!            [Module] Notification Center models         //
 // !! ------------------------------------------------------------ //
+// * NotificationType                                             //
 // * Notification                                                 //
 // * NotificationReceipt                                          //
 // * NotificationSetting                                          //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// One platform-wide row per notification event (e.g. one digest per completed
-// scan). Per-user read state lives in NotificationReceipt, so fan-out needs
-// no writes: a missing receipt simply means "unread" for that user.
+// A declared notification category. Business code registers a type at startup
+// (NotificationTypeRegistryService.register) and declares a database row
+// (NotificationTypeService.upsertDeclaration). The database row wins for
+// runtime-editable fields (defaultSeverity, pushEnabled, channelGroupId):
+// declarations only create missing rows, never override operator edits.
+model NotificationType {
+  key            String    @id @db.VarChar(100)
+  name           String    @db.VarChar(255)
+  // Handlebars-style template rendered with the notify() context, e.g.
+  // "{{project}} {{source}} 新增 {{count}} 个风险".
+  titleTemplate  String    @db.VarChar(512)
+  // Optional multi-line detail template.
+  detailTemplate String?   @db.Text
+  defaultSeverity String   @db.VarChar(10)
+  // Per-type push master switch; falls back to the platform setting when the
+  // type row does not specify a channel group.
+  pushEnabled    Boolean   @default(true)
+  // Optional message-bot channel group override for this type.
+  channelGroupId String?   @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/notification-center")
+}
+
+// One platform-wide row per delivered notification event. Per-user read state
+// lives in NotificationReceipt, so fan-out needs no writes: a missing receipt
+// simply means "unread" for that user.
 model Notification {
-  id            String    @id @default(uuid()) @db.Uuid
-  // security-scan-digest | security-spike
-  type          String    @db.VarChar(40)
-  // critical | high | medium | low | unknown — highest severity covered by
-  // this notification.
-  severity      String    @db.VarChar(10)
-  title         String    @db.VarChar(512)
-  detail        String?   @db.Text
-  // Structured context: new/open severity counts, top new findings, spike
-  // statistics, and the scope label (application name for dependency scans).
-  payload       Json?
-  sourceModule  String    @db.VarChar(40)
-  scanId        String?   @db.Uuid
-  projectId     String?   @db.Uuid
-  applicationId String?   @db.Uuid
+  id        String   @id @default(uuid()) @db.Uuid
+  // Key of the NotificationType this notification was produced from.
+  typeKey   String   @db.VarChar(100)
+  // Resolved severity for this delivery (type default or an explicit override
+  // passed to notify()).
+  severity  String   @db.VarChar(10)
+  title     String   @db.VarChar(512)
+  detail    String?  @db.Text
+  // Structured context passed to notify(); preserved for the notification
+  // detail panels and downstream consumers.
+  payload   Json?
+  // Optional idempotency key: when provided, notify() is a no-op if a row with
+  // the same key already exists. Nullable unique allows multiple nulls.
+  deduplicationKey String? @db.VarChar(255)
+  // Generic scope identifier (project id, tenant id, ...). Meaning is owned by
+  // the registering type.
+  projectId String?  @db.Uuid
   // Frontend relative path the notification deep-links to.
-  link          String?   @db.VarChar(512)
-  createdAt     DateTime  @default(now())
+  link      String?  @db.VarChar(512)
+  createdAt DateTime @default(now())
 
   receipts NotificationReceipt[]
 
-  // Idempotency: at most one digest per (source module, scan), so a re-fired
-  // scan-completed event never produces a duplicate notification.
-  @@unique([sourceModule, scanId])
+  @@unique([deduplicationKey])
   @@index([createdAt])
+  @@index([typeKey])
   @@index([projectId])
   @@schema("module/notification-center")
 }
@@ -61,20 +89,13 @@ model NotificationSetting {
   id      Int @id
 
   inAppEnabled Boolean @default(true)
-  // Master switch for Lark/Slack push through the message-bot module.
+  // Master switch for Lark/Slack push through the message-bot module. A type
+  // push only fires when both this switch and the type's own pushEnabled are on.
   pushEnabled Boolean @default(false)
-  // New findings below this severity do not produce any notification.
+  // Notifications below this severity are dropped before delivery.
   minimumSeverity String @default("high") @db.VarChar(10)
-  // Scalar id of a message-bot channel group; no cross-schema relation. Every
-  // channel (Lark/Slack) in the group receives the push.
+  // Default message-bot channel group for types that do not declare their own.
   channelGroupId String? @db.Uuid
-
-  // Spike (sudden increase) rule: flag a scan when the number of new
-  // high+ findings is at least max(spikeThreshold, 2 x trailing daily
-  // average) and strictly above that average.
-  spikeEnabled      Boolean @default(true)
-  spikeThreshold    Int     @default(5)
-  spikeBaselineDays Int     @default(7)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
