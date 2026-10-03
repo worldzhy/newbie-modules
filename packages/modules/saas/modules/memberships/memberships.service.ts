@@ -23,14 +23,14 @@ import {AuthService} from '../auth/auth.service';
 import {TeamsService} from '../teams/teams.service';
 import {CreateMembershipInput} from './memberships.interface';
 import {generateRandomString} from '@devbie/newbie/utilities/random.util';
-import {EmailService} from '@modules/notification/email/email.service';
+import {AwsSesService} from '@modules/aws-ses/aws-ses.service';
 
 @Injectable()
 export class MembershipsService {
   constructor(
     private prisma: PrismaService,
     private auth: AuthService,
-    private email: EmailService,
+    private email: AwsSesService,
     private configService: ConfigService,
     private teamsService: TeamsService,
     private apiKeyService: ApiKeysService
@@ -196,7 +196,7 @@ export class MembershipsService {
       },
       include: {team: {select: {name: true}}},
     });
-    this.email.sendWithTemplate({
+    this.email.sendEmailWithTemplate({
       toAddress: `"${user.name}" <${data.email}>`,
       template: {
         'teams/invitation': {

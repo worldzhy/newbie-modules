@@ -70,7 +70,7 @@ import {
 } from '../../helpers/scopes';
 import axios from 'axios';
 import {generateRandomString} from '@devbie/newbie/utilities/random.util';
-import {EmailService} from '@modules/notification/email/email.service';
+import {AwsSesService} from '@modules/aws-ses/aws-ses.service';
 
 @Injectable()
 export class AuthService {
@@ -78,7 +78,7 @@ export class AuthService {
 
   constructor(
     private prisma: PrismaService,
-    private email: EmailService,
+    private email: AwsSesService,
     private configService: ConfigService,
     private pwnedService: PwnedService,
     private tokensService: TokensService,
@@ -352,7 +352,7 @@ export class AuthService {
     if (!emailDetails) throw new NotFoundException(USER_NOT_FOUND);
     if (emailDetails.isVerified)
       throw new ConflictException(EMAIL_VERIFIED_CONFLICT);
-    this.email.sendWithTemplate({
+    this.email.sendEmailWithTemplate({
       toAddress: `"${emailDetails.user.name}" <${email}>`,
       template: resend
         ? {
@@ -514,7 +514,7 @@ export class AuthService {
       include: {user: true},
     });
     if (!emailDetails) throw new NotFoundException(USER_NOT_FOUND);
-    this.email.sendWithTemplate({
+    this.email.sendEmailWithTemplate({
       toAddress: `"${emailDetails.user.name}" <${email}>`,
       template: {
         'auth/password-reset': {
@@ -558,7 +558,7 @@ export class AuthService {
     await this.approvedSubnetsService.upsertNewSubnet(id, ipAddress);
 
     if (user.prefersEmail) {
-      this.email.sendWithTemplate({
+      this.email.sendEmailWithTemplate({
         toAddress: `"${user.name}" <${user.prefersEmail.email}>`,
         template: {'users/password-changed': {userName: user.name}},
       });
@@ -599,7 +599,7 @@ export class AuthService {
           role: 'MEMBER',
         },
       });
-      this.email.sendWithTemplate({
+      this.email.sendEmailWithTemplate({
         toAddress: `"${result.user.name}" <${result.email}>`,
         template: {
           'teams/invitation': {
@@ -660,7 +660,7 @@ export class AuthService {
               .filter(i => i)
               .join(', ') || 'Unknown location';
           if (user.prefersEmail)
-            this.email.sendWithTemplate({
+            this.email.sendEmailWithTemplate({
               toAddress: `"${user.name}" <${user.prefersEmail.email}>`,
               template: {
                 'auth/used-backup-code': {
@@ -749,7 +749,7 @@ export class AuthService {
     );
     if (user.twoFactorMethod === 'EMAIL' || forceMethod === 'EMAIL') {
       if (user.prefersEmail) {
-        this.email.sendWithTemplate({
+        this.email.sendEmailWithTemplate({
           toAddress: `"${user.name}" <${user.prefersEmail.email}>`,
           template: {
             'auth/login-link': {
@@ -824,7 +824,7 @@ export class AuthService {
           .filter(i => i)
           .join(', ') || 'Unknown location';
       if (user.prefersEmail)
-        this.email.sendWithTemplate({
+        this.email.sendEmailWithTemplate({
           toAddress: `"${user.name}" <${user.prefersEmail.email}>`,
           template: {
             'auth/approve-subnet': {

@@ -23,14 +23,14 @@ import {ApiKeysService} from '../api-keys/api-keys.service';
 import {AuthService} from '../auth/auth.service';
 import {PasswordUpdateInput} from './users.interface';
 import {AwsS3Service} from '@modules/aws-s3/aws-s3.service';
-import {EmailService} from '@modules/notification/email/email.service';
+import {AwsSesService} from '@modules/aws-ses/aws-ses.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     private prisma: PrismaService,
     private auth: AuthService,
-    private email: EmailService,
+    private email: AwsSesService,
     private configService: ConfigService,
     private tokensService: TokensService,
     private s3Service: AwsS3Service,
@@ -92,7 +92,7 @@ export class UsersService {
         !!data.ignorePwnedPassword
       );
       if (user.prefersEmail) {
-        this.email.sendWithTemplate({
+        this.email.sendEmailWithTemplate({
           toAddress: `"${user.name}" <${user.prefersEmail.email}>`,
           template: {'users/password-changed': {userName: user.name}},
         });
@@ -129,7 +129,7 @@ export class UsersService {
     await this.prisma.session.deleteMany({where: {user: {id}}});
     if (deactivatedBy === id)
       if (user.prefersEmail) {
-        this.email.sendWithTemplate({
+        this.email.sendEmailWithTemplate({
           toAddress: `"${user.name}" <${user.prefersEmail.email}>`,
           template: {'users/deactivated': {userName: user.name}},
         });
@@ -167,7 +167,7 @@ export class UsersService {
       ) ?? ''
     );
     if (user.prefersEmail) {
-      this.email.sendWithTemplate({
+      this.email.sendEmailWithTemplate({
         toAddress: `"${user.name}" <${user.prefersEmail.email}>`,
         template: {
           'users/merge-request': {

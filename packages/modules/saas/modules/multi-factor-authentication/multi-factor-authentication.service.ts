@@ -20,7 +20,7 @@ import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
 import {TwilioService} from '../../providers/twilio/twilio.service';
 import {AuthService} from '../auth/auth.service';
 import {generateRandomString} from '@devbie/newbie/utilities/random.util';
-import {EmailService} from '@modules/notification/email/email.service';
+import {AwsSesService} from '@modules/aws-ses/aws-ses.service';
 
 @Injectable()
 export class MultiFactorAuthenticationService {
@@ -29,7 +29,7 @@ export class MultiFactorAuthenticationService {
     private auth: AuthService,
     private configService: ConfigService,
     private twilioService: TwilioService,
-    private emailService: EmailService
+    private emailService: AwsSesService
   ) {}
 
   async requestTotpMfa(userId: number): Promise<string> {
@@ -83,7 +83,7 @@ export class MultiFactorAuthenticationService {
       data: {twoFactorSecret: secret},
     });
     if (!user.prefersEmail) throw new BadRequestException(NO_EMAILS);
-    return this.emailService.sendWithTemplate({
+    return this.emailService.sendEmailWithTemplate({
       toAddress: `"${user.name}" <${user.prefersEmail.emailSafe}>`,
       template: {
         'auth/enable-email-mfa': {
