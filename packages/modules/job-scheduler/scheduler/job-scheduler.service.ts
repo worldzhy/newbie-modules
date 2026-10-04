@@ -9,7 +9,7 @@ import {
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { HandlerRegistryService, ScheduledHandler } from "./handler-registry.service";
+import { JobHandlerRegistryService, JobHandler } from "./handler-registry.service";
 
 const RECONCILE_INTERVAL_MS = 30_000;
 const CRON_JOB_NAME_PREFIX = "job-scheduler:";
@@ -20,7 +20,7 @@ const PG_UNIQUE_VIOLATION = "P2002";
 
 type JobTrigger = "schedule" | "manual";
 
-export interface JobDeclaration {
+export interface JobScheduleDeclaration {
   key: string;
   handlerKey: string;
   cronExpr: string;
@@ -29,7 +29,7 @@ export interface JobDeclaration {
   payload?: unknown;
 }
 
-interface ScheduledJobRecord {
+interface JobScheduleRecord {
   id: number;
   key: string;
   handlerKey: string;
@@ -42,8 +42,8 @@ interface ScheduledJobRecord {
 @Injectable()
 export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(JobSchedulerService.name);
-  /// Per-process reentry guard: keys of jobs whose run is still in progress.
-  private readonly runningJobKeys = new Set<string>();
+  /// Per-process reentry guard: keys of schedules whose run is still in progress.
+  private readonly runningScheduleKeys = new Set<string>();
   /// What the in-memory cron jobs were built from, so reconcile can detect
   /// database-side cron/timezone drift without touching cron internals.
   private readonly registeredJobs = new Map<string, { cronExpr: string; timezone: string }>();
@@ -52,14 +52,14 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly schedulerRegistry: SchedulerRegistry,
-    private readonly handlerRegistry: HandlerRegistryService,
+    private readonly jobHandlerRegistry: JobHandlerRegistryService,
   ) {}
 
   async onModuleInit() {
     await this.reconcile();
     this.reconcileTimer = setInterval(() => {
       this.reconcile().catch((error) => {
-        this.logger.error(`Scheduled job reconcile failed: ${this.getErrorMessage(error)}`);
+        this.logger.error(`Schedule reconcile failed: ${this.getErrorMessage(error)}`);
       });
     }, RECONCILE_INTERVAL_MS);
   }
@@ -70,31 +70,31 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /// Sync database job definitions into dynamic cron jobs: create/update for
-  /// enabled jobs, remove cron jobs for disabled or deleted definitions.
+  /// Sync database schedule definitions into dynamic cron jobs: create/update
+  /// for enabled schedules, remove cron jobs for disabled or deleted schedules.
   async reconcile() {
-    const jobs = (await this.prisma.scheduledJob.findMany({
+    const schedules = (await this.prisma.jobSchedule.findMany({
       orderBy: { key: "asc" },
-    })) as unknown as ScheduledJobRecord[];
+    })) as unknown as JobScheduleRecord[];
 
     const desiredCronJobNames = new Set<string>();
 
-    for (const job of jobs) {
-      if (!job.enabled) {
+    for (const schedule of schedules) {
+      if (!schedule.enabled) {
         continue;
       }
 
-      const cronJobName = this.cronJobName(job.key);
+      const cronJobName = this.cronJobName(schedule.key);
       desiredCronJobNames.add(cronJobName);
 
       const registered = this.registeredJobs.get(cronJobName);
-      if (registered && registered.cronExpr === job.cronExpr && registered.timezone === job.timezone) {
+      if (registered && registered.cronExpr === schedule.cronExpr && registered.timezone === schedule.timezone) {
         continue;
       }
 
       this.deleteCronJob(cronJobName);
-      this.addCronJob(job, cronJobName);
-      this.registeredJobs.set(cronJobName, { cronExpr: job.cronExpr, timezone: job.timezone });
+      this.addCronJob(schedule, cronJobName);
+      this.registeredJobs.set(cronJobName, { cronExpr: schedule.cronExpr, timezone: schedule.timezone });
     }
 
     for (const cronJobName of this.registeredJobs.keys()) {
@@ -105,27 +105,27 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /// Manually trigger a job regardless of its `enabled` flag. Still subject to
-  /// the same reentry guard: while a run is in progress the run is recorded as
-  /// `skipped`.
-  async triggerJob(key: string) {
-    const job = await this.prisma.scheduledJob.findUnique({ where: { key } });
-    if (!job) {
-      throw new NotFoundException(`Scheduled job not found: ${key}`);
+  /// Manually trigger a schedule regardless of its `enabled` flag. Still
+  /// subject to the same reentry guard: while a run is in progress the run is
+  /// recorded as `skipped`.
+  async triggerSchedule(key: string) {
+    const schedule = await this.prisma.jobSchedule.findUnique({ where: { key } });
+    if (!schedule) {
+      throw new NotFoundException(`Job schedule not found: ${key}`);
     }
-    return this.executeJob(job as unknown as ScheduledJobRecord, "manual");
+    return this.executeSchedule(schedule as unknown as JobScheduleRecord, "manual");
   }
 
-  /// Declare a default job definition from business code. The database row
-  /// wins: declarations only create missing rows, never override runtime edits.
-  async upsertJobDeclaration(declaration: JobDeclaration): Promise<void> {
-    const existing = await this.prisma.scheduledJob.findUnique({ where: { key: declaration.key } });
+  /// Declare a default schedule from business code. The database row wins:
+  /// declarations only create missing rows, never override runtime edits.
+  async upsertScheduleDeclaration(declaration: JobScheduleDeclaration): Promise<void> {
+    const existing = await this.prisma.jobSchedule.findUnique({ where: { key: declaration.key } });
     if (existing) {
       return;
     }
 
     try {
-      await this.prisma.scheduledJob.create({
+      await this.prisma.jobSchedule.create({
         data: {
           key: declaration.key,
           handlerKey: declaration.handlerKey,
@@ -137,7 +137,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
         },
       });
       this.logger.log(
-        `Scheduled job declared: ${declaration.key} (${declaration.cronExpr} ${
+        `Job schedule declared: ${declaration.key} (${declaration.cronExpr} ${
           declaration.timezone ?? DEFAULT_TIMEZONE
         })`,
       );
@@ -149,14 +149,14 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /// Update the runtime-editable fields of a job definition, then reconcile
-  /// immediately so the change takes effect without waiting for the next
-  /// 30s reconcile tick. Only enabled/cronExpr/timezone are editable here;
-  /// key, handlerKey and payload stay declaration-owned.
-  async updateJob(key: string, updates: { enabled?: boolean; cronExpr?: string; timezone?: string }) {
-    const job = await this.prisma.scheduledJob.findUnique({ where: { key } });
-    if (!job) {
-      throw new NotFoundException(`Scheduled job not found: ${key}`);
+  /// Update the runtime-editable fields of a schedule, then reconcile
+  /// immediately so the change takes effect without waiting for the next 30s
+  /// reconcile tick. Only enabled/cronExpr/timezone are editable here; key,
+  /// handlerKey and payload stay declaration-owned.
+  async updateSchedule(key: string, updates: { enabled?: boolean; cronExpr?: string; timezone?: string }) {
+    const schedule = await this.prisma.jobSchedule.findUnique({ where: { key } });
+    if (!schedule) {
+      throw new NotFoundException(`Job schedule not found: ${key}`);
     }
 
     const hasUpdate = updates.enabled !== undefined || updates.cronExpr !== undefined || updates.timezone !== undefined;
@@ -164,13 +164,13 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException("No updatable fields provided. Supported fields: enabled, cronExpr, timezone.");
     }
 
-    const nextCronExpr = updates.cronExpr ?? job.cronExpr;
-    const nextTimezone = updates.timezone ?? job.timezone;
+    const nextCronExpr = updates.cronExpr ?? schedule.cronExpr;
+    const nextTimezone = updates.timezone ?? schedule.timezone;
     if (updates.cronExpr !== undefined || updates.timezone !== undefined) {
       this.assertValidCron(nextCronExpr, nextTimezone);
     }
 
-    const updated = await this.prisma.scheduledJob.update({
+    const updated = await this.prisma.jobSchedule.update({
       where: { key },
       data: {
         ...(updates.enabled !== undefined ? { enabled: updates.enabled } : {}),
@@ -183,22 +183,22 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     return updated;
   }
 
-  listJobs() {
-    return this.prisma.scheduledJob.findMany({ orderBy: { key: "asc" } });
+  listSchedules() {
+    return this.prisma.jobSchedule.findMany({ orderBy: { key: "asc" } });
   }
 
-  async listJobRuns(key: string, limitQuery?: string) {
-    const job = await this.prisma.scheduledJob.findUnique({ where: { key } });
-    if (!job) {
-      throw new NotFoundException(`Scheduled job not found: ${key}`);
+  async listScheduleRuns(key: string, limitQuery?: string) {
+    const schedule = await this.prisma.jobSchedule.findUnique({ where: { key } });
+    if (!schedule) {
+      throw new NotFoundException(`Job schedule not found: ${key}`);
     }
 
     const parsedLimit = Number.parseInt(limitQuery ?? "", 10);
     const limit =
       Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, MAX_RUN_LIMIT) : DEFAULT_RUN_LIMIT;
 
-    return this.prisma.scheduledJobRun.findMany({
-      where: { jobId: job.id },
+    return this.prisma.jobRun.findMany({
+      where: { scheduleId: schedule.id },
       orderBy: { startedAt: "desc" },
       take: limit,
     });
@@ -216,22 +216,22 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private addCronJob(job: ScheduledJobRecord, cronJobName: string) {
+  private addCronJob(schedule: JobScheduleRecord, cronJobName: string) {
     const cronJob = new CronJob(
-      job.cronExpr,
+      schedule.cronExpr,
       () => {
-        this.executeJob(job, "schedule").catch((error) => {
-          this.logger.error(`Scheduled job ${job.key} failed unexpectedly: ${this.getErrorMessage(error)}`);
+        this.executeSchedule(schedule, "schedule").catch((error) => {
+          this.logger.error(`Schedule ${schedule.key} failed unexpectedly: ${this.getErrorMessage(error)}`);
         });
       },
       null,
       false,
-      job.timezone || DEFAULT_TIMEZONE,
+      schedule.timezone || DEFAULT_TIMEZONE,
     );
 
     this.schedulerRegistry.addCronJob(cronJobName, cronJob);
     cronJob.start();
-    this.logger.log(`Cron job started for scheduled job ${job.key}: ${job.cronExpr} (${job.timezone})`);
+    this.logger.log(`Cron job started for schedule ${schedule.key}: ${schedule.cronExpr} (${schedule.timezone})`);
   }
 
   private deleteCronJob(cronJobName: string) {
@@ -244,12 +244,12 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async executeJob(job: ScheduledJobRecord, trigger: JobTrigger) {
-    if (this.runningJobKeys.has(job.key)) {
-      this.logger.warn(`Skipping ${trigger} run of scheduled job ${job.key}: previous run is still in progress.`);
-      return this.prisma.scheduledJobRun.create({
+  private async executeSchedule(schedule: JobScheduleRecord, trigger: JobTrigger) {
+    if (this.runningScheduleKeys.has(schedule.key)) {
+      this.logger.warn(`Skipping ${trigger} run of schedule ${schedule.key}: previous run is still in progress.`);
+      return this.prisma.jobRun.create({
         data: {
-          jobId: job.id,
+          scheduleId: schedule.id,
           trigger,
           status: "skipped",
           startedAt: new Date(),
@@ -260,21 +260,21 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       });
     }
 
-    this.runningJobKeys.add(job.key);
+    this.runningScheduleKeys.add(schedule.key);
     const startedAt = new Date();
-    const run = await this.prisma.scheduledJobRun.create({
-      data: { jobId: job.id, trigger, status: "running", startedAt },
+    const run = await this.prisma.jobRun.create({
+      data: { scheduleId: schedule.id, trigger, status: "running", startedAt },
     });
 
     try {
-      const handler: ScheduledHandler | undefined = this.handlerRegistry.getHandler(job.handlerKey);
+      const handler: JobHandler | undefined = this.jobHandlerRegistry.getHandler(schedule.handlerKey);
       if (!handler) {
-        throw new Error(`Scheduled handler is not registered: ${job.handlerKey}`);
+        throw new Error(`Job handler is not registered: ${schedule.handlerKey}`);
       }
-      await handler(job.payload ?? undefined);
+      await handler(schedule.payload ?? undefined);
 
       const finishedAt = new Date();
-      return this.prisma.scheduledJobRun.update({
+      return this.prisma.jobRun.update({
         where: { id: run.id },
         data: {
           status: "success",
@@ -286,11 +286,11 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       const finishedAt = new Date();
       const errorMessage = this.getErrorMessage(error);
       this.logger.error(
-        `Scheduled job ${job.key} ${trigger} run failed after ${
+        `Schedule ${schedule.key} ${trigger} run failed after ${
           finishedAt.getTime() - startedAt.getTime()
         }ms: ${errorMessage}`,
       );
-      return this.prisma.scheduledJobRun.update({
+      return this.prisma.jobRun.update({
         where: { id: run.id },
         data: {
           status: "failed",
@@ -300,7 +300,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
         },
       });
     } finally {
-      this.runningJobKeys.delete(job.key);
+      this.runningScheduleKeys.delete(schedule.key);
     }
   }
 

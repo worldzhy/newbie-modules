@@ -1,6 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 import { ScheduleModule } from "@nestjs/schedule";
-import { HandlerRegistryService } from "./scheduler/handler-registry.service";
+import { JobHandlerRegistryService } from "./scheduler/handler-registry.service";
 import { JobSchedulerService } from "./scheduler/job-scheduler.service";
 import { JobSchedulerController } from "./job-scheduler.controller";
 
@@ -11,7 +11,7 @@ import { JobSchedulerController } from "./job-scheduler.controller";
   // twice. The re-export below makes SchedulerRegistry globally injectable.
   imports: [ScheduleModule.forRoot()],
   controllers: [JobSchedulerController],
-  providers: [HandlerRegistryService, JobSchedulerService],
-  exports: [ScheduleModule, HandlerRegistryService, JobSchedulerService],
+  providers: [JobHandlerRegistryService, JobSchedulerService],
+  exports: [ScheduleModule, JobHandlerRegistryService, JobSchedulerService],
 })
 export class JobSchedulerModule {}

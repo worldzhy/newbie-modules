@@ -1,14 +1,16 @@
 // ! ------------------------------------------------------------ //
 // !           [Module] Job scheduler models              //
 // ! ------------------------------------------------------------ //
-// * ScheduledJob                                                 //
-// * ScheduledJobRun                                              //
+// * JobSchedule                                                  //
+// * JobRun                                                       //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-/// Declarative job definition. Business modules upsert defaults on startup
-/// (`createdVia="declaration"`); the database row wins at runtime so operators
-/// can pause a job, change its cron expression, or trigger it manually.
-model ScheduledJob {
+/// A schedule for one job: when it runs (cronExpr + timezone), whether it is
+/// enabled, and the opaque payload passed to the job handler. Business modules
+/// upsert defaults on startup (`createdVia="declaration"`); the database row
+/// wins at runtime so operators can pause a schedule, change its cron
+/// expression, or trigger it manually.
+model JobSchedule {
   id         Int      @id @default(autoincrement())
   key        String   @unique
   handlerKey String
@@ -20,16 +22,16 @@ model ScheduledJob {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  runs ScheduledJobRun[]
+  runs JobRun[]
 
   @@schema("module/job-scheduler")
 }
 
 /// Execution history for one job run. `status="skipped"` records a reentry
-/// guard rejection: the previous run of the same job was still in progress.
-model ScheduledJobRun {
+/// guard rejection: the previous run of the same schedule was still in progress.
+model JobRun {
   id         Int       @id @default(autoincrement())
-  jobId      Int
+  scheduleId Int
   /// schedule | manual
   trigger    String
   /// running | success | failed | skipped
@@ -39,8 +41,8 @@ model ScheduledJobRun {
   durationMs Int?
   error      String?
 
-  job ScheduledJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  schedule JobSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
 
-  @@index([jobId, startedAt])
+  @@index([scheduleId, startedAt])
   @@schema("module/job-scheduler")
 }

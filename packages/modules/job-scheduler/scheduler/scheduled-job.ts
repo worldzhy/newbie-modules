@@ -1,17 +1,17 @@
 import { Inject, Logger, OnModuleInit } from "@nestjs/common";
 import { JobSchedulerService } from "./job-scheduler.service";
-import { HandlerRegistryService } from "./handler-registry.service";
+import { JobHandlerRegistryService } from "./handler-registry.service";
 
 /**
- * Convenience base class for a scheduled task: the subclass declares the job
+ * Convenience base class for a scheduled job: the subclass declares the job
  * identity and default schedule, implements `handle`, and the base class
- * wires registration plus job declaration on module init.
+ * wires handler registration plus schedule declaration on module init.
  *
  * Platform dependencies are property-injected by the framework so subclasses
  * keep their constructor free of scheduling boilerplate.
  */
-export abstract class ScheduledTask implements OnModuleInit {
-  protected abstract readonly jobKey: string;
+export abstract class ScheduledJob implements OnModuleInit {
+  protected abstract readonly key: string;
   protected abstract readonly cronExpr: string;
   protected abstract readonly timezone: string;
   protected abstract readonly enabled: boolean;
@@ -20,14 +20,14 @@ export abstract class ScheduledTask implements OnModuleInit {
   @Inject(JobSchedulerService)
   protected readonly jobScheduler!: JobSchedulerService;
 
-  @Inject(HandlerRegistryService)
-  protected readonly handlerRegistry!: HandlerRegistryService;
+  @Inject(JobHandlerRegistryService)
+  protected readonly jobHandlerRegistry!: JobHandlerRegistryService;
 
   async onModuleInit(): Promise<void> {
-    this.handlerRegistry.registerHandler(this.jobKey, (payload) => this.handle(payload));
-    await this.jobScheduler.upsertJobDeclaration({
-      key: this.jobKey,
-      handlerKey: this.jobKey,
+    this.jobHandlerRegistry.registerHandler(this.key, (payload) => this.handle(payload));
+    await this.jobScheduler.upsertScheduleDeclaration({
+      key: this.key,
+      handlerKey: this.key,
       cronExpr: this.cronExpr,
       timezone: this.timezone,
       enabled: this.enabled,

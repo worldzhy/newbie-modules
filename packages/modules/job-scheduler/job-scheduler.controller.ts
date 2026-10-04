@@ -1,12 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { JobSchedulerService } from "./scheduler/job-scheduler.service";
-import {
-  ListScheduledJobRunsDto,
-  ScheduledJobDto,
-  ScheduledJobRunDto,
-  UpdateScheduledJobDto,
-} from "./job-scheduler.dto";
+import { JobRunDto, JobScheduleDto, ListJobRunsDto, UpdateJobScheduleDto } from "./job-scheduler.dto";
 
 @ApiTags("Job Scheduler")
 @ApiBearerAuth()
@@ -14,31 +9,31 @@ import {
 export class JobSchedulerController {
   constructor(private readonly jobScheduler: JobSchedulerService) {}
 
-  @Get("jobs")
-  @ApiOperation({ summary: "List all scheduled job definitions" })
-  @ApiResponse({ status: 200, type: [ScheduledJobDto] })
-  listJobs(): Promise<ScheduledJobDto[]> {
-    return this.jobScheduler.listJobs() as Promise<ScheduledJobDto[]>;
+  @Get("schedules")
+  @ApiOperation({ summary: "List all job schedules" })
+  @ApiResponse({ status: 200, type: [JobScheduleDto] })
+  listSchedules(): Promise<JobScheduleDto[]> {
+    return this.jobScheduler.listSchedules() as Promise<JobScheduleDto[]>;
   }
 
-  @Get("jobs/:key/runs")
-  @ApiOperation({ summary: "List recent execution history for a scheduled job" })
-  @ApiResponse({ status: 200, type: [ScheduledJobRunDto] })
-  listJobRuns(@Param("key") key: string, @Query() query: ListScheduledJobRunsDto): Promise<ScheduledJobRunDto[]> {
-    return this.jobScheduler.listJobRuns(key, query.limit) as Promise<ScheduledJobRunDto[]>;
+  @Get("schedules/:key/runs")
+  @ApiOperation({ summary: "List recent execution runs for a job schedule" })
+  @ApiResponse({ status: 200, type: [JobRunDto] })
+  listScheduleRuns(@Param("key") key: string, @Query() query: ListJobRunsDto): Promise<JobRunDto[]> {
+    return this.jobScheduler.listScheduleRuns(key, query.limit) as Promise<JobRunDto[]>;
   }
 
-  @Patch("jobs/:key")
-  @ApiOperation({ summary: "Update runtime-editable fields (enabled, cronExpr, timezone) of a scheduled job" })
-  @ApiResponse({ status: 200, type: ScheduledJobDto })
-  updateJob(@Param("key") key: string, @Body() body: UpdateScheduledJobDto): Promise<ScheduledJobDto> {
-    return this.jobScheduler.updateJob(key, body ?? {}) as Promise<ScheduledJobDto>;
+  @Patch("schedules/:key")
+  @ApiOperation({ summary: "Update runtime-editable fields (enabled, cronExpr, timezone) of a job schedule" })
+  @ApiResponse({ status: 200, type: JobScheduleDto })
+  updateSchedule(@Param("key") key: string, @Body() body: UpdateJobScheduleDto): Promise<JobScheduleDto> {
+    return this.jobScheduler.updateSchedule(key, body ?? {}) as Promise<JobScheduleDto>;
   }
 
-  @Post("jobs/:key/trigger")
-  @ApiOperation({ summary: "Manually trigger a scheduled job now" })
-  @ApiResponse({ status: 200, type: ScheduledJobRunDto })
-  triggerJob(@Param("key") key: string): Promise<ScheduledJobRunDto> {
-    return this.jobScheduler.triggerJob(key) as Promise<ScheduledJobRunDto>;
+  @Post("schedules/:key/trigger")
+  @ApiOperation({ summary: "Manually trigger a job schedule now" })
+  @ApiResponse({ status: 200, type: JobRunDto })
+  triggerSchedule(@Param("key") key: string): Promise<JobRunDto> {
+    return this.jobScheduler.triggerSchedule(key) as Promise<JobRunDto>;
   }
 }

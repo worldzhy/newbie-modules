@@ -34,7 +34,7 @@ export interface RegisteredNotification extends NotificationDeclaration {}
  *
  * Business code typically declares a notification by subclassing the abstract
  * Notification base class, which registers itself here on module init.
- * Mirrors job-scheduler's HandlerRegistryService: business code registers a
+ * Mirrors job-scheduler's JobHandlerRegistryService: business code registers a
  * stable key at startup, the center dispatches by that key.
  */
 @Injectable()

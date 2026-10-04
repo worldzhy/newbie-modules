@@ -1,14 +1,14 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsBoolean, IsOptional, IsString } from "class-validator";
 
-export class ScheduledJobDto {
+export class JobScheduleDto {
   @ApiProperty()
   id: number;
 
-  @ApiProperty({ description: "Unique job key, e.g. aws-audit" })
+  @ApiProperty({ description: "Unique schedule key, e.g. aws-audit" })
   key: string;
 
-  @ApiProperty({ description: "Key of the in-process handler that executes the job" })
+  @ApiProperty({ description: "Key of the in-process job handler that executes the schedule" })
   handlerKey: string;
 
   @ApiProperty({ description: "Cron expression, e.g. 0 3 * * *" })
@@ -23,7 +23,7 @@ export class ScheduledJobDto {
   @ApiProperty({ type: Object, required: false, nullable: true })
   payload?: unknown;
 
-  @ApiProperty({ description: "How the job was created", example: "declaration" })
+  @ApiProperty({ description: "How the schedule was created", example: "declaration" })
   createdVia: string;
 
   @ApiProperty()
@@ -33,12 +33,12 @@ export class ScheduledJobDto {
   updatedAt: Date;
 }
 
-export class ScheduledJobRunDto {
+export class JobRunDto {
   @ApiProperty()
   id: number;
 
   @ApiProperty()
-  jobId: number;
+  scheduleId: number;
 
   @ApiProperty({ enum: ["schedule", "manual"] })
   trigger: string;
@@ -59,8 +59,8 @@ export class ScheduledJobRunDto {
   error: string | null;
 }
 
-export class UpdateScheduledJobDto {
-  @ApiProperty({ required: false, description: "Enable or pause the job" })
+export class UpdateJobScheduleDto {
+  @ApiProperty({ required: false, description: "Enable or pause the schedule" })
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
@@ -76,7 +76,7 @@ export class UpdateScheduledJobDto {
   timezone?: string;
 }
 
-export class ListScheduledJobRunsDto {
+export class ListJobRunsDto {
   @ApiProperty({ required: false, default: 50, description: "Maximum runs to return (1-200)" })
   limit?: string;
 }
