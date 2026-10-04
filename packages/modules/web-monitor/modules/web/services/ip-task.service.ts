@@ -1,11 +1,11 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {MonitorModelsService} from '../../../models/mongo/monitor-models.service';
-import {RedisService} from '../../../models/redis/redis.service';
-import {SystemService} from '../../../modules/system/system.service';
-import {func} from '../../../shared/utils';
-import https from 'https';
-import {RedisKeyPrefix} from '../../../models/enum';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
+import { RedisService } from "../../../models/redis/redis.service";
+import { SystemService } from "../../../modules/system/system.service";
+import { func } from "../../../shared/utils";
+import https from "https";
+import { RedisKeyPrefix } from "../../../models/enum";
 
 @Injectable()
 export class WebIpTaskService {
@@ -14,9 +14,9 @@ export class WebIpTaskService {
     private readonly config: ConfigService,
     private readonly models: MonitorModelsService,
     private readonly redis: RedisService,
-    private readonly system: SystemService
+    private readonly system: SystemService,
   ) {
-    this.cfg = this.config.get('modules.web-monitor');
+    this.cfg = this.config.get("modules.web-monitor");
   }
 
   async saveWebGetIpDatas() {
@@ -24,14 +24,14 @@ export class WebIpTaskService {
     if (!systems || !systems.length) return;
     for (const sys of systems) {
       const appId = sys.appId;
-      if (!appId || !sys.statisticsEnabled) continue;
+      if (!appId) continue;
       await this.saveWebGetIpDatasByOne(appId);
     }
   }
 
   private async saveWebGetIpDatasByOne(appId: string) {
     try {
-      const query: any = {city: {$exists: false}};
+      const query: any = { city: { $exists: false } };
       const beginTime = await this.redis.get(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`);
       query.createTime = {
         $gt: beginTime ? new Date(beginTime) : new Date(Date.now() - this.cfg.ip_task_space_time),
@@ -39,9 +39,9 @@ export class WebIpTaskService {
       const datas = await this.models
         .WebEnvironment(appId)
         .find(query)
-        .read('secondaryPreferred')
+        .read("secondaryPreferred")
         .limit(this.cfg.ip_thread * 60)
-        .sort({createTime: 1})
+        .sort({ createTime: 1 })
         .exec();
       if (datas && datas.length) {
         for (let i = 0; i < this.cfg.ip_thread; i++) {
@@ -68,7 +68,7 @@ export class WebIpTaskService {
   }
 
   private async getIpData(ip: string, _id: string, appId: string) {
-    let _copyip = ip.split('.');
+    let _copyip = ip.split(".");
     const copyip = `${_copyip[0]}.${_copyip[1]}.${_copyip[2]}`;
     let datas = await this.redis.get(copyip);
     if (datas) {
@@ -85,10 +85,10 @@ export class WebIpTaskService {
   private httpGetJson(url: string): Promise<any> {
     return new Promise((resolve, reject) => {
       https
-        .get(url, res => {
-          let data = '';
-          res.on('data', chunk => (data += chunk));
-          res.on('end', () => {
+        .get(url, (res) => {
+          let data = "";
+          res.on("data", (chunk) => (data += chunk));
+          res.on("end", () => {
             try {
               resolve(JSON.parse(data));
             } catch (e) {
@@ -96,7 +96,7 @@ export class WebIpTaskService {
             }
           });
         })
-        .on('error', reject);
+        .on("error", reject);
     });
   }
 
@@ -111,7 +111,7 @@ export class WebIpTaskService {
           province: result.result.ad_info.province,
           city: result.result.ad_info.city,
         };
-        await this.redis.set(copyip, JSON.stringify(json), 'EX', this.cfg.ipRedisTTL);
+        await this.redis.set(copyip, JSON.stringify(json), "EX", this.cfg.ipRedisTTL);
         return await this.updateWebEnvironment(json, _id, appId);
       }
       return {};
@@ -124,7 +124,7 @@ export class WebIpTaskService {
   private async updateWebEnvironment(data: any, id: string, appId: string) {
     return await this.models
       .WebEnvironment(appId)
-      .updateOne({_id: id}, {$set: {province: data.province, city: data.city}}, {upsert: true})
+      .updateOne({ _id: id }, { $set: { province: data.province, city: data.city } }, { upsert: true })
       .exec();
   }
 }

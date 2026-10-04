@@ -83,17 +83,4 @@ export class SystemController {
     const result = await this.system.deleteSystem(appId, type);
     return func.result({data: result});
   }
-
-  @Post('/manageReportRecipients')
-  @ApiOperation({summary: 'Add or remove a report recipient (item: 1 daily report, 2 PV peak report)'})
-  @ApiResponse({type: Object})
-  async manageReportRecipients(@Body() body: any) {
-    const appId = body.appId;
-    const email = body.email;
-    const action = body.action || 1;
-    const item = body.item || 1;
-    if (!appId) throw new Error('appId must not be empty');
-    const result = await this.system.manageReportRecipients(appId, email, action, item);
-    return func.result({data: result});
-  }
 }

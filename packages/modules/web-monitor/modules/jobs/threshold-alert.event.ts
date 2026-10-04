@@ -1,7 +1,7 @@
 /**
  * Domain event emitted by the scheduled threshold-alert evaluation when a
- * system with alertsEnabled=true breaches a performance or error threshold
- * inside the evaluation window.
+ * monitored system breaches a performance or error threshold inside the
+ * evaluation window.
  *
  * The web-monitor module only emits; application-layer subscribers decide how
  * the event becomes a user-facing notification (mirrors the job-scheduler

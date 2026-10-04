@@ -41,14 +41,13 @@ export class WebReportTaskService {
       return;
     }
     const system = await this.system.getSystemForAppId(item.appId);
-    if (!system || !system.statisticsEnabled) return;
-    // TODO querytype === 'PagePerf'
-    if (system.pagePerformanceEnabled && querytype === ReportType.PagePerf)
-      await this.savePages(item, system.slowPageTime);
-    if (system.resourcePerformanceEnabled || system.ajaxPerformanceEnabled)
-      this.forEachResources(item, system, appAjaxs);
-    if (system.errorReportingEnabled) await this.collectErrors(item, appErrors);
-    if (system.browserEnvironmentEnabled && querytype === ReportType.PagePerf) await this.saveEnvironment(item);
+    if (!system) return;
+    // All anomaly-relevant data is always persisted; thresholds define what an
+    // anomaly is, collection switches are intentionally not supported.
+    if (querytype === ReportType.PagePerf) await this.savePages(item, system.slowPageTime);
+    this.forEachResources(item, system, appAjaxs);
+    await this.collectErrors(item, appErrors);
+    if (querytype === ReportType.PagePerf) await this.saveEnvironment(item);
     await this.saveCustoms(item);
   }
 
@@ -267,9 +266,9 @@ export class WebReportTaskService {
     if (!data.resourceList || !data.resourceList.length) return;
     data.resourceList.forEach((item: any) => {
       if (item.type === "xmlhttprequest" || item.type === "fetchrequest" || item.type === "fetch") {
-        if (system.ajaxPerformanceEnabled) this.saveAjaxs(data, item, appAjaxs);
+        this.saveAjaxs(data, item, appAjaxs);
       } else {
-        if (system.resourcePerformanceEnabled) this.saveResours(data, item, system);
+        this.saveResours(data, item, system);
       }
     });
   }

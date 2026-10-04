@@ -32,7 +32,7 @@ export class WebPvuvipTaskService {
 
     const jobs = systems.map(async (sys: any) => {
       const appId = sys.appId;
-      if (!appId || !sys.statisticsEnabled) return;
+      if (!appId) return;
       const data = await this.pvuvip.getPvUvIpSurvey(appId, beginTime, endTime);
       await this.pvuvip.savePvUvIpData(appId, endTime, 1, data);
     });
@@ -51,7 +51,7 @@ export class WebPvuvipTaskService {
   private async groupData(datas: any[], type: number, beginTime: Date, endTime: Date, createTime: Date) {
     for (const sys of datas) {
       const appId = sys.appId;
-      if (!appId || !sys.statisticsEnabled) continue;
+      if (!appId) continue;
       await this.savePvUvIpData(appId, createTime, type, beginTime, endTime);
     }
   }

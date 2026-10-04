@@ -1,17 +1,16 @@
-import {Injectable} from '@nestjs/common';
-import {MongoModelRegistry} from '@modules/mongo/mongo-model.registry';
+import { Injectable } from "@nestjs/common";
+import { MongoModelRegistry } from "@modules/mongo/mongo-model.registry";
 
-import {SystemSchema} from './system.schema';
-import {EmailSchema} from './email.schema';
-import {DayReportNumSchema} from './day-report-num.schema';
+import { SystemSchema } from "./system.schema";
+import { DayReportNumSchema } from "./day-report-num.schema";
 
-import {WebEnvironmentSchema} from './web/web-environment.schema';
-import {WebPageSchema} from './web/web-page.schema';
-import {WebResourceSchema} from './web/web-resource.schema';
-import {WebCustomSchema, WebCustomFilterSchema} from './web/web-custom.schema';
-import {WebPvuvipSchema} from './web/web-pvuvip.schema';
+import { WebEnvironmentSchema } from "./web/web-environment.schema";
+import { WebPageSchema } from "./web/web-page.schema";
+import { WebResourceSchema } from "./web/web-resource.schema";
+import { WebCustomSchema, WebCustomFilterSchema } from "./web/web-custom.schema";
+import { WebPvuvipSchema } from "./web/web-pvuvip.schema";
 
-import {MongoCollectionPrefix, MongoStaticCollection} from '../enum';
+import { MongoCollectionPrefix, MongoStaticCollection } from "../enum";
 
 @Injectable()
 export class MonitorModelsService {
@@ -26,10 +25,6 @@ export class MonitorModelsService {
     return this.modelRegistry.getOrCreateModel(MongoStaticCollection.System, SystemSchema);
   }
 
-  Email() {
-    return this.modelRegistry.getOrCreateModel(MongoStaticCollection.Email, EmailSchema);
-  }
-
   DayReportNum() {
     return this.modelRegistry.getOrCreateModel(MongoStaticCollection.DayReportNum, DayReportNumSchema);
   }
@@ -38,7 +33,7 @@ export class MonitorModelsService {
   WebEnvironment(appId: string) {
     return this.modelRegistry.getOrCreateModel(
       `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appId}`,
-      WebEnvironmentSchema
+      WebEnvironmentSchema,
     );
   }
 
@@ -57,7 +52,7 @@ export class MonitorModelsService {
   WebCustomFilter(appId: string) {
     return this.modelRegistry.getOrCreateModel(
       `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appId}`,
-      WebCustomFilterSchema
+      WebCustomFilterSchema,
     );
   }
 

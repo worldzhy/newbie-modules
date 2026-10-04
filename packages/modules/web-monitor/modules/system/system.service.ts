@@ -32,18 +32,11 @@ export class SystemService {
     system.appId = appId;
     system.userId = [body.token || ""];
     system.createTime = new Date();
-    system.statisticsEnabled = body.statisticsEnabled ?? true;
     system.slowPageTime = body.slowPageTime || 5;
     system.slowJsTime = body.slowJsTime || 2;
     system.slowCssTime = body.slowCssTime || 2;
     system.slowImgTime = body.slowImgTime || 2;
     system.slowAjaxTime = body.slowAjaxTime || 2;
-    system.pagePerformanceEnabled = body.pagePerformanceEnabled ?? true;
-    system.ajaxPerformanceEnabled = body.ajaxPerformanceEnabled ?? true;
-    system.resourcePerformanceEnabled = body.resourcePerformanceEnabled ?? true;
-    system.browserEnvironmentEnabled = body.browserEnvironmentEnabled ?? true;
-    system.errorReportingEnabled = body.errorReportingEnabled ?? true;
-    system.alertsEnabled = body.alertsEnabled ?? false;
 
     const result = await system.save();
     await this.updateSystemNodeCache(appId);
@@ -56,7 +49,6 @@ export class SystemService {
 
     const update = {
       $set: {
-        statisticsEnabled: body.statisticsEnabled ?? true,
         systemName: body.systemName || "",
         systemDomain: body.systemDomain || "",
         slowPageTime: body.slowPageTime || 5,
@@ -65,14 +57,6 @@ export class SystemService {
         slowCssTime: body.slowCssTime || 2,
         slowImgTime: body.slowImgTime || 2,
         slowAjaxTime: body.slowAjaxTime || 2,
-        pagePerformanceEnabled: body.pagePerformanceEnabled ?? true,
-        ajaxPerformanceEnabled: body.ajaxPerformanceEnabled ?? true,
-        resourcePerformanceEnabled: body.resourcePerformanceEnabled ?? true,
-        browserEnvironmentEnabled: body.browserEnvironmentEnabled ?? true,
-        errorReportingEnabled: body.errorReportingEnabled ?? true,
-        dailyReportEnabled: body.dailyReportEnabled ?? true,
-        pvPeakReportEnabled: body.pvPeakReportEnabled ?? true,
-        alertsEnabled: body.alertsEnabled ?? false,
       },
     };
     const result = await this.models.System().updateOne({ appId: appId }, update, { multi: true }).exec();
@@ -87,7 +71,7 @@ export class SystemService {
 
   /**
    * Upserts the Mongo System document backing a WEB_MONITOR agent.
-   * The document carries the collection thresholds/switches (config truth source
+   * The document carries the anomaly detection thresholds (config truth source
    * stays in Mongo); appId equals the agent's immutable appKey. Idempotent by
    * appId so it can be safely retried after the PG-side agent issuance.
    */
@@ -96,7 +80,7 @@ export class SystemService {
       .System()
       .findOneAndUpdate(
         { appId: body.appId },
-        { $set: { projectId: body.projectId, systemName: body.systemName, type: "web", statisticsEnabled: true } },
+        { $set: { projectId: body.projectId, systemName: body.systemName, type: "web" } },
         { upsert: true, new: true },
       )
       .exec();
@@ -110,9 +94,8 @@ export class SystemService {
   }
 
   async getSysForUserId(query: any) {
-    const { alertsEnabled, systemName, type, projectId } = query;
+    const { systemName, type, projectId } = query;
     const param: any = {};
-    if (alertsEnabled !== undefined) param.alertsEnabled = alertsEnabled === "true" || alertsEnabled === "1";
     if (systemName) param.systemName = new RegExp(systemName);
     if (type) param.type = type;
     if (projectId) param.projectId = projectId;
@@ -122,14 +105,6 @@ export class SystemService {
   async getSystemForAppId(appId: string) {
     if (!appId) throw new Error("Query a system: appId must not be empty");
     return this.nodeCache.getAppInfo(appId) || ({} as any);
-  }
-
-  async findAlertEnabledSystems() {
-    return (await this.models.System().find({ alertsEnabled: true }).read("secondaryPreferred").exec()) || [];
-  }
-
-  async findDailyReportEnabledSystems() {
-    return (await this.models.System().find({ dailyReportEnabled: true }).read("secondaryPreferred").exec()) || [];
   }
 
   async getSystemList() {
@@ -155,35 +130,5 @@ export class SystemService {
 
   async deleteSystem(appId: string, type: string): Promise<any> {
     return this.models.System().deleteOne({ appId: appId, type }).exec();
-  }
-
-  async manageReportRecipients(appId: string, email: string, action: number, item = 1) {
-    const system = await this.getSystemForDb(appId);
-    if (!system) throw new Error("Invalid appId");
-    const listKey: "dailyReportRecipients" | "pvPeakRecipients" =
-      item === 2 ? "pvPeakRecipients" : "dailyReportRecipients";
-    const update = action === 1 ? { $addToSet: { [listKey]: email } } : { $pull: { [listKey]: email } };
-    return this.models.System().updateOne({ appId: appId }, update, { multi: true }).exec();
-  }
-
-  async updateEmailSystemIds(emailAddr: string, appId: string, handletype = 1, handleitem = 1) {
-    let str = "";
-    let type = "";
-    if (handleitem === 1) {
-      str = "每日发送日报权限";
-      type = "daliy";
-    } else if (handleitem === 2) {
-      str = "超过历史流量峰值邮件触达";
-      type = "highest";
-    }
-    const handleData =
-      handletype === 1
-        ? {
-            $push: {
-              systemIds: { $each: [{ systemId: appId, desc: str, type }] },
-            },
-          }
-        : { $pull: { systemIds: { systemId: appId, type } } };
-    return this.models.Email().updateOne({ email: emailAddr }, handleData, { multi: true }).exec();
   }
 }
