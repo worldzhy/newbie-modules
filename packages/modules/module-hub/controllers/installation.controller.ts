@@ -24,7 +24,7 @@ import { ModuleHubReleaseService } from "../services/release.service";
  */
 @ApiTags("Module Hub")
 @Controller("module-hub")
-export class InstallationsController {
+export class InstallationController {
   constructor(
     private readonly installations: ModuleHubInstallationService,
     private readonly releases: ModuleHubReleaseService,

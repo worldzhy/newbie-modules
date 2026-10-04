@@ -12,7 +12,7 @@ import { HeartbeatInstallationService } from "../services/installation.service";
  */
 @ApiTags("Heartbeat")
 @Controller("heartbeat")
-export class InstallationsController {
+export class InstallationController {
   constructor(private readonly installations: HeartbeatInstallationService) {}
 
   @Post("installations")

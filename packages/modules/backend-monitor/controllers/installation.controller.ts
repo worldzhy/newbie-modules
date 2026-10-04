@@ -16,7 +16,7 @@ import { MonitorInstallationService } from "../services/monitor-installation.ser
 @ApiTags("backend-monitor")
 @ApiBearerAuth()
 @Controller("backend-monitor/installations")
-export class BackendMonitorInstallationsController {
+export class BackendMonitorInstallationController {
   constructor(private readonly installations: MonitorInstallationService) {}
 
   @Post()

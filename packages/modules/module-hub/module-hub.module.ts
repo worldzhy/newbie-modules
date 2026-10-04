@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
 
-import { InstallationsController } from "./controllers/installations.controller";
+import { InstallationController } from "./controllers/installation.controller";
 import { ReportController } from "./controllers/report.controller";
 import { WebhookController } from "./controllers/webhook.controller";
 import { ModuleHubInstallationService } from "./services/installation.service";
@@ -9,7 +9,7 @@ import { ModuleHubReleaseService } from "./services/release.service";
 /**
  * Module Hub — observer plane for remote installation management.
  *
- * - InstallationsController: host integration (installation lifecycle,
+ * - InstallationController: host integration (installation lifecycle,
  *   catalog). Protected by the host's own auth.
  * - ReportController: token-only open endpoint where running instances report
  *   process-start facts and periodic liveness. Module upgrades happen via
@@ -17,7 +17,7 @@ import { ModuleHubReleaseService } from "./services/release.service";
  * - WebhookController: registry push ingestion. HMAC verified.
  */
 @Module({
-  controllers: [InstallationsController, ReportController, WebhookController],
+  controllers: [InstallationController, ReportController, WebhookController],
   providers: [ModuleHubInstallationService, ModuleHubReleaseService],
   exports: [ModuleHubInstallationService, ModuleHubReleaseService],
 })

@@ -1,13 +1,13 @@
 import { Module } from "@nestjs/common";
 
-import { InstallationsController } from "./controllers/installations.controller";
+import { InstallationController } from "./controllers/installation.controller";
 import { PingController } from "./controllers/ping.controller";
 import { HeartbeatInstallationService } from "./services/installation.service";
 
 /**
  * Heartbeat — pure liveness plane for deployment endpoints.
  *
- * - InstallationsController: host integration (installation lifecycle).
+ * - InstallationController: host integration (installation lifecycle).
  *   Protected by the host's own auth.
  * - PingController: token-only open endpoint where running processes report
  *   liveness. No snapshots, no command channel.
@@ -17,7 +17,7 @@ import { HeartbeatInstallationService } from "./services/installation.service";
  * independently of backend-monitor / module-hub.
  */
 @Module({
-  controllers: [InstallationsController, PingController],
+  controllers: [InstallationController, PingController],
   providers: [HeartbeatInstallationService],
   exports: [HeartbeatInstallationService],
 })
