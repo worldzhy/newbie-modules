@@ -51,7 +51,12 @@ export const func = {
     return fmt;
   },
   getRealIp(headers: Record<string, any>, ip?: string) {
-    return headers["x-real-ip"] || headers["x-forwarded-for"] || ip;
+    if (headers["x-real-ip"]) return headers["x-real-ip"];
+    const forwardedFor = headers["x-forwarded-for"];
+    // X-Forwarded-For may be a comma-separated chain ("client, proxy1, ...");
+    // the first hop is the original client address.
+    if (typeof forwardedFor === "string" && forwardedFor) return forwardedFor.split(",")[0].trim();
+    return ip;
   },
   // Simplified: replace pure numeric path segments with *
   urlHelper(input: string) {

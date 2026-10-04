@@ -1,4 +1,4 @@
-import { Controller, Post, Req, Headers, Body } from "@nestjs/common";
+import { BadRequestException, Controller, HttpException, HttpStatus, Post, Req, Headers, Body } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { SiteService } from "../../modules/site/site.service";
@@ -46,7 +46,7 @@ export class WebReportController {
     query.userAgent = headers["user-agent"];
 
     const system = await this.site.getSiteForAppId(query.appId);
-    if (!system?.appId) throw new Error(`appId:${query.appId} does not exist`);
+    if (!system?.appId) throw new BadRequestException(`appId:${query.appId} does not exist`);
 
     await this.saveWebReportDataForRedis(query);
     return func.result({ data: "ok" });
@@ -56,7 +56,11 @@ export class WebReportController {
     const limit = this.config.redis_consumption?.total_limit_web;
     if (limit) {
       const length = await this.redis.llen(RedisKeys.WEB_REPORT_DATAS);
-      if (length >= limit) throw new Error(`redis: ${RedisKeys.WEB_REPORT_DATAS}: rate limit reached (${limit})`);
+      if (length >= limit)
+        throw new HttpException(
+          `redis: ${RedisKeys.WEB_REPORT_DATAS}: rate limit reached (${limit})`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
     }
     await this.redis.lpush(RedisKeys.WEB_REPORT_DATAS, JSON.stringify(query));
     await this.dayReportNum.redisCount(query.appId);

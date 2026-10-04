@@ -91,16 +91,24 @@ export class JobsService implements OnModuleInit {
     const windowMs = Number(this.cfg.alertWindowMs) || 60000;
     const windowEnd = new Date();
     const windowStart = new Date(windowEnd.getTime() - windowMs);
-    for (const system of systems) {
-      if (!system?.appId) continue;
-      try {
-        await this.evaluateSystem(system, windowStart, windowEnd, windowMs);
-      } catch (error) {
-        this.logger.error(
-          `Threshold alert evaluation failed for system ${system.appId}: ${this.getErrorMessage(error)}`,
-        );
+    // Bounded worker pool: evaluate systems in parallel but cap concurrency so a
+    // large system list cannot stampede Mongo/ClickHouse at once.
+    const concurrency = Number(this.cfg.alertEvaluationConcurrency) || 5;
+    let nextIndex = 0;
+    const workers = Array.from({ length: Math.min(concurrency, systems.length) }, async () => {
+      while (nextIndex < systems.length) {
+        const system = systems[nextIndex++];
+        if (!system?.appId) continue;
+        try {
+          await this.evaluateSystem(system, windowStart, windowEnd, windowMs);
+        } catch (error) {
+          this.logger.error(
+            `Threshold alert evaluation failed for system ${system.appId}: ${this.getErrorMessage(error)}`,
+          );
+        }
       }
-    }
+    });
+    await Promise.all(workers);
   }
 
   private async evaluateSystem(system: any, windowStart: Date, windowEnd: Date, windowMs: number) {
