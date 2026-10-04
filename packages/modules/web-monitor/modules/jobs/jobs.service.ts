@@ -290,7 +290,7 @@ export class JobsService implements OnModuleInit {
     // error fingerprint and alert for fingerprints with no row before the
     // window. A fingerprint that persists is already "known" one minute
     // later, so it never re-alerts.
-    await this.runSignal("new js errors", async () => {
+    await this.runSignal("js-error-first-seen", async () => {
       const errorModel = await this.clickhouse.WebError(system.appId);
       const timeFilter = this.buildClickhouseTimeFilter(windowStart, windowEnd);
       const groups = await errorModel.find({
@@ -316,7 +316,7 @@ export class JobsService implements OnModuleInit {
         if (existedRows.length > 0) continue;
         this.emitAlert({
           ...base,
-          signal: "new-js-error",
+          signal: "js-error-first-seen",
           severity: "high",
           count: parseInt(row.count ?? "0", 10),
           affectedUsers: parseInt(row.users ?? "0", 10),
