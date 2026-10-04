@@ -107,6 +107,45 @@ export class HeartbeatInstallationService {
   }
 
   /**
+   * Return installations that have stopped pinging: not revoked, have been
+   * seen at least once, and whose lastSeenAt is older than the online
+   * threshold. The returned shape carries the self-reported runtime facts so
+   * callers (e.g. notification wiring) can render a useful alert without
+   * issuing a second query.
+   */
+  async findOfflineInstallations(): Promise<
+    Array<{
+      id: string;
+      label: string;
+      env: string | null;
+      instanceId: string | null;
+      appVersion: string | null;
+      lastSeenAt: Date;
+    }>
+  > {
+    const cutoff = new Date(Date.now() - ONLINE_THRESHOLD_SECONDS * 1000);
+    const rows = await this.prisma.heartbeatInstallation.findMany({
+      where: {
+        revokedAt: null,
+        lastSeenAt: { not: null, lt: cutoff },
+      },
+      select: {
+        id: true,
+        label: true,
+        env: true,
+        instanceId: true,
+        appVersion: true,
+        lastSeenAt: true,
+      },
+    });
+    // The where clause guarantees lastSeenAt is non-null; Prisma's type does
+    // not narrow on the `not: null` condition, so filter defensively.
+    return rows
+      .filter((row): row is typeof row & { lastSeenAt: Date } => row.lastSeenAt !== null)
+      .map(({ lastSeenAt, ...rest }) => ({ ...rest, lastSeenAt }));
+  }
+
+  /**
    * Liveness touch on every ping: firstSeenAt is written exactly once
    * (COALESCE), lastSeenAt always advances, runtime facts refresh when sent.
    */
