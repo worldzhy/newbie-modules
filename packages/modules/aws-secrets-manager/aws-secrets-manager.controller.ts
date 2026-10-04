@@ -1,117 +1,80 @@
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query} from '@nestjs/common';
-import {ApiTags, ApiOperation, ApiResponse, ApiBearerAuth} from '@nestjs/swagger';
-import {Prisma} from '@generated/prisma/client';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import {
   CreateSecretDto,
+  DeleteSecretResponseDto,
+  GetSecretRequestDto,
+  GetSecretValueResponseDto,
   ListSecretsRequestDto,
   SecretListResponseDto,
   SecretResponseDto,
+  SetRotationRequestDto,
   UpdateSecretDto,
-  GetSecretValueResponseDto,
-  DeployRotationLambdaDto,
-} from './aws-secrets-manager.dto';
-import {AwsSecretsManagerService} from './aws-secrets-manager.service';
+} from "./aws-secrets-manager.dto";
+import { AwsSecretsManagerService } from "./aws-secrets-manager.service";
 
-@ApiTags('AWS Secrets Manager')
+@ApiTags("AWS Secrets Manager")
 @ApiBearerAuth()
-@Controller('aws-secrets-manager/secrets')
+@Controller("aws-secrets-manager/secrets")
 export class AwsSecretsManagerController {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly secretsService: AwsSecretsManagerService
-  ) {}
+  constructor(private readonly secretsService: AwsSecretsManagerService) {}
 
-  @Post('')
-  @ApiOperation({summary: 'Create Secret'})
-  @ApiResponse({status: 201, description: 'Secret created successfully', type: SecretResponseDto})
+  @Post("")
+  @ApiOperation({ summary: "Create Secret" })
+  @ApiResponse({ status: 201, description: "Secret created successfully", type: SecretResponseDto })
   async createSecret(@Body() body: CreateSecretDto) {
-    return await this.secretsService.createSecret({
-      name: body.name,
-      type: body.type,
-      region: body.region,
-      secretValue: body.secretValue,
-      rotationEnabled: body.rotationEnabled,
-      rotationRules: body.rotationRules,
-      description: body.description,
-      projectId: body.projectId,
-    });
+    return await this.secretsService.createSecret(body);
   }
 
-  @Get('')
-  @ApiOperation({summary: 'List all Secrets (metadata only, no secret values)'})
-  @ApiResponse({type: SecretListResponseDto})
+  @Get("")
+  @ApiOperation({ summary: "List all managed Secrets (metadata only, no secret values)" })
+  @ApiResponse({ type: SecretListResponseDto })
   async listSecrets(@Query() query: ListSecretsRequestDto) {
-    const project = await this.prisma.project.findUniqueOrThrow({
-      where: {id: query.projectId},
-      select: {secretGroupId: true},
-    });
-    if (!project.secretGroupId) {
-      throw new BadRequestException(`Project ${query.projectId} does not have a Secret Group configured`);
-    }
-
-    return await this.prisma.findManyInManyPages({
-      model: Prisma.ModelName.Secret,
-      pagination: {page: query.page, pageSize: query.pageSize},
-      findManyArgs: {
-        where: {groupId: project.secretGroupId},
-        orderBy: {createdAt: 'desc'},
-      },
-    });
+    return await this.secretsService.listSecrets(query);
   }
 
-  @Get(':id')
-  @ApiOperation({summary: 'Get Secret metadata (no secret value)'})
-  @ApiResponse({type: SecretResponseDto})
-  async getSecret(@Param('id') id: string) {
-    return await this.prisma.secret.findUniqueOrThrow({where: {id}});
+  @Get(":name")
+  @ApiOperation({ summary: "Get Secret metadata (no secret value)" })
+  @ApiResponse({ type: SecretResponseDto })
+  async getSecret(@Param("name") name: string, @Query() query: GetSecretRequestDto) {
+    return await this.secretsService.getSecret(query.projectId, name, query.region);
   }
 
-  @Get(':id/value')
-  @ApiOperation({summary: 'Get complete Secret information (including secret value)'})
-  @ApiResponse({type: GetSecretValueResponseDto, description: 'Complete Secret information (including secret value)'})
-  async getSecretValue(@Param('id') id: string): Promise<GetSecretValueResponseDto> {
-    // This endpoint is called when user clicks "View Password" in UI
-    return await this.secretsService.getSecretWithValue(id);
+  @Get(":name/value")
+  @ApiOperation({ summary: "Get Secret value" })
+  @ApiResponse({ type: GetSecretValueResponseDto, description: "Secret name and decrypted value" })
+  async getSecretValue(
+    @Param("name") name: string,
+    @Query() query: GetSecretRequestDto,
+  ): Promise<GetSecretValueResponseDto> {
+    return await this.secretsService.getSecretValue(query.projectId, name, query.region);
   }
 
-  @Patch(':id')
-  @ApiOperation({summary: 'Update Secret'})
-  @ApiResponse({type: SecretResponseDto})
-  async updateSecret(@Param('id') id: string, @Body() body: UpdateSecretDto) {
-    return await this.secretsService.updateSecret(id, {
-      secretValue: body.secretValue,
-      description: body.description,
-    });
+  @Patch(":name")
+  @ApiOperation({ summary: "Update Secret" })
+  @ApiResponse({ type: SecretResponseDto })
+  async updateSecret(@Param("name") name: string, @Body() body: UpdateSecretDto) {
+    return await this.secretsService.updateSecret(body.projectId, name, body);
   }
 
-  @Delete(':id')
-  @ApiOperation({summary: 'Delete Secret'})
-  @ApiResponse({type: SecretResponseDto})
-  async deleteSecret(@Param('id') id: string) {
-    return await this.secretsService.deleteSecret(id);
+  @Delete(":name")
+  @ApiOperation({ summary: "Delete Secret (30-day recovery window)" })
+  @ApiResponse({ type: DeleteSecretResponseDto })
+  async deleteSecret(@Param("name") name: string, @Query() query: GetSecretRequestDto) {
+    return await this.secretsService.deleteSecret(query.projectId, name, query.region);
   }
 
-  @Post(':id/rotate')
-  @ApiOperation({summary: 'Manually trigger Secret rotation'})
-  @ApiResponse({status: 200, description: 'Rotation triggered successfully', type: Boolean})
-  async rotateSecret(@Param('id') id: string) {
-    return await this.secretsService.rotateSecret(id);
+  @Post(":name/rotate")
+  @ApiOperation({ summary: "Trigger an immediate rotation with the existing rotation configuration" })
+  @ApiResponse({ type: SecretResponseDto })
+  async rotateSecret(@Param("name") name: string, @Query() query: GetSecretRequestDto) {
+    return await this.secretsService.rotateSecret(query.projectId, name, query.region);
   }
 
-  @Post('deploy-rotation-lambda')
-  @ApiOperation({summary: 'Deploy Rotation Lambda via SST'})
-  @ApiResponse({status: 200, description: 'Lambda deployed successfully', type: Boolean})
-  async deployRotationLambda(@Body() body: DeployRotationLambdaDto) {
-    return await this.secretsService.deployRotationLambda(body.projectId);
+  @Post(":name/rotation")
+  @ApiOperation({ summary: "Enable or disable automatic rotation" })
+  @ApiResponse({ type: SecretResponseDto })
+  async setRotation(@Param("name") name: string, @Body() body: SetRotationRequestDto) {
+    return await this.secretsService.setRotation(body.projectId, name, body);
   }
-
-  @Post('remove-rotation-lambda')
-  @ApiOperation({summary: 'Remove Rotation Lambda via SST'})
-  @ApiResponse({status: 200, description: 'Lambda removed successfully', type: Boolean})
-  async removeRotationLambda(@Body() body: DeployRotationLambdaDto) {
-    return await this.secretsService.removeRotationLambda(body.projectId);
-  }
-
-  /* End */
 }

@@ -5,7 +5,6 @@
     "file": "aws-secrets-manager.module",
     "className": "AwsSecretsManagerModule"
   },
-  "schema": "prisma/schema.prisma",
   "config-service": {
     "aws-secrets-manager": {}
   },

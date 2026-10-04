@@ -1,172 +1,162 @@
-import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
-import {IsString, IsOptional, IsEnum, IsBoolean, IsObject, ValidateIf} from 'class-validator';
-import {CommonListRequestDto, CommonListResponseDto} from '@devbie/newbie/common.dto';
-import {SecretType} from '@generated/prisma/client';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsIn, IsInt, IsBoolean, IsObject, IsOptional, IsString, Matches, Min } from "class-validator";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
+import { SECRET_TYPES, SecretType } from "./aws-secrets-manager.types";
 
 /**
- * Response DTO for Secret metadata (no secret value).
- * The actual secret value is only returned by the dedicated 'getSecretValue' endpoint.
+ * Secret metadata mirrored from AWS Secrets Manager (the single source of truth).
+ * The actual secret value is only returned by the dedicated value endpoint.
  */
 export class SecretResponseDto {
-  @ApiProperty({type: String})
-  id: string;
-
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   name: string;
 
-  @ApiPropertyOptional({type: String})
-  description?: string | null;
-
-  @ApiProperty({enum: SecretType})
-  type: SecretType;
-
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   arn: string;
 
-  @ApiProperty({type: String})
+  @ApiPropertyOptional({ type: String })
+  description?: string | null;
+
+  @ApiPropertyOptional({ enum: SECRET_TYPES })
+  type?: SecretType | null;
+
+  @ApiProperty({ type: String })
   region: string;
 
-  @ApiProperty({type: Boolean})
+  @ApiProperty({ type: Boolean })
   rotationEnabled: boolean;
 
-  @ApiPropertyOptional({type: Object})
-  rotationRules?: object | null;
-
-  @ApiPropertyOptional({type: String})
+  @ApiPropertyOptional({ type: String })
   rotationLambdaArn?: string | null;
 
-  @ApiPropertyOptional({type: Date})
+  @ApiPropertyOptional({ type: Object })
+  rotationRules?: object | null;
+
+  @ApiPropertyOptional({ type: Date })
   lastRotatedAt?: Date | null;
 
-  @ApiProperty({type: Date})
-  createdAt: Date;
+  @ApiPropertyOptional({ type: Date })
+  lastChangedAt?: Date | null;
 
-  @ApiProperty({type: Date})
-  updatedAt: Date;
-
-  @ApiProperty({type: String})
-  groupId: string;
+  @ApiPropertyOptional({ type: Date })
+  createdAt?: Date | null;
 }
 
-/**
- * Paginated list response for secrets (metadata only).
- */
 export class SecretListResponseDto extends CommonListResponseDto {
-  @ApiProperty({type: SecretResponseDto, isArray: true})
+  @ApiProperty({ type: SecretResponseDto, isArray: true })
   declare records: SecretResponseDto[];
 }
 
 export class ListSecretsRequestDto extends CommonListRequestDto {
-  @ApiProperty({description: 'Project ID for filtering', required: true})
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
   @IsString()
   projectId: string;
+
+  @ApiPropertyOptional({ description: "AWS region override (defaults to the credential default region)" })
+  @IsOptional()
+  @IsString()
+  region?: string;
 }
 
-export class ListSecretsResponseDto extends CommonListResponseDto {}
+export class GetSecretRequestDto {
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
+  @IsString()
+  projectId: string;
+
+  @ApiPropertyOptional({ description: "AWS region override (defaults to the credential default region)" })
+  @IsOptional()
+  @IsString()
+  region?: string;
+}
 
 export class CreateSecretDto {
-  @ApiProperty({description: 'Secret name (unique identifier)', required: true})
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
   @IsString()
+  projectId: string;
+
+  @ApiProperty({
+    description: "Secret name; letters, digits and /_+=.@- excluding slash (used as URL path parameter)",
+    required: true,
+  })
+  @IsString()
+  @Matches(/^[a-zA-Z0-9_+=.@-]{1,512}$/)
   name: string;
 
-  @ApiProperty({description: 'Secret description', required: false})
+  @ApiProperty({ enum: SECRET_TYPES, description: "Secret type", required: true })
+  @IsIn(SECRET_TYPES)
+  type: SecretType;
+
+  @ApiProperty({ description: "Secret value (key-value pairs)", type: Object, required: true })
+  @IsObject()
+  secretValue: Record<string, any>;
+
+  @ApiPropertyOptional({ description: "Secret description" })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiProperty({enum: SecretType, description: 'Secret type', required: true})
-  @IsEnum(SecretType)
-  type: SecretType;
-
-  @ApiProperty({description: 'Secret value (key-value pairs)', type: Object, required: true})
-  @IsObject()
-  secretValue: Record<string, any>;
-
-  @ApiProperty({description: 'AWS Region (defaults to region in configuration)', required: false})
+  @ApiPropertyOptional({ description: "AWS region override (defaults to the credential default region)" })
   @IsOptional()
   @IsString()
   region?: string;
-
-  @ApiProperty({
-    description: 'Enable automatic rotation (only for RDS_CREDENTIALS/DOCUMENTDB_CREDENTIALS/AWS_API_KEY)',
-    default: false,
-    required: false,
-  })
-  @IsOptional()
-  @IsBoolean()
-  rotationEnabled?: boolean;
-
-  @ApiProperty({
-    description: 'Rotation rules configuration',
-    type: Object,
-    required: false,
-    example: {AutomaticallyAfterDays: 30},
-  })
-  @IsOptional()
-  @IsObject()
-  @ValidateIf(o => o.rotationEnabled === true)
-  rotationRules?: {AutomaticallyAfterDays: number};
-
-  @ApiProperty({description: 'Project ID', required: true})
-  @IsString()
-  projectId: string;
 }
 
 export class UpdateSecretDto {
-  @ApiProperty({description: 'Update Secret value', type: Object, required: false})
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
+  @IsString()
+  projectId: string;
+
+  @ApiPropertyOptional({ description: "New secret value (key-value pairs)", type: Object })
   @IsOptional()
   @IsObject()
   secretValue?: Record<string, any>;
 
-  @ApiProperty({description: 'Update description', required: false})
+  @ApiPropertyOptional({ description: "New description" })
   @IsOptional()
   @IsString()
   description?: string;
+
+  @ApiPropertyOptional({ enum: SECRET_TYPES, description: "New secret type" })
+  @IsOptional()
+  @IsIn(SECRET_TYPES)
+  type?: SecretType;
+
+  @ApiPropertyOptional({ description: "AWS region override (defaults to the credential default region)" })
+  @IsOptional()
+  @IsString()
+  region?: string;
+}
+
+export class SetRotationRequestDto {
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
+  @IsString()
+  projectId: string;
+
+  @ApiProperty({ description: "Enable or disable automatic rotation", required: true })
+  @IsBoolean()
+  enabled: boolean;
+
+  @ApiPropertyOptional({ description: "Rotation interval in days (defaults to 30)", default: 30 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  days?: number;
+
+  @ApiPropertyOptional({ description: "AWS region override (defaults to the credential default region)" })
+  @IsOptional()
+  @IsString()
+  region?: string;
 }
 
 export class GetSecretValueResponseDto {
-  @ApiProperty({description: 'Secret ID'})
-  id: string;
-
-  @ApiProperty({description: 'Secret name'})
+  @ApiProperty({ description: "Secret name" })
   name: string;
 
-  @ApiProperty({enum: SecretType, description: 'Secret type'})
-  type: SecretType;
-
-  @ApiProperty({description: 'Actual secret value', type: Object})
+  @ApiProperty({ description: "Actual secret value", type: Object })
   secretValue: Record<string, any>;
-
-  @ApiProperty({description: 'Description', required: false})
-  description?: string | null;
-
-  @ApiProperty({description: 'AWS Secret ARN'})
-  arn: string;
-
-  @ApiProperty({description: 'AWS Region'})
-  region: string;
-
-  @ApiProperty({description: 'Enable automatic rotation'})
-  rotationEnabled: boolean;
-
-  @ApiProperty({description: 'Lambda ARN', required: false})
-  rotationLambdaArn?: string | null;
-
-  @ApiProperty({description: 'Rotation rules', required: false})
-  rotationRules?: any;
-
-  @ApiProperty({description: 'Last rotation timestamp', required: false})
-  lastRotatedAt?: Date | null;
-
-  @ApiProperty({description: 'Created at'})
-  createdAt: Date;
-
-  @ApiProperty({description: 'Updated at'})
-  updatedAt: Date;
 }
 
-export class DeployRotationLambdaDto {
-  @ApiProperty({description: 'Project ID where to deploy Lambda', required: true})
-  @IsString()
-  projectId: string;
+export class DeleteSecretResponseDto {
+  @ApiProperty({ description: "Name of the deleted secret" })
+  name: string;
 }
