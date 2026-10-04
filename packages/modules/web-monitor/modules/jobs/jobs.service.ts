@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { Cron, SchedulerRegistry } from "@nestjs/schedule";
+import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
@@ -39,13 +39,12 @@ export class JobsService implements OnModuleInit {
     this.cfg = this.configService.get("modules.web-monitor");
   }
 
+  // Periodic scheduling lives in the consumer's application layer
+  // (job-scheduler ScheduledJob classes calling the public methods below).
+  // This module only keeps the high-frequency report-queue consumer loop,
+  // which intentionally stays a plain CronJob outside job-scheduler.
   async onModuleInit() {
-    await this.updateAppInfoCache();
-    await this.pvuvipMinuteCount();
-    await this.ipTask();
-    await this.dayReportNumTask();
     this.registerReportStoreTask();
-    this.registerAlertEvaluationTask();
   }
 
   private registerReportStoreTask() {
@@ -60,22 +59,6 @@ export class JobsService implements OnModuleInit {
       "Asia/Shanghai",
     );
     this.scheduler.addCronJob("consumeReportQueues", job);
-    job.start();
-  }
-
-  private registerAlertEvaluationTask() {
-    const expr = this.cfg.alertTaskCronTime;
-    if (!expr) return;
-    const job = new CronJob(
-      expr,
-      async () => {
-        await this.evaluateThresholdAlerts();
-      },
-      null,
-      true,
-      "Asia/Shanghai",
-    );
-    this.scheduler.addCronJob("evaluateThresholdAlerts", job);
     job.start();
   }
 
@@ -409,7 +392,6 @@ export class JobsService implements OnModuleInit {
     return true;
   }
 
-  @Cron("0 */5 * * * *", { timeZone: "Asia/Shanghai" })
   async updateAppInfoCache() {
     try {
       const systems = await this.system.getSystemList();
@@ -419,21 +401,18 @@ export class JobsService implements OnModuleInit {
     }
   }
 
-  @Cron("0 */2 * * * *", { timeZone: "Asia/Shanghai" })
   async pvuvipMinuteCount() {
     const getLock = await this.redisLock(RedisKeys.PVUVIP_PRE_MINUTE_LOCK, this.cfg.pvuvip_task_minute_lock_time);
     if (!getLock) return;
     await this.webPvuvipTask.getWebPvUvIpByMinute();
   }
 
-  @Cron("0 */1 * * * *", { timeZone: "Asia/Shanghai" })
   async ipTask() {
     const getLock = await this.redisLock(RedisKeys.IP_TASK_LOCK, this.cfg.ip_task_lock_time);
     if (!getLock) return;
     await this.webIpTask.saveWebGetIpDatas();
   }
 
-  @Cron("0 0 0 */1 * *", { timeZone: "Asia/Shanghai" })
   async dayReportNumTask() {
     const getLock = await this.redisLock(RedisKeys.DAY_REPORT_NUM_TASK_LOCK, this.cfg.day_report_num_task_lock_time);
     if (!getLock) return;
