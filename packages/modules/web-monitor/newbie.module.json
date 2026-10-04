@@ -5,6 +5,7 @@
     "file": "web-monitor.module",
     "className": "WebMonitorModule"
   },
+  "schema": "prisma/schema.prisma",
   "config-service": {
     "web-monitor": {
       "isLocalDev": false,
