@@ -187,15 +187,16 @@ export class WebReportTaskService {
 
   private async saveSdkError(data: any) {
     const model = await this.ch.WebSdkError();
-    const sdkErr = model.build();
-    sdkErr.appId = data.appId;
-    sdkErr.createTime = data.createTime;
-    sdkErr.markUser = data.markUser;
-    sdkErr.sdkVersion = data.sdkVersion;
+    const sdkErr: Record<string, any> = {
+      appId: data.appId,
+      createTime: data.createTime,
+      markUser: data.markUser,
+      sdkVersion: data.sdkVersion,
+      name: data.name,
+      msg: data.msg,
+      stack: data.stack,
+    };
     this.setUser(sdkErr, data);
-    sdkErr.name = data.name;
-    sdkErr.msg = data.msg;
-    sdkErr.stack = data.stack;
 
     const parser = new UAParser();
     parser.setUA(data.userAgent);
@@ -205,7 +206,7 @@ export class WebReportTaskService {
     sdkErr.system = result?.os?.name || "";
     sdkErr.systemVersion = result?.os?.version || "";
 
-    await sdkErr.save();
+    await model.insertMany([sdkErr]);
   }
 
   private setUser(obj: any, data: any) {
@@ -283,10 +284,10 @@ export class WebReportTaskService {
     }
     const duration = Math.floor(Math.abs(item.duration || 0));
 
-    const model = await this.ch.WebAjax(data.appId);
-    const _ajax = model.build();
-    _ajax.appId = data.appId;
-    _ajax.createTime = item.requestTime ? new Date(item.requestTime) : data.createTime;
+    const _ajax: Record<string, any> = {
+      appId: data.appId,
+      createTime: item.requestTime ? new Date(item.requestTime) : data.createTime,
+    };
     _ajax.url = newName || "";
     _ajax.fullUrl = item.name || "";
     _ajax.method = item.method || "";
@@ -324,8 +325,7 @@ export class WebReportTaskService {
         newName = item?.data?.resourceUrl || "";
       }
 
-      const model = await this.ch.WebError(data.appId);
-      const errors = model.build();
+      const errors: Record<string, any> = {};
       errors.resourceUrl = newName || "";
       errors.fullUrl = item?.data?.resourceUrl || "";
       errors.url = data.url || "";
