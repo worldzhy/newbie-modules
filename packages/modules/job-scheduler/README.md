@@ -18,3 +18,6 @@ As a convenience, a concrete scheduled job can instead extend the abstract `Sche
 
 - This module is the sole owner of `ScheduleModule.forRoot()` and re-exports it; do not import a second forRoot in the same application, otherwise `@Cron` handlers will be registered twice.
 - Default timezone is `Asia/Shanghai`.
+- Job concurrency protection is process-local. It is a re-entry guard, not a distributed lock.
+- Job keys follow `{domain}.{verb}[-{object}]` (e.g. `aws.audit`, `web.evaluate-threshold-alerts`). The domain prefix mirrors the notification-center key convention, but job keys are verb phrases (the actor) while notification keys are nouns/states (the event).
+- The `scheduleKey` filter of `GET /job-scheduler/runs` only accepts an exact schedule key; callers narrow by domain on the request side.
