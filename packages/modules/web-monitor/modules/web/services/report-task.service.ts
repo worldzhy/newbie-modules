@@ -8,6 +8,21 @@ import { func } from "../../../shared/utils";
 import { UAParser } from "ua-parser-js";
 import { RedisKeys, ReportType } from "../../../models/enum";
 
+/**
+ * Plain-row accumulators for one drain tick. ClickHouse destinations were
+ * already batched per app; Mongo destinations now batch the same way so a
+ * tick costs O(apps) writes instead of O(reports) single-document saves.
+ */
+interface DrainBuckets {
+  appAjaxs: Record<string, any[]>;
+  appErrors: Record<string, any[]>;
+  appPages: Record<string, any[]>;
+  appEnvironments: Record<string, any[]>;
+  appResources: Record<string, any[]>;
+  appCustoms: Record<string, any[]>;
+  sdkErrors: any[];
+}
+
 @Injectable()
 export class WebReportTaskService {
   private cfg: any;
@@ -20,38 +35,38 @@ export class WebReportTaskService {
   ) {
     this.cfg = this.config.get("modules.web-monitor");
   }
-  private async getWebItemDataForRedis({
-    appAjaxs,
-    appErrors,
-  }: {
-    appAjaxs: Record<string, any[]>;
-    appErrors: Record<string, any[]>;
-  }) {
-    let query: any = await this.redis.rpop(RedisKeys.WEB_REPORT_DATAS);
-    if (!query) return;
+
+  private pushRow(bucket: Record<string, any[]>, appId: string, row: any) {
+    const rows = bucket[appId];
+    if (rows) rows.push(row);
+    else bucket[appId] = [row];
+  }
+
+  private async collectQueueItem(raw: string, buckets: DrainBuckets) {
+    let query: any;
     try {
-      query = JSON.parse(query);
+      query = JSON.parse(raw);
     } catch {
       return;
     }
     const querytype = query.type || ReportType.PagePerf;
     const item = await this.handleWebData(query);
     if (query.type === ReportType.SdkError) {
-      await this.saveSdkError(item);
+      this.collectSdkError(item, buckets.sdkErrors);
       return;
     }
     const system = await this.site.getSiteForAppId(item.appId);
     if (!system) return;
     // All anomaly-relevant data is always persisted; thresholds define what an
     // anomaly is, collection switches are intentionally not supported.
-    if (querytype === ReportType.PagePerf) await this.savePages(item, system.slowPageTime);
-    this.forEachResources(item, system, appAjaxs);
-    await this.collectErrors(item, appErrors);
-    if (querytype === ReportType.PagePerf) await this.saveEnvironment(item);
-    await this.saveCustoms(item);
+    if (querytype === ReportType.PagePerf) this.collectPages(item, system.slowPageTime, buckets.appPages);
+    this.forEachResources(item, system, buckets);
+    this.collectErrors(item, buckets.appErrors);
+    if (querytype === ReportType.PagePerf) await this.collectEnvironment(item, buckets.appEnvironments);
+    this.collectCustoms(item, buckets.appCustoms);
   }
 
-  private async savePages(item: any, slowPageTime = 5) {
+  private collectPages(item: any, slowPageTime = 5, appPages: Record<string, any[]>) {
     const performance = item.performance || {};
     let newName = "";
     try {
@@ -62,52 +77,52 @@ export class WebReportTaskService {
     }
     slowPageTime = slowPageTime * 1000;
     const speedType = performance.lodt >= slowPageTime ? 2 : 1;
-    const PageModel = this.models.WebPage(item.appId);
-    const pages = new PageModel();
-    pages.appId = item.appId;
-    pages.createTime = item.createTime;
-    pages.url = newName;
-    pages.fullUrl = item.url;
-    pages.preUrl = item.preUrl;
-    pages.speedType = speedType;
-    pages.isFirstIn = item.isFirstIn;
-    pages.markPage = item.markPage;
-    pages.markUser = item.markUser;
-    if (performance.wit !== undefined) pages.whiteTime = performance.wit;
-    if (performance.dnst !== undefined) pages.dnsTime = performance.dnst;
-    if (performance.lodt !== undefined) pages.loadTime = performance.lodt;
-    if (performance.reqt !== undefined) pages.requestTime = performance.reqt;
-    if (performance.tcpt !== undefined) pages.tcpTime = performance.tcpt;
-    if (performance.andt !== undefined) pages.analysisDomTime = performance.andt;
-    pages.screenWidth = item.screenWidth;
-    pages.screenHeight = item.screenHeight;
-    await pages.save();
+    const page: Record<string, any> = {
+      appId: item.appId,
+      createTime: item.createTime,
+      url: newName,
+      fullUrl: item.url,
+      preUrl: item.preUrl,
+      speedType,
+      isFirstIn: item.isFirstIn,
+      markPage: item.markPage,
+      markUser: item.markUser,
+      screenWidth: item.screenWidth,
+      screenHeight: item.screenHeight,
+    };
+    if (performance.wit !== undefined) page.whiteTime = performance.wit;
+    if (performance.dnst !== undefined) page.dnsTime = performance.dnst;
+    if (performance.lodt !== undefined) page.loadTime = performance.lodt;
+    if (performance.reqt !== undefined) page.requestTime = performance.reqt;
+    if (performance.tcpt !== undefined) page.tcpTime = performance.tcpt;
+    if (performance.andt !== undefined) page.analysisDomTime = performance.andt;
+    this.pushRow(appPages, item.appId, page);
   }
 
-  private async saveCustoms(data: any) {
+  private collectCustoms(data: any, appCustoms: Record<string, any[]>) {
     if (!data.customs || !data.customs.length) return;
-    const CustomModel = this.models.WebCustom(data.appId);
     for (const item of data.customs) {
-      const customs = new CustomModel();
-      customs.appId = data.appId;
-      customs.createTime = data.createTime;
-      customs.markPage = data.markPage;
-      customs.markUser = data.markUser;
-      customs.path = "";
-      customs.customName = item.customName;
-      customs.customContent = item.customContent;
       if (item.customFilter && Object.prototype.toString.apply(item.customFilter) === "[object Object]") {
         Object.keys(item.customFilter).forEach((key) => {
           if (typeof item.customFilter[key] === "number") item.customFilter[key] = String(item.customFilter[key]);
         });
       }
-      this.setUser(customs, data);
-      customs.customFilter = item.customFilter;
-      await customs.save();
+      const custom: Record<string, any> = {
+        appId: data.appId,
+        createTime: data.createTime,
+        markPage: data.markPage,
+        markUser: data.markUser,
+        path: "",
+        customName: item.customName,
+        customContent: item.customContent,
+        customFilter: item.customFilter,
+      };
+      this.setUser(custom, data);
+      this.pushRow(appCustoms, data.appId, custom);
     }
   }
 
-  private async saveResours(data: any, item: any, system: any) {
+  private collectResource(data: any, item: any, system: any, appResources: Record<string, any[]>) {
     let slowTime = 2;
     let speedType = 1;
     let duration = Math.floor(Math.abs(item.duration || 0));
@@ -125,26 +140,26 @@ export class WebReportTaskService {
     } catch {
       newName = item.name || "";
     }
-    const ResourceModel = this.models.WebResource(data.appId);
-    const resours = new ResourceModel();
-    resours.appId = data.appId;
-    resours.createTime = item.requestTime ? new Date(item.requestTime) : data.createTime;
-    resours.url = data.url;
-    resours.fullUrl = item.name;
-    resours.speedType = speedType;
-    resours.name = newName;
-    resours.method = item.method;
-    resours.type = item.type;
-    resours.duration = duration;
-    resours.bodySize = item.bodySize ? Number(item.bodySize) : 0;
-    resours.nextHopProtocol = item.nextHopProtocol;
-    resours.markPage = data.markPage;
-    resours.markUser = data.markUser;
-    this.setUser(resours, data);
-    await resours.save();
+    const resource: Record<string, any> = {
+      appId: data.appId,
+      createTime: item.requestTime ? new Date(item.requestTime) : data.createTime,
+      url: data.url,
+      fullUrl: item.name,
+      speedType,
+      name: newName,
+      method: item.method,
+      type: item.type,
+      duration,
+      bodySize: item.bodySize ? Number(item.bodySize) : 0,
+      nextHopProtocol: item.nextHopProtocol,
+      markPage: data.markPage,
+      markUser: data.markUser,
+    };
+    this.setUser(resource, data);
+    this.pushRow(appResources, data.appId, resource);
   }
 
-  private async saveEnvironment(data: any) {
+  private async collectEnvironment(data: any, appEnvironments: Record<string, any[]>) {
     const ip = data.ip;
     if (!ip) return;
     let copyip = ip.split(".");
@@ -156,14 +171,14 @@ export class WebReportTaskService {
     } catch {
       datas = null;
     }
-    const EnvModel = this.models.WebEnvironment(data.appId);
-    const environment = new EnvModel();
-    environment.appId = data.appId;
-    environment.createTime = data.createTime;
-    environment.url = data.url;
-    environment.markPage = data.markPage;
-    environment.markUser = data.markUser;
-    environment.markUv = data.markUv;
+    const environment: Record<string, any> = {
+      appId: data.appId,
+      createTime: data.createTime,
+      url: data.url,
+      markPage: data.markPage,
+      markUser: data.markUser,
+      markUv: data.markUv,
+    };
     if (data.markDevice) environment.markDevice = data.markDevice;
     this.setUser(environment, data);
 
@@ -182,11 +197,10 @@ export class WebReportTaskService {
       environment.province = datas.province;
       environment.city = datas.city;
     }
-    await environment.save();
+    this.pushRow(appEnvironments, data.appId, environment);
   }
 
-  private async saveSdkError(data: any) {
-    const model = await this.ch.WebSdkError();
+  private collectSdkError(data: any, sdkErrors: any[]) {
     const sdkErr: Record<string, any> = {
       appId: data.appId,
       createTime: data.createTime,
@@ -206,7 +220,7 @@ export class WebReportTaskService {
     sdkErr.system = result?.os?.name || "";
     sdkErr.systemVersion = result?.os?.version || "";
 
-    await model.insertMany([sdkErr]);
+    sdkErrors.push(sdkErr);
   }
 
   private setUser(obj: any, data: any) {
@@ -216,18 +230,63 @@ export class WebReportTaskService {
 
   async saveWebReportDatasForRedis() {
     const count = this.cfg.redis_consumption?.thread_web || 1000;
-    const appAjaxs: Record<string, any[]> = {};
-    const appErrors: Record<string, any[]> = {};
-    for (let i = 0; i < count; i++) {
-      await this.getWebItemDataForRedis({ appAjaxs, appErrors });
+    const buckets: DrainBuckets = {
+      appAjaxs: {},
+      appErrors: {},
+      appPages: {},
+      appEnvironments: {},
+      appResources: {},
+      appCustoms: {},
+      sdkErrors: [],
+    };
+    // One round trip for the whole batch instead of one RPOP per report.
+    const raws = await this.redis.rpopBatch(RedisKeys.WEB_REPORT_DATAS, count);
+    for (const raw of raws) {
+      try {
+        await this.collectQueueItem(raw, buckets);
+      } catch (e: any) {
+        // A single malformed/poisoned item must not abort the rest of the batch.
+        console.error("web report item processing failed", e?.message || e);
+      }
     }
-    for (const appId of Object.keys(appAjaxs)) {
-      const model = await this.ch.WebAjax(appId);
-      if (appAjaxs[appId]?.length) await model.insertMany(appAjaxs[appId]);
+    await this.flushBuckets(buckets);
+  }
+
+  private async flushBuckets(buckets: DrainBuckets) {
+    const flush = async (label: string, write: () => Promise<unknown>) => {
+      try {
+        await write();
+      } catch (e: any) {
+        // One failing destination must not suppress the remaining flushes.
+        console.error(`web report flush failed (${label})`, e?.message || e);
+      }
+    };
+    for (const appId of Object.keys(buckets.appAjaxs)) {
+      const rows = buckets.appAjaxs[appId];
+      if (rows.length) await flush(`ajax:${appId}`, async () => (await this.ch.WebAjax(appId)).insertMany(rows));
     }
-    for (const appId of Object.keys(appErrors)) {
-      const model = await this.ch.WebError(appId);
-      if (appErrors[appId]?.length) await model.insertMany(appErrors[appId]);
+    for (const appId of Object.keys(buckets.appErrors)) {
+      const rows = buckets.appErrors[appId];
+      if (rows.length) await flush(`error:${appId}`, async () => (await this.ch.WebError(appId)).insertMany(rows));
+    }
+    if (buckets.sdkErrors.length) {
+      await flush("sdk-error", async () => (await this.ch.WebSdkError()).insertMany(buckets.sdkErrors));
+    }
+    for (const appId of Object.keys(buckets.appPages)) {
+      const rows = buckets.appPages[appId];
+      if (rows.length) await flush(`page:${appId}`, () => this.models.WebPage(appId).insertMany(rows));
+    }
+    for (const appId of Object.keys(buckets.appEnvironments)) {
+      const rows = buckets.appEnvironments[appId];
+      if (rows.length) await flush(`environment:${appId}`, () => this.models.WebEnvironment(appId).insertMany(rows));
+    }
+    for (const appId of Object.keys(buckets.appResources)) {
+      const rows = buckets.appResources[appId];
+      if (rows.length) await flush(`resource:${appId}`, () => this.models.WebResource(appId).insertMany(rows));
+    }
+    for (const appId of Object.keys(buckets.appCustoms)) {
+      const rows = buckets.appCustoms[appId];
+      if (rows.length) await flush(`custom:${appId}`, () => this.models.WebCustom(appId).insertMany(rows));
     }
   }
 
@@ -263,18 +322,18 @@ export class WebReportTaskService {
     return item;
   }
 
-  private forEachResources(data: any, system: any, appAjaxs: Record<string, any[]>) {
+  private forEachResources(data: any, system: any, buckets: DrainBuckets) {
     if (!data.resourceList || !data.resourceList.length) return;
     data.resourceList.forEach((item: any) => {
       if (item.type === "xmlhttprequest" || item.type === "fetchrequest" || item.type === "fetch") {
-        this.saveAjaxs(data, item, appAjaxs);
+        this.saveAjaxs(data, item, buckets.appAjaxs);
       } else {
-        this.saveResours(data, item, system);
+        this.collectResource(data, item, system, buckets.appResources);
       }
     });
   }
 
-  private async saveAjaxs(data: any, item: any, appAjaxs: Record<string, any[]>) {
+  private saveAjaxs(data: any, item: any, appAjaxs: Record<string, any[]>) {
     let newName = "";
     try {
       const newurl = new URL(func.urlHelper(item.name));
@@ -307,12 +366,10 @@ export class WebReportTaskService {
     _ajax.markPage = data.markPage || "";
     _ajax.markUser = data.markUser || "";
 
-    const bucket = appAjaxs[data.appId];
-    if (bucket) bucket.push(_ajax);
-    else appAjaxs[data.appId] = [_ajax];
+    this.pushRow(appAjaxs, data.appId, _ajax);
   }
 
-  private async collectErrors(data: any, appErrors: Record<string, any[]>) {
+  private collectErrors(data: any, appErrors: Record<string, any[]>) {
     if (!data.errorList || !data.errorList.length) return;
     for (const item of data.errorList) {
       if (item?.data?.resourceUrl && item.data.resourceUrl.startsWith("data://image")) continue;
@@ -359,9 +416,7 @@ export class WebReportTaskService {
       if (data.uid) errors.uid = String(data.uid);
       if (data.p) errors.phone = func.decryptPhone(data.p);
 
-      const bucket = appErrors[data.appId];
-      if (bucket) bucket.push(errors);
-      else appErrors[data.appId] = [errors];
+      this.pushRow(appErrors, data.appId, errors);
     }
   }
 }

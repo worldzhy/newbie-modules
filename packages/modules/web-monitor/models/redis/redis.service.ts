@@ -58,4 +58,8 @@ export class RedisService implements OnModuleInit {
   async rpop(key: string) {
     return this.client.rpop(key);
   }
+  /** Pops up to `count` items in one round trip (RPOP key count, Redis >= 6.2). */
+  async rpopBatch(key: string, count: number): Promise<string[]> {
+    return ((await (this.client as any).rpop(key, count)) as string[] | null) || [];
+  }
 }

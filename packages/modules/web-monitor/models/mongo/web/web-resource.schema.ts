@@ -25,3 +25,7 @@ export const WebResourceSchema = SchemaFactory.createForClass(WebResource);
 WebResourceSchema.index({ speedType: 1, name: 1, createTime: -1 });
 WebResourceSchema.index({ name: 1, createTime: -1 });
 WebResourceSchema.index({ speedType: 1, url: 1 });
+// Serves the per-minute threshold evaluation match { createTime, type: $in }
+// (jobs.service slow-resource signals), which previously scanned the whole
+// per-app collection.
+WebResourceSchema.index({ type: 1, createTime: -1 });

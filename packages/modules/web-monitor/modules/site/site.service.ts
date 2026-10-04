@@ -106,7 +106,13 @@ export class SiteService {
 
   async getSiteForAppId(appId: string) {
     if (!appId) throw new Error("Query a system: appId must not be empty");
-    return this.nodeCache.getAppInfo(appId) || ({} as any);
+    const cached = this.nodeCache.getAppInfo(appId);
+    if (cached) return cached;
+    // Cache miss (cold start, or a site created outside the API): fall back to
+    // Mongo and backfill so ingest never rejects a legitimate appId with a 500.
+    const system = await this.getSiteForDb(appId);
+    if (system?.appId) this.nodeCache.updateSiteCache(system as any);
+    return system;
   }
 
   async getSiteList() {
@@ -131,6 +137,8 @@ export class SiteService {
   }
 
   async deleteSite(appId: string, type: string): Promise<any> {
-    return this.models.System().deleteOne({ appId: appId, type }).exec();
+    const result = await this.models.System().deleteOne({ appId: appId, type }).exec();
+    this.nodeCache.removeAppInfo(appId);
+    return result;
   }
 }
