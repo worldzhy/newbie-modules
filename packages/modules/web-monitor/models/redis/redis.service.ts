@@ -1,6 +1,6 @@
-import {Injectable, OnModuleInit} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import Redis from 'ioredis';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import Redis from "ioredis";
 
 @Injectable()
 export class RedisService implements OnModuleInit {
@@ -9,18 +9,18 @@ export class RedisService implements OnModuleInit {
   constructor(private readonly configService: ConfigService) {}
 
   onModuleInit() {
-    const raw = this.configService.get('modules.web-monitor.redis');
+    const raw = this.configService.get("modules.web-monitor.redis");
     const cfg = (() => {
-      if (typeof raw === 'string') {
-        const [host, port, password, db] = raw.split(':');
+      if (typeof raw === "string") {
+        const [host, port, password, db] = raw.split(":");
         return {
-          host: host || '127.0.0.1',
+          host: host || "127.0.0.1",
           port: port ? Number(port) : 6379,
-          password: password || '',
+          password: password || "",
           db: db ? Number(db) : 1,
         };
       }
-      return raw || {host: '127.0.0.1', port: 6379, password: '', db: 1};
+      return raw || { host: "127.0.0.1", port: 6379, password: "", db: 1 };
     })();
     this.client = new Redis({
       host: cfg.host,
@@ -28,8 +28,8 @@ export class RedisService implements OnModuleInit {
       password: cfg.password,
       db: cfg.db,
     });
-    this.client.connect().catch(err => {
-      console.error('Redis connect error:', err?.message || err);
+    this.client.connect().catch((err) => {
+      console.error("Redis connect error:", err?.message || err);
     });
   }
 

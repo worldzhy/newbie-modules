@@ -1,5 +1,5 @@
-import {Global, Module} from '@nestjs/common';
-import {MonitorModelsService} from './monitor-models.service';
+import { Global, Module } from "@nestjs/common";
+import { MonitorModelsService } from "./monitor-models.service";
 
 /**
  * Frontend-monitor MongoDB model factory.

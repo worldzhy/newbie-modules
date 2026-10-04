@@ -13,87 +13,87 @@ const decryptP = {
 
 export const func = {
   isSkipIp(ip?: string) {
-    if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.includes('127.0.0.1') || ip.includes('::ffff')) return true;
+    if (!ip || ip === "127.0.0.1" || ip === "::1" || ip.includes("127.0.0.1") || ip.includes("::ffff")) return true;
     return false;
   },
   randomString(len = 7) {
-    const $chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz23456789';
+    const $chars = "ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz23456789";
     const maxPos = $chars.length;
-    let pwd = '';
+    let pwd = "";
     for (let i = 0; i < len; i++) {
       pwd += $chars.charAt(Math.floor(Math.random() * maxPos));
     }
     return pwd + Date.now();
   },
-  result<T>(jn: Partial<{code: number; desc: string; data: T; time?: number}> = {}) {
+  result<T>(jn: Partial<{ code: number; desc: string; data: T; time?: number }> = {}) {
     // return Object.assign({ code: 1000, desc: 'Success', data: '' }, jn);
     return jn.data;
   },
-  errResult<T>(jn: Partial<{code: number; desc: string; data: T; time?: number}> = {}) {
+  errResult<T>(jn: Partial<{ code: number; desc: string; data: T; time?: number }> = {}) {
     // return Object.assign({ code: 1010, desc: 'Request failed', data: '' }, jn);
     return jn.data;
   },
   format(date: Date, fmt: string) {
     const o: Record<string, number> = {
-      'M+': date.getMonth() + 1,
-      'd+': date.getDate(),
-      'h+': date.getHours(),
-      'H+': date.getHours() > 12 ? date.getHours() - 12 : date.getHours(),
-      'm+': date.getMinutes(),
-      's+': date.getSeconds(),
+      "M+": date.getMonth() + 1,
+      "d+": date.getDate(),
+      "h+": date.getHours(),
+      "H+": date.getHours() > 12 ? date.getHours() - 12 : date.getHours(),
+      "m+": date.getMinutes(),
+      "s+": date.getSeconds(),
     };
-    if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (date.getFullYear() + '').substr(4 - RegExp.$1.length));
+    if (/(y+)/.test(fmt)) fmt = fmt.replace(RegExp.$1, (date.getFullYear() + "").substr(4 - RegExp.$1.length));
     for (const k in o) {
-      if (new RegExp('(' + k + ')').test(fmt)) {
-        fmt = fmt.replace(RegExp.$1, RegExp.$1.length === 1 ? String(o[k]) : ('00' + o[k]).substr(('' + o[k]).length));
+      if (new RegExp("(" + k + ")").test(fmt)) {
+        fmt = fmt.replace(RegExp.$1, RegExp.$1.length === 1 ? String(o[k]) : ("00" + o[k]).substr(("" + o[k]).length));
       }
     }
     return fmt;
   },
   getRealIp(headers: Record<string, any>, ip?: string) {
-    return headers['x-real-ip'] || headers['x-forwarded-for'] || ip;
+    return headers["x-real-ip"] || headers["x-forwarded-for"] || ip;
   },
   // Simplified: replace pure numeric path segments with *
   urlHelper(input: string) {
     try {
-      const schemeIdx = input.indexOf('://');
+      const schemeIdx = input.indexOf("://");
       if (schemeIdx !== -1) {
-        const pathStart = input.indexOf('/', schemeIdx + 3);
+        const pathStart = input.indexOf("/", schemeIdx + 3);
         if (pathStart === -1) return input;
         const head = input.slice(0, pathStart);
-        const path = input.slice(pathStart).replace(/\/\d+\b/g, '/*');
+        const path = input.slice(pathStart).replace(/\/\d+\b/g, "/*");
         return head + path;
       }
-      return input.replace(/\/\d+\b/g, '/*');
+      return input.replace(/\/\d+\b/g, "/*");
     } catch {
       return input;
     }
   },
   // Added: object check (arrays included)
   isObject(input: any) {
-    return input !== null && typeof input === 'object';
+    return input !== null && typeof input === "object";
   },
   filterKeyWord(input: any) {
     try {
-      return typeof input === 'string' ? input : JSON.stringify(input);
+      return typeof input === "string" ? input : JSON.stringify(input);
     } catch {
-      return '';
+      return "";
     }
   },
   decryptPhone(str) {
-    if (typeof str !== 'string') return str;
-    let t = '';
+    if (typeof str !== "string") return str;
+    let t = "";
     return str
-      .split('')
-      .map(item => {
+      .split("")
+      .map((item) => {
         t += item;
         if (t.length === 2) {
           const r = decryptP[t];
-          t = '';
+          t = "";
           return r;
         }
       })
-      .join('');
+      .join("");
   },
   setMatchTime(query, $match) {
     const createTime: any = {};
@@ -108,5 +108,5 @@ export const func = {
   },
 };
 
-const ips = ['118.112.75.70', '119.57.35.106', '221.231.219.26', '140.206.142.182'];
+const ips = ["118.112.75.70", "119.57.35.106", "221.231.219.26", "140.206.142.182"];
 export const getRandomIp = () => ips[Math.floor(Math.random() * ips.length)];

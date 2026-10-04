@@ -1,19 +1,24 @@
-import {Injectable} from '@nestjs/common';
-import {MonitorModelsService} from '../../../models/mongo/monitor-models.service';
-import {ConfigService} from '@nestjs/config';
+import { Injectable } from "@nestjs/common";
+import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class AnalysisService {
   private cfg: any;
   constructor(
     private readonly models: MonitorModelsService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
   ) {
-    this.cfg = this.config.get('modules.web-monitor');
+    this.cfg = this.config.get("modules.web-monitor");
   }
 
-  async getAnalysislist(appId: string, beginTime?: string, endTime?: string, filter?: {phone?: string; uid?: string}) {
-    const query: any = {$match: {}};
+  async getAnalysislist(
+    appId: string,
+    beginTime?: string,
+    endTime?: string,
+    filter?: { phone?: string; uid?: string },
+  ) {
+    const query: any = { $match: {} };
     if (filter?.phone) query.$match.phone = filter.phone;
     if (filter?.uid) query.$match.uid = filter.uid;
     const createTime: any = {};
@@ -29,20 +34,20 @@ export class AnalysisService {
       .WebEnvironment(appId)
       .aggregate([
         query,
-        {$group: {_id: {markUser: '$markUser'}, visitTime: {$first: '$createTime'}}},
-        {$sort: {visitTime: 1}},
+        { $group: { _id: { markUser: "$markUser" }, visitTime: { $first: "$createTime" } } },
+        { $sort: { visitTime: 1 } },
       ])
-      .read('secondaryPreferred')
+      .read("secondaryPreferred")
       .exec();
-    return {list: result};
+    return { list: result };
   }
 
   async getAnalysisOneList(appId: string, markUser: string) {
     return await this.models
       .WebEnvironment(appId)
-      .find({markUser})
-      .read('secondaryPreferred')
-      .sort({createTime: 1})
+      .find({ markUser })
+      .read("secondaryPreferred")
+      .sort({ createTime: 1 })
       .exec();
   }
 
@@ -51,12 +56,12 @@ export class AnalysisService {
     const top_jump_out = await this.getRealTimeTopJumpOutForDb(appId, beginTime, endTime);
     const top_browser = await this.getRealTimeTopBrowserForDb(appId, beginTime, endTime);
     const provinces = await this.getRealTimeTopProvinceForDb(appId, beginTime, endTime);
-    return {top_pages, top_jump_out, top_browser, provinces};
+    return { top_pages, top_jump_out, top_browser, provinces };
   }
 
   async getProvinceCount(appId: string, beginTime?: string, endTime?: string) {
     const res = await this.getRealTimeTopProvinceForDb(appId, beginTime, endTime);
-    return {provinces: res};
+    return { provinces: res };
   }
 
   private getMatch(beginTime?: string, endTime?: string) {
@@ -78,12 +83,12 @@ export class AnalysisService {
     return await this.models
       .WebPage(appId)
       .aggregate([
-        {$match: {...$match}},
-        {$group: {_id: {url: '$url'}, count: {$sum: 1}}},
-        {$sort: {count: -1}},
-        {$limit: this.cfg.top_alalysis_size?.web || 10},
+        { $match: { ...$match } },
+        { $group: { _id: { url: "$url" }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: this.cfg.top_alalysis_size?.web || 10 },
       ])
-      .read('secondaryPreferred')
+      .read("secondaryPreferred")
       .exec();
   }
 
@@ -92,14 +97,14 @@ export class AnalysisService {
     return await this.models
       .WebEnvironment(appId)
       .aggregate([
-        {$match: $match},
-        {$group: {_id: {markUser: '$markUser'}, urls: {$push: '$url'}, count: {$sum: 1}}},
-        {$match: {count: 1}},
-        {$group: {_id: {value: {$arrayElemAt: ['$urls', 0]}}, count: {$sum: 1}}},
-        {$sort: {count: -1}},
-        {$limit: this.cfg.top_alalysis_size?.web || 10},
+        { $match: $match },
+        { $group: { _id: { markUser: "$markUser" }, urls: { $push: "$url" }, count: { $sum: 1 } } },
+        { $match: { count: 1 } },
+        { $group: { _id: { value: { $arrayElemAt: ["$urls", 0] } }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: this.cfg.top_alalysis_size?.web || 10 },
       ])
-      .read('secondaryPreferred')
+      .read("secondaryPreferred")
       .exec();
   }
 
@@ -108,12 +113,12 @@ export class AnalysisService {
     return await this.models
       .WebEnvironment(appId)
       .aggregate([
-        {$match: {...$match}},
-        {$group: {_id: {browser: '$browser'}, count: {$sum: 1}}},
-        {$sort: {count: -1}},
-        {$limit: this.cfg.top_alalysis_size?.web || 10},
+        { $match: { ...$match } },
+        { $group: { _id: { browser: "$browser" }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: this.cfg.top_alalysis_size?.web || 10 },
       ])
-      .read('secondaryPreferred')
+      .read("secondaryPreferred")
       .exec();
   }
 
@@ -122,12 +127,12 @@ export class AnalysisService {
     return await this.models
       .WebEnvironment(appId)
       .aggregate([
-        {$match: {...$match}},
-        {$group: {_id: {province: '$province'}, count: {$sum: 1}}},
-        {$sort: {count: -1}},
-        {$limit: this.cfg.top_alalysis_size?.web || 10},
+        { $match: { ...$match } },
+        { $group: { _id: { province: "$province" }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: this.cfg.top_alalysis_size?.web || 10 },
       ])
-      .read('secondaryPreferred')
+      .read("secondaryPreferred")
       .exec();
   }
 }

@@ -1,10 +1,10 @@
-import {Injectable} from '@nestjs/common';
-import {MonitorModelsService} from '../../models/mongo/monitor-models.service';
-import {RedisService} from '../../models/redis/redis.service';
-import {ConfigService} from '@nestjs/config';
-import dayjs from 'dayjs';
-import {func} from '../../shared/utils';
-import {RedisKeyPrefix} from '../../models/enum';
+import { Injectable } from "@nestjs/common";
+import { MonitorModelsService } from "../../models/mongo/monitor-models.service";
+import { RedisService } from "../../models/redis/redis.service";
+import { ConfigService } from "@nestjs/config";
+import dayjs from "dayjs";
+import { func } from "../../shared/utils";
+import { RedisKeyPrefix } from "../../models/enum";
 
 @Injectable()
 export class DayReportNumService {
@@ -12,15 +12,15 @@ export class DayReportNumService {
   constructor(
     private readonly models: MonitorModelsService,
     private readonly redis: RedisService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
   ) {
-    this.cfg = this.configService.get('modules.web-monitor');
+    this.cfg = this.configService.get("modules.web-monitor");
   }
 
   async numCountTask() {
     const date = new Date(new Date().getTime() - 86400000);
-    const yesterday = new Date(func.format(date, 'yyyy/MM/dd')).getTime();
-    const apps = await this.models.System().find().read('secondaryPreferred').exec();
+    const yesterday = new Date(func.format(date, "yyyy/MM/dd")).getTime();
+    const apps = await this.models.System().find().read("secondaryPreferred").exec();
 
     for (const app of apps) {
       const key = `${RedisKeyPrefix.DAY_REPORT_NUM}${app.appId}_${yesterday}`;
@@ -48,19 +48,19 @@ export class DayReportNumService {
     const query = {
       appId,
       dayTime: {
-        $gte: new Date(dayjs(beginTime).format('YYYY-MM-DD 00:00:00')),
-        $lte: new Date(dayjs(endTime).format('YYYY-MM-DD 23:59:59')),
+        $gte: new Date(dayjs(beginTime).format("YYYY-MM-DD 00:00:00")),
+        $lte: new Date(dayjs(endTime).format("YYYY-MM-DD 23:59:59")),
       },
     };
     return (
-      (await this.models.DayReportNum().findOne(query, {num: 1, dayTime: 1}).read('secondaryPreferred').exec()) ||
+      (await this.models.DayReportNum().findOne(query, { num: 1, dayTime: 1 }).read("secondaryPreferred").exec()) ||
       ({} as any)
     );
   }
 
   async redisCount(appId: string) {
     const date = new Date();
-    const today = new Date(func.format(date, 'yyyy/MM/dd')).getTime();
+    const today = new Date(func.format(date, "yyyy/MM/dd")).getTime();
     await this.redis.incr(`${RedisKeyPrefix.DAY_REPORT_NUM}${appId}_${today}`);
   }
 }

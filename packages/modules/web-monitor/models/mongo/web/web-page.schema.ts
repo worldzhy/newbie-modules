@@ -1,10 +1,10 @@
-import {Prop, Schema, SchemaFactory} from '@nestjs/mongoose';
-import {Document, Schema as MongooseSchema} from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document, Schema as MongooseSchema } from "mongoose";
 
-@Schema({shardKey: {_id: 'hashed'}})
+@Schema({ shardKey: { _id: "hashed" } })
 export class WebPage {
   @Prop() appId: string; // App ID
-  @Prop({default: Date.now}) createTime: Date; // Visit time
+  @Prop({ default: Date.now }) createTime: Date; // Visit time
   @Prop() url: string; // URL domain
   @Prop() fullUrl: string; // Full URL
   @Prop() preUrl: string; // Referrer URL
@@ -16,7 +16,7 @@ export class WebPage {
   @Prop() dnsTime: number; // DNS time (ms)
   @Prop() tcpTime: number; // TCP connect time (ms)
   @Prop() domTime: number; // DOM build time (ms)
-  @Prop({type: [MongooseSchema.Types.Mixed], default: []}) resourceList: any[]; // Resource performance list
+  @Prop({ type: [MongooseSchema.Types.Mixed], default: [] }) resourceList: any[]; // Resource performance list
   @Prop() totalResSize: number; // Total resource size
   @Prop() whiteTime: number; // First paint (ms)
   @Prop() redirectTime: number; // Redirect time
@@ -29,5 +29,5 @@ export class WebPage {
 }
 export type WebPageDocument = WebPage & Document;
 export const WebPageSchema = SchemaFactory.createForClass(WebPage);
-WebPageSchema.index({speedType: 1, isFirstIn: 1, url: 1, createTime: -1});
-WebPageSchema.index({createTime: -1});
+WebPageSchema.index({ speedType: 1, isFirstIn: 1, url: 1, createTime: -1 });
+WebPageSchema.index({ createTime: -1 });

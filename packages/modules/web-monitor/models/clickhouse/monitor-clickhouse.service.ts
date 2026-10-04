@@ -1,10 +1,10 @@
-import {Injectable, OnModuleInit} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {ClickhouseService} from '@modules/clickhouse/clickhouse.service';
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
 
-import WebAjaxFactory from './web/ajax';
-import WebErrorFactory from './web/error';
-import WebSdkErrorFactory from './web/sdk-error';
+import WebAjaxFactory from "./web/ajax";
+import WebErrorFactory from "./web/error";
+import WebSdkErrorFactory from "./web/sdk-error";
 
 @Injectable()
 export class MonitorClickhouseService implements OnModuleInit {
@@ -14,7 +14,7 @@ export class MonitorClickhouseService implements OnModuleInit {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly clickhouse: ClickhouseService
+    private readonly clickhouse: ClickhouseService,
   ) {}
 
   async onModuleInit() {
@@ -22,8 +22,8 @@ export class MonitorClickhouseService implements OnModuleInit {
     // exposes the ORM-like helpers (createDatabase / model). The business layer
     // only needs to select which database to use.
     const dbName =
-      this.configService.get<string>('modules.web-monitor.clickhouseDB') ||
-      this.configService.getOrThrow<string>('modules.clickhouse.database');
+      this.configService.get<string>("modules.web-monitor.clickhouseDB") ||
+      this.configService.getOrThrow<string>("modules.clickhouse.database");
 
     // Ensure the database exists before creating tables.
     await this.clickhouse.createDatabase(dbName);

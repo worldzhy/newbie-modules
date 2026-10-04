@@ -1,10 +1,10 @@
-import {Prop, Schema, SchemaFactory} from '@nestjs/mongoose';
-import {Document} from 'mongoose';
+import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
+import { Document } from "mongoose";
 
-@Schema({shardKey: {_id: 'hashed'}})
+@Schema({ shardKey: { _id: "hashed" } })
 export class WebEnvironment {
   @Prop() appId: string; // App ID
-  @Prop({default: Date.now}) createTime: Date; // Visit time
+  @Prop({ default: Date.now }) createTime: Date; // Visit time
   @Prop() url: string; // Page URL
   @Prop() markPage: string; // Page mark
   @Prop() markUser: string; // User mark
@@ -23,6 +23,6 @@ export class WebEnvironment {
 }
 export type WebEnvironmentDocument = WebEnvironment & Document;
 export const WebEnvironmentSchema = SchemaFactory.createForClass(WebEnvironment);
-WebEnvironmentSchema.index({createTime: -1});
-WebEnvironmentSchema.index({markPage: -1});
-WebEnvironmentSchema.index({markUser: -1});
+WebEnvironmentSchema.index({ createTime: -1 });
+WebEnvironmentSchema.index({ markPage: -1 });
+WebEnvironmentSchema.index({ markUser: -1 });

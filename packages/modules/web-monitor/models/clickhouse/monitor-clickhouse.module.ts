@@ -1,5 +1,5 @@
-import {Global, Module} from '@nestjs/common';
-import {MonitorClickhouseService} from './monitor-clickhouse.service';
+import { Global, Module } from "@nestjs/common";
+import { MonitorClickhouseService } from "./monitor-clickhouse.service";
 
 @Global()
 @Module({

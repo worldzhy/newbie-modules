@@ -1,4 +1,4 @@
-import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 /**
  * Response DTO for one error row.
@@ -15,95 +15,95 @@ import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
 export class WebMonitorErrorItemResponseDto {
   @ApiPropertyOptional({
     type: () => WebMonitorErrorItemResponseDto,
-    description: 'Shallow copy of the row itself (grouped mode) or the full row (detail mode)',
+    description: "Shallow copy of the row itself (grouped mode) or the full row (detail mode)",
   })
   _id?: WebMonitorErrorItemResponseDto;
 
-  @ApiPropertyOptional({type: String, description: 'Row creation time (ClickHouse DateTime string)'})
+  @ApiPropertyOptional({ type: String, description: "Row creation time (ClickHouse DateTime string)" })
   createTime?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Error message'})
+  @ApiPropertyOptional({ type: String, description: "Error message" })
   msg?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Error stack trace'})
+  @ApiPropertyOptional({ type: String, description: "Error stack trace" })
   stack?: string;
 
   // ---- Group-by keys (present depending on the `type` query param) ----
-  @ApiPropertyOptional({type: String, description: 'Error resource URL (web group-by key)'})
+  @ApiPropertyOptional({ type: String, description: "Error resource URL (web group-by key)" })
   resourceUrl?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Error resource URL / JS error type (group-by key)'})
+  @ApiPropertyOptional({ type: String, description: "Error resource URL / JS error type (group-by key)" })
   name?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Error category (group-by key)'})
+  @ApiPropertyOptional({ type: String, description: "Error category (group-by key)" })
   type?: string;
 
-  @ApiPropertyOptional({type: String, description: 'HTTP status (group-by key)'})
+  @ApiPropertyOptional({ type: String, description: "HTTP status (group-by key)" })
   status?: string;
 
-  @ApiPropertyOptional({type: String, description: 'JS error type (wx group-by key)'})
+  @ApiPropertyOptional({ type: String, description: "JS error type (wx group-by key)" })
   errorType?: string;
 
   // ---- Grouped-mode aggregation extras ----
-  @ApiPropertyOptional({type: String, description: 'Latest occurrence time in the group'})
+  @ApiPropertyOptional({ type: String, description: "Latest occurrence time in the group" })
   lastCreateTime?: string;
 
-  @ApiPropertyOptional({type: Number, description: 'Occurrence count in the group'})
+  @ApiPropertyOptional({ type: Number, description: "Occurrence count in the group" })
   count?: number;
 
-  @ApiPropertyOptional({type: Number, description: 'Distinct affected users in the group'})
+  @ApiPropertyOptional({ type: Number, description: "Distinct affected users in the group" })
   userNum?: number;
 
-  @ApiPropertyOptional({type: String, description: 'Latest error message in the group'})
+  @ApiPropertyOptional({ type: String, description: "Latest error message in the group" })
   lastMsg?: string;
 
   // ---- Full-row columns (WebError table) ----
-  @ApiPropertyOptional({type: String, description: 'Resource element type (web only)'})
+  @ApiPropertyOptional({ type: String, description: "Resource element type (web only)" })
   target?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Source API (web only)'})
+  @ApiPropertyOptional({ type: String, description: "Source API (web only)" })
   api?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Column number'})
+  @ApiPropertyOptional({ type: String, description: "Column number" })
   col?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Line number'})
+  @ApiPropertyOptional({ type: String, description: "Line number" })
   line?: string;
 
-  @ApiPropertyOptional({type: String, description: 'HTTP query params'})
+  @ApiPropertyOptional({ type: String, description: "HTTP query params" })
   query?: string;
 
-  @ApiPropertyOptional({type: String, description: 'POST body params'})
+  @ApiPropertyOptional({ type: String, description: "POST body params" })
   options?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Request method'})
+  @ApiPropertyOptional({ type: String, description: "Request method" })
   method?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Full error resource URL (wx only)'})
+  @ApiPropertyOptional({ type: String, description: "Full error resource URL (wx only)" })
   fullName?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Full error resource URL (web only)'})
+  @ApiPropertyOptional({ type: String, description: "Full error resource URL (web only)" })
   fullUrl?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Page URL (web only)'})
+  @ApiPropertyOptional({ type: String, description: "Page URL (web only)" })
   url?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Page path (wx only)'})
+  @ApiPropertyOptional({ type: String, description: "Page path (wx only)" })
   path?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Page mark'})
+  @ApiPropertyOptional({ type: String, description: "Page mark" })
   markPage?: string;
 
-  @ApiPropertyOptional({type: String, description: 'User mark'})
+  @ApiPropertyOptional({ type: String, description: "User mark" })
   markUser?: string;
 
-  @ApiPropertyOptional({type: String, description: 'User phone'})
+  @ApiPropertyOptional({ type: String, description: "User phone" })
   phone?: string;
 
-  @ApiPropertyOptional({type: String, description: 'User ID'})
+  @ApiPropertyOptional({ type: String, description: "User ID" })
   uid?: string;
 
-  @ApiPropertyOptional({type: String, description: 'Trace ID'})
+  @ApiPropertyOptional({ type: String, description: "Trace ID" })
   traceId?: string;
 }
 
@@ -112,13 +112,13 @@ export class WebMonitorErrorItemResponseDto {
  * Shared by the web and wx error endpoints.
  */
 export class WebMonitorErrorListResponseDto {
-  @ApiProperty({type: WebMonitorErrorItemResponseDto, isArray: true, description: 'Error rows'})
+  @ApiProperty({ type: WebMonitorErrorItemResponseDto, isArray: true, description: "Error rows" })
   dataList: WebMonitorErrorItemResponseDto[];
 
-  @ApiProperty({type: Number, description: 'Total record count'})
+  @ApiProperty({ type: Number, description: "Total record count" })
   totalNum: number;
 
-  @ApiProperty({type: Number, description: 'Current page number'})
+  @ApiProperty({ type: Number, description: "Current page number" })
   pageNo: number;
 }
 
@@ -127,22 +127,22 @@ export class WebMonitorErrorListResponseDto {
  * Shared by the web and wx error endpoints.
  */
 export class WebMonitorErrorOneListResponseDto {
-  @ApiProperty({type: WebMonitorErrorItemResponseDto, isArray: true, description: 'Error rows'})
+  @ApiProperty({ type: WebMonitorErrorItemResponseDto, isArray: true, description: "Error rows" })
   dataList: WebMonitorErrorItemResponseDto[];
 
-  @ApiProperty({type: Number, description: 'Total record count'})
+  @ApiProperty({ type: Number, description: "Total record count" })
   totalNum: number;
 
-  @ApiProperty({type: Number, description: 'Current page number'})
+  @ApiProperty({ type: Number, description: "Current page number" })
   pageNo: number;
 
-  @ApiProperty({type: String, description: 'Earliest occurrence time of the error'})
+  @ApiProperty({ type: String, description: "Earliest occurrence time of the error" })
   first: string;
 
-  @ApiProperty({type: String, description: 'Latest occurrence time of the error'})
+  @ApiProperty({ type: String, description: "Latest occurrence time of the error" })
   last: string;
 
-  @ApiProperty({type: Number, description: 'Distinct affected users'})
+  @ApiProperty({ type: Number, description: "Distinct affected users" })
   userNum: number;
 }
 
@@ -151,6 +151,6 @@ export class WebMonitorErrorOneListResponseDto {
  * Shared by the web and wx error endpoints.
  */
 export class WebMonitorErrorMarkUserListResponseDto {
-  @ApiProperty({type: WebMonitorErrorItemResponseDto, isArray: true, description: 'Error rows'})
+  @ApiProperty({ type: WebMonitorErrorItemResponseDto, isArray: true, description: "Error rows" })
   list: WebMonitorErrorItemResponseDto[];
 }

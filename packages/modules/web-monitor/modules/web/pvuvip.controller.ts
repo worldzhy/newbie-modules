@@ -1,77 +1,77 @@
-import {Controller, Get, Query} from '@nestjs/common';
-import {ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {ConfigService} from '@nestjs/config';
-import {DayReportNumService} from '../../modules/day-report/day-report-num.service';
-import {func} from '../../shared/utils';
-import {PvuvipService} from './services/pvuvip.service';
-import {WebMonitorPvUvIpResponseDto} from './pvuvip.dto';
-import parser from 'cron-parser';
+import { Controller, Get, Query } from "@nestjs/common";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ConfigService } from "@nestjs/config";
+import { DayReportNumService } from "../../modules/day-report/day-report-num.service";
+import { func } from "../../shared/utils";
+import { PvuvipService } from "./services/pvuvip.service";
+import { WebMonitorPvUvIpResponseDto } from "./pvuvip.dto";
+import parser from "cron-parser";
 
-@ApiTags('Frontend Monitor / Web / PvUvIp')
-@Controller('/api/v1/pvuvip')
+@ApiTags("Frontend Monitor / Web / PvUvIp")
+@Controller("/api/v1/pvuvip")
 export class PvuvipController {
   private cfg: any;
   constructor(
     private readonly configService: ConfigService,
     private readonly pvuvipSrv: PvuvipService,
-    private readonly dayReportNum: DayReportNumService
+    private readonly dayReportNum: DayReportNumService,
   ) {
-    this.cfg = this.configService.get('modules.web-monitor');
+    this.cfg = this.configService.get("modules.web-monitor");
   }
 
-  @Get('/getPvUvIpSurveyToday')
-  @ApiOperation({summary: "Get today's PV/UV/IP survey"})
-  @ApiResponse({type: Object})
+  @Get("/getPvUvIpSurveyToday")
+  @ApiOperation({ summary: "Get today's PV/UV/IP survey" })
+  @ApiResponse({ type: Object })
   async getPvUvIpSurveyToday(@Query() q: any) {
-    const {appId} = q;
-    if (!appId) throw new Error('PV/UV/IP overview: appId must not be empty');
+    const { appId } = q;
+    if (!appId) throw new Error("PV/UV/IP overview: appId must not be empty");
     const interval = parser.parseExpression(this.cfg.pvuvip_task_minute_cron_time);
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
     const betweenTime = Math.abs(new Date(timer).getTime() - timestrat);
-    const todayStart = new Date(func.format(new Date(), 'yyyy/MM/dd 00:00:00'));
+    const todayStart = new Date(func.format(new Date(), "yyyy/MM/dd 00:00:00"));
     const survey = await this.pvuvipSrv.getPvUvIpSurvey(appId, todayStart, new Date());
     const num = await this.dayReportNum.getTodayFromRedis(
       appId,
-      new Date(func.format(new Date(), 'yyyy/MM/dd')).getTime()
+      new Date(func.format(new Date(), "yyyy/MM/dd")).getTime(),
     );
-    return func.result({time: betweenTime, data: {...survey, num}});
+    return func.result({ time: betweenTime, data: { ...survey, num } });
   }
 
-  @Get('/getPvUvIpSurveyOne')
-  @ApiOperation({summary: 'Get PV/UV/IP survey for a time range'})
-  @ApiResponse({type: WebMonitorPvUvIpResponseDto})
+  @Get("/getPvUvIpSurveyOne")
+  @ApiOperation({ summary: "Get PV/UV/IP survey for a time range" })
+  @ApiResponse({ type: WebMonitorPvUvIpResponseDto })
   async getPvUvIpSurveyOne(@Query() q: any) {
-    const {appId, beginTime, endTime} = q;
-    if (!appId) throw new Error('PV/UV/IP overview: appId must not be empty');
-    if (!beginTime) throw new Error('PV/UV/IP overview: beginTime must not be empty');
-    if (!endTime) throw new Error('PV/UV/IP overview: endTime must not be empty');
+    const { appId, beginTime, endTime } = q;
+    if (!appId) throw new Error("PV/UV/IP overview: appId must not be empty");
+    if (!beginTime) throw new Error("PV/UV/IP overview: beginTime must not be empty");
+    if (!endTime) throw new Error("PV/UV/IP overview: endTime must not be empty");
     const result = await this.pvuvipSrv.getPvUvIpSurveyOne(appId, new Date(beginTime), new Date(endTime));
-    return func.result({data: result});
+    return func.result({ data: result });
   }
 
-  @Get('/getHistoryPvUvIplist')
-  @ApiOperation({summary: 'Get history PV/UV/IP list'})
-  @ApiResponse({type: WebMonitorPvUvIpResponseDto, isArray: true})
+  @Get("/getHistoryPvUvIplist")
+  @ApiOperation({ summary: "Get history PV/UV/IP list" })
+  @ApiResponse({ type: WebMonitorPvUvIpResponseDto, isArray: true })
   async getHistoryPvUvIplist(@Query() q: any) {
-    const {appId, beginTime, endTime} = q;
-    if (!appId) throw new Error('PV/UV/IP historical overview: appId must not be empty');
-    if (!beginTime) throw new Error('PV/UV/IP historical overview: beginTime must not be empty');
-    if (!endTime) throw new Error('PV/UV/IP historical overview: endTime must not be empty');
+    const { appId, beginTime, endTime } = q;
+    if (!appId) throw new Error("PV/UV/IP historical overview: appId must not be empty");
+    if (!beginTime) throw new Error("PV/UV/IP historical overview: beginTime must not be empty");
+    if (!endTime) throw new Error("PV/UV/IP historical overview: endTime must not be empty");
     const rows = await this.pvuvipSrv.getHistoryPvUvIplistByRange(
       appId,
       new Date(Number(beginTime)),
-      new Date(Number(endTime))
+      new Date(Number(endTime)),
     );
-    return func.result({data: rows || []});
+    return func.result({ data: rows || [] });
   }
 
-  @Get('/getPvUvIpList')
-  @ApiOperation({summary: 'Get PV/UV/IP data list'})
-  @ApiResponse({type: Object})
+  @Get("/getPvUvIpList")
+  @ApiOperation({ summary: "Get PV/UV/IP data list" })
+  @ApiResponse({ type: Object })
   async getPvUvIpList(@Query() q: any) {
-    const {appId, beginTime, endTime} = q;
-    if (!appId) throw new Error('UI PV/UV/IP query: appId must not be empty');
+    const { appId, beginTime, endTime } = q;
+    if (!appId) throw new Error("UI PV/UV/IP query: appId must not be empty");
     const interval = parser.parseExpression(this.cfg.pvuvip_task_minute_cron_time);
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
@@ -79,15 +79,15 @@ export class PvuvipController {
     const bt = beginTime ? new Date(beginTime) : new Date(timestrat - betweenTime * 30);
     const et = endTime ? new Date(endTime) : new Date(timestrat);
     const data = await this.pvuvipSrv.getPvUvIpData(appId, bt, et);
-    return func.result({time: betweenTime, data});
+    return func.result({ time: betweenTime, data });
   }
 
-  @Get('/getPvUvIpOne')
-  @ApiOperation({summary: 'Get single PV/UV/IP survey'})
-  @ApiResponse({type: Object})
+  @Get("/getPvUvIpOne")
+  @ApiOperation({ summary: "Get single PV/UV/IP survey" })
+  @ApiResponse({ type: Object })
   async getPvUvIpOne(@Query() q: any) {
-    const {appId, beginTime, endTime} = q;
-    if (!appId) throw new Error('UI PV/UV/IP query: appId must not be empty');
+    const { appId, beginTime, endTime } = q;
+    if (!appId) throw new Error("UI PV/UV/IP query: appId must not be empty");
     const interval = parser.parseExpression(this.cfg.pvuvip_task_minute_cron_time);
     interval.prev();
     let et: Date;
@@ -100,7 +100,7 @@ export class PvuvipController {
       bt = new Date(interval.prev().toString());
     }
     const res = await this.pvuvipSrv.getPvUvIpSurveyOne(appId, bt, et);
-    const timeStr = func.format(et, 'yyyy/MM/dd hh:mm') + ':00';
-    return func.result({data: {time: timeStr, ...res}});
+    const timeStr = func.format(et, "yyyy/MM/dd hh:mm") + ":00";
+    return func.result({ data: { time: timeStr, ...res } });
   }
 }
