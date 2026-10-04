@@ -3,7 +3,7 @@ import { ApiTags } from "@nestjs/swagger";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 
 import { HeartbeatPingDto, HeartbeatPingResponseDto } from "../heartbeat.dto";
-import { HeartbeatInstallationService } from "../services/installation.service";
+import { HeartbeatInstallationService, PING_INTERVAL_SECONDS } from "../services/installation.service";
 
 /**
  * Token-only public endpoint for heartbeat pings.
@@ -30,20 +30,18 @@ export class PingController {
       throw new UnauthorizedException("Missing X-Heartbeat-Token header.");
     }
 
-    const installation = await this.installations.resolveByToken(token);
-    if (!installation) {
-      throw new UnauthorizedException("Invalid or revoked installation token.");
-    }
-
-    await this.installations.touchOnPing(installation.id, {
+    const accepted = await this.installations.recordPing(token, {
       appVersion: body.appVersion,
       env: body.env,
       instanceId: body.instanceId,
     });
+    if (!accepted) {
+      throw new UnauthorizedException("Invalid or revoked installation token.");
+    }
 
     return {
       serverTime: new Date(),
-      reportIntervalSeconds: 30,
+      reportIntervalSeconds: PING_INTERVAL_SECONDS,
     };
   }
 }

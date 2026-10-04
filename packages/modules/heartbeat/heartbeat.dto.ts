@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsOptional, IsString } from "class-validator";
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
 
 // ---------------------------------------------------------------------------
 // host integration API DTOs (host side; the host may also inject the service
@@ -9,11 +9,14 @@ import { IsOptional, IsString } from "class-validator";
 export class CreateHeartbeatInstallationDto {
   @ApiProperty({ description: 'Human-readable label, e.g. "nightwatch-prod"' })
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   label: string;
 
   @ApiPropertyOptional({ description: "Opaque host-owned tag (e.g. projectId/applicationId); never parsed here" })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   externalRef?: string;
 }
 
@@ -33,18 +36,21 @@ export class HeartbeatPingDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   appVersion?: string;
 
   // Self-reported deployment environment, e.g. "prod".
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   env?: string;
 
   // Self-reported instance identifier (EC2 instance id, hostname, ...).
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(128)
   instanceId?: string;
 }
 

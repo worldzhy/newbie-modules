@@ -41,5 +41,9 @@ model HeartbeatInstallation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Host-side lookups batch by externalRef (application list/status views);
+  // the offline monitor scans the lastSeenAt range once per minute.
+  @@index([externalRef])
+  @@index([lastSeenAt])
   @@schema("module/heartbeat")
 }
