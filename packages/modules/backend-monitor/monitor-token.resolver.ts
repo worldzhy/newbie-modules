@@ -42,11 +42,11 @@ export interface IngestFacts {
 }
 
 /**
- * Resolves backend-monitor report tokens to MonitorInstallation rows.
+ * Resolves backend-monitor report tokens to BackendMonitorInstallation rows.
  *
  * Phase 3 pilot (module-hub design §9.2): ingest no longer reads
  * application.Agent (SERVER_MONITOR). Tokens are random UUIDs hashed with
- * SHA-256 in the module's own MonitorInstallation table; the application_id
+ * SHA-256 in the module's own BackendMonitorInstallation table; the application_id
  * dimension is derived from the opaque host externalRef
  * ("projectId/applicationId"). The ingest path is high-volume, so results are
  * cached in-process and liveness writes are throttled — a revoked token may

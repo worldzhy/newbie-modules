@@ -10,7 +10,7 @@ import { ModuleHubReleaseService } from "../services/release.service";
  * Token-only public endpoint for installation self-reports.
  *
  * Host auth (JWT/Guard) is bypassed here: authentication is the
- * X-Module-Hub-Token header, resolved against HubInstallation.tokenHash.
+ * X-Module-Hub-Token header, resolved against ModuleHubInstallation.tokenHash.
  *
  * One endpoint carries two report kinds (design doc §4.2):
  * - "full": process-start self-registration with runtime facts and snapshot;

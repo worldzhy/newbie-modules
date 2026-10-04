@@ -23,7 +23,7 @@ const MAX_FUTURE_SKEW_MS = 60 * 1000; // 1 minute
 
 export interface RequestLogRow {
   application_id: string;
-  // MonitorInstallation that reported the row (module-hub design §9.2,
+  // BackendMonitorInstallation that reported the row (module-hub design §9.2,
   // Phase 3). application_id stays the leading partition/sort key so the
   // frontend query contract is unchanged.
   installation_id: string;
@@ -75,7 +75,7 @@ export class BackendMonitorService {
   ) {}
 
   /**
-   * Authenticates one batch against its MonitorInstallation token and inserts
+   * Authenticates one batch against its BackendMonitorInstallation token and inserts
    * its events into ClickHouse with at most one multi-row insert per
    * non-empty event array. The installation id is stamped on every row;
    * application_id is mapped from the installation's externalRef so existing

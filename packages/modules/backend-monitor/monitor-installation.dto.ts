@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsOptional, IsString, MaxLength } from "class-validator";
 
 // ---------------------------------------------------------------------------
-// Host integration API DTOs for MonitorInstallation (module-hub design §9.2).
+// Host integration API DTOs for BackendMonitorInstallation (module-hub design §9.2).
 // Ingest itself stays token-only via the X-Backend-Monitor-Token header.
 // ---------------------------------------------------------------------------
 

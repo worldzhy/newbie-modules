@@ -138,7 +138,7 @@ export class ModuleHubInstallationService {
   /** Enroll a new installation. The plaintext token is returned ONCE. */
   async create(input: { label: string; repoUrl?: string; externalRef?: string; actor?: string }) {
     const token = randomUUID();
-    const row = await this.prisma.hubInstallation.create({
+    const row = await this.prisma.moduleHubInstallation.create({
       data: {
         label: input.label,
         repoUrl: input.repoUrl ?? null,
@@ -154,7 +154,7 @@ export class ModuleHubInstallationService {
   }
 
   async list(query: { externalRef?: string }) {
-    const rows = await this.prisma.hubInstallation.findMany({
+    const rows = await this.prisma.moduleHubInstallation.findMany({
       where: query.externalRef ? { externalRef: query.externalRef } : undefined,
       orderBy: { createdAt: "desc" },
     });
@@ -162,7 +162,7 @@ export class ModuleHubInstallationService {
   }
 
   async getOrThrow(id: string) {
-    const row = await this.prisma.hubInstallation.findUnique({ where: { id } });
+    const row = await this.prisma.moduleHubInstallation.findUnique({ where: { id } });
     if (!row) throw new NotFoundException(`Installation ${id} not found.`);
     return row;
   }
@@ -196,7 +196,7 @@ export class ModuleHubInstallationService {
     await this.getOrThrow(id);
     // Prisma's Json? column type narrows null/objects at runtime; cast to any
     // to accept both null (clears) and arbitrary JSON objects (sets).
-    await this.prisma.hubInstallation.update({
+    await this.prisma.moduleHubInstallation.update({
       where: { id },
       data: { targetSpec: spec as any },
     });
@@ -208,7 +208,7 @@ export class ModuleHubInstallationService {
   async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
     const token = randomUUID();
-    await this.prisma.hubInstallation.update({
+    await this.prisma.moduleHubInstallation.update({
       where: { id },
       data: { tokenHash: hashInstallationToken(token) },
     });
@@ -219,14 +219,14 @@ export class ModuleHubInstallationService {
   /** Soft revocation: reports are rejected (401), rows are retained for audit. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    await this.prisma.hubInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
+    await this.prisma.moduleHubInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
     await this.audit(id, "installation.revoke", `host:${actor ?? "unknown"}`);
     return { id, revoked: true };
   }
 
   /** Token-only authentication for the report endpoint. */
   async resolveByToken(token: string) {
-    const row = await this.prisma.hubInstallation.findUnique({
+    const row = await this.prisma.moduleHubInstallation.findUnique({
       where: { tokenHash: hashInstallationToken(token) },
     });
     if (!row || row.revokedAt) return null;
@@ -257,7 +257,7 @@ export class ModuleHubInstallationService {
     const now = new Date();
     if (facts.kind === "ping") {
       await this.prisma.$executeRaw`
-        UPDATE "module/module-hub"."HubInstallation"
+        UPDATE "module/module-hub"."ModuleHubInstallation"
         SET "lastSeenAt" = ${now}, "updatedAt" = ${now}
         WHERE "id" = ${id}::uuid
       `;
@@ -266,7 +266,7 @@ export class ModuleHubInstallationService {
     // kind === "full": refresh all runtime fact columns + modulesSnapshot.
     const modulesJson = facts.modules ? JSON.stringify(facts.modules) : null;
     await this.prisma.$executeRaw`
-      UPDATE "module/module-hub"."HubInstallation"
+      UPDATE "module/module-hub"."ModuleHubInstallation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
           "framework" = ${facts.framework ?? null},

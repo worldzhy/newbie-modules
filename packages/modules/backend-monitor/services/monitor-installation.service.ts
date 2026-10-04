@@ -35,7 +35,7 @@ export class MonitorInstallationService {
   /** Enroll a new installation. The plaintext token is returned ONCE. */
   async create(input: { label: string; externalRef?: string; env?: string; kind?: string }) {
     const token = randomUUID();
-    const row = await this.prisma.monitorInstallation.create({
+    const row = await this.prisma.backendMonitorInstallation.create({
       data: {
         label: input.label,
         externalRef: input.externalRef ?? null,
@@ -48,7 +48,7 @@ export class MonitorInstallationService {
   }
 
   async list(query: { externalRef?: string }) {
-    const rows = await this.prisma.monitorInstallation.findMany({
+    const rows = await this.prisma.backendMonitorInstallation.findMany({
       where: query.externalRef ? { externalRef: query.externalRef } : undefined,
       orderBy: { createdAt: "desc" },
     });
@@ -56,7 +56,7 @@ export class MonitorInstallationService {
   }
 
   async getOrThrow(id: string) {
-    const row = await this.prisma.monitorInstallation.findUnique({ where: { id } });
+    const row = await this.prisma.backendMonitorInstallation.findUnique({ where: { id } });
     if (!row) throw new NotFoundException(`Monitor installation ${id} not found.`);
     return row;
   }
@@ -69,7 +69,7 @@ export class MonitorInstallationService {
   async regenerateToken(id: string) {
     await this.getOrThrow(id);
     const token = randomUUID();
-    await this.prisma.monitorInstallation.update({
+    await this.prisma.backendMonitorInstallation.update({
       where: { id },
       data: { tokenHash: hashMonitorToken(token) },
     });
@@ -79,13 +79,13 @@ export class MonitorInstallationService {
   /** Soft revocation: ingest is rejected (401), rows are retained. */
   async revoke(id: string) {
     await this.getOrThrow(id);
-    await this.prisma.monitorInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
+    await this.prisma.backendMonitorInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
     return { id, revoked: true };
   }
 
   /** Token-only authentication for the ingest endpoint. */
   async resolveByToken(token: string) {
-    const row = await this.prisma.monitorInstallation.findUnique({
+    const row = await this.prisma.backendMonitorInstallation.findUnique({
       where: { tokenHash: hashMonitorToken(token) },
     });
     if (!row || row.revokedAt) return null;
@@ -108,7 +108,7 @@ export class MonitorInstallationService {
   ) {
     const now = new Date();
     await this.prisma.$executeRaw`
-      UPDATE "module/backend-monitor"."MonitorInstallation"
+      UPDATE "module/backend-monitor"."BackendMonitorInstallation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
           "env" = COALESCE(${facts.env ?? null}, "env"),

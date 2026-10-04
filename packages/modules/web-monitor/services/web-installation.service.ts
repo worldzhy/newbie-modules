@@ -43,7 +43,7 @@ export class WebInstallationService {
     const token = randomUUID();
     // func.randomString appends Date.now(); keep only the leading random part.
     const appKey = func.randomString(7).slice(0, 7);
-    const row = await this.prisma.webInstallation.create({
+    const row = await this.prisma.webMonitorInstallation.create({
       data: {
         label: input.label,
         externalRef: input.externalRef ?? null,
@@ -55,7 +55,7 @@ export class WebInstallationService {
   }
 
   async list(query: { externalRef?: string }) {
-    const rows = await this.prisma.webInstallation.findMany({
+    const rows = await this.prisma.webMonitorInstallation.findMany({
       where: query.externalRef ? { externalRef: query.externalRef } : undefined,
       orderBy: { createdAt: "desc" },
     });
@@ -63,7 +63,7 @@ export class WebInstallationService {
   }
 
   async getOrThrow(id: string) {
-    const row = await this.prisma.webInstallation.findUnique({ where: { id } });
+    const row = await this.prisma.webMonitorInstallation.findUnique({ where: { id } });
     if (!row) throw new NotFoundException(`Web installation ${id} not found.`);
     return row;
   }
@@ -74,14 +74,14 @@ export class WebInstallationService {
 
   /** Exact-match lookup by the host-mapping tag ("projectId/applicationId"). */
   async findByExternalRef(externalRef: string) {
-    return this.prisma.webInstallation.findFirst({ where: { externalRef } });
+    return this.prisma.webMonitorInstallation.findFirst({ where: { externalRef } });
   }
 
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string) {
     await this.getOrThrow(id);
     const token = randomUUID();
-    await this.prisma.webInstallation.update({
+    await this.prisma.webMonitorInstallation.update({
       where: { id },
       data: { tokenHash: hashWebToken(token) },
     });
@@ -91,20 +91,20 @@ export class WebInstallationService {
   /** Soft revocation: reports are rejected (401), rows are retained. */
   async revoke(id: string) {
     await this.getOrThrow(id);
-    await this.prisma.webInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
+    await this.prisma.webMonitorInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
     return { id, revoked: true };
   }
 
   /** Re-enable a revoked installation by clearing the revocation marker. */
   async unrevoke(id: string) {
     await this.getOrThrow(id);
-    await this.prisma.webInstallation.update({ where: { id }, data: { revokedAt: null } });
+    await this.prisma.webMonitorInstallation.update({ where: { id }, data: { revokedAt: null } });
     return { id, revoked: false };
   }
 
   /** Token-only authentication for the report endpoint. */
   async resolveByToken(token: string) {
-    const row = await this.prisma.webInstallation.findUnique({
+    const row = await this.prisma.webMonitorInstallation.findUnique({
       where: { tokenHash: hashWebToken(token) },
     });
     if (!row || row.revokedAt) return null;
@@ -118,7 +118,7 @@ export class WebInstallationService {
   async touchOnReport(id: string) {
     const now = new Date();
     await this.prisma.$executeRaw`
-      UPDATE "module/web-monitor"."WebInstallation"
+      UPDATE "module/web-monitor"."WebMonitorInstallation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
           "updatedAt" = ${now}

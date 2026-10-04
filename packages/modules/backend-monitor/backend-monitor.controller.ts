@@ -17,7 +17,7 @@ export class BackendMonitorController {
 
   /**
    * Batched ingestion endpoint for backend applications.
-   * Open route (no user JWT); authentication is the MonitorInstallation
+   * Open route (no user JWT); authentication is the BackendMonitorInstallation
    * report token presented via X-Backend-Monitor-Token (module-hub design
    * §9.2). One call carries request metrics and/or errors, enabling one auth
    * lookup and at most one insert per table.

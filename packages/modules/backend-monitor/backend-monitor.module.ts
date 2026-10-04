@@ -12,7 +12,7 @@ import { AiAnalysisService } from "./ai-analysis/ai-analysis.service";
  * BackendMonitorModule
  *
  * Server-side ingestion for backend applications. Accepts batched request
- * metrics and error reports authenticated by a MonitorInstallation report
+ * metrics and error reports authenticated by a BackendMonitorInstallation report
  * token (module-hub design §9.2, Phase 3 pilot — the module owns its token
  * table instead of reading application.Agent/SERVER_MONITOR), and stores
  * them in ClickHouse. Query endpoints back the monitoring UI's request/error

@@ -5,7 +5,7 @@ Backend application monitoring ingestion for nightwatch.
 ## Responsibilities
 
 - `POST /backend-monitor/ingest` (`@NoGuard`) — batched request metrics + error
-  reports authenticated by a **MonitorInstallation** report token sent as
+  reports authenticated by a **BackendMonitorInstallation** report token sent as
   `X-Backend-Monitor-Token`, stored in ClickHouse `application_request_logs` /
   `application_error_logs`.
 - `GET /backend-monitor/request-logs` / `error-logs` — paginated, application-scoped
@@ -23,7 +23,7 @@ Backend application monitoring ingestion for nightwatch.
 
 ## Identity model (module-hub design §9.2, Phase 3)
 
-The module owns its own token table, `MonitorInstallation`
+The module owns its own token table, `BackendMonitorInstallation`
 (PostgreSQL schema `"module/backend-monitor"`), instead of reading
 `application.Agent` of type `SERVER_MONITOR`:
 

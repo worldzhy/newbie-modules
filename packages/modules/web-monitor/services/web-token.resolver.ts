@@ -31,7 +31,7 @@ interface CachedToken {
 }
 
 /**
- * Resolves web-monitor report tokens to WebInstallation rows.
+ * Resolves web-monitor report tokens to WebMonitorInstallation rows.
  *
  * The ingest path is high-volume, so results are cached in-process and
  * liveness writes are throttled — a revoked token may still be accepted for

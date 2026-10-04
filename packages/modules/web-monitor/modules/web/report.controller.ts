@@ -33,7 +33,7 @@ export class WebReportController {
     if (req.headers["content-type"] && req.headers["content-type"].includes("text/plain")) {
       query = JSON.parse(body as string);
     }
-    // The SDK presents the secret WebInstallation token; the server resolves
+    // The SDK presents the secret WebMonitorInstallation token; the server resolves
     // the public appKey (storage partition key) from it. appId is no longer a
     // credential. Resolution is cached and liveness writes are throttled.
     const { appKey } = await this.tokenResolver.resolve(query.token);

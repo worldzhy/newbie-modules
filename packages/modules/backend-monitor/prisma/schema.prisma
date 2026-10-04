@@ -1,11 +1,11 @@
 // ! ------------------------------------------------------------ //
 // !             [Module] Backend Monitor models                  //
 // ! ------------------------------------------------------------ //
-// * MonitorInstallation                                            //
+// * BackendMonitorInstallation                                            //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 // Backend-monitor ingest identity. PostgreSQL schema: "module/backend-monitor".
-// One MonitorInstallation = one running deployment endpoint reporting request
+// One BackendMonitorInstallation = one running deployment endpoint reporting request
 // and error logs (module-hub design §9.2, Phase 3 pilot). The module owns the
 // token end to end instead of reading application.Agent (SERVER_MONITOR):
 // the token is a random UUID, only its SHA-256 hash is stored, the plaintext
@@ -17,7 +17,7 @@
 //
 // Lifecycle is derived, not stored: never-seen (lastSeenAt null) / online /
 // stale. Only revocation is an explicit persisted state.
-model MonitorInstallation {
+model BackendMonitorInstallation {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   // Human-readable label assigned at enrollment, e.g. "nightwatch-prod".
