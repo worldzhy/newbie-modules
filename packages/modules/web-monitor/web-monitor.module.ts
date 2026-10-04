@@ -29,7 +29,8 @@ import { RemoveModule } from "./modules/remove/remove.module";
   ],
   // WebInstallationService is provided by WebModule (report-side wiring) and
   // re-exported here for consuming projects whose application layer
-  // provisions installations (e.g. nightwatch).
-  exports: [WebModule],
+  // provisions installations (e.g. nightwatch). SystemModule is re-exported so
+  // application-layer scheduled jobs can consume SystemService.
+  exports: [WebModule, SystemModule],
 })
 export class WebMonitorModule {}
