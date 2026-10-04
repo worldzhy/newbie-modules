@@ -1,11 +1,11 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {SystemService} from '../../../modules/system/system.service';
-import {PvuvipService} from './pvuvip.service';
-import {func} from '../../../shared/utils';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { SystemService } from "../../../modules/system/system.service";
+import { PvuvipService } from "./pvuvip.service";
+import { func } from "../../../shared/utils";
 
 function cronMinuteInterval(cronExp: string) {
-  const m = cronExp.split(' ')[1] || '*/2';
+  const m = cronExp.split(" ")[1] || "*/2";
   const match = m.match(/\*\/(\d+)/);
   const step = match ? Number(match[1]) : 2;
   return step * 60000;
@@ -17,9 +17,9 @@ export class WebPvuvipTaskService {
   constructor(
     private readonly config: ConfigService,
     private readonly system: SystemService,
-    private readonly pvuvip: PvuvipService
+    private readonly pvuvip: PvuvipService,
   ) {
-    this.cfg = this.config.get('modules.web-monitor');
+    this.cfg = this.config.get("modules.web-monitor");
   }
 
   async getWebPvUvIpByMinute() {
@@ -32,7 +32,7 @@ export class WebPvuvipTaskService {
 
     const jobs = systems.map(async (sys: any) => {
       const appId = sys.appId;
-      if (!appId || sys.isUse !== 0) return;
+      if (!appId || !sys.statisticsEnabled) return;
       const data = await this.pvuvip.getPvUvIpSurvey(appId, beginTime, endTime);
       await this.pvuvip.savePvUvIpData(appId, endTime, 1, data);
     });
@@ -40,7 +40,7 @@ export class WebPvuvipTaskService {
   }
 
   async getWebPvUvIpByDay() {
-    const todayStart = new Date(func.format(new Date(), 'yyyy/MM/dd 00:00:00'));
+    const todayStart = new Date(func.format(new Date(), "yyyy/MM/dd 00:00:00"));
     const endTime = todayStart;
     const beginTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
     const systems = await this.system.getWebSystemList();
@@ -51,7 +51,7 @@ export class WebPvuvipTaskService {
   private async groupData(datas: any[], type: number, beginTime: Date, endTime: Date, createTime: Date) {
     for (const sys of datas) {
       const appId = sys.appId;
-      if (!appId || sys.isUse !== 0) continue;
+      if (!appId || !sys.statisticsEnabled) continue;
       await this.savePvUvIpData(appId, createTime, type, beginTime, endTime);
     }
   }

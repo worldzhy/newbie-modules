@@ -1,17 +1,17 @@
-import {Injectable, Logger, OnModuleInit} from '@nestjs/common';
-import {Cron, SchedulerRegistry} from '@nestjs/schedule';
-import {CronJob} from 'cron';
-import {ConfigService} from '@nestjs/config';
-import {RedisService} from '../../models/redis/redis.service';
-import {SystemService} from '../../modules/system/system.service';
-import {NodeCacheService} from '../../shared/node-cache.service';
-import {func} from '../../shared/utils';
-import {DayReportNumService} from '../../modules/day-report/day-report-num.service';
-import {RedisKeys} from '../../models/enum';
-import {WebReportTaskService} from '../../modules/web/services/report-task.service';
-import {WebPvuvipTaskService} from '../../modules/web/services/pvuvip-task.service';
-import {WebIpTaskService} from '../../modules/web/services/ip-task.service';
-import ip from 'ip';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { Cron, SchedulerRegistry } from "@nestjs/schedule";
+import { CronJob } from "cron";
+import { ConfigService } from "@nestjs/config";
+import { RedisService } from "../../models/redis/redis.service";
+import { SystemService } from "../../modules/system/system.service";
+import { NodeCacheService } from "../../shared/node-cache.service";
+import { func } from "../../shared/utils";
+import { DayReportNumService } from "../../modules/day-report/day-report-num.service";
+import { RedisKeys } from "../../models/enum";
+import { WebReportTaskService } from "../../modules/web/services/report-task.service";
+import { WebPvuvipTaskService } from "../../modules/web/services/pvuvip-task.service";
+import { WebIpTaskService } from "../../modules/web/services/ip-task.service";
+import ip from "ip";
 
 @Injectable()
 export class JobsService implements OnModuleInit {
@@ -27,9 +27,9 @@ export class JobsService implements OnModuleInit {
     private readonly scheduler: SchedulerRegistry,
     private readonly webReportTask: WebReportTaskService,
     private readonly webPvuvipTask: WebPvuvipTaskService,
-    private readonly webIpTask: WebIpTaskService
+    private readonly webIpTask: WebIpTaskService,
   ) {
-    this.cfg = this.configService.get('modules.web-monitor');
+    this.cfg = this.configService.get("modules.web-monitor");
   }
 
   async onModuleInit() {
@@ -38,11 +38,11 @@ export class JobsService implements OnModuleInit {
     await this.ipTask();
     await this.dayReportNumTask();
     this.registerReportStoreTask();
-    this.registerAlarmTask();
+    this.registerAlertEvaluationTask();
   }
 
   private registerReportStoreTask() {
-    const expr = this.cfg.redis_consumption?.task_time || '*/10 * * * * *';
+    const expr = this.cfg.redis_consumption?.task_time || "*/10 * * * * *";
     const job = new CronJob(
       expr,
       async () => {
@@ -50,34 +50,34 @@ export class JobsService implements OnModuleInit {
       },
       null,
       true,
-      'Asia/Shanghai'
+      "Asia/Shanghai",
     );
-    this.scheduler.addCronJob('consumeReportQueues', job);
+    this.scheduler.addCronJob("consumeReportQueues", job);
     job.start();
   }
 
-  private registerAlarmTask() {
-    if (!this.cfg.alarm) return;
-    const expr = this.cfg.alarm_task_cron_time;
+  private registerAlertEvaluationTask() {
+    if (!this.cfg.alertsEnabled) return;
+    const expr = this.cfg.alertTaskCronTime;
     if (!expr) return;
     const job = new CronJob(
       expr,
       async () => {
-        await this.alarmTask();
+        await this.evaluateThresholdAlerts();
       },
       null,
       true,
-      'Asia/Shanghai'
+      "Asia/Shanghai",
     );
-    this.scheduler.addCronJob('alarmTask', job);
+    this.scheduler.addCronJob("evaluateThresholdAlerts", job);
     job.start();
   }
 
-  async alarmTask() {}
+  async evaluateThresholdAlerts() {}
 
   private async redisLock(redisKey: string, ttl: number) {
     const lock = `${ip.address()}:${this.cfg.port}:${func.randomString(3)}`;
-    const res = await this.redis.set(redisKey, lock, 'EX', ttl, 'NX');
+    const res = await this.redis.set(redisKey, lock, "EX", ttl, "NX");
     if (!res) {
       // Lock is held by another instance — normal in multi-instance deployments.
       // Log at verbose level so it doesn't spam the console every minute.
@@ -95,38 +95,38 @@ export class JobsService implements OnModuleInit {
     return true;
   }
 
-  @Cron('0 */5 * * * *', {timeZone: 'Asia/Shanghai'})
+  @Cron("0 */5 * * * *", { timeZone: "Asia/Shanghai" })
   async updateAppInfoCache() {
     try {
       const systems = await this.system.getSystemList();
       this.nodeCache.updateAllSystemCache(systems as any);
     } catch (e) {
-      console.error('IO error: failed to update cached appId info', e?.message || e);
+      console.error("IO error: failed to update cached appId info", e?.message || e);
     }
   }
 
-  @Cron('0 */2 * * * *', {timeZone: 'Asia/Shanghai'})
+  @Cron("0 */2 * * * *", { timeZone: "Asia/Shanghai" })
   async pvuvipMinuteCount() {
     const getLock = await this.redisLock(RedisKeys.PVUVIP_PRE_MINUTE_LOCK, this.cfg.pvuvip_task_minute_lock_time);
     if (!getLock) return;
     await this.webPvuvipTask.getWebPvUvIpByMinute();
   }
 
-  @Cron('0 */1 * * * *', {timeZone: 'Asia/Shanghai'})
+  @Cron("0 */1 * * * *", { timeZone: "Asia/Shanghai" })
   async ipTask() {
     const getLock = await this.redisLock(RedisKeys.IP_TASK_LOCK, this.cfg.ip_task_lock_time);
     if (!getLock) return;
     await this.webIpTask.saveWebGetIpDatas();
   }
 
-  @Cron('0 0 0 */1 * *', {timeZone: 'Asia/Shanghai'})
+  @Cron("0 0 0 */1 * *", { timeZone: "Asia/Shanghai" })
   async dayReportNumTask() {
     const getLock = await this.redisLock(RedisKeys.DAY_REPORT_NUM_TASK_LOCK, this.cfg.day_report_num_task_lock_time);
     if (!getLock) return;
     await this.dayReportNum.numCountTask();
   }
 
-  @Cron('0 0 0 */1 * *', {timeZone: 'Asia/Shanghai'})
+  @Cron("0 0 0 */1 * *", { timeZone: "Asia/Shanghai" })
   async preDayReportTask() {
     if (!this.cfg.day_report) return;
     const getLock = await this.redisLock(RedisKeys.DAY_REPORT_TASK_LOCK, this.cfg.day_report_task_lock_time);
@@ -138,7 +138,7 @@ export class JobsService implements OnModuleInit {
     try {
       if (this.cfg.is_web_consume_task_run) await this.consumeWebQueue();
     } catch (e) {
-      console.error('Consumer queue exception', e?.message || e);
+      console.error("Consumer queue exception", e?.message || e);
     }
     // Can later be split into a standalone cron job if needed
   }

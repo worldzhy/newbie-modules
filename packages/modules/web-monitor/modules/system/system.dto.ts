@@ -35,8 +35,8 @@ export class WebMonitorSystemResponseDto {
   @ApiProperty({type: String, description: 'Creation time'})
   createTime: string;
 
-  @ApiProperty({type: Number, description: 'Enable statistics: 0 yes, 1 no'})
-  isUse: number;
+  @ApiProperty({type: Boolean, description: 'Master statistics switch'})
+  statisticsEnabled: boolean;
 
   @ApiProperty({type: Number, description: 'Slow page threshold (seconds)'})
   slowPageTime: number;
@@ -53,33 +53,33 @@ export class WebMonitorSystemResponseDto {
   @ApiProperty({type: Number, description: 'Slow AJAX threshold (seconds)'})
   slowAjaxTime: number;
 
-  @ApiProperty({type: Number, description: 'Collect page performance: 0 yes, 1 no'})
-  isStatisiPages: number;
+  @ApiProperty({type: Boolean, description: 'Collect page performance'})
+  pagePerformanceEnabled: boolean;
 
-  @ApiProperty({type: Number, description: 'Collect AJAX performance: 0 yes, 1 no'})
-  isStatisiAjax: number;
+  @ApiProperty({type: Boolean, description: 'Collect AJAX performance'})
+  ajaxPerformanceEnabled: boolean;
 
-  @ApiProperty({type: Number, description: 'Collect resource performance: 0 yes, 1 no'})
-  isStatisiResource: number;
+  @ApiProperty({type: Boolean, description: 'Collect resource performance'})
+  resourcePerformanceEnabled: boolean;
 
-  @ApiProperty({type: Number, description: 'Store user system info: 0 yes, 1 no'})
-  isStatisiSystem: number;
+  @ApiProperty({type: Boolean, description: 'Collect browser/OS/geo environment'})
+  browserEnvironmentEnabled: boolean;
 
-  @ApiProperty({type: Number, description: 'Report page errors: 0 yes, 1 no'})
-  isStatisiError: number;
+  @ApiProperty({type: Boolean, description: 'Report page errors'})
+  errorReportingEnabled: boolean;
 
-  @ApiProperty({type: Number, description: 'Send daily report: 0 yes, 1 no'})
-  isDailyUse: number;
+  @ApiProperty({type: Boolean, description: 'Send daily report'})
+  dailyReportEnabled: boolean;
 
   @ApiProperty({type: String, isArray: true, description: 'Daily report recipients'})
-  daliyList: string[];
+  dailyReportRecipients: string[];
 
-  @ApiProperty({type: Number, description: 'Send PV peak emails: 0 yes, 1 no'})
-  isHighestUse: number;
+  @ApiProperty({type: Boolean, description: 'Send PV peak report'})
+  pvPeakReportEnabled: boolean;
 
-  @ApiProperty({type: Number, description: 'Enable alerts: 1 on, 0 off'})
-  isWarning: number;
+  @ApiProperty({type: Boolean, description: 'Enable threshold alerts'})
+  alertsEnabled: boolean;
 
-  @ApiProperty({type: String, isArray: true, description: 'PV peak alert recipients'})
-  highestList: string[];
+  @ApiProperty({type: String, isArray: true, description: 'PV peak report recipients'})
+  pvPeakRecipients: string[];
 }

@@ -24,7 +24,7 @@ export class WebIpTaskService {
     if (!systems || !systems.length) return;
     for (const sys of systems) {
       const appId = sys.appId;
-      if (!appId || sys.isUse !== 0) continue;
+      if (!appId || !sys.statisticsEnabled) continue;
       await this.saveWebGetIpDatasByOne(appId);
     }
   }

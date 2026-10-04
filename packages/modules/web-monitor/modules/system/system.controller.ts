@@ -84,16 +84,16 @@ export class SystemController {
     return func.result({data: result});
   }
 
-  @Post('/handleDaliyEmail')
-  @ApiOperation({summary: 'Handle daily email report'})
+  @Post('/manageReportRecipients')
+  @ApiOperation({summary: 'Add or remove a report recipient (item: 1 daily report, 2 PV peak report)'})
   @ApiResponse({type: Object})
-  async handleDaliyEmail(@Body() body: any) {
+  async manageReportRecipients(@Body() body: any) {
     const appId = body.appId;
     const email = body.email;
-    const type = body.type || 1;
+    const action = body.action || 1;
     const item = body.item || 1;
     if (!appId) throw new Error('appId must not be empty');
-    const result = await this.system.handleDaliyEmail(appId, email, type, true, item);
+    const result = await this.system.manageReportRecipients(appId, email, action, item);
     return func.result({data: result});
   }
 }
