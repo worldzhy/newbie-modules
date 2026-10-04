@@ -2,7 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { ClickhouseModule } from "@modules/clickhouse/clickhouse.module";
 import { BackendMonitorController } from "./backend-monitor.controller";
 import { BackendMonitorService } from "./backend-monitor.service";
-import { BackendMonitorInstallationController } from "./controllers/installation.controller";
+import { InstallationController } from "./controllers/installation.controller";
 import { MonitorTokenResolver } from "./monitor-token.resolver";
 import { MonitorInstallationService } from "./services/monitor-installation.service";
 import { AiAnalysisController } from "./ai-analysis/ai-analysis.controller";
@@ -26,7 +26,7 @@ import { AiAnalysisService } from "./ai-analysis/ai-analysis.service";
 @Global()
 @Module({
   imports: [ClickhouseModule],
-  controllers: [BackendMonitorController, BackendMonitorInstallationController, AiAnalysisController],
+  controllers: [BackendMonitorController, InstallationController, AiAnalysisController],
   providers: [BackendMonitorService, MonitorInstallationService, MonitorTokenResolver, AiAnalysisService],
   // MonitorInstallationService is exported for consuming projects whose
   // application layer provisions installations (e.g. nightwatch).
