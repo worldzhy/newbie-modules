@@ -4,7 +4,7 @@ import { CronJob } from "cron";
 import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { RedisService } from "../../models/redis/redis.service";
-import { SystemService } from "../../modules/system/system.service";
+import { SiteService } from "../../modules/site/site.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
 import { func } from "../../shared/utils";
 import { DayReportNumService } from "../../modules/day-report/day-report-num.service";
@@ -25,7 +25,7 @@ export class JobsService implements OnModuleInit {
   constructor(
     private readonly redis: RedisService,
     private readonly configService: ConfigService,
-    private readonly system: SystemService,
+    private readonly site: SiteService,
     private readonly nodeCache: NodeCacheService,
     private readonly dayReportNum: DayReportNumService,
     private readonly scheduler: SchedulerRegistry,
@@ -82,7 +82,7 @@ export class JobsService implements OnModuleInit {
 
     let systems: any[];
     try {
-      systems = await this.system.getWebSystemList();
+      systems = await this.site.getWebSiteList();
     } catch (error) {
       this.logger.error(`Threshold alert evaluation failed to load systems: ${this.getErrorMessage(error)}`);
       return;
@@ -394,8 +394,8 @@ export class JobsService implements OnModuleInit {
 
   async updateAppInfoCache() {
     try {
-      const systems = await this.system.getSystemList();
-      this.nodeCache.updateAllSystemCache(systems as any);
+      const systems = await this.site.getSiteList();
+      this.nodeCache.updateAllSiteCache(systems as any);
     } catch (e) {
       console.error("IO error: failed to update cached appId info", e?.message || e);
     }

@@ -5,7 +5,7 @@ import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
 import { SharedModule } from "../../shared/shared.module";
 import { DayReportModule } from "../../modules/day-report/day-report.module";
 import { RedisModule } from "../../models/redis/redis.module";
-import { SystemModule } from "../../modules/system/system.module";
+import { SiteModule } from "../../modules/site/site.module";
 import { WebInstallationService } from "../../services/web-installation.service";
 import { WebTokenResolver } from "../../services/web-token.resolver";
 
@@ -39,7 +39,7 @@ import { WebIpTaskService } from "./services/ip-task.service";
     SharedModule,
     DayReportModule,
     RedisModule,
-    SystemModule,
+    SiteModule,
   ],
   controllers: [
     WebReportController,

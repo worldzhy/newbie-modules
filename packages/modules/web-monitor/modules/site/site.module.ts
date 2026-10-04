@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
-import { SystemService } from "./system.service";
-import { SystemController } from "./system.controller";
+import { SiteService } from "./site.service";
+import { SiteController } from "./site.controller";
 import { NodeCacheService } from "../../shared/node-cache.service";
 import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
 
@@ -8,8 +8,8 @@ import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
 // so no MongooseModule.forFeature registration is needed here.
 @Module({
   imports: [MonitorModelsModule],
-  controllers: [SystemController],
-  providers: [SystemService, NodeCacheService],
-  exports: [SystemService, NodeCacheService],
+  controllers: [SiteController],
+  providers: [SiteService, NodeCacheService],
+  exports: [SiteService, NodeCacheService],
 })
-export class SystemModule {}
+export class SiteModule {}

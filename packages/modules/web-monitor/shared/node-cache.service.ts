@@ -15,13 +15,13 @@ export class NodeCacheService {
     this.appInfo.set(appId, system);
   }
 
-  updateAllSystemCache(systems: SystemDocument[]) {
+  updateAllSiteCache(systems: SystemDocument[]) {
     systems.forEach((system) => {
-      this.updateSystemCache(system);
+      this.updateSiteCache(system);
     });
   }
 
-  updateSystemCache(system: SystemDocument) {
+  updateSiteCache(system: SystemDocument) {
     this.setAppInfo(system.appId, system);
   }
 }

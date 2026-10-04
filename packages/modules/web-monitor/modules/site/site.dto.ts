@@ -4,7 +4,7 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
  * Response DTO for a web-monitor System document (MongoDB).
  * Mirrors the fields defined in models/mongo/system.schema.ts.
  */
-export class WebMonitorSystemResponseDto {
+export class WebMonitorSiteResponseDto {
   @ApiProperty({ type: String, description: "MongoDB document ID" })
   _id: string;
 

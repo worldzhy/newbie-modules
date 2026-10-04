@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { SystemService } from "../../../modules/system/system.service";
+import { SiteService } from "../../../modules/site/site.service";
 import { PvuvipService } from "./pvuvip.service";
 import { func } from "../../../shared/utils";
 
@@ -16,7 +16,7 @@ export class WebPvuvipTaskService {
   private cfg: any;
   constructor(
     private readonly config: ConfigService,
-    private readonly system: SystemService,
+    private readonly site: SiteService,
     private readonly pvuvip: PvuvipService,
   ) {
     this.cfg = this.config.get("modules.web-monitor");
@@ -27,7 +27,7 @@ export class WebPvuvipTaskService {
     const endTime = new Date();
     const beginTime = new Date(endTime.getTime() - between);
 
-    const systems = await this.system.getWebSystemList();
+    const systems = await this.site.getWebSiteList();
     if (!systems || !systems.length) return;
 
     const jobs = systems.map(async (sys: any) => {
@@ -43,7 +43,7 @@ export class WebPvuvipTaskService {
     const todayStart = new Date(func.format(new Date(), "yyyy/MM/dd 00:00:00"));
     const endTime = todayStart;
     const beginTime = new Date(endTime.getTime() - 24 * 60 * 60 * 1000);
-    const systems = await this.system.getWebSystemList();
+    const systems = await this.site.getWebSiteList();
     if (!systems || !systems.length) return;
     await this.groupData(systems, 2, beginTime, endTime, beginTime);
   }

@@ -6,7 +6,7 @@ import { MongoModule } from "@modules/mongo/mongo.module";
 import { RedisModule } from "./models/redis/redis.module";
 import { MonitorClickhouseModule } from "./models/clickhouse/monitor-clickhouse.module";
 import { SharedModule } from "./shared/shared.module";
-import { SystemModule } from "./modules/system/system.module";
+import { SiteModule } from "./modules/site/site.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
 import { DayReportModule } from "./modules/day-report/day-report.module";
 import { MonitorModelsModule } from "./models/mongo/monitor-models.module";
@@ -21,7 +21,7 @@ import { RemoveModule } from "./modules/remove/remove.module";
     MonitorClickhouseModule,
     MonitorModelsModule,
     SharedModule,
-    SystemModule,
+    SiteModule,
     DayReportModule,
     JobsModule,
     WebModule,
@@ -29,8 +29,8 @@ import { RemoveModule } from "./modules/remove/remove.module";
   ],
   // WebInstallationService is provided by WebModule (report-side wiring) and
   // re-exported here for consuming projects whose application layer
-  // provisions installations (e.g. nightwatch). SystemModule is re-exported so
-  // application-layer scheduled jobs can consume SystemService.
-  exports: [WebModule, SystemModule],
+  // provisions installations (e.g. nightwatch). SiteModule is re-exported so
+  // application-layer scheduled jobs can consume SiteService.
+  exports: [WebModule, SiteModule],
 })
 export class WebMonitorModule {}

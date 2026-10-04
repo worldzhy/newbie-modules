@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { RedisService } from "../../../models/redis/redis.service";
-import { SystemService } from "../../../modules/system/system.service";
+import { SiteService } from "../../../modules/site/site.service";
 import { MonitorClickhouseService } from "../../../models/clickhouse/monitor-clickhouse.service";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
 import { func } from "../../../shared/utils";
@@ -14,7 +14,7 @@ export class WebReportTaskService {
   constructor(
     private readonly config: ConfigService,
     private readonly redis: RedisService,
-    private readonly system: SystemService,
+    private readonly site: SiteService,
     private readonly models: MonitorModelsService,
     private readonly ch: MonitorClickhouseService,
   ) {
@@ -40,7 +40,7 @@ export class WebReportTaskService {
       await this.saveSdkError(item);
       return;
     }
-    const system = await this.system.getSystemForAppId(item.appId);
+    const system = await this.site.getSiteForAppId(item.appId);
     if (!system) return;
     // All anomaly-relevant data is always persisted; thresholds define what an
     // anomaly is, collection switches are intentionally not supported.

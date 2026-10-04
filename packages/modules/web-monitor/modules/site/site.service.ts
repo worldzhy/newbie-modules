@@ -4,13 +4,13 @@ import { NodeCacheService } from "../../shared/node-cache.service";
 import { func } from "../../shared/utils";
 
 @Injectable()
-export class SystemService {
+export class SiteService {
   constructor(
     private readonly models: MonitorModelsService,
     private readonly nodeCache: NodeCacheService,
   ) {}
 
-  async saveSystemData(body: any) {
+  async saveSiteData(body: any) {
     const type = body.type;
     if (!body.projectId) return func.errResult({ desc: "A new system must belong to a project" });
     if (!body.systemDomain && type === "web")
@@ -40,11 +40,11 @@ export class SystemService {
     system.slowAjaxTime = body.slowAjaxTime || 2;
 
     const result = await system.save();
-    await this.updateSystemNodeCache(appId);
+    await this.updateSiteNodeCache(appId);
     return func.result({ data: result });
   }
 
-  async updateSystemData(body: any) {
+  async updateSiteData(body: any) {
     const appId = body.appId;
     if (!appId) return func.errResult({ desc: "Update system: appId must not be empty" });
 
@@ -62,13 +62,13 @@ export class SystemService {
       },
     };
     const result = await this.models.System().updateOne({ appId: appId }, update, { multi: true }).exec();
-    await this.updateSystemNodeCache(appId);
+    await this.updateSiteNodeCache(appId);
     return func.result({ data: result });
   }
 
-  async updateSystemNodeCache(appId: string) {
-    const system = await this.getSystemForDb(appId);
-    this.nodeCache.updateSystemCache(system as any);
+  async updateSiteNodeCache(appId: string) {
+    const system = await this.getSiteForDb(appId);
+    this.nodeCache.updateSiteCache(system as any);
   }
 
   /**
@@ -77,7 +77,7 @@ export class SystemService {
    * stays in Mongo); appId equals the agent's immutable appKey. Idempotent by
    * appId so it can be safely retried after the PG-side agent issuance.
    */
-  async upsertSystemForWebAgent(body: { appId: string; projectId: string; systemName: string }) {
+  async upsertSiteForWebAgent(body: { appId: string; projectId: string; systemName: string }) {
     const result = await this.models
       .System()
       .findOneAndUpdate(
@@ -86,16 +86,16 @@ export class SystemService {
         { upsert: true, new: true },
       )
       .exec();
-    await this.updateSystemNodeCache(body.appId);
+    await this.updateSiteNodeCache(body.appId);
     return result;
   }
 
-  async getSystemForDb(appId: string) {
+  async getSiteForDb(appId: string) {
     if (!appId) throw new Error("Query a system: appId must not be empty");
     return (await this.models.System().findOne({ appId: appId }).exec()) || ({} as any);
   }
 
-  async getSysForUserId(query: any) {
+  async getSitesForUserId(query: any) {
     const { systemName, type, projectId } = query;
     const param: any = {};
     if (systemName) param.systemName = new RegExp(systemName);
@@ -104,33 +104,33 @@ export class SystemService {
     return (await this.models.System().find(param).exec()) || [];
   }
 
-  async getSystemForAppId(appId: string) {
+  async getSiteForAppId(appId: string) {
     if (!appId) throw new Error("Query a system: appId must not be empty");
     return this.nodeCache.getAppInfo(appId) || ({} as any);
   }
 
-  async getSystemList() {
+  async getSiteList() {
     return (await this.models.System().find({}).exec()) || [];
   }
 
-  async getWebSystemList() {
+  async getWebSiteList() {
     return (await this.models.System().find({ type: "web" }).exec()) || [];
   }
 
-  async deleteWebSystemUser(appId: string, userToken: string) {
+  async deleteWebSiteUser(appId: string, userToken: string) {
     return this.models
       .System()
       .updateOne({ appId: appId }, { $pull: { userId: userToken } }, { multi: true })
       .exec();
   }
-  async addWebSystemUser(appId: string, userToken: string) {
+  async addWebSiteUser(appId: string, userToken: string) {
     return this.models
       .System()
       .updateOne({ appId: appId }, { $push: { userId: userToken } }, { multi: true })
       .exec();
   }
 
-  async deleteSystem(appId: string, type: string): Promise<any> {
+  async deleteSite(appId: string, type: string): Promise<any> {
     return this.models.System().deleteOne({ appId: appId, type }).exec();
   }
 }

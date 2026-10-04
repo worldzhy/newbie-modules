@@ -1,7 +1,7 @@
 import { Controller, Post, Req, Headers, Body } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
-import { SystemService } from "../../modules/system/system.service";
+import { SiteService } from "../../modules/site/site.service";
 import { ConfigService } from "@nestjs/config";
 import { func, getRandomIp } from "../../shared/utils";
 import { DayReportNumService } from "../../modules/day-report/day-report-num.service";
@@ -15,7 +15,7 @@ export class WebReportController {
   private config: any;
 
   constructor(
-    private readonly system: SystemService,
+    private readonly site: SiteService,
     private readonly configService: ConfigService,
     private readonly dayReportNum: DayReportNumService,
     private readonly redis: RedisService,
@@ -45,7 +45,7 @@ export class WebReportController {
     query.url = query.url || headers["referer"];
     query.userAgent = headers["user-agent"];
 
-    const system = await this.system.getSystemForAppId(query.appId);
+    const system = await this.site.getSiteForAppId(query.appId);
     if (!system?.appId) throw new Error(`appId:${query.appId} does not exist`);
 
     await this.saveWebReportDataForRedis(query);

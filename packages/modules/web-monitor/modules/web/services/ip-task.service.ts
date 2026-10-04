@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
 import { RedisService } from "../../../models/redis/redis.service";
-import { SystemService } from "../../../modules/system/system.service";
+import { SiteService } from "../../../modules/site/site.service";
 import { func } from "../../../shared/utils";
 import https from "https";
 import { RedisKeyPrefix } from "../../../models/enum";
@@ -14,13 +14,13 @@ export class WebIpTaskService {
     private readonly config: ConfigService,
     private readonly models: MonitorModelsService,
     private readonly redis: RedisService,
-    private readonly system: SystemService,
+    private readonly site: SiteService,
   ) {
     this.cfg = this.config.get("modules.web-monitor");
   }
 
   async saveWebGetIpDatas() {
-    const systems = await this.system.getWebSystemList();
+    const systems = await this.site.getWebSiteList();
     if (!systems || !systems.length) return;
     for (const sys of systems) {
       const appId = sys.appId;
