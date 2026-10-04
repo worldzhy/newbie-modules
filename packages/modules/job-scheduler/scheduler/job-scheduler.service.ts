@@ -8,6 +8,7 @@ import {
 } from "@nestjs/common";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { JobHandlerRegistryService, JobHandler } from "./handler-registry.service";
 
@@ -18,7 +19,24 @@ const DEFAULT_RUN_LIMIT = 50;
 const MAX_RUN_LIMIT = 200;
 const PG_UNIQUE_VIOLATION = "P2002";
 
-type JobTrigger = "schedule" | "manual";
+/// Emitted after a job run is persisted with status "failed". The scheduler
+/// stays decoupled from notification-center; application-layer listeners turn
+/// this event into notifications.
+export const JOB_RUN_FAILED_EVENT = "job-scheduler.run-failed";
+
+export type JobTrigger = "schedule" | "manual";
+
+export interface JobRunFailedEvent {
+  runId: number;
+  scheduleId: number;
+  scheduleKey: string;
+  handlerKey: string;
+  trigger: JobTrigger;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  error: string;
+}
 
 export interface JobScheduleDeclaration {
   key: string;
@@ -53,6 +71,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly jobHandlerRegistry: JobHandlerRegistryService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async onModuleInit() {
@@ -285,20 +304,37 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       const finishedAt = new Date();
       const errorMessage = this.getErrorMessage(error);
-      this.logger.error(
-        `Schedule ${schedule.key} ${trigger} run failed after ${
-          finishedAt.getTime() - startedAt.getTime()
-        }ms: ${errorMessage}`,
-      );
-      return this.prisma.jobRun.update({
+      const durationMs = finishedAt.getTime() - startedAt.getTime();
+      this.logger.error(`Schedule ${schedule.key} ${trigger} run failed after ${durationMs}ms: ${errorMessage}`);
+      const failedRun = await this.prisma.jobRun.update({
         where: { id: run.id },
         data: {
           status: "failed",
           finishedAt,
-          durationMs: finishedAt.getTime() - startedAt.getTime(),
+          durationMs,
           error: errorMessage.slice(0, 2000),
         },
       });
+      // Fire only after the failed run is persisted; listeners must never mask
+      // the recorded run, so a failing listener is logged, never rethrown here.
+      try {
+        this.eventEmitter.emit(JOB_RUN_FAILED_EVENT, {
+          runId: failedRun.id,
+          scheduleId: schedule.id,
+          scheduleKey: schedule.key,
+          handlerKey: schedule.handlerKey,
+          trigger,
+          startedAt: startedAt.toISOString(),
+          finishedAt: finishedAt.toISOString(),
+          durationMs,
+          error: errorMessage,
+        } satisfies JobRunFailedEvent);
+      } catch (listenerError) {
+        this.logger.error(
+          `Failed to emit ${JOB_RUN_FAILED_EVENT} for run ${run.id}: ${this.getErrorMessage(listenerError)}`,
+        );
+      }
+      return failedRun;
     } finally {
       this.runningScheduleKeys.delete(schedule.key);
     }
