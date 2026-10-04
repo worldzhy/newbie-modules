@@ -309,6 +309,11 @@ export class AwsAuditService {
         },
       });
       await this.pruneFailedScans(projectId, scanId);
+      this.eventEmitter.emit("aws-audit.scan-failed", {
+        projectId,
+        scanId,
+        error: this.getErrorMessage(error),
+      });
     } finally {
       this.activeScans.delete(projectId);
     }

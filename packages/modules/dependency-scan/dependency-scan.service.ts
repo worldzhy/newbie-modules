@@ -247,11 +247,24 @@ export class DependencyScanService {
         `Dependency scan ${scanId} finished for application ${application.name}: ${result.findings.length} findings across ${result.packageCount} packages`,
       );
     } catch (error: any) {
+      const errorMessage = this.getErrorMessage(error);
       await this.prisma.dependencyScan.update({
         where: { id: scanId },
-        data: { status: "FAILED", errorMessage: this.getErrorMessage(error), finishedAt: new Date() },
+        data: { status: "FAILED", errorMessage, finishedAt: new Date() },
       });
       await this.pruneFailedScans(applicationId, scanId);
+      const application = await this.prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { projectId: true },
+      });
+      if (application) {
+        this.eventEmitter.emit("dependency-scan.scan-failed", {
+          applicationId,
+          projectId: application.projectId,
+          scanId,
+          error: errorMessage,
+        });
+      }
     } finally {
       this.activeScans.delete(applicationId);
     }
