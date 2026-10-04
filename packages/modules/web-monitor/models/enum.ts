@@ -25,6 +25,7 @@ export enum RedisKeys {
   IP_TASK_LOCK = 'IpTaskLock',
   DAY_REPORT_NUM_TASK_LOCK = 'DayReportNumTaskLock',
   DAY_REPORT_TASK_LOCK = 'DayReportTaskLock',
+  ALERT_EVALUATION_TASK_LOCK = 'AlertEvaluationTaskLock',
 }
 
 export enum RedisKeyPrefix {

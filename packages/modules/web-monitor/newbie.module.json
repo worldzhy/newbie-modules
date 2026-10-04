@@ -48,6 +48,7 @@
     "WEB_MONITOR_TENCENT_MAP_KEY": ""
   },
   "dependencies": {
+    "@nestjs/event-emitter": "latest",
     "@nestjs/schedule": "latest",
     "cron-parser": "4.x",
     "dotenv": "latest",
