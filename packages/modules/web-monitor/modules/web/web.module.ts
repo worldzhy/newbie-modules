@@ -6,6 +6,8 @@ import { SharedModule } from "../../shared/shared.module";
 import { DayReportModule } from "../../modules/day-report/day-report.module";
 import { RedisModule } from "../../models/redis/redis.module";
 import { SystemModule } from "../../modules/system/system.module";
+import { WebInstallationService } from "../../services/web-installation.service";
+import { WebTokenResolver } from "../../services/web-token.resolver";
 
 import { WebReportController } from "./report.controller";
 
@@ -62,7 +64,13 @@ import { WebIpTaskService } from "./services/ip-task.service";
     WebReportTaskService,
     WebPvuvipTaskService,
     WebIpTaskService,
+    // Installation identity lives here (not on the root WebMonitorModule) so
+    // WebReportController can resolve WebTokenResolver without a module cycle.
+    WebInstallationService,
+    WebTokenResolver,
   ],
-  exports: [WebReportTaskService, WebPvuvipTaskService, WebIpTaskService],
+  // WebInstallationService is re-exported by the root WebMonitorModule for
+  // consuming projects whose application layer provisions installations.
+  exports: [WebReportTaskService, WebPvuvipTaskService, WebIpTaskService, WebInstallationService],
 })
 export class WebModule {}

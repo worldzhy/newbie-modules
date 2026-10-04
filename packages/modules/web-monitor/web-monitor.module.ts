@@ -12,8 +12,6 @@ import { DayReportModule } from "./modules/day-report/day-report.module";
 import { MonitorModelsModule } from "./models/mongo/monitor-models.module";
 import { WebModule } from "./modules/web/web.module";
 import { RemoveModule } from "./modules/remove/remove.module";
-import { WebInstallationService } from "./services/web-installation.service";
-import { WebTokenResolver } from "./services/web-token.resolver";
 
 @Global()
 @Module({
@@ -29,9 +27,9 @@ import { WebTokenResolver } from "./services/web-token.resolver";
     WebModule,
     RemoveModule,
   ],
-  providers: [WebInstallationService, WebTokenResolver],
-  // WebInstallationService is exported for consuming projects whose
-  // application layer provisions installations (e.g. nightwatch).
-  exports: [WebInstallationService],
+  // WebInstallationService is provided by WebModule (report-side wiring) and
+  // re-exported here for consuming projects whose application layer
+  // provisions installations (e.g. nightwatch).
+  exports: [WebModule],
 })
 export class WebMonitorModule {}
