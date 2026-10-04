@@ -7,7 +7,7 @@ import { SEVERITIES } from "./notification-center.constants";
  * values from the `context` object passed to notify().
  */
 export interface NotificationDeclaration {
-  /** Stable unique key, e.g. "security.scan-digest". */
+  /** Stable unique key, e.g. "aws.scan-report". */
   key: string;
   /** Human-readable name shown in the settings UI. */
   name: string;
