@@ -1,0 +1,49 @@
+// ! ------------------------------------------------------------ //
+// !              [Module] Web Monitor models                     //
+// ! ------------------------------------------------------------ //
+// * WebInstallation                                                //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+// Web-monitor ingest identity. PostgreSQL schema: "module/web-monitor".
+// One WebInstallation = one FRONTEND application whose browser SDK reports
+// to /api/v1/report/web. The module owns the token end to end instead of
+// reading application.Agent (WEB_MONITOR): the token is a random UUID, only
+// its SHA-256 hash is stored, the plaintext is returned once at
+// enrollment/rotation, and revocation is a soft delete.
+//
+// `appKey` is the immutable public partition key embedded in Mongo collection
+// names (WebPages_<appKey>) and ClickHouse table names (WebAjax_<appKey>);
+// it is generated at enrollment and never rotated.
+//
+// Host-side grouping lives in opaque `externalRef` (convention:
+// "projectId/applicationId"); the application layer matches on it to render
+// credential state. Cross-schema references use scalar ids, never FKs.
+//
+// Lifecycle is derived, not stored: never-seen (lastSeenAt null) / online /
+// stale. Only revocation is an explicit persisted state.
+model WebInstallation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  // Human-readable label assigned at enrollment, e.g. "nightwatch-web-monitor".
+  label String @db.VarChar(255)
+  // SHA-256 hex of the report token. The plaintext token is returned once at
+  // creation/rotation and never stored.
+  tokenHash String @unique @db.VarChar(64)
+
+  // Immutable public partition key (embedded in Mongo/ClickHouse names).
+  appKey String @unique @db.VarChar(64)
+
+  // Opaque host-owned tag (convention: "projectId/applicationId").
+  externalRef String? @db.VarChar(255)
+
+  firstSeenAt DateTime?
+  lastSeenAt  DateTime?
+
+  // Soft revocation: reports are rejected (401), rows retained for history.
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/web-monitor")
+}

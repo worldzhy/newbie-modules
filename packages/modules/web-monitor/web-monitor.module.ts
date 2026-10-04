@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 // ScheduleModule.forRoot() is owned by the job-scheduler module when both
 // modules are assembled: a second forRoot would register every @Cron twice.
 // Shared MongoDB connection module, consumed via the microservices path alias.
@@ -12,7 +12,10 @@ import { DayReportModule } from "./modules/day-report/day-report.module";
 import { MonitorModelsModule } from "./models/mongo/monitor-models.module";
 import { WebModule } from "./modules/web/web.module";
 import { RemoveModule } from "./modules/remove/remove.module";
+import { WebInstallationService } from "./services/web-installation.service";
+import { WebTokenResolver } from "./services/web-token.resolver";
 
+@Global()
 @Module({
   imports: [
     MongoModule,
@@ -26,6 +29,9 @@ import { RemoveModule } from "./modules/remove/remove.module";
     WebModule,
     RemoveModule,
   ],
-  providers: [],
+  providers: [WebInstallationService, WebTokenResolver],
+  // WebInstallationService is exported for consuming projects whose
+  // application layer provisions installations (e.g. nightwatch).
+  exports: [WebInstallationService],
 })
 export class WebMonitorModule {}
