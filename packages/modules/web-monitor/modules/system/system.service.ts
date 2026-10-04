@@ -33,6 +33,7 @@ export class SystemService {
     system.userId = [body.token || ""];
     system.createTime = new Date();
     system.slowPageTime = body.slowPageTime || 5;
+    system.slowWhiteTime = body.slowWhiteTime || 2;
     system.slowJsTime = body.slowJsTime || 2;
     system.slowCssTime = body.slowCssTime || 2;
     system.slowImgTime = body.slowImgTime || 2;
@@ -52,6 +53,7 @@ export class SystemService {
         systemName: body.systemName || "",
         systemDomain: body.systemDomain || "",
         slowPageTime: body.slowPageTime || 5,
+        slowWhiteTime: body.slowWhiteTime || 2,
         slowJsTime: body.slowJsTime || 2,
         type: body.type || "web",
         slowCssTime: body.slowCssTime || 2,

@@ -11,6 +11,7 @@ export class System {
   @Prop({ type: [String], default: [] }) userId: string[]; // Owner user IDs
   @Prop({ default: Date.now }) createTime: Date; // Creation time
   @Prop({ default: 5 }) slowPageTime: number; // Slow page threshold (s)
+  @Prop({ default: 2 }) slowWhiteTime: number; // Slow first-paint threshold (s)
   @Prop({ default: 2 }) slowJsTime: number; // Slow JS threshold (s)
   @Prop({ default: 2 }) slowCssTime: number; // Slow CSS threshold (s)
   @Prop({ default: 2 }) slowImgTime: number; // Slow image threshold (s)

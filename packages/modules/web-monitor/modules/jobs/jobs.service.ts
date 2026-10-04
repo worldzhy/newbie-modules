@@ -81,11 +81,16 @@ export class JobsService implements OnModuleInit {
 
   // Minimum breaching occurrences within one evaluation window before a
   // signal fires. Every web system is evaluated; these gates keep a single
-  // slow resource from producing an alert every minute.
-  private static readonly MIN_SLOW_PAGE_COUNT = 1;
+  // slow load from producing an alert every minute.
+  private static readonly MIN_SLOW_PAGE_COUNT = 2;
+  private static readonly MIN_SLOW_FIRST_PAINT_COUNT = 2;
   private static readonly MIN_SLOW_RESOURCE_COUNT = 3;
   private static readonly MIN_SLOW_AJAX_COUNT = 3;
+  // A spike needs enough errors AND enough distinct visitors, so one user
+  // stuck in an error loop cannot page the channel group.
   private static readonly JS_ERROR_SPIKE_COUNT = 10;
+  private static readonly JS_ERROR_SPIKE_USER_COUNT = 2;
+  private static readonly NEW_ERROR_LIMIT = 3;
   private static readonly TOP_ITEMS_LIMIT = 3;
 
   async evaluateThresholdAlerts() {
@@ -145,6 +150,34 @@ export class JobsService implements OnModuleInit {
           thresholdMs: (system.slowPageTime ?? 5) * 1000,
           topItems: topRows.map(
             (row: any) => `${row._id || "Unknown page"} — ${row.count} load(s), max ${row.maxLoadTime ?? 0}ms`,
+          ),
+        });
+      }
+    });
+
+    await this.runSignal("slow first paints", async () => {
+      const pageModel = this.models.WebPage(system.appId);
+      const paintThresholdMs = (system.slowWhiteTime ?? 2) * 1000;
+      const match = { createTime: { $gte: windowStart, $lt: windowEnd }, whiteTime: { $gte: paintThresholdMs } };
+      const [count, topRows] = await Promise.all([
+        pageModel.countDocuments(match),
+        pageModel.aggregate([
+          { $match: match },
+          { $group: { _id: "$url", count: { $sum: 1 }, maxWhiteTime: { $max: "$whiteTime" } } },
+          { $sort: { count: -1 } },
+          { $limit: JobsService.TOP_ITEMS_LIMIT },
+        ]),
+      ]);
+      if (count >= JobsService.MIN_SLOW_FIRST_PAINT_COUNT) {
+        this.emitAlert({
+          ...base,
+          signal: "slow-first-paint",
+          severity: "medium",
+          count,
+          thresholdMs: paintThresholdMs,
+          topItems: topRows.map(
+            (row: any) =>
+              `${row._id || "Unknown page"} — ${row.count} load(s), max first paint ${row.maxWhiteTime ?? 0}ms`,
           ),
         });
       }
@@ -221,9 +254,17 @@ export class JobsService implements OnModuleInit {
     await this.runSignal("js error spike", async () => {
       const errorModel = await this.clickhouse.WebError(system.appId);
       const timeFilter = this.buildClickhouseTimeFilter(windowStart, windowEnd);
-      const countRows = await errorModel.find({ where: timeFilter, select: "count() AS total" });
+      // Count both errors and distinct identified visitors. Anonymous
+      // traffic (empty markUser) cannot be attributed, so the user gate only
+      // applies when at least one visitor in the window is identifiable.
+      const countRows = await errorModel.find({
+        where: timeFilter,
+        select: "count() AS total, uniqExactIf(markUser, markUser != '') AS markedUsers",
+      });
       const count = parseInt(countRows[0]?.total ?? "0", 10);
-      if (count >= JobsService.JS_ERROR_SPIKE_COUNT) {
+      const markedUsers = parseInt(countRows[0]?.markedUsers ?? "0", 10);
+      const enoughUsers = markedUsers === 0 || markedUsers >= JobsService.JS_ERROR_SPIKE_USER_COUNT;
+      if (count >= JobsService.JS_ERROR_SPIKE_COUNT && enoughUsers) {
         const topRows = await errorModel.find({
           where: timeFilter,
           select: "name, type, resourceUrl, COUNT() AS count",
@@ -236,10 +277,56 @@ export class JobsService implements OnModuleInit {
           signal: "js-error-spike",
           severity: "high",
           count,
+          affectedUsers: markedUsers,
           topItems: topRows.map(
             (row: any) =>
               `[${row.type || "Error"}] ${row.name || "Unknown error"} @ ${row.resourceUrl || ""} — ${row.count}`,
           ),
+        });
+      }
+    });
+
+    // First-seen JS errors (Sentry-style new issues): group the window by
+    // error fingerprint and alert for fingerprints with no row before the
+    // window. A fingerprint that persists is already "known" one minute
+    // later, so it never re-alerts.
+    await this.runSignal("new js errors", async () => {
+      const errorModel = await this.clickhouse.WebError(system.appId);
+      const timeFilter = this.buildClickhouseTimeFilter(windowStart, windowEnd);
+      const groups = await errorModel.find({
+        where: timeFilter,
+        select: "name, resourceUrl, line, type, COUNT() AS count, uniqExactIf(markUser, markUser != '') AS users",
+        groupBy: "name, resourceUrl, line, type",
+        orderBy: "count DESC",
+        limit: JobsService.NEW_ERROR_LIMIT,
+      });
+      for (const row of groups) {
+        const name = String(row.name ?? "Unknown error");
+        const resourceUrl = String(row.resourceUrl ?? "");
+        const line = String(row.line ?? "");
+        const fingerprint = this.errorFingerprint(name, resourceUrl, line);
+        const beforeFilter = this.buildClickhouseBeforeFilter(windowStart);
+        const existedRows = await errorModel.find({
+          where:
+            `${beforeFilter} AND name = ${this.chLiteral(name)} ` +
+            `AND resourceUrl = ${this.chLiteral(resourceUrl)} AND line = ${this.chLiteral(line)}`,
+          select: "1",
+          limit: 1,
+        });
+        if (existedRows.length > 0) continue;
+        this.emitAlert({
+          ...base,
+          signal: "new-js-error",
+          severity: "high",
+          count: parseInt(row.count ?? "0", 10),
+          affectedUsers: parseInt(row.users ?? "0", 10),
+          errorName: name,
+          resourceUrl,
+          fingerprint,
+          topItems: [
+            `[${row.type || "Error"}] ${name} @ ${resourceUrl || "unknown"}:${line || "?"} ` +
+              `— ${row.count} occurrence(s), ${row.users} identified user(s)`,
+          ],
         });
       }
     });
@@ -270,6 +357,27 @@ export class JobsService implements OnModuleInit {
       `createTime >= toDateTime('${this.toShanghaiDateTime(windowStart)}', 'Asia/Shanghai') ` +
       `AND createTime < toDateTime('${this.toShanghaiDateTime(windowEnd)}', 'Asia/Shanghai')`
     );
+  }
+
+  /** Upper-bound filter for checking whether an error fingerprint existed earlier. */
+  private buildClickhouseBeforeFilter(windowStart: Date): string {
+    return `createTime < toDateTime('${this.toShanghaiDateTime(windowStart)}', 'Asia/Shanghai')`;
+  }
+
+  /** Escapes a value as a ClickHouse single-quoted string literal. */
+  private chLiteral(value: string): string {
+    return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+  }
+
+  /** Compact stable hash (FNV-1a, hex) of an error name/url/line fingerprint. */
+  private errorFingerprint(name: string, resourceUrl: string, line: string): string {
+    const source = `${name}|${resourceUrl}|${line}`;
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < source.length; i++) {
+      hash ^= source.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193) >>> 0;
+    }
+    return hash.toString(16).padStart(8, "0");
   }
 
   /** Formats a Date as a ClickHouse datetime literal in Asia/Shanghai (UTC+8). */

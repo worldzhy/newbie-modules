@@ -38,6 +38,9 @@ export class WebMonitorSystemResponseDto {
   @ApiProperty({ type: Number, description: "Slow page threshold (seconds)" })
   slowPageTime: number;
 
+  @ApiProperty({ type: Number, description: "Slow first-paint threshold (seconds)" })
+  slowWhiteTime: number;
+
   @ApiProperty({ type: Number, description: "Slow JS threshold (seconds)" })
   slowJsTime: number;
 

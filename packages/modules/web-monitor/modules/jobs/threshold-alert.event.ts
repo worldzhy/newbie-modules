@@ -9,7 +9,8 @@
  */
 export const WEB_THRESHOLD_ALERT_EVENT = "web-monitor.threshold-alert";
 
-export type WebThresholdAlertSignal = "slow-page" | "slow-resource" | "slow-ajax" | "js-error-spike";
+export type WebThresholdAlertSignal =
+  "slow-page" | "slow-first-paint" | "slow-resource" | "slow-ajax" | "js-error-spike" | "new-js-error";
 
 export type WebThresholdAlertCategory = "js" | "css" | "img";
 
@@ -24,6 +25,8 @@ export interface WebThresholdAlertEvent {
   severity: "medium" | "high";
   /** Breaching occurrences observed in the window. */
   count: number;
+  /** Distinct affected visitors (markUser) in the window, when the signal tracks it. */
+  affectedUsers?: number;
   /** Breached millisecond threshold (performance signals only). */
   thresholdMs?: number;
   /** Evaluation window size in milliseconds. */
@@ -32,4 +35,10 @@ export interface WebThresholdAlertEvent {
   windowStartedAt: string;
   /** Pre-rendered top offender lines for the notification detail body. */
   topItems: string[];
+  /** Error name for fingerprint-based signals (new-js-error). */
+  errorName?: string;
+  /** Error resource URL for fingerprint-based signals (new-js-error). */
+  resourceUrl?: string;
+  /** Stable fingerprint of a first-seen error, appended to the dedupe bucket. */
+  fingerprint?: string;
 }
