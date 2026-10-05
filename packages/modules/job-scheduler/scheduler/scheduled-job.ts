@@ -12,6 +12,7 @@ import { JobHandlerRegistryService } from "./handler-registry.service";
  */
 export abstract class ScheduledJob implements OnModuleInit {
   protected abstract readonly key: string;
+  protected abstract readonly name: string;
   /// Optional override; defaults to the platform timezone when not declared.
   protected readonly timezone: string = DEFAULT_TIMEZONE;
   protected abstract readonly cronExpr: string;
