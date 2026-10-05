@@ -23,7 +23,7 @@ import { Expose, expose } from "@modules/account/helpers/expose";
 import { verifyEmail } from "@modules/account/helpers/validator";
 import { GeolocationService } from "@modules/account/helpers/geolocation.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
-import { AuditLogService, AuditEvent } from "@modules/account/modules/audit-logs/audit-log.service";
+import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { CookieService } from "@modules/security/cookie/cookie.service";
 import { TokenService } from "@modules/security/token/token.service";
@@ -83,7 +83,7 @@ export class AuthService {
 
     // [step 5] Record the login.
     await this.auditLogService.record(AuditEvent.LOGIN, {
-      userId: params.userId,
+      actorId: params.userId,
       ipAddress: params.ipAddress,
       userAgent: params.userAgent,
     });
@@ -159,7 +159,7 @@ export class AuthService {
 
     await this.approvedSubnetService.approveNewSubnet(user.id, params.ipAddress);
     await this.auditLogService.record(AuditEvent.SIGNUP, {
-      userId: user.id,
+      actorId: user.id,
       ipAddress: params.ipAddress,
     });
     return expose(user);

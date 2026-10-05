@@ -6,7 +6,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { generateRandomString } from "@devbie/newbie/utilities/random.util";
 import { generateHash } from "@devbie/newbie/utilities/common.util";
 import { Expose, expose } from "../../helpers/expose";
-import { AuditLogService, AuditEvent } from "../audit-logs/audit-log.service";
+import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
 import { LRUCache } from "lru-cache";
 
 /** An API key belongs to either a user (personal key) or an organization. */
@@ -59,9 +59,10 @@ export class ApiKeyService {
       },
     });
     await this.auditLogService.record(AuditEvent.API_KEY_CREATED, {
-      userId: params.userId,
-      apiKeyId: apiKey.id,
+      actorId: params.userId,
       organizationId: params.organizationId,
+      resourceType: "api-key",
+      resourceId: String(apiKey.id),
       detail: { description: apiKey.description },
     });
     return { ...expose<ApiKey>({ ...apiKey }), secret };
@@ -167,9 +168,10 @@ export class ApiKeyService {
     });
     this.lru.delete(ownedApiKey.key);
     await this.auditLogService.record(AuditEvent.API_KEY_DELETED, {
-      userId: "organizationId" in owner ? undefined : owner.userId,
-      apiKeyId: id,
+      actorId: "organizationId" in owner ? undefined : owner.userId,
       organizationId: "organizationId" in owner ? owner.organizationId : undefined,
+      resourceType: "api-key",
+      resourceId: String(id),
     });
     return expose<ApiKey>(apiKey);
   }

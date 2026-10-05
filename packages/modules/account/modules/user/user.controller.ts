@@ -5,7 +5,7 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TokenService } from "@modules/security/token/token.service";
-import { AuditLogService, AuditEvent } from "@modules/account/modules/audit-logs/audit-log.service";
+import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
 import { UserService } from "./user.service";
 import {
   ChangeUserPasswordDto,
@@ -154,7 +154,9 @@ export class UserController {
 
     if (roles !== undefined) {
       await this.auditLogService.record(AuditEvent.ROLES_CHANGED, {
-        userId,
+        actorId: userId,
+        resourceType: "user",
+        resourceId: userId,
         detail: { roles },
       });
     }

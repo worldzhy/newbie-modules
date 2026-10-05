@@ -1,0 +1,42 @@
+// !! ------------------------------------------------------------ //
+// !!                    [Module] Audit models                     //
+// !! ------------------------------------------------------------ //
+// * AuditLog                                                      //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+// Append-only, immutable audit trail. There is deliberately no update or
+// delete API: rows are created by explicit AuditLogService.record() calls and
+// by the global AuditInterceptor, and only ever read back.
+//
+// The actor is a weak scalar reference (actorType + actorId) rather than a
+// cross-schema relation: users or API keys may be deleted while their audit
+// history must remain intact.
+model AuditLog {
+  id             Int      @id @default(autoincrement())
+  event          String
+  action         String?
+  resourceType   String?
+  resourceId     String?
+  result         String   @default("success")
+  detail         Json?
+  actorType      String?
+  actorId        String?
+  organizationId String?  @db.Uuid
+  ipAddress      String?
+  userAgent      String?
+  city           String?
+  region         String?
+  timezone       String?
+  countryCode    String?
+  browser        String?
+  operatingSystem String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([actorId])
+  @@index([event])
+  @@index([createdAt])
+  @@index([organizationId, createdAt])
+  @@schema("module/audit")
+}

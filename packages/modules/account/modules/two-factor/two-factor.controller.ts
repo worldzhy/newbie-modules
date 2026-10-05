@@ -1,7 +1,7 @@
 import { Body, Controller, Post, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { UserRequest } from "@modules/security/security.interface";
-import { AuditLogService, AuditEvent } from "../audit-logs/audit-log.service";
+import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
 import { DisableTwoFactorDto, EnableTwoFactorDto } from "./two-factor.dto";
 import { TwoFactorService } from "./two-factor.service";
 
@@ -25,7 +25,7 @@ export class TwoFactorController {
   @ApiOperation({ summary: "Confirm TOTP code and enable two-factor authentication" })
   async enable(@Req() request: UserRequest, @Body() body: EnableTwoFactorDto) {
     const result = await this.twoFactorService.enable(request.user.userId, body.code);
-    await this.auditLogService.record(AuditEvent.MFA_ENABLED, { userId: request.user.userId });
+    await this.auditLogService.record(AuditEvent.MFA_ENABLED, { actorId: request.user.userId });
     return result;
   }
 
@@ -33,7 +33,7 @@ export class TwoFactorController {
   @ApiOperation({ summary: "Disable two-factor authentication" })
   async disable(@Req() request: UserRequest, @Body() body: DisableTwoFactorDto) {
     await this.twoFactorService.disable(request.user.userId, body);
-    await this.auditLogService.record(AuditEvent.MFA_DISABLED, { userId: request.user.userId });
+    await this.auditLogService.record(AuditEvent.MFA_DISABLED, { actorId: request.user.userId });
     return { message: "Two-factor authentication disabled." };
   }
 }

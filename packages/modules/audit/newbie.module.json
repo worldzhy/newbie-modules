@@ -1,0 +1,24 @@
+{
+  "key": "audit",
+  "layer": "foundation",
+  "module": {
+    "file": "audit.module",
+    "className": "AuditModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "config-service": {
+    "audit": {
+      "geolocationLruSize": "int(process.env.AUDIT_GEOLOCATION_LRU_SIZE, 100)"
+    }
+  },
+  "env": {
+    "AUDIT_GEOLOCATION_LRU_SIZE": ""
+  },
+  "dependencies": {
+    "geolite2-redist": "latest",
+    "lru-cache": "latest",
+    "maxmind": "latest",
+    "ua-parser-js": "latest"
+  },
+  "devDependencies": {}
+}
