@@ -284,6 +284,16 @@ export class AuthService {
       await this.approvedSubnetService.approveNewSubnet(user.id, params.ipAddress);
     } else {
       if (user.status === UserStatus.INACTIVE) {
+        // Google proved control of the email, so this is a login rejection of
+        // a known identity rather than an upstream handshake failure.
+        await this.auditLogService.record(AuditEvent.LOGIN_FAILED, {
+          actorType: AuditActorType.USER,
+          actorId: user.id,
+          result: AuditResult.FAILURE,
+          ipAddress: params.ipAddress,
+          userAgent: params.userAgent,
+          detail: { reason: "inactive_user", provider: "google" },
+        });
         throw new ForbiddenException("The account is not active.");
       }
       // Sync the verification state: Google proved control of the email.
