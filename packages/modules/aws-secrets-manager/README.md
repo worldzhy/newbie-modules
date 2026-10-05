@@ -14,18 +14,38 @@ A stateless read-through proxy over AWS Secrets Manager. AWS is the single sourc
 
 All routes live under `/aws-secrets-manager/secrets` and are keyed by secret **name** (there is no local id). Every endpoint requires a `projectId` (query or body) to resolve the AWS credential; an optional `region` overrides the credential default region.
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| POST | `/aws-secrets-manager/secrets` | Create a secret (value + tags in one atomic call) |
-| GET | `/aws-secrets-manager/secrets` | List managed secrets (metadata only) |
-| GET | `/aws-secrets-manager/secrets/:name` | Secret metadata |
-| GET | `/aws-secrets-manager/secrets/:name/value` | Decrypted secret value (AWSCURRENT) |
-| PATCH | `/aws-secrets-manager/secrets/:name` | Update value / description / type |
-| DELETE | `/aws-secrets-manager/secrets/:name` | Delete with a 30-day recovery window |
-| POST | `/aws-secrets-manager/secrets/:name/rotate` | Trigger an immediate rotation |
-| POST | `/aws-secrets-manager/secrets/:name/rotation` | Enable / disable automatic rotation |
+| Method | Path                                          | Purpose                                               |
+| ------ | --------------------------------------------- | ----------------------------------------------------- |
+| POST   | `/aws-secrets-manager/secrets`                | Create a secret (value + tags in one atomic call)     |
+| GET    | `/aws-secrets-manager/secrets`                | List managed secrets (one cursor page, metadata only) |
+| GET    | `/aws-secrets-manager/secrets/:name`          | Secret metadata                                       |
+| GET    | `/aws-secrets-manager/secrets/:name/value`    | Decrypted secret value (AWSCURRENT)                   |
+| PATCH  | `/aws-secrets-manager/secrets/:name`          | Update value / description / type                     |
+| DELETE | `/aws-secrets-manager/secrets/:name`          | Delete with a 30-day recovery window                  |
+| POST   | `/aws-secrets-manager/secrets/:name/rotate`   | Trigger an immediate rotation                         |
+| POST   | `/aws-secrets-manager/secrets/:name/rotation` | Enable / disable automatic rotation                   |
 
 Secret names must match `^[a-zA-Z0-9_+=.@-]{1,512}$` (no slash — the name is a URL path parameter).
+
+## Pagination
+
+The list endpoint uses AWS-native cursor pagination (there is no total count — AWS cannot return one without a full scan):
+
+- Request: optional `pageSize` (1–100, default 100) and `nextToken`.
+- Response: `{ records, nextToken }`; `nextToken` is `null` on the last page, otherwise pass it back unchanged to fetch the next page.
+
+## Secret values
+
+The write path (create / update) accepts `secretValue` as either:
+
+- a JSON object — stored as a JSON document, or
+- a non-empty plain-text string — stored verbatim.
+
+The value endpoint returns `{ name, secretValue, valueType }` where `valueType` is:
+
+- `json` — `SecretString` parsed into an object;
+- `text` — `SecretString` returned verbatim (plain text, or a non-object JSON document such as an array or scalar);
+- `binary` — externally provisioned `SecretBinary`, re-encoded as base64 (binary values cannot be created from this plane).
 
 ## Rotation
 

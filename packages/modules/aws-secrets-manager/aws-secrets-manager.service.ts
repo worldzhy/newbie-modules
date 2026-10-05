@@ -22,15 +22,31 @@ import {
   UpdateSecretCommand,
 } from "@aws-sdk/client-secrets-manager";
 import type { SecretListEntry } from "@aws-sdk/client-secrets-manager";
-import { MANAGED_TAG_KEY, SECRET_TYPE_TAG_KEY, SECRET_TYPES, SecretType } from "./aws-secrets-manager.types";
+import {
+  MANAGED_TAG_KEY,
+  SECRET_TYPE_TAG_KEY,
+  SECRET_TYPES,
+  SecretType,
+  SecretValueType,
+} from "./aws-secrets-manager.types";
+import { DEFAULT_LIST_PAGE_SIZE } from "./aws-secrets-manager.dto";
+import type { SecretValuePayload } from "./aws-secrets-manager.dto";
 
 const DEFAULT_ROTATION_DAYS = 30;
 const DELETE_RECOVERY_WINDOW_DAYS = 30;
-const LIST_PAGE_SIZE = 100;
+
+/** Bounded TTL for cached AWS clients: bounds memory and self-heals rotated credentials. */
+const CLIENT_CACHE_TTL_MS = 5 * 60 * 1000;
+const CLIENT_CACHE_MAX_ENTRIES = 100;
 
 interface ProjectContext {
   client: SecretsManagerClient;
   region: string;
+}
+
+interface CachedClient {
+  client: SecretsManagerClient;
+  expiresAt: number;
 }
 
 /**
@@ -42,43 +58,33 @@ interface ProjectContext {
 @Injectable()
 export class AwsSecretsManagerService {
   private readonly logger = new Logger(AwsSecretsManagerService.name);
-  private readonly clientCache = new Map<string, SecretsManagerClient>();
+  private readonly clientCache = new Map<string, CachedClient>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly credentialService: AwsCredentialService,
   ) {}
 
-  async listSecrets(params: { projectId: string; page: number; pageSize: number; region?: string }) {
+  /**
+   * Returns a single AWS page (cursor pagination). The opaque nextToken must be
+   * passed back by the caller; total count is unknown without a full scan and
+   * is therefore not returned.
+   */
+  async listSecrets(params: { projectId: string; pageSize?: number; nextToken?: string; region?: string }) {
     const { client, region } = await this.getProjectContext(params.projectId, params.region);
 
-    const entries: SecretListEntry[] = [];
-    let nextToken: string | undefined;
-    do {
-      const response = await this.callAws(() =>
-        client.send(
-          new ListSecretsCommand({
-            Filters: [{ Key: "tag-key", Values: [MANAGED_TAG_KEY] }],
-            MaxResults: LIST_PAGE_SIZE,
-            NextToken: nextToken,
-          }),
-        ),
-      );
-      entries.push(...(response.SecretList ?? []));
-      nextToken = response.NextToken;
-    } while (nextToken);
+    const response = await this.callAws(() =>
+      client.send(
+        new ListSecretsCommand({
+          Filters: [{ Key: "tag-key", Values: [MANAGED_TAG_KEY] }],
+          MaxResults: params.pageSize ?? DEFAULT_LIST_PAGE_SIZE,
+          ...(params.nextToken ? { NextToken: params.nextToken } : {}),
+        }),
+      ),
+    );
 
-    const start = params.page * params.pageSize;
-    const records = entries.slice(start, start + params.pageSize).map((entry) => this.toSecretResponse(entry, region));
-    return {
-      pagination: {
-        countOfCurrentPage: records.length,
-        countOfTotal: entries.length,
-        page: params.page,
-        pageSize: params.pageSize,
-      },
-      records,
-    };
+    const records = (response.SecretList ?? []).map((entry) => this.toSecretResponse(entry, region));
+    return { records, nextToken: response.NextToken ?? null };
   }
 
   async getSecret(projectId: string, name: string, region?: string) {
@@ -87,25 +93,42 @@ export class AwsSecretsManagerService {
     return this.toSecretResponse(entry, resolvedRegion);
   }
 
-  async getSecretValue(projectId: string, name: string, region?: string) {
+  async getSecretValue(
+    projectId: string,
+    name: string,
+    region?: string,
+  ): Promise<{ name: string; secretValue: SecretValuePayload; valueType: SecretValueType }> {
     const { client } = await this.getProjectContext(projectId, region);
     const response = await this.callAws(() =>
       client.send(new GetSecretValueCommand({ SecretId: name, VersionStage: "AWSCURRENT" })),
     );
-    const raw =
-      response.SecretString ?? (response.SecretBinary ? Buffer.from(response.SecretBinary).toString("utf-8") : "{}");
-
-    let secretValue: Record<string, any>;
-    try {
-      secretValue = JSON.parse(raw);
-    } catch {
-      throw new BadRequestException("Secret value is not valid JSON");
-    }
 
     // Value reads are the most sensitive operation of this plane; audit them via
     // the log sink until a dedicated audit trail is wired.
     this.logger.log(`Secret value read: project=${projectId} name=${name}`);
-    return { name, secretValue };
+
+    // Binary secrets cannot be created from this plane; return them as base64
+    // so externally provisioned binary secrets do not turn into a 400.
+    if (response.SecretBinary) {
+      return { name, secretValue: Buffer.from(response.SecretBinary).toString("base64"), valueType: "binary" };
+    }
+
+    const raw = response.SecretString;
+    if (raw === undefined) {
+      return { name, secretValue: "", valueType: "text" };
+    }
+
+    // Only JSON objects map to the structured valueType; JSON scalars/arrays
+    // and any non-JSON text are surfaced verbatim as plain text.
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return { name, secretValue: parsed as Record<string, unknown>, valueType: "json" };
+      }
+    } catch {
+      // Not a JSON document: fall through to the verbatim text representation.
+    }
+    return { name, secretValue: raw, valueType: "text" };
   }
 
   async createSecret(params: {
@@ -113,7 +136,7 @@ export class AwsSecretsManagerService {
     name: string;
     type: SecretType;
     description?: string;
-    secretValue: Record<string, any>;
+    secretValue: SecretValuePayload;
     region?: string;
   }) {
     const { client, region } = await this.getProjectContext(params.projectId, params.region);
@@ -124,7 +147,7 @@ export class AwsSecretsManagerService {
         new CreateSecretCommand({
           Name: params.name,
           Description: params.description,
-          SecretString: JSON.stringify(params.secretValue),
+          SecretString: this.serializeSecretValue(params.secretValue),
           Tags: [
             { Key: MANAGED_TAG_KEY, Value: "true" },
             { Key: SECRET_TYPE_TAG_KEY, Value: params.type },
@@ -138,7 +161,7 @@ export class AwsSecretsManagerService {
   async updateSecret(
     projectId: string,
     name: string,
-    data: { secretValue?: Record<string, any>; description?: string; type?: SecretType; region?: string },
+    data: { secretValue?: SecretValuePayload; description?: string; type?: SecretType; region?: string },
   ) {
     const { client, region } = await this.getProjectContext(projectId, data.region);
 
@@ -147,7 +170,7 @@ export class AwsSecretsManagerService {
         client.send(
           new UpdateSecretCommand({
             SecretId: name,
-            ...(data.secretValue !== undefined ? { SecretString: JSON.stringify(data.secretValue) } : {}),
+            ...(data.secretValue !== undefined ? { SecretString: this.serializeSecretValue(data.secretValue) } : {}),
             ...(data.description !== undefined ? { Description: data.description } : {}),
           }),
         ),
@@ -214,22 +237,59 @@ export class AwsSecretsManagerService {
 
   // --- Helpers ---
 
+  /** Objects are stored as JSON text; plain strings are stored verbatim. */
+  private serializeSecretValue(secretValue: SecretValuePayload): string {
+    return typeof secretValue === "string" ? secretValue : JSON.stringify(secretValue);
+  }
+
   private async getProjectContext(projectId: string, region?: string): Promise<ProjectContext> {
     const credential = await this.credentialService.resolveProjectCredential(projectId);
     const resolvedRegion = region ?? credential.defaultRegion;
     const cacheKey = `${projectId}:${resolvedRegion}:${credential.accessKeyId}`;
-    let client = this.clientCache.get(cacheKey);
-    if (!client) {
-      client = new SecretsManagerClient({
-        region: resolvedRegion,
-        credentials: {
-          accessKeyId: credential.accessKeyId,
-          secretAccessKey: credential.secretAccessKey,
-        },
-      });
-      this.clientCache.set(cacheKey, client);
+    const now = Date.now();
+
+    const cached = this.clientCache.get(cacheKey);
+    if (cached) {
+      if (cached.expiresAt > now) {
+        return { client: cached.client, region: resolvedRegion };
+      }
+      this.clientCache.delete(cacheKey);
+      this.disposeClient(cached.client);
     }
+
+    const client = new SecretsManagerClient({
+      region: resolvedRegion,
+      credentials: {
+        accessKeyId: credential.accessKeyId,
+        secretAccessKey: credential.secretAccessKey,
+      },
+    });
+
+    // Bounded LRU-ish eviction: Map preserves insertion order, so the first
+    // key is the oldest entry. TTL expiry bounds staleness after credential
+    // rotation; the entry cap bounds memory across projects/regions.
+    if (this.clientCache.size >= CLIENT_CACHE_MAX_ENTRIES) {
+      const oldestKey = this.clientCache.keys().next().value;
+      if (oldestKey !== undefined) {
+        const oldest = this.clientCache.get(oldestKey);
+        this.clientCache.delete(oldestKey);
+        if (oldest) {
+          this.disposeClient(oldest.client);
+        }
+      }
+    }
+
+    this.clientCache.set(cacheKey, { client, expiresAt: now + CLIENT_CACHE_TTL_MS });
     return { client, region: resolvedRegion };
+  }
+
+  /** Best-effort socket cleanup for evicted clients; never throws. */
+  private disposeClient(client: SecretsManagerClient): void {
+    try {
+      client.destroy();
+    } catch (error) {
+      this.logger.debug(`Failed to close an evicted AWS client: ${(error as Error)?.name ?? "UnknownError"}`);
+    }
   }
 
   private async getRotationLambdaArn(projectId: string): Promise<string | null> {
@@ -260,10 +320,20 @@ export class AwsSecretsManagerService {
     };
   }
 
-  /** Map AWS SDK errors onto HTTP semantics without leaking raw AWS messages. */
+  /**
+   * Map AWS SDK errors onto HTTP semantics. Logs only the non-sensitive error
+   * name, HTTP status and AWS requestId — raw SDK messages can contain ARNs
+   * and account IDs and must never reach the log sink.
+   */
   private toHttpException(error: unknown): HttpException {
-    const { name, message } = (error ?? {}) as { name?: string; message?: string };
-    this.logger.warn(`AWS Secrets Manager call failed: ${name ?? "UnknownError"}: ${message ?? String(error)}`);
+    const { name, $metadata } = (error ?? {}) as {
+      name?: string;
+      $metadata?: { httpStatusCode?: number; requestId?: string };
+    };
+    this.logger.warn(
+      `AWS Secrets Manager call failed: name=${name ?? "UnknownError"} ` +
+        `status=${$metadata?.httpStatusCode ?? "n/a"} requestId=${$metadata?.requestId ?? "n/a"}`,
+    );
     switch (name) {
       case "ResourceNotFoundException":
         return new NotFoundException("Secret not found in AWS Secrets Manager");

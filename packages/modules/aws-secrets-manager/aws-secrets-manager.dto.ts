@@ -1,7 +1,51 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsIn, IsInt, IsBoolean, IsObject, IsOptional, IsString, Matches, Min } from "class-validator";
-import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
-import { SECRET_TYPES, SecretType } from "./aws-secrets-manager.types";
+import { Type } from "class-transformer";
+import {
+  buildMessage,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+  ValidateBy,
+  ValidationOptions,
+} from "class-validator";
+import { SECRET_TYPES, SECRET_VALUE_TYPES, SecretType, SecretValueType } from "./aws-secrets-manager.types";
+
+/** Default/maximum page size mirrors the AWS ListSecrets MaxResults ceiling. */
+export const DEFAULT_LIST_PAGE_SIZE = 100;
+export const MAX_LIST_PAGE_SIZE = 100;
+
+/** Secret payload accepted on the write path: a JSON object or a non-empty plain-text string. */
+export type SecretValuePayload = Record<string, unknown> | string;
+
+/**
+ * Accepts a key/value JSON object or a non-empty plain-text string. Arrays,
+ * numbers, booleans and null are rejected; a JSON object is serialized by the
+ * service, while a string is stored verbatim.
+ */
+export function IsSecretValue(validationOptions?: ValidationOptions): PropertyDecorator {
+  return ValidateBy(
+    {
+      name: "isSecretValue",
+      validator: {
+        validate: (value: unknown): boolean => {
+          if (typeof value === "string") {
+            return value.length > 0;
+          }
+          return typeof value === "object" && value !== null && !Array.isArray(value);
+        },
+        defaultMessage: buildMessage(
+          (eachPrefix) => `${eachPrefix}$property must be a non-empty string or a plain object`,
+        ),
+      },
+    },
+    validationOptions,
+  );
+}
 
 /**
  * Secret metadata mirrored from AWS Secrets Manager (the single source of truth).
@@ -42,12 +86,19 @@ export class SecretResponseDto {
   createdAt?: Date | null;
 }
 
-export class SecretListResponseDto extends CommonListResponseDto {
+export class SecretListResponseDto {
   @ApiProperty({ type: SecretResponseDto, isArray: true })
-  declare records: SecretResponseDto[];
+  records: SecretResponseDto[];
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: "Opaque cursor for the next page; pass it back as nextToken. Null when no more pages",
+  })
+  nextToken: string | null;
 }
 
-export class ListSecretsRequestDto extends CommonListRequestDto {
+export class ListSecretsRequestDto {
   @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
   @IsString()
   projectId: string;
@@ -56,6 +107,24 @@ export class ListSecretsRequestDto extends CommonListRequestDto {
   @IsOptional()
   @IsString()
   region?: string;
+
+  @ApiPropertyOptional({
+    description: "Number of records per page (1-100)",
+    default: DEFAULT_LIST_PAGE_SIZE,
+    minimum: 1,
+    maximum: MAX_LIST_PAGE_SIZE,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(MAX_LIST_PAGE_SIZE)
+  pageSize?: number;
+
+  @ApiPropertyOptional({ description: "Opaque pagination token returned by the previous call" })
+  @IsOptional()
+  @IsString()
+  nextToken?: string;
 }
 
 export class GetSecretRequestDto {
@@ -86,9 +155,16 @@ export class CreateSecretDto {
   @IsIn(SECRET_TYPES)
   type: SecretType;
 
-  @ApiProperty({ description: "Secret value (key-value pairs)", type: Object, required: true })
-  @IsObject()
-  secretValue: Record<string, any>;
+  @ApiProperty({
+    description: "Secret value: a JSON object (stored as JSON) or a non-empty string (stored verbatim)",
+    required: true,
+    oneOf: [
+      { type: "object", additionalProperties: true },
+      { type: "string", minLength: 1 },
+    ],
+  })
+  @IsSecretValue()
+  secretValue: SecretValuePayload;
 
   @ApiPropertyOptional({ description: "Secret description" })
   @IsOptional()
@@ -106,10 +182,16 @@ export class UpdateSecretDto {
   @IsString()
   projectId: string;
 
-  @ApiPropertyOptional({ description: "New secret value (key-value pairs)", type: Object })
+  @ApiPropertyOptional({
+    description: "New secret value: a JSON object (stored as JSON) or a non-empty string (stored verbatim)",
+    oneOf: [
+      { type: "object", additionalProperties: true },
+      { type: "string", minLength: 1 },
+    ],
+  })
   @IsOptional()
-  @IsObject()
-  secretValue?: Record<string, any>;
+  @IsSecretValue()
+  secretValue?: SecretValuePayload;
 
   @ApiPropertyOptional({ description: "New description" })
   @IsOptional()
@@ -152,8 +234,14 @@ export class GetSecretValueResponseDto {
   @ApiProperty({ description: "Secret name" })
   name: string;
 
-  @ApiProperty({ description: "Actual secret value", type: Object })
-  secretValue: Record<string, any>;
+  @ApiProperty({
+    description: "Decrypted value: an object when valueType=json, raw text for text, base64 for binary",
+    oneOf: [{ type: "object", additionalProperties: true }, { type: "string" }],
+  })
+  secretValue: SecretValuePayload;
+
+  @ApiProperty({ enum: SECRET_VALUE_TYPES, description: "Payload encoding of the secretValue field" })
+  valueType: SecretValueType;
 }
 
 export class DeleteSecretResponseDto {
