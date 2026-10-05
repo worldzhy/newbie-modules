@@ -8,7 +8,8 @@ import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { TokenService } from "@modules/security/token/token.service";
 import { TokenSubject } from "@modules/security/token/token.constants";
 import { MfaTokenPayload } from "../../account.interface";
-import { AuditActorType, AuditEvent, AuditLogService, AuditResult } from "@modules/audit/audit-log.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
+import { recordLoginFailure } from "../../auth/login-audit";
 
 const MULTI_FACTOR_TOKEN_TTL_SECONDS = 5 * 60;
 // Accept one adjacent 30-second step (epochTolerance is in seconds) so minor
@@ -148,11 +149,11 @@ export class TwoFactorService {
         options: { subject: TokenSubject.MULTI_FACTOR_TOKEN },
       });
     } catch (error) {
-      await this.recordLoginFailure({
+      await recordLoginFailure(this.auditLogService, {
         actorId: null,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
-        reason: "mfa_token_invalid",
+        detail: { reason: "mfa_token_invalid" },
       });
       throw error;
     }
@@ -160,11 +161,11 @@ export class TwoFactorService {
     const attemptKey = payload.userId;
     const attempts = await this.totpAttemptLimiter.get(attemptKey);
     if (attempts !== null && attempts.remainingPoints <= 0) {
-      await this.recordLoginFailure({
+      await recordLoginFailure(this.auditLogService, {
         actorId: payload.userId,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
-        reason: "totp_too_many_attempts",
+        detail: { reason: "totp_too_many_attempts" },
       });
       throw new ForbiddenException("Too many incorrect authenticator codes. Please log in again.");
     }
@@ -174,20 +175,20 @@ export class TwoFactorService {
       select: { id: true, twoFactorSecret: true },
     });
     if (!user) {
-      await this.recordLoginFailure({
+      await recordLoginFailure(this.auditLogService, {
         actorId: payload.userId,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
-        reason: "mfa_user_missing",
+        detail: { reason: "mfa_user_missing" },
       });
       throw new BadRequestException("The account no longer exists.");
     }
     if (!user.twoFactorSecret) {
-      await this.recordLoginFailure({
+      await recordLoginFailure(this.auditLogService, {
         actorId: user.id,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
-        reason: "totp_not_enabled",
+        detail: { reason: "totp_not_enabled" },
       });
       throw new BadRequestException("Two-factor authentication is not enabled.");
     }
@@ -199,34 +200,16 @@ export class TwoFactorService {
     });
     if (!result.valid) {
       await this.totpAttemptLimiter.penalty(attemptKey);
-      await this.recordLoginFailure({
+      await recordLoginFailure(this.auditLogService, {
         actorId: user.id,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
-        reason: "totp_code_invalid",
+        detail: { reason: "totp_code_invalid" },
       });
       throw new BadRequestException("The authenticator code is invalid.");
     }
 
     await this.totpAttemptLimiter.delete(attemptKey);
     return user.id;
-  }
-
-  /** Audit a failed second-factor attempt. The actor is unknown when the MFA
-   * challenge token itself cannot be verified. */
-  private async recordLoginFailure(params: {
-    actorId: string | null;
-    ipAddress: string;
-    userAgent?: string;
-    reason: string;
-  }): Promise<void> {
-    await this.auditLogService.record(AuditEvent.LOGIN_FAILED, {
-      actorType: params.actorId ? AuditActorType.USER : undefined,
-      actorId: params.actorId,
-      result: AuditResult.FAILURE,
-      ipAddress: params.ipAddress,
-      userAgent: params.userAgent,
-      detail: { reason: params.reason },
-    });
   }
 }

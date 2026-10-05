@@ -7,7 +7,8 @@ import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/
 import { VerificationCodeService } from "@modules/account/modules/verification-code/verification-code.service";
 import { UserService } from "@modules/account/modules/user/user.service";
 import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
-import { AuditActorType, AuditEvent, AuditLogService, AuditResult } from "@modules/audit/audit-log.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
+import { recordLoginFailure } from "../login-audit";
 
 @Injectable()
 export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.verification-code") {
@@ -43,19 +44,31 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
     // [step 1] Get the user.
     const user = await this.userService.findByAccount(account);
     if (!user) {
-      await this.recordFailure(request, { account, channel, reason: "unknown_account", actorId: null });
+      await recordLoginFailure(this.auditLogService, {
+        request,
+        actorId: null,
+        detail: { account, channel, reason: "unknown_account" },
+      });
       throw new UnauthorizedException("The user does not exist.");
     }
 
     // [step 2] Check if the account is active, mirroring the password strategy.
     if (user.status === UserStatus.INACTIVE) {
-      await this.recordFailure(request, { account, channel, reason: "inactive_user", actorId: user.id });
+      await recordLoginFailure(this.auditLogService, {
+        request,
+        actorId: user.id,
+        detail: { account, channel, reason: "inactive_user" },
+      });
       throw new NewbieException(NewbieExceptionType.Login_InactiveUser);
     }
 
     // [step 3] Handle invalid account situation.
     if (!verifyEmail(account) && !verifyPhone(account)) {
-      await this.recordFailure(request, { account, channel, reason: "invalid_account", actorId: user.id });
+      await recordLoginFailure(this.auditLogService, {
+        request,
+        actorId: user.id,
+        detail: { account, channel, reason: "invalid_account" },
+      });
       throw new UnauthorizedException("Invalid account.");
     }
 
@@ -73,7 +86,11 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
           VerificationCodeUse.LOGIN_BY_PHONE,
         );
     if (!isCodeValid) {
-      await this.recordFailure(request, { account, channel, reason: "invalid_code", actorId: user.id });
+      await recordLoginFailure(this.auditLogService, {
+        request,
+        actorId: user.id,
+        detail: { account, channel, reason: "invalid_code" },
+      });
       throw new UnauthorizedException("Invalid code.");
     }
 
@@ -86,24 +103,5 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
 
     // [step 6] OK.
     return { userId: user.id };
-  }
-
-  /**
-   * Persist the failed attempt before the auth exception propagates. Guards
-   * run before the global audit interceptor, so a rejected login would leave
-   * no trail unless the strategy records it explicitly.
-   */
-  private async recordFailure(
-    request: Request,
-    params: { account: string; channel: "email" | "phone" | "unknown"; reason: string; actorId: string | null },
-  ): Promise<void> {
-    await this.auditLogService.record(AuditEvent.LOGIN_FAILED, {
-      actorType: params.actorId ? AuditActorType.USER : undefined,
-      actorId: params.actorId,
-      result: AuditResult.FAILURE,
-      ipAddress: request.ip,
-      userAgent: request.headers["user-agent"],
-      detail: { account: params.account, channel: params.channel, reason: params.reason },
-    });
   }
 }

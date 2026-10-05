@@ -23,7 +23,8 @@ import { Expose, expose } from "@modules/account/helpers/expose";
 import { verifyEmail } from "@modules/account/helpers/validator";
 import { GeolocationService } from "@modules/account/helpers/geolocation.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
-import { AuditActorType, AuditEvent, AuditLogService, AuditResult } from "@modules/audit/audit-log.service";
+import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
+import { recordLoginFailure } from "./login-audit";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { CookieService } from "@modules/security/cookie/cookie.service";
 import { TokenService } from "@modules/security/token/token.service";
@@ -194,7 +195,12 @@ export class AuthService {
     if (!user) throw new NotFoundException(USER_NOT_FOUND);
 
     if (!user.emails.find((i) => i.email === user.email)?.isVerified) {
-      await this.recordLoginFailure(params.userId, params.ipAddress, params.userAgent, "email_unverified");
+      await recordLoginFailure(this.auditLogService, {
+        actorId: params.userId,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        detail: { reason: "email_unverified" },
+      });
       throw new UnauthorizedException(UNVERIFIED_EMAIL);
     }
 
@@ -227,26 +233,14 @@ export class AuthService {
         });
       }
 
-      await this.recordLoginFailure(params.userId, params.ipAddress, params.userAgent, "location_unapproved");
+      await recordLoginFailure(this.auditLogService, {
+        actorId: params.userId,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        detail: { reason: "location_unapproved" },
+      });
       throw new UnauthorizedException(UNVERIFIED_LOCATION);
     }
-  }
-
-  /** Record a post-credential login gate failure with the request context. */
-  private async recordLoginFailure(
-    userId: string,
-    ipAddress: string,
-    userAgent: string,
-    reason: string,
-  ): Promise<void> {
-    await this.auditLogService.record(AuditEvent.LOGIN_FAILED, {
-      actorType: AuditActorType.USER,
-      actorId: userId,
-      result: AuditResult.FAILURE,
-      ipAddress,
-      userAgent,
-      detail: { reason },
-    });
   }
 
   /**
@@ -286,10 +280,8 @@ export class AuthService {
       if (user.status === UserStatus.INACTIVE) {
         // Google proved control of the email, so this is a login rejection of
         // a known identity rather than an upstream handshake failure.
-        await this.auditLogService.record(AuditEvent.LOGIN_FAILED, {
-          actorType: AuditActorType.USER,
+        await recordLoginFailure(this.auditLogService, {
           actorId: user.id,
-          result: AuditResult.FAILURE,
           ipAddress: params.ipAddress,
           userAgent: params.userAgent,
           detail: { reason: "inactive_user", provider: "google" },
