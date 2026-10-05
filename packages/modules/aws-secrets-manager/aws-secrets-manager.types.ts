@@ -22,3 +22,20 @@ export const SECRET_TYPE_TAG_KEY = "nightwatch:secret-type";
 export const SECRET_VALUE_TYPES = ["json", "text", "binary"] as const;
 
 export type SecretValueType = (typeof SECRET_VALUE_TYPES)[number];
+
+/** Audit resourceType carried by every secret audit row. */
+export const SECRET_AUDIT_RESOURCE_TYPE = "secret";
+
+/**
+ * Business audit events emitted by this module (open "domain.action" set
+ * consumed by AuditLogService). The generic HTTP interceptor row is skipped
+ * on the mutating routes because it cannot resolve the `:name` resource.
+ */
+export const SECRET_AUDIT_EVENTS = {
+  VALUE_READ: "secret.value_read",
+  CREATED: "secret.created",
+  UPDATED: "secret.updated",
+  DELETED: "secret.deleted",
+  ROTATED: "secret.rotated",
+  ROTATION_CONFIGURED: "secret.rotation_configured",
+} as const;

@@ -5,7 +5,7 @@
     "file": "aws-secrets-manager.module",
     "className": "AwsSecretsManagerModule"
   },
-  "moduleDependencies": ["aws-core"],
+  "moduleDependencies": ["audit", "aws-core"],
   "config-service": {
     "aws-secrets-manager": {}
   },

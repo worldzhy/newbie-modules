@@ -103,9 +103,8 @@ export class AwsSecretsManagerService {
       client.send(new GetSecretValueCommand({ SecretId: name, VersionStage: "AWSCURRENT" })),
     );
 
-    // Value reads are the most sensitive operation of this plane; audit them via
-    // the log sink until a dedicated audit trail is wired.
-    this.logger.log(`Secret value read: project=${projectId} name=${name}`);
+    // Value reads are audited by the controller as `secret.value_read` business
+    // events (actor/IP/resource), so no log-plane audit is emitted here.
 
     // Binary secrets cannot be created from this plane; return them as base64
     // so externally provisioned binary secrets do not turn into a 400.

@@ -47,6 +47,21 @@ The value endpoint returns `{ name, secretValue, valueType }` where `valueType` 
 - `text` — `SecretString` returned verbatim (plain text, or a non-object JSON document such as an array or scalar);
 - `binary` — externally provisioned `SecretBinary`, re-encoded as base64 (binary values cannot be created from this plane).
 
+## Audit trail
+
+All sensitive operations write business audit rows through the audit module's `AuditLogService` (`resourceType: "secret"`, `resourceId` = secret name, with actor / IP / user agent):
+
+| Event                        | Trigger                             |
+| ---------------------------- | ----------------------------------- |
+| `secret.value_read`          | GET value (success and failure)     |
+| `secret.created`             | create secret                       |
+| `secret.updated`             | update value / description / type   |
+| `secret.deleted`             | delete secret                       |
+| `secret.rotated`             | immediate rotation                  |
+| `secret.rotation_configured` | enable / disable automatic rotation |
+
+The five mutating routes carry `@SkipHttpAudit()` so they are not double-recorded by the generic HTTP interceptor (which cannot resolve the `:name` path parameter as a resource id). Detail payloads contain only projectId, region, type, changed field **names**, enabled/days, `valueType`, or a failure `reason`/`statusCode` — **never secret values or raw AWS error messages**. List and metadata reads are not audited.
+
 ## Rotation
 
 - Enabling rotation calls `RotateSecret` with the Lambda ARN from Project Settings and a day interval (default 30); AWS both configures the schedule and starts the first rotation.
