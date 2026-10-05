@@ -3,7 +3,6 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Response } from "express";
 import { TwoFactorService } from "../modules/two-factor/two-factor.service";
 import { LimitLoginByIp } from "@modules/security/rate-limiter/rate-limiter.decorator";
-import { SkipHttpAudit } from "@modules/audit/http-audit-skip.decorator";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 import { LoginByPasswordResponseDto, TotpLoginDto } from "./auth.dto";
 import { AuthService } from "./auth.service";
@@ -18,7 +17,6 @@ export class LoginByTotpController {
 
   /** Complete the password login with a TOTP code from the authenticator app. */
   @NoGuard()
-  @SkipHttpAudit()
   @LimitLoginByIp()
   @Post("login-by-totp")
   @ApiOperation({ summary: "Complete login with a TOTP code" })

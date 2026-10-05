@@ -60,7 +60,7 @@ All sensitive operations write business audit rows through the audit module's `A
 | `secret.rotated`             | immediate rotation                  |
 | `secret.rotation_configured` | enable / disable automatic rotation |
 
-The five mutating routes carry `@SkipHttpAudit()` so they are not double-recorded by the generic HTTP interceptor (which cannot resolve the `:name` path parameter as a resource id). Detail payloads contain only projectId, region, type, changed field **names**, enabled/days, `valueType`, or a failure `reason`/`statusCode` — **never secret values or raw AWS error messages**. List and metadata reads are not audited.
+The mutating and value-read routes emit their own business audit events for every outcome, which is why they pass the audit coverage detector without any generic HTTP audit row. Detail payloads contain only projectId, region, type, changed field **names**, enabled/days, `valueType`, or a failure `reason`/`statusCode` — **never secret values or raw AWS error messages**. List and metadata reads are not audited.
 
 ## Rotation
 

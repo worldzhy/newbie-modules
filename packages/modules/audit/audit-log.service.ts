@@ -3,6 +3,7 @@ import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { UAParser } from "ua-parser-js";
 import { GeolocationService } from "./helpers/geolocation.service";
+import { AuditContextService } from "./audit-context.service";
 import { AuditLogQueryDto } from "./audit-log.dto";
 
 /** Kind of identity an audit row is attributed to. */
@@ -59,19 +60,12 @@ export class AuditLogService {
    * covered; new event emitters that introduce searchable text should add
    * the key here.
    */
-  private static readonly KEYWORD_DETAIL_KEYS = [
-    "reason",
-    "account",
-    "channel",
-    "provider",
-    "path",
-    "routePath",
-    "description",
-  ];
+  private static readonly KEYWORD_DETAIL_KEYS = ["reason", "account", "channel", "provider", "description"];
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly geolocationService: GeolocationService,
+    private readonly auditContext: AuditContextService,
   ) {}
 
   /**
@@ -80,6 +74,10 @@ export class AuditLogService {
    * so this method swallows its own errors after logging them.
    */
   async record(event: string, params: AuditLogRecordParams): Promise<void> {
+    // Mark coverage as soon as the write is attempted: a route that calls
+    // record() is audited even if this particular write ultimately fails
+    // (the failure itself is logged below).
+    this.auditContext.noteBusinessEvent();
     try {
       const location = params.ipAddress ? await this.geolocationService.getLocation(params.ipAddress) : undefined;
       const ua = params.userAgent ? new UAParser(params.userAgent) : undefined;

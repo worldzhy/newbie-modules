@@ -1,7 +1,6 @@
 import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { AuditLogService, AuditResult } from "@modules/audit/audit-log.service";
-import { SkipHttpAudit } from "@modules/audit/http-audit-skip.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import {
   CreateSecretDto,
@@ -27,7 +26,6 @@ export class AwsSecretsManagerController {
   ) {}
 
   @Post("")
-  @SkipHttpAudit()
   @ApiOperation({ summary: "Create Secret" })
   @ApiResponse({ status: 201, description: "Secret created successfully", type: SecretResponseDto })
   async createSecret(@Req() request: UserRequest, @Body() body: CreateSecretDto) {
@@ -73,7 +71,6 @@ export class AwsSecretsManagerController {
   }
 
   @Patch(":name")
-  @SkipHttpAudit()
   @ApiOperation({ summary: "Update Secret" })
   @ApiResponse({ type: SecretResponseDto })
   async updateSecret(@Req() request: UserRequest, @Param("name") name: string, @Body() body: UpdateSecretDto) {
@@ -94,7 +91,6 @@ export class AwsSecretsManagerController {
   }
 
   @Delete(":name")
-  @SkipHttpAudit()
   @ApiOperation({ summary: "Delete Secret (30-day recovery window)" })
   @ApiResponse({ type: DeleteSecretResponseDto })
   async deleteSecret(@Req() request: UserRequest, @Param("name") name: string, @Query() query: GetSecretRequestDto) {
@@ -108,7 +104,6 @@ export class AwsSecretsManagerController {
   }
 
   @Post(":name/rotate")
-  @SkipHttpAudit()
   @ApiOperation({ summary: "Trigger an immediate rotation with the existing rotation configuration" })
   @ApiResponse({ type: SecretResponseDto })
   async rotateSecret(@Req() request: UserRequest, @Param("name") name: string, @Query() query: GetSecretRequestDto) {
@@ -122,7 +117,6 @@ export class AwsSecretsManagerController {
   }
 
   @Post(":name/rotation")
-  @SkipHttpAudit()
   @ApiOperation({ summary: "Enable or disable automatic rotation" })
   @ApiResponse({ type: SecretResponseDto })
   async setRotation(@Req() request: UserRequest, @Param("name") name: string, @Body() body: SetRotationRequestDto) {

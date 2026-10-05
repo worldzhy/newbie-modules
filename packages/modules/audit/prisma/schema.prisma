@@ -5,8 +5,9 @@
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 // Append-only, immutable audit trail. There is deliberately no update or
-// delete API: rows are created by explicit AuditLogService.record() calls and
-// by the global AuditInterceptor, and only ever read back.
+// delete API: rows are created exclusively by explicit
+// AuditLogService.record() business-event calls, and only ever read back.
+// Generic HTTP request tracing lives in the access log channel, never here.
 //
 // The actor is a weak scalar reference (actorType + actorId) rather than a
 // cross-schema relation: users or API keys may be deleted while their audit
