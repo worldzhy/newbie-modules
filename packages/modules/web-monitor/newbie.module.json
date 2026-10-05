@@ -6,6 +6,7 @@
     "className": "WebMonitorModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["clickhouse", "mongo"],
   "config-service": {
     "web-monitor": {
       "isLocalDev": false,

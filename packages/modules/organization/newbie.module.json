@@ -5,5 +5,6 @@
     "file": "organization.module",
     "className": "OrganizationModule"
   },
-  "schema": "prisma/schema.prisma"
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["account", "aws-ses", "security"]
 }

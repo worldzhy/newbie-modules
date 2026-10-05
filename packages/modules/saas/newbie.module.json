@@ -6,6 +6,7 @@
     "className": "SaasModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["aws-s3", "aws-ses", "elasticsearch"],
   "config-service": {
     "saas": {
       "clientLoginUrl": "process.env.HOST_CLIENT_LOGIN_URL || 'http://localhost:3001/account/login'",

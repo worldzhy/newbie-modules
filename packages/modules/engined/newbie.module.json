@@ -5,5 +5,6 @@
     "file": "engined.module",
     "className": "EnginedModule"
   },
-  "schema": "prisma/schema.prisma"
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["aws-sqs", "elasticsearch"]
 }

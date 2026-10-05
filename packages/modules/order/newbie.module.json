@@ -6,5 +6,6 @@
     "className": "OrderModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security"],
   "dependencies": {}
 }

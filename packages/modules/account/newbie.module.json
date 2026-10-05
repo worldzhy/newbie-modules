@@ -6,6 +6,7 @@
     "className": "AccountModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["audit", "aws-ses", "aws-sms", "security"],
   "config-service": {
     "account": {
       "cache": {

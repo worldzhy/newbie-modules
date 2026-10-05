@@ -6,6 +6,7 @@
     "className": "AuditModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security"],
   "config-service": {
     "audit": {
       "geolocationLruSize": "int(process.env.AUDIT_GEOLOCATION_LRU_SIZE, 100)"

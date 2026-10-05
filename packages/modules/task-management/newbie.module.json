@@ -6,6 +6,7 @@
     "className": "TaskManagementModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security"],
   "dependencies": {
     "chinese-days": "^1.5.7"
   }

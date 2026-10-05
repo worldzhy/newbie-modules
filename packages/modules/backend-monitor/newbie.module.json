@@ -6,6 +6,7 @@
     "className": "BackendMonitorModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["clickhouse", "security"],
   "config-service": {
     "backendMonitor": {
       "deepseekKey": "process.env.BACKEND_MONITOR_DEEPSEEK_KEY"

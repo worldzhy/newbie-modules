@@ -6,6 +6,7 @@
     "className": "AwsAuditModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["aws-core"],
   "config-service": {},
   "env": {},
   "dependencies": {
