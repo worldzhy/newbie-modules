@@ -1,7 +1,7 @@
 import { CallHandler, ExecutionContext, HttpException, Injectable, Logger, NestInterceptor } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import type { Request, Response } from "express";
-import { defer, Observable } from "rxjs";
+import { Observable } from "rxjs";
 import { tap } from "rxjs/operators";
 import { AuditActorType, AuditResult } from "./audit-log.service";
 import { AuditContextService } from "./audit-context.service";
@@ -21,6 +21,10 @@ type TrackedRequest = Request & { user?: unknown };
  *   any business event, and which are not annotated @NoAuditNeeded(), the
  *   interceptor reports a coverage gap outside production so missing
  *   audit points surface during development.
+ *
+ * The request-scoped state is created by AuditContextMiddleware, not here:
+ * guards may also emit audit events, and an interceptor-only storage scope
+ * would not surround them.
  *
  * High-volume machine traffic is excluded from both channels: telemetry
  * ingestion and liveness pings have their own stores.
@@ -49,30 +53,24 @@ export class HttpAccessInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<TrackedRequest>();
     const response = context.switchToHttp().getResponse<Response>();
+    const startedAt = Date.now();
 
-    // 'defer' opens the AsyncLocalStorage context at subscription time, so
-    // audit writes anywhere in the handler's async chain are tracked.
-    return defer(() =>
-      this.auditContext.run(() => {
-        const startedAt = Date.now();
-        return next.handle().pipe(
-          tap({
-            next: () => {
-              this.afterRequest(context, request, response, {
-                outcome: AuditResult.SUCCESS,
-                statusCode: response.statusCode,
-                durationMs: Date.now() - startedAt,
-              });
-            },
-            error: (error: unknown) => {
-              this.afterRequest(context, request, response, {
-                outcome: AuditResult.FAILURE,
-                statusCode: error instanceof HttpException ? error.getStatus() : 500,
-                durationMs: Date.now() - startedAt,
-              });
-            },
-          }),
-        );
+    return next.handle().pipe(
+      tap({
+        next: () => {
+          this.afterRequest(context, request, {
+            outcome: AuditResult.SUCCESS,
+            statusCode: response.statusCode,
+            durationMs: Date.now() - startedAt,
+          });
+        },
+        error: (error: unknown) => {
+          this.afterRequest(context, request, {
+            outcome: AuditResult.FAILURE,
+            statusCode: error instanceof HttpException ? error.getStatus() : 500,
+            durationMs: Date.now() - startedAt,
+          });
+        },
       }),
     );
   }
@@ -80,7 +78,6 @@ export class HttpAccessInterceptor implements NestInterceptor {
   private afterRequest(
     context: ExecutionContext,
     request: TrackedRequest,
-    _response: Response,
     result: { outcome: string; statusCode: number; durationMs: number },
   ): void {
     if (this.isExcluded(request.path)) {
