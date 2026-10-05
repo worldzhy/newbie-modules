@@ -63,9 +63,7 @@ export class AuditLogService {
    */
   async record(event: string, params: AuditLogRecordParams): Promise<void> {
     try {
-      const location = params.ipAddress
-        ? await this.geolocationService.getLocation(params.ipAddress)
-        : undefined;
+      const location = params.ipAddress ? await this.geolocationService.getLocation(params.ipAddress) : undefined;
       const ua = params.userAgent ? new UAParser(params.userAgent) : undefined;
       await this.prisma.auditLog.create({
         data: {
@@ -99,10 +97,7 @@ export class AuditLogService {
   }
 
   /** Query audit logs within an organization or for a single actor. */
-  async findMany(
-    scope: { organizationId?: string; actorId?: string },
-    query: AuditLogQueryDto,
-  ) {
+  async findMany(scope: { organizationId?: string; actorId?: string }, query: AuditLogQueryDto) {
     const where: Prisma.AuditLogWhereInput = {
       ...scope,
       ...(query.event ? { event: query.event } : {}),
@@ -130,7 +125,7 @@ export class AuditLogService {
 
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.AuditLog,
-      pagination: { page: query.page, pageSize: query.pageSize },
+      pagination: { page: query.page ?? 1, pageSize: query.pageSize ?? 20 },
       findManyArgs: { where, orderBy: { id: "desc" } },
     });
   }
