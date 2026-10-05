@@ -5,14 +5,16 @@
 // * JobRun                                                       //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-/// A schedule for one job: when it runs (cronExpr + timezone), whether it is
-/// enabled, and the opaque payload passed to the job handler. Business modules
-/// upsert defaults on startup (`createdVia="declaration"`); the database row
-/// wins at runtime so operators can pause a schedule, change its cron
-/// expression, or trigger it manually.
+/// A schedule for one job: human-readable name, when it runs (cronExpr +
+/// timezone), whether it is enabled, and the opaque payload passed to the job
+/// handler. Business modules upsert defaults on startup
+/// (`createdVia="declaration"`); the database row wins at runtime so operators
+/// can pause a schedule, change its cron expression, or trigger it manually.
+/// The name stays declaration-owned and is re-synced on every startup.
 model JobSchedule {
   id         Int      @id @default(autoincrement())
   key        String   @unique
+  name       String   @default("")
   handlerKey String
   cronExpr   String
   timezone   String   @default("Asia/Shanghai")

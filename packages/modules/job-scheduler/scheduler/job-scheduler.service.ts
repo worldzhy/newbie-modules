@@ -40,6 +40,7 @@ export interface JobRunFailedEvent {
 
 export interface JobScheduleDeclaration {
   key: string;
+  name?: string;
   handlerKey: string;
   cronExpr: string;
   timezone?: string;
@@ -50,6 +51,7 @@ export interface JobScheduleDeclaration {
 interface JobScheduleRecord {
   id: number;
   key: string;
+  name: string;
   handlerKey: string;
   cronExpr: string;
   timezone: string;
@@ -135,11 +137,18 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     return this.executeSchedule(schedule as unknown as JobScheduleRecord, "manual");
   }
 
-  /// Declare a default schedule from business code. The database row wins:
-  /// declarations only create missing rows, never override runtime edits.
+  /// Declare a default schedule from business code. The database row wins for
+  /// runtime settings: declarations only create missing rows, never override
+  /// cron/timezone/enabled edits. The display name stays declaration-owned and
+  /// is re-synced on every startup.
   async upsertScheduleDeclaration(declaration: JobScheduleDeclaration): Promise<void> {
     const existing = await this.prisma.jobSchedule.findUnique({ where: { key: declaration.key } });
+
     if (existing) {
+      const declaredName = declaration.name ?? "";
+      if (existing.name !== declaredName) {
+        await this.prisma.jobSchedule.update({ where: { key: declaration.key }, data: { name: declaredName } });
+      }
       return;
     }
 
@@ -147,6 +156,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       await this.prisma.jobSchedule.create({
         data: {
           key: declaration.key,
+          name: declaration.name ?? "",
           handlerKey: declaration.handlerKey,
           cronExpr: declaration.cronExpr,
           timezone: declaration.timezone ?? DEFAULT_TIMEZONE,

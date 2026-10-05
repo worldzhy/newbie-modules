@@ -12,6 +12,7 @@ import { JobHandlerRegistryService } from "./handler-registry.service";
  */
 export abstract class ScheduledJob implements OnModuleInit {
   protected abstract readonly key: string;
+  protected abstract readonly name: string;
   protected abstract readonly cronExpr: string;
   protected abstract readonly timezone: string;
   protected abstract readonly enabled: boolean;
@@ -27,6 +28,7 @@ export abstract class ScheduledJob implements OnModuleInit {
     this.jobHandlerRegistry.registerHandler(this.key, (payload) => this.handle(payload));
     await this.jobScheduler.upsertScheduleDeclaration({
       key: this.key,
+      name: this.name,
       handlerKey: this.key,
       cronExpr: this.cronExpr,
       timezone: this.timezone,
