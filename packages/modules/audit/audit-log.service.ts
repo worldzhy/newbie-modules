@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { UAParser } from "ua-parser-js";
@@ -51,6 +51,24 @@ export type AuditLogRecordParams = {
 
 @Injectable()
 export class AuditLogService {
+  private readonly logger = new Logger(AuditLogService.name);
+
+  /**
+   * Detail payload keys searched by 'keyword'. Postgres JSON substring
+   * filters require an explicit path, so only known string fields are
+   * covered; new event emitters that introduce searchable text should add
+   * the key here.
+   */
+  private static readonly KEYWORD_DETAIL_KEYS = [
+    "reason",
+    "account",
+    "channel",
+    "provider",
+    "path",
+    "routePath",
+    "description",
+  ];
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly geolocationService: GeolocationService,
@@ -92,7 +110,7 @@ export class AuditLogService {
       });
     } catch (error) {
       // Never let an audit failure break the primary flow.
-      console.error("[AuditLogService] failed to record event", event, error);
+      this.logger.error(`Failed to record audit event '${event}': ${String(error)}`);
     }
   }
 
@@ -118,6 +136,9 @@ export class AuditLogService {
             OR: [
               { event: { contains: query.keyword, mode: "insensitive" } },
               { resourceId: { contains: query.keyword, mode: "insensitive" } },
+              ...AuditLogService.KEYWORD_DETAIL_KEYS.map((key) => ({
+                detail: { path: [key], string_contains: query.keyword as string },
+              })),
             ],
           }
         : {}),
@@ -125,7 +146,7 @@ export class AuditLogService {
 
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.AuditLog,
-      pagination: { page: query.page ?? 1, pageSize: query.pageSize ?? 20 },
+      pagination: { page: query.page ?? 0, pageSize: query.pageSize ?? 20 },
       findManyArgs: { where, orderBy: { id: "desc" } },
     });
   }

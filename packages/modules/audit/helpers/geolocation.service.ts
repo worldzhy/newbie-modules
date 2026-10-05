@@ -1,4 +1,4 @@
-import { Injectable, OnModuleDestroy } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -8,6 +8,7 @@ import { LRUCache } from "lru-cache";
 
 @Injectable()
 export class GeolocationService implements OnModuleDestroy {
+  private readonly logger = new Logger(GeolocationService.name);
   private reader: Reader<CityResponse> | null;
   private lru: LRUCache<string, Partial<CityResponse>>;
 
@@ -37,7 +38,7 @@ export class GeolocationService implements OnModuleDestroy {
       }
       return this.reader?.get(ipAddress) ?? {};
     } catch (error) {
-      console.error(error);
+      this.logger.error(`Failed to resolve geolocation: ${String(error)}`);
       return {};
     }
   }
@@ -58,7 +59,7 @@ export class GeolocationService implements OnModuleDestroy {
     try {
       return await geolite2.open(GeoIpDbName.City, (databasePath) => maxmind.open<CityResponse>(databasePath));
     } catch (error) {
-      console.error("GeoLite database is unavailable:", error);
+      this.logger.error(`GeoLite database is unavailable: ${String(error)}`);
       return null;
     }
   }

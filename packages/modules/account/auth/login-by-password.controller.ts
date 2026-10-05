@@ -8,6 +8,7 @@ import { GuardByPassword } from "@modules/security/authentication/password/passw
 import { UserRequest } from "@modules/security/security.interface";
 import { LimitLoginByIp, LimitLoginByUser } from "@modules/security/rate-limiter/rate-limiter.decorator";
 import { LimitLoginByIpService } from "@modules/security/rate-limiter/rate-limiter.service";
+import { SkipHttpAudit } from "@modules/audit/http-audit-skip.decorator";
 import { LoginByPasswordRequestDto, LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
 
 @ApiTags("Account / Auth")
@@ -31,6 +32,7 @@ export class LoginByPasswordController {
    * the client completes login at /auth/login-by-totp.
    */
   @Post("login-by-password")
+  @SkipHttpAudit()
   @LimitLoginByIp()
   @LimitLoginByUser()
   @GuardByPassword()

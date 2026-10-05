@@ -25,7 +25,11 @@ export class TwoFactorController {
   @ApiOperation({ summary: "Confirm TOTP code and enable two-factor authentication" })
   async enable(@Req() request: UserRequest, @Body() body: EnableTwoFactorDto) {
     const result = await this.twoFactorService.enable(request.user.userId, body.code);
-    await this.auditLogService.record(AuditEvent.MFA_ENABLED, { actorId: request.user.userId });
+    await this.auditLogService.record(AuditEvent.MFA_ENABLED, {
+      actorId: request.user.userId,
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"],
+    });
     return result;
   }
 
@@ -33,7 +37,11 @@ export class TwoFactorController {
   @ApiOperation({ summary: "Disable two-factor authentication" })
   async disable(@Req() request: UserRequest, @Body() body: DisableTwoFactorDto) {
     await this.twoFactorService.disable(request.user.userId, body);
-    await this.auditLogService.record(AuditEvent.MFA_DISABLED, { actorId: request.user.userId });
+    await this.auditLogService.record(AuditEvent.MFA_DISABLED, {
+      actorId: request.user.userId,
+      ipAddress: request.ip,
+      userAgent: request.headers["user-agent"],
+    });
     return { message: "Two-factor authentication disabled." };
   }
 }

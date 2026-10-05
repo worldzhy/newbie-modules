@@ -1,8 +1,10 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
 import type { Request } from "express";
 import { Observable } from "rxjs";
 import { tap } from "rxjs/operators";
 import { AuditActorType, AuditLogService, AuditResult } from "./audit-log.service";
+import { HTTP_AUDIT_SKIP } from "./http-audit-skip.decorator";
 
 type MutatingRequest = Request & { user?: unknown };
 
@@ -33,11 +35,21 @@ export class AuditInterceptor implements NestInterceptor {
    */
   private static readonly EXCLUDED_PATH_PREFIXES = ["/api/v1", "/heartbeat/ping"];
 
-  constructor(private readonly auditLogService: AuditLogService) {}
+  constructor(
+    private readonly auditLogService: AuditLogService,
+    private readonly reflector: Reflector,
+  ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest<MutatingRequest>();
     if (!AuditInterceptor.MUTATING_METHODS.includes(request.method) || this.isExcluded(request.path)) {
+      return next.handle();
+    }
+
+    // Routes annotated with @SkipHttpAudit() emit their own business event
+    // (for example auth.login) for every outcome, so the generic row is noise.
+    const skip = this.reflector.getAllAndOverride<boolean>(HTTP_AUDIT_SKIP, [context.getHandler(), context.getClass()]);
+    if (skip) {
       return next.handle();
     }
 
@@ -80,9 +92,7 @@ export class AuditInterceptor implements NestInterceptor {
   }
 
   private isExcluded(path: string): boolean {
-    return AuditInterceptor.EXCLUDED_PATH_PREFIXES.some(
-      (prefix) => path === prefix || path.startsWith(`${prefix}/`),
-    );
+    return AuditInterceptor.EXCLUDED_PATH_PREFIXES.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
   }
 
   private resolveResourceId(params: Request["params"]): string | undefined {

@@ -1,7 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsDateString, IsInt, IsOptional, IsString, Min } from "class-validator";
+import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 import { CommonListResponseDto } from "@devbie/newbie/common.dto";
+
+/** Allowed values for the result filter; mirrors AuditResult in audit-log.service. */
+const RESULT_VALUES = ["success", "failure"] as const;
+
+/** Upper bound for a single page so callers cannot pull the whole table at once. */
+const MAX_PAGE_SIZE = 100;
 
 /**
  * Filter and pagination parameters accepted by the audit log query endpoints.
@@ -27,10 +33,10 @@ export class AuditLogQueryDto {
   @IsString()
   resourceType?: string;
 
-  @ApiPropertyOptional({ type: String, description: "Filter by result: success / failure" })
+  @ApiPropertyOptional({ type: String, enum: RESULT_VALUES, description: "Filter by result: success / failure" })
   @IsOptional()
-  @IsString()
-  result?: string;
+  @IsIn(RESULT_VALUES)
+  result?: (typeof RESULT_VALUES)[number];
 
   @ApiPropertyOptional({ type: String, description: "Only include rows created at or after this ISO-8601 instant" })
   @IsOptional()
@@ -42,16 +48,21 @@ export class AuditLogQueryDto {
   @IsDateString()
   endTime?: string;
 
-  @ApiPropertyOptional({ type: String, description: "Case-insensitive substring match on event or resource ID" })
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      "Case-insensitive substring match on event, resource ID or known detail fields " +
+      "(reason, account, channel, provider, path, description)",
+  })
   @IsOptional()
   @IsString()
   keyword?: string;
 
-  @ApiPropertyOptional({ type: Number, default: 1 })
+  @ApiPropertyOptional({ type: Number, default: 0, description: "Zero-based page index; the first page is 0" })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
-  @Min(1)
+  @Min(0)
   page?: number;
 
   @ApiPropertyOptional({ type: Number, default: 20 })
@@ -59,6 +70,7 @@ export class AuditLogQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(MAX_PAGE_SIZE)
   pageSize?: number;
 }
 

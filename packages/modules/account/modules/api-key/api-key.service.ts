@@ -44,6 +44,8 @@ export class ApiKeyService {
   async createApiKey(params: {
     userId: string;
     organizationId?: string;
+    ipAddress?: string;
+    userAgent?: string;
     data: Omit<Omit<Prisma.ApiKeyCreateInput, "key" | "secret">, "user" | "organization">;
   }): Promise<Expose<ApiKey> & { secret: string }> {
     const key = await generateRandomString();
@@ -63,6 +65,8 @@ export class ApiKeyService {
       organizationId: params.organizationId,
       resourceType: "api-key",
       resourceId: String(apiKey.id),
+      ipAddress: params.ipAddress,
+      userAgent: params.userAgent,
       detail: { description: apiKey.description },
     });
     return { ...expose<ApiKey>({ ...apiKey }), secret };
@@ -100,8 +104,12 @@ export class ApiKeyService {
     return await this.updateOwnedApiKey({ userId }, id, data);
   }
 
-  async deleteApiKey(userId: string, id: number): Promise<Expose<ApiKey>> {
-    return await this.deleteOwnedApiKey({ userId }, id);
+  async deleteApiKey(
+    userId: string,
+    id: number,
+    requestContext?: { ipAddress?: string; userAgent?: string },
+  ): Promise<Expose<ApiKey>> {
+    return await this.deleteOwnedApiKey({ userId }, id, requestContext);
   }
 
   async updateApiKeyForOrganization(
@@ -161,7 +169,11 @@ export class ApiKeyService {
     return expose<ApiKey>(apiKey);
   }
 
-  private async deleteOwnedApiKey(owner: ApiKeyOwner, id: number): Promise<Expose<ApiKey>> {
+  private async deleteOwnedApiKey(
+    owner: ApiKeyOwner,
+    id: number,
+    requestContext?: { ipAddress?: string; userAgent?: string },
+  ): Promise<Expose<ApiKey>> {
     const ownedApiKey = await this.getOwnedApiKey(owner, id);
     const apiKey = await this.prisma.apiKey.delete({
       where: { id },
@@ -172,6 +184,8 @@ export class ApiKeyService {
       organizationId: "organizationId" in owner ? owner.organizationId : undefined,
       resourceType: "api-key",
       resourceId: String(id),
+      ipAddress: requestContext?.ipAddress,
+      userAgent: requestContext?.userAgent,
     });
     return expose<ApiKey>(apiKey);
   }

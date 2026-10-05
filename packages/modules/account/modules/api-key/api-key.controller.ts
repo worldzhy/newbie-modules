@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, Ip, Param, Patch, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { ApiKey, Prisma } from "@generated/prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
@@ -23,8 +23,10 @@ export class ApiKeyController {
   async create(
     @Param("userId") userId: string,
     @Body() data: CreateApiKeyDto,
+    @Ip() ipAddress: string,
+    @Headers("user-agent") userAgent: string,
   ): Promise<Expose<ApiKey> & { secret: string }> {
-    return await this.apiKeyService.createApiKey({ userId, data });
+    return await this.apiKeyService.createApiKey({ userId, data, ipAddress, userAgent });
   }
 
   /** Get API keys for the current user */
@@ -84,8 +86,13 @@ export class ApiKeyController {
   @Delete(":id")
   @ApiOperation({ summary: "Delete an API key" })
   @ApiResponse({ type: ApiKeyResponseDto })
-  async remove(@Param("userId") userId: string, @Param("id") id: number): Promise<Expose<ApiKey>> {
-    return await this.apiKeyService.deleteApiKey(userId, id);
+  async remove(
+    @Param("userId") userId: string,
+    @Param("id") id: number,
+    @Ip() ipAddress: string,
+    @Headers("user-agent") userAgent: string,
+  ): Promise<Expose<ApiKey>> {
+    return await this.apiKeyService.deleteApiKey(userId, id, { ipAddress, userAgent });
   }
 
   /** Get logs for an API key */

@@ -6,6 +6,7 @@ import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TokenService } from "@modules/security/token/token.service";
 import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
+import { UserRequest } from "@modules/security/security.interface";
 import { UserService } from "./user.service";
 import {
   ChangeUserPasswordDto,
@@ -138,7 +139,7 @@ export class UserController {
       },
     },
   })
-  async updateUser(@Param("userId") userId: string, @Body() body: UpdateUserDto) {
+  async updateUser(@Param("userId") userId: string, @Body() body: UpdateUserDto, @Req() request: UserRequest) {
     // Prisma requires scalar list updates to use {set: [...]}, while the DTO
     // accepts a plain enum array. Empty array clears all roles.
     const { roles, ...scalarFields } = body;
@@ -154,9 +155,13 @@ export class UserController {
 
     if (roles !== undefined) {
       await this.auditLogService.record(AuditEvent.ROLES_CHANGED, {
-        actorId: userId,
+        // The actor is the admin performing the change; the target user is
+        // the resource. An admin editing their own roles has both equal.
+        actorId: request.user.userId,
         resourceType: "user",
         resourceId: userId,
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"],
         detail: { roles },
       });
     }

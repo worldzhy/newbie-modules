@@ -7,6 +7,7 @@ import { UserRequest } from "@modules/security/security.interface";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
+import { SkipHttpAudit } from "@modules/audit/http-audit-skip.decorator";
 import { LimitLoginByIp, LimitLoginByUser } from "@modules/security/rate-limiter/rate-limiter.decorator";
 import { GuardByVerificationCode } from "@modules/security/authentication/verification-code/verification-code.decorator";
 import { UserService } from "@modules/account/modules/user/user.service";
@@ -131,6 +132,7 @@ export class LoginByVerificationCodeController {
    * [2] phone
    */
   @GuardByVerificationCode()
+  @SkipHttpAudit()
   @LimitLoginByIp()
   @LimitLoginByUser()
   @Post("login-by-verification-code")

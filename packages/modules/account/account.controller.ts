@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Patch, Post, Req } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Headers, Ip, Patch, Post, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { VerificationCodeUse } from "@generated/prisma/client";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
@@ -49,7 +49,12 @@ export class AccountController {
   @Post("change-password")
   @ApiOperation({ summary: "Change the password of the current user" })
   @ApiResponse({ type: PasswordChangeResponseDto })
-  async changePassword(@Req() request: UserRequest, @Body() body: ChangePasswordDto) {
+  async changePassword(
+    @Req() request: UserRequest,
+    @Body() body: ChangePasswordDto,
+    @Ip() ipAddress: string,
+    @Headers("user-agent") userAgent: string,
+  ) {
     // [step 1] Guard statement.
     if (!("currentPassword" in body) || !("newPassword" in body)) {
       throw new BadRequestException("Please carry 'currentPassword' and 'newPassword' in the request body.");
@@ -91,7 +96,11 @@ export class AccountController {
       },
     });
 
-    await this.auditLogService.record(AuditEvent.PASSWORD_CHANGED, { actorId: userId });
+    await this.auditLogService.record(AuditEvent.PASSWORD_CHANGED, {
+      actorId: userId,
+      ipAddress,
+      userAgent,
+    });
 
     return updatedUser;
   }
@@ -126,6 +135,8 @@ export class AccountController {
   async resetPassword(
     @Body()
     body: ResetPasswordDto,
+    @Ip() ipAddress: string,
+    @Headers("user-agent") userAgent: string,
   ) {
     if (body.email && verifyEmail(body.email)) {
       // Only a code issued for resetting password can complete the reset.
@@ -146,7 +157,11 @@ export class AccountController {
         // The reset often happens after account takeover: revoke every session
         // of the user, including any session held by an attacker.
         await this.prisma.session.deleteMany({ where: { userId: updated.id } });
-        await this.auditLogService.record(AuditEvent.PASSWORD_RESET, { actorId: updated.id });
+        await this.auditLogService.record(AuditEvent.PASSWORD_RESET, {
+          actorId: updated.id,
+          ipAddress,
+          userAgent,
+        });
         return updated;
       } else {
         throw new NewbieException(NewbieExceptionType.ResetPassword_InvalidCode);
@@ -169,7 +184,11 @@ export class AccountController {
         await this.verificationCodeService.inactivateForPhone(body.phone, VerificationCodeUse.RESET_PASSWORD);
         // Revoke every session of the user after a successful reset.
         await this.prisma.session.deleteMany({ where: { userId: updated.id } });
-        await this.auditLogService.record(AuditEvent.PASSWORD_RESET, { actorId: updated.id });
+        await this.auditLogService.record(AuditEvent.PASSWORD_RESET, {
+          actorId: updated.id,
+          ipAddress,
+          userAgent,
+        });
         return updated;
       } else {
         throw new NewbieException(NewbieExceptionType.ResetPassword_InvalidCode);
