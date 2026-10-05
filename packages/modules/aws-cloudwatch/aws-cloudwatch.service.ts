@@ -1,24 +1,24 @@
-import {Injectable} from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import {
   CloudWatchClient,
   GetMetricDataCommand,
   GetMetricDataCommandOutput,
   ListMetricsCommand,
-} from '@aws-sdk/client-cloudwatch';
-import {GetEC2InstancesCPUMetricParams, GetRDSInstancesMetricParams, MetricData} from './aws-cloudwatch.interface';
-import {CloudwatchEC2MetricName} from '@modules/aws-cloudwatch/aws-cloudwatch.enum';
+} from "@aws-sdk/client-cloudwatch";
+import { GetEC2InstancesCPUMetricParams, GetRDSInstancesMetricParams, MetricData } from "./aws-cloudwatch.interface";
+import { CloudwatchEC2MetricName } from "@modules/aws-cloudwatch/aws-cloudwatch.enum";
 
 @Injectable()
 export class AwsCloudwatchService {
   constructor() {}
 
-  private initCloudwatchClient(args: {accessKeyId?: string; secretAccessKey?: string; region: string}) {
-    const {accessKeyId, secretAccessKey, region} = args;
+  private initCloudwatchClient(args: { accessKeyId?: string; secretAccessKey?: string; region: string }) {
+    const { accessKeyId, secretAccessKey, region } = args;
     let client: CloudWatchClient;
     if (accessKeyId && secretAccessKey) {
-      client = new CloudWatchClient({region, credentials: {accessKeyId, secretAccessKey}});
+      client = new CloudWatchClient({ region, credentials: { accessKeyId, secretAccessKey } });
     } else {
-      client = new CloudWatchClient({region});
+      client = new CloudWatchClient({ region });
     }
     return client;
   }
@@ -35,7 +35,7 @@ export class AwsCloudwatchService {
       period,
       statistics,
     } = params;
-    const cloudwatchClient = this.initCloudwatchClient({accessKeyId, secretAccessKey, region});
+    const cloudwatchClient = this.initCloudwatchClient({ accessKeyId, secretAccessKey, region });
     if (ec2InstanceRemoteIds.length === 0) {
       return [];
     }
@@ -43,12 +43,12 @@ export class AwsCloudwatchService {
     const metricQueries: any[] = [];
 
     if (metricName === CloudwatchEC2MetricName.CPU_UTILIZATION) {
-      ec2InstanceRemoteIds.forEach(remoteId => {
+      ec2InstanceRemoteIds.forEach((remoteId) => {
         metricQueries.push({
           Metric: {
-            Namespace: 'AWS/EC2',
+            Namespace: "AWS/EC2",
             MetricName: metricName,
-            Dimensions: [{Name: 'InstanceId', Value: remoteId}],
+            Dimensions: [{ Name: "InstanceId", Value: remoteId }],
           },
           Period: period,
           Stat: statistics,
@@ -60,17 +60,17 @@ export class AwsCloudwatchService {
       // We need to list every ec2 instance metrics as well.
       for (const remoteId of ec2InstanceRemoteIds) {
         const listMetricsCommand = new ListMetricsCommand({
-          Namespace: 'CWAgent',
+          Namespace: "CWAgent",
           MetricName: metricName,
           Dimensions: [
-            {Name: 'InstanceId', Value: remoteId},
-            {Name: 'path', Value: '/'},
+            { Name: "InstanceId", Value: remoteId },
+            { Name: "path", Value: "/" },
           ],
         });
         const listRes = await cloudwatchClient.send(listMetricsCommand);
         if (listRes && listRes.Metrics && listRes.Metrics.length > 0) {
           metricQueries.push({
-            Metric: {...listRes.Metrics[0]},
+            Metric: { ...listRes.Metrics[0] },
             Period: period,
             Stat: statistics,
           });
@@ -82,14 +82,14 @@ export class AwsCloudwatchService {
       // We need to list every ec2 instance metrics as well.
       for (const remoteId of ec2InstanceRemoteIds) {
         const listMetricsCommand = new ListMetricsCommand({
-          Namespace: 'CWAgent',
+          Namespace: "CWAgent",
           MetricName: metricName,
-          Dimensions: [{Name: 'InstanceId', Value: remoteId}],
+          Dimensions: [{ Name: "InstanceId", Value: remoteId }],
         });
         const listRes = await cloudwatchClient.send(listMetricsCommand);
         if (listRes && listRes.Metrics && listRes.Metrics.length > 0) {
           metricQueries.push({
-            Metric: {...listRes.Metrics[0]},
+            Metric: { ...listRes.Metrics[0] },
             Period: period,
             Stat: statistics,
           });
@@ -101,7 +101,7 @@ export class AwsCloudwatchService {
       StartTime: startTime,
       EndTime: endTime,
       MetricDataQueries: metricQueries.map((item, idx) => {
-        let id = '';
+        let id = "";
         if (metricName === CloudwatchEC2MetricName.CPU_UTILIZATION) {
           id = `cpu${idx}`;
         } else if (metricName === CloudwatchEC2MetricName.DISK_USED_PERCENT) {
@@ -133,7 +133,7 @@ export class AwsCloudwatchService {
       period,
       statistics,
     } = params;
-    const cloudwatchClient = this.initCloudwatchClient({accessKeyId, secretAccessKey, region});
+    const cloudwatchClient = this.initCloudwatchClient({ accessKeyId, secretAccessKey, region });
     if (rdsInstanceRemoteIds.length === 0) {
       return [];
     }
@@ -145,9 +145,9 @@ export class AwsCloudwatchService {
         Id: `q${index}`,
         MetricStat: {
           Metric: {
-            Namespace: 'AWS/RDS',
+            Namespace: "AWS/RDS",
             MetricName: metricName,
-            Dimensions: [{Name: 'DBInstanceIdentifier', Value: id}],
+            Dimensions: [{ Name: "DBInstanceIdentifier", Value: id }],
           },
           Period: period,
           Stat: statistics,
@@ -165,18 +165,18 @@ export class AwsCloudwatchService {
 
     if (output.MetricDataResults) {
       for (const result of output.MetricDataResults) {
-        const dataPoints: {timestamp: Date; value: number}[] = [];
+        const dataPoints: { timestamp: Date; value: number }[] = [];
         if (result.Timestamps && result.Values) {
           dataPoints.push(
             ...result.Timestamps.map((t, i) => ({
               timestamp: new Date(t),
               value: result.Values![i],
-            }))
+            })),
           );
           dataPoints.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
         }
 
-        results.push({...result, DataPoints: dataPoints});
+        results.push({ ...result, DataPoints: dataPoints });
       }
     }
 

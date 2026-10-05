@@ -1,14 +1,14 @@
-import {IsEnum, IsNotEmpty, IsNumber, IsUUID} from 'class-validator';
-import {ApiProperty} from '@nestjs/swagger';
-import {CloudwatchMetricRDSMetricName, CloudwatchMetricStatistics} from '../aws-cloudwatch.enum';
+import { IsEnum, IsNotEmpty, IsNumber, IsUUID } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
+import { CloudwatchMetricRDSMetricName, CloudwatchMetricStatistics } from "../aws-cloudwatch.enum";
 
 export class GetWatchedRDSInstancesMetricDto {
   @ApiProperty()
   @IsNotEmpty()
-  @IsUUID('4')
+  @IsUUID("4")
   awsAccountId: string;
 
-  @ApiProperty({enum: CloudwatchMetricRDSMetricName})
+  @ApiProperty({ enum: CloudwatchMetricRDSMetricName })
   @IsNotEmpty()
   @IsEnum(CloudwatchMetricRDSMetricName)
   metricName: CloudwatchMetricRDSMetricName;
@@ -21,11 +21,11 @@ export class GetWatchedRDSInstancesMetricDto {
   @IsNotEmpty()
   endTime: string;
 
-  @ApiProperty({type: Number, description: 'The period must be a multiple of 60'})
+  @ApiProperty({ type: Number, description: "The period must be a multiple of 60" })
   @IsNumber()
   period: number;
 
-  @ApiProperty({enum: CloudwatchMetricStatistics})
+  @ApiProperty({ enum: CloudwatchMetricStatistics })
   @IsNotEmpty()
   @IsEnum(CloudwatchMetricStatistics)
   statistics: CloudwatchMetricStatistics;

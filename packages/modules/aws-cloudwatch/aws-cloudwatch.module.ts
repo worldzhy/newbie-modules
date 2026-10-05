@@ -1,5 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 import { AwsCloudwatchService } from "@modules/aws-cloudwatch/aws-cloudwatch.service";
+import { AwsCloudwatchCredentialService } from "@modules/aws-cloudwatch/aws-cloudwatch-credential.service";
 import { AWSAccountController } from "@modules/aws-cloudwatch/aws-account/aws-account.controller";
 import { Ec2InstanceController } from "./ec2-instance/ec2-instance.controller";
 import { Ec2InstanceService } from "./ec2-instance/ec2-instance.service";
@@ -21,6 +22,7 @@ import { RdsMetricService } from "./rds-instance/rds-metric.service";
   ],
   providers: [
     AwsCloudwatchService,
+    AwsCloudwatchCredentialService,
     Ec2InstanceService,
     Ec2MetricService,
     RdsInstanceService,
@@ -28,6 +30,7 @@ import { RdsMetricService } from "./rds-instance/rds-metric.service";
   ],
   exports: [
     AwsCloudwatchService,
+    AwsCloudwatchCredentialService,
     Ec2InstanceService,
     Ec2MetricService,
     RdsInstanceService,

@@ -6,17 +6,18 @@
 // * RdsInstance                                                   //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
+// AWS access keys are no longer stored on this model. CloudWatch data
+// collection resolves the project-shared credential provided by aws-core
+// (ProjectAwsCredential) at runtime. AwsAccount only keeps the monitoring
+// scope: the 12-digit AWS account id anchor and the regions to discover.
 model AwsAccount {
-  id              String        @id @default(uuid()) @db.Uuid
-  awsAccountId    String        @unique
-  iamUserName     String
-  accessKeyId     String        @unique
-  secretAccessKey String
-  regions         AwsRegion[]
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  ec2Instances    Ec2Instance[]
-  rdsInstances    RdsInstance[]
+  id           String         @id @default(uuid()) @db.Uuid
+  awsAccountId String         @unique
+  regions      AwsRegion[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  ec2Instances Ec2Instance[]
+  rdsInstances RdsInstance[]
 
   @@schema("module/aws-cloudwatch")
 }

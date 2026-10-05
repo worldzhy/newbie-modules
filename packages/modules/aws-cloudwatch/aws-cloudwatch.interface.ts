@@ -1,9 +1,9 @@
-import {MetricDataResult} from '@aws-sdk/client-cloudwatch';
+import { MetricDataResult } from "@aws-sdk/client-cloudwatch";
 import {
   CloudwatchEC2MetricName,
   CloudwatchMetricRDSMetricName,
   CloudwatchMetricStatistics,
-} from './aws-cloudwatch.enum';
+} from "./aws-cloudwatch.enum";
 
 export interface GetEC2InstancesCPUMetricParams {
   ec2InstanceRemoteIds: string[];
@@ -30,5 +30,5 @@ export interface GetRDSInstancesMetricParams {
 }
 
 export interface MetricData extends MetricDataResult {
-  DataPoints: {timestamp: Date; value: number}[];
+  DataPoints: { timestamp: Date; value: number }[];
 }
