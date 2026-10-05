@@ -1,6 +1,7 @@
 import {Injectable} from '@nestjs/common';
 import {
   SQSClient,
+  SQSClientConfig,
   SendMessageCommand,
   GetQueueAttributesCommand,
   QueueAttributeName,
@@ -13,29 +14,25 @@ export class AwsSqsService {
   private queueUrl: string;
 
   constructor(private readonly configService: ConfigService) {
-    const accessKeyId = this.configService.getOrThrow<string>(
-      'modules.aws-sqs.accessKeyId'
-    );
-    const secretAccessKey = this.configService.getOrThrow<string>(
-      'modules.aws-sqs.secretAccessKey'
-    );
-    const region = this.configService.getOrThrow<string>(
-      'modules.aws-sqs.region'
-    );
+    const config = this.configService.getOrThrow<{
+      accessKeyId?: string;
+      secretAccessKey?: string;
+      region: string;
+      queueUrl: string;
+    }>('modules.aws-sqs');
 
-    if (accessKeyId && secretAccessKey && region) {
-      this.client = new SQSClient({
-        credentials: {
-          accessKeyId: accessKeyId,
-          secretAccessKey: secretAccessKey,
-        },
-        region: region,
-      });
+    this.queueUrl = config.queueUrl;
+
+    // Static credentials are optional; when absent the SDK default
+    // credential chain applies (SSO locally, instance profile on EC2).
+    const clientConfig: SQSClientConfig = {region: config.region};
+    if (config.accessKeyId && config.secretAccessKey) {
+      clientConfig.credentials = {
+        accessKeyId: config.accessKeyId,
+        secretAccessKey: config.secretAccessKey,
+      };
     }
-
-    this.queueUrl = this.configService.getOrThrow<string>(
-      'modules.aws-sqs.queueUrl'
-    );
+    this.client = new SQSClient(clientConfig);
   }
 
   /**
