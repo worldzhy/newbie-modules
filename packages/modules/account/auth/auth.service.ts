@@ -23,7 +23,7 @@ import { Expose, expose } from "@modules/account/helpers/expose";
 import { verifyEmail } from "@modules/account/helpers/validator";
 import { GeolocationService } from "@modules/account/helpers/geolocation.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
-import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
+import { AuditActorType, AuditEvent, AuditLogService, AuditResult } from "@modules/audit/audit-log.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { CookieService } from "@modules/security/cookie/cookie.service";
 import { TokenService } from "@modules/security/token/token.service";
@@ -56,6 +56,7 @@ export class AuthService {
     await this.checkLoginEligibility({
       userId: params.userId,
       ipAddress: params.ipAddress,
+      userAgent: params.userAgent,
     });
 
     // [step 1] Update last login time and generate a new session atomically.
@@ -182,16 +183,20 @@ export class AuthService {
 
   /**
    * Single-query login gate: email verification and (when enabled) location
-   * approval are both evaluated from one user load.
+   * approval are both evaluated from one user load. A correct credential that
+   * still fails this gate is a failed login and is audited like one.
    */
-  private async checkLoginEligibility(params: { userId: string; ipAddress: string }): Promise<void> {
+  private async checkLoginEligibility(params: { userId: string; ipAddress: string; userAgent: string }): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: params.userId },
       select: { email: true, name: true, emails: true, checkLocationOnLogin: true },
     });
     if (!user) throw new NotFoundException(USER_NOT_FOUND);
 
-    if (!user.emails.find((i) => i.email === user.email)?.isVerified) throw new UnauthorizedException(UNVERIFIED_EMAIL);
+    if (!user.emails.find((i) => i.email === user.email)?.isVerified) {
+      await this.recordLoginFailure(params.userId, params.ipAddress, params.userAgent, "email_unverified");
+      throw new UnauthorizedException(UNVERIFIED_EMAIL);
+    }
 
     if (!user.checkLocationOnLogin) return;
 
@@ -222,8 +227,26 @@ export class AuthService {
         });
       }
 
+      await this.recordLoginFailure(params.userId, params.ipAddress, params.userAgent, "location_unapproved");
       throw new UnauthorizedException(UNVERIFIED_LOCATION);
     }
+  }
+
+  /** Record a post-credential login gate failure with the request context. */
+  private async recordLoginFailure(
+    userId: string,
+    ipAddress: string,
+    userAgent: string,
+    reason: string,
+  ): Promise<void> {
+    await this.auditLogService.record(AuditEvent.LOGIN_FAILED, {
+      actorType: AuditActorType.USER,
+      actorId: userId,
+      result: AuditResult.FAILURE,
+      ipAddress,
+      userAgent,
+      detail: { reason },
+    });
   }
 
   /**

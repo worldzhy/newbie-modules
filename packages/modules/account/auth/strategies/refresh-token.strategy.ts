@@ -8,6 +8,7 @@ import { NO_TOKEN_PROVIDED } from "@devbie/newbie/exceptions/errors.constants";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { TokenService } from "@modules/security/token/token.service";
 import { CookieName } from "@modules/security/cookie/cookie.service";
+import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 
 @Injectable()
 export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.refresh-token") {
@@ -15,6 +16,7 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.ref
     private readonly prisma: PrismaService,
     private readonly sessionService: SessionService,
     private readonly tokenService: TokenService,
+    private readonly auditLogService: AuditLogService,
   ) {
     super();
   }
@@ -48,7 +50,15 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.ref
       } catch {
         throw new UnauthorizedException("Token is incorrect.");
       }
-      await this.prisma.session.deleteMany({ where: { userId } });
+      const { count } = await this.prisma.session.deleteMany({ where: { userId } });
+      await this.auditLogService.record(AuditEvent.SESSION_REVOKED, {
+        actorType: AuditActorType.USER,
+        actorId: userId,
+        resourceType: "session",
+        detail: { reason: "refresh_token_reuse", revokedSessionCount: count },
+        ipAddress: req.ip,
+        userAgent: req.headers["user-agent"],
+      });
       throw new UnauthorizedException("Refresh token reuse detected; all sessions have been revoked.");
     }
 

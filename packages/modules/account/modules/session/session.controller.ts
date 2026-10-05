@@ -7,13 +7,17 @@ import { SessionResponseDto, SessionsListRequestDto, SessionsListResponseDto } f
 import { SESSION_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { UserRequest } from "@modules/security/security.interface";
 import { SelfOnlyGuard } from "@modules/security/self-only/self-only.guard";
+import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 
 @ApiTags("Account / Session")
 @ApiBearerAuth()
 @UseGuards(SelfOnlyGuard)
 @Controller("users/:userId/sessions")
 export class SessionController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   /** Get sessions for a user */
   @Get()
@@ -65,17 +69,31 @@ export class SessionController {
     };
   }
 
-  /** Delete a session for a user */
+  /** Revoke a session for a user */
   @Delete(":id")
   @ApiOperation({ summary: "Delete a session" })
   @ApiResponse({ type: SessionResponseDto })
-  async remove(@Param("userId") userId: string, @Param("id", ParseIntPipe) id: number): Promise<Expose<Session>> {
+  async remove(
+    @Req() req: UserRequest,
+    @Param("userId") userId: string,
+    @Param("id", ParseIntPipe) id: number,
+  ): Promise<Expose<Session>> {
     // Guard already verified ownership; keep the lookup so a missing id
     // returns 404 instead of a Prisma delete error.
     const testSession = await this.prisma.session.findUnique({ where: { id, userId } });
     if (!testSession) throw new NotFoundException(SESSION_NOT_FOUND);
     const session = await this.prisma.session.delete({
       where: { id },
+    });
+
+    await this.auditLogService.record(AuditEvent.SESSION_REVOKED, {
+      actorType: AuditActorType.USER,
+      actorId: req.user.userId,
+      resourceType: "session",
+      resourceId: String(id),
+      detail: { sessionOwnerId: userId, isCurrentSession: req.user.sessionId === id },
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"],
     });
 
     return expose<Session>(session);

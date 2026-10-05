@@ -27,7 +27,12 @@ export class LoginByTotpController {
     @Headers("User-Agent") userAgent: string,
     @Res({ passthrough: true }) response: Response,
   ): Promise<LoginByPasswordResponseDto> {
-    const userId = await this.twoFactorService.consumeMfaChallenge({ token: body.token, code: body.code });
+    const userId = await this.twoFactorService.consumeMfaChallenge({
+      token: body.token,
+      code: body.code,
+      ipAddress,
+      userAgent,
+    });
     return await this.authService.login({ ipAddress, userAgent, userId, response });
   }
 }
