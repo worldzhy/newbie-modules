@@ -14,7 +14,7 @@ import { JobHandlerRegistryService, JobHandler } from "./handler-registry.servic
 
 const RECONCILE_INTERVAL_MS = 30_000;
 const CRON_JOB_NAME_PREFIX = "job-scheduler:";
-const DEFAULT_TIMEZONE = "Asia/Shanghai";
+export const DEFAULT_TIMEZONE = "Asia/Shanghai";
 const DEFAULT_RUN_LIMIT = 50;
 const MAX_RUN_LIMIT = 200;
 const PG_UNIQUE_VIOLATION = "P2002";

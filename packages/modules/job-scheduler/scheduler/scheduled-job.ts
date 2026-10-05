@@ -1,5 +1,5 @@
 import { Inject, Logger, OnModuleInit } from "@nestjs/common";
-import { JobSchedulerService } from "./job-scheduler.service";
+import { DEFAULT_TIMEZONE, JobSchedulerService } from "./job-scheduler.service";
 import { JobHandlerRegistryService } from "./handler-registry.service";
 
 /**
@@ -12,9 +12,9 @@ import { JobHandlerRegistryService } from "./handler-registry.service";
  */
 export abstract class ScheduledJob implements OnModuleInit {
   protected abstract readonly key: string;
-  protected abstract readonly name: string;
+  /// Optional override; defaults to the platform timezone when not declared.
+  protected readonly timezone: string = DEFAULT_TIMEZONE;
   protected abstract readonly cronExpr: string;
-  protected abstract readonly timezone: string;
   protected abstract readonly enabled: boolean;
   protected abstract readonly logger: Logger;
 
