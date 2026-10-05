@@ -269,6 +269,10 @@ export class NotificationCenterService {
   async list(userId: string, query: ListNotificationsRequestDto): Promise<ListNotificationsResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
     const unreadOnly = query.unreadOnly === "true";
+    const notificationKeys = query.notificationKeys
+      ?.split(",")
+      .map((key) => key.trim())
+      .filter(Boolean);
 
     const result = await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.NotificationRecord,
@@ -277,6 +281,9 @@ export class NotificationCenterService {
         where: {
           createdAt: { gte: visibleSince },
           ...(unreadOnly ? { receipts: { none: { userId } } } : {}),
+          ...(query.severity ? { severity: query.severity } : {}),
+          ...(notificationKeys && notificationKeys.length > 0 ? { notificationKey: { in: notificationKeys } } : {}),
+          ...(query.projectId ? { projectId: query.projectId } : {}),
         },
         orderBy: { createdAt: "desc" },
       },

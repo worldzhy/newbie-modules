@@ -95,6 +95,27 @@ export class ListNotificationsRequestDto extends CommonListRequestDto {
   @IsOptional()
   @IsString()
   unreadOnly?: string;
+
+  @ApiProperty({ required: false, enum: SEVERITIES, description: "Filter by resolved severity" })
+  @IsOptional()
+  @IsString()
+  @IsIn(SEVERITIES as unknown as string[])
+  severity?: string;
+
+  @ApiProperty({
+    type: String,
+    required: false,
+    description: "Comma-separated notification keys to filter by, e.g. 'heartbeat.offline,job.run-failed'",
+  })
+  @IsOptional()
+  @IsString()
+  notificationKeys?: string;
+
+  @ApiProperty({ type: String, required: false, description: "Filter by scoped project id (UUID)" })
+  @IsOptional()
+  @IsString()
+  @IsUUID()
+  projectId?: string;
 }
 
 export class ListNotificationsResponseDto extends CommonListResponseDto {
