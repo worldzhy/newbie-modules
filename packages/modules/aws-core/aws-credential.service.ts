@@ -1,5 +1,12 @@
 import { randomUUID } from "node:crypto";
-import { BadGatewayException, BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadGatewayException,
+  BadRequestException,
+  HttpException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ProjectAwsCredential } from "@generated/prisma/client";
 import { UpsertProjectAwsCredentialDto } from "./aws-credential.dto";
@@ -269,6 +276,12 @@ export class AwsCredentialService {
    * AWS requestId are logged; raw SDK messages can contain account data.
    */
   private toAssumptionException(error: unknown): Error {
+    // The credential provider already maps STS failures through this method;
+    // pass its HttpException through unchanged instead of mapping it twice
+    // (which would degrade a 400 trust error into a 502).
+    if (error instanceof HttpException) {
+      return error;
+    }
     const { name, $metadata } = (error ?? {}) as {
       name?: string;
       $metadata?: { httpStatusCode?: number; requestId?: string };
