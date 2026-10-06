@@ -1,5 +1,5 @@
-import {Injectable} from '@nestjs/common';
-import {pwnedPassword} from 'hibp';
+import { Injectable } from "@nestjs/common";
+import { pwnedPassword } from "hibp";
 
 @Injectable()
 export class PwnedService {

@@ -1,10 +1,10 @@
-import {Injectable} from '@nestjs/common';
-import {Prisma} from '@generated/prisma/client';
-import {AvailabilityService} from '@modules/event-scheduling/availability.service';
-import {ceilByMinutes, floorByMinutes} from '@devbie/newbie/utilities/datetime.util';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@generated/prisma/client";
+import { AvailabilityService } from "@modules/event-scheduling/availability.service";
+import { ceilByMinutes, floorByMinutes } from "@devbie/newbie/utilities/datetime.util";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
-const ROLE_NAME_EVENT_HOST = 'Event Host';
+const ROLE_NAME_EVENT_HOST = "Event Host";
 const userSelectArgs: Prisma.EventHostSelect = {
   id: true,
   fullName: true,
@@ -19,7 +19,7 @@ export class EventHostService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly availabilityService: AvailabilityService
+    private readonly availabilityService: AvailabilityService,
   ) {
     this.MINUTES_Of_TIMESLOT_UNIT = this.availabilityService.MINUTES_Of_TIMESLOT_UNIT;
   }
@@ -34,18 +34,22 @@ export class EventHostService {
     weekOfMonth: number;
     minutesOfDuration: number;
   }) {
-    type UserResult = Prisma.Result<typeof this.prisma.eventHost, {select: typeof userSelectArgs}, 'findUniqueOrThrow'>;
+    type UserResult = Prisma.Result<
+      typeof this.prisma.eventHost,
+      { select: typeof userSelectArgs },
+      "findUniqueOrThrow"
+    >;
 
     // [step 1] Get coaches for the specific venue.
     const coaches = await this.prisma.eventHost.findMany({
       where: {
-        roles: {some: {name: ROLE_NAME_EVENT_HOST}},
-        eventVenueIds: {has: event.venueId},
-        eventTypeIds: {has: event.typeId},
+        roles: { some: { name: ROLE_NAME_EVENT_HOST } },
+        eventVenueIds: { has: event.venueId },
+        eventTypeIds: { has: event.typeId },
       },
       select: userSelectArgs,
     });
-    const coachIds = coaches.map(coach => {
+    const coachIds = coaches.map((coach) => {
       return coach.id;
     });
 
@@ -57,10 +61,10 @@ export class EventHostService {
     const newDatetimeOfEnd = ceilByMinutes(event.datetimeOfEnd, this.MINUTES_Of_TIMESLOT_UNIT);
     const availabilities = await this.prisma.availabilityTimeslot.findMany({
       where: {
-        hostId: {in: coachIds},
-        venueIds: {has: event.venueId},
-        datetimeOfStart: {gte: newDatetimeOfStart},
-        datetimeOfEnd: {lte: newDatetimeOfEnd},
+        hostId: { in: coachIds },
+        venueIds: { has: event.venueId },
+        datetimeOfStart: { gte: newDatetimeOfStart },
+        datetimeOfEnd: { lte: newDatetimeOfEnd },
         // status: AvailabilityTimeslotStatus.USABLE,
       },
     });
@@ -77,7 +81,7 @@ export class EventHostService {
     }[] = [];
     for (let i = 0; i < coaches.length; i++) {
       const coach = coaches[i];
-      const availabilitiesOfOneCoach = availabilities.filter(availability => {
+      const availabilitiesOfOneCoach = availabilities.filter((availability) => {
         return availability.hostId === coach.id;
       });
       if (availabilitiesOfOneCoach.length >= event.minutesOfDuration / this.MINUTES_Of_TIMESLOT_UNIT) {
@@ -93,19 +97,19 @@ export class EventHostService {
         });
 
         // ! A coach can not be dispatched more classes than his/her max preference.
-        if (coach['profile']?.quotaOfWeekMax! - countOfEvents > 0) {
+        if (coach["profile"]?.quotaOfWeekMax! - countOfEvents > 0) {
           sortedAvailableCoaches.push({
             hostId: coach.id,
-            remainingQuota: coach['profile']?.quotaOfWeekMin! - countOfEvents,
-            remainingQuotaOfMin: coach['profile']?.quotaOfWeekMin! - countOfEvents,
-            remainingQuotaOfMax: coach['profile']?.quotaOfWeekMax! - countOfEvents,
-            quotaOfWeek: coach['profile']?.quotaOfWeekMin!,
-            quotaOfWeekMin: coach['profile']?.quotaOfWeekMin!,
-            quotaOfWeekMax: coach['profile']?.quotaOfWeekMax!,
+            remainingQuota: coach["profile"]?.quotaOfWeekMin! - countOfEvents,
+            remainingQuotaOfMin: coach["profile"]?.quotaOfWeekMin! - countOfEvents,
+            remainingQuotaOfMax: coach["profile"]?.quotaOfWeekMax! - countOfEvents,
+            quotaOfWeek: coach["profile"]?.quotaOfWeekMin!,
+            quotaOfWeekMin: coach["profile"]?.quotaOfWeekMin!,
+            quotaOfWeekMax: coach["profile"]?.quotaOfWeekMax!,
           });
 
           // Count of coach's events in all locations.
-          coach['profile']!['quotaOfUsed'] = countOfEvents;
+          coach["profile"]!["quotaOfUsed"] = countOfEvents;
           availableCoaches.push(coach);
         }
       }
@@ -172,13 +176,13 @@ export class EventHostService {
     // [step 1] Get coaches for the specific venue.
     const coaches = await this.prisma.eventHost.findMany({
       where: {
-        roles: {some: {name: ROLE_NAME_EVENT_HOST}},
-        eventVenueIds: {has: event.venueId},
-        eventTypeIds: {has: event.typeId},
+        roles: { some: { name: ROLE_NAME_EVENT_HOST } },
+        eventVenueIds: { has: event.venueId },
+        eventTypeIds: { has: event.typeId },
       },
       select: userSelectArgs,
     });
-    const coachIds = coaches.map(coach => {
+    const coachIds = coaches.map((coach) => {
       return coach.id;
     });
 
@@ -187,10 +191,10 @@ export class EventHostService {
     const newDatetimeOfEnd = ceilByMinutes(event.datetimeOfEnd, this.MINUTES_Of_TIMESLOT_UNIT);
     const availabilities = await this.prisma.availabilityTimeslot.findMany({
       where: {
-        hostId: {in: coachIds},
-        venueIds: {has: event.venueId},
-        datetimeOfStart: {gte: newDatetimeOfStart},
-        datetimeOfEnd: {lte: newDatetimeOfEnd},
+        hostId: { in: coachIds },
+        venueIds: { has: event.venueId },
+        datetimeOfStart: { gte: newDatetimeOfStart },
+        datetimeOfEnd: { lte: newDatetimeOfEnd },
         // status: AvailabilityTimeslotStatus.USABLE,
       },
     });
@@ -200,13 +204,13 @@ export class EventHostService {
       const coach = coaches[i];
 
       // Check if the coach is available between the start time and end time.
-      const availabilitiesOfOneCoach = availabilities.filter(availability => {
+      const availabilitiesOfOneCoach = availabilities.filter((availability) => {
         return availability.hostId === coach.id;
       });
       if (availabilitiesOfOneCoach.length >= event.minutesOfDuration / this.MINUTES_Of_TIMESLOT_UNIT) {
-        coach['isAvailable'] = true;
+        coach["isAvailable"] = true;
       } else {
-        coach['isAvailable'] = false;
+        coach["isAvailable"] = false;
       }
 
       // Count coach's events in all locations.
@@ -220,10 +224,10 @@ export class EventHostService {
         },
       });
 
-      coach['quotaOfUsed'] = countOfEvents;
-      coach['remainingQuota'] = coach.quotaOfWeekMin! - countOfEvents;
-      coach['remainingQuotaOfMin'] = coach.quotaOfWeekMin! - countOfEvents;
-      coach['remainingQuotaOfMax'] = coach.quotaOfWeekMax! - countOfEvents;
+      coach["quotaOfUsed"] = countOfEvents;
+      coach["remainingQuota"] = coach.quotaOfWeekMin! - countOfEvents;
+      coach["remainingQuotaOfMin"] = coach.quotaOfWeekMin! - countOfEvents;
+      coach["remainingQuotaOfMax"] = coach.quotaOfWeekMax! - countOfEvents;
 
       // [RC 2023-11-21] A coach is available even she/he has been scheduled more than max preferred number of classes.
       // if (countOfEvents >= coach['profile'].quotaOfWeekMax) {
@@ -235,32 +239,32 @@ export class EventHostService {
     coaches.sort((coachA, coachB) => {
       const a = coachA;
       const b = coachB;
-      if (a['remainingQuota'] > 0 && b['remainingQuota'] > 0) {
-        if (a['remainingQuota'] / a.quotaOfWeekMin! >= b['remainingQuota'] / b.quotaOfWeekMin!) {
+      if (a["remainingQuota"] > 0 && b["remainingQuota"] > 0) {
+        if (a["remainingQuota"] / a.quotaOfWeekMin! >= b["remainingQuota"] / b.quotaOfWeekMin!) {
           return -1; // a is in front of b
         } else {
           return 1; // b is in front of a
         }
-      } else if (a['remainingQuota'] <= 0 && b['remainingQuota'] <= 0) {
-        if (a['remainingQuotaOfMin'] > 0 && b['remainingQuotaOfMin'] > 0) {
-          if (a['remainingQuotaOfMin'] / a.quotaOfWeekMin! >= b['remainingQuotaOfMin'] / b.quotaOfWeekMin!) {
+      } else if (a["remainingQuota"] <= 0 && b["remainingQuota"] <= 0) {
+        if (a["remainingQuotaOfMin"] > 0 && b["remainingQuotaOfMin"] > 0) {
+          if (a["remainingQuotaOfMin"] / a.quotaOfWeekMin! >= b["remainingQuotaOfMin"] / b.quotaOfWeekMin!) {
             return -1;
           } else {
             return 1;
           }
-        } else if (a['remainingQuotaOfMin'] <= 0 && b['remainingQuotaOfMin'] <= 0) {
+        } else if (a["remainingQuotaOfMin"] <= 0 && b["remainingQuotaOfMin"] <= 0) {
           // ! The remainingQuotaOfMax must be larger than 0.
-          if (a['remainingQuotaOfMax'] / a.quotaOfWeekMax! >= b['remainingQuotaOfMax'] / b.quotaOfWeekMax!) {
+          if (a["remainingQuotaOfMax"] / a.quotaOfWeekMax! >= b["remainingQuotaOfMax"] / b.quotaOfWeekMax!) {
             return -1;
           } else {
             return 1;
           }
-        } else if (a['remainingQuotaOfMin'] > 0) {
+        } else if (a["remainingQuotaOfMin"] > 0) {
           return -1;
         } else {
           return 1;
         }
-      } else if (a['remainingQuota'] > 0) {
+      } else if (a["remainingQuota"] > 0) {
         return -1;
       } else {
         return 1;

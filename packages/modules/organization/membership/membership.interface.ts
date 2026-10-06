@@ -1,4 +1,4 @@
-import {MembershipRole} from '@generated/prisma/client';
+import { MembershipRole } from "@generated/prisma/client";
 
 export interface CreateMembershipInput {
   email: string;

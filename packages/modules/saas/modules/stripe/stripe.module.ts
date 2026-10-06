@@ -1,17 +1,12 @@
-import {
-  MiddlewareConsumer,
-  Module,
-  NestModule,
-  RequestMethod,
-} from '@nestjs/common';
-import {RawBodyMiddleware} from '@devbie/newbie/middlewares/raw-body.middleware';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from "@nestjs/common";
+import { RawBodyMiddleware } from "@devbie/newbie/middlewares/raw-body.middleware";
 
-import {StripeBillingController} from './stripe-billing.controller';
-import {StripeWebhookController} from './stripe-webhook.controller';
-import {StripeSubscriptionController} from './stripe-subscription.controller';
-import {StripeSourcesController} from './stripe-sources.controller';
-import {StripeInvoicesController} from './stripe-invoices.controller';
-import {StripeService} from './stripe.service';
+import { StripeBillingController } from "./stripe-billing.controller";
+import { StripeWebhookController } from "./stripe-webhook.controller";
+import { StripeSubscriptionController } from "./stripe-subscription.controller";
+import { StripeSourcesController } from "./stripe-sources.controller";
+import { StripeInvoicesController } from "./stripe-invoices.controller";
+import { StripeService } from "./stripe.service";
 
 @Module({
   controllers: [
@@ -27,7 +22,7 @@ import {StripeService} from './stripe.service';
 export class StripeModule implements NestModule {
   public configure(consumer: MiddlewareConsumer): void {
     consumer.apply(RawBodyMiddleware).forRoutes({
-      path: '/webhooks/stripe',
+      path: "/webhooks/stripe",
       method: RequestMethod.POST,
     });
   }

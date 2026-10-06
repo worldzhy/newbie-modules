@@ -1,36 +1,36 @@
-import {Logger, Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import PDLJS from 'peopledatalabs';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {Prisma} from '@generated/prisma/client';
-import {PeopleFinderCallThirdPartyDto} from '../people-finder.dto';
-import {PeopleFinderNotificationService} from '../people-finder.notification.service';
+import { Logger, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import PDLJS from "peopledatalabs";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { Prisma } from "@generated/prisma/client";
+import { PeopleFinderCallThirdPartyDto } from "../people-finder.dto";
+import { PeopleFinderNotificationService } from "../people-finder.notification.service";
 import {
   SearchPeopleByDomainReqDto,
   SearchPeopleResDto,
   SearchPeopleArrayResDto,
   SearchPeopleByLinkedinReqDto,
   PeopledatalabsStatus,
-} from './peopledatalabs.dto';
-import {PeopleFinderStatus, PeopleFinderPlatforms, SearchFilter, PeopleFinderSourceMode} from '../constants';
+} from "./peopledatalabs.dto";
+import { PeopleFinderStatus, PeopleFinderPlatforms, SearchFilter, PeopleFinderSourceMode } from "../constants";
 
-export * from './peopledatalabs.dto';
+export * from "./peopledatalabs.dto";
 
 @Injectable()
 export class PeopledatalabsService {
   private apiKey: string;
   private api;
-  private loggerContext = 'Peopledatalabs';
+  private loggerContext = "Peopledatalabs";
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private peopleFinderNotification: PeopleFinderNotificationService,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {
-    this.apiKey = this.configService.getOrThrow<string>('modules.peopleFinder.peopledatalabs.apiKey');
+    this.apiKey = this.configService.getOrThrow<string>("modules.peopleFinder.peopledatalabs.apiKey");
     // @ts-ignore
-    this.api = PDLJS({apiKey: this.apiKey});
+    this.api = PDLJS({ apiKey: this.apiKey });
 
     // this.searchPeopleByDomain({
     //   fullName: 'Jovan Bethell',
@@ -52,14 +52,14 @@ export class PeopledatalabsService {
     needPhone,
     needEmail,
   }: SearchPeopleByDomainReqDto): Promise<SearchPeopleArrayResDto> {
-    const should: {exists: {field: string}}[] = [];
+    const should: { exists: { field: string } }[] = [];
     if (needPhone) {
-      should.push({exists: {field: 'phone_numbers'}});
+      should.push({ exists: { field: "phone_numbers" } });
     }
     if (needEmail) {
-      should.push({exists: {field: 'emails'}});
+      should.push({ exists: { field: "emails" } });
     }
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       const esQuery = {
         query: {
           bool: {
@@ -69,8 +69,8 @@ export class PeopledatalabsService {
                   should,
                 },
               },
-              {match: {full_name: name}},
-              {match: {job_company_website: companyDomain}},
+              { match: { full_name: name } },
+              { match: { job_company_website: companyDomain } },
             ],
           },
         },
@@ -83,33 +83,33 @@ export class PeopledatalabsService {
       try {
         this.api.person.search
           .elastic(params)
-          .then(res => {
+          .then((res) => {
             if (res.status === PeopledatalabsStatus.SUCCESS) {
-              resolve({res: res});
+              resolve({ res: res });
               this.logger.log(
-                'Peopledatalabs searchPeopleByDomain success: ' + JSON.stringify(res),
-                this.loggerContext
+                "Peopledatalabs searchPeopleByDomain success: " + JSON.stringify(res),
+                this.loggerContext,
               );
             } else {
-              const resError = {error: res.status, ctx: res};
-              resolve({error: resError});
+              const resError = { error: res.status, ctx: res };
+              resolve({ error: resError });
               this.logger.error(
-                'Peopledatalabs searchPeopleByDomain error: ' + JSON.stringify(resError),
-                this.loggerContext
+                "Peopledatalabs searchPeopleByDomain error: " + JSON.stringify(resError),
+                this.loggerContext,
               );
             }
           })
-          .catch(error => {
+          .catch((error) => {
             this.catchErrorRes({
               error,
-              errorTitle: 'Peopledatalabs searchPeopleByDomain error: ',
+              errorTitle: "Peopledatalabs searchPeopleByDomain error: ",
               resolve,
             });
           });
       } catch (error) {
         this.catchErrorRes({
           error,
-          errorTitle: 'Peopledatalabs searchPeopleByDomain error: ',
+          errorTitle: "Peopledatalabs searchPeopleByDomain error: ",
           resolve,
         });
       }
@@ -123,8 +123,8 @@ export class PeopledatalabsService {
    * https://docs.peopledatalabs.com/docs/quickstart-person-enrichment-api
    * 1 credit
    */
-  async searchPeopleByLinkedin({linkedinUrl}: SearchPeopleByLinkedinReqDto): Promise<SearchPeopleResDto> {
-    return new Promise(resolve => {
+  async searchPeopleByLinkedin({ linkedinUrl }: SearchPeopleByLinkedinReqDto): Promise<SearchPeopleResDto> {
+    return new Promise((resolve) => {
       const params = {
         profile: linkedinUrl,
       };
@@ -132,33 +132,33 @@ export class PeopledatalabsService {
         // Pass the parameters object to the Person Enrichment API
         this.api.person
           .enrichment(params)
-          .then(res => {
+          .then((res) => {
             if (res.status === PeopledatalabsStatus.SUCCESS) {
-              resolve({res});
+              resolve({ res });
               this.logger.log(
-                'Peopledatalabs searchPeopleByLinkedin success: ' + JSON.stringify(res),
-                this.loggerContext
+                "Peopledatalabs searchPeopleByLinkedin success: " + JSON.stringify(res),
+                this.loggerContext,
               );
             } else {
-              const resError = {error: res.status, ctx: res};
-              resolve({error: resError});
+              const resError = { error: res.status, ctx: res };
+              resolve({ error: resError });
               this.logger.error(
-                'Peopledatalabs searchPeopleByLinkedin error: ' + JSON.stringify(resError),
-                this.loggerContext
+                "Peopledatalabs searchPeopleByLinkedin error: " + JSON.stringify(resError),
+                this.loggerContext,
               );
             }
           })
-          .catch(error => {
+          .catch((error) => {
             this.catchErrorRes({
               error,
-              errorTitle: 'Peopledatalabs searchPeopleByLinkedin error: ',
+              errorTitle: "Peopledatalabs searchPeopleByLinkedin error: ",
               resolve,
             });
           });
       } catch (error) {
         this.catchErrorRes({
           error,
-          errorTitle: 'Peopledatalabs searchPeopleByLinkedin error: ',
+          errorTitle: "Peopledatalabs searchPeopleByLinkedin error: ",
           resolve,
         });
       }
@@ -174,8 +174,8 @@ export class PeopledatalabsService {
     errorTitle: string;
     resolve: (error: object) => void;
   }) => {
-    const resError = {error};
-    resolve({error: resError});
+    const resError = { error };
+    resolve({ error: resError });
     this.logger.error(errorTitle + JSON.stringify(resError), this.loggerContext);
   };
 
@@ -183,16 +183,16 @@ export class PeopledatalabsService {
    * peopledatalabs [support: email,phone]
    */
   async find(
-    mode: 'byLinkedin' | 'byDomain',
+    mode: "byLinkedin" | "byDomain",
     user: PeopleFinderCallThirdPartyDto,
-    {needPhone, needEmail}: SearchFilter
+    { needPhone, needEmail }: SearchFilter,
   ) {
     const dataFlag = {
       email: false,
       phone: false,
     };
     let noCredits = false;
-    if (mode === 'byLinkedin') {
+    if (mode === "byLinkedin") {
       if (user.linkedin) {
         const newRecord = await this.prisma.peopleFinderCallThirdParty.create({
           data: {
@@ -203,7 +203,7 @@ export class PeopledatalabsService {
           },
         });
 
-        const {error, res} = await this.searchPeopleByLinkedin({
+        const { error, res } = await this.searchPeopleByLinkedin({
           linkedinUrl: user.linkedin,
         });
 
@@ -214,7 +214,7 @@ export class PeopledatalabsService {
           // notification webhook
           if (error.error && error.error.status === PeopledatalabsStatus.PAYMENT_REQUIRED) {
             await this.peopleFinderNotification.send({
-              message: '[peopledatalabs] Not have enough credits',
+              message: "[peopledatalabs] Not have enough credits",
             });
             noCredits = true;
           }
@@ -236,14 +236,14 @@ export class PeopledatalabsService {
           } else {
             updateData.status = PeopleFinderStatus.failed;
             updateData.ctx = {
-              msg: 'No data records were found for this person',
+              msg: "No data records were found for this person",
               res: res as object,
             };
           }
         }
 
         await this.prisma.peopleFinderCallThirdParty.update({
-          where: {id: newRecord.id},
+          where: { id: newRecord.id },
           data: updateData,
         });
 
@@ -264,7 +264,7 @@ export class PeopledatalabsService {
           },
         });
         return {
-          error: {error: 'Missing parameters'},
+          error: { error: "Missing parameters" },
           dataFlag,
           callThirdPartyId: newRecord.id,
         };
@@ -284,7 +284,7 @@ export class PeopledatalabsService {
       //   });
       // }
     }
-    if (mode === 'byDomain') {
+    if (mode === "byDomain") {
       if (user.companyDomain && user.name) {
         const newRecord = await this.prisma.peopleFinderCallThirdParty.create({
           data: {
@@ -295,7 +295,7 @@ export class PeopledatalabsService {
           },
         });
 
-        const {error, res} = await this.searchPeopleByDomain({
+        const { error, res } = await this.searchPeopleByDomain({
           companyDomain: user.companyDomain,
           name: user.name,
           needPhone,
@@ -309,7 +309,7 @@ export class PeopledatalabsService {
           // notification webhook
           if (error.error && error.error.status === PeopledatalabsStatus.PAYMENT_REQUIRED) {
             await this.peopleFinderNotification.send({
-              message: '[peopledatalabs] Not have enough credits',
+              message: "[peopledatalabs] Not have enough credits",
             });
             noCredits = true;
           }
@@ -335,14 +335,14 @@ export class PeopledatalabsService {
           } else if (!dataArray || !dataArray.length) {
             updateData.status = PeopleFinderStatus.failed;
             updateData.ctx = {
-              msg: 'No data records were found for this person',
+              msg: "No data records were found for this person",
               res: res as object,
             };
           }
         }
 
         await this.prisma.peopleFinderCallThirdParty.update({
-          where: {id: newRecord.id},
+          where: { id: newRecord.id },
           data: updateData,
         });
 
@@ -364,7 +364,7 @@ export class PeopledatalabsService {
         });
 
         return {
-          error: {error: 'Missing parameters'},
+          error: { error: "Missing parameters" },
           dataFlag,
           callThirdPartyId: newRecord.id,
         };

@@ -1,5 +1,5 @@
-import {ApiProperty} from '@nestjs/swagger';
-import {IsString} from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsString } from "class-validator";
 
 class CommonResDto {
   error?: unknown;
@@ -34,7 +34,7 @@ export class SearchPeopleLinkedinReqDto {
   @ApiProperty({
     type: String,
     required: false,
-    description: 'Name of country, city or state',
+    description: "Name of country, city or state",
   })
   @IsString()
   /** Name of country, city or state */
@@ -60,12 +60,12 @@ export class SearchPeopleByLinkedinReqDto {
    * default value: exclude
    * Costs an extra `1` credit per email returned on top of the cost of the base endpoint (if data is available).
    */
-  personalEmail?: 'exclude' | 'include';
+  personalEmail?: "exclude" | "include";
   /**
    * default value: exclude
    * Costs an extra `1` credit per number returned on top of the cost of the base endpoint (if data is available).
    */
-  personalContactNumber?: 'exclude' | 'include';
+  personalContactNumber?: "exclude" | "include";
 }
 
 export class SearchPeopleByLinkedinRes {

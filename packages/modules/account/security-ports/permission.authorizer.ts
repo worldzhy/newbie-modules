@@ -1,10 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PermissionAction, UserRole } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import {
-  PermissionAuthorizer,
-  PermissionRequirement,
-} from "@modules/security/ports/permission.authorizer";
+import { PermissionAuthorizer, PermissionRequirement } from "@modules/security/ports/permission.authorizer";
 
 /**
  * Account-side binding of security's PermissionAuthorizer port. Encapsulates

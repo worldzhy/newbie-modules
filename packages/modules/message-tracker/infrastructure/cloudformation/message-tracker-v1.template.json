@@ -148,12 +148,12 @@
                   "Rules": [
                     {
                       "Name": "prefix",
-                      "Value": {"Ref": "EventStreamS3Prefix"}
+                      "Value": { "Ref": "EventStreamS3Prefix" }
                     }
                   ]
                 }
               },
-              "Function": {"Fn::GetAtt": ["S3EventLambdaFunction", "Arn"]}
+              "Function": { "Fn::GetAtt": ["S3EventLambdaFunction", "Arn"] }
             }
           ]
         }
@@ -168,7 +168,7 @@
           "Statement": [
             {
               "Effect": "Allow",
-              "Principal": {"Service": "firehose.amazonaws.com"},
+              "Principal": { "Service": "firehose.amazonaws.com" },
               "Action": "sts:AssumeRole"
             }
           ]
@@ -204,10 +204,10 @@
     "PinpintEventDeliveryStream": {
       "Type": "AWS::KinesisFirehose::DeliveryStream",
       "Properties": {
-        "DeliveryStreamName": {"Ref": "PinpointEventDeliveryStreamName"},
+        "DeliveryStreamName": { "Ref": "PinpointEventDeliveryStreamName" },
         "DeliveryStreamType": "DirectPut",
         "ExtendedS3DestinationConfiguration": {
-          "BucketARN": {"Fn::GetAtt": ["EventStreamS3", "Arn"]},
+          "BucketARN": { "Fn::GetAtt": ["EventStreamS3", "Arn"] },
           "BufferingHints": {
             "IntervalInSeconds": 300,
             "SizeInMBs": 5
@@ -230,8 +230,8 @@
           "EncryptionConfiguration": {
             "NoEncryptionConfig": "NoEncryption"
           },
-          "ErrorOutputPrefix": {"Ref": "EventStreamS3ErrorOutputPrefix"},
-          "Prefix": {"Ref": "EventStreamS3Prefix"},
+          "ErrorOutputPrefix": { "Ref": "EventStreamS3ErrorOutputPrefix" },
+          "Prefix": { "Ref": "EventStreamS3Prefix" },
           "RoleARN": {
             "Fn::GetAtt": ["PinpintEventDeliveryStreamRole", "Arn"]
           }
@@ -263,10 +263,7 @@
               "Statement": [
                 {
                   "Effect": "Allow",
-                  "Action": [
-                    "mobileanalytics:PutEvents",
-                    "mobileanalytics:PutItems"
-                  ],
+                  "Action": ["mobileanalytics:PutEvents", "mobileanalytics:PutItems"],
                   "Resource": "*"
                 }
               ]
@@ -278,33 +275,33 @@
     "PinpointAlarmEmailChannel": {
       "Type": "AWS::Pinpoint::EmailChannel",
       "Properties": {
-        "ApplicationId": {"Ref": "PinpointAlarm"},
+        "ApplicationId": { "Ref": "PinpointAlarm" },
         "Enabled": true,
-        "FromAddress": {"Ref": "FromAddress"},
-        "Identity": {"Ref": "SESIdentityARN"},
-        "RoleArn": {"Fn::GetAtt": ["PinpointEmailChannelRole", "Arn"]}
+        "FromAddress": { "Ref": "FromAddress" },
+        "Identity": { "Ref": "SESIdentityARN" },
+        "RoleArn": { "Fn::GetAtt": ["PinpointEmailChannelRole", "Arn"] }
       },
       "DependsOn": ["PinpointEmailChannelRole", "PinpointAlarm"]
     },
     "PinpointLevel1EmailChannel": {
       "Type": "AWS::Pinpoint::EmailChannel",
       "Properties": {
-        "ApplicationId": {"Ref": "PinpointLevel1"},
+        "ApplicationId": { "Ref": "PinpointLevel1" },
         "Enabled": true,
-        "FromAddress": {"Ref": "FromAddress"},
-        "Identity": {"Ref": "SESIdentityARN"},
-        "RoleArn": {"Fn::GetAtt": ["PinpointEmailChannelRole", "Arn"]}
+        "FromAddress": { "Ref": "FromAddress" },
+        "Identity": { "Ref": "SESIdentityARN" },
+        "RoleArn": { "Fn::GetAtt": ["PinpointEmailChannelRole", "Arn"] }
       },
       "DependsOn": ["PinpointEmailChannelRole", "PinpointLevel1"]
     },
     "PinpointLevel2EmailChannel": {
       "Type": "AWS::Pinpoint::EmailChannel",
       "Properties": {
-        "ApplicationId": {"Ref": "PinpointLevel2"},
+        "ApplicationId": { "Ref": "PinpointLevel2" },
         "Enabled": true,
-        "FromAddress": {"Ref": "FromAddress"},
-        "Identity": {"Ref": "SESIdentityARN"},
-        "RoleArn": {"Fn::GetAtt": ["PinpointEmailChannelRole", "Arn"]}
+        "FromAddress": { "Ref": "FromAddress" },
+        "Identity": { "Ref": "SESIdentityARN" },
+        "RoleArn": { "Fn::GetAtt": ["PinpointEmailChannelRole", "Arn"] }
       },
       "DependsOn": ["PinpointEmailChannelRole", "PinpointLevel2"]
     },
@@ -328,7 +325,7 @@
     "PinpointLevel1EventStream": {
       "Type": "AWS::Pinpoint::EventStream",
       "Properties": {
-        "ApplicationId": {"Ref": "PinpointLevel1"},
+        "ApplicationId": { "Ref": "PinpointLevel1" },
         "DestinationStreamArn": {
           "Fn::GetAtt": ["PinpintEventDeliveryStream", "Arn"]
         },
@@ -361,10 +358,7 @@
               "Statement": [
                 {
                   "Effect": "Allow",
-                  "Action": [
-                    "firehose:PutRecordBatch",
-                    "firehose:DescribeDeliveryStream"
-                  ],
+                  "Action": ["firehose:PutRecordBatch", "firehose:DescribeDeliveryStream"],
                   "Resource": {
                     "Fn::GetAtt": ["PinpintEventDeliveryStream", "Arn"]
                   }
@@ -378,17 +372,17 @@
     "PinpointLevel2": {
       "Type": "AWS::Pinpoint::App",
       "Properties": {
-        "Name": {"Ref": "PinpointLevel2AppName"}
+        "Name": { "Ref": "PinpointLevel2AppName" }
       }
     },
     "PinpointLevel2EventStream": {
       "Type": "AWS::Pinpoint::EventStream",
       "Properties": {
-        "ApplicationId": {"Ref": "PinpointLevel2"},
+        "ApplicationId": { "Ref": "PinpointLevel2" },
         "DestinationStreamArn": {
           "Fn::GetAtt": ["PinpintEventDeliveryStream", "Arn"]
         },
-        "RoleArn": {"Fn::GetAtt": ["PinpointLevel2EventStreamRole", "Arn"]}
+        "RoleArn": { "Fn::GetAtt": ["PinpointLevel2EventStreamRole", "Arn"] }
       },
       "DependsOn": ["PinpointLevel2", "PinpointLevel2EventStreamRole"]
     },
@@ -400,7 +394,7 @@
           "Statement": [
             {
               "Effect": "Allow",
-              "Principal": {"Service": "pinpoint.amazonaws.com"},
+              "Principal": { "Service": "pinpoint.amazonaws.com" },
               "Action": "sts:AssumeRole"
             }
           ]
@@ -413,10 +407,7 @@
               "Statement": [
                 {
                   "Effect": "Allow",
-                  "Action": [
-                    "firehose:PutRecordBatch",
-                    "firehose:DescribeDeliveryStream"
-                  ],
+                  "Action": ["firehose:PutRecordBatch", "firehose:DescribeDeliveryStream"],
                   "Resource": {
                     "Fn::GetAtt": ["PinpintEventDeliveryStream", "Arn"]
                   }
@@ -430,16 +421,16 @@
     "FinalDeadLetterSQS": {
       "Type": "AWS::SQS::Queue",
       "Properties": {
-        "QueueName": {"Ref": "FinalDeadLetterSQSName"},
+        "QueueName": { "Ref": "FinalDeadLetterSQSName" },
         "VisibilityTimeout": 60
       }
     },
     "EmailSQSLevel2": {
       "Type": "AWS::SQS::Queue",
       "Properties": {
-        "QueueName": {"Ref": "EmailSQSLevel2Name"},
+        "QueueName": { "Ref": "EmailSQSLevel2Name" },
         "RedrivePolicy": {
-          "deadLetterTargetArn": {"Fn::GetAtt": ["FinalDeadLetterSQS", "Arn"]},
+          "deadLetterTargetArn": { "Fn::GetAtt": ["FinalDeadLetterSQS", "Arn"] },
           "maxReceiveCount": 1
         },
         "VisibilityTimeout": 60
@@ -449,9 +440,9 @@
     "EmailSQSLevel1": {
       "Type": "AWS::SQS::Queue",
       "Properties": {
-        "QueueName": {"Ref": "EmailSQSLevel1Name"},
+        "QueueName": { "Ref": "EmailSQSLevel1Name" },
         "RedrivePolicy": {
-          "deadLetterTargetArn": {"Fn::GetAtt": ["EmailSQSLevel2", "Arn"]},
+          "deadLetterTargetArn": { "Fn::GetAtt": ["EmailSQSLevel2", "Arn"] },
           "maxReceiveCount": 1
         },
         "VisibilityTimeout": 60
@@ -467,7 +458,7 @@
           "Statement": [
             {
               "Effect": "Allow",
-              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Principal": { "Service": "lambda.amazonaws.com" },
               "Action": "sts:AssumeRole"
             }
           ]
@@ -499,19 +490,19 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
-          "S3Key": {"Ref": "AlarmLambdaCodeArchiveName"}
+          "S3Bucket": { "Ref": "LambdaCodeS3BucketName" },
+          "S3Key": { "Ref": "AlarmLambdaCodeArchiveName" }
         },
         "Description": "It receives final dead-letter queue messages to send alarm email or sms.",
         "Environment": {
           "Variables": {
-            "DB_HOST": {"Ref": "DatabaseHost"},
-            "DB_PORT": {"Ref": "DatabasePort"},
-            "DB_USER": {"Ref": "DatabaseMasterUsername"},
-            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
-            "DB_NAME": {"Ref": "DatabaseName"},
-            "PINPOINT_APP_ID": {"Ref": "PinpointAlarm"},
-            "FROM_EMAIL_ADDRESS": {"Ref": "FromAddress"},
+            "DB_HOST": { "Ref": "DatabaseHost" },
+            "DB_PORT": { "Ref": "DatabasePort" },
+            "DB_USER": { "Ref": "DatabaseMasterUsername" },
+            "DB_PWD": { "Ref": "DatabaseMasterUserPassword" },
+            "DB_NAME": { "Ref": "DatabaseName" },
+            "PINPOINT_APP_ID": { "Ref": "PinpointAlarm" },
+            "FROM_EMAIL_ADDRESS": { "Ref": "FromAddress" },
             "ALARM_TO_EMAIL_ADDRESS": ""
           }
         },
@@ -521,7 +512,7 @@
         "Handler": "index.handler",
         "MemorySize": 128,
         "PackageType": "Zip",
-        "Role": {"Fn::GetAtt": ["AlarmLambdaRole", "Arn"]},
+        "Role": { "Fn::GetAtt": ["AlarmLambdaRole", "Arn"] },
         "Runtime": "nodejs22.x",
         "Timeout": 60
       },
@@ -532,8 +523,8 @@
       "Properties": {
         "BatchSize": 10,
         "Enabled": true,
-        "EventSourceArn": {"Fn::GetAtt": ["FinalDeadLetterSQS", "Arn"]},
-        "FunctionName": {"Fn::GetAtt": ["AlarmLambda", "Arn"]},
+        "EventSourceArn": { "Fn::GetAtt": ["FinalDeadLetterSQS", "Arn"] },
+        "FunctionName": { "Fn::GetAtt": ["AlarmLambda", "Arn"] },
         "MaximumBatchingWindowInSeconds": 0
       },
       "DependsOn": ["AlarmLambda", "FinalDeadLetterSQS"]
@@ -547,7 +538,7 @@
           "Statement": [
             {
               "Effect": "Allow",
-              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Principal": { "Service": "lambda.amazonaws.com" },
               "Action": "sts:AssumeRole"
             }
           ]
@@ -579,28 +570,28 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
-          "S3Key": {"Ref": "MessageShooterLambdaCodeArchiveName"}
+          "S3Bucket": { "Ref": "LambdaCodeS3BucketName" },
+          "S3Key": { "Ref": "MessageShooterLambdaCodeArchiveName" }
         },
         "Description": "It receives SQS messages to send emails or sms.",
         "Environment": {
           "Variables": {
             "MESSAGE_TYPE": "email",
             "SHOOTER_LEVEL": 1,
-            "DB_HOST": {"Ref": "DatabaseHost"},
-            "DB_PORT": {"Ref": "DatabasePort"},
-            "DB_USER": {"Ref": "DatabaseMasterUsername"},
-            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
-            "DB_NAME": {"Ref": "DatabaseName"},
-            "PINPOINT_APP_ID": {"Ref": "PinpointLevel1"},
-            "FROM_EMAIL_ADDRESS": {"Ref": "FromAddress"}
+            "DB_HOST": { "Ref": "DatabaseHost" },
+            "DB_PORT": { "Ref": "DatabasePort" },
+            "DB_USER": { "Ref": "DatabaseMasterUsername" },
+            "DB_PWD": { "Ref": "DatabaseMasterUserPassword" },
+            "DB_NAME": { "Ref": "DatabaseName" },
+            "PINPOINT_APP_ID": { "Ref": "PinpointLevel1" },
+            "FROM_EMAIL_ADDRESS": { "Ref": "FromAddress" }
           }
         },
-        "FunctionName": {"Ref": "EmailShooterLevel1LambdaName"},
+        "FunctionName": { "Ref": "EmailShooterLevel1LambdaName" },
         "Handler": "index.handler",
         "MemorySize": 128,
         "PackageType": "Zip",
-        "Role": {"Fn::GetAtt": ["ShooterLambdaRole", "Arn"]},
+        "Role": { "Fn::GetAtt": ["ShooterLambdaRole", "Arn"] },
         "Runtime": "nodejs22.x",
         "Timeout": 60
       },
@@ -611,8 +602,8 @@
       "Properties": {
         "BatchSize": 10,
         "Enabled": true,
-        "EventSourceArn": {"Fn::GetAtt": ["EmailSQSLevel1", "Arn"]},
-        "FunctionName": {"Fn::GetAtt": ["EmailShooterLevel1", "Arn"]},
+        "EventSourceArn": { "Fn::GetAtt": ["EmailSQSLevel1", "Arn"] },
+        "FunctionName": { "Fn::GetAtt": ["EmailShooterLevel1", "Arn"] },
         "MaximumBatchingWindowInSeconds": 0
       },
       "DependsOn": ["EmailShooterLevel1", "EmailSQSLevel1"]
@@ -621,28 +612,28 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
-          "S3Key": {"Ref": "MessageShooterLambdaCodeArchiveName"}
+          "S3Bucket": { "Ref": "LambdaCodeS3BucketName" },
+          "S3Key": { "Ref": "MessageShooterLambdaCodeArchiveName" }
         },
         "Description": "It receives SQS messages to send emails or sms.",
         "Environment": {
           "Variables": {
             "MESSAGE_TYPE": "email",
             "SHOOTER_LEVEL": 2,
-            "DB_HOST": {"Ref": "DatabaseHost"},
-            "DB_PORT": {"Ref": "DatabasePort"},
-            "DB_USER": {"Ref": "DatabaseMasterUsername"},
-            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
-            "DB_NAME": {"Ref": "DatabaseName"},
-            "PINPOINT_APP_ID": {"Ref": "PinpointLevel2"},
-            "FROM_EMAIL_ADDRESS": {"Ref": "FromAddress"}
+            "DB_HOST": { "Ref": "DatabaseHost" },
+            "DB_PORT": { "Ref": "DatabasePort" },
+            "DB_USER": { "Ref": "DatabaseMasterUsername" },
+            "DB_PWD": { "Ref": "DatabaseMasterUserPassword" },
+            "DB_NAME": { "Ref": "DatabaseName" },
+            "PINPOINT_APP_ID": { "Ref": "PinpointLevel2" },
+            "FROM_EMAIL_ADDRESS": { "Ref": "FromAddress" }
           }
         },
-        "FunctionName": {"Ref": "EmailShooterLevel2LambdaName"},
+        "FunctionName": { "Ref": "EmailShooterLevel2LambdaName" },
         "Handler": "index.handler",
         "MemorySize": 128,
         "PackageType": "Zip",
-        "Role": {"Fn::GetAtt": ["ShooterLambdaRole", "Arn"]},
+        "Role": { "Fn::GetAtt": ["ShooterLambdaRole", "Arn"] },
         "Runtime": "nodejs22.x",
         "Timeout": 60
       },
@@ -653,8 +644,8 @@
       "Properties": {
         "BatchSize": 10,
         "Enabled": true,
-        "EventSourceArn": {"Fn::GetAtt": ["EmailSQSLevel2", "Arn"]},
-        "FunctionName": {"Fn::GetAtt": ["EmailShooterLevel2", "Arn"]},
+        "EventSourceArn": { "Fn::GetAtt": ["EmailSQSLevel2", "Arn"] },
+        "FunctionName": { "Fn::GetAtt": ["EmailShooterLevel2", "Arn"] },
         "MaximumBatchingWindowInSeconds": 0
       },
       "DependsOn": ["EmailShooterLevel2", "EmailSQSLevel2"]
@@ -680,24 +671,24 @@
       "Type": "AWS::Lambda::Function",
       "Properties": {
         "Code": {
-          "S3Bucket": {"Ref": "LambdaCodeS3BucketName"},
-          "S3Key": {"Ref": "PinpointEventProcessorLambdaCodeArchiveName"}
+          "S3Bucket": { "Ref": "LambdaCodeS3BucketName" },
+          "S3Key": { "Ref": "PinpointEventProcessorLambdaCodeArchiveName" }
         },
         "Description": "It processes the pinpoint events from the Kinesis Firehose.",
         "Environment": {
           "Variables": {
-            "DB_HOST": {"Ref": "DatabaseHost"},
-            "DB_PORT": {"Ref": "DatabasePort"},
-            "DB_USER": {"Ref": "DatabaseMasterUsername"},
-            "DB_PWD": {"Ref": "DatabaseMasterUserPassword"},
-            "DB_NAME": {"Ref": "DatabaseName"}
+            "DB_HOST": { "Ref": "DatabaseHost" },
+            "DB_PORT": { "Ref": "DatabasePort" },
+            "DB_USER": { "Ref": "DatabaseMasterUsername" },
+            "DB_PWD": { "Ref": "DatabaseMasterUserPassword" },
+            "DB_NAME": { "Ref": "DatabaseName" }
           }
         },
-        "FunctionName": {"Ref": "PinpointEventProcessorLambdaName"},
+        "FunctionName": { "Ref": "PinpointEventProcessorLambdaName" },
         "Handler": "index.handler",
         "MemorySize": 128,
         "PackageType": "Zip",
-        "Role": {"Fn::GetAtt": ["S3EventLambdaFunctionRole", "Arn"]},
+        "Role": { "Fn::GetAtt": ["S3EventLambdaFunctionRole", "Arn"] },
         "Runtime": "nodejs22.x",
         "Timeout": 60
       },
@@ -711,7 +702,7 @@
           "Statement": [
             {
               "Effect": "Allow",
-              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Principal": { "Service": "lambda.amazonaws.com" },
               "Action": "sts:AssumeRole"
             }
           ]
@@ -723,7 +714,7 @@
   },
   "Outputs": {
     "EmailQueueUrl": {
-      "Value": {"Fn::GetAtt": ["EmailSQSLevel1", "QueueUrl"]},
+      "Value": { "Fn::GetAtt": ["EmailSQSLevel1", "QueueUrl"] },
       "Description": "InceptionPad message service email queue URL"
     }
   }

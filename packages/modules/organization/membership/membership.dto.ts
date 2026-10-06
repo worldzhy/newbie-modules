@@ -1,7 +1,7 @@
-import {IsEmail, IsIn, IsNotEmpty, IsOptional, IsString} from 'class-validator';
-import {OrgMembership, MembershipRole} from '@generated/prisma/client';
-import {CommonListRequestDto, CommonListResponseDto} from '@devbie/newbie/common.dto';
-import {ApiProperty} from '@nestjs/swagger';
+import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { OrgMembership, MembershipRole } from "@generated/prisma/client";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class ListMembershipsRequestDto extends CommonListRequestDto {}
 
@@ -15,9 +15,9 @@ export class ListMembershipsResponseDto extends CommonListResponseDto {
 
 export class UpdateMembershipDto {
   @IsString()
-  @IsIn(['OWNER', 'ADMIN', 'MEMBER'])
+  @IsIn(["OWNER", "ADMIN", "MEMBER"])
   @IsOptional()
-  role?: 'OWNER' | 'ADMIN' | 'MEMBER';
+  role?: "OWNER" | "ADMIN" | "MEMBER";
 }
 
 export class CreateMembershipDto {

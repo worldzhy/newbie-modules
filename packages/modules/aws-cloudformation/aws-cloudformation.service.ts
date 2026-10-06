@@ -1,14 +1,14 @@
-import {CreateStackCommandOutput, DeleteStackCommandOutput} from '@aws-sdk/client-cloudformation';
-import {BadRequestException, Injectable} from '@nestjs/common';
-import {AwsResourceStackState} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AwsCloudformationStackService, CloudFormationStackType} from './stack/stack.service';
+import { CreateStackCommandOutput, DeleteStackCommandOutput } from "@aws-sdk/client-cloudformation";
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { AwsResourceStackState } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AwsCloudformationStackService, CloudFormationStackType } from "./stack/stack.service";
 
 @Injectable()
 export class AwsCloudformationService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cloudformationStackService: AwsCloudformationStackService
+    private readonly cloudformationStackService: AwsCloudformationStackService,
   ) {
     // this.prisma.$use(awsResourceStackPrismaMiddleware);
   }
@@ -17,15 +17,15 @@ export class AwsCloudformationService {
     return Object.values(CloudFormationStackType);
   }
 
-  getStackParams(params: {manager: string; type: string}) {
+  getStackParams(params: { manager: string; type: string }) {
     return this.cloudformationStackService.getStackParams(params.type);
   }
 
   async createStack(stackId: string) {
     // [step 1] Get the infrastructure stack.
     const stack = await this.prisma.awsResourceStack.findUniqueOrThrow({
-      where: {id: stackId},
-      include: {environment: true},
+      where: { id: stackId },
+      include: { environment: true },
     });
 
     // if (
@@ -45,14 +45,14 @@ export class AwsCloudformationService {
         stackParams: stack.params as object,
       })
     ) {
-      throw new BadRequestException('This infrastructure stack parameters are not ready.');
+      throw new BadRequestException("This infrastructure stack parameters are not ready.");
     }
 
     output = await this.cloudformationStackService.createResources(stack);
     state = AwsResourceStackState.BUILD_PROCESSING;
 
     return await this.prisma.awsResourceStack.update({
-      where: {id: stack.id},
+      where: { id: stack.id },
       data: {
         state: state,
         createStackOutput: output as object,
@@ -63,8 +63,8 @@ export class AwsCloudformationService {
   async destroyStack(stackId: string) {
     // [step 1] Get the infrastructure stack.
     const stack = await this.prisma.awsResourceStack.findUniqueOrThrow({
-      where: {id: stackId},
-      include: {environment: true},
+      where: { id: stackId },
+      include: { environment: true },
     });
 
     // if (
@@ -85,7 +85,7 @@ export class AwsCloudformationService {
     state = AwsResourceStackState.DESTROY_PROCESSING;
 
     return await this.prisma.awsResourceStack.update({
-      where: {id: stack.id},
+      where: { id: stack.id },
       data: {
         state: state,
         deleteStackOutput: output as object,

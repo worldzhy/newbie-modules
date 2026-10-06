@@ -1,9 +1,9 @@
-import {Prisma} from '@generated/prisma/client';
-import {isString} from 'class-validator';
-import {datePlusMinutes, splitDateTime} from '@devbie/newbie/utilities/datetime.util';
+import { Prisma } from "@generated/prisma/client";
+import { isString } from "class-validator";
+import { datePlusMinutes, splitDateTime } from "@devbie/newbie/utilities/datetime.util";
 
 function formatOutputDate(date: Date) {
-  return new Date(date).toISOString().split('T')[0];
+  return new Date(date).toISOString().split("T")[0];
 }
 
 function eventGeneratedFields(data: any) {
@@ -26,9 +26,9 @@ function eventGeneratedFields(data: any) {
   }
 }
 
-const eventContainerCreateOrUpdate = ({model, operation, args, query}) => {
+const eventContainerCreateOrUpdate = ({ model, operation, args, query }) => {
   if (args.data) {
-    const {dateOfOpening, dateOfClosure} = args.data;
+    const { dateOfOpening, dateOfClosure } = args.data;
     if (isString(dateOfOpening)) {
       args.data.dateOfOpening = new Date(dateOfOpening);
     }
@@ -57,7 +57,7 @@ const eventContainerFindUniqueOrFindUniqueThrowOrFindFirstOrFindFirstThrow = asy
   return result;
 };
 
-const eventContainerFindMany = async ({model, operation, args, query}) => {
+const eventContainerFindMany = async ({ model, operation, args, query }) => {
   const result = await query(args);
   if (result.length) {
     for (let i = 0; i < result.length; i++) {
@@ -72,14 +72,14 @@ const eventContainerFindMany = async ({model, operation, args, query}) => {
   return result;
 };
 
-const eventCreateOrUpdate = ({model, operation, args, query}) => {
+const eventCreateOrUpdate = ({ model, operation, args, query }) => {
   if (args.data) {
     eventGeneratedFields(args.data);
   }
   return query(args);
 };
 
-const eventCreateMany = ({model, operation, args, query}) => {
+const eventCreateMany = ({ model, operation, args, query }) => {
   if (args.data && args.data.length) {
     for (let i = 0; i < args.data.length; i++) {
       eventGeneratedFields(args.data[i]);
@@ -88,10 +88,10 @@ const eventCreateMany = ({model, operation, args, query}) => {
   return query(args);
 };
 
-const eventDelete = ({model, operation, args, query}) => {
+const eventDelete = ({ model, operation, args, query }) => {
   return query({
     ...args,
-    operation: 'update',
+    operation: "update",
     args: {
       where: args.where,
       data: {
@@ -101,10 +101,10 @@ const eventDelete = ({model, operation, args, query}) => {
   });
 };
 
-const eventDeleteMany = ({model, operation, args, query}) => {
+const eventDeleteMany = ({ model, operation, args, query }) => {
   return query({
     ...args,
-    operation: 'updateMany',
+    operation: "updateMany",
     args: {
       where: args.where,
       data: {
@@ -114,7 +114,7 @@ const eventDeleteMany = ({model, operation, args, query}) => {
   });
 };
 
-export const eventPrismaExtension = Prisma.defineExtension(prisma =>
+export const eventPrismaExtension = Prisma.defineExtension((prisma) =>
   prisma.$extends({
     query: {
       eventContainer: {
@@ -134,5 +134,5 @@ export const eventPrismaExtension = Prisma.defineExtension(prisma =>
         deleteMany: eventDeleteMany,
       },
     },
-  })
+  }),
 );

@@ -1,19 +1,19 @@
-import {Injectable, OnModuleInit, Logger} from '@nestjs/common';
-import {DiscoveryService, MetadataScanner, Reflector} from '@nestjs/core';
-import {SKILL_METADATA, SkillMetadata} from './skill.decorator';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable, OnModuleInit, Logger } from "@nestjs/common";
+import { DiscoveryService, MetadataScanner, Reflector } from "@nestjs/core";
+import { SKILL_METADATA, SkillMetadata } from "./skill.decorator";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 @Injectable()
 export class SkillRegistry implements OnModuleInit {
   private readonly logger = new Logger(SkillRegistry.name);
-  private skills = new Map<string, {metadata: SkillMetadata; handler: (args: any) => any; instance: any}>();
+  private skills = new Map<string, { metadata: SkillMetadata; handler: (args: any) => any; instance: any }>();
   private activeSkills: SkillMetadata[] = []; // Skills loaded from DB
 
   constructor(
     private readonly discoveryService: DiscoveryService,
     private readonly metadataScanner: MetadataScanner,
     private readonly reflector: Reflector,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {}
 
   async onModuleInit() {
@@ -25,9 +25,9 @@ export class SkillRegistry implements OnModuleInit {
   private discoverSkills() {
     const providers = this.discoveryService.getProviders();
 
-    providers.forEach(wrapper => {
-      const {instance} = wrapper;
-      if (!instance || typeof instance !== 'object') {
+    providers.forEach((wrapper) => {
+      const { instance } = wrapper;
+      if (!instance || typeof instance !== "object") {
         return;
       }
 
@@ -51,7 +51,7 @@ export class SkillRegistry implements OnModuleInit {
     for (const [name, skillInfo] of this.skills.entries()) {
       try {
         await this.prisma.skill.upsert({
-          where: {name},
+          where: { name },
           update: {
             description: skillInfo.metadata.description,
             parameters: skillInfo.metadata.parameters,
@@ -72,17 +72,17 @@ export class SkillRegistry implements OnModuleInit {
   public async loadActiveSkillsFromDb() {
     try {
       const dbSkills = await this.prisma.skill.findMany({
-        where: {isActive: true},
+        where: { isActive: true },
       });
       this.activeSkills = dbSkills.map((s: any) => ({
         name: s.name,
         description: s.description,
-        parameters: typeof s.parameters === 'string' ? JSON.parse(s.parameters) : s.parameters,
+        parameters: typeof s.parameters === "string" ? JSON.parse(s.parameters) : s.parameters,
       }));
       this.logger.log(`Loaded ${this.activeSkills.length} active skills from DB`);
     } catch (e) {
-      this.logger.error('Failed to load active skills from DB, falling back to local registry', e);
-      this.activeSkills = Array.from(this.skills.values()).map(s => s.metadata);
+      this.logger.error("Failed to load active skills from DB, falling back to local registry", e);
+      this.activeSkills = Array.from(this.skills.values()).map((s) => s.metadata);
     }
   }
 

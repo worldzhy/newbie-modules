@@ -1,11 +1,11 @@
-import {Logger, Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {Prisma} from '@generated/prisma/client';
-import * as ProxycurlApi from 'proxycurl-js-linkedin-profile-scraper';
-import {PeopleFinderNotificationService} from '../people-finder.notification.service';
-import {PeopleFinderCallThirdPartyDto} from '../people-finder.dto';
-import {PeopleFinderStatus, PeopleFinderPlatforms, SearchFilter, PeopleFinderSourceMode} from '../constants';
+import { Logger, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { Prisma } from "@generated/prisma/client";
+import * as ProxycurlApi from "proxycurl-js-linkedin-profile-scraper";
+import { PeopleFinderNotificationService } from "../people-finder.notification.service";
+import { PeopleFinderCallThirdPartyDto } from "../people-finder.dto";
+import { PeopleFinderStatus, PeopleFinderPlatforms, SearchFilter, PeopleFinderSourceMode } from "../constants";
 import {
   SearchPeopleLinkedinReqDto,
   SearchPeopleByLinkedinRes,
@@ -13,24 +13,24 @@ import {
   SearchPeopleLinkedinResDto,
   SearchPeopleByLinkedinReqDto,
   ErrorStatus,
-} from './proxycurl.dto';
+} from "./proxycurl.dto";
 
 @Injectable()
 export class ProxycurlService {
   private apiKey: string;
   private api;
-  private loggerContext = 'Proxycurl';
+  private loggerContext = "Proxycurl";
 
   constructor(
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly logger: Logger,
-    private peopleFinderNotification: PeopleFinderNotificationService
+    private peopleFinderNotification: PeopleFinderNotificationService,
   ) {
-    this.apiKey = this.configService.getOrThrow<string>('modules.peopleFinder.proxycurl.apiKey');
+    this.apiKey = this.configService.getOrThrow<string>("modules.peopleFinder.proxycurl.apiKey");
     const defaultClient = ProxycurlApi.ApiClient.instance;
     // Configure Bearer access token for authorization: BearerAuth
-    const BearerAuth = defaultClient.authentications['BearerAuth'];
+    const BearerAuth = defaultClient.authentications["BearerAuth"];
     BearerAuth.accessToken = this.apiKey;
     this.api = new ProxycurlApi.PeopleAPIApi();
 
@@ -53,7 +53,7 @@ export class ProxycurlService {
     lastName,
     location,
   }: SearchPeopleLinkedinReqDto): Promise<SearchPeopleLinkedinResDto> {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       try {
         this.api.personLookupEndpoint(
           companyDomain,
@@ -65,35 +65,35 @@ export class ProxycurlService {
           },
           (error, data, response) => {
             let spent = 0;
-            if (response.header['x-proxycurl-credit-cost']) {
+            if (response.header["x-proxycurl-credit-cost"]) {
               try {
-                spent = Number(response.header['x-proxycurl-credit-cost']);
+                spent = Number(response.header["x-proxycurl-credit-cost"]);
               } catch (e) {
                 spent = 0;
               }
             }
             // data {url:string}
             if (error) {
-              const resError = {error};
-              resolve({error: resError, spent});
+              const resError = { error };
+              resolve({ error: resError, spent });
               this.logger.error(
-                'Proxycurl searchPeopleLinkedin error: ' + JSON.stringify(resError),
-                this.loggerContext
+                "Proxycurl searchPeopleLinkedin error: " + JSON.stringify(resError),
+                this.loggerContext,
               );
             } else {
               // response.body has more details
-              resolve({res: response.body, spent});
+              resolve({ res: response.body, spent });
               this.logger.log(
-                'Proxycurl searchPeopleLinkedin success: ' + JSON.stringify(response.body),
-                this.loggerContext
+                "Proxycurl searchPeopleLinkedin success: " + JSON.stringify(response.body),
+                this.loggerContext,
               );
             }
-          }
+          },
         );
       } catch (error) {
         this.catchErrorRes({
           error,
-          errorTitle: 'Proxycurl searchPeopleLinkedin error: ',
+          errorTitle: "Proxycurl searchPeopleLinkedin error: ",
           resolve,
         });
       }
@@ -110,11 +110,11 @@ export class ProxycurlService {
     personalEmail,
     personalContactNumber,
   }: SearchPeopleByLinkedinReqDto): Promise<SearchPeopleByLinkedinResDto> {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       try {
         this.api.personProfileEndpoint(
           linkedinUrl,
-          'on-error',
+          "on-error",
           {
             // Costs an extra `1` credit per email returned on top of the cost of the base endpoint (if data is available).
             personalEmail,
@@ -123,30 +123,30 @@ export class ProxycurlService {
           },
           (error, data: SearchPeopleByLinkedinRes, response) => {
             let spent = 0;
-            if (response && response.header && response.header['x-proxycurl-credit-cost']) {
+            if (response && response.header && response.header["x-proxycurl-credit-cost"]) {
               try {
-                spent = Number(response.header['x-proxycurl-credit-cost']);
+                spent = Number(response.header["x-proxycurl-credit-cost"]);
               } catch (e) {
                 spent = 0;
               }
             }
             if (error) {
-              const resError = {error};
-              resolve({error: resError, spent});
+              const resError = { error };
+              resolve({ error: resError, spent });
               this.logger.error(
-                'Proxycurl searchPeopleByLinkedin error: ' + JSON.stringify(resError),
-                this.loggerContext
+                "Proxycurl searchPeopleByLinkedin error: " + JSON.stringify(resError),
+                this.loggerContext,
               );
             } else {
-              resolve({res: data, spent});
-              this.logger.log('Proxycurl searchPeopleByLinkedin success: ' + JSON.stringify(data), this.loggerContext);
+              resolve({ res: data, spent });
+              this.logger.log("Proxycurl searchPeopleByLinkedin success: " + JSON.stringify(data), this.loggerContext);
             }
-          }
+          },
         );
       } catch (error) {
         this.catchErrorRes({
           error,
-          errorTitle: 'Proxycurl searchPeopleByLinkedin error: ',
+          errorTitle: "Proxycurl searchPeopleByLinkedin error: ",
           resolve,
         });
       }
@@ -161,8 +161,8 @@ export class ProxycurlService {
     errorTitle: string;
     resolve: (error: object) => void;
   }) => {
-    const resError = {error, spent: 0};
-    resolve({error: resError});
+    const resError = { error, spent: 0 };
+    resolve({ error: resError });
     this.logger.error(errorTitle + JSON.stringify(resError), this.loggerContext);
   };
 
@@ -171,7 +171,7 @@ export class ProxycurlService {
    */
   async find(
     user: PeopleFinderCallThirdPartyDto,
-    {needPhone, needEmail}: SearchFilter
+    { needPhone, needEmail }: SearchFilter,
   ): Promise<{
     res?: object;
     error?: object;
@@ -196,10 +196,10 @@ export class ProxycurlService {
           status: PeopleFinderStatus.pending,
         },
       });
-      const {res, error, spent} = await this.searchPeopleByLinkedin({
+      const { res, error, spent } = await this.searchPeopleByLinkedin({
         linkedinUrl: user.linkedin,
-        personalEmail: needEmail ? 'include' : 'exclude',
-        personalContactNumber: needPhone ? 'include' : 'exclude',
+        personalEmail: needEmail ? "include" : "exclude",
+        personalContactNumber: needPhone ? "include" : "exclude",
       });
       const updateData: Prisma.PeopleFinderCallThirdPartyUpdateInput = {};
 
@@ -209,7 +209,7 @@ export class ProxycurlService {
         // notification webhook
         if (error.error && error.error.status === ErrorStatus.INSUFFICIENT_CREDITS) {
           await this.peopleFinderNotification.send({
-            message: '[proxycurl] Not have enough credits',
+            message: "[proxycurl] Not have enough credits",
           });
           noCredits = true;
         }
@@ -227,11 +227,11 @@ export class ProxycurlService {
       updateData.spent = spent;
 
       await this.prisma.peopleFinderCallThirdParty.update({
-        where: {id: newRecord.id},
+        where: { id: newRecord.id },
         data: updateData,
       });
 
-      return {res, error, dataFlag, callThirdPartyId: newRecord.id, noCredits};
+      return { res, error, dataFlag, callThirdPartyId: newRecord.id, noCredits };
     } else if (user.companyDomain && user.firstName) {
       const newRecord = await this.prisma.peopleFinderCallThirdParty.create({
         data: {
@@ -242,7 +242,7 @@ export class ProxycurlService {
         },
       });
 
-      const {res, error, spent} = await this.searchPeopleLinkedin({
+      const { res, error, spent } = await this.searchPeopleLinkedin({
         firstName: user.firstName,
         lastName: user.lastName,
         companyDomain: user.companyDomain,
@@ -256,7 +256,7 @@ export class ProxycurlService {
         // notification webhook
         if (error.error && error.error.status === ErrorStatus.INSUFFICIENT_CREDITS) {
           await this.peopleFinderNotification.send({
-            message: '[proxycurl] Not have enough credits',
+            message: "[proxycurl] Not have enough credits",
           });
           noCredits = true;
         }
@@ -271,7 +271,7 @@ export class ProxycurlService {
       updateData.spent = spent;
 
       await this.prisma.peopleFinderCallThirdParty.update({
-        where: {id: newRecord.id},
+        where: { id: newRecord.id },
         data: updateData,
       });
 
@@ -281,10 +281,10 @@ export class ProxycurlService {
             ...user,
             linkedin: res.url,
           },
-          {needPhone, needEmail}
+          { needPhone, needEmail },
         );
       }
-      return {res, error, dataFlag, callThirdPartyId: newRecord.id, noCredits};
+      return { res, error, dataFlag, callThirdPartyId: newRecord.id, noCredits };
     }
     return {
       res: undefined,

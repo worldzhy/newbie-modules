@@ -1,24 +1,24 @@
-import {Controller, Delete, Get, Patch, Post, Body, Param, Query} from '@nestjs/common';
-import {ApiTags, ApiBearerAuth, ApiBody} from '@nestjs/swagger';
-import {Organization, PermissionAction, Prisma} from '@generated/prisma/client';
-import {RequirePermission} from '@modules/security/authorization/require-permission.decorator';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Controller, Delete, Get, Patch, Post, Body, Param, Query } from "@nestjs/common";
+import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { Organization, PermissionAction, Prisma } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
-@ApiTags('Organization')
+@ApiTags("Organization")
 @ApiBearerAuth()
-@Controller('organizations')
+@Controller("organizations")
 export class OrganizationController {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Post('')
+  @Post("")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Organization)
   @ApiBody({
     description: "The 'name' is required in request body.",
     examples: {
       a: {
-        summary: '1. Create',
+        summary: "1. Create",
         value: {
-          name: 'InceptionPad Inc',
+          name: "InceptionPad Inc",
         },
       },
     },
@@ -29,32 +29,32 @@ export class OrganizationController {
     });
   }
 
-  @Get('')
+  @Get("")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.Organization)
   async getOrganizations(
-    @Query('page') page: number,
-    @Query('pageSize') pageSize: number,
-    @Query('name') name?: string
+    @Query("page") page: number,
+    @Query("pageSize") pageSize: number,
+    @Query("name") name?: string,
   ) {
     // [step 1] Construct where argument.
     let where: Prisma.OrganizationWhereInput | undefined;
     if (name) {
       name = name.trim();
       if (name.length > 0) {
-        where = {name: {search: name}};
+        where = { name: { search: name } };
       }
     }
 
     // [step 2] Get organizations.
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.Organization,
-      pagination: {page, pageSize},
+      pagination: { page, pageSize },
       findManyArgs: {
         orderBy: {
           _relevance: {
-            fields: ['name'],
-            search: 'database',
-            sort: 'asc',
+            fields: ["name"],
+            search: "database",
+            sort: "asc",
           },
         },
         where: where,
@@ -62,43 +62,43 @@ export class OrganizationController {
     });
   }
 
-  @Get(':organizationId')
+  @Get(":organizationId")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.Organization)
-  async getOrganization(@Param('organizationId') organizationId: string): Promise<Organization> {
+  async getOrganization(@Param("organizationId") organizationId: string): Promise<Organization> {
     return await this.prisma.organization.findUniqueOrThrow({
-      where: {id: organizationId},
+      where: { id: organizationId },
     });
   }
 
-  @Patch(':organizationId')
+  @Patch(":organizationId")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.Organization)
   @ApiBody({
-    description: '',
+    description: "",
     examples: {
       a: {
-        summary: '1. Update name',
+        summary: "1. Update name",
         value: {
-          name: 'InceptionPad Inc',
+          name: "InceptionPad Inc",
         },
       },
     },
   })
   async updateOrganization(
-    @Param('organizationId') organizationId: string,
+    @Param("organizationId") organizationId: string,
     @Body()
-    body: Prisma.OrganizationUpdateInput
+    body: Prisma.OrganizationUpdateInput,
   ): Promise<Organization> {
     return await this.prisma.organization.update({
-      where: {id: organizationId},
+      where: { id: organizationId },
       data: body,
     });
   }
 
-  @Delete(':organizationId')
+  @Delete(":organizationId")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Organization)
-  async deleteOrganization(@Param('organizationId') organizationId: string): Promise<Organization> {
+  async deleteOrganization(@Param("organizationId") organizationId: string): Promise<Organization> {
     return await this.prisma.organization.delete({
-      where: {id: organizationId},
+      where: { id: organizationId },
     });
   }
 

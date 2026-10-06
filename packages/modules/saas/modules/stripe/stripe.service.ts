@@ -1,12 +1,6 @@
-import {
-  BadRequestException,
-  ConflictException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import Stripe from 'stripe';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import Stripe from "stripe";
 import {
   BILLING_ACCOUNT_CREATED_CONFLICT,
   BILLING_NOT_FOUND,
@@ -15,8 +9,8 @@ import {
   INVOICE_NOT_FOUND,
   SOURCE_NOT_FOUND,
   SUBSCRIPTION_NOT_FOUND,
-} from '../../errors/errors.constants';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+} from "../../errors/errors.constants";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 @Injectable()
 export class StripeService {
@@ -25,29 +19,26 @@ export class StripeService {
 
   constructor(
     private configService: ConfigService,
-    private prisma: PrismaService
+    private prisma: PrismaService,
   ) {
-    const stripeApiKey = this.configService.getOrThrow<string>(
-      'modules.saas.payments.stripeApiKey'
-    );
+    const stripeApiKey = this.configService.getOrThrow<string>("modules.saas.payments.stripeApiKey");
     this.stripe = new Stripe(stripeApiKey, {
-      apiVersion: '2024-06-20',
+      apiVersion: "2024-06-20",
     });
   }
 
   async createCustomer(teamId: number, data: Stripe.CustomerCreateParams) {
     const team = await this.prisma.team.findUnique({
-      where: {id: teamId},
-      select: {attributes: true},
+      where: { id: teamId },
+      select: { attributes: true },
     });
     if (!team) throw new NotFoundException(GROUP_NOT_FOUND);
-    const attributes = team.attributes as {stripeCustomerId?: string};
-    if (attributes?.stripeCustomerId)
-      throw new ConflictException(BILLING_ACCOUNT_CREATED_CONFLICT);
+    const attributes = team.attributes as { stripeCustomerId?: string };
+    if (attributes?.stripeCustomerId) throw new ConflictException(BILLING_ACCOUNT_CREATED_CONFLICT);
     const result = await this.stripe.customers.create(data);
     await this.prisma.team.update({
-      where: {id: teamId},
-      data: {attributes: {stripeCustomerId: result.id}},
+      where: { id: teamId },
+      data: { attributes: { stripeCustomerId: result.id } },
     });
     return result as Stripe.Response<Stripe.Customer>;
   }
@@ -67,25 +58,19 @@ export class StripeService {
 
   async deleteCustomer(teamId: number): Promise<Stripe.DeletedCustomer> {
     const stripeId = await this.stripeId(teamId);
-    const result = (await this.stripe.customers.del(
-      stripeId
-    )) as Stripe.DeletedCustomer;
+    const result = (await this.stripe.customers.del(stripeId)) as Stripe.DeletedCustomer;
     await this.prisma.team.update({
-      where: {id: teamId},
-      data: {attributes: {stripeCustomerId: null}},
+      where: { id: teamId },
+      data: { attributes: { stripeCustomerId: null } },
     });
     return result;
   }
 
-  async getBillingPortalLink(
-    teamId: number
-  ): Promise<Stripe.Response<Stripe.BillingPortal.Session>> {
+  async getBillingPortalLink(teamId: number): Promise<Stripe.Response<Stripe.BillingPortal.Session>> {
     const stripeId = await this.stripeId(teamId);
     return this.stripe.billingPortal.sessions.create({
       customer: stripeId,
-      return_url: `${this.configService.get<string>(
-        'modules.app.frontendUrl'
-      )}/teams/${teamId}`,
+      return_url: `${this.configService.get<string>("modules.app.frontendUrl")}/teams/${teamId}`,
     });
   }
 
@@ -93,8 +78,8 @@ export class StripeService {
     teamId: number,
     params: {
       take?: number;
-      cursor?: {id: string};
-    }
+      cursor?: { id: string };
+    },
   ): Promise<Stripe.Invoice[]> {
     const stripeId = await this.stripeId(teamId);
     const result = await this.stripe.invoices.list({
@@ -108,8 +93,7 @@ export class StripeService {
   async getInvoice(teamId: number, invoiceId: string): Promise<Stripe.Invoice> {
     const stripeId = await this.stripeId(teamId);
     const result = await this.stripe.invoices.retrieve(invoiceId);
-    if (result.customer !== stripeId)
-      throw new NotFoundException(INVOICE_NOT_FOUND);
+    if (result.customer !== stripeId) throw new NotFoundException(INVOICE_NOT_FOUND);
     return result;
   }
 
@@ -117,8 +101,8 @@ export class StripeService {
     teamId: number,
     params: {
       take?: number;
-      cursor?: {id: string};
-    }
+      cursor?: { id: string };
+    },
   ): Promise<Stripe.Subscription[]> {
     const stripeId = await this.stripeId(teamId);
     const result = await this.stripe.subscriptions.list({
@@ -129,14 +113,10 @@ export class StripeService {
     return this.list<Stripe.Subscription>(result);
   }
 
-  async getSubscription(
-    teamId: number,
-    subscriptionId: string
-  ): Promise<Stripe.Subscription> {
+  async getSubscription(teamId: number, subscriptionId: string): Promise<Stripe.Subscription> {
     const stripeId = await this.stripeId(teamId);
     const result = await this.stripe.subscriptions.retrieve(subscriptionId);
-    if (result.customer !== stripeId)
-      throw new NotFoundException(SUBSCRIPTION_NOT_FOUND);
+    if (result.customer !== stripeId) throw new NotFoundException(SUBSCRIPTION_NOT_FOUND);
     return result;
   }
 
@@ -144,8 +124,8 @@ export class StripeService {
     teamId: number,
     params: {
       take?: number;
-      cursor?: {id: string};
-    }
+      cursor?: { id: string };
+    },
   ): Promise<Stripe.CustomerSource[]> {
     const stripeId = await this.stripeId(teamId);
     const result = await this.stripe.customers.listSources(stripeId, {
@@ -158,52 +138,41 @@ export class StripeService {
   async getSource(teamId: number, sourceId: string): Promise<Stripe.Source> {
     const stripeId = await this.stripeId(teamId);
     const result = await this.stripe.sources.retrieve(sourceId);
-    if (result.customer !== stripeId)
-      throw new NotFoundException(SOURCE_NOT_FOUND);
+    if (result.customer !== stripeId) throw new NotFoundException(SOURCE_NOT_FOUND);
     return result;
   }
 
   async deleteSource(teamId: number, sourceId: string): Promise<void> {
     const stripeId = await this.stripeId(teamId);
     const result = await this.stripe.sources.retrieve(sourceId);
-    if (result.customer !== stripeId)
-      throw new NotFoundException(SOURCE_NOT_FOUND);
+    if (result.customer !== stripeId) throw new NotFoundException(SOURCE_NOT_FOUND);
     await this.stripe.customers.deleteSource(stripeId, sourceId);
   }
 
   async createSession(
     teamId: number,
     mode: Stripe.Checkout.SessionCreateParams.Mode,
-    planId?: string
+    planId?: string,
   ): Promise<Stripe.Checkout.Session> {
     const stripeId = await this.stripeId(teamId);
     const data: Stripe.Checkout.SessionCreateParams = {
       customer: stripeId,
       mode,
-      payment_method_types: this.configService.get<
-        Array<Stripe.Checkout.SessionCreateParams.PaymentMethodType>
-      >('modules.saas.payments.paymentMethodTypes') ?? ['card'],
-      success_url: `${this.configService.get<string>(
-        'modules.app.frontendUrl'
-      )}/teams/${teamId}`,
-      cancel_url: `${this.configService.get<string>(
-        'modules.app.frontendUrl'
-      )}/teams/${teamId}`,
+      payment_method_types: this.configService.get<Array<Stripe.Checkout.SessionCreateParams.PaymentMethodType>>(
+        "modules.saas.payments.paymentMethodTypes",
+      ) ?? ["card"],
+      success_url: `${this.configService.get<string>("modules.app.frontendUrl")}/teams/${teamId}`,
+      cancel_url: `${this.configService.get<string>("modules.app.frontendUrl")}/teams/${teamId}`,
     };
-    if (mode === 'subscription')
-      data.line_items = [{quantity: 1, price: planId}];
+    if (mode === "subscription") data.line_items = [{ quantity: 1, price: planId }];
     const result = await this.stripe.checkout.sessions.create(data);
     return result;
   }
 
-  async cancelSubscription(
-    teamId: number,
-    subscriptionId: string
-  ): Promise<Stripe.Subscription> {
+  async cancelSubscription(teamId: number, subscriptionId: string): Promise<Stripe.Subscription> {
     const stripeId = await this.stripeId(teamId);
     const result = await this.stripe.subscriptions.retrieve(subscriptionId);
-    if (result.customer !== stripeId)
-      throw new NotFoundException(SUBSCRIPTION_NOT_FOUND);
+    if (result.customer !== stripeId) throw new NotFoundException(SUBSCRIPTION_NOT_FOUND);
     return this.stripe.subscriptions.update(subscriptionId, {
       cancel_at_period_end: true,
     });
@@ -211,40 +180,35 @@ export class StripeService {
 
   async plans(teamId: number, product?: string): Promise<Stripe.Plan[]> {
     const stripeId = await this.stripeId(teamId);
-    const plans = await this.stripe.plans.list({product});
-    return plans.data.filter(plan => {
+    const plans = await this.stripe.plans.list({ product });
+    return plans.data.filter((plan) => {
       let show = true;
-      ['special', 'internal'].forEach(word => {
+      ["special", "internal"].forEach((word) => {
         if (plan.nickname!.toLowerCase().includes(word)) show = false;
       });
       const tokens = plan
         .nickname!.toLowerCase()
-        .replace(/[^a-zA-Z0-9]/g, ' ')
-        .replace(/\s\s+/g, ' ')
-        .split(' ');
-      [stripeId, teamId.toString()].forEach(word => {
+        .replace(/[^a-zA-Z0-9]/g, " ")
+        .replace(/\s\s+/g, " ")
+        .split(" ");
+      [stripeId, teamId.toString()].forEach((word) => {
         if (tokens.includes(word)) show = true;
       });
       return show;
     });
   }
 
-  async handleWebhook(
-    signature: string,
-    payload: Buffer
-  ): Promise<{received: true}> {
+  async handleWebhook(signature: string, payload: Buffer): Promise<{ received: true }> {
     const event = this.stripe.webhooks.constructEvent(
       payload,
       signature,
-      this.configService.get<string>(
-        'modules.saas.payments.stripeEndpointSecret'
-      ) ?? ''
+      this.configService.get<string>("modules.saas.payments.stripeEndpointSecret") ?? "",
     );
     switch (event.type) {
       default:
         this.logger.warn(`Unhandled event type ${event.type}`);
     }
-    return {received: true};
+    return { received: true };
   }
 
   private list<T>(result: Stripe.Response<Stripe.ApiList<T>>) {
@@ -254,13 +218,12 @@ export class StripeService {
   /** Get the Stripe customer ID from a team or throw an error */
   private async stripeId(teamId: number): Promise<string> {
     const team = await this.prisma.team.findUnique({
-      where: {id: teamId},
-      select: {attributes: true},
+      where: { id: teamId },
+      select: { attributes: true },
     });
     if (!team) throw new NotFoundException(GROUP_NOT_FOUND);
-    const attributes = team.attributes as {stripeCustomerId?: string};
-    if (!attributes?.stripeCustomerId)
-      throw new BadRequestException(BILLING_NOT_FOUND);
+    const attributes = team.attributes as { stripeCustomerId?: string };
+    if (!attributes?.stripeCustomerId) throw new BadRequestException(BILLING_NOT_FOUND);
     return attributes.stripeCustomerId;
   }
 }

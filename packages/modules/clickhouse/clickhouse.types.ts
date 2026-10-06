@@ -1,10 +1,10 @@
 // ClickHouse column data types used by table schemas.
 export const ClickhouseDataType = {
-  String: 'String',
-  DateTime: 'DateTime',
-  UInt16: 'UInt16',
-  UInt32: 'UInt32',
-  Int32: 'Int32',
+  String: "String",
+  DateTime: "DateTime",
+  UInt16: "UInt16",
+  UInt32: "UInt32",
+  Int32: "Int32",
   LowCardinality: (inner: string) => `LowCardinality(${inner})`,
 } as const;
 
@@ -36,9 +36,9 @@ export interface ClickhouseColumnMeta {
 
 // Schema diff produced by comparing code schema against table metadata.
 export interface ClickhouseSchemaDiff {
-  addColumns: Array<{name: string; type: string}>;
+  addColumns: Array<{ name: string; type: string }>;
   deleteColumns: string[];
-  modifyColumns: Array<{name: string; type: string}>;
+  modifyColumns: Array<{ name: string; type: string }>;
 }
 
 // Query builder object for SELECT statements.

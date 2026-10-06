@@ -1,6 +1,6 @@
-import {Injectable} from '@nestjs/common';
-import {DatatransPipeline, PostgresqlDatasourceTable} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { DatatransPipeline, PostgresqlDatasourceTable } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 @Injectable()
 export class DatatransPipelineService {
@@ -10,14 +10,14 @@ export class DatatransPipelineService {
     table: string;
     numberOfRecords: number;
     recordAverageSize: number; //
-    hasMany: {name: string; numberOfRecords: number}[];
-    belongsTo: {name: string; numberOfRecords: number}[];
+    hasMany: { name: string; numberOfRecords: number }[];
+    belongsTo: { name: string; numberOfRecords: number }[];
   }> {
-    const fromTable = pipeline['fromTable'] as PostgresqlDatasourceTable;
+    const fromTable = pipeline["fromTable"] as PostgresqlDatasourceTable;
 
-    const childTables: {name: string; numberOfRecords: number}[] = [];
-    const parentTables: {name: string; numberOfRecords: number}[] = [];
-    let countResult: {count: bigint}[];
+    const childTables: { name: string; numberOfRecords: number }[] = [];
+    const parentTables: { name: string; numberOfRecords: number }[] = [];
+    let countResult: { count: bigint }[];
     let recordAverageSize = 1.0;
 
     // [step 1] Get the total count of the table records.
@@ -30,7 +30,7 @@ export class DatatransPipelineService {
     await Promise.all(
       // Use 'map' instead of 'forEach'
       // https://www.becomebetterprogrammer.com/javascript-foreach-async-await/
-      pipeline.hasManyTables.map(async tableName => {
+      pipeline.hasManyTables.map(async (tableName) => {
         countResult = await this.prisma.$queryRawUnsafe(`SELECT COUNT(*) FROM "${fromTable.schema}"."${tableName}"`);
 
         childTables.push({
@@ -39,12 +39,12 @@ export class DatatransPipelineService {
         });
 
         recordAverageSize += Number(countResult[0].count) / total;
-      })
+      }),
     );
 
     // [step 3] Get the total count of the parent tables' records.
     await Promise.all(
-      pipeline.belongsToTables.map(async tableName => {
+      pipeline.belongsToTables.map(async (tableName) => {
         countResult = await this.prisma.$queryRawUnsafe(`SELECT COUNT(*) FROM "${fromTable.schema}"."${tableName}"`);
 
         parentTables.push({
@@ -53,7 +53,7 @@ export class DatatransPipelineService {
         });
 
         recordAverageSize += 1.0;
-      })
+      }),
     );
 
     return {

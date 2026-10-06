@@ -1,10 +1,10 @@
-import {DynamicModule, Global, Module} from '@nestjs/common';
-import {ConfigModule, ConfigService} from '@nestjs/config';
-import {CacheModule} from '@nestjs/cache-manager';
-import KeyvRedis from '@keyv/redis';
-import Keyv from 'keyv';
-import {CacheableMemory} from 'cacheable';
-import MicroservicesConfiguration from '../microservices.config';
+import { DynamicModule, Global, Module } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { CacheModule } from "@nestjs/cache-manager";
+import KeyvRedis from "@keyv/redis";
+import Keyv from "keyv";
+import { CacheableMemory } from "cacheable";
+import MicroservicesConfiguration from "../microservices.config";
 
 @Global()
 @Module({
@@ -13,43 +13,45 @@ import MicroservicesConfiguration from '../microservices.config';
 export class NewbieCacheModule {}
 
 function getModules(): (DynamicModule | Promise<DynamicModule>)[] {
-  const modules: (DynamicModule | Promise<DynamicModule>)[] = [ConfigModule.forRoot({load: [MicroservicesConfiguration], isGlobal: true})];
+  const modules: (DynamicModule | Promise<DynamicModule>)[] = [
+    ConfigModule.forRoot({ load: [MicroservicesConfiguration], isGlobal: true }),
+  ];
 
   if (process.env.REDIS_HOST) {
     modules.push(
       CacheModule.registerAsync({
         imports: [ConfigModule],
         useFactory: async (configService: ConfigService) => {
-          const ttl = configService.get('modules.cache.redis.ttl');
-          const host = configService.get('modules.cache.redis.host');
-          const port = configService.get('modules.cache.redis.port');
-          const user = configService.get('modules.cache.redis.user');
-          const password = configService.get('modules.cache.redis.password');
+          const ttl = configService.get("modules.cache.redis.ttl");
+          const host = configService.get("modules.cache.redis.host");
+          const port = configService.get("modules.cache.redis.port");
+          const user = configService.get("modules.cache.redis.user");
+          const password = configService.get("modules.cache.redis.password");
 
           const uri =
             user && password
-              ? 'redis://' + user + ':' + password + '@' + host + ':' + port
-              : 'redis://' + host + ':' + port;
+              ? "redis://" + user + ":" + password + "@" + host + ":" + port
+              : "redis://" + host + ":" + port;
 
-          return {stores: [new KeyvRedis(uri, {throwOnConnectError: true})]};
+          return { stores: [new KeyvRedis(uri, { throwOnConnectError: true })] };
         },
         inject: [ConfigService],
         isGlobal: true,
-      })
+      }),
     );
   } else {
     modules.push(
       CacheModule.registerAsync({
         imports: [ConfigModule],
         useFactory: async (configService: ConfigService) => {
-          const ttl = configService.get('modules.cache.memory.ttl'); // milliseconds
-          const lruSize = configService.get('modules.cache.memory.lruSize');
+          const ttl = configService.get("modules.cache.memory.ttl"); // milliseconds
+          const lruSize = configService.get("modules.cache.memory.lruSize");
 
-          return {stores: [new Keyv({store: new CacheableMemory({ttl, lruSize})})]};
+          return { stores: [new Keyv({ store: new CacheableMemory({ ttl, lruSize }) })] };
         },
         inject: [ConfigService],
         isGlobal: true,
-      })
+      }),
     );
   }
 

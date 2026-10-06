@@ -1,10 +1,10 @@
-import {Injectable} from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 
 @Injectable()
 export class NetworkHipaa_Stack {
   static getStackParams() {
     return {
-      SNSAlarmEmail: 'henry@inceptionpad.com',
+      SNSAlarmEmail: "henry@inceptionpad.com",
     };
   }
 
@@ -21,6 +21,6 @@ export class NetworkHipaa_Stack {
   }
 
   static getStackTemplate() {
-    return 'quickstart-compliance-hipaa/templates/compliance-hipaa-entrypoint.template.yaml';
+    return "quickstart-compliance-hipaa/templates/compliance-hipaa-entrypoint.template.yaml";
   }
 }

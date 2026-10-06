@@ -1,8 +1,8 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {google} from '@googlemaps/places/build/protos/protos';
-import {PlacesClient} from '@googlemaps/places';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { google } from "@googlemaps/places/build/protos/protos";
+import { PlacesClient } from "@googlemaps/places";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 /**
  * API introduction
@@ -16,12 +16,10 @@ export class GooglePlacesService {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {
     this.client = new PlacesClient({
-      apiKey: this.config.getOrThrow<string>(
-        'modules.googlemaps.credentials.apiKey'
-      ),
+      apiKey: this.config.getOrThrow<string>("modules.googlemaps.credentials.apiKey"),
     });
   }
 
@@ -43,20 +41,16 @@ export class GooglePlacesService {
   async getPlaceIdsByText(input: string) {
     // Check if the input is already cached
     const records = await this.prisma.googlePlacePrediction.findMany({
-      where: {input},
+      where: { input },
     });
     if (records.length > 0) {
-      return records.map(record => record.placeId);
+      return records.map((record) => record.placeId);
     }
 
     // If not cached, perform the autocomplete search
-    const result = await this.client.autocompletePlaces({input: input});
+    const result = await this.client.autocompletePlaces({ input: input });
     const suggestions = result[0].suggestions;
-    if (
-      suggestions === undefined ||
-      suggestions === null ||
-      suggestions.length === 0
-    ) {
+    if (suggestions === undefined || suggestions === null || suggestions.length === 0) {
       return [];
     }
 
@@ -81,11 +75,9 @@ export class GooglePlacesService {
             input,
             placeId,
             text: suggestion.placePrediction.text ?? undefined,
-            structuredFormat:
-              suggestion.placePrediction.structuredFormat ?? undefined,
+            structuredFormat: suggestion.placePrediction.structuredFormat ?? undefined,
             types: suggestion.placePrediction.types ?? undefined,
-            distanceMeters:
-              suggestion.placePrediction.distanceMeters ?? undefined,
+            distanceMeters: suggestion.placePrediction.distanceMeters ?? undefined,
           });
         }
       }
@@ -106,7 +98,7 @@ export class GooglePlacesService {
   async getPlaceDetail(placeId: string) {
     // Check if the place detail is already cached
     const record = await this.prisma.googlePlaceDetail.findUnique({
-      where: {placeId},
+      where: { placeId },
     });
     if (record) {
       return record.place as google.maps.places.v1.IPlace;
@@ -114,25 +106,25 @@ export class GooglePlacesService {
 
     // If not cached, fetch the place detail from Google Places API
     const result = await this.client.getPlace(
-      {name: `places/${placeId}`},
+      { name: `places/${placeId}` },
       {
         otherArgs: {
           headers: {
-            'X-Goog-FieldMask': [
-              'places.addressComponents',
-              'places.adrFormatAddress',
-              'places.businessStatus',
-              'places.formattedAddress',
-              'places.id',
-              'places.name',
-              'places.plusCode',
-              'places.types',
-              'places.utcOffsetMinutes',
-              'places.websiteUri',
+            "X-Goog-FieldMask": [
+              "places.addressComponents",
+              "places.adrFormatAddress",
+              "places.businessStatus",
+              "places.formattedAddress",
+              "places.id",
+              "places.name",
+              "places.plusCode",
+              "places.types",
+              "places.utcOffsetMinutes",
+              "places.websiteUri",
             ],
           },
         },
-      }
+      },
     );
 
     // Store the result in the database

@@ -1,21 +1,21 @@
-import {HttpService} from '@nestjs/axios';
-import {Logger, Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {Prisma} from '@generated/prisma/client';
-import {PeopleFinderCallThirdPartyDto} from '../people-finder.dto';
-import {PeopleFinderNotificationService} from '../people-finder.notification.service';
-import {PeopleFinderStatus, PeopleFinderPlatforms, PeopleFinderSourceMode} from '../constants';
+import { HttpService } from "@nestjs/axios";
+import { Logger, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { Prisma } from "@generated/prisma/client";
+import { PeopleFinderCallThirdPartyDto } from "../people-finder.dto";
+import { PeopleFinderNotificationService } from "../people-finder.notification.service";
+import { PeopleFinderStatus, PeopleFinderPlatforms, PeopleFinderSourceMode } from "../constants";
 import {
   SearchEmailByDomainReqDto,
   SearchEmailResDto,
   SearchEmailThirdResDto,
   VoliaNorbertStatus,
   SearchEmailContentResDto,
-} from './volia-norbert.dto';
-export * from './volia-norbert.dto';
+} from "./volia-norbert.dto";
+export * from "./volia-norbert.dto";
 
-const baseUrl = 'https://api.voilanorbert.com/2018-01-08';
+const baseUrl = "https://api.voilanorbert.com/2018-01-08";
 @Injectable()
 export class VoilaNorbertService {
   private apiKey: string;
@@ -26,23 +26,23 @@ export class VoilaNorbertService {
     };
     headers: object;
   };
-  private loggerContext = 'Voilanorbert';
+  private loggerContext = "Voilanorbert";
 
   constructor(
     private httpService: HttpService,
     private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private peopleFinderNotification: PeopleFinderNotificationService,
-    private readonly logger: Logger
+    private readonly logger: Logger,
   ) {
-    this.apiKey = this.configService.getOrThrow<string>('modules.peopleFinder.voilanorbert.apiKey');
+    this.apiKey = this.configService.getOrThrow<string>("modules.peopleFinder.voilanorbert.apiKey");
     this.reqConfig = {
       auth: {
-        username: 'inception',
+        username: "inception",
         password: this.apiKey,
       },
       headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
+        "Content-Type": "application/x-www-form-urlencoded",
       },
     };
     // this.SearchEmailByDomain({
@@ -66,7 +66,7 @@ export class VoilaNorbertService {
     // list_id,
   }: SearchEmailByDomainReqDto): Promise<SearchEmailResDto> {
     const url = `${baseUrl}/search/name`;
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       const data = {
         name,
         company,
@@ -78,31 +78,31 @@ export class VoilaNorbertService {
         .post<SearchEmailByDomainReqDto, SearchEmailThirdResDto>(url, data, this.reqConfig)
         .then(async (res: SearchEmailThirdResDto) => {
           if (res.status === VoliaNorbertStatus.SUCCESS) {
-            resolve({res: res.data});
+            resolve({ res: res.data });
             this.logger.log(
-              'VoliaNorbert searchEmailByDomain success: ' + JSON.stringify(res.data),
-              this.loggerContext
+              "VoliaNorbert searchEmailByDomain success: " + JSON.stringify(res.data),
+              this.loggerContext,
             );
           } else {
             if (res.status === VoliaNorbertStatus.INSUFFICIENT_CREDITS) {
               // notification webhook
               await this.peopleFinderNotification.send({
-                message: '[VoliaNorbert] Not have enough credits',
+                message: "[VoliaNorbert] Not have enough credits",
               });
               noCredits = true;
             }
-            const resError = {error: res.data, status: res.status};
-            resolve({error: resError, noCredits});
+            const resError = { error: res.data, status: res.status };
+            resolve({ error: resError, noCredits });
             this.logger.error(
-              'VoliaNorbert searchEmailByDomain error: ' + JSON.stringify(resError),
-              this.loggerContext
+              "VoliaNorbert searchEmailByDomain error: " + JSON.stringify(resError),
+              this.loggerContext,
             );
           }
         })
-        .catch(e => {
-          const resError = {error: e.response.data};
-          resolve({error: resError, noCredits});
-          this.logger.error('VoliaNorbert searchEmailByDomain error: ' + JSON.stringify(resError), this.loggerContext);
+        .catch((e) => {
+          const resError = { error: e.response.data };
+          resolve({ error: resError, noCredits });
+          this.logger.error("VoliaNorbert searchEmailByDomain error: " + JSON.stringify(resError), this.loggerContext);
         });
     });
   }
@@ -113,7 +113,7 @@ export class VoilaNorbertService {
    * @param webhook: xxxx.com?id=
    */
   async find(user: PeopleFinderCallThirdPartyDto, webhook: string) {
-    const {name, companyDomain} = user;
+    const { name, companyDomain } = user;
     if (!name || !companyDomain) return;
     const newRecord = await this.prisma.peopleFinderCallThirdParty.create({
       data: {
@@ -125,14 +125,14 @@ export class VoilaNorbertService {
     });
 
     // todo spent
-    const {res, error, noCredits} = await this.searchEmailByDomain({
+    const { res, error, noCredits } = await this.searchEmailByDomain({
       name,
       companyDomain,
       webhook: webhook + newRecord.id,
     });
 
     const result = await this.voilanorbertContactSearchCallback(newRecord.id, res, error);
-    return {...result, noCredits};
+    return { ...result, noCredits };
   }
 
   async voilanorbertContactSearchCallback(id: number, data?: SearchEmailContentResDto, error?: object) {
@@ -155,10 +155,10 @@ export class VoilaNorbertService {
     }
 
     await this.prisma.peopleFinderCallThirdParty.update({
-      where: {id},
+      where: { id },
       data: updateData,
     });
 
-    return {error, res: data, dataFlag, callThirdPartyId: id};
+    return { error, res: data, dataFlag, callThirdPartyId: id };
   }
 }

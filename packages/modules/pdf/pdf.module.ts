@@ -1,5 +1,5 @@
-import {Module, Global} from '@nestjs/common';
-import {PdfService} from './pdf.service';
+import { Module, Global } from "@nestjs/common";
+import { PdfService } from "./pdf.service";
 
 @Global()
 @Module({

@@ -1,13 +1,13 @@
-import {Injectable} from '@nestjs/common';
-import {PostgresqlDatasourceTable, Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PostgresqlDatasourceTable, Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 @Injectable()
 export class PostgresqlDatasourceTableService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findUniqueOrThrow(
-    params: Prisma.PostgresqlDatasourceTableFindUniqueOrThrowArgs
+    params: Prisma.PostgresqlDatasourceTableFindUniqueOrThrowArgs,
   ): Promise<PostgresqlDatasourceTable> {
     // [middleware] The id from HTTP request is string type. Convert it to number type.
     // this.prisma.$use(async (params, next) => {
@@ -26,7 +26,7 @@ export class PostgresqlDatasourceTableService {
 
   async checkExistence(id: number): Promise<boolean> {
     const count = await this.prisma.postgresqlDatasourceTable.count({
-      where: {id: id},
+      where: { id: id },
     });
     return count > 0 ? true : false;
   }

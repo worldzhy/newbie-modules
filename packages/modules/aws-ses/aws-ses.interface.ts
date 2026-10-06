@@ -75,16 +75,16 @@ export interface SendEmailWithTemplateParams {
 }
 
 export enum EmailTemplate {
-  AuthVerifyEmail = 'auth/verify-email',
-  AuthVerifyEmailResend = 'auth/verify-email-resend',
-  AuthVerifySubnet = 'auth/verify-subnet',
-  AuthEnableEmailMfa = 'auth/enable-email-mfa',
-  AuthLoginLink = 'auth/login-link',
-  AuthPasswordReset = 'auth/password-reset',
-  AuthUsedBackupCode = 'auth/used-backup-code',
-  AuthVerificationCode = 'auth/verification-code',
-  OrganizationsInvitation = 'organizations/invitation',
-  UsersDeactivated = 'users/deactivated',
-  UsersMergeRequest = 'users/merge-request',
-  UsersPasswordChanged = 'users/password-changed',
+  AuthVerifyEmail = "auth/verify-email",
+  AuthVerifyEmailResend = "auth/verify-email-resend",
+  AuthVerifySubnet = "auth/verify-subnet",
+  AuthEnableEmailMfa = "auth/enable-email-mfa",
+  AuthLoginLink = "auth/login-link",
+  AuthPasswordReset = "auth/password-reset",
+  AuthUsedBackupCode = "auth/used-backup-code",
+  AuthVerificationCode = "auth/verification-code",
+  OrganizationsInvitation = "organizations/invitation",
+  UsersDeactivated = "users/deactivated",
+  UsersMergeRequest = "users/merge-request",
+  UsersPasswordChanged = "users/password-changed",
 }

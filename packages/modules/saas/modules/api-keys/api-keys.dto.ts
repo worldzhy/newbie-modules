@@ -1,4 +1,4 @@
-import {IsArray, IsNotEmpty, IsOptional, IsString} from 'class-validator';
+import { IsArray, IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 export class CreateApiKeyDto {
   @IsString()
@@ -10,17 +10,17 @@ export class CreateApiKeyDto {
   name?: string;
 
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   scopes?: string[];
 
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   ipRestrictions?: string[];
 
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   referrerRestrictions?: string[];
 }
@@ -35,17 +35,17 @@ export class UpdateApiKeyDto {
   name?: string;
 
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   scopes?: string[];
 
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   ipRestrictions?: string[];
 
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsOptional()
   referrerRestrictions?: string[];
 }
@@ -60,17 +60,17 @@ export class ReplaceApiKeyDto {
   name!: string;
 
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsNotEmpty()
   scopes!: string[];
 
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsNotEmpty()
   ipRestrictions!: string[];
 
   @IsArray()
-  @IsString({each: true})
+  @IsString({ each: true })
   @IsNotEmpty()
   referrerRestrictions!: string[];
 }

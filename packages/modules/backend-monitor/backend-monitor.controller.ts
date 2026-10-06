@@ -1,17 +1,17 @@
-import {Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query} from '@nestjs/common';
-import {ApiHeader, ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {NoGuard} from '@modules/security/authentication/public/public.decorator';
-import {BackendMonitorService} from './backend-monitor.service';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query } from "@nestjs/common";
+import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { NoGuard } from "@modules/security/authentication/public/public.decorator";
+import { BackendMonitorService } from "./backend-monitor.service";
 import {
   BackendMonitorErrorLogListResponseDto,
   BackendMonitorRequestLogListResponseDto,
   CreateBackendMonitorIngestDto,
   ListBackendMonitorErrorLogsDto,
   ListBackendMonitorRequestLogsDto,
-} from './backend-monitor.dto';
+} from "./backend-monitor.dto";
 
-@ApiTags('Backend Monitor')
-@Controller('backend-monitor')
+@ApiTags("Backend Monitor")
+@Controller("backend-monitor")
 export class BackendMonitorController {
   constructor(private readonly backendMonitorService: BackendMonitorService) {}
 
@@ -22,22 +22,22 @@ export class BackendMonitorController {
    * §9.2). One call carries request metrics and/or errors, enabling one auth
    * lookup and at most one insert per table.
    */
-  @ApiOperation({summary: 'Ingest a batch of backend request/error events'})
+  @ApiOperation({ summary: "Ingest a batch of backend request/error events" })
   @ApiHeader({
-    name: 'X-Backend-Monitor-Token',
-    description: 'The plaintext report token returned once at installation enrollment',
+    name: "X-Backend-Monitor-Token",
+    description: "The plaintext report token returned once at installation enrollment",
     required: true,
   })
-  @ApiResponse({status: 204, description: 'Batch accepted.'})
-  @ApiResponse({status: 400, description: 'Empty batch or invalid event payload.'})
-  @ApiResponse({status: 401, description: 'Invalid or missing monitor installation token.'})
-  @ApiResponse({status: 413, description: 'An event array exceeds the batch limit.'})
+  @ApiResponse({ status: 204, description: "Batch accepted." })
+  @ApiResponse({ status: 400, description: "Empty batch or invalid event payload." })
+  @ApiResponse({ status: 401, description: "Invalid or missing monitor installation token." })
+  @ApiResponse({ status: 413, description: "An event array exceeds the batch limit." })
   @HttpCode(HttpStatus.NO_CONTENT)
   @NoGuard()
-  @Post('ingest')
+  @Post("ingest")
   async ingest(
-    @Headers('x-backend-monitor-token') reportToken: string,
-    @Body() body: CreateBackendMonitorIngestDto
+    @Headers("x-backend-monitor-token") reportToken: string,
+    @Body() body: CreateBackendMonitorIngestDto,
   ): Promise<void> {
     await this.backendMonitorService.ingest(reportToken, body);
   }
@@ -47,17 +47,17 @@ export class BackendMonitorController {
    * keeps the legacy query contract (applicationId/page/pageSize/keyword/
    * sortField/sortOrder) and snake_case row shape.
    */
-  @ApiOperation({summary: 'List backend request logs for an application'})
-  @ApiResponse({status: 200, type: BackendMonitorRequestLogListResponseDto})
-  @Get('request-logs')
+  @ApiOperation({ summary: "List backend request logs for an application" })
+  @ApiResponse({ status: 200, type: BackendMonitorRequestLogListResponseDto })
+  @Get("request-logs")
   async listRequestLogs(@Query() query: ListBackendMonitorRequestLogsDto) {
     return await this.backendMonitorService.listRequestLogs(query);
   }
 
   /** Paginated error logs for one application. */
-  @ApiOperation({summary: 'List backend error logs for an application'})
-  @ApiResponse({status: 200, type: BackendMonitorErrorLogListResponseDto})
-  @Get('error-logs')
+  @ApiOperation({ summary: "List backend error logs for an application" })
+  @ApiResponse({ status: 200, type: BackendMonitorErrorLogListResponseDto })
+  @Get("error-logs")
   async listErrorLogs(@Query() query: ListBackendMonitorErrorLogsDto) {
     return await this.backendMonitorService.listErrorLogs(query);
   }

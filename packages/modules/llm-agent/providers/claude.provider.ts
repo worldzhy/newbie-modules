@@ -1,7 +1,7 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {HttpService} from '@nestjs/axios';
-import {lastValueFrom} from 'rxjs';
-import {ILLMProvider, LLMCallOptions, LLMMessage, LLMResponse, ProviderConfig} from './llm-provider.interface';
+import { Injectable, Logger } from "@nestjs/common";
+import { HttpService } from "@nestjs/axios";
+import { lastValueFrom } from "rxjs";
+import { ILLMProvider, LLMCallOptions, LLMMessage, LLMResponse, ProviderConfig } from "./llm-provider.interface";
 
 @Injectable()
 export class ClaudeProvider implements ILLMProvider {
@@ -13,49 +13,49 @@ export class ClaudeProvider implements ILLMProvider {
 
   constructor(
     private readonly config: ProviderConfig,
-    private readonly httpService: HttpService
+    private readonly httpService: HttpService,
   ) {
     if (!config.apiKey) {
-      this.logger.warn('CLAUDE_API_KEY is not configured');
+      this.logger.warn("CLAUDE_API_KEY is not configured");
     }
-    this.apiKey = config.apiKey || '';
-    this.baseUrl = config.baseUrl || 'https://api.anthropic.com/v1';
-    this.model = config.model || 'claude-3-5-sonnet-20241022';
-    this.anthropicVersion = config.version || '2023-06-01';
+    this.apiKey = config.apiKey || "";
+    this.baseUrl = config.baseUrl || "https://api.anthropic.com/v1";
+    this.model = config.model || "claude-3-5-sonnet-20241022";
+    this.anthropicVersion = config.version || "2023-06-01";
   }
 
   // Convert generic LLMMessage to Claude's message format
-  private formatMessages(messages: LLMMessage[]): {system?: string; messages: any[]} {
-    let system = '';
+  private formatMessages(messages: LLMMessage[]): { system?: string; messages: any[] } {
+    let system = "";
     const formattedMessages: any[] = [];
 
     for (const msg of messages) {
-      if (msg.role === 'system') {
-        system += (system ? '\n' : '') + msg.content;
-      } else if (msg.role === 'tool') {
+      if (msg.role === "system") {
+        system += (system ? "\n" : "") + msg.content;
+      } else if (msg.role === "tool") {
         // Claude expects tool results as 'user' role with a specific content structure
         formattedMessages.push({
-          role: 'user',
+          role: "user",
           content: [
             {
-              type: 'tool_result',
+              type: "tool_result",
               tool_use_id: msg.tool_call_id,
               content: msg.content,
             },
           ],
         });
-      } else if (msg.role === 'assistant' && msg.tool_calls) {
+      } else if (msg.role === "assistant" && msg.tool_calls) {
         // Claude assistant tool calls
-        const toolUseContents = msg.tool_calls.map(tc => ({
-          type: 'tool_use',
+        const toolUseContents = msg.tool_calls.map((tc) => ({
+          type: "tool_use",
           id: tc.id,
           name: tc.function.name,
-          input: typeof tc.function.arguments === 'string' ? JSON.parse(tc.function.arguments) : tc.function.arguments,
+          input: typeof tc.function.arguments === "string" ? JSON.parse(tc.function.arguments) : tc.function.arguments,
         }));
 
         formattedMessages.push({
-          role: 'assistant',
-          content: msg.content ? [{type: 'text', text: msg.content}, ...toolUseContents] : toolUseContents,
+          role: "assistant",
+          content: msg.content ? [{ type: "text", text: msg.content }, ...toolUseContents] : toolUseContents,
         });
       } else {
         formattedMessages.push({
@@ -65,13 +65,13 @@ export class ClaudeProvider implements ILLMProvider {
       }
     }
 
-    return {system: system || undefined, messages: formattedMessages};
+    return { system: system || undefined, messages: formattedMessages };
   }
 
   // Convert generic tools to Claude's tool format
   private formatTools(tools?: any[]): any[] | undefined {
     if (!tools || tools.length === 0) return undefined;
-    return tools.map(t => ({
+    return tools.map((t) => ({
       name: t.function.name,
       description: t.function.description,
       input_schema: t.function.parameters,
@@ -80,10 +80,10 @@ export class ClaudeProvider implements ILLMProvider {
 
   async call(messages: LLMMessage[], options?: LLMCallOptions): Promise<LLMResponse> {
     if (!this.apiKey) {
-      throw new Error('Claude API Key is not configured');
+      throw new Error("Claude API Key is not configured");
     }
 
-    const {system, messages: claudeMessages} = this.formatMessages(messages);
+    const { system, messages: claudeMessages } = this.formatMessages(messages);
 
     const payload: any = {
       model: this.model,
@@ -105,26 +105,26 @@ export class ClaudeProvider implements ILLMProvider {
       const response = await lastValueFrom(
         this.httpService.post(`${this.baseUrl}/messages`, payload, {
           headers: {
-            'x-api-key': this.apiKey,
-            'anthropic-version': this.anthropicVersion,
-            'Content-Type': 'application/json',
+            "x-api-key": this.apiKey,
+            "anthropic-version": this.anthropicVersion,
+            "Content-Type": "application/json",
           },
-        })
+        }),
       );
 
       const data = response.data;
 
-      let textContent = '';
+      let textContent = "";
       const toolCalls: any[] = [];
 
       // Parse Claude's content array
       for (const block of data.content) {
-        if (block.type === 'text') {
+        if (block.type === "text") {
           textContent += block.text;
-        } else if (block.type === 'tool_use') {
+        } else if (block.type === "tool_use") {
           toolCalls.push({
             id: block.id,
-            type: 'function',
+            type: "function",
             function: {
               name: block.name,
               arguments: JSON.stringify(block.input),
@@ -138,7 +138,7 @@ export class ClaudeProvider implements ILLMProvider {
         tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
       };
     } catch (error: any) {
-      this.logger.error('Claude API call failed', error.response?.data || error.message);
+      this.logger.error("Claude API call failed", error.response?.data || error.message);
       throw new Error(`Failed to communicate with Claude provider: ${error.message}`);
     }
   }

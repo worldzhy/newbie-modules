@@ -1,16 +1,16 @@
-import {OnQueueCompleted, Process, Processor} from '@nestjs/bull';
-import {Job} from 'bull';
-import {AvailabilityExpressionStatus} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AvailabilityService} from '@modules/event-scheduling/availability.service';
+import { OnQueueCompleted, Process, Processor } from "@nestjs/bull";
+import { Job } from "bull";
+import { AvailabilityExpressionStatus } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AvailabilityService } from "@modules/event-scheduling/availability.service";
 
-export const EventSchedulingQueue = 'event-scheduling';
+export const EventSchedulingQueue = "event-scheduling";
 
 @Processor(EventSchedulingQueue)
 export class AvailabilityJobProcessor {
   constructor(
     private readonly prisma: PrismaService,
-    private availabilityService: AvailabilityService
+    private availabilityService: AvailabilityService,
   ) {}
 
   // @Process({concurrency: 10}) // todo: Check if the concurrency is valid.
@@ -27,7 +27,7 @@ export class AvailabilityJobProcessor {
 
     // [step 2] Delete and create timeslots.
     await this.prisma.availabilityTimeslot.deleteMany({
-      where: {expressionId: availabilityExpressionId},
+      where: { expressionId: availabilityExpressionId },
     });
     await this.prisma.availabilityTimeslot.createMany({
       data: availabilityTimeslots,
@@ -35,7 +35,7 @@ export class AvailabilityJobProcessor {
 
     // [step 3] Update expression status.
     await this.prisma.availabilityExpression.update({
-      where: {id: availabilityExpressionId},
+      where: { id: availabilityExpressionId },
       data: {
         status: AvailabilityExpressionStatus.PUBLISHED,
       },
@@ -46,6 +46,6 @@ export class AvailabilityJobProcessor {
 
   @OnQueueCompleted()
   onCompleted(job: Job, result: any) {
-    console.log('Availability job ' + job.id + ' is completed.');
+    console.log("Availability job " + job.id + " is completed.");
   }
 }

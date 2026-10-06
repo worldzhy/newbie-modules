@@ -1,4 +1,4 @@
-import {createHash} from 'node:crypto';
+import { createHash } from "node:crypto";
 
 /**
  * Computes a stable error fingerprint used to group equivalent errors.
@@ -12,18 +12,11 @@ import {createHash} from 'node:crypto';
  * only, no semantic dependency).
  */
 export function computeErrorFingerprint(type: string, message: string, stack?: string): string {
-  const normalizedMessage = message
-    .replace(/\d+/g, '#')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 200);
+  const normalizedMessage = message.replace(/\d+/g, "#").replace(/\s+/g, " ").trim().slice(0, 200);
 
   const businessFrame = extractTopBusinessFrame(stack);
 
-  return createHash('sha1')
-    .update(`${type}|${normalizedMessage}|${businessFrame}`)
-    .digest('hex')
-    .slice(0, 16);
+  return createHash("sha1").update(`${type}|${normalizedMessage}|${businessFrame}`).digest("hex").slice(0, 16);
 }
 
 /**
@@ -31,11 +24,11 @@ export function computeErrorFingerprint(type: string, message: string, stack?: s
  * line and column numbers masked. Empty string when no such frame exists.
  */
 function extractTopBusinessFrame(stack?: string): string {
-  if (!stack) return '';
+  if (!stack) return "";
   const frame = stack
-    .split('\n')
-    .map(line => line.trim())
-    .find(line => line.startsWith('at ') && !/node:internal|node_modules/.test(line));
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.startsWith("at ") && !/node:internal|node_modules/.test(line));
   // Mask numeric positions (line:column, embedded ids) but keep the file path.
-  return frame ? frame.replace(/:\d+/g, ':#') : '';
+  return frame ? frame.replace(/:\d+/g, ":#") : "";
 }

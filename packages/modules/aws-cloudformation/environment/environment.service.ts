@@ -1,13 +1,13 @@
-import {Injectable} from '@nestjs/common';
-import {Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AwsSecretKeyTokenService} from '../token/secretkey-token.service';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AwsSecretKeyTokenService } from "../token/secretkey-token.service";
 
 @Injectable()
 export class AwsEnvironmentService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly secretKeyTokenService: AwsSecretKeyTokenService
+    private readonly secretKeyTokenService: AwsSecretKeyTokenService,
   ) {}
 
   async create(args: Prisma.AwsEnvironmentCreateArgs) {

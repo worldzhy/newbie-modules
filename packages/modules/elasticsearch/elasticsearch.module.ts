@@ -1,5 +1,5 @@
-import {Module, Global} from '@nestjs/common';
-import {ElasticsearchService} from './elasticsearch.service';
+import { Module, Global } from "@nestjs/common";
+import { ElasticsearchService } from "./elasticsearch.service";
 
 @Global()
 @Module({

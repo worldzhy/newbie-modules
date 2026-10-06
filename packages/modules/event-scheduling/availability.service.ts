@@ -1,15 +1,15 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {AvailabilityTimeslotStatus, Event, Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { AvailabilityTimeslotStatus, Event, Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   ceilByMinutes,
   datePlusMinutes,
   datePlusYears,
   floorByMinutes,
   splitDateTime,
-} from '@devbie/newbie/utilities/datetime.util';
-const CronParser = require('cron-parser');
+} from "@devbie/newbie/utilities/datetime.util";
+const CronParser = require("cron-parser");
 
 @Injectable()
 export class AvailabilityService {
@@ -17,24 +17,24 @@ export class AvailabilityService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {
     this.MINUTES_Of_TIMESLOT_UNIT = this.configService.getOrThrow<number>(
-      'modules.eventScheduling.minutesOfTimeslotUnit'
+      "modules.eventScheduling.minutesOfTimeslotUnit",
     );
   }
 
   async parseAvailabilityExpression(id: number) {
     const expression = await this.prisma.availabilityExpression.findUniqueOrThrow({
-      where: {id},
+      where: { id },
     });
 
     // [step 1] Construct cron parser options.
     let timeZone: string | null = null;
     if (expression.venueIds.length > 0) {
       const venue = await this.prisma.eventVenue.findUnique({
-        where: {id: expression.venueIds[0]},
-        select: {timeZone: true},
+        where: { id: expression.venueIds[0] },
+        select: { timeZone: true },
       });
       if (venue) timeZone = venue.timeZone;
     }
@@ -59,7 +59,7 @@ export class AvailabilityService {
           cronExpression: exp,
           cronParserOptions: cronParserOptions,
           minutesOfDuration: expression.minutesOfDuration,
-        })
+        }),
       );
     }
 
@@ -73,7 +73,7 @@ export class AvailabilityService {
           cronExpression: exp,
           cronParserOptions: cronParserOptions,
           minutesOfDuration: expression.minutesOfDuration,
-        })
+        }),
       );
     }
 
@@ -97,7 +97,7 @@ export class AvailabilityService {
       }
     }
 
-    return finalAvailabilityTimeslots.map(timeslot => {
+    return finalAvailabilityTimeslots.map((timeslot) => {
       timeslot.expressionId = expression.id;
       timeslot.hostId = expression.hostId;
       timeslot.venueIds = expression.venueIds;
@@ -112,16 +112,16 @@ export class AvailabilityService {
     datetimeOfEnd: Date;
   }) {
     return await this.prisma.availabilityTimeslot.groupBy({
-      by: ['hostId'],
+      by: ["hostId"],
       where: {
         hostId: {
           in: params.hostIds,
         },
-        venueIds: {has: params.venueId},
-        datetimeOfStart: {gte: params.datetimeOfStart},
-        datetimeOfEnd: {lte: params.datetimeOfEnd},
+        venueIds: { has: params.venueId },
+        datetimeOfStart: { gte: params.datetimeOfStart },
+        datetimeOfEnd: { lte: params.datetimeOfEnd },
       },
-      _count: {hostId: true},
+      _count: { hostId: true },
     });
   }
 
@@ -133,7 +133,7 @@ export class AvailabilityService {
     minutesOfTimeslot: number;
     timeZone?: string;
   }) {
-    const parser = require('cron-parser');
+    const parser = require("cron-parser");
     const timeslots: {
       datetimeOfStart: Date;
       datetimeOfEnd: Date;
@@ -156,7 +156,7 @@ export class AvailabilityService {
 
     const interval = parser.parseExpression(
       `0/${params.minutesOfTimeslot} ${params.hourOfOpening}-${params.hourOfClosure - 1} * * *`,
-      cronParserOptions
+      cronParserOptions,
     );
 
     while (interval.hasNext()) {
@@ -194,10 +194,10 @@ export class AvailabilityService {
     await this.prisma.availabilityTimeslot.updateMany({
       where: {
         hostId: event.hostId,
-        datetimeOfStart: {gte: newDatetimeOfStart},
-        datetimeOfEnd: {lte: newDatetimeOfEnd},
+        datetimeOfStart: { gte: newDatetimeOfStart },
+        datetimeOfEnd: { lte: newDatetimeOfEnd },
       },
-      data: {status: AvailabilityTimeslotStatus.USED},
+      data: { status: AvailabilityTimeslotStatus.USED },
     });
   }
 
@@ -216,14 +216,14 @@ export class AvailabilityService {
     await this.prisma.availabilityTimeslot.updateMany({
       where: {
         hostId: event.hostId,
-        datetimeOfStart: {gte: newDatetimeOfStart},
-        datetimeOfEnd: {lte: newDatetimeOfEnd},
+        datetimeOfStart: { gte: newDatetimeOfStart },
+        datetimeOfEnd: { lte: newDatetimeOfEnd },
       },
-      data: {status: AvailabilityTimeslotStatus.USABLE},
+      data: { status: AvailabilityTimeslotStatus.USABLE },
     });
   }
 
-  private parseCronExpression(args: {cronExpression: string; cronParserOptions: any; minutesOfDuration: number}) {
+  private parseCronExpression(args: { cronExpression: string; cronParserOptions: any; minutesOfDuration: number }) {
     const timeslots: Prisma.AvailabilityTimeslotUncheckedUpdateInput[] = [];
     try {
       const interval = CronParser.parseExpression(args.cronExpression, args.cronParserOptions);

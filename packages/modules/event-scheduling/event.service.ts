@@ -1,14 +1,14 @@
-import {Injectable} from '@nestjs/common';
-import {Event, EventChangeLogType, EventIssueStatus, EventStatus, Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {constructDateTime, daysOfMonth} from '@devbie/newbie/utilities/datetime.util';
-import {EventIssueService} from './event-issue.service';
+import { Injectable } from "@nestjs/common";
+import { Event, EventChangeLogType, EventIssueStatus, EventStatus, Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { constructDateTime, daysOfMonth } from "@devbie/newbie/utilities/datetime.util";
+import { EventIssueService } from "./event-issue.service";
 
 @Injectable()
 export class EventService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly eventIssueService: EventIssueService
+    private readonly eventIssueService: EventIssueService,
   ) {
     // this.prisma.$use(eventPrismaMiddleware);
   }
@@ -54,7 +54,7 @@ export class EventService {
                 event.hour,
                 event.minute,
                 0,
-                event.timeZone
+                event.timeZone,
               );
 
               const targetEvent = {
@@ -81,9 +81,9 @@ export class EventService {
   }
   /* End */
 
-  async updateEvent(eventId: number, body: Prisma.EventUncheckedUpdateInput & {needToDuplicate?: boolean}) {
+  async updateEvent(eventId: number, body: Prisma.EventUncheckedUpdateInput & { needToDuplicate?: boolean }) {
     const oldEvent = await this.prisma.event.findUniqueOrThrow({
-      where: {id: eventId},
+      where: { id: eventId },
     });
 
     // [step 0] Collect events to be repeated in this month.
@@ -92,7 +92,7 @@ export class EventService {
       otherEvents.push(
         ...(await this.prisma.event.findMany({
           where: {
-            id: {not: eventId},
+            id: { not: eventId },
             containerId: oldEvent.containerId,
             hostId: oldEvent.hostId,
             typeId: oldEvent.typeId,
@@ -101,7 +101,7 @@ export class EventService {
             dayOfWeek: oldEvent.dayOfWeek,
             status: EventStatus.EDITING,
           },
-        }))
+        })),
       );
     }
     delete body.needToDuplicate;
@@ -109,21 +109,21 @@ export class EventService {
     // [step 1] Update event.
     if (body.typeId) {
       const eventType = await this.prisma.eventType.findUniqueOrThrow({
-        where: {id: body.typeId as number},
+        where: { id: body.typeId as number },
       });
       body.minutesOfDuration = eventType.minutesOfDuration;
     }
     const newEvent = await this.prisma.event.update({
-      where: {id: eventId},
+      where: { id: eventId },
       data: body,
-      include: {type: true},
+      include: { type: true },
     });
 
     // [step 2] Note the update.
     await this.prisma.eventChangeLog.create({
       data: {
         type: EventChangeLogType.USER,
-        description: 'Update class: ' + newEvent['type'].name + ' at ' + newEvent.datetimeOfStart,
+        description: "Update class: " + newEvent["type"].name + " at " + newEvent.datetimeOfStart,
         eventContainerId: newEvent.containerId,
         eventId: eventId,
       },
@@ -133,14 +133,14 @@ export class EventService {
     await this.eventIssueService.check(newEvent);
 
     // [step 4] Attach information.
-    newEvent['issues'] = await this.prisma.eventIssue.findMany({
-      where: {status: EventIssueStatus.UNREPAIRED, eventId: newEvent.id},
+    newEvent["issues"] = await this.prisma.eventIssue.findMany({
+      where: { status: EventIssueStatus.UNREPAIRED, eventId: newEvent.id },
     });
 
     if (newEvent.hostId) {
-      newEvent['hostUser'] = await this.prisma.eventHost.findUniqueOrThrow({
-        where: {id: newEvent.hostId},
-        select: {id: true, fullName: true, eventHostTitle: true},
+      newEvent["hostUser"] = await this.prisma.eventHost.findUniqueOrThrow({
+        where: { id: newEvent.hostId },
+        select: { id: true, fullName: true, eventHostTitle: true },
       });
     }
 
@@ -155,11 +155,11 @@ export class EventService {
         newEvent.hour,
         newEvent.minute,
         0,
-        newEvent.timeZone
+        newEvent.timeZone,
       );
 
       const newOtherEvent = await this.prisma.event.update({
-        where: {id: otherEvent.id},
+        where: { id: otherEvent.id },
         data: {
           hostId: newEvent.hostId,
           typeId: newEvent.typeId,
@@ -173,7 +173,7 @@ export class EventService {
       await this.prisma.eventChangeLog.create({
         data: {
           type: EventChangeLogType.USER,
-          description: 'Update class: ' + newEvent['type'].name + ' at ' + newOtherEvent.datetimeOfStart,
+          description: "Update class: " + newEvent["type"].name + " at " + newOtherEvent.datetimeOfStart,
           eventContainerId: newOtherEvent.containerId,
           eventId: newOtherEvent.id,
         },

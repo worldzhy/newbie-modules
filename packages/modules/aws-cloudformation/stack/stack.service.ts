@@ -1,4 +1,4 @@
-import {Injectable} from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import {
   Capability,
   CloudFormationClient,
@@ -7,31 +7,31 @@ import {
   DeleteStackCommand,
   DeleteStackCommandOutput,
   DescribeStacksCommand,
-} from '@aws-sdk/client-cloudformation';
-import {AwsEnvironment, AwsResourceStack} from '@generated/prisma/client';
-import {CicdBuild_Stack} from './cicd-build.stack';
-import {CicdPipeline_Stack} from './cicd-pipeline.stack';
-import {CicdRepository_Stack} from './cicd-repository.stack';
-import {ComputingFargate_Stack} from './computing-fargate.stack';
-import {NetworkHipaa_Stack} from './network-hipaa.stack';
-import {ProductMessageTracker_Stack} from './product-message-tracker.stack';
-import {Null_Stack} from './null.stack';
-import {AwsSecretKeyTokenService} from '../token/secretkey-token.service';
+} from "@aws-sdk/client-cloudformation";
+import { AwsEnvironment, AwsResourceStack } from "@generated/prisma/client";
+import { CicdBuild_Stack } from "./cicd-build.stack";
+import { CicdPipeline_Stack } from "./cicd-pipeline.stack";
+import { CicdRepository_Stack } from "./cicd-repository.stack";
+import { ComputingFargate_Stack } from "./computing-fargate.stack";
+import { NetworkHipaa_Stack } from "./network-hipaa.stack";
+import { ProductMessageTracker_Stack } from "./product-message-tracker.stack";
+import { Null_Stack } from "./null.stack";
+import { AwsSecretKeyTokenService } from "../token/secretkey-token.service";
 
 export const CloudFormationStackType = {
-  CICD_BUILD: 'CICD_BUILD',
-  CICD_PIPELINE: 'CICD_PIPELINE',
-  CICD_REPOSITORY: 'CICD_REPOSITORY',
-  FARGATE: 'FARGATE',
-  HIPAA_NETWORK: 'HIPAA_NETWORK',
-  MESSAGE_TRACKER: 'MESSAGE_TRACKER',
+  CICD_BUILD: "CICD_BUILD",
+  CICD_PIPELINE: "CICD_PIPELINE",
+  CICD_REPOSITORY: "CICD_REPOSITORY",
+  FARGATE: "FARGATE",
+  HIPAA_NETWORK: "HIPAA_NETWORK",
+  MESSAGE_TRACKER: "MESSAGE_TRACKER",
 };
 
 @Injectable()
 export class AwsCloudformationStackService {
   constructor(private readonly secretKeyTokenService: AwsSecretKeyTokenService) {}
 
-  async createResources(stack: AwsResourceStack & {environment: AwsEnvironment}): Promise<CreateStackCommandOutput> {
+  async createResources(stack: AwsResourceStack & { environment: AwsEnvironment }): Promise<CreateStackCommandOutput> {
     // [step 1] Create a cloudformation client.
     const client = await this.getCloudFormationClient(stack.environment);
 
@@ -46,18 +46,18 @@ export class AwsCloudformationStackService {
       case CloudFormationStackType.FARGATE:
         break;
       case CloudFormationStackType.HIPAA_NETWORK:
-        stack.params!['AWSConfigARN'] =
-          'arn:aws:iam::' +
+        stack.params!["AWSConfigARN"] =
+          "arn:aws:iam::" +
           stack.environment.awsAccountId +
-          ':role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig';
+          ":role/aws-service-role/config.amazonaws.com/AWSServiceRoleForConfig";
         break;
       case CloudFormationStackType.MESSAGE_TRACKER:
-        stack.params!['LambdaCodeS3BucketName'] = stack.environment.s3ForCloudformation;
-        stack.params!['PinpointEventProcessorLambdaCodeArchiveName'] =
-          'quickstart-message-tracker/codes/pinpoint-event-receiver.zip';
-        stack.params!['AlarmLambdaCodeArchiveName'] = 'quickstart-message-tracker/codes/alarm-message-sender.zip';
-        stack.params!['MessageShooterLambdaCodeArchiveName'] =
-          'quickstart-message-tracker/codes/pinpoint-message-sender.zip';
+        stack.params!["LambdaCodeS3BucketName"] = stack.environment.s3ForCloudformation;
+        stack.params!["PinpointEventProcessorLambdaCodeArchiveName"] =
+          "quickstart-message-tracker/codes/pinpoint-event-receiver.zip";
+        stack.params!["AlarmLambdaCodeArchiveName"] = "quickstart-message-tracker/codes/alarm-message-sender.zip";
+        stack.params!["MessageShooterLambdaCodeArchiveName"] =
+          "quickstart-message-tracker/codes/pinpoint-message-sender.zip";
         break;
       default:
         break;
@@ -66,8 +66,8 @@ export class AwsCloudformationStackService {
       Capabilities: [Capability.CAPABILITY_IAM], // Allow cloudformation to create IAM resource.
       StackName: stack.name!,
       TemplateURL: this.getStackTemplate(stack),
-      Parameters: Object.keys(stack.params!).map(key => {
-        return {ParameterKey: key, ParameterValue: stack.params![key]};
+      Parameters: Object.keys(stack.params!).map((key) => {
+        return { ParameterKey: key, ParameterValue: stack.params![key] };
       }),
     });
 
@@ -75,24 +75,24 @@ export class AwsCloudformationStackService {
     return await client.send(command);
   }
 
-  async describeResources(stack: AwsResourceStack & {environment: AwsEnvironment}) {
+  async describeResources(stack: AwsResourceStack & { environment: AwsEnvironment }) {
     // [step 1] Create a cloudformation client.
     const client = await this.getCloudFormationClient(stack.environment);
 
     // [step 2] Build parameters for cloudformation command.
-    const command = new DescribeStacksCommand({StackName: stack.name!});
+    const command = new DescribeStacksCommand({ StackName: stack.name! });
 
     // [step 3] Send command.
 
     return await client.send(command);
   }
 
-  async destroyResources(stack: AwsResourceStack & {environment: AwsEnvironment}): Promise<DeleteStackCommandOutput> {
+  async destroyResources(stack: AwsResourceStack & { environment: AwsEnvironment }): Promise<DeleteStackCommandOutput> {
     // [step 1] Create a cloudformation client.
     const client = await this.getCloudFormationClient(stack.environment);
 
     // [step 2] Build parameters for cloudformation command.
-    const command = new DeleteStackCommand({StackName: stack.name!});
+    const command = new DeleteStackCommand({ StackName: stack.name! });
 
     // [step 3] Send command and update state.
     return await client.send(command);
@@ -104,7 +104,7 @@ export class AwsCloudformationStackService {
   }
 
   //* Check parameters before building stack.
-  checkStackParams(params: {stackType: string; stackParams: object}): boolean {
+  checkStackParams(params: { stackType: string; stackParams: object }): boolean {
     return this.getStackServiceByType(params.stackType)?.checkStackParams(params.stackParams);
   }
 
@@ -118,20 +118,20 @@ export class AwsCloudformationStackService {
     });
   }
 
-  private getStackTemplate(stack: AwsResourceStack & {environment: AwsEnvironment}): string {
+  private getStackTemplate(stack: AwsResourceStack & { environment: AwsEnvironment }): string {
     const templatePath = this.getStackServiceByType(stack.type).getStackTemplate();
 
-    if (stack.environment.awsRegion && stack.environment.awsRegion.startsWith('cn')) {
+    if (stack.environment.awsRegion && stack.environment.awsRegion.startsWith("cn")) {
       return (
-        'https://' +
+        "https://" +
         stack.environment.s3ForCloudformation +
-        '.s3.' +
+        ".s3." +
         stack.environment.awsRegion +
-        '.amazonaws.com.cn/' +
+        ".amazonaws.com.cn/" +
         templatePath
       );
     } else {
-      return 'https://' + stack.environment.s3ForCloudformation + '.s3.amazonaws.com/' + templatePath;
+      return "https://" + stack.environment.s3ForCloudformation + ".s3.amazonaws.com/" + templatePath;
     }
   }
 

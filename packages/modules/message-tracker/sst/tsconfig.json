@@ -20,20 +20,14 @@
     "emitDecoratorMetadata": true,
     "incremental": true
   },
-  "include": [
-    "packages/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".sst"
-  ],
+  "include": ["packages/**/*"],
+  "exclude": ["node_modules", "dist", ".sst"],
   "references": [
     {
       "path": "./packages/core"
     },
     {
       "path": "./packages/functions"
-    },
+    }
   ]
-} 
+}

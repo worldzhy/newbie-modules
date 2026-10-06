@@ -1,10 +1,10 @@
-import {Injectable} from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 
 @Injectable()
 export class CicdBuild_Stack {
   static getStackParams() {
     return {
-      repositoryName: 'example-repo',
+      repositoryName: "example-repo",
     };
   }
 
@@ -17,10 +17,10 @@ export class CicdBuild_Stack {
   }
 
   static getStackOutputKeys() {
-    return ['CodeCloneUrlHttp', 'ImageUrlHttp'];
+    return ["CodeCloneUrlHttp", "ImageUrlHttp"];
   }
 
   static getStackTemplate() {
-    return 'quickstart-coderepo-and-imagerepo/templates/coderepo-and-imagerepo.template.yaml';
+    return "quickstart-coderepo-and-imagerepo/templates/coderepo-and-imagerepo.template.yaml";
   }
 }

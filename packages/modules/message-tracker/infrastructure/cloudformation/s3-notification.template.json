@@ -32,7 +32,7 @@
     "DeliveryStreamS3": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
-        "BucketName": {"Ref": "DeliveryStreamS3BucketName"},
+        "BucketName": { "Ref": "DeliveryStreamS3BucketName" },
         "NotificationConfiguration": {
           "LambdaConfigurations": [
             {
@@ -42,12 +42,12 @@
                   "Rules": [
                     {
                       "Name": "prefix",
-                      "Value": {"Ref": "DeliveryStreamS3Prefix"}
+                      "Value": { "Ref": "DeliveryStreamS3Prefix" }
                     }
                   ]
                 }
               },
-              "Function": {"Fn::GetAtt": ["S3EventLambdaFunction", "Arn"]}
+              "Function": { "Fn::GetAtt": ["S3EventLambdaFunction", "Arn"] }
             }
           ]
         }
@@ -79,12 +79,12 @@
           "S3Key": "code-events-processor.zip"
         },
         "Description": "It processes the pinpoint events from the Kinesis Firehose.",
-        "FunctionName": {"Ref": "PinpointEventProcessorLambdaName"},
+        "FunctionName": { "Ref": "PinpointEventProcessorLambdaName" },
         "Handler": "index.handler",
         "MemorySize": 128,
         "PackageType": "Zip",
         "ReservedConcurrentExecutions": 100,
-        "Role": {"Fn::GetAtt": ["S3EventLambdaFunctionRole", "Arn"]},
+        "Role": { "Fn::GetAtt": ["S3EventLambdaFunctionRole", "Arn"] },
         "Runtime": "nodejs22.x",
         "Timeout": 60
       },
@@ -98,7 +98,7 @@
           "Statement": [
             {
               "Effect": "Allow",
-              "Principal": {"Service": "lambda.amazonaws.com"},
+              "Principal": { "Service": "lambda.amazonaws.com" },
               "Action": "sts:AssumeRole"
             }
           ]

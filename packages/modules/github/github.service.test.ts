@@ -21,10 +21,12 @@ type OctokitMethods = {
 
 function makeOctokitMock(handlers: Partial<OctokitMethods>) {
   const calls: Record<string, any[]> = {};
-  const wrap = (name: string, fn?: Function) => (...args: any[]) => {
-    (calls[name] ??= []).push(args);
-    return fn ? fn(...args) : Promise.resolve();
-  };
+  const wrap =
+    (name: string, fn?: Function) =>
+    (...args: any[]) => {
+      (calls[name] ??= []).push(args);
+      return fn ? fn(...args) : Promise.resolve();
+    };
   return {
     calls,
     repos: {
@@ -133,10 +135,7 @@ describe("GitHubService.ensureRepoExists", () => {
       },
     });
     const service = makeService(m);
-    await assert.rejects(
-      service.ensureRepoExists("o", "n", "to", "tr"),
-      (e: any) => e.status === 500,
-    );
+    await assert.rejects(service.ensureRepoExists("o", "n", "to", "tr"), (e: any) => e.status === 500);
   });
 
   it("rethrows non-422 errors from generate", async () => {
@@ -149,10 +148,7 @@ describe("GitHubService.ensureRepoExists", () => {
       },
     });
     const service = makeService(m);
-    await assert.rejects(
-      service.ensureRepoExists("o", "n", "to", "tr"),
-      (e: any) => e.status === 403,
-    );
+    await assert.rejects(service.ensureRepoExists("o", "n", "to", "tr"), (e: any) => e.status === 403);
   });
 
   it("warns and continues when repo not readable after 3 retries", async () => {
@@ -268,10 +264,7 @@ describe("GitHubService.upsertEnvExample", () => {
       "repos.createOrUpdateFileContents": async () => ({}),
     });
     const service = makeService(m);
-    await assert.rejects(
-      service.upsertEnvExample("o", "r", ["# FOO="]),
-      (e: any) => e.status === 403,
-    );
+    await assert.rejects(service.upsertEnvExample("o", "r", ["# FOO="]), (e: any) => e.status === 403);
   });
 
   it("detects keys with leading spaces and no leading # (permissive parsing)", async () => {
@@ -313,10 +306,7 @@ describe("GitHubService.deleteRepo", () => {
       },
     });
     const service = makeService(m);
-    await assert.rejects(
-      service.deleteRepo("o", "r"),
-      (e: any) => e.status === 403,
-    );
+    await assert.rejects(service.deleteRepo("o", "r"), (e: any) => e.status === 403);
   });
 
   it("succeeds on 204", async () => {

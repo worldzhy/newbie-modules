@@ -1,10 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 
-import {
-  CreateMonitorInstallationDto,
-  ListMonitorInstallationsQueryDto,
-} from "../monitor-installation.dto";
+import { CreateMonitorInstallationDto, ListMonitorInstallationsQueryDto } from "../monitor-installation.dto";
 import { MonitorInstallationService } from "../services/monitor-installation.service";
 
 /**

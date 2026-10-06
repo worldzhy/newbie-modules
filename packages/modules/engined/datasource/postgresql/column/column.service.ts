@@ -1,6 +1,6 @@
-import {Injectable} from '@nestjs/common';
-import {PostgresqlDatasourceTableColumn, Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PostgresqlDatasourceTableColumn, Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 @Injectable()
 export class PostgresqlDatasourceTableColumnService {
@@ -26,7 +26,7 @@ export class PostgresqlDatasourceTableColumnService {
   //    ! Postgresql table operations      //
   // ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄ //
 
-  async addColulmn(column: {table: string; name: string; type: string; constraint?: string | null}): Promise<void> {
+  async addColulmn(column: { table: string; name: string; type: string; constraint?: string | null }): Promise<void> {
     const sql = column.constraint
       ? `ALTER TABLE ${column.table}
     ADD COLUMN ${column.name} ${column.type} ${column.constraint};`
@@ -38,8 +38,8 @@ export class PostgresqlDatasourceTableColumnService {
 
   async dropColulmn(column: PostgresqlDatasourceTableColumn): Promise<void> {
     await this.prisma.$executeRawUnsafe(
-      `ALTER TABLE ${column['table'].name}
-      DROP COLUMN ${column.name};`
+      `ALTER TABLE ${column["table"].name}
+      DROP COLUMN ${column.name};`,
     );
   }
 

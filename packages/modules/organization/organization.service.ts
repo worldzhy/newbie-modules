@@ -1,10 +1,10 @@
-import {Injectable, NotFoundException} from '@nestjs/common';
-import type {Prisma} from '@generated/prisma/client';
-import {Organization} from '@generated/prisma/client';
-import randomColor from 'randomcolor';
-import {GROUP_NOT_FOUND} from '@devbie/newbie/exceptions/errors.constants';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {Expose, expose} from '@modules/account/helpers/expose';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import type { Prisma } from "@generated/prisma/client";
+import { Organization } from "@generated/prisma/client";
+import randomColor from "randomcolor";
+import { GROUP_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { Expose, expose } from "@modules/account/helpers/expose";
 
 @Injectable()
 export class OrganizationService {
@@ -12,24 +12,24 @@ export class OrganizationService {
 
   async create(ownerUserId: string, data: Prisma.OrganizationCreateInput) {
     let initials = data.name.trim().substring(0, 2).toUpperCase();
-    if (data.name.includes(' '))
+    if (data.name.includes(" "))
       initials = data.name
-        .split(' ')
-        .map(i => i.trim().substring(0, 1))
-        .join('')
+        .split(" ")
+        .map((i) => i.trim().substring(0, 1))
+        .join("")
         .toUpperCase();
     data.profilePictureUrl =
       data.profilePictureUrl ??
       `https://ui-avatars.com/api/?name=${initials}&background=${randomColor({
-        luminosity: 'light',
-      }).replace('#', '')}&color=000000`;
+        luminosity: "light",
+      }).replace("#", "")}&color=000000`;
 
     return this.prisma.organization.create({
-      include: {memberships: {include: {organization: true}}},
+      include: { memberships: { include: { organization: true } } },
       data: {
         ...data,
         memberships: {
-          create: {role: 'OWNER', userId: ownerUserId},
+          create: { role: "OWNER", userId: ownerUserId },
         },
       },
     });
@@ -42,7 +42,7 @@ export class OrganizationService {
     where?: Prisma.OrganizationWhereInput;
     orderBy?: Prisma.OrganizationOrderByWithAggregationInput;
   }): Promise<Expose<Organization>[]> {
-    const {skip, take, cursor, where, orderBy} = params;
+    const { skip, take, cursor, where, orderBy } = params;
     try {
       const organizations = await this.prisma.organization.findMany({
         skip,
@@ -51,7 +51,7 @@ export class OrganizationService {
         where,
         orderBy,
       });
-      return organizations.map(user => expose<Organization>(user));
+      return organizations.map((user) => expose<Organization>(user));
     } catch (error) {
       return [];
     }
@@ -65,10 +65,10 @@ export class OrganizationService {
     }: {
       select?: Record<string, boolean>;
       include?: Record<string, boolean>;
-    }
+    },
   ): Promise<Expose<Organization>> {
     const organization = await this.prisma.organization.findUnique({
-      where: {id},
+      where: { id },
       select,
       include,
     } as any);
@@ -78,11 +78,11 @@ export class OrganizationService {
 
   async updateOrganization(id: string, data: Prisma.OrganizationUpdateInput): Promise<Expose<Organization>> {
     const testOrganization = await this.prisma.organization.findUnique({
-      where: {id},
+      where: { id },
     });
     if (!testOrganization) throw new NotFoundException(GROUP_NOT_FOUND);
     const organization = await this.prisma.organization.update({
-      where: {id},
+      where: { id },
       data,
     });
     return expose<Organization>(organization);
@@ -90,11 +90,11 @@ export class OrganizationService {
 
   async replaceOrganization(id: string, data: Prisma.OrganizationCreateInput): Promise<Expose<Organization>> {
     const testOrganization = await this.prisma.organization.findUnique({
-      where: {id},
+      where: { id },
     });
     if (!testOrganization) throw new NotFoundException(GROUP_NOT_FOUND);
     const organization = await this.prisma.organization.update({
-      where: {id},
+      where: { id },
       data,
     });
     return expose<Organization>(organization);
@@ -102,12 +102,12 @@ export class OrganizationService {
 
   async deleteOrganization(id: string): Promise<Expose<Organization>> {
     const testOrganization = await this.prisma.organization.findUnique({
-      where: {id},
+      where: { id },
     });
     if (!testOrganization) throw new NotFoundException(GROUP_NOT_FOUND);
-    await this.prisma.orgMembership.deleteMany({where: {organization: {id}}});
+    await this.prisma.orgMembership.deleteMany({ where: { organization: { id } } });
     const organization = await this.prisma.organization.delete({
-      where: {id},
+      where: { id },
     });
     return expose<Organization>(organization);
   }

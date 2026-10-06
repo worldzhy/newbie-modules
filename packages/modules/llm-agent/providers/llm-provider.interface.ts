@@ -1,5 +1,5 @@
 export interface LLMMessage {
-  role: 'system' | 'user' | 'assistant' | 'tool';
+  role: "system" | "user" | "assistant" | "tool";
   content: string | null;
   name?: string;
   tool_call_id?: string;
@@ -7,7 +7,7 @@ export interface LLMMessage {
 }
 
 export interface LLMTool {
-  type: 'function';
+  type: "function";
   function: {
     name: string;
     description: string;

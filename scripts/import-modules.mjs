@@ -25,10 +25,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-const REGISTRY_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "..",
-);
+const REGISTRY_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MODULES_DIR = path.join(REGISTRY_ROOT, "packages", "modules");
 
 /**
@@ -312,9 +309,7 @@ async function importModule(meta, refresh) {
       .then(() => true)
       .catch(() => false))
   ) {
-    console.info(
-      `skip ${meta.key} (already imported; pass --refresh to overwrite)`,
-    );
+    console.info(`skip ${meta.key} (already imported; pass --refresh to overwrite)`);
     return;
   }
 
@@ -330,13 +325,9 @@ async function importModule(meta, refresh) {
     const settingsFile = path.join(tmp, ".newbie", `${meta.key}.settings.json`);
     const schemaFile = path.join(tmp, ".newbie", `${meta.key}.schema`);
 
-    const settings = expectsSettings
-      ? await readOptionalJson(settingsFile)
-      : null;
+    const settings = expectsSettings ? await readOptionalJson(settingsFile) : null;
     if (expectsSettings && settings === null) {
-      console.warn(
-        `\n[warn] ${meta.key}: expected .newbie/${meta.key}.settings.json but it is missing`,
-      );
+      console.warn(`\n[warn] ${meta.key}: expected .newbie/${meta.key}.settings.json but it is missing`);
     }
     let schema = null;
     if (expectsSchema) {
@@ -344,9 +335,7 @@ async function importModule(meta, refresh) {
         schema = await fs.readFile(schemaFile, "utf8");
       } catch (error) {
         if (error.code === "ENOENT") {
-          console.warn(
-            `\n[warn] ${meta.key}: expected .newbie/${meta.key}.schema but it is missing`,
-          );
+          console.warn(`\n[warn] ${meta.key}: expected .newbie/${meta.key}.schema but it is missing`);
         } else {
           throw error;
         }
@@ -357,11 +346,7 @@ async function importModule(meta, refresh) {
     await moderniseImportAliases(target);
     if (schema !== null) {
       await fs.mkdir(path.join(target, "prisma"), { recursive: true });
-      await fs.writeFile(
-        path.join(target, "prisma", "schema.prisma"),
-        moderniseSchemaFragment(schema),
-        "utf8",
-      );
+      await fs.writeFile(path.join(target, "prisma", "schema.prisma"), moderniseSchemaFragment(schema), "utf8");
     }
     await fs.writeFile(
       path.join(target, "newbie.module.json"),
@@ -378,13 +363,8 @@ async function main() {
   const args = process.argv.slice(2);
   const refresh = args.includes("--refresh");
   const keys = args.filter((arg) => !arg.startsWith("--"));
-  const selected =
-    keys.length > 0
-      ? MODULES.filter((meta) => keys.includes(meta.key))
-      : MODULES;
-  const unknown = keys.filter(
-    (key) => !MODULES.some((meta) => meta.key === key),
-  );
+  const selected = keys.length > 0 ? MODULES.filter((meta) => keys.includes(meta.key)) : MODULES;
+  const unknown = keys.filter((key) => !MODULES.some((meta) => meta.key === key));
   if (unknown.length > 0) {
     console.error(`Unknown module key(s): ${unknown.join(", ")}`);
     process.exit(1);

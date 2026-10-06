@@ -1,6 +1,6 @@
-import {ApiProperty, ApiPropertyOptional} from '@nestjs/swagger';
-import {IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested} from 'class-validator';
-import {Type} from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsArray, IsNotEmpty, IsOptional, IsString, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
 
 /**
  * A single message in the AI conversation history.
@@ -8,17 +8,17 @@ import {Type} from 'class-transformer';
 export class AiChatMessageDto {
   @ApiProperty({
     type: String,
-    description: 'The role of the message sender: user or assistant',
-    example: 'user',
+    description: "The role of the message sender: user or assistant",
+    example: "user",
   })
   @IsNotEmpty()
   @IsString()
-  role: 'user' | 'assistant';
+  role: "user" | "assistant";
 
   @ApiProperty({
     type: String,
-    description: 'The message content',
-    example: 'Show me the top 5 slowest requests today',
+    description: "The message content",
+    example: "Show me the top 5 slowest requests today",
   })
   @IsNotEmpty()
   @IsString()
@@ -31,8 +31,8 @@ export class AiChatMessageDto {
 export class AiAnalysisChatDto {
   @ApiProperty({
     type: String,
-    description: 'Application ID (UUID) used to scope data queries',
-    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: "Application ID (UUID) used to scope data queries",
+    example: "550e8400-e29b-41d4-a716-446655440000",
   })
   @IsNotEmpty()
   @IsString()
@@ -40,8 +40,8 @@ export class AiAnalysisChatDto {
 
   @ApiProperty({
     type: String,
-    description: 'The user message / question for AI analysis',
-    example: 'Show me the top 5 slowest requests today',
+    description: "The user message / question for AI analysis",
+    example: "Show me the top 5 slowest requests today",
   })
   @IsNotEmpty()
   @IsString()
@@ -49,11 +49,11 @@ export class AiAnalysisChatDto {
 
   @ApiPropertyOptional({
     type: [AiChatMessageDto],
-    description: 'Previous conversation history for context continuity',
+    description: "Previous conversation history for context continuity",
   })
   @IsOptional()
   @IsArray()
-  @ValidateNested({each: true})
+  @ValidateNested({ each: true })
   @Type(() => AiChatMessageDto)
   history?: AiChatMessageDto[];
 }
@@ -64,14 +64,14 @@ export class AiAnalysisChatDto {
  */
 export interface AiResponseBlock {
   /** The type of content block */
-  type: 'text' | 'chart' | 'table' | 'analysis';
+  type: "text" | "chart" | "table" | "analysis";
 
   /** Text content — used when type is 'text' or 'analysis' */
   text?: string;
 
   /** Chart configuration — used when type is 'chart' */
   chart?: {
-    chartType: 'line' | 'bar' | 'pie' | 'doughnut';
+    chartType: "line" | "bar" | "pie" | "doughnut";
     title: string;
     labels: string[];
     datasets: Array<{
@@ -85,7 +85,7 @@ export interface AiResponseBlock {
   /** Table configuration — used when type is 'table' */
   table?: {
     title: string;
-    columns: Array<{field: string; headerName: string; width?: number}>;
+    columns: Array<{ field: string; headerName: string; width?: number }>;
     rows: Array<Record<string, any>>;
   };
 }

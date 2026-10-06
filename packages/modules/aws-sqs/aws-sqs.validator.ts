@@ -1,8 +1,7 @@
-import validator from 'validator';
+import validator from "validator";
 
 export function verifyRegion(region: string) {
-  const pattern =
-    /(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d/g;
+  const pattern = /(us(-gov)?|ap|ca|cn|eu|sa)-(central|(north|south)?(east|west)?)-\d/g;
   return pattern.test(region);
 }
 
@@ -15,20 +14,20 @@ export function verifyRegion(region: string) {
  */
 export function verifySqsQueueName(name: string) {
   // [step 1] S3 bucket name length must be larger than 2 and smaller than 64.
-  if (!validator.isLength(name, {min: 3, max: 63})) {
+  if (!validator.isLength(name, { min: 3, max: 63 })) {
     return false;
   }
 
   // [step 2] Uppercase letters are not allowed.
-  if (RegExp('[A-Z]').test(name)) {
+  if (RegExp("[A-Z]").test(name)) {
     return false;
   }
 
   // [step 3] 'xn--' is reserved prefix and '-s3alias' is reserved suffix by AWS.
-  if (name.startsWith('xn--') || name.endsWith('-s3alias')) {
+  if (name.startsWith("xn--") || name.endsWith("-s3alias")) {
     return false;
   }
 
   // [step 4] For special characters, only '-' can be contained in the username.
-  return validator.isAlphanumeric(name, 'en-US', {ignore: '[-]'});
+  return validator.isAlphanumeric(name, "en-US", { ignore: "[-]" });
 }

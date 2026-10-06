@@ -1,12 +1,5 @@
-import {
-  IsArray,
-  IsBoolean,
-  IsNotEmpty,
-  IsObject,
-  IsOptional,
-  IsString,
-} from 'class-validator';
-import {ApiProperty} from '@nestjs/swagger';
+import { IsArray, IsBoolean, IsNotEmpty, IsObject, IsOptional, IsString } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class CreateTeamDto {
   @IsBoolean()

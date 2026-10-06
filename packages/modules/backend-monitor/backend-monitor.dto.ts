@@ -28,8 +28,7 @@ export const INGEST_BATCH_LIMIT = 500;
  */
 export class BackendMonitorRequestEventDto {
   @ApiProperty({
-    description:
-      "Client-generated correlation id, shared with matching error events",
+    description: "Client-generated correlation id, shared with matching error events",
     maxLength: 128,
   })
   @IsNotEmpty()
@@ -257,8 +256,7 @@ export class ListBackendMonitorRequestLogsDto {
   keyword?: string;
 
   @ApiPropertyOptional({
-    description:
-      "Sort field: path | method | status_code | duration_ms | request_at",
+    description: "Sort field: path | method | status_code | duration_ms | request_at",
   })
   @IsOptional()
   @IsString()
@@ -303,8 +301,7 @@ export class ListBackendMonitorErrorLogsDto {
   keyword?: string;
 
   @ApiPropertyOptional({
-    description:
-      "Sort field: type | message | path | status_code | occurred_at",
+    description: "Sort field: type | message | path | status_code | occurred_at",
   })
   @IsOptional()
   @IsString()

@@ -1,10 +1,10 @@
-import {SQSHandler} from 'aws-lambda';
-import {Database} from '@message-tracker/core/database';
-import {EmailService} from '@message-tracker/core/ses';
-import {checkEmailMessageBody, checkTextMessageBody} from '../utils.js';
-import {SqsMessageStatus} from './interface.js';
+import { SQSHandler } from "aws-lambda";
+import { Database } from "@message-tracker/core/database";
+import { EmailService } from "@message-tracker/core/ses";
+import { checkEmailMessageBody, checkTextMessageBody } from "../utils.js";
+import { SqsMessageStatus } from "./interface.js";
 
-export const handler: SQSHandler = async event => {
+export const handler: SQSHandler = async (event) => {
   if (!event.Records || event.Records.length <= 0) {
     return;
   }
@@ -70,18 +70,15 @@ export const handler: SQSHandler = async event => {
     }
 
     // Update messages status in database
-    await updateEmailMessages(failedEmailMessages.map(msg => msg.sqsMessageId));
-    await updateTextMessages(failedTextMessages.map(msg => msg.sqsMessageId));
+    await updateEmailMessages(failedEmailMessages.map((msg) => msg.sqsMessageId));
+    await updateTextMessages(failedTextMessages.map((msg) => msg.sqsMessageId));
 
     // If there are failed messages, send an email with the list
     if (failedEmailMessages.length > 0 || failedTextMessages.length > 0) {
-      const content = generateAlarmEmailHTML(
-        failedEmailMessages,
-        failedTextMessages
-      );
+      const content = generateAlarmEmailHTML(failedEmailMessages, failedTextMessages);
       const emailParams = {
         toAddress: adminEmailAddress,
-        subject: 'Failed Messages',
+        subject: "Failed Messages",
         html: content,
         text: content,
       };
@@ -89,7 +86,7 @@ export const handler: SQSHandler = async event => {
       await email.sendEmail(emailParams);
     }
   } catch (error) {
-    console.error('Error processing alarm messages:', error);
+    console.error("Error processing alarm messages:", error);
     throw error;
   } finally {
     await db.close();
@@ -106,7 +103,7 @@ function generateAlarmEmailHTML(
   textMessages: Array<{
     phoneNumber: string;
     text: string;
-  }>
+  }>,
 ): string {
   let htmlStr = `
     <!doctype html>

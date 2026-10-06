@@ -1,5 +1,5 @@
-import {ApprovedSubnet, Email, Session, User} from '@prisma/client';
-import {Expose} from './interfaces';
+import { ApprovedSubnet, Email, Session, User } from "@prisma/client";
+import { Expose } from "./interfaces";
 
 /** Delete sensitive keys from an object */
 export function expose<T>(item: T): Expose<T> {

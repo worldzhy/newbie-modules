@@ -1,82 +1,82 @@
-import {BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post} from '@nestjs/common';
-import {ApiBearerAuth, ApiBody, ApiTags} from '@nestjs/swagger';
-import {AwsEnvironment, Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {AwsEnvironmentService} from '@modules/aws-cloudformation/environment/environment.service';
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
+import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { AwsEnvironment, Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AwsEnvironmentService } from "@modules/aws-cloudformation/environment/environment.service";
 
-@ApiTags('AWS Environment')
+@ApiTags("AWS Environment")
 @ApiBearerAuth()
-@Controller('aws-environments')
+@Controller("aws-environments")
 export class AwsEnvironmentController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly awsEnvironmentService: AwsEnvironmentService
+    private readonly awsEnvironmentService: AwsEnvironmentService,
   ) {}
 
-  @Post('')
+  @Post("")
   @ApiBody({
     description: "The 'name' is required in request body.",
     examples: {
       a: {
-        summary: '1. Create',
+        summary: "1. Create",
         value: {
-          name: 'Aircruiser Prod',
-          awsAccessKeyId: '',
-          awsSecretAccessKey: '',
-          awsRegion: '',
+          name: "Aircruiser Prod",
+          awsAccessKeyId: "",
+          awsSecretAccessKey: "",
+          awsRegion: "",
         },
       },
     },
   })
   async createEnvironment(
     @Body()
-    body: Prisma.AwsEnvironmentUncheckedCreateInput
+    body: Prisma.AwsEnvironmentUncheckedCreateInput,
   ): Promise<AwsEnvironment> {
     // [step 1] Guard statement.
     if (!body.name) {
-      throw new BadRequestException('Invalid project environment name in the request body.');
+      throw new BadRequestException("Invalid project environment name in the request body.");
     }
 
     // [step 2] Create project.
-    return await this.awsEnvironmentService.create({data: body});
+    return await this.awsEnvironmentService.create({ data: body });
   }
 
-  @Get(':environmentId')
-  async getEnvironment(@Param('environmentId') environmentId: string): Promise<AwsEnvironment> {
+  @Get(":environmentId")
+  async getEnvironment(@Param("environmentId") environmentId: string): Promise<AwsEnvironment> {
     return await this.prisma.awsEnvironment.findUniqueOrThrow({
-      where: {id: environmentId},
+      where: { id: environmentId },
     });
   }
 
-  @Patch(':environmentId')
+  @Patch(":environmentId")
   @ApiBody({
-    description: 'Update environment variables.',
+    description: "Update environment variables.",
     examples: {
       a: {
-        summary: '1. Without AWS profile',
+        summary: "1. Without AWS profile",
         value: {
-          awsAccountId: '929553487761',
-          awsAccessKeyId: 'fakeAKIXXXXXQB3I56H72',
-          awsSecretAccessKey: 'fakeNyXXXXXXXXXrBJk7LUEhXBqHKxG4PiCJ6cQ',
-          awsRegion: 'us-east-1',
+          awsAccountId: "929553487761",
+          awsAccessKeyId: "fakeAKIXXXXXQB3I56H72",
+          awsSecretAccessKey: "fakeNyXXXXXXXXXrBJk7LUEhXBqHKxG4PiCJ6cQ",
+          awsRegion: "us-east-1",
         },
       },
     },
   })
   async updateEnvironment(
-    @Param('environmentId') environmentId: string,
-    @Body() body: Prisma.AwsEnvironmentUpdateInput
+    @Param("environmentId") environmentId: string,
+    @Body() body: Prisma.AwsEnvironmentUpdateInput,
   ): Promise<AwsEnvironment> {
     return await this.awsEnvironmentService.update({
-      where: {id: environmentId},
+      where: { id: environmentId },
       data: body,
     });
   }
 
-  @Delete(':environmentId')
-  async deleteEnvironment(@Param('environmentId') environmentId: string): Promise<AwsEnvironment> {
+  @Delete(":environmentId")
+  async deleteEnvironment(@Param("environmentId") environmentId: string): Promise<AwsEnvironment> {
     return await this.prisma.awsEnvironment.delete({
-      where: {id: environmentId},
+      where: { id: environmentId },
     });
   }
 

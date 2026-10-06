@@ -1,7 +1,7 @@
-import {Global, Module} from '@nestjs/common';
-import {MongooseModule} from '@nestjs/mongoose';
-import {ConfigModule, ConfigService} from '@nestjs/config';
-import {MongoModelRegistry} from './mongo-model.registry';
+import { Global, Module } from "@nestjs/common";
+import { MongooseModule } from "@nestjs/mongoose";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { MongoModelRegistry } from "./mongo-model.registry";
 
 /**
  * Shared MongoDB infrastructure module.
@@ -19,16 +19,16 @@ import {MongoModelRegistry} from './mongo-model.registry';
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => {
-        const uri = config.get<string>('modules.mongo.uri');
+        const uri = config.get<string>("modules.mongo.uri");
         if (!uri) {
           // Fail fast instead of falling back to an implicit database: the
           // connection is shared by multiple business microservices, so a
           // guessed default URI would make every model land in the wrong db.
           throw new Error(
-            'MONGO_URL is not configured. Set it to the MongoDB connection URI, e.g. mongodb://127.0.0.1:27017/<database>'
+            "MONGO_URL is not configured. Set it to the MongoDB connection URI, e.g. mongodb://127.0.0.1:27017/<database>",
           );
         }
-        return {uri};
+        return { uri };
       },
       inject: [ConfigService],
     }),

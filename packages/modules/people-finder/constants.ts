@@ -1,37 +1,37 @@
 export enum PeopleFinderPlatforms {
-  voilanorbert = 'voilanorbert',
-  proxycurl = 'proxycurl',
-  peopledatalabs = 'peopledatalabs',
+  voilanorbert = "voilanorbert",
+  proxycurl = "proxycurl",
+  peopledatalabs = "peopledatalabs",
 }
 export enum PeopleFinderStatus {
-  pending = 'pending',
-  completed = 'completed',
-  failed = 'failed',
-  deleted = 'deleted',
-  parameterError = 'parameterError',
+  pending = "pending",
+  completed = "completed",
+  failed = "failed",
+  deleted = "deleted",
+  parameterError = "parameterError",
 }
 
 export enum PeopleFinderTaskStatus {
-  pending = 'pending',
-  completed = 'completed',
+  pending = "pending",
+  completed = "completed",
 }
 export enum PeopleFinderBatchTaskStatus {
-  pending = 'pending',
-  synchronizingData = 'synchronizingData',
-  completed = 'completed',
+  pending = "pending",
+  synchronizingData = "synchronizingData",
+  completed = "completed",
 }
 
 export enum PeopleFinderBatchTaskCallBackStatus {
-  pending = 'pending',
-  error = 'error',
-  completed = 'completed',
+  pending = "pending",
+  error = "error",
+  completed = "completed",
 }
 
 export enum PeopleFinderSourceMode {
-  searchEmailByDomain = 'searchEmailByDomain',
-  searchPeopleByDomain = 'searchPeopleByDomain',
-  searchPeopleByLinkedin = 'searchPeopleByLinkedin',
-  searchPeopleLinkedin = 'searchPeopleLinkedin',
+  searchEmailByDomain = "searchEmailByDomain",
+  searchPeopleByDomain = "searchPeopleByDomain",
+  searchPeopleByLinkedin = "searchPeopleByLinkedin",
+  searchPeopleLinkedin = "searchPeopleLinkedin",
 }
 
 export type PeopleFinderUserReq = {
@@ -52,4 +52,4 @@ export type PeopleFinderTaskBullJob = {
   findPhone?: boolean;
 } & PeopleFinderUserReq;
 
-export type SearchFilter = {needPhone: boolean; needEmail: boolean};
+export type SearchFilter = { needPhone: boolean; needEmail: boolean };

@@ -1,4 +1,5 @@
 # us-states-normalize
+
 A library to normalize and convert any variations of US state names and abbreviations.
 
 ## Installation
@@ -6,7 +7,6 @@ A library to normalize and convert any variations of US state names and abbrevia
 ```
 npm install us-states-normalize --save
 ```
-
 
 ## Usage
 
@@ -42,6 +42,7 @@ normalize('DC', { omit: ['DC'] });                                    // null
 ```
 
 The options along with their defaults:
+
 ```
 {
   region: [String|Array]('state') - ['state', 'territory', 'associated']
@@ -50,13 +51,11 @@ The options along with their defaults:
 }
 ```
 
-
 ## Test
 
 ```
 npm test
 ```
-
 
 ## US States and Territories
 
@@ -127,6 +126,7 @@ VI - Virgin Islands
 ```
 
 ### Freely Associated States
+
 ```
 FM - Federated States Of Micronesia
 MH - Marshall Islands

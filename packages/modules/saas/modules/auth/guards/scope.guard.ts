@@ -1,14 +1,14 @@
-import {CanActivate, ExecutionContext, Injectable} from '@nestjs/common';
-import {Reflector} from '@nestjs/core';
-import * as minimatch from 'minimatch';
-import {AccessTokenParsed, UserRequest} from '../auth.interface';
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import * as minimatch from "minimatch";
+import { AccessTokenParsed, UserRequest } from "../auth.interface";
 
 @Injectable()
 export class ScopesGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const scopes = this.reflector.get<string[]>('scopes', context.getHandler());
+    const scopes = this.reflector.get<string[]>("scopes", context.getHandler());
     const request = context.switchToHttp().getRequest<UserRequest>();
     if (!scopes) return true;
     const user: AccessTokenParsed = request.user;

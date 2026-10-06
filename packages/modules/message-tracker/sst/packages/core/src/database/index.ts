@@ -1,4 +1,4 @@
-import postgres from 'postgres';
+import postgres from "postgres";
 
 export interface DatabaseConfig {
   host: string;
@@ -19,8 +19,8 @@ export class Database {
       user: process.env.DB_USER!,
       password: process.env.DB_PWD!,
       database: process.env.DB_NAME!,
-      ssl: process.env.DB_SSL === 'true' ? {rejectUnauthorized: false} : false,
-    }
+      ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : false,
+    },
   ) {
     this.sql = postgres({
       host: config.host,

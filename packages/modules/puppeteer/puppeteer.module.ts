@@ -1,5 +1,5 @@
-import {Global, Module} from '@nestjs/common';
-import {PuppeteerService} from './puppeteer.service';
+import { Global, Module } from "@nestjs/common";
+import { PuppeteerService } from "./puppeteer.service";
 
 @Global()
 @Module({

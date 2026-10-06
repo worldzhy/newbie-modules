@@ -1,11 +1,11 @@
-import {Body, Controller, HttpCode, HttpStatus, Post, Res} from '@nestjs/common';
-import {ApiOperation, ApiResponse, ApiTags} from '@nestjs/swagger';
-import {Response} from 'express';
-import {AiAnalysisService} from './ai-analysis.service';
-import {AiAnalysisChatDto} from './ai-analysis.dto';
+import { Body, Controller, HttpCode, HttpStatus, Post, Res } from "@nestjs/common";
+import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Response } from "express";
+import { AiAnalysisService } from "./ai-analysis.service";
+import { AiAnalysisChatDto } from "./ai-analysis.dto";
 
-@ApiTags('AI Analysis')
-@Controller('ai-analysis')
+@ApiTags("AI Analysis")
+@Controller("ai-analysis")
 export class AiAnalysisController {
   constructor(private readonly aiAnalysisService: AiAnalysisService) {}
 
@@ -27,31 +27,31 @@ export class AiAnalysisController {
    * The applicationId in the body scopes data queries so users can only
    * analyze data belonging to their own applications.
    */
-  @ApiOperation({summary: 'Chat with AI for data analysis (streaming SSE)'})
-  @ApiResponse({status: 200, description: 'SSE stream of AI analysis results.', type: String})
-  @ApiResponse({status: 401, description: 'Invalid application token or not authenticated.'})
+  @ApiOperation({ summary: "Chat with AI for data analysis (streaming SSE)" })
+  @ApiResponse({ status: 200, description: "SSE stream of AI analysis results.", type: String })
+  @ApiResponse({ status: 401, description: "Invalid application token or not authenticated." })
   @HttpCode(HttpStatus.OK)
-  @Post('chat')
+  @Post("chat")
   async chat(@Body() body: AiAnalysisChatDto, @Res() res: Response) {
     // Set up SSE headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable Nginx buffering
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no"); // Disable Nginx buffering
     res.flushHeaders();
 
     try {
       await this.aiAnalysisService.chatStream(body, (event: string, data: any) => {
-        if (event === '__keepalive__') {
+        if (event === "__keepalive__") {
           // SSE comment — keeps the connection alive, clients ignore it
-          res.write(': keepalive\n\n');
+          res.write(": keepalive\n\n");
         } else {
           res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
         }
       });
     } catch (error) {
       res.write(
-        `event: error\ndata: ${JSON.stringify({message: error instanceof Error ? error.message : 'Unknown error'})}\n\n`
+        `event: error\ndata: ${JSON.stringify({ message: error instanceof Error ? error.message : "Unknown error" })}\n\n`,
       );
     }
 

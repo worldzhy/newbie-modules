@@ -1,15 +1,15 @@
-import {Injectable} from '@nestjs/common';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {BillingCycle} from '@generated/prisma/client';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { BillingCycle } from "@generated/prisma/client";
 
 @Injectable()
 export class SubscriptionService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async createSubscription(params: {membershipId: string; planId: number}) {
+  async createSubscription(params: { membershipId: string; planId: number }) {
     // [step 1] Find the subscription plan
     const plan = await this.prisma.subscriptionPlan.findUniqueOrThrow({
-      where: {id: params.planId},
+      where: { id: params.planId },
     });
 
     // [step 2] Create the subscription
@@ -28,7 +28,7 @@ export class SubscriptionService {
       dateOfEnd = new Date(dateOfStart);
       dateOfEnd.setFullYear(dateOfStart.getFullYear() + 20);
     } else {
-      throw new Error('Unsupported billing cycle');
+      throw new Error("Unsupported billing cycle");
     }
 
     return await this.prisma.subscription.create({

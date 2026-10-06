@@ -1,28 +1,28 @@
-import {Logger, Injectable, BadRequestException} from '@nestjs/common';
-import {HttpService} from '@nestjs/axios';
-import {Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Logger, Injectable, BadRequestException } from "@nestjs/common";
+import { HttpService } from "@nestjs/axios";
+import { Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   PeopleFinderStatus,
   PeopleFinderPlatforms,
   PeopleFinderTaskStatus,
   PeopleFinderBatchTaskStatus,
   PeopleFinderBatchTaskCallBackStatus,
-} from './constants';
-import {PeopleFinderUserReq} from '@modules/people-finder/constants';
-import {CreateContactSearchTaskBatchReqDto} from './people-finder.dto';
-import {PeopleFinderNotificationService} from './people-finder.notification.service';
-export * from './constants';
+} from "./constants";
+import { PeopleFinderUserReq } from "@modules/people-finder/constants";
+import { CreateContactSearchTaskBatchReqDto } from "./people-finder.dto";
+import { PeopleFinderNotificationService } from "./people-finder.notification.service";
+export * from "./constants";
 
 @Injectable()
 export class PeopleFinderService {
-  private loggerContext = 'PeopleFinderService';
+  private loggerContext = "PeopleFinderService";
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly logger: Logger,
     private httpService: HttpService,
-    private peopleFinderNotification: PeopleFinderNotificationService
+    private peopleFinderNotification: PeopleFinderNotificationService,
   ) {}
 
   async isExist({
@@ -76,14 +76,14 @@ export class PeopleFinderService {
     batchId,
     peoples,
     callbackUrl,
-  }: CreateContactSearchTaskBatchReqDto): Promise<{taskBatchId: number}> {
+  }: CreateContactSearchTaskBatchReqDto): Promise<{ taskBatchId: number }> {
     const taskBatch = await this.prisma.peopleFinderTaskBatch.findFirst({
       where: {
         batchId,
       },
     });
     if (taskBatch) {
-      throw new BadRequestException('BatchId already exists.');
+      throw new BadRequestException("BatchId already exists.");
     }
     const newTaskBatch = await this.prisma.peopleFinderTaskBatch.create({
       data: {
@@ -94,23 +94,23 @@ export class PeopleFinderService {
       },
     });
     await this.prisma.peopleFinderTask.createMany({
-      data: peoples.map(item => ({
+      data: peoples.map((item) => ({
         ...item,
         status: PeopleFinderTaskStatus.pending,
         taskBatchId: newTaskBatch.id,
       })),
     });
-    return {taskBatchId: newTaskBatch.id};
+    return { taskBatchId: newTaskBatch.id };
   }
 
-  async getTaskBatchTasks(batchId: string, options: {status?: PeopleFinderTaskStatus} = {}) {
+  async getTaskBatchTasks(batchId: string, options: { status?: PeopleFinderTaskStatus } = {}) {
     const taskBatch = await this.prisma.peopleFinderTaskBatch.findFirst({
       where: {
         batchId,
       },
     });
     if (!taskBatch) {
-      throw new BadRequestException('Batch not found.');
+      throw new BadRequestException("Batch not found.");
     }
     return await this.prisma.peopleFinderTask.findMany({
       where: {
@@ -120,16 +120,16 @@ export class PeopleFinderService {
     });
   }
 
-  async checkTaskBatchStatus({batchId, taskBatchId}: {batchId?: string; taskBatchId?: number}) {
+  async checkTaskBatchStatus({ batchId, taskBatchId }: { batchId?: string; taskBatchId?: number }) {
     const taskBatch = await this.prisma.peopleFinderTaskBatch.findFirst({
       where: taskBatchId
-        ? {id: taskBatchId}
+        ? { id: taskBatchId }
         : {
             batchId,
           },
     });
     if (!taskBatch) {
-      throw new BadRequestException('BatchId not found.');
+      throw new BadRequestException("BatchId not found.");
     }
     const total = await this.prisma.peopleFinderTask.count({
       where: {
@@ -150,40 +150,40 @@ export class PeopleFinderService {
   }
 
   async checkAndExecuteTaskBatchCallback(taskBatchId: number) {
-    const {completed} = await this.checkTaskBatchStatus({
+    const { completed } = await this.checkTaskBatchStatus({
       taskBatchId: taskBatchId,
     });
 
     if (!completed) return;
 
     await this.prisma.peopleFinderTaskBatch.update({
-      where: {id: taskBatchId},
+      where: { id: taskBatchId },
       data: {
         status: PeopleFinderBatchTaskStatus.synchronizingData,
       },
     });
 
     const list = await this.prisma.peopleFinderTask.findMany({
-      where: {taskBatchId},
+      where: { taskBatchId },
     });
 
     for (let i = 0; i < list.length; i++) {
       const task = list[i];
       const resultList = await this.prisma.peopleFinderCallThirdParty.findMany({
-        where: {id: {in: task.callThirdPartyIds}},
+        where: { id: { in: task.callThirdPartyIds } },
       });
 
       // get emails \ phones \ linkedins
       let emails: string[] = [];
       let phones: string[] = [];
       let linkedins: string[] = [];
-      resultList.map(item => {
+      resultList.map((item) => {
         if (item.emails && item.emails.length) {
           if (item.source === PeopleFinderPlatforms.voilanorbert) {
-            item.emails = item.emails.map((emailCon: {email: string; score: number}) => emailCon.email);
+            item.emails = item.emails.map((emailCon: { email: string; score: number }) => emailCon.email);
           }
           if (item.source === PeopleFinderPlatforms.peopledatalabs) {
-            item.emails = item.emails.map((emailCon: {address: string; type: string}) => emailCon.address);
+            item.emails = item.emails.map((emailCon: { address: string; type: string }) => emailCon.address);
           }
           emails = emails.concat(item.emails as string[]);
         }
@@ -196,7 +196,7 @@ export class PeopleFinderService {
       });
 
       await this.prisma.peopleFinderTask.update({
-        where: {id: task.id},
+        where: { id: task.id },
         data: {
           emails: Array.from(new Set(emails)),
           phones: Array.from(new Set(phones)),
@@ -206,7 +206,7 @@ export class PeopleFinderService {
     }
 
     const taskBatch = await this.prisma.peopleFinderTaskBatch.update({
-      where: {id: taskBatchId},
+      where: { id: taskBatchId },
       data: {
         status: PeopleFinderBatchTaskStatus.completed,
       },
@@ -214,11 +214,13 @@ export class PeopleFinderService {
 
     if (taskBatch?.callbackUrl && taskBatch.callbackStatus !== PeopleFinderBatchTaskCallBackStatus.completed) {
       this.httpService.axiosRef
-        .post<{batchId: string}, {status: number; data: string}>(taskBatch?.callbackUrl, {batchId: taskBatch.batchId})
-        .then(async res => {
+        .post<{ batchId: string }, { status: number; data: string }>(taskBatch?.callbackUrl, {
+          batchId: taskBatch.batchId,
+        })
+        .then(async (res) => {
           if (res.status >= 200 && res.status < 300) {
             await this.prisma.peopleFinderTaskBatch.update({
-              where: {id: taskBatchId},
+              where: { id: taskBatchId },
               data: {
                 callbackStatus: PeopleFinderBatchTaskCallBackStatus.completed,
               },
@@ -228,21 +230,21 @@ export class PeopleFinderService {
               message: `[callback error] url:${taskBatch?.callbackUrl}, batchId:${taskBatch.batchId}`,
             });
           }
-          this.logger.log('checkAndExecuteTaskBatchCallback: ' + JSON.stringify(res.data), this.loggerContext);
+          this.logger.log("checkAndExecuteTaskBatchCallback: " + JSON.stringify(res.data), this.loggerContext);
         })
-        .catch(async e => {
+        .catch(async (e) => {
           this.peopleFinderNotification.send({
             message: `[callback error] url:${taskBatch?.callbackUrl}, batchId:${taskBatch.batchId}`,
           });
           await this.prisma.peopleFinderTaskBatch.update({
-            where: {id: taskBatchId},
+            where: { id: taskBatchId },
             data: {
               callbackStatus: PeopleFinderBatchTaskCallBackStatus.error,
             },
           });
           this.logger.error(
-            'checkAndExecuteTaskBatchCallback catch: ' + JSON.stringify({error: e}),
-            this.loggerContext
+            "checkAndExecuteTaskBatchCallback catch: " + JSON.stringify({ error: e }),
+            this.loggerContext,
           );
         });
     }

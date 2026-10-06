@@ -1,21 +1,21 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {Client} from '@elastic/elasticsearch';
-import {Index} from '@elastic/elasticsearch/api/requestParams';
-import PQueue from 'p-queue';
-import pRetry from 'p-retry';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Client } from "@elastic/elasticsearch";
+import { Index } from "@elastic/elasticsearch/api/requestParams";
+import PQueue from "p-queue";
+import pRetry from "p-retry";
 
 @Injectable()
 export class ElasticsearchService extends Client {
-  private logger = new Logger('Elasticsearch');
-  private queue = new PQueue({concurrency: 1});
+  private logger = new Logger("Elasticsearch");
+  private queue = new PQueue({ concurrency: 1 });
 
   constructor(private readonly configService: ConfigService) {
-    const config = configService.getOrThrow('modules.elasticsearch');
+    const config = configService.getOrThrow("modules.elasticsearch");
 
     super({
       node: config.node,
-      auth: {username: config.username, password: config.password},
+      auth: { username: config.username, password: config.password },
     });
   }
 
@@ -23,14 +23,14 @@ export class ElasticsearchService extends Client {
     this.queue
       .add(() =>
         pRetry(() => this.indexRecord(index, record, params), {
-          retries: this.configService.get<number>('modules.elasticsearch.retries') ?? 3,
-          onFailedAttempt: error => {
+          retries: this.configService.get<number>("modules.elasticsearch.retries") ?? 3,
+          onFailedAttempt: (error) => {
             this.logger.error(
               `Indexing record failed, retrying (${error.retriesLeft} attempts left)`,
-              error.error.name
+              error.error.name,
             );
           },
-        })
+        }),
       )
       .then(() => {})
       .catch(() => {});
@@ -50,7 +50,7 @@ export class ElasticsearchService extends Client {
       body: {
         query: {
           bool: {
-            must: [{range: {date: {lte: now}}}],
+            must: [{ range: { date: { lte: now } } }],
           },
         },
       },
@@ -58,6 +58,6 @@ export class ElasticsearchService extends Client {
   }
 
   private async indexRecord(index: string, record: Record<string, any>, params?: Index) {
-    return this.index({index, body: record, ...params});
+    return this.index({ index, body: record, ...params });
   }
 }

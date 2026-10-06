@@ -1,8 +1,8 @@
-import {RequestParams} from '@elastic/elasticsearch';
-import {Injectable, NotFoundException} from '@nestjs/common';
-import {ElasticsearchDatasource} from '@generated/prisma/client';
-import {ElasticsearchService} from '@modules/elasticsearch/elasticsearch.service';
-import {get as lodash_get, split as lodash_split} from 'lodash';
+import { RequestParams } from "@elastic/elasticsearch";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { ElasticsearchDatasource } from "@generated/prisma/client";
+import { ElasticsearchService } from "@modules/elasticsearch/elasticsearch.service";
+import { get as lodash_get, split as lodash_split } from "lodash";
 
 @Injectable()
 export class ElasticsearchDatasourceService {
@@ -16,7 +16,7 @@ export class ElasticsearchDatasourceService {
     // [step 1] Get mappings of all indices.
     const result = await this.elastic.indices.getMapping();
     if (result.statusCode !== 200) {
-      throw new NotFoundException('Not found the elasticsearch mappings of indices');
+      throw new NotFoundException("Not found the elasticsearch mappings of indices");
     }
 
     return result;
@@ -44,18 +44,18 @@ export class ElasticsearchDatasourceService {
   }
 
   private parseSearchAggregationsParams(params: any) {
-    const {type} = params;
-    const index = lodash_get(params, 'searchDto.index');
-    const query = lodash_get(params, 'searchDto.body.query');
-    const aggregationMode = lodash_get(params, 'aggregationMode');
+    const { type } = params;
+    const index = lodash_get(params, "searchDto.index");
+    const query = lodash_get(params, "searchDto.body.query");
+    const aggregationMode = lodash_get(params, "aggregationMode");
 
     let result = {};
     let field: any;
     let termsSize: any;
     switch (type) {
-      case 'terms':
-        field = lodash_get(params, 'option.column[0]');
-        termsSize = lodash_get(params, 'option.chartOption.termsSize') || 10;
+      case "terms":
+        field = lodash_get(params, "option.column[0]");
+        termsSize = lodash_get(params, "option.chartOption.termsSize") || 10;
         result = {
           index,
           body: {
@@ -73,11 +73,11 @@ export class ElasticsearchDatasourceService {
           },
         };
         break;
-      case 'nested':
-        if (aggregationMode === 'normal') {
-          field = lodash_get(params, 'option.column[0]');
-          termsSize = lodash_get(params, 'option.chartOption.termsSize') || 10;
-          const nestPath = lodash_get(lodash_split(field, '.'), '0');
+      case "nested":
+        if (aggregationMode === "normal") {
+          field = lodash_get(params, "option.column[0]");
+          termsSize = lodash_get(params, "option.chartOption.termsSize") || 10;
+          const nestPath = lodash_get(lodash_split(field, "."), "0");
           result = {
             index,
             body: {
@@ -100,11 +100,11 @@ export class ElasticsearchDatasourceService {
               },
             },
           };
-        } else if (aggregationMode === 'reverse') {
-          field = lodash_get(params, 'option.column[0]');
-          termsSize = lodash_get(params, 'option.chartOption.termsSize') || 10;
-          const reverseColumns = lodash_get(params, 'reverseColumns');
-          const nestPath = lodash_get(lodash_split(field, '.'), '0');
+        } else if (aggregationMode === "reverse") {
+          field = lodash_get(params, "option.column[0]");
+          termsSize = lodash_get(params, "option.chartOption.termsSize") || 10;
+          const reverseColumns = lodash_get(params, "reverseColumns");
+          const nestPath = lodash_get(lodash_split(field, "."), "0");
           result = {
             index,
             body: {
@@ -148,22 +148,22 @@ export class ElasticsearchDatasourceService {
   }
 
   private parseSearchAggregationsResult(params: any, response: any) {
-    const {type} = params;
-    const {statusCode} = response;
+    const { type } = params;
+    const { statusCode } = response;
 
     if (statusCode !== 200) {
       return null;
     }
 
-    const aggregations = lodash_get(response, 'body.aggregations');
+    const aggregations = lodash_get(response, "body.aggregations");
 
     switch (type) {
-      case 'terms':
+      case "terms":
         return {
           sum_other_doc_count: aggregations.terms.sum_other_doc_count,
           list: aggregations.terms.buckets,
         };
-      case 'nested':
+      case "nested":
         return {
           sum_other_doc_count: aggregations.terms.terms.sum_other_doc_count,
           list: aggregations.terms.terms.buckets,

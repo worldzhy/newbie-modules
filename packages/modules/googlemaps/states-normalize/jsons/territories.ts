@@ -1,18 +1,18 @@
 export const territories = {
   AS: {
-    name: 'American Samoa',
+    name: "American Samoa",
   },
   GU: {
-    name: 'Guam',
+    name: "Guam",
   },
   MP: {
-    name: 'Northern Mariana Islands',
+    name: "Northern Mariana Islands",
   },
   PR: {
-    name: 'Puerto Rico',
+    name: "Puerto Rico",
   },
   VI: {
-    name: 'Virgin Islands',
-    other: ['U.S.V.I.', 'U.S. Virgin Islands'],
+    name: "Virgin Islands",
+    other: ["U.S.V.I.", "U.S. Virgin Islands"],
   },
 };

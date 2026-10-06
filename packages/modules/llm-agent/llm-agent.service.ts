@@ -1,18 +1,18 @@
-import {Injectable, Logger, BadRequestException} from '@nestjs/common';
-import {SkillRegistry} from './skills/skill.registry';
-import {LLMProviderFactory} from './providers/provider.factory';
-import {LLMMessage} from './providers/llm-provider.interface';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
+import { SkillRegistry } from "./skills/skill.registry";
+import { LLMProviderFactory } from "./providers/provider.factory";
+import { LLMMessage } from "./providers/llm-provider.interface";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 export enum UserIntent {
-  CHAT = 'CHAT', // Casual chat
-  BREAKDOWN_REQUEST = 'BREAKDOWN_REQUEST', // User wants to break down a requirement
-  TASK_CONFIRMATION = 'TASK_CONFIRMATION', // User confirms the current tasks
-  TASK_MODIFICATION = 'TASK_MODIFICATION', // User wants to modify/update tasks
-  TASK_QUERY = 'TASK_QUERY', // User asks about current tasks
-  END_CONVERSATION = 'END_CONVERSATION', // User wants to end/stop the conversation
-  INIT_GROUP = 'INIT_GROUP', // User wants to initialize the current chat group (TaskGroup & members)
-  SKILL_INVOCATION = 'SKILL_INVOCATION', // User wants to use a specific system skill
+  CHAT = "CHAT", // Casual chat
+  BREAKDOWN_REQUEST = "BREAKDOWN_REQUEST", // User wants to break down a requirement
+  TASK_CONFIRMATION = "TASK_CONFIRMATION", // User confirms the current tasks
+  TASK_MODIFICATION = "TASK_MODIFICATION", // User wants to modify/update tasks
+  TASK_QUERY = "TASK_QUERY", // User asks about current tasks
+  END_CONVERSATION = "END_CONVERSATION", // User wants to end/stop the conversation
+  INIT_GROUP = "INIT_GROUP", // User wants to initialize the current chat group (TaskGroup & members)
+  SKILL_INVOCATION = "SKILL_INVOCATION", // User wants to use a specific system skill
 }
 
 export interface IntentAnalysisResult {
@@ -21,12 +21,12 @@ export interface IntentAnalysisResult {
 }
 
 export enum LLMTaskStatus {
-  PENDING = 'PENDING',
-  DEVELOPING = 'DEVELOPING',
-  TESTING = 'TESTING',
-  DEPLOYED = 'DEPLOYED',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
+  PENDING = "PENDING",
+  DEVELOPING = "DEVELOPING",
+  TESTING = "TESTING",
+  DEPLOYED = "DEPLOYED",
+  COMPLETED = "COMPLETED",
+  CANCELLED = "CANCELLED",
 }
 
 export interface TaskItem {
@@ -43,16 +43,16 @@ export class LlmAgentService {
   constructor(
     private readonly skillRegistry: SkillRegistry,
     private readonly providerFactory: LLMProviderFactory,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {
-    this.logger.log('LlmAgentService initialized');
+    this.logger.log("LlmAgentService initialized");
   }
 
   private async callLLM(messages: LLMMessage[], jsonMode: boolean = false, tools: any[] = []): Promise<any> {
     try {
       // Always get the provider right before calling, in case it was switched dynamically
       const provider = await this.providerFactory.getProvider();
-      return await provider.call(messages, {jsonMode, tools});
+      return await provider.call(messages, { jsonMode, tools });
     } catch (error: any) {
       const errorMessage = error?.message || String(error);
       this.logger.error(`Error calling LLM: ${errorMessage}`, error?.stack);
@@ -68,8 +68,8 @@ export class LlmAgentService {
    * Mask an API key for all outbound responses, exposing only the last 4 characters.
    * Internal provider construction reads the raw key straight from the DB and never passes through here.
    */
-  private maskApiKey<T extends {apiKey: string}>(model: T): T {
-    return {...model, apiKey: model.apiKey ? '********' + model.apiKey.slice(-4) : ''};
+  private maskApiKey<T extends { apiKey: string }>(model: T): T {
+    return { ...model, apiKey: model.apiKey ? "********" + model.apiKey.slice(-4) : "" };
   }
 
   async getCurrentProvider() {
@@ -78,17 +78,17 @@ export class LlmAgentService {
 
   async switchProvider(providerId: string) {
     await this.providerFactory.switchProvider(providerId);
-    return {success: true, currentProvider: providerId};
+    return { success: true, currentProvider: providerId };
   }
 
   // --- LLM Models Management ---
 
   async getModels() {
     const models = await this.prisma.llmModel.findMany({
-      orderBy: {createdAt: 'asc'},
+      orderBy: { createdAt: "asc" },
     });
     // Mask API keys for security before returning to frontend
-    return models.map(m => this.maskApiKey(m));
+    return models.map((m) => this.maskApiKey(m));
   }
 
   async createModel(dto: any) {
@@ -96,65 +96,65 @@ export class LlmAgentService {
     const count = await this.prisma.llmModel.count();
     const isActive = count === 0;
 
-    const dataToCreate = {...dto, isActive};
-    if (dataToCreate.version === '') {
+    const dataToCreate = { ...dto, isActive };
+    if (dataToCreate.version === "") {
       dataToCreate.version = null;
     }
 
     return this.maskApiKey(
       await this.prisma.llmModel.create({
         data: dataToCreate,
-      })
+      }),
     );
   }
 
   async updateModel(id: string, dto: any) {
-    const dataToUpdate = {...dto};
+    const dataToUpdate = { ...dto };
 
     // If the apiKey comes in as masked, don't update it
-    if (dataToUpdate.apiKey && dataToUpdate.apiKey.startsWith('********')) {
+    if (dataToUpdate.apiKey && dataToUpdate.apiKey.startsWith("********")) {
       delete dataToUpdate.apiKey;
     }
 
-    if (dataToUpdate.version === '') {
+    if (dataToUpdate.version === "") {
       dataToUpdate.version = null;
     }
 
     return this.maskApiKey(
       await this.prisma.llmModel.update({
-        where: {id},
+        where: { id },
         data: dataToUpdate,
-      })
+      }),
     );
   }
 
   async deleteModel(id: string) {
-    const model = await this.prisma.llmModel.findUnique({where: {id}});
+    const model = await this.prisma.llmModel.findUnique({ where: { id } });
     if (model?.isActive) {
-      throw new BadRequestException('Cannot delete the currently active model. Switch to another model first.');
+      throw new BadRequestException("Cannot delete the currently active model. Switch to another model first.");
     }
     return this.maskApiKey(
       await this.prisma.llmModel.delete({
-        where: {id},
-      })
+        where: { id },
+      }),
     );
   }
 
   async testModel(id: string) {
-    const model = await this.prisma.llmModel.findUnique({where: {id}});
+    const model = await this.prisma.llmModel.findUnique({ where: { id } });
     if (!model) {
-      throw new BadRequestException('Model not found');
+      throw new BadRequestException("Model not found");
     }
 
     try {
       // Test without modifying the active state in DB
       const provider = await this.providerFactory.createProviderInstance(model);
-      const response = await provider.call([{role: 'user', content: 'ping'}]);
+      const response = await provider.call([{ role: "user", content: "ping" }]);
 
       if (response && response.content) {
-        return {success: true, message: 'Connection successful'};
+        return { success: true, message: "Connection successful" };
       } else {
-        return {success: false, message: 'No content received from model'};
+        return { success: false, message: "No content received from model" };
       }
     } catch (error: any) {
       throw new BadRequestException(`Connection failed: ${error.message}`);
@@ -163,15 +163,15 @@ export class LlmAgentService {
 
   async analyzeIntent(userMessage: string, context: any = {}): Promise<IntentAnalysisResult> {
     const activeSkills = this.skillRegistry.getAllSkills();
-    const skillsPromptInfo = activeSkills.map(s => `- ${s.name}: ${s.description}`).join('\n');
+    const skillsPromptInfo = activeSkills.map((s) => `- ${s.name}: ${s.description}`).join("\n");
 
     const systemPrompt = `
 You are an intelligent assistant for a task management bot.
 Your goal is to analyze the user's latest message and determine their intent based on the conversation context.
 
 Context:
-- Current Session Status: ${context.status || 'IDLE'} (e.g., IDLE, WAITING_CONFIRMATION)
-- Has Pending Tasks: ${context.hasPendingTasks ? 'Yes' : 'No'}
+- Current Session Status: ${context.status || "IDLE"} (e.g., IDLE, WAITING_CONFIRMATION)
+- Has Pending Tasks: ${context.hasPendingTasks ? "Yes" : "No"}
 
 Available Intents:
 1. BREAKDOWN_REQUEST: The user EXPLICITLY asks to create tasks, break down a requirement, or provides a clear, actionable requirement that needs project management. 
@@ -209,18 +209,18 @@ Output JSON format:
 
     const response = await this.callLLM(
       [
-        {role: 'system', content: systemPrompt},
-        {role: 'user', content: userMessage},
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
       ],
-      true
+      true,
     );
 
     try {
-      const parsed = JSON.parse(response.content || '{}');
+      const parsed = JSON.parse(response.content || "{}");
       return parsed;
     } catch (e) {
-      this.logger.error('Failed to parse intent JSON', e);
-      return {intent: UserIntent.CHAT, reasoning: 'Failed to parse intent'};
+      this.logger.error("Failed to parse intent JSON", e);
+      return { intent: UserIntent.CHAT, reasoning: "Failed to parse intent" };
     }
   }
 
@@ -250,14 +250,14 @@ Output JSON format:
 `;
     const response = await this.callLLM(
       [
-        {role: 'system', content: systemPrompt},
-        {role: 'user', content: requirement},
+        { role: "system", content: systemPrompt },
+        { role: "user", content: requirement },
       ],
-      true
+      true,
     );
 
     try {
-      const parsed = JSON.parse(response.content || '{}');
+      const parsed = JSON.parse(response.content || "{}");
       return (parsed.tasks || []).map((t: any) => ({
         ...t,
         status: LLMTaskStatus[t.status as keyof typeof LLMTaskStatus] || t.status || LLMTaskStatus.PENDING,
@@ -283,14 +283,14 @@ Return the updated list of tasks in JSON format.
 `;
     const response = await this.callLLM(
       [
-        {role: 'system', content: systemPrompt},
-        {role: 'user', content: instruction},
+        { role: "system", content: systemPrompt },
+        { role: "user", content: instruction },
       ],
-      true
+      true,
     );
 
     try {
-      const parsed = JSON.parse(response.content || '{}');
+      const parsed = JSON.parse(response.content || "{}");
       return (parsed.tasks || currentTasks).map((t: any) => ({
         ...t,
         status: LLMTaskStatus[t.status as keyof typeof LLMTaskStatus] || t.status || LLMTaskStatus.PENDING,
@@ -322,14 +322,14 @@ User: "未完成的任务有哪些" -> PENDING
     try {
       const response = await this.callLLM(
         [
-          {role: 'system', content: systemPrompt},
-          {role: 'user', content: userMessage},
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
         ],
-        false // Not JSON mode, just a string
+        false, // Not JSON mode, just a string
       );
 
       const status = response.content?.trim().toUpperCase();
-      if (status === 'ALL') return undefined;
+      if (status === "ALL") return undefined;
       return status;
     } catch (e) {
       return undefined;
@@ -355,14 +355,14 @@ User: "把这些任务归档到 V2.0 项目" -> V2.0
     try {
       const response = await this.callLLM(
         [
-          {role: 'system', content: systemPrompt},
-          {role: 'user', content: userMessage},
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
         ],
-        false
+        false,
       );
 
       const name = response.content?.trim();
-      if (name === 'NONE' || !name) return undefined;
+      if (name === "NONE" || !name) return undefined;
       return name;
     } catch (e) {
       return undefined;
@@ -395,21 +395,21 @@ Examples returning false:
     try {
       const response = await this.callLLM(
         [
-          {role: 'system', content: systemPrompt},
-          {role: 'user', content: userMessage},
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
         ],
-        true // JSON mode
+        true, // JSON mode
       );
 
-      const parsed = JSON.parse(response.content || '{}');
+      const parsed = JSON.parse(response.content || "{}");
       return !!parsed.includeCompleted;
     } catch (e) {
-      this.logger.error('Failed to parse shouldIncludeCompletedTasks response', e);
+      this.logger.error("Failed to parse shouldIncludeCompletedTasks response", e);
       return false; // Default to false
     }
   }
 
-  async analyzePaginationIntent(userMessage: string): Promise<{isNextPage: boolean; isPrevPage: boolean}> {
+  async analyzePaginationIntent(userMessage: string): Promise<{ isNextPage: boolean; isPrevPage: boolean }> {
     const systemPrompt = `
 You are a semantic analyzer for a task management bot.
 Determine if the user's query implies they want to navigate to the next or previous page of a list.
@@ -440,20 +440,20 @@ Examples returning {"isNextPage": false, "isPrevPage": false}:
     try {
       const response = await this.callLLM(
         [
-          {role: 'system', content: systemPrompt},
-          {role: 'user', content: userMessage},
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userMessage },
         ],
-        true // JSON mode
+        true, // JSON mode
       );
 
-      const parsed = JSON.parse(response.content || '{}');
+      const parsed = JSON.parse(response.content || "{}");
       return {
         isNextPage: !!parsed.isNextPage,
         isPrevPage: !!parsed.isPrevPage,
       };
     } catch (e) {
-      this.logger.error('Failed to parse analyzePaginationIntent response', e);
-      return {isNextPage: false, isPrevPage: false};
+      this.logger.error("Failed to parse analyzePaginationIntent response", e);
+      return { isNextPage: false, isPrevPage: false };
     }
   }
 
@@ -481,16 +481,16 @@ Output ONLY the report content in Markdown format. Do not output JSON.
     try {
       const response = await this.callLLM(
         [
-          {role: 'system', content: systemPrompt},
-          {role: 'user', content: userContent},
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
         ],
-        false
+        false,
       );
 
-      return response.content || 'Failed to generate report, please try again later.';
+      return response.content || "Failed to generate report, please try again later.";
     } catch (e) {
-      this.logger.error('Failed to generate project monthly summary', e);
-      return 'An error occurred while generating the report.';
+      this.logger.error("Failed to generate project monthly summary", e);
+      return "An error occurred while generating the report.";
     }
   }
 
@@ -518,16 +518,16 @@ Examples of text that should return false:
     try {
       const response = await this.callLLM(
         [
-          {role: 'system', content: systemPrompt},
-          {role: 'user', content: replyText},
+          { role: "system", content: systemPrompt },
+          { role: "user", content: replyText },
         ],
-        true // JSON mode
+        true, // JSON mode
       );
 
-      const parsed = JSON.parse(response.content || '{}');
+      const parsed = JSON.parse(response.content || "{}");
       return !!parsed.isSwitchRequest;
     } catch (e) {
-      this.logger.error('Failed to parse isSwitchModelRequest response', e);
+      this.logger.error("Failed to parse isSwitchModelRequest response", e);
       return false;
     }
   }
@@ -535,7 +535,7 @@ Examples of text that should return false:
   async chat(message: string, history: any[] = []): Promise<string> {
     const messages: LLMMessage[] = [
       {
-        role: 'system',
+        role: "system",
         content: `You are a helpful assistant. You have access to the following skills:
 ${JSON.stringify(this.skillRegistry.getAllSkills())}
 If the user asks to perform an action that matches a skill, use the tool call.
@@ -547,11 +547,11 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
 `,
       },
       ...history,
-      {role: 'user', content: message},
+      { role: "user", content: message },
     ];
 
-    const tools: any[] = this.skillRegistry.getAllSkills().map(skill => ({
-      type: 'function',
+    const tools: any[] = this.skillRegistry.getAllSkills().map((skill) => ({
+      type: "function",
       function: {
         name: skill.name,
         description: skill.description,
@@ -566,11 +566,11 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
     let maxToolRounds = 3;
     while (response.tool_calls && response.tool_calls.length > 0 && maxToolRounds > 0) {
       maxToolRounds--;
-      const executedToolResults: {name: string; content: string}[] = [];
+      const executedToolResults: { name: string; content: string }[] = [];
 
       // Add the assistant's initial response (which includes the tool calls) to the history
       messages.push({
-        role: 'assistant',
+        role: "assistant",
         content: null,
         tool_calls: response.tool_calls,
       });
@@ -581,10 +581,10 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
         let functionArgs = {};
 
         try {
-          if (typeof toolCall.function.arguments === 'string') {
+          if (typeof toolCall.function.arguments === "string") {
             // DeepSeek and some models might return a messy string with markers like ✿ARGS✿: {...}
             let argsStr = toolCall.function.arguments;
-            const argsMarker = '✿ARGS✿:';
+            const argsMarker = "✿ARGS✿:";
             if (argsStr.includes(argsMarker)) {
               argsStr = argsStr.split(argsMarker)[1].trim();
             }
@@ -600,10 +600,10 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
             // A safer approach for escaping actual control characters without double-escaping already escaped ones:
             // JSON.parse can handle properly formatted strings. It only fails if there are unescaped control characters.
             // Using a custom replacer that targets actual control characters:
-            const escapedArgsStr = argsStr.replace(/[\n\r\t]/g, match => {
-              if (match === '\n') return '\\n';
-              if (match === '\r') return '\\r';
-              if (match === '\t') return '\\t';
+            const escapedArgsStr = argsStr.replace(/[\n\r\t]/g, (match) => {
+              if (match === "\n") return "\\n";
+              if (match === "\r") return "\\r";
+              if (match === "\t") return "\\t";
               return match;
             });
 
@@ -616,12 +616,12 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
           this.logger.error(`Failed to parse tool arguments: ${toolCall.function.arguments}. Error: ${message}`);
           // Instead of continuing and ignoring the tool call, let's pass an error to the LLM so it knows it messed up
           messages.push({
-            role: 'tool',
+            role: "tool",
             tool_call_id: toolCall.id,
             name: functionName,
             content: JSON.stringify({
               error:
-                'Failed to parse tool arguments. Ensure arguments are a valid JSON object. Do NOT include markdown, text, or markers like ✿ARGS✿.',
+                "Failed to parse tool arguments. Ensure arguments are a valid JSON object. Do NOT include markdown, text, or markers like ✿ARGS✿.",
             }),
           });
           continue; // Skip execution but the error is recorded in history
@@ -631,16 +631,16 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
 
         try {
           const result = await this.skillRegistry.executeSkill(functionName, functionArgs);
-          const resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+          const resultStr = typeof result === "string" ? result : JSON.stringify(result);
 
           // If the skill is one of the query skills that should return raw JSON for UI rendering,
           // we can short-circuit the LLM loop and return the raw JSON directly to the orchestrator.
           const uiRenderingSkills = [
-            'queryTasks',
-            'getTaskDetail',
-            'queryProjects',
-            'queryWeeklyReport',
-            'queryMonthlyReport',
+            "queryTasks",
+            "getTaskDetail",
+            "queryProjects",
+            "queryWeeklyReport",
+            "queryMonthlyReport",
           ];
           if (uiRenderingSkills.includes(functionName)) {
             // Some models might wrap the JSON string with additional markdown or text, but here `result`
@@ -652,9 +652,9 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
             return `__TOOL_RAW_RESULT__\n${resultStr}`;
           }
 
-          executedToolResults.push({name: functionName, content: resultStr});
+          executedToolResults.push({ name: functionName, content: resultStr });
           messages.push({
-            role: 'tool',
+            role: "tool",
             tool_call_id: toolCall.id,
             name: functionName,
             content: resultStr,
@@ -662,10 +662,10 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
         } catch (error: any) {
           this.logger.error(`Skill execution failed: ${error?.message}`);
           messages.push({
-            role: 'tool',
+            role: "tool",
             tool_call_id: toolCall.id,
             name: functionName,
-            content: JSON.stringify({error: `Failed to execute action: ${error?.message}`}),
+            content: JSON.stringify({ error: `Failed to execute action: ${error?.message}` }),
           });
         }
       }
@@ -678,24 +678,24 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
         if (executedToolResults.length === 1) {
           const single = executedToolResults[0];
           try {
-            const parsed = JSON.parse(single.content || '{}');
-            if (typeof parsed?.message === 'string' && parsed.message.trim()) {
+            const parsed = JSON.parse(single.content || "{}");
+            if (typeof parsed?.message === "string" && parsed.message.trim()) {
               return parsed.message;
             }
             if (parsed?.success === true) {
-              return '✅ 操作已执行成功。';
+              return "✅ 操作已执行成功。";
             }
           } catch {
             // Expected failure: tool result content may not be JSON — fall back to the default success message.
           }
-          return '✅ 操作已执行成功。';
+          return "✅ 操作已执行成功。";
         }
 
         if (executedToolResults.length > 1) {
           let successCount = 0;
           for (const r of executedToolResults) {
             try {
-              const parsed = JSON.parse(r.content || '{}');
+              const parsed = JSON.parse(r.content || "{}");
               if (parsed?.success === true) successCount++;
             } catch {
               // Expected failure: tool result content may not be JSON — skip this entry.
@@ -709,14 +709,14 @@ EXCEPTION TO RULE 3: If you just executed the \`queryTasks\`, \`getTaskDetail\`,
 
         const msg = error?.message || String(error);
         this.logger.error(`Error calling LLM after tool execution: ${msg}`, error?.stack);
-        return '抱歉，系统内部出现错误，请稍后再试。';
+        return "抱歉，系统内部出现错误，请稍后再试。";
       }
     }
 
-    return response.content || '';
+    return response.content || "";
   }
 
-  async parseFeedback(input: string): Promise<{score: number; comment: string}> {
+  async parseFeedback(input: string): Promise<{ score: number; comment: string }> {
     const systemPrompt = `
 You are a feedback parser. Analyze the user's input and extract a rating score (1-5) and any additional comments.
 If no explicit score is given but the sentiment is positive, default to 5. If negative, default to 1. If neutral/unclear, default to 3.
@@ -729,20 +729,20 @@ Return a JSON object:
 `;
     const response = await this.callLLM(
       [
-        {role: 'system', content: systemPrompt},
-        {role: 'user', content: input},
+        { role: "system", content: systemPrompt },
+        { role: "user", content: input },
       ],
-      true
+      true,
     );
 
     try {
-      const parsed = JSON.parse(response.content || '{}');
+      const parsed = JSON.parse(response.content || "{}");
       return {
-        score: typeof parsed.score === 'number' && parsed.score >= 1 && parsed.score <= 5 ? parsed.score : 5,
+        score: typeof parsed.score === "number" && parsed.score >= 1 && parsed.score <= 5 ? parsed.score : 5,
         comment: parsed.comment || input,
       };
     } catch (e) {
-      return {score: 5, comment: input};
+      return { score: 5, comment: input };
     }
   }
 }

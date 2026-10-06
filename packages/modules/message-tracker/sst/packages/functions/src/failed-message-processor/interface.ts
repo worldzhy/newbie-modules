@@ -1,3 +1,3 @@
 export enum SqsMessageStatus {
-  FAILED = 'FAILED',
+  FAILED = "FAILED",
 }

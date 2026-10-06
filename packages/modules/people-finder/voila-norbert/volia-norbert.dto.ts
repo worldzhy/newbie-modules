@@ -1,5 +1,5 @@
-import {ApiProperty} from '@nestjs/swagger';
-import {IsString, IsOptional} from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsString, IsOptional } from "class-validator";
 
 export enum VoliaNorbertStatus {
   SUCCESS = 200,
@@ -64,7 +64,7 @@ export class SearchEmailContentResDto {
   @ApiProperty({
     type: EmailDto,
     description:
-      'When searching, this data is set to null. Once the search is done, if we found the corresponding email, the email becomes an object containing information including the email value and the score related to this email.',
+      "When searching, this data is set to null. Once the search is done, if we found the corresponding email, the email becomes an object containing information including the email value and the score related to this email.",
   })
   email: EmailDto | null;
 
@@ -76,7 +76,7 @@ export class SearchEmailContentResDto {
   @ApiProperty({
     type: Boolean,
     description:
-      'The searching boolean returned by the server will let you know if the server is searching for that contact of it has already been found',
+      "The searching boolean returned by the server will let you know if the server is searching for that contact of it has already been found",
   })
   searching: boolean;
 

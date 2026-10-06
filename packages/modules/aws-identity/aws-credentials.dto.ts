@@ -22,7 +22,10 @@ export class AwsCrossAccountBindingDto {
   @ApiProperty({ description: "Per-binding external ID required by the role trust policy" })
   externalId: string;
 
-  @ApiPropertyOptional({ description: "Customer AWS account ID resolved via STS after assuming the role", type: String })
+  @ApiPropertyOptional({
+    description: "Customer AWS account ID resolved via STS after assuming the role",
+    type: String,
+  })
   awsAccountId?: string | null;
 
   @ApiPropertyOptional({ description: "Customer IAM role name resolved via STS after assuming the role", type: String })

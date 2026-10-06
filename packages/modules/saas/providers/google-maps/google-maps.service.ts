@@ -1,6 +1,6 @@
-import {Client} from '@googlemaps/google-maps-services-js';
-import {Injectable, Logger} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
+import { Client } from "@googlemaps/google-maps-services-js";
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class GoogleMapsService {
@@ -8,18 +8,14 @@ export class GoogleMapsService {
   private client: Client;
 
   constructor(private configService: ConfigService) {
-    const config = this.configService.getOrThrow(
-      'modules.saas.googleMaps'
-    );
+    const config = this.configService.getOrThrow("modules.saas.googleMaps");
 
     if (config.apiKey) this.client = new Client();
-    else this.logger.warn('Google Maps API key not found');
+    else this.logger.warn("Google Maps API key not found");
   }
 
   autocomplete(query: string, components?: string[]) {
-    const config = this.configService.getOrThrow(
-      'modules.saas.googleMaps'
-    );
+    const config = this.configService.getOrThrow("modules.saas.googleMaps");
 
     return this.client.placeAutocomplete({
       params: {

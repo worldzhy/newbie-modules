@@ -1,9 +1,9 @@
-import {HttpException, HttpStatus, Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {generateUuid} from '@devbie/newbie/utilities/random.util';
-import {extname} from 'path';
-import COS from 'cos-nodejs-sdk-v5';
+import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { generateUuid } from "@devbie/newbie/utilities/random.util";
+import { extname } from "path";
+import COS from "cos-nodejs-sdk-v5";
 
 @Injectable()
 export class TencentCosService {
@@ -13,19 +13,19 @@ export class TencentCosService {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {
-    this.region = this.config.getOrThrow<string>('modules.tencent-cos.region');
-    this.bucket = this.config.getOrThrow<string>('modules.tencent-cos.bucket');
+    this.region = this.config.getOrThrow<string>("modules.tencent-cos.region");
+    this.bucket = this.config.getOrThrow<string>("modules.tencent-cos.bucket");
 
     this.cos = new COS({
-      SecretId: this.config.getOrThrow<string>('modules.tencent-cos.secretId'),
-      SecretKey: this.config.getOrThrow<string>('modules.tencent-cos.secretKey'),
+      SecretId: this.config.getOrThrow<string>("modules.tencent-cos.secretId"),
+      SecretKey: this.config.getOrThrow<string>("modules.tencent-cos.secretKey"),
     });
   }
 
   async createBucket(bucketName: string) {
-    return await this.cos.putBucket({Bucket: bucketName, Region: this.region});
+    return await this.cos.putBucket({ Bucket: bucketName, Region: this.region });
   }
 
   async deleteBucket(bucketName: string) {
@@ -43,7 +43,7 @@ export class TencentCosService {
     });
   }
 
-  async putObject(params: {key: string; body: Buffer | string}) {
+  async putObject(params: { key: string; body: Buffer | string }) {
     return await this.cos.putObject({
       Bucket: this.bucket,
       Region: this.region,
@@ -52,23 +52,23 @@ export class TencentCosService {
     });
   }
 
-  async createFolder(params: {bucket?: string; name: string; parentId?: string}) {
+  async createFolder(params: { bucket?: string; name: string; parentId?: string }) {
     let key = params.name;
     if (params.parentId) {
-      key = (await this.getFilePathString(params.parentId)) + '/' + params.name;
+      key = (await this.getFilePathString(params.parentId)) + "/" + params.name;
     }
 
     const output = await this.cos.putObject({
       Bucket: params.bucket ?? this.bucket,
       Region: this.region,
-      Key: key + '/',
-      Body: '',
+      Key: key + "/",
+      Body: "",
     });
 
     return await this.prisma.cosFile.create({
       data: {
         name: params.name,
-        type: 'Folder',
+        type: "Folder",
         cosBucket: params.bucket ?? this.bucket,
         cosKey: key,
         cosResponse: output as object,
@@ -77,7 +77,7 @@ export class TencentCosService {
     });
   }
 
-  async uploadFile(params: {file: Express.Multer.File; bucket?: string; parentId?: string; path?: string}) {
+  async uploadFile(params: { file: Express.Multer.File; bucket?: string; parentId?: string; path?: string }) {
     // [step 1] Generate key.
     let cosKey: string;
     if (params.parentId) {
@@ -97,7 +97,7 @@ export class TencentCosService {
       Body: params.file.buffer,
     });
     if (output.statusCode !== 200) {
-      throw new HttpException('Upload Failed', HttpStatus.BAD_REQUEST);
+      throw new HttpException("Upload Failed", HttpStatus.BAD_REQUEST);
     }
 
     // [step 3] Create a record.
@@ -113,12 +113,12 @@ export class TencentCosService {
       },
     });
 
-    return {url: output.Location};
+    return { url: output.Location };
   }
 
   async deleteFile(fileId: string) {
     const file = await this.prisma.cosFile.findFirstOrThrow({
-      where: {id: fileId},
+      where: { id: fileId },
     });
 
     try {
@@ -136,7 +136,7 @@ export class TencentCosService {
 
   async deleteFolder(fileId: string) {
     const file = await this.prisma.cosFile.findFirstOrThrow({
-      where: {id: fileId},
+      where: { id: fileId },
     });
 
     try {
@@ -152,7 +152,7 @@ export class TencentCosService {
   }
 
   /** Get a signed URL to access an S3 object for signedUrlExpiresIn seconds */
-  async getSignedDownloadUrl(params: {bucket?: string; key: string}) {
+  async getSignedDownloadUrl(params: { bucket?: string; key: string }) {
     return new Promise((resolve, reject) => {
       this.cos.getObjectUrl(
         {
@@ -164,10 +164,10 @@ export class TencentCosService {
         },
         (err, data) => {
           if (err) {
-            reject(new HttpException('Get Signed Download URL Failed', HttpStatus.BAD_REQUEST));
+            reject(new HttpException("Get Signed Download URL Failed", HttpStatus.BAD_REQUEST));
           }
-          resolve({url: data.Url});
-        }
+          resolve({ url: data.Url });
+        },
       );
     });
   }
@@ -177,8 +177,8 @@ export class TencentCosService {
 
     // [step 1] Get current file.
     const file = await this.prisma.cosFile.findFirstOrThrow({
-      where: {id: fileId},
-      select: {id: true, name: true, type: true, parentId: true},
+      where: { id: fileId },
+      select: { id: true, name: true, type: true, parentId: true },
     });
     path.push(file);
 
@@ -211,7 +211,7 @@ export class TencentCosService {
     });
   }
 
-  async completeMultipartUpload(key: string, uploadId: string, parts: {PartNumber: number; ETag: string}[]) {
+  async completeMultipartUpload(key: string, uploadId: string, parts: { PartNumber: number; ETag: string }[]) {
     return this.cos.multipartComplete({
       Bucket: this.bucket,
       Region: this.region,
@@ -224,13 +224,13 @@ export class TencentCosService {
   /**
    * Remove directories and their contents recursively
    */
-  private async deleteFolderInCosRecursively(params: {bucket: string; key: string}) {
+  private async deleteFolderInCosRecursively(params: { bucket: string; key: string }) {
     try {
       // [step 1] List objects
       const listResponse = await this.cos.getBucket({
         Bucket: params.bucket,
         Region: this.region,
-        Prefix: params.key + '',
+        Prefix: params.key + "",
       });
       if (!listResponse.Contents || listResponse.Contents.length === 0) {
         return;
@@ -240,12 +240,12 @@ export class TencentCosService {
       const deleteResponse = await this.cos.deleteMultipleObject({
         Bucket: params.bucket,
         Region: this.region,
-        Objects: listResponse.Contents.map(content => {
-          return {Key: content.Key};
+        Objects: listResponse.Contents.map((content) => {
+          return { Key: content.Key };
         }),
       });
       if (deleteResponse.statusCode !== 200) {
-        throw new HttpException('Delete Folder Failed', HttpStatus.BAD_REQUEST);
+        throw new HttpException("Delete Folder Failed", HttpStatus.BAD_REQUEST);
       } else {
         if (listResponse.IsTruncated) {
           await this.deleteFolderInCosRecursively(params);
@@ -262,12 +262,12 @@ export class TencentCosService {
    */
   private async deleteFileInDatabaseRecursively(fileId: string) {
     // [step 1] Delete file.
-    await this.prisma.cosFile.delete({where: {id: fileId}});
+    await this.prisma.cosFile.delete({ where: { id: fileId } });
 
     // [step 2] Delete files in the folder.
     const filesInFolder = await this.prisma.cosFile.findMany({
-      where: {parentId: fileId},
-      select: {id: true},
+      where: { parentId: fileId },
+      select: { id: true },
     });
 
     for (let i = 0; i < filesInFolder.length; i++) {
@@ -276,18 +276,18 @@ export class TencentCosService {
   }
 
   private async getFilePathString(fileId: string) {
-    let path = '';
+    let path = "";
 
     // [step 1] Get current file.
     const file = await this.prisma.cosFile.findFirstOrThrow({
-      where: {id: fileId},
-      select: {id: true, name: true, type: true, parentId: true},
+      where: { id: fileId },
+      select: { id: true, name: true, type: true, parentId: true },
     });
     path = file.name;
 
     // [step 2] Get parent file.
     if (file.parentId) {
-      path = (await this.getFilePathString(file.parentId)) + '/' + path;
+      path = (await this.getFilePathString(file.parentId)) + "/" + path;
     } else {
       // Do nothing.
     }

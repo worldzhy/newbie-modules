@@ -1,12 +1,12 @@
-import {Global, Module} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {JwtModule} from '@nestjs/jwt';
-import {AwsCloudformationStackController} from './stack/stack.controller';
-import {AwsCloudformationStackService} from './stack/stack.service';
-import {AwsEnvironmentController} from './environment/environment.controller';
-import {AwsEnvironmentService} from './environment/environment.service';
-import {AwsSecretKeyTokenService} from './token/secretkey-token.service';
-import {AwsCloudformationService} from './aws-cloudformation.service';
+import { Global, Module } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { JwtModule } from "@nestjs/jwt";
+import { AwsCloudformationStackController } from "./stack/stack.controller";
+import { AwsCloudformationStackService } from "./stack/stack.service";
+import { AwsEnvironmentController } from "./environment/environment.controller";
+import { AwsEnvironmentService } from "./environment/environment.service";
+import { AwsSecretKeyTokenService } from "./token/secretkey-token.service";
+import { AwsCloudformationService } from "./aws-cloudformation.service";
 
 @Global()
 @Module({
@@ -14,7 +14,7 @@ import {AwsCloudformationService} from './aws-cloudformation.service';
     JwtModule.registerAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow<string>('modules.aws-cloudformation.token.secret'),
+        secret: config.getOrThrow<string>("modules.aws-cloudformation.token.secret"),
       }),
     }),
   ],

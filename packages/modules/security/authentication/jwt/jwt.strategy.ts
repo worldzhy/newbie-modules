@@ -5,10 +5,7 @@ import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { Request } from "express";
 import { TokenService } from "../../token/token.service";
-import {
-  ACCESS_TOKEN_SESSION_RESOLVER,
-  AccessTokenSessionResolver,
-} from "../../ports/access-token-session.resolver";
+import { ACCESS_TOKEN_SESSION_RESOLVER, AccessTokenSessionResolver } from "../../ports/access-token-session.resolver";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {

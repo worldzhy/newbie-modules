@@ -1,6 +1,6 @@
-import {Injectable} from '@nestjs/common';
-import {InjectConnection} from '@nestjs/mongoose';
-import {Connection, Model, Schema as MongooseSchema} from 'mongoose';
+import { Injectable } from "@nestjs/common";
+import { InjectConnection } from "@nestjs/mongoose";
+import { Connection, Model, Schema as MongooseSchema } from "mongoose";
 
 /**
  * Business-agnostic lazy Mongoose model registry.

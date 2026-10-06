@@ -1,17 +1,6 @@
-import {AnyRecord, MxRecord, NaptrRecord, SoaRecord, SrvRecord} from 'dns';
+import { AnyRecord, MxRecord, NaptrRecord, SoaRecord, SrvRecord } from "dns";
 
-export type RecordType =
-  | 'A'
-  | 'AAAA'
-  | 'ANY'
-  | 'CNAME'
-  | 'MX'
-  | 'NAPTR'
-  | 'NS'
-  | 'PTR'
-  | 'SOA'
-  | 'SRV'
-  | 'TXT';
+export type RecordType = "A" | "AAAA" | "ANY" | "CNAME" | "MX" | "NAPTR" | "NS" | "PTR" | "SOA" | "SRV" | "TXT";
 
 export type RecordResult =
   | Array<string>

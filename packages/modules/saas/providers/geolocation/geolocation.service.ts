@@ -1,8 +1,8 @@
-import {Injectable, OnModuleDestroy} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import * as geolite2 from 'geolite2-redist';
-import maxmind, {CityResponse, Reader} from 'maxmind';
-import {LRUCache} from 'lru-cache';
+import { Injectable, OnModuleDestroy } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as geolite2 from "geolite2-redist";
+import maxmind, { CityResponse, Reader } from "maxmind";
+import { LRUCache } from "lru-cache";
 
 @Injectable()
 export class GeolocationService implements OnModuleDestroy {
@@ -11,9 +11,7 @@ export class GeolocationService implements OnModuleDestroy {
 
   constructor(private configService: ConfigService) {
     this.lru = new LRUCache({
-      maxSize: this.configService.getOrThrow<number>(
-        'modules.saas.cache.geolocationLruSize'
-      ),
+      maxSize: this.configService.getOrThrow<number>("modules.saas.cache.geolocationLruSize"),
     });
   }
 
@@ -29,9 +27,7 @@ export class GeolocationService implements OnModuleDestroy {
     return result;
   }
 
-  private async getSafeLocation(
-    ipAddress: string
-  ): Promise<Partial<CityResponse>> {
+  private async getSafeLocation(ipAddress: string): Promise<Partial<CityResponse>> {
     try {
       return this.getUnsafeLocation(ipAddress);
     } catch (error) {
@@ -39,13 +35,9 @@ export class GeolocationService implements OnModuleDestroy {
     }
   }
 
-  private async getUnsafeLocation(
-    ipAddress: string
-  ): Promise<Partial<CityResponse>> {
+  private async getUnsafeLocation(ipAddress: string): Promise<Partial<CityResponse>> {
     if (!this.reader)
-      this.reader = await geolite2.open<CityResponse>('GeoLite2-City', path =>
-        maxmind.open<CityResponse>(path)
-      );
+      this.reader = await geolite2.open<CityResponse>("GeoLite2-City", (path) => maxmind.open<CityResponse>(path));
     return this.reader.get(ipAddress) ?? {};
   }
 }

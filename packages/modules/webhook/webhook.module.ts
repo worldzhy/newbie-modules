@@ -1,8 +1,8 @@
-import {Module} from '@nestjs/common';
-import {ConfigModule} from '@nestjs/config';
+import { Module } from "@nestjs/common";
+import { ConfigModule } from "@nestjs/config";
 
-import {WebhookController} from './webhook.controller';
-import {WebhookService} from './webhook.service';
+import { WebhookController } from "./webhook.controller";
+import { WebhookService } from "./webhook.service";
 
 @Module({
   imports: [ConfigModule],

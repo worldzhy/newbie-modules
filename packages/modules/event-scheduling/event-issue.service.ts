@@ -1,16 +1,21 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {Event, EventHost, EventIssueStatus, EventIssueType, EventStatus, Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {ceilByMinutes, dateMinusMinutes, datePlusMinutes, floorByMinutes} from '@devbie/newbie/utilities/datetime.util';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Event, EventHost, EventIssueStatus, EventIssueType, EventStatus, Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import {
+  ceilByMinutes,
+  dateMinusMinutes,
+  datePlusMinutes,
+  floorByMinutes,
+} from "@devbie/newbie/utilities/datetime.util";
 
 enum EventIssueDescription {
-  Error_CoachNotExisted = 'The coach is not existed.',
-  Error_CoachNotConfigured = 'The coach has not been configured.',
-  Error_TimeUnavailale = 'The coach is not available at this time.',
-  Error_TimeConflict = 'The coach was scheduled at another location at this period of time.',
-  Error_ClassUnavailable = 'The coach is not able to teach this type of class.',
-  Error_LocationUnavailable = 'The coach is not able to teach in this location.',
+  Error_CoachNotExisted = "The coach is not existed.",
+  Error_CoachNotConfigured = "The coach has not been configured.",
+  Error_TimeUnavailale = "The coach is not available at this time.",
+  Error_TimeConflict = "The coach was scheduled at another location at this period of time.",
+  Error_ClassUnavailable = "The coach is not able to teach this type of class.",
+  Error_LocationUnavailable = "The coach is not able to teach in this location.",
 }
 
 const MINUTES_OF_CONFLICT_DISTANCE = 60;
@@ -21,10 +26,10 @@ export class EventIssueService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {
     this.MINUTES_Of_TIMESLOT_UNIT = this.configService.getOrThrow<number>(
-      'modules.eventScheduling.minutesOfTimeslotUnit'
+      "modules.eventScheduling.minutesOfTimeslotUnit",
     );
   }
 
@@ -37,7 +42,7 @@ export class EventIssueService {
     if (event.hostId) {
       if (
         (await this.prisma.eventHost.count({
-          where: {id: event.hostId},
+          where: { id: event.hostId },
         })) > 0
       ) {
         return;
@@ -46,14 +51,14 @@ export class EventIssueService {
 
     // [step 0] Delete old unrepaired issues.
     await this.prisma.eventIssue.deleteMany({
-      where: {eventId: event.id, status: EventIssueStatus.UNREPAIRED},
+      where: { eventId: event.id, status: EventIssueStatus.UNREPAIRED },
     });
 
     // [step 1] Get the coach.
     let eventHost: EventHost | null = null;
     if (event.hostId) {
       eventHost = await this.prisma.eventHost.findUnique({
-        where: {id: event.hostId},
+        where: { id: event.hostId },
       });
     }
 
@@ -92,9 +97,9 @@ export class EventIssueService {
       const count = await this.prisma.availabilityTimeslot.count({
         where: {
           hostId: eventHost.id,
-          venueIds: {has: event.venueId},
-          datetimeOfStart: {gte: newDatetimeOfStart},
-          datetimeOfEnd: {lte: newDatetimeOfEnd},
+          venueIds: { has: event.venueId },
+          datetimeOfStart: { gte: newDatetimeOfStart },
+          datetimeOfEnd: { lte: newDatetimeOfEnd },
         },
       });
       if (count < event.minutesOfDuration / this.MINUTES_Of_TIMESLOT_UNIT) {
@@ -109,7 +114,7 @@ export class EventIssueService {
       const conflictingEvents = await this.prisma.event.findMany({
         where: {
           hostId: eventHost.id,
-          venueId: {not: event.venueId},
+          venueId: { not: event.venueId },
           datetimeOfStart: {
             lt: datePlusMinutes(event.datetimeOfEnd, MINUTES_OF_CONFLICT_DISTANCE),
           },
@@ -118,24 +123,24 @@ export class EventIssueService {
           },
           deletedAt: null,
         },
-        select: {venue: {select: {name: true}}},
+        select: { venue: { select: { name: true } } },
       });
       if (conflictingEvents.length > 0) {
         const stringVenues = conflictingEvents
-          .map(event => {
-            return event['venue'].name;
+          .map((event) => {
+            return event["venue"].name;
           })
           .toString();
         issueCreateManyInput.push({
           type: EventIssueType.ERROR_CONFLICTING_EVENT_TIME,
-          description: EventIssueDescription.Error_TimeConflict + '(' + stringVenues + ')',
+          description: EventIssueDescription.Error_TimeConflict + "(" + stringVenues + ")",
           eventId: event.id,
         });
       }
     }
 
     if (issueCreateManyInput.length > 0) {
-      await this.prisma.eventIssue.createMany({data: issueCreateManyInput});
+      await this.prisma.eventIssue.createMany({ data: issueCreateManyInput });
     }
   }
 

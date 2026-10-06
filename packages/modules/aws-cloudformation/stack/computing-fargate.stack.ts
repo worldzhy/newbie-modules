@@ -1,4 +1,4 @@
-import {Injectable} from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 
 @Injectable()
 export class ComputingFargate_Stack {
@@ -19,10 +19,10 @@ export class ComputingFargate_Stack {
   }
 
   static getStackOutputKeys() {
-    return ['RepoUrl', 'LoadBalancerUrl', 'CodePipelineName', 'CodePipelineUrl'];
+    return ["RepoUrl", "LoadBalancerUrl", "CodePipelineName", "CodePipelineUrl"];
   }
 
   static getStackTemplate() {
-    return 'quickstart-nestjs-fargate-cicd/templates/fargate-cicd.template.yaml';
+    return "quickstart-nestjs-fargate-cicd/templates/fargate-cicd.template.yaml";
   }
 }

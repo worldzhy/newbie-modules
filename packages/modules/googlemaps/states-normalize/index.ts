@@ -1,12 +1,12 @@
-import {states} from './jsons/states';
-import {territories} from './jsons/territories';
-import {associations} from './jsons/associations';
-import {canada} from './jsons/canada';
+import { states } from "./jsons/states";
+import { territories } from "./jsons/territories";
+import { associations } from "./jsons/associations";
+import { canada } from "./jsons/canada";
 
-const _ = require('lodash');
+const _ = require("lodash");
 
-const allRegions = {...states, ...territories, ...associations, ...canada};
-const uspsFullNameMap = _.mapValues(allRegions, value => {
+const allRegions = { ...states, ...territories, ...associations, ...canada };
+const uspsFullNameMap = _.mapValues(allRegions, (value) => {
   return value.name || null;
 });
 
@@ -17,7 +17,7 @@ function sanitizeToLettersOnly(words) {
   const sanitize = function (word) {
     return word
       .trim()
-      .replace(/[^a-zA-Z]/g, '')
+      .replace(/[^a-zA-Z]/g, "")
       .toUpperCase();
   };
 
@@ -29,12 +29,12 @@ function getPatterns(json) {
   return _.reduce(
     json,
     (result, value, key) => {
-      const values = [key, value['name'], value['AP'], value['other']];
+      const values = [key, value["name"], value["AP"], value["other"]];
 
       result[key] = _.flatMap(values, sanitizeToLettersOnly);
       return result;
     },
-    {}
+    {},
   );
 }
 
@@ -53,31 +53,28 @@ const patterns = {
     }
  */
 const defaultOptions = {
-  region: 'all',
-  returnType: 'USPS',
+  region: "all",
+  returnType: "USPS",
   omit: null,
 };
 
 export function normalize(state, options?) {
   const sanitizedState = sanitizeToLettersOnly(state);
-  const opts = {...defaultOptions, ...options};
+  const opts = { ...defaultOptions, ...options };
 
-  const regions =
-    opts.region === 'all'
-      ? ['state', 'territory', 'associated', 'canada']
-      : _.castArray(opts.region);
-  const regionPatterns = _.map(regions, r => {
+  const regions = opts.region === "all" ? ["state", "territory", "associated", "canada"] : _.castArray(opts.region);
+  const regionPatterns = _.map(regions, (r) => {
     return patterns[r];
   });
   const keys = Object.assign.apply(this, [{}].concat(regionPatterns));
 
   if (opts.omit) {
-    _.castArray(opts.omit).forEach(key => {
+    _.castArray(opts.omit).forEach((key) => {
       delete keys[key];
     });
   }
 
-  const uspsKey = _.findKey(keys, p => {
+  const uspsKey = _.findKey(keys, (p) => {
     return ~p.indexOf(sanitizedState);
   });
 
@@ -87,11 +84,11 @@ export function normalize(state, options?) {
 
   // eslint-disable-next-line default-case
   switch (opts.returnType) {
-    case 'USPS':
+    case "USPS":
       return uspsKey || null;
 
-    case 'name':
-    case 'AP':
+    case "name":
+    case "AP":
       return allRegions[uspsKey][opts.returnType] || null;
   }
 

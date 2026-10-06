@@ -1,12 +1,4 @@
-import {
-  IsEmail,
-  IsNotEmpty,
-  IsObject,
-  IsOptional,
-  IsString,
-  Length,
-  ValidateNested,
-} from 'class-validator';
+import { IsEmail, IsNotEmpty, IsObject, IsOptional, IsString, Length, ValidateNested } from "class-validator";
 
 class Address {
   @IsString()

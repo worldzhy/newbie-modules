@@ -1,8 +1,8 @@
-import {Injectable} from '@nestjs/common';
-import {auth, drive, drive_v3} from '@googleapis/drive';
-import {ConfigService} from '@nestjs/config';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {GoogleAccountRole} from './google-drive.enum';
+import { Injectable } from "@nestjs/common";
+import { auth, drive, drive_v3 } from "@googleapis/drive";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { GoogleAccountRole } from "./google-drive.enum";
 
 /**
  * Note: In this service, assume "files" means both files and folders.
@@ -14,24 +14,24 @@ export class GoogleDrivePermissionService {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly prisma: PrismaService
+    private readonly prisma: PrismaService,
   ) {
     // Create a new JWT client using the key file downloaded from the Google Developer Console.
     const authObj = new auth.GoogleAuth({
-      keyFile: this.config.getOrThrow<string>('modules.googleapis.credentials.serviceAccount'),
-      scopes: ['https://www.googleapis.com/auth/drive'],
+      keyFile: this.config.getOrThrow<string>("modules.googleapis.credentials.serviceAccount"),
+      scopes: ["https://www.googleapis.com/auth/drive"],
     });
 
-    this.drive = drive({version: 'v3', auth: auth});
+    this.drive = drive({ version: "v3", auth: auth });
   }
 
-  async createPermission(params: {fileId: string; email: string; role: GoogleAccountRole}) {
+  async createPermission(params: { fileId: string; email: string; role: GoogleAccountRole }) {
     try {
       const response = await this.drive.permissions.create({
         fileId: params.fileId,
         sendNotificationEmail: true,
         requestBody: {
-          type: 'user',
+          type: "user",
           emailAddress: params.email,
           role: params.role,
         },
@@ -41,7 +41,7 @@ export class GoogleDrivePermissionService {
       return await this.prisma.googleDrivePermission.create({
         data: {
           permissionId: response.data.id!,
-          type: 'user',
+          type: "user",
           role: params.role,
           email: params.email,
           fileId: params.fileId,
@@ -56,7 +56,7 @@ export class GoogleDrivePermissionService {
   async deletePermission(id: number) {
     try {
       const permission = await this.prisma.googleDrivePermission.delete({
-        where: {id},
+        where: { id },
       });
 
       await this.drive.permissions.delete({
@@ -70,7 +70,7 @@ export class GoogleDrivePermissionService {
     }
   }
 
-  async listPermissions(params: {fileId: string}) {
+  async listPermissions(params: { fileId: string }) {
     try {
       const response = await this.drive.permissions.list({
         fileId: params.fileId,
@@ -83,13 +83,13 @@ export class GoogleDrivePermissionService {
       }
 
       return Promise.all(
-        permissions.map(async permission => {
+        permissions.map(async (permission) => {
           return await this.drive.permissions.get({
             fileId: params.fileId,
             permissionId: permission.id!,
             supportsAllDrives: true,
           });
-        })
+        }),
       );
     } catch (error) {
       // TODO (developer) - Handle exception

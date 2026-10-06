@@ -9,7 +9,7 @@ import {
   IsUrl,
   Length,
   MinLength,
-} from 'class-validator';
+} from "class-validator";
 
 export class RegisterDto {
   @IsString()
@@ -35,13 +35,13 @@ export class RegisterDto {
   countryCode?: string;
 
   @IsString()
-  @IsIn(['MALE', 'FEMALE', 'NONBINARY', 'UNKNOWN'])
+  @IsIn(["MALE", "FEMALE", "NONBINARY", "UNKNOWN"])
   @IsOptional()
-  gender?: 'MALE' | 'FEMALE' | 'NONBINARY' | 'UNKNOWN';
+  gender?: "MALE" | "FEMALE" | "NONBINARY" | "UNKNOWN";
 
-  @IsIn(['ACCOUNT', 'UPDATES', 'PROMOTIONS'])
+  @IsIn(["ACCOUNT", "UPDATES", "PROMOTIONS"])
   @IsOptional()
-  notificationEmails?: 'ACCOUNT' | 'UPDATES' | 'PROMOTIONS';
+  notificationEmails?: "ACCOUNT" | "UPDATES" | "PROMOTIONS";
 
   @IsString()
   @IsOptional()
@@ -52,14 +52,14 @@ export class RegisterDto {
   prefersLanguage?: string;
 
   @IsString()
-  @IsIn(['NO_PREFERENCE', 'LIGHT', 'DARK'])
+  @IsIn(["NO_PREFERENCE", "LIGHT", "DARK"])
   @IsOptional()
-  prefersColorScheme?: 'NO_PREFERENCE' | 'LIGHT' | 'DARK';
+  prefersColorScheme?: "NO_PREFERENCE" | "LIGHT" | "DARK";
 
   @IsString()
-  @IsIn(['NO_PREFERENCE', 'REDUCE'])
+  @IsIn(["NO_PREFERENCE", "REDUCE"])
   @IsOptional()
-  prefersReducedMotion?: 'NO_PREFERENCE' | 'REDUCE';
+  prefersReducedMotion?: "NO_PREFERENCE" | "REDUCE";
 
   @IsUrl()
   @IsOptional()

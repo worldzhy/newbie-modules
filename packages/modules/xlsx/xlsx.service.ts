@@ -1,6 +1,6 @@
-import {Injectable} from '@nestjs/common';
-import {Express} from 'express';
-import * as XLSX from 'xlsx';
+import { Injectable } from "@nestjs/common";
+import { Express } from "express";
+import * as XLSX from "xlsx";
 
 /** Raw content of a single worksheet: its name plus a matrix of string cell values. */
 export interface XlsxSheetMatrix {
@@ -43,29 +43,29 @@ export class XLSXService {
     const originalError = console.error;
     console.warn = () => {};
     console.error = (...args: unknown[]) => {
-      if (typeof args[0] === 'string' && args[0].startsWith('Bad uncompressed size:')) return;
+      if (typeof args[0] === "string" && args[0].startsWith("Bad uncompressed size:")) return;
       originalError.apply(console, args);
     };
 
     let workbook: XLSX.WorkBook;
     try {
-      workbook = XLSX.read(buffer, {type: 'buffer', cellDates: true});
+      workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
     } finally {
       console.warn = originalWarn;
       console.error = originalError;
     }
 
-    return workbook.SheetNames.map(sheetName => {
+    return workbook.SheetNames.map((sheetName) => {
       const sheet = workbook.Sheets[sheetName];
       // header:1 returns raw row arrays; defval:'' fills empty cells.
       const rawRows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
         header: 1,
-        defval: '',
+        defval: "",
       });
-      const rows: string[][] = rawRows.map(row =>
-        (row as unknown[]).map(cell => (cell instanceof Date ? cell.toISOString().slice(0, 10) : String(cell ?? '')))
+      const rows: string[][] = rawRows.map((row) =>
+        (row as unknown[]).map((cell) => (cell instanceof Date ? cell.toISOString().slice(0, 10) : String(cell ?? ""))),
       );
-      return {sheetName, rows};
+      return { sheetName, rows };
     });
   }
 
@@ -130,15 +130,15 @@ export class XLSXService {
   private getColumns(sheet: XLSX.WorkSheet): string[] {
     const columns: string[] = [];
 
-    if (sheet['!ref']) {
-      const range = XLSX.utils.decode_range(sheet['!ref']);
+    if (sheet["!ref"]) {
+      const range = XLSX.utils.decode_range(sheet["!ref"]);
       const startRow = range.s.r; // start in the first row
 
       // walk every column in the range
       for (let C = range.s.c; C <= range.e.c; ++C) {
-        let column = 'UNKNOWN ' + C; // <-- replace with your desired default
+        let column = "UNKNOWN " + C; // <-- replace with your desired default
 
-        const cell = sheet[XLSX.utils.encode_cell({c: C, r: startRow})]; // find the cell in the first row
+        const cell = sheet[XLSX.utils.encode_cell({ c: C, r: startRow })]; // find the cell in the first row
         if (cell && cell.t) {
           column = XLSX.utils.format_cell(cell);
         }

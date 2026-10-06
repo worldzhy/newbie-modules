@@ -1,43 +1,43 @@
-import {ApiProperty} from '@nestjs/swagger';
-import {IsArray, IsNumber, IsString, MinLength, IsOptional} from 'class-validator';
-import {Type} from 'class-transformer';
-import {CommonListRequestDto, CommonListResponseDto} from '@devbie/newbie/common.dto';
-import {FileEntity} from './aws-s3-file.entity';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsArray, IsNumber, IsString, MinLength, IsOptional } from "class-validator";
+import { Type } from "class-transformer";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
+import { FileEntity } from "./aws-s3-file.entity";
 
 export class GetSignedUploadUrlResponseDto {
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   fileId: string;
 
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   signedUploadUrl: string;
 }
 
 export class CreateFileResponseDto {
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   id: string;
 
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   name: string;
 
-  @ApiProperty({type: String, required: false})
+  @ApiProperty({ type: String, required: false })
   type: string;
 
-  @ApiProperty({type: Number, required: false})
+  @ApiProperty({ type: Number, required: false })
   size: number;
 
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   s3Bucket: string;
 
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   s3Key: string;
 
-  @ApiProperty({type: String, required: false})
+  @ApiProperty({ type: String, required: false })
   parentId: string;
 
-  @ApiProperty({type: String, required: false})
+  @ApiProperty({ type: String, required: false })
   uploadId: string;
 
-  @ApiProperty({type: Number})
+  @ApiProperty({ type: Number })
   uploadProgress: number;
 }
 
@@ -45,7 +45,7 @@ export class ListFilesRequestDto extends CommonListRequestDto {
   @ApiProperty({
     type: String,
     required: false,
-    description: 'The folder ID to list files in, if not provided, lists root files.',
+    description: "The folder ID to list files in, if not provided, lists root files.",
   })
   @IsOptional()
   @IsString()
@@ -56,7 +56,7 @@ export class ListFilesResponseDto extends CommonListResponseDto {
   @ApiProperty({
     type: FileEntity,
     isArray: true,
-    description: 'The last update timestamp.',
+    description: "The last update timestamp.",
   })
   declare records: FileEntity[];
 }
@@ -65,7 +65,7 @@ export class CreateFolderRequestDto {
   @ApiProperty({
     type: String,
     required: true,
-    description: 'The name of the folder to create.',
+    description: "The name of the folder to create.",
   })
   @IsString()
   @MinLength(1)
@@ -74,7 +74,7 @@ export class CreateFolderRequestDto {
   @ApiProperty({
     type: String,
     required: false,
-    description: 'The parent folder ID to create the folder in.',
+    description: "The parent folder ID to create the folder in.",
   })
   @IsOptional()
   @IsString()
@@ -82,20 +82,20 @@ export class CreateFolderRequestDto {
 }
 
 export class CreateFileRequestDto {
-  @ApiProperty({type: String, required: true})
+  @ApiProperty({ type: String, required: true })
   @IsString()
   name: string;
 
-  @ApiProperty({type: String, required: true})
+  @ApiProperty({ type: String, required: true })
   @IsString()
   type: string;
 
-  @ApiProperty({type: Number, required: true})
+  @ApiProperty({ type: Number, required: true })
   @Type(() => Number)
   @IsNumber()
   size: number;
 
-  @ApiProperty({type: String, required: false})
+  @ApiProperty({ type: String, required: false })
   @IsOptional()
   @IsString()
   encoding?: string;
@@ -103,7 +103,7 @@ export class CreateFileRequestDto {
   @ApiProperty({
     type: String,
     required: false,
-    description: 'The folder ID to create the file in, do not use both `parentId` and `path` at the same time.',
+    description: "The folder ID to create the file in, do not use both `parentId` and `path` at the same time.",
   })
   @IsOptional()
   @IsString()
@@ -120,7 +120,7 @@ export class CreateFileRequestDto {
 }
 
 export class RenameFileRequestDto {
-  @ApiProperty({type: String, required: true})
+  @ApiProperty({ type: String, required: true })
   @IsString()
   name: string;
 }
@@ -171,7 +171,7 @@ export class UploadFileRequestDto {
   @ApiProperty({
     type: String,
     required: false,
-    description: 'The parent folder ID to upload the file to, do not use both `parentId` and `path` at the same time.',
+    description: "The parent folder ID to upload the file to, do not use both `parentId` and `path` at the same time.",
   })
   @IsOptional()
   @IsString()
@@ -201,7 +201,7 @@ export class UploadBase64RequestDto {
   @ApiProperty({
     type: String,
     required: false,
-    description: 'The parent folder ID to upload the file to, do not use both `parentId` and `path` at the same time.',
+    description: "The parent folder ID to upload the file to, do not use both `parentId` and `path` at the same time.",
   })
   @IsOptional()
   @IsString()
@@ -219,7 +219,7 @@ export class UploadBase64RequestDto {
   @ApiProperty({
     type: String,
     required: true,
-    description: 'Base64 encoded file data.',
+    description: "Base64 encoded file data.",
   })
   @IsString()
   base64: string;
@@ -227,7 +227,7 @@ export class UploadBase64RequestDto {
   @ApiProperty({
     type: String,
     required: false,
-    description: 'If not set, a random name will be generated.',
+    description: "If not set, a random name will be generated.",
   })
   @IsOptional()
   @IsString()
@@ -248,11 +248,11 @@ export class UploadBase64RequestDto {
 //* Multipart upload DTOs */
 //*************************/
 class UploadPartInfo {
-  @ApiProperty({type: String, required: true})
+  @ApiProperty({ type: String, required: true })
   @IsString()
   ETag: string;
 
-  @ApiProperty({type: Number, required: true})
+  @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
   PartNumber: number;
@@ -263,31 +263,31 @@ export class CreateMultipartUploadRequestDto extends CreateFileRequestDto {}
 export class CreateMultipartUploadResponseDto extends CreateFileResponseDto {}
 
 export class UploadPartRequestDto {
-  @ApiProperty({type: String, required: true})
+  @ApiProperty({ type: String, required: true })
   @IsString()
   uploadId: string;
 
-  @ApiProperty({type: Number, required: true})
+  @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
   uploadProgress: number;
 
-  @ApiProperty({type: Number, required: true})
+  @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
   partNumber: number;
 }
 
 export class UploadPartResponseDto {
-  @ApiProperty({type: String})
+  @ApiProperty({ type: String })
   ETag: string;
 
-  @ApiProperty({type: Number})
+  @ApiProperty({ type: Number })
   PartNumber: number;
 }
 
 export class CompleteMultipartUploadRequestDto {
-  @ApiProperty({type: String, required: true})
+  @ApiProperty({ type: String, required: true })
   @IsString()
   uploadId: string;
 
@@ -300,7 +300,7 @@ export class CompleteMultipartUploadRequestDto {
 }
 
 export class AbortMultipartUploadRequestDto {
-  @ApiProperty({type: String, required: true})
+  @ApiProperty({ type: String, required: true })
   @IsString()
   uploadId: string;
 }

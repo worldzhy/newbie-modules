@@ -1,7 +1,7 @@
-import {Global, Module} from '@nestjs/common';
-import {AwsS3Service} from './aws-s3.service';
-import {AwsS3FileService} from './aws-s3-file.service';
-import {AwsS3FileController} from './aws-s3-file.controller';
+import { Global, Module } from "@nestjs/common";
+import { AwsS3Service } from "./aws-s3.service";
+import { AwsS3FileService } from "./aws-s3-file.service";
+import { AwsS3FileController } from "./aws-s3-file.controller";
 
 @Global()
 @Module({

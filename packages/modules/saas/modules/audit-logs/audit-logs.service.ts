@@ -1,9 +1,9 @@
-import {Injectable} from '@nestjs/common';
-import type {Prisma} from '@prisma/client';
-import {AuditLog} from '@prisma/client';
-import {Expose} from '../../helpers/interfaces';
-import {expose} from '../../helpers/expose';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
+import { AuditLog } from "@prisma/client";
+import { Expose } from "../../helpers/interfaces";
+import { expose } from "../../helpers/expose";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 @Injectable()
 export class AuditLogsService {
@@ -16,7 +16,7 @@ export class AuditLogsService {
     where?: Prisma.AuditLogWhereInput;
     orderBy?: Prisma.AuditLogOrderByWithAggregationInput;
   }): Promise<Expose<AuditLog>[]> {
-    const {skip, take, cursor, where, orderBy} = params;
+    const { skip, take, cursor, where, orderBy } = params;
     try {
       const AuditLog = await this.prisma.auditLog.findMany({
         skip,
@@ -24,9 +24,9 @@ export class AuditLogsService {
         cursor,
         where,
         orderBy,
-        include: {team: true, user: true},
+        include: { team: true, user: true },
       });
-      return AuditLog.map(team => expose<AuditLog>(team));
+      return AuditLog.map((team) => expose<AuditLog>(team));
     } catch (error) {
       return [];
     }

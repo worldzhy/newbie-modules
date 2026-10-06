@@ -1,38 +1,38 @@
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {Body, Controller, Param, Patch, Post} from '@nestjs/common';
-import {ApiBearerAuth, ApiOperation, ApiTags} from '@nestjs/swagger';
-import {GuardByApiKey} from '@modules/security/authentication/api-key/api-key.decorator';
-import {MembershipService} from '@modules/membership/membership.service';
-import {SubscriptionService} from '@modules/membership/subscription/subscription.service';
-import {SubscriptionStatus} from '@generated/prisma/client';
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { Body, Controller, Param, Patch, Post } from "@nestjs/common";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { GuardByApiKey } from "@modules/security/authentication/api-key/api-key.decorator";
+import { MembershipService } from "@modules/membership/membership.service";
+import { SubscriptionService } from "@modules/membership/subscription/subscription.service";
+import { SubscriptionStatus } from "@generated/prisma/client";
 import {
   CreateWechatSubscriptionRequestDto,
   GetWechatSubscriptionRequestDto,
   UpdateWechatSubscriptionRequestDto,
-} from './wechat-subscription.dto';
+} from "./wechat-subscription.dto";
 
-@ApiTags('Membership / Subscription')
+@ApiTags("Membership / Subscription")
 @ApiBearerAuth()
-@Controller('wechat-subscriptions')
+@Controller("wechat-subscriptions")
 export class WechatSubscriptionController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly membershipService: MembershipService,
-    private readonly subscriptionService: SubscriptionService
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   @GuardByApiKey()
   @Post()
-  @ApiOperation({summary: 'Create a new subscription'})
+  @ApiOperation({ summary: "Create a new subscription" })
   async createSubscription(@Body() body: CreateWechatSubscriptionRequestDto) {
     const user = await this.prisma.user.findUniqueOrThrow({
-      where: {wechatOpenId: body.wechatOpenId},
+      where: { wechatOpenId: body.wechatOpenId },
     });
 
     // [step 1] Find or create the membership for the user
     let membership = await this.prisma.membership.findUnique({
-      where: {userId: user.id},
-      select: {id: true},
+      where: { userId: user.id },
+      select: { id: true },
     });
     if (!membership) {
       membership = await this.membershipService.createMembership({
@@ -60,14 +60,14 @@ export class WechatSubscriptionController {
   }
 
   @GuardByApiKey()
-  @Patch(':id')
-  @ApiOperation({summary: 'Update an existing subscription'})
+  @Patch(":id")
+  @ApiOperation({ summary: "Update an existing subscription" })
   async updateSubscription(
     @Param() params: GetWechatSubscriptionRequestDto,
-    @Body() body: UpdateWechatSubscriptionRequestDto
+    @Body() body: UpdateWechatSubscriptionRequestDto,
   ) {
     return await this.prisma.subscription.update({
-      where: {id: params.id},
+      where: { id: params.id },
       data: body,
     });
   }

@@ -1,5 +1,5 @@
-import {ApiProperty} from '@nestjs/swagger';
-import {IsString, IsOptional, IsArray, IsBoolean} from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsString, IsOptional, IsArray, IsBoolean } from "class-validator";
 
 export class ContactSearchPeopleBase {
   @ApiProperty({

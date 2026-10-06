@@ -1,8 +1,8 @@
-import type {Request as NestRequest} from '@nestjs/common';
-import {UserRole} from '@prisma/client';
-import type {Request as ExpressRequest} from 'express';
+import type { Request as NestRequest } from "@nestjs/common";
+import { UserRole } from "@prisma/client";
+import type { Request as ExpressRequest } from "express";
 
-export type MfaMethod = 'NONE' | 'SMS' | 'TOTP' | 'EMAIL';
+export type MfaMethod = "NONE" | "SMS" | "TOTP" | "EMAIL";
 
 export interface AccessTokenClaims {
   id: number;
@@ -23,8 +23,8 @@ export interface TotpTokenResponse {
 }
 
 export enum AccessTokenType {
-  user = 'user',
-  apiKey = 'api-key',
+  user = "user",
+  apiKey = "api-key",
 }
 
 export interface AccessTokenParsed {

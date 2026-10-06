@@ -1,5 +1,5 @@
-import {Module} from '@nestjs/common';
-import {ProxycurlService} from './proxycurl.service';
+import { Module } from "@nestjs/common";
+import { ProxycurlService } from "./proxycurl.service";
 
 @Module({
   providers: [ProxycurlService],

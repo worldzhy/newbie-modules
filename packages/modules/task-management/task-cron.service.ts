@@ -1,10 +1,10 @@
-import {Injectable, Logger} from '@nestjs/common';
-import {Cron} from '@nestjs/schedule';
-import {TaskService} from './task.service';
-import {LarkBotService} from '../lark-bot/lark-bot.service';
-import {LlmAgentService} from '../llm-agent/llm-agent.service';
-import dayjs from 'dayjs';
-import * as chineseDays from 'chinese-days';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron } from "@nestjs/schedule";
+import { TaskService } from "./task.service";
+import { LarkBotService } from "../lark-bot/lark-bot.service";
+import { LlmAgentService } from "../llm-agent/llm-agent.service";
+import dayjs from "dayjs";
+import * as chineseDays from "chinese-days";
 
 @Injectable()
 export class TaskCronService {
@@ -13,7 +13,7 @@ export class TaskCronService {
   constructor(
     private readonly taskService: TaskService,
     private readonly larkBotService: LarkBotService,
-    private readonly llmAgentService: LlmAgentService
+    private readonly llmAgentService: LlmAgentService,
   ) {}
 
   /**
@@ -21,12 +21,12 @@ export class TaskCronService {
    * 0 30 14 * * 5
    * Second: 0, Minute: 30, Hour: 14, Day of Month: *, Month: *, Day of Week: 5 (Friday)
    */
-  @Cron('0 30 14 * * 5', {
-    name: 'weeklySummaryReminder',
-    timeZone: 'Asia/Shanghai',
+  @Cron("0 30 14 * * 5", {
+    name: "weeklySummaryReminder",
+    timeZone: "Asia/Shanghai",
   })
   async triggerWeeklySummaryReminder() {
-    this.logger.log('Running weekly summary reminder cron job...');
+    this.logger.log("Running weekly summary reminder cron job...");
 
     // 1. Check if today is a public holiday
     // Simple weekend check is already handled by cron expression (runs on Friday).
@@ -34,7 +34,7 @@ export class TaskCronService {
     // For now, we assume it's a working day unless we integrate a specific calendar API.
     const isHoliday = await this.checkIfTodayIsHoliday();
     if (isHoliday) {
-      this.logger.log('Today is a public holiday. Skipping weekly summary reminder.');
+      this.logger.log("Today is a public holiday. Skipping weekly summary reminder.");
       return;
     }
 
@@ -44,19 +44,19 @@ export class TaskCronService {
 
       // 3. Send reminder card to each group
       for (const group of groups) {
-        if (group.chatId && group.chatId !== 'DEFAULT_GROUP') {
+        if (group.chatId && group.chatId !== "DEFAULT_GROUP") {
           await this.sendReminderCard(group.chatId);
         }
       }
       this.logger.log(`Weekly summary reminder sent to ${groups.length} groups.`);
     } catch (error) {
-      this.logger.error('Failed to execute weekly summary reminder cron job', error);
+      this.logger.error("Failed to execute weekly summary reminder cron job", error);
     }
   }
 
   private async checkIfTodayIsHoliday(): Promise<boolean> {
     try {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
       // Use chinese-days to check if today is a holiday locally
       if (chineseDays.isHoliday(today)) {
@@ -76,17 +76,17 @@ export class TaskCronService {
     }
   }
 
-  @Cron('0 0 1 * *', {
-    name: 'monthlyProjectSummary',
-    timeZone: 'Asia/Shanghai',
+  @Cron("0 0 1 * *", {
+    name: "monthlyProjectSummary",
+    timeZone: "Asia/Shanghai",
   })
   async triggerMonthlyProjectSummary() {
-    this.logger.log('Running monthly project summary cron job...');
+    this.logger.log("Running monthly project summary cron job...");
 
     try {
       const now = dayjs();
       // The report is for the previous month
-      const lastMonthDate = now.subtract(1, 'month');
+      const lastMonthDate = now.subtract(1, "month");
       const year = lastMonthDate.year();
       const month = lastMonthDate.month() + 1; // dayjs month is 0-indexed
 
@@ -96,7 +96,7 @@ export class TaskCronService {
         await this.generateAndSendMonthlyReportForProject(project.id, year, month);
       }
     } catch (error) {
-      this.logger.error('Failed to execute monthly project summary cron job', error);
+      this.logger.error("Failed to execute monthly project summary cron job", error);
     }
   }
 
@@ -107,11 +107,11 @@ export class TaskCronService {
       const targetMonthDate = dayjs()
         .year(year)
         .month(month - 1);
-      const startDate = targetMonthDate.startOf('month').toDate();
-      const endDate = targetMonthDate.endOf('month').toDate();
+      const startDate = targetMonthDate.startOf("month").toDate();
+      const endDate = targetMonthDate.endOf("month").toDate();
 
       const projects = await this.taskService.getAllProjects();
-      const project = projects.find(p => p.id === projectId);
+      const project = projects.find((p) => p.id === projectId);
       if (!project) {
         throw new Error(`Project with ID ${projectId} not found.`);
       }
@@ -133,37 +133,37 @@ export class TaskCronService {
         });
       }
 
-      return {success: true, message: 'Monthly report generated successfully.', year, month};
+      return { success: true, message: "Monthly report generated successfully.", year, month };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       this.logger.error(`Failed to generate monthly report for project ${projectId}`, e);
-      return {success: false, error: message};
+      return { success: false, error: message };
     }
   }
 
   private async sendMonthlyReportCard(
     chatId: string,
-    report: {projectName: string; year: number; month: number; content: string}
+    report: { projectName: string; year: number; month: number; content: string },
   ) {
     const card = {
-      config: {wide_screen_mode: true},
+      config: { wide_screen_mode: true },
       header: {
-        template: 'blue',
-        title: {content: `📊 项目月报: ${report.projectName}`, tag: 'plain_text'},
+        template: "blue",
+        title: { content: `📊 项目月报: ${report.projectName}`, tag: "plain_text" },
       },
       elements: [
         {
-          tag: 'div',
+          tag: "div",
           text: {
             content: `**${report.year}年${report.month}月 总结**\n\n${report.content}`,
-            tag: 'lark_md',
+            tag: "lark_md",
           },
         },
       ],
     };
 
     try {
-      await this.larkBotService.sendCard({receiveId: chatId, card});
+      await this.larkBotService.sendCard({ receiveId: chatId, card });
     } catch (e) {
       this.logger.error(`Failed to send monthly report card to chat ${chatId}`, e);
     }
@@ -171,26 +171,26 @@ export class TaskCronService {
 
   private async sendReminderCard(chatId: string) {
     const card = {
-      config: {wide_screen_mode: true},
+      config: { wide_screen_mode: true },
       header: {
-        template: 'orange',
-        title: {content: '📝 周总结提交提醒', tag: 'plain_text'},
+        template: "orange",
+        title: { content: "📝 周总结提交提醒", tag: "plain_text" },
       },
       elements: [
         {
-          tag: 'div',
+          tag: "div",
           text: {
-            content: '本周的工作即将结束，请各位同学记得提交本周的**周总结**哦！',
-            tag: 'lark_md',
+            content: "本周的工作即将结束，请各位同学记得提交本周的**周总结**哦！",
+            tag: "lark_md",
           },
         },
-        {tag: 'hr'},
+        { tag: "hr" },
         {
-          tag: 'note',
+          tag: "note",
           elements: [
             {
-              tag: 'plain_text',
-              content: '你可以随时对我说：“我的任务有哪些” 来回顾本周的待办事项。',
+              tag: "plain_text",
+              content: "你可以随时对我说：“我的任务有哪些” 来回顾本周的待办事项。",
             },
           ],
         },
@@ -198,7 +198,7 @@ export class TaskCronService {
     };
 
     try {
-      await this.larkBotService.sendCard({receiveId: chatId, card});
+      await this.larkBotService.sendCard({ receiveId: chatId, card });
     } catch (e) {
       this.logger.error(`Failed to send reminder card to chat ${chatId}`, e);
     }

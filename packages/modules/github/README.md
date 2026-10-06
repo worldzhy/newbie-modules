@@ -13,22 +13,22 @@ When neither is present, `octokit` is still constructed but logs a warning; meth
 
 ## env
 
-| env                      | Required        | Description                                                                     |
-| ------------------------ | --------------- | ------------------------------------------------------------------------------- |
-| `GITHUB_USER_AGENT`      | No              | User-Agent, defaults to `saas-starter`                                          |
-| `GITHUB_AUTH`            | Optional in App mode | PAT / personal token                                                      |
-| `GITHUB_APP_ID`          | Optional in PAT mode | GitHub App ID                                                             |
+| env                      | Required             | Description                                                                     |
+| ------------------------ | -------------------- | ------------------------------------------------------------------------------- |
+| `GITHUB_USER_AGENT`      | No                   | User-Agent, defaults to `saas-starter`                                          |
+| `GITHUB_AUTH`            | Optional in App mode | PAT / personal token                                                            |
+| `GITHUB_APP_ID`          | Optional in PAT mode | GitHub App ID                                                                   |
 | `GITHUB_PRIVATE_KEY`     | Optional in PAT mode | App PEM private key; newlines stored as literal `\n` (restored at construction) |
-| `GITHUB_INSTALLATION_ID` | Optional in PAT mode | App installation ID (numeric string)                                     |
+| `GITHUB_INSTALLATION_ID` | Optional in PAT mode | App installation ID (numeric string)                                            |
 
 ## Methods
 
-| Method                                                         | Semantics                                                                                                                                                                                                                                                              |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `isConfigured()`                                               | Whether enough credentials exist for orchestration (the App triplet or a PAT)                                                                                                                                                                                          |
-| `ensureRepoExists(org, name, tplOwner, tplRepo, description?)` | Idempotent repo creation: GET 200 skips; 404 generates from the template (private:true); 422 throws `RepoNameConflictError`. After generate returns 202, retries 3 times internally (2s each) until the repo is readable. Returns `{cloneUrl, generated}`             |
-| `upsertEnvExample(org, repo, placeholderLines)`                | Idempotently writes `.env.example`: GET fetches sha + current content, dedupes by env-var key, appends only missing placeholder lines (comment format, no real values), PUT with sha; 404 creates. **Does not overwrite template content**                            |
-| `deleteRepo(org, repo)`                                        | best-effort repo deletion; 404 is ignored. Used for teardown cleanup                                                                                                                                                                                                   |
+| Method                                                         | Semantics                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isConfigured()`                                               | Whether enough credentials exist for orchestration (the App triplet or a PAT)                                                                                                                                                                             |
+| `ensureRepoExists(org, name, tplOwner, tplRepo, description?)` | Idempotent repo creation: GET 200 skips; 404 generates from the template (private:true); 422 throws `RepoNameConflictError`. After generate returns 202, retries 3 times internally (2s each) until the repo is readable. Returns `{cloneUrl, generated}` |
+| `upsertEnvExample(org, repo, placeholderLines)`                | Idempotently writes `.env.example`: GET fetches sha + current content, dedupes by env-var key, appends only missing placeholder lines (comment format, no real values), PUT with sha; 404 creates. **Does not overwrite template content**                |
+| `deleteRepo(org, repo)`                                        | best-effort repo deletion; 404 is ignored. Used for teardown cleanup                                                                                                                                                                                      |
 
 `RepoNameConflictError` is thrown when the generate call in `ensureRepoExists` returns 422, meaning the repository name is occupied by a repository not owned by the caller.
 

@@ -1,42 +1,42 @@
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {Body, Controller, Get, Param, Patch, Post} from '@nestjs/common';
-import {ApiTags, ApiBearerAuth, ApiResponse, ApiOperation} from '@nestjs/swagger';
-import {GuardByApiKey} from '@modules/security/authentication/api-key/api-key.decorator';
-import {OrderService} from '../order.service';
-import {CreateOrderResponseDto, UpdateOrderResponseDto} from '../order.dto';
-import {WechatWorkflowCreateOrderRequestDto, WechatWorkflowUpdateOrderPaidRequestDto} from './wechat-workflow.dto';
-import {OrderStatus, PaymentMethod} from '@generated/prisma/client';
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { ApiTags, ApiBearerAuth, ApiResponse, ApiOperation } from "@nestjs/swagger";
+import { GuardByApiKey } from "@modules/security/authentication/api-key/api-key.decorator";
+import { OrderService } from "../order.service";
+import { CreateOrderResponseDto, UpdateOrderResponseDto } from "../order.dto";
+import { WechatWorkflowCreateOrderRequestDto, WechatWorkflowUpdateOrderPaidRequestDto } from "./wechat-workflow.dto";
+import { OrderStatus, PaymentMethod } from "@generated/prisma/client";
 
-@ApiTags('Order Management / Wechat Workflow Order')
+@ApiTags("Order Management / Wechat Workflow Order")
 @ApiBearerAuth()
 @GuardByApiKey()
-@Controller('wechat-workflow-orders')
+@Controller("wechat-workflow-orders")
 export class WechatWorkflowOrderController {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly orderService: OrderService
+    private readonly orderService: OrderService,
   ) {}
 
-  @Get(':id')
-  @ApiOperation({summary: '[Auth by API key] Get order details'})
-  async getOrder(@Param('id') id: string) {
-    return await this.prisma.order.findUnique({where: {id}});
+  @Get(":id")
+  @ApiOperation({ summary: "[Auth by API key] Get order details" })
+  async getOrder(@Param("id") id: string) {
+    return await this.prisma.order.findUnique({ where: { id } });
   }
 
-  @Post('')
+  @Post("")
   @ApiOperation({
-    summary: '[Auth by API key] Call from Tencent cloudbase workflow',
+    summary: "[Auth by API key] Call from Tencent cloudbase workflow",
   })
-  @ApiResponse({type: CreateOrderResponseDto})
+  @ApiResponse({ type: CreateOrderResponseDto })
   async createOrder(@Body() body: WechatWorkflowCreateOrderRequestDto) {
     const user = await this.prisma.user.findUniqueOrThrow({
-      where: {wechatOpenId: body.wechatOpenId},
+      where: { wechatOpenId: body.wechatOpenId },
     });
 
     // [step 2] Check if there's an existing pending order
     const existingOrders = await this.prisma.order.findMany({
-      where: {userId: user.id, status: 'PENDING'},
-      include: {items: true},
+      where: { userId: user.id, status: "PENDING" },
+      include: { items: true },
     });
 
     // Compare items of existing orders with the new order
@@ -51,7 +51,7 @@ export class WechatWorkflowOrderController {
         })
       ) {
         // ! Do not return the existing order, because the order id might be invalid.
-        await this.prisma.order.delete({where: {id: order.id}});
+        await this.prisma.order.delete({ where: { id: order.id } });
         break;
       }
     }
@@ -64,11 +64,11 @@ export class WechatWorkflowOrderController {
     });
   }
 
-  @Patch(':id/paid')
-  @ApiResponse({type: UpdateOrderResponseDto})
-  async paid(@Param('id') id: string, @Body() body: WechatWorkflowUpdateOrderPaidRequestDto) {
+  @Patch(":id/paid")
+  @ApiResponse({ type: UpdateOrderResponseDto })
+  async paid(@Param("id") id: string, @Body() body: WechatWorkflowUpdateOrderPaidRequestDto) {
     return await this.prisma.order.update({
-      where: {id},
+      where: { id },
       data: {
         status: OrderStatus.PAID,
         wechatTransactionId: body.wechatTransactionId,
@@ -77,12 +77,12 @@ export class WechatWorkflowOrderController {
     });
   }
 
-  @Patch(':id/refunded')
-  @ApiResponse({type: UpdateOrderResponseDto})
-  async refunded(@Param('id') id: string) {
+  @Patch(":id/refunded")
+  @ApiResponse({ type: UpdateOrderResponseDto })
+  async refunded(@Param("id") id: string) {
     return await this.prisma.order.update({
-      where: {id},
-      data: {status: OrderStatus.REFUNDED},
+      where: { id },
+      data: { status: OrderStatus.REFUNDED },
     });
   }
 

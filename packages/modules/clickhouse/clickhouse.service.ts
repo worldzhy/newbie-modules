@@ -1,13 +1,13 @@
-import {Injectable, OnModuleDestroy, OnModuleInit} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {ClickHouseClient, createClient} from '@clickhouse/client';
+import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { ClickHouseClient, createClient } from "@clickhouse/client";
 import {
   ClickhouseTableConfig,
   ClickhouseQueryObject,
   ClickhouseDeleteObject,
   ClickhouseColumnMeta,
   ClickhouseSchemaDiff,
-} from './clickhouse.types';
+} from "./clickhouse.types";
 
 /**
  * Shared ClickHouse service.
@@ -29,10 +29,10 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
 
   constructor(private readonly configService: ConfigService) {
     // Read the shared ClickHouse configuration through NestJS configuration services.
-    const url = this.configService.getOrThrow<string>('modules.clickhouse.url') || 'http://localhost:8123';
-    const username = this.configService.get<string>('modules.clickhouse.username') || 'default';
-    const password = this.configService.get<string>('modules.clickhouse.password') || '';
-    const database = this.configService.get<string | undefined>('modules.clickhouse.database');
+    const url = this.configService.getOrThrow<string>("modules.clickhouse.url") || "http://localhost:8123";
+    const username = this.configService.get<string>("modules.clickhouse.username") || "default";
+    const password = this.configService.get<string>("modules.clickhouse.password") || "";
+    const database = this.configService.get<string | undefined>("modules.clickhouse.database");
 
     this.defaultDbName = database;
     this.client = createClient({
@@ -43,11 +43,11 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async query(options: Parameters<ClickHouseClient['query']>[0]) {
+  async query(options: Parameters<ClickHouseClient["query"]>[0]) {
     return this.client.query(options);
   }
 
-  async insert(options: Parameters<ClickHouseClient['insert']>[0]) {
+  async insert(options: Parameters<ClickHouseClient["insert"]>[0]) {
     return this.client.insert(options);
   }
 
@@ -66,7 +66,7 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
 
   // Create database if not exists.
   async createDatabase(dbName: string): Promise<void> {
-    await this.query({query: `CREATE DATABASE IF NOT EXISTS ${dbName}`});
+    await this.query({ query: `CREATE DATABASE IF NOT EXISTS ${dbName}` });
   }
 
   // Create a model instance:
@@ -100,12 +100,12 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
   // Returns null when the table does not exist.
   private async getTableMeta(table: string): Promise<ClickhouseColumnMeta[] | null> {
     try {
-      const result = await this.query({query: `DESCRIBE TABLE ${table}`, format: 'JSONEachRow'});
+      const result = await this.query({ query: `DESCRIBE TABLE ${table}`, format: "JSONEachRow" });
       return (await result.json()) as ClickhouseColumnMeta[];
     } catch (err: any) {
       const msg = String(err?.message || err);
       // ClickHouse error code 60 / "doesn't exist" / "does not exist" → table missing.
-      if (msg.includes('does not exist') || msg.includes("doesn't exist") || err?.code === 60) {
+      if (msg.includes("does not exist") || msg.includes("doesn't exist") || err?.code === 60) {
         return null;
       }
       throw err; // Re-throw unexpected errors (network, auth, etc.).
@@ -115,25 +115,25 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
   // Compare the code schema against the actual table columns.
   // Returns columns to add (in code only), delete (in table only), and modify (type changed).
   private diffTableMeta(
-    codeSchema: ClickhouseTableConfig['schema'],
-    tableMeta: ClickhouseColumnMeta[]
+    codeSchema: ClickhouseTableConfig["schema"],
+    tableMeta: ClickhouseColumnMeta[],
   ): ClickhouseSchemaDiff {
-    const tableMetaMap = new Map(tableMeta.map(c => [c.name, c.type]));
-    const addColumns: ClickhouseSchemaDiff['addColumns'] = [];
-    const modifyColumns: ClickhouseSchemaDiff['modifyColumns'] = [];
+    const tableMetaMap = new Map(tableMeta.map((c) => [c.name, c.type]));
+    const addColumns: ClickhouseSchemaDiff["addColumns"] = [];
+    const modifyColumns: ClickhouseSchemaDiff["modifyColumns"] = [];
     for (const [name, def] of Object.entries(codeSchema)) {
       const actualType = tableMetaMap.get(name);
       if (actualType !== undefined) {
         if (normalizeType(def.type) !== normalizeType(actualType)) {
-          modifyColumns.push({name, type: def.type});
+          modifyColumns.push({ name, type: def.type });
         }
         tableMetaMap.delete(name);
       } else {
-        addColumns.push({name, type: def.type});
+        addColumns.push({ name, type: def.type });
       }
     }
     const deleteColumns = Array.from(tableMetaMap.keys());
-    return {addColumns, deleteColumns, modifyColumns};
+    return { addColumns, deleteColumns, modifyColumns };
   }
 
   // Apply the schema diff to the table via ALTER TABLE ADD/DROP/MODIFY COLUMN.
@@ -149,7 +149,7 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
       statements.push(`ALTER TABLE ${table} MODIFY COLUMN ${item.name} ${item.type}`);
     }
     for (const sql of statements) {
-      await this.query({query: sql});
+      await this.query({ query: sql });
     }
   }
 
@@ -159,21 +159,21 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
     const columns = Object.entries(config.schema)
       .map(([name, def]) => {
         const parts = [name, def.type];
-        if (def.default !== undefined && typeof def.default !== 'function') {
+        if (def.default !== undefined && typeof def.default !== "function") {
           parts.push(`DEFAULT ${def.default}`);
         }
-        return parts.join(' ');
+        return parts.join(" ");
       })
-      .join(', ');
+      .join(", ");
     const ddl = `CREATE TABLE IF NOT EXISTS ${table} (${columns}) ${config.options}`;
-    await this.query({query: ddl});
+    await this.query({ query: ddl });
   }
 }
 
 // Trim whitespace and lowercase for type comparison so "LowCardinality( String )"
 // and "LowCardinality(String)" are treated as the same type.
 function normalizeType(type: string): string {
-  return type.replace(/\s+/g, '').toLowerCase();
+  return type.replace(/\s+/g, "").toLowerCase();
 }
 
 /**
@@ -184,25 +184,25 @@ export class ClickhouseModel<T = any> {
   constructor(
     private readonly ch: ClickhouseService,
     private readonly table: string,
-    private readonly config: ClickhouseTableConfig
+    private readonly config: ClickhouseTableConfig,
   ) {}
 
   // Query builder: single object or chained array (subquery wrapping).
   async find(qObjArray: ClickhouseQueryObject | ClickhouseQueryObject[]): Promise<T[]> {
     if (!Array.isArray(qObjArray)) qObjArray = [qObjArray];
-    let sql = '';
+    let sql = "";
     qObjArray.forEach((qObj, i) => {
       const target = i === 0 ? this.table : `(${sql})`;
       sql = this.objectToSql(target, qObj);
     });
-    const result = await this.ch.query({query: sql, format: 'JSONEachRow'});
+    const result = await this.ch.query({ query: sql, format: "JSONEachRow" });
     return (await result.json()) as T[];
   }
 
   // ALTER TABLE ... DELETE WHERE ...
   async delete(delObj: ClickhouseDeleteObject): Promise<void> {
     const sql = `ALTER TABLE ${this.table} DELETE WHERE ${delObj.where}`;
-    await this.ch.query({query: sql});
+    await this.ch.query({ query: sql });
   }
 
   // INSERT INTO ... VALUES (for SDK ingestion endpoints if needed).
@@ -211,17 +211,17 @@ export class ClickhouseModel<T = any> {
     const columns = Object.keys(this.config.schema);
     await this.ch.insert({
       table: this.table,
-      values: rows.map(r => columns.reduce((obj, col) => ({...obj, [col]: (r as any)[col] ?? null}), {})),
-      format: 'JSONEachRow',
+      values: rows.map((r) => columns.reduce((obj, col) => ({ ...obj, [col]: (r as any)[col] ?? null }), {})),
+      format: "JSONEachRow",
     });
   }
 
   // Build SELECT SQL from a query object.
   private objectToSql(table: string, q: ClickhouseQueryObject): string {
-    const where = q.where ? ` WHERE ${q.where}` : '';
-    const groupBy = q.groupBy ? ` GROUP BY ${q.groupBy}` : '';
-    const orderBy = q.orderBy ? ` ORDER BY ${q.orderBy}` : '';
-    const limit = q.limit ? ` LIMIT ${q.skip ? `${q.skip},` : ''}${q.limit}` : '';
-    return `SELECT ${q.select || '*'} FROM ${table}${where}${groupBy}${orderBy}${limit}`;
+    const where = q.where ? ` WHERE ${q.where}` : "";
+    const groupBy = q.groupBy ? ` GROUP BY ${q.groupBy}` : "";
+    const orderBy = q.orderBy ? ` ORDER BY ${q.orderBy}` : "";
+    const limit = q.limit ? ` LIMIT ${q.skip ? `${q.skip},` : ""}${q.limit}` : "";
+    return `SELECT ${q.select || "*"} FROM ${table}${where}${groupBy}${orderBy}${limit}`;
   }
 }

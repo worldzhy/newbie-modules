@@ -1,17 +1,17 @@
-import {Injectable} from '@nestjs/common';
-import {Skill} from './skill.decorator';
-import {LLMProviderFactory} from '../providers/provider.factory';
+import { Injectable } from "@nestjs/common";
+import { Skill } from "./skill.decorator";
+import { LLMProviderFactory } from "../providers/provider.factory";
 
 @Injectable()
 export class LlmSkills {
   constructor(private readonly providerFactory: LLMProviderFactory) {}
 
   @Skill({
-    name: 'queryLLMProviders',
+    name: "queryLLMProviders",
     description:
-      'Query the list of available Large Language Models (LLMs) in the system and their availability status.',
+      "Query the list of available Large Language Models (LLMs) in the system and their availability status.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {},
       required: [],
     },
@@ -21,32 +21,32 @@ export class LlmSkills {
     const current = await this.providerFactory.getCurrentProviderId();
 
     const formattedList = providers
-      .map(p => {
-        const status = p.isAvailable ? 'Available' : 'Unavailable - Missing API Key';
-        const isCurrent = p.id === current ? ' [Current Active]' : '';
+      .map((p) => {
+        const status = p.isAvailable ? "Available" : "Unavailable - Missing API Key";
+        const isCurrent = p.id === current ? " [Current Active]" : "";
         return `- ${p.name} (ID: ${p.id}): ${status}${isCurrent}`;
       })
-      .join('\n');
+      .join("\n");
 
     return `System LLM Providers:\n${formattedList}`;
   }
 
   @Skill({
-    name: 'switchLLMProvider',
+    name: "switchLLMProvider",
     description:
-      'Attempt to switch the current active Large Language Model (LLM). Note: Users are NOT allowed to switch models directly from chat.',
+      "Attempt to switch the current active Large Language Model (LLM). Note: Users are NOT allowed to switch models directly from chat.",
     parameters: {
-      type: 'object',
+      type: "object",
       properties: {
         providerId: {
-          type: 'string',
+          type: "string",
           description: 'The ID of the LLM provider to switch to (e.g., "openai", "qwen")',
         },
       },
-      required: ['providerId'],
+      required: ["providerId"],
     },
   })
-  async switchLLMProvider(args: {providerId: string}) {
+  async switchLLMProvider(args: { providerId: string }) {
     // Intercept chat attempts to switch model
     return JSON.stringify({
       success: false,

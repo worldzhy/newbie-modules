@@ -1,5 +1,5 @@
-import {Module} from '@nestjs/common';
-import {VoilaNorbertService} from './volia-norbert.service';
+import { Module } from "@nestjs/common";
+import { VoilaNorbertService } from "./volia-norbert.service";
 
 @Module({
   providers: [VoilaNorbertService],

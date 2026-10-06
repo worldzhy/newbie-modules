@@ -1,11 +1,11 @@
-import {Injectable, Logger, BadRequestException} from '@nestjs/common';
-import {HttpService} from '@nestjs/axios';
-import {ILLMProvider} from './llm-provider.interface';
-import {QwenProvider} from './qwen.provider';
-import {OpenaiProvider} from './openai.provider';
-import {DeepseekProvider} from './deepseek.provider';
-import {ClaudeProvider} from './claude.provider';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
+import { HttpService } from "@nestjs/axios";
+import { ILLMProvider } from "./llm-provider.interface";
+import { QwenProvider } from "./qwen.provider";
+import { OpenaiProvider } from "./openai.provider";
+import { DeepseekProvider } from "./deepseek.provider";
+import { ClaudeProvider } from "./claude.provider";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 export interface ProviderInfo {
   id: string;
@@ -22,15 +22,15 @@ export class LLMProviderFactory {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly httpService: HttpService
+    private readonly httpService: HttpService,
   ) {}
 
   async getAvailableProviders(): Promise<ProviderInfo[]> {
     const models = await this.prisma.llmModel.findMany({
-      orderBy: {createdAt: 'asc'},
+      orderBy: { createdAt: "asc" },
     });
 
-    return models.map(m => ({
+    return models.map((m) => ({
       id: m.id,
       name: m.name,
       isAvailable: !!m.apiKey,
@@ -40,7 +40,7 @@ export class LLMProviderFactory {
   }
 
   async switchProvider(modelId: string): Promise<void> {
-    const target = await this.prisma.llmModel.findUnique({where: {id: modelId}});
+    const target = await this.prisma.llmModel.findUnique({ where: { id: modelId } });
 
     if (!target) {
       throw new BadRequestException(`Model '${modelId}' not found.`);
@@ -52,13 +52,13 @@ export class LLMProviderFactory {
 
     // Set all to inactive
     await this.prisma.llmModel.updateMany({
-      data: {isActive: false},
+      data: { isActive: false },
     });
 
     // Set the target to active
     await this.prisma.llmModel.update({
-      where: {id: modelId},
-      data: {isActive: true},
+      where: { id: modelId },
+      data: { isActive: true },
     });
 
     // Invalidate cached instances if necessary
@@ -69,18 +69,18 @@ export class LLMProviderFactory {
 
   async getCurrentProviderId(): Promise<string | null> {
     const active = await this.prisma.llmModel.findFirst({
-      where: {isActive: true},
+      where: { isActive: true },
     });
     return active?.id || null;
   }
 
   async getProvider(): Promise<ILLMProvider> {
     const activeModel = await this.prisma.llmModel.findFirst({
-      where: {isActive: true},
+      where: { isActive: true },
     });
 
     if (!activeModel) {
-      throw new Error('No active LLM model configured in the database.');
+      throw new Error("No active LLM model configured in the database.");
     }
 
     if (this.providerInstances.has(activeModel.id)) {
@@ -102,16 +102,16 @@ export class LLMProviderFactory {
     };
 
     switch (model.provider) {
-      case 'openai':
+      case "openai":
         provider = new OpenaiProvider(config, this.httpService);
         break;
-      case 'deepseek':
+      case "deepseek":
         provider = new DeepseekProvider(config, this.httpService);
         break;
-      case 'claude':
+      case "claude":
         provider = new ClaudeProvider(config, this.httpService);
         break;
-      case 'qwen':
+      case "qwen":
       default:
         provider = new QwenProvider(config, this.httpService);
         break;

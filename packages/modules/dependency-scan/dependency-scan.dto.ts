@@ -50,7 +50,10 @@ export class DependencyScanScanRecordDto {
   @ApiPropertyOptional({ description: "Error message when status is FAILED", type: String })
   errorMessage?: string | null;
 
-  @ApiPropertyOptional({ description: "Aggregated summary counts, null until scan completes", type: DependencyScanScanSummaryDto })
+  @ApiPropertyOptional({
+    description: "Aggregated summary counts, null until scan completes",
+    type: DependencyScanScanSummaryDto,
+  })
   summary?: DependencyScanScanSummaryDto | null;
 
   @ApiPropertyOptional({ description: "Locked packages found in the lockfile", type: Number })
@@ -173,7 +176,10 @@ export class DependencyScanProjectReportResponseDto {
   @ApiProperty({ description: "Project-level aggregated summary", type: DependencyScanProjectSummaryDto })
   summary: DependencyScanProjectSummaryDto;
 
-  @ApiProperty({ type: [DependencyScanApplicationOverviewDto], description: "Per-application scan state and open findings" })
+  @ApiProperty({
+    type: [DependencyScanApplicationOverviewDto],
+    description: "Per-application scan state and open findings",
+  })
   applications: DependencyScanApplicationOverviewDto[];
 }
 
@@ -182,6 +188,9 @@ export class DependencyScanScanStartResponseDto {
   @ApiProperty({ description: "Whether the scan request was accepted" })
   accepted: boolean;
 
-  @ApiProperty({ description: "The scan record that was started (or the already-running one)", type: DependencyScanScanRecordDto })
+  @ApiProperty({
+    description: "The scan record that was started (or the already-running one)",
+    type: DependencyScanScanRecordDto,
+  })
   scan: DependencyScanScanRecordDto;
 }

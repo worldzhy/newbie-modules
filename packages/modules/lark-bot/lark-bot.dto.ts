@@ -1,62 +1,62 @@
-import {ApiProperty} from '@nestjs/swagger';
-import {IsNotEmpty, IsOptional, IsString, IsNumber} from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsNotEmpty, IsOptional, IsString, IsNumber } from "class-validator";
 
 export class GetChatHistoryDto {
-  @ApiProperty({description: 'The ID of the chat group', required: true})
+  @ApiProperty({ description: "The ID of the chat group", required: true })
   @IsString()
   @IsNotEmpty()
   chatId: string;
 
-  @ApiProperty({description: 'Start time in seconds (timestamp)', required: false})
+  @ApiProperty({ description: "Start time in seconds (timestamp)", required: false })
   @IsString()
   @IsOptional()
   startTime?: string;
 
-  @ApiProperty({description: 'End time in seconds (timestamp)', required: false})
+  @ApiProperty({ description: "End time in seconds (timestamp)", required: false })
   @IsString()
   @IsOptional()
   endTime?: string;
 
-  @ApiProperty({description: 'Page token for pagination', required: false})
+  @ApiProperty({ description: "Page token for pagination", required: false })
   @IsString()
   @IsOptional()
   pageToken?: string;
 
-  @ApiProperty({description: 'Page size', required: false, default: 20})
+  @ApiProperty({ description: "Page size", required: false, default: 20 })
   @IsNumber()
   @IsOptional()
   pageSize?: number;
 }
 
 export class SendTextDto {
-  @ApiProperty({description: 'The ID of the chat group or user', required: true})
+  @ApiProperty({ description: "The ID of the chat group or user", required: true })
   @IsString()
   @IsNotEmpty()
   receiveId: string;
 
-  @ApiProperty({description: 'Type of receive_id (open_id, chat_id, etc.)', default: 'chat_id'})
+  @ApiProperty({ description: "Type of receive_id (open_id, chat_id, etc.)", default: "chat_id" })
   @IsString()
   @IsOptional()
   receiveIdType?: string;
 
-  @ApiProperty({description: 'Text content to send'})
+  @ApiProperty({ description: "Text content to send" })
   @IsString()
   @IsNotEmpty()
   text: string;
 }
 
 export class SendCardDto {
-  @ApiProperty({description: 'The ID of the chat group or user', required: true})
+  @ApiProperty({ description: "The ID of the chat group or user", required: true })
   @IsString()
   @IsNotEmpty()
   receiveId: string;
 
-  @ApiProperty({description: 'Type of receive_id (open_id, chat_id, etc.)', default: 'chat_id'})
+  @ApiProperty({ description: "Type of receive_id (open_id, chat_id, etc.)", default: "chat_id" })
   @IsString()
   @IsOptional()
   receiveIdType?: string;
 
-  @ApiProperty({description: 'Card content (JSON object or string)'})
+  @ApiProperty({ description: "Card content (JSON object or string)" })
   @IsNotEmpty()
   card: any;
 }
@@ -133,7 +133,7 @@ export class CreateLarkGroupDto {
 }
 
 export class UpdateLarkTaskDto {
-  @ApiProperty({enum: ['pending', 'in_progress', 'completed']})
+  @ApiProperty({ enum: ["pending", "in_progress", "completed"] })
   @IsString()
   @IsOptional()
   status?: string;

@@ -1,9 +1,9 @@
-import {Injectable} from '@nestjs/common';
-import {auth, sheets, sheets_v4} from '@googleapis/sheets';
-import {ConfigService} from '@nestjs/config';
-import {generateRandomNumber, number2alphabet} from '@devbie/newbie/utilities/common.util';
+import { Injectable } from "@nestjs/common";
+import { auth, sheets, sheets_v4 } from "@googleapis/sheets";
+import { ConfigService } from "@nestjs/config";
+import { generateRandomNumber, number2alphabet } from "@devbie/newbie/utilities/common.util";
 
-const DEFAULT_SHEET_TITLE = 'Sheet1';
+const DEFAULT_SHEET_TITLE = "Sheet1";
 
 /**
  * API parameters introduction
@@ -27,22 +27,22 @@ export class GoogleSheetService {
   constructor(private readonly config: ConfigService) {
     // Create a new JWT client using the key file downloaded from the Google Developer Console.
     const authObj = new auth.GoogleAuth({
-      keyFile: this.config.getOrThrow<string>('modules.googleapis.credentials.serviceAccount'),
-      scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+      keyFile: this.config.getOrThrow<string>("modules.googleapis.credentials.serviceAccount"),
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
 
-    this.client = sheets({version: 'v4', auth: authObj});
+    this.client = sheets({ version: "v4", auth: authObj });
   }
 
   /**************************************
    * Sheet Operations                   *
    **************************************/
 
-  async addSheet(params: {fileId: string; properties: sheets_v4.Schema$SheetProperties; headings?: string[]}) {
+  async addSheet(params: { fileId: string; properties: sheets_v4.Schema$SheetProperties; headings?: string[] }) {
     const response = await this.client.spreadsheets.batchUpdate({
       spreadsheetId: params.fileId,
       requestBody: {
-        requests: [{addSheet: {properties: params.properties}}],
+        requests: [{ addSheet: { properties: params.properties } }],
       },
     });
     console.log(response);
@@ -55,14 +55,14 @@ export class GoogleSheetService {
     // }
   }
 
-  async clearSheet(params: {fileId: string; sheetTitle?: string}) {
+  async clearSheet(params: { fileId: string; sheetTitle?: string }) {
     await this.client.spreadsheets.values.clear({
       spreadsheetId: params.fileId,
       range: params.sheetTitle ?? DEFAULT_SHEET_TITLE,
     });
   }
 
-  async getSheetId(params: {fileId: string; sheetTitle?: string}) {
+  async getSheetId(params: { fileId: string; sheetTitle?: string }) {
     const response = await this.client.spreadsheets.get({
       spreadsheetId: params.fileId,
     });
@@ -76,7 +76,7 @@ export class GoogleSheetService {
     }
   }
 
-  async updateHeadings(params: {fileId: string; sheetTitle?: string; headings: string[]}) {
+  async updateHeadings(params: { fileId: string; sheetTitle?: string; headings: string[] }) {
     // [step 0] Get sheet id.
     const sheetId = await this.getSheetId({
       fileId: params.fileId,
@@ -97,8 +97,8 @@ export class GoogleSheetService {
               },
               cell: {
                 userEnteredFormat: {
-                  backgroundColorStyle: {themeColor: 'BACKGROUND'},
-                  horizontalAlignment: 'LEFT',
+                  backgroundColorStyle: { themeColor: "BACKGROUND" },
+                  horizontalAlignment: "LEFT",
                   textFormat: {
                     foregroundColorStyle: {
                       themeColor: `ACCENT${generateRandomNumber(6) ?? 1}`,
@@ -107,16 +107,16 @@ export class GoogleSheetService {
                   },
                 },
               },
-              fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)',
+              fields: "userEnteredFormat(backgroundColor,textFormat,horizontalAlignment)",
             },
           },
           {
             updateSheetProperties: {
               properties: {
                 sheetId: sheetId,
-                gridProperties: {frozenRowCount: 1},
+                gridProperties: { frozenRowCount: 1 },
               },
-              fields: 'gridProperties.frozenRowCount',
+              fields: "gridProperties.frozenRowCount",
             },
           },
         ],
@@ -136,7 +136,7 @@ export class GoogleSheetService {
    * Row Operations                     *
    **************************************/
 
-  async getRows(params: {fileId: string; sheetTitle?: string}) {
+  async getRows(params: { fileId: string; sheetTitle?: string }) {
     try {
       const response = await this.client.spreadsheets.values.get({
         spreadsheetId: params.fileId,
@@ -148,13 +148,13 @@ export class GoogleSheetService {
     }
   }
 
-  async appendRows(params: {fileId: string; sheetTitle?: string; data: any[][]}) {
+  async appendRows(params: { fileId: string; sheetTitle?: string; data: any[][] }) {
     try {
       const response = await this.client.spreadsheets.values.append({
         spreadsheetId: params.fileId,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         range: `${params.sheetTitle ?? DEFAULT_SHEET_TITLE}!A1`,
-        requestBody: {values: params.data},
+        requestBody: { values: params.data },
       });
       return response.data.spreadsheetId;
     } catch (err) {
@@ -162,14 +162,14 @@ export class GoogleSheetService {
     }
   }
 
-  async updateRow(params: {fileId: string; sheetTitle?: string; rowIndex: number; rowData: string[]}) {
+  async updateRow(params: { fileId: string; sheetTitle?: string; rowIndex: number; rowData: string[] }) {
     try {
       const columnLetter = number2alphabet(params.rowData.length);
       const response = await this.client.spreadsheets.values.update({
         spreadsheetId: params.fileId,
-        valueInputOption: 'RAW',
+        valueInputOption: "RAW",
         range: `${params.sheetTitle ?? DEFAULT_SHEET_TITLE}!A${params.rowIndex}:${columnLetter}${params.rowIndex}`,
-        requestBody: {values: [params.rowData]},
+        requestBody: { values: [params.rowData] },
       });
 
       return response.data.spreadsheetId;
@@ -178,7 +178,7 @@ export class GoogleSheetService {
     }
   }
 
-  async deleteRows(params: {fileId: string; startIndex: number; endIndex: number}) {
+  async deleteRows(params: { fileId: string; startIndex: number; endIndex: number }) {
     try {
       const spreadsheet = await this.client.spreadsheets.batchUpdate({
         spreadsheetId: params.fileId,
@@ -188,7 +188,7 @@ export class GoogleSheetService {
               deleteDimension: {
                 range: {
                   sheetId: 0,
-                  dimension: 'ROWS',
+                  dimension: "ROWS",
                   startIndex: params.startIndex,
                   endIndex: params.endIndex,
                 },
@@ -207,7 +207,7 @@ export class GoogleSheetService {
    * Column Operations                  *
    **************************************/
 
-  async deleteColumns(params: {fileId: string; startIndex: number; endIndex: number}) {
+  async deleteColumns(params: { fileId: string; startIndex: number; endIndex: number }) {
     try {
       const spreadsheet = await this.client.spreadsheets.batchUpdate({
         spreadsheetId: params.fileId,
@@ -217,7 +217,7 @@ export class GoogleSheetService {
               deleteDimension: {
                 range: {
                   sheetId: 0,
-                  dimension: 'COLUMNS',
+                  dimension: "COLUMNS",
                   startIndex: params.startIndex,
                   endIndex: params.endIndex,
                 },
@@ -232,19 +232,19 @@ export class GoogleSheetService {
     }
   }
 
-  async resizeColumms(params: {fileId: string; startIndex: number; endIndex: number; pixelSize?: number}) {
+  async resizeColumms(params: { fileId: string; startIndex: number; endIndex: number; pixelSize?: number }) {
     const requests: object[] = [];
     if (params.pixelSize) {
       requests.push({
         updateDimensionProperties: {
           range: {
             sheetId: 0,
-            dimension: 'COLUMNS',
+            dimension: "COLUMNS",
             startIndex: params.startIndex,
             endIndex: params.endIndex,
           },
-          properties: {pixelSize: params.pixelSize},
-          fields: 'pixelSize',
+          properties: { pixelSize: params.pixelSize },
+          fields: "pixelSize",
         },
       });
     } else {
@@ -252,7 +252,7 @@ export class GoogleSheetService {
         autoResizeDimensions: {
           dimensions: {
             sheetId: 0,
-            dimension: 'COLUMNS',
+            dimension: "COLUMNS",
             startIndex: params.startIndex,
             endIndex: params.endIndex,
           },
@@ -263,7 +263,7 @@ export class GoogleSheetService {
     try {
       const spreadsheet = await this.client.spreadsheets.batchUpdate({
         spreadsheetId: params.fileId,
-        requestBody: {requests: requests},
+        requestBody: { requests: requests },
       });
       return spreadsheet.data.spreadsheetId;
     } catch (err) {
@@ -272,7 +272,7 @@ export class GoogleSheetService {
   }
 
   // ! This function is ineffective.
-  async hideColumns(params: {fileId: string; startIndex: number; endIndex: number}) {
+  async hideColumns(params: { fileId: string; startIndex: number; endIndex: number }) {
     try {
       const spreadsheet = await this.client.spreadsheets.batchUpdate({
         spreadsheetId: params.fileId,
@@ -282,12 +282,12 @@ export class GoogleSheetService {
               updateDimensionProperties: {
                 range: {
                   sheetId: 0,
-                  dimension: 'COLUMNS',
+                  dimension: "COLUMNS",
                   startIndex: params.startIndex,
                   endIndex: params.endIndex,
                 },
-                properties: {hiddenByUser: true},
-                fields: 'hiddenByUser',
+                properties: { hiddenByUser: true },
+                fields: "hiddenByUser",
               },
             },
           ],

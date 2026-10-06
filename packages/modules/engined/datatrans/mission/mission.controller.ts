@@ -1,70 +1,70 @@
-import {Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post} from '@nestjs/common';
-import {ApiBearerAuth, ApiBody, ApiTags} from '@nestjs/swagger';
-import {DatatransMission, DatatransMissionState, Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from "@nestjs/common";
+import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { DatatransMission, DatatransMissionState, Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
-@ApiTags('Datatrans Mission')
+@ApiTags("Datatrans Mission")
 @ApiBearerAuth()
-@Controller('datatrans-missions')
+@Controller("datatrans-missions")
 export class DatatransMissionController {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Post('')
+  @Post("")
   @ApiBody({
-    description: '',
+    description: "",
     examples: {
       a: {
-        summary: '1. Create',
+        summary: "1. Create",
         value: {
           numberOfRecords: 6,
           numberOfBatches: 1,
-          datatransPipelineId: '5842956f-7dce-4c60-928d-575450c96d19',
+          datatransPipelineId: "5842956f-7dce-4c60-928d-575450c96d19",
         },
       },
     },
   })
   async createDatatransMission(@Body() body: Prisma.DatatransMissionUncheckedCreateInput): Promise<DatatransMission> {
-    return await this.prisma.datatransMission.create({data: body});
+    return await this.prisma.datatransMission.create({ data: body });
   }
 
-  @Get('')
+  @Get("")
   async getDatatransMissions(): Promise<DatatransMission[]> {
     return await this.prisma.datatransMission.findMany({});
   }
 
-  @Get(':missionId')
-  async getDatatransMission(@Param('missionId') missionId: string): Promise<DatatransMission | null> {
+  @Get(":missionId")
+  async getDatatransMission(@Param("missionId") missionId: string): Promise<DatatransMission | null> {
     return await this.prisma.datatransMission.findUnique({
-      where: {id: missionId},
+      where: { id: missionId },
     });
   }
 
-  @Patch(':missionId')
+  @Patch(":missionId")
   async updateDatatransMission(
-    @Param('missionId') missionId: string,
-    @Body() body: Prisma.DatatransMissionUpdateInput
+    @Param("missionId") missionId: string,
+    @Body() body: Prisma.DatatransMissionUpdateInput,
   ): Promise<DatatransMission> {
     return await this.prisma.datatransMission.update({
-      where: {id: missionId},
+      where: { id: missionId },
       data: body,
     });
   }
 
-  @Delete(':missionId')
-  async deleteDatatransMission(@Param('missionId') missionId: string): Promise<DatatransMission> {
+  @Delete(":missionId")
+  async deleteDatatransMission(@Param("missionId") missionId: string): Promise<DatatransMission> {
     return await this.prisma.datatransMission.delete({
-      where: {id: missionId},
+      where: { id: missionId },
     });
   }
 
-  @Patch(':missionId/mission2tasks')
-  async splitDatatransMission2Tasks(@Param('missionId') missionId: string): Promise<DatatransMission> {
+  @Patch(":missionId/mission2tasks")
+  async splitDatatransMission2Tasks(@Param("missionId") missionId: string): Promise<DatatransMission> {
     // [step 1] Get mission.
     const mission = await this.prisma.datatransMission.findUnique({
-      where: {id: missionId},
+      where: { id: missionId },
     });
     if (!mission) {
-      throw new NotFoundException('Not found the mission.');
+      throw new NotFoundException("Not found the mission.");
     }
 
     // [step 2] Split mission to tasks.
@@ -97,8 +97,8 @@ export class DatatransMissionController {
 
     // [step 3] Update mission state.
     return await this.prisma.datatransMission.update({
-      where: {id: missionId},
-      data: {state: DatatransMissionState.SPLIT},
+      where: { id: missionId },
+      data: { state: DatatransMissionState.SPLIT },
     });
   }
 

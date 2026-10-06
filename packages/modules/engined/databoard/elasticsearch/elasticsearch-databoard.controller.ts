@@ -1,27 +1,27 @@
-import {Body, Controller, Delete, Get, Param, Patch, Post, Query} from '@nestjs/common';
-import {ApiBearerAuth, ApiBody, ApiTags} from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
 import {
   ElasticsearchDataboard,
   ElasticsearchDataboardState,
   ElasticsearchDatasourceIndexField,
   Prisma,
-} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+} from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
-@ApiTags('Databoard - Elasticsearch')
+@ApiTags("Databoard - Elasticsearch")
 @ApiBearerAuth()
-@Controller('elasticsearch-databoards')
+@Controller("elasticsearch-databoards")
 export class ElasticsearchDataboardController {
   constructor(private readonly prisma: PrismaService) {}
 
-  @Post('')
+  @Post("")
   @ApiBody({
     description: "The 'name' and 'datasourceType' are required in request body.",
     examples: {
       a: {
-        summary: '1. Create',
+        summary: "1. Create",
         value: {
-          name: 'databoard_01',
+          name: "databoard_01",
           datasourceIndexId: 1,
         },
       },
@@ -29,63 +29,63 @@ export class ElasticsearchDataboardController {
   })
   async createElasticsearchDataboard(
     @Body()
-    body: Prisma.ElasticsearchDataboardUncheckedCreateInput
+    body: Prisma.ElasticsearchDataboardUncheckedCreateInput,
   ) {
-    return await this.prisma.elasticsearchDataboard.create({data: body});
+    return await this.prisma.elasticsearchDataboard.create({ data: body });
   }
 
-  @Get('')
-  async getElasticsearchDataboards(@Query('page') page: number, @Query('pageSize') pageSize: number) {}
+  @Get("")
+  async getElasticsearchDataboards(@Query("page") page: number, @Query("pageSize") pageSize: number) {}
 
-  @Get(':databoardId')
-  async getElasticsearchDataboard(@Param('databoardId') databoardId: string): Promise<ElasticsearchDataboard> {
+  @Get(":databoardId")
+  async getElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     return await this.prisma.elasticsearchDataboard.findUniqueOrThrow({
-      where: {id: databoardId},
+      where: { id: databoardId },
     });
   }
 
-  @Patch(':databoardId')
+  @Patch(":databoardId")
   @ApiBody({
-    description: 'Update databoard.',
+    description: "Update databoard.",
     examples: {
       a: {
-        summary: '1. Update name',
+        summary: "1. Update name",
         value: {
-          name: 'databoard-01',
+          name: "databoard-01",
         },
       },
     },
   })
   async updateElasticsearchDataboard(
-    @Param('databoardId') databoardId: string,
-    @Body() body: Prisma.ElasticsearchDataboardUpdateInput
+    @Param("databoardId") databoardId: string,
+    @Body() body: Prisma.ElasticsearchDataboardUpdateInput,
   ): Promise<ElasticsearchDataboard> {
     return await this.prisma.elasticsearchDataboard.update({
-      where: {id: databoardId},
+      where: { id: databoardId },
       data: body,
     });
   }
 
-  @Delete(':databoardId')
-  async deleteElasticsearchDataboard(@Param('databoardId') databoardId: string): Promise<ElasticsearchDataboard> {
+  @Delete(":databoardId")
+  async deleteElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     return await this.prisma.elasticsearchDataboard.delete({
-      where: {id: databoardId},
+      where: { id: databoardId },
     });
   }
 
-  @Patch(':databoardId/load')
-  async loadElasticsearchDataboard(@Param('databoardId') databoardId: string): Promise<ElasticsearchDataboard> {
+  @Patch(":databoardId/load")
+  async loadElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     // [step 1] Get databoard
     const databoard = await this.prisma.elasticsearchDataboard.findUniqueOrThrow({
-      where: {id: databoardId},
-      include: {datasourceIndex: {include: {fields: true}}},
+      where: { id: databoardId },
+      include: { datasourceIndex: { include: { fields: true } } },
     });
 
     // [step 2] Load columns
-    const datasourceIndexFields: ElasticsearchDatasourceIndexField[] = databoard['datasourceIndex']['fields'];
+    const datasourceIndexFields: ElasticsearchDatasourceIndexField[] = databoard["datasourceIndex"]["fields"];
 
     await this.prisma.elasticsearchDataboardColumn.createMany({
-      data: datasourceIndexFields.map(field => {
+      data: datasourceIndexFields.map((field) => {
         return {
           name: field.name,
           databoardId: databoardId,
@@ -96,36 +96,36 @@ export class ElasticsearchDataboardController {
 
     // [step 3] Update databoard state
     return await this.prisma.elasticsearchDataboard.update({
-      where: {id: databoardId},
-      data: {state: ElasticsearchDataboardState.LOADED},
+      where: { id: databoardId },
+      data: { state: ElasticsearchDataboardState.LOADED },
     });
   }
 
-  @Patch(':databoardId/unload')
-  async unloadElasticsearchDataboard(@Param('databoardId') databoardId: string): Promise<ElasticsearchDataboard> {
+  @Patch(":databoardId/unload")
+  async unloadElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     // [step 1] Get databoard
     const databoard = await this.prisma.elasticsearchDataboard.findUniqueOrThrow({
-      where: {id: databoardId},
+      where: { id: databoardId },
     });
 
     // [step 2] Unload columns
     await this.prisma.elasticsearchDataboardColumn.deleteMany({
-      where: {databoardId: databoardId},
+      where: { databoardId: databoardId },
     });
 
     // [step 3] Update databoard state
     return await this.prisma.elasticsearchDataboard.update({
-      where: {id: databoardId},
-      data: {state: ElasticsearchDataboardState.NOT_LOADED},
+      where: { id: databoardId },
+      data: { state: ElasticsearchDataboardState.NOT_LOADED },
     });
   }
 
-  @Get(':databoardId/columns')
-  async getElasticsearchDataboardColumns(@Param('databoardId') databoardId: string): Promise<ElasticsearchDataboard> {
+  @Get(":databoardId/columns")
+  async getElasticsearchDataboardColumns(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     // [step 1] Get databoard
     return await this.prisma.elasticsearchDataboard.findUniqueOrThrow({
-      where: {id: databoardId},
-      include: {columns: true},
+      where: { id: databoardId },
+      include: { columns: true },
     });
   }
 

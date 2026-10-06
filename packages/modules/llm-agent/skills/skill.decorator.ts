@@ -1,6 +1,6 @@
-import {SetMetadata} from '@nestjs/common';
+import { SetMetadata } from "@nestjs/common";
 
-export const SKILL_METADATA = 'SKILL_METADATA';
+export const SKILL_METADATA = "SKILL_METADATA";
 
 export interface SkillMetadata {
   name: string;

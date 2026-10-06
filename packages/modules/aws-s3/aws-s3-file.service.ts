@@ -1,12 +1,12 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
-import {generateRandomString, generateUuid} from '@devbie/newbie/utilities/random.util';
-import {S3File} from '@generated/prisma/client';
-import {extname} from 'path';
-import {AwsS3Service} from './aws-s3.service';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { generateRandomString, generateUuid } from "@devbie/newbie/utilities/random.util";
+import { S3File } from "@generated/prisma/client";
+import { extname } from "path";
+import { AwsS3Service } from "./aws-s3.service";
 
-const SYSTEM_FOLDER_PATH = '_system/';
+const SYSTEM_FOLDER_PATH = "_system/";
 
 @Injectable()
 export class AwsS3FileService {
@@ -17,11 +17,11 @@ export class AwsS3FileService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly s3: AwsS3Service
+    private readonly s3: AwsS3Service,
   ) {
-    this.bucket = this.config.getOrThrow<string>('modules.aws-s3.bucket');
-    this.region = this.config.getOrThrow<string>('modules.aws-s3.region');
-    this.cdnHostname = this.config.get<string>('modules.aws-s3.cdnHostname');
+    this.bucket = this.config.getOrThrow<string>("modules.aws-s3.bucket");
+    this.region = this.config.getOrThrow<string>("modules.aws-s3.region");
+    this.cdnHostname = this.config.get<string>("modules.aws-s3.cdnHostname");
   }
 
   getSystemFolderPath() {
@@ -36,7 +36,7 @@ export class AwsS3FileService {
     // [step 1] Check if the s3File table is empty.
     const count = await this.prisma.s3File.count();
     if (count > 0) {
-      throw new Error('The s3File table is not empty. Please clear the table before syncing.');
+      throw new Error("The s3File table is not empty. Please clear the table before syncing.");
     }
 
     // [step 2] Get all objects from S3 bucket.
@@ -51,17 +51,17 @@ export class AwsS3FileService {
       s3Key: string;
     }[] = [];
 
-    for (const {s3Key, size} of objects) {
+    for (const { s3Key, size } of objects) {
       const fileSize = size;
-      let fileName = '';
-      let fileType = '';
+      let fileName = "";
+      let fileType = "";
 
-      if (s3Key.endsWith('/')) {
-        fileName = s3Key.slice(0, -1).split('/').pop() || '';
-        fileType = 'folder';
+      if (s3Key.endsWith("/")) {
+        fileName = s3Key.slice(0, -1).split("/").pop() || "";
+        fileType = "folder";
       } else {
-        fileName = s3Key.split('/').pop() || '';
-        fileType = s3Key.split('.').pop() || '';
+        fileName = s3Key.split("/").pop() || "";
+        fileType = s3Key.split(".").pop() || "";
       }
 
       createManyInputs.push({
@@ -75,26 +75,26 @@ export class AwsS3FileService {
 
     const files = await this.prisma.s3File.createManyAndReturn({
       data: createManyInputs,
-      select: {id: true, s3Key: true},
+      select: { id: true, s3Key: true },
     });
 
     // [step 4] Link parent-child relationships.
-    const fileMap = new Map(files.map(file => [file.s3Key, file.id]));
+    const fileMap = new Map(files.map((file) => [file.s3Key, file.id]));
 
-    for (const {id, s3Key} of files) {
+    for (const { id, s3Key } of files) {
       let parts: string[];
-      if (s3Key.endsWith('/')) {
-        parts = s3Key.slice(0, -1).split('/');
+      if (s3Key.endsWith("/")) {
+        parts = s3Key.slice(0, -1).split("/");
       } else {
-        parts = s3Key.split('/');
+        parts = s3Key.split("/");
       }
       if (parts.length > 1) {
-        const parentKey = parts.slice(0, -1).join('/') + '/';
+        const parentKey = parts.slice(0, -1).join("/") + "/";
         const parentId = fileMap.get(parentKey);
         if (parentId) {
           await this.prisma.s3File.update({
-            where: {id: id},
-            data: {parentId: parentId},
+            where: { id: id },
+            data: { parentId: parentId },
           });
         }
       }
@@ -109,10 +109,10 @@ export class AwsS3FileService {
     let parentId = params.parentId;
 
     // Remove leading and trailing slashes from path
-    params.path = params.path.replace(/^\/+|\/+$/g, '');
+    params.path = params.path.replace(/^\/+|\/+$/g, "");
 
     // convert the path to a folder if it does not exist
-    const folderNames = params.path.split('/');
+    const folderNames = params.path.split("/");
     for (let i = 0; i < folderNames.length; i++) {
       if (folderNames[i].length === 0) {
         continue; // Skip empty folder names.
@@ -121,7 +121,7 @@ export class AwsS3FileService {
       const existingFolder = await this.prisma.s3File.findFirst({
         where: {
           name: folderNames[i],
-          type: 'folder',
+          type: "folder",
           parentId: parentId,
         },
       });
@@ -131,16 +131,16 @@ export class AwsS3FileService {
       } else {
         let s3Key: string;
         if (parentId) {
-          s3Key = (await this.getFilePathString(parentId)) + '/' + folderNames[i] + '/';
+          s3Key = (await this.getFilePathString(parentId)) + "/" + folderNames[i] + "/";
         } else {
-          s3Key = folderNames[i] + '/';
+          s3Key = folderNames[i] + "/";
         }
 
-        const output = await this.s3.putObject({key: s3Key});
+        const output = await this.s3.putObject({ key: s3Key });
         const folder = await this.prisma.s3File.create({
           data: {
             name: folderNames[i],
-            type: 'folder',
+            type: "folder",
             s3Bucket: this.bucket,
             s3Key: s3Key,
             s3Response: output as object,
@@ -166,7 +166,7 @@ export class AwsS3FileService {
   }) {
     // Validate parameters
     if (params.path && params.parentId) {
-      throw new Error('Do not use both `parentId` and `path` at the same time.');
+      throw new Error("Do not use both `parentId` and `path` at the same time.");
     }
 
     // Create or get the parent folder if path is provided.
@@ -177,7 +177,7 @@ export class AwsS3FileService {
     }
 
     // [step 1] Check if a file with the same name exists in the same folder.
-    let existingFile: {id: string; s3Key: string} | null = null;
+    let existingFile: { id: string; s3Key: string } | null = null;
     let origionalName: string;
     if (params.name) {
       existingFile = await this.prisma.s3File.findFirst({
@@ -186,7 +186,7 @@ export class AwsS3FileService {
           s3Bucket: this.bucket,
           parentId: params.parentId,
         },
-        select: {id: true, s3Key: true},
+        select: { id: true, s3Key: true },
       });
       origionalName = params.name;
     } else {
@@ -204,7 +204,7 @@ export class AwsS3FileService {
         const ext = extname(origionalName);
         const randomStr = await generateRandomString(6);
 
-        name = ext === '' ? origionalName + randomStr : origionalName.slice(0, -ext.length) + randomStr + ext;
+        name = ext === "" ? origionalName + randomStr : origionalName.slice(0, -ext.length) + randomStr + ext;
 
         if (params.parentId) {
           s3Key = (await this.getFilePathString(params.parentId)) + `/${name}`;
@@ -231,13 +231,13 @@ export class AwsS3FileService {
     // [step 4] Create or update a record in the database.
     if (existingFile && params.overwrite) {
       return await this.prisma.s3File.update({
-        where: {id: existingFile.id},
+        where: { id: existingFile.id },
         data: {
           type: params.type,
           size: params.size,
           s3Response: output as object,
         },
-        select: {id: true, name: true},
+        select: { id: true, name: true },
       });
     } else {
       return await this.prisma.s3File.create({
@@ -250,7 +250,7 @@ export class AwsS3FileService {
           s3Response: output as object,
           parentId: params.parentId,
         },
-        select: {id: true, name: true},
+        select: { id: true, name: true },
       });
     }
   }
@@ -263,15 +263,15 @@ export class AwsS3FileService {
     name?: string;
     overwrite?: boolean;
   }) {
-    const {base64, ...others} = params;
+    const { base64, ...others } = params;
 
     // Convert base64 to buffer
-    const base64Data = base64.replace(/^data:([\w\/]+);base64,/, '');
-    const buffer = Buffer.from(base64Data, 'base64');
+    const base64Data = base64.replace(/^data:([\w\/]+);base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
 
     // Extract mimetype from base64 string
     const mimetypeMatch = base64.match(/^data:([\w\/]+);base64,/);
-    const mimetype = mimetypeMatch ? mimetypeMatch[1] : '';
+    const mimetype = mimetypeMatch ? mimetypeMatch[1] : "";
 
     return await this.uploadFile({
       buffer: buffer,
@@ -284,8 +284,8 @@ export class AwsS3FileService {
   // Get object from AWS S3 by file ID.
   async getFileObject(fileId: string) {
     const file = await this.prisma.s3File.findFirstOrThrow({
-      where: {id: fileId},
-      select: {s3Bucket: true, s3Key: true},
+      where: { id: fileId },
+      select: { s3Bucket: true, s3Key: true },
     });
 
     return await this.s3.getObject({
@@ -297,7 +297,7 @@ export class AwsS3FileService {
   async getFileBuffer(fileId: string) {
     const object = await this.getFileObject(fileId);
     if (!object.Body) {
-      throw new Error('File not found');
+      throw new Error("File not found");
     }
 
     return Buffer.from((await object.Body.transformToByteArray()).buffer);
@@ -309,8 +309,8 @@ export class AwsS3FileService {
 
     // [step 1] Get current file.
     const file = await this.prisma.s3File.findFirstOrThrow({
-      where: {id: fileId},
-      select: {id: true, name: true, type: true, parentId: true},
+      where: { id: fileId },
+      select: { id: true, name: true, type: true, parentId: true },
     });
     path.push(file);
 
@@ -330,11 +330,11 @@ export class AwsS3FileService {
   }) {
     // [step 1] Get the file or folder to be moved.
     const originalFile = await this.prisma.s3File.findFirstOrThrow({
-      where: {id: params.fileId},
+      where: { id: params.fileId },
     });
 
     // [step 2] Copy the file or folder.
-    if (originalFile.type === 'folder') {
+    if (originalFile.type === "folder") {
       await this.copyFolder({
         folder: originalFile,
         destinationParentId: params.destinationParentId,
@@ -359,7 +359,7 @@ export class AwsS3FileService {
   // Delete a file in AWS S3, then delete the record in the database.
   async deleteFile(fileId: string) {
     const file = await this.prisma.s3File.findFirstOrThrow({
-      where: {id: fileId},
+      where: { id: fileId },
     });
 
     try {
@@ -378,7 +378,7 @@ export class AwsS3FileService {
   //* Multipart upload operations */
   //*******************************/
 
-  async createMultipartUpload(params: {name: string; type: string; size: number; parentId?: string; path?: string}) {
+  async createMultipartUpload(params: { name: string; type: string; size: number; parentId?: string; path?: string }) {
     // [step 1] Generate s3Key.
     const s3Key = await this.generateS3Key({
       name: params.name,
@@ -414,12 +414,12 @@ export class AwsS3FileService {
     body: Buffer | Uint8Array | Blob | string;
   }) {
     const file = await this.prisma.s3File.findFirstOrThrow({
-      where: {uploadId: params.uploadId},
+      where: { uploadId: params.uploadId },
     });
 
     await this.prisma.s3File.update({
-      where: {id: file.id},
-      data: {uploadProgress: params.uploadProgress},
+      where: { id: file.id },
+      data: { uploadProgress: params.uploadProgress },
     });
 
     return await this.s3.uploadPart({
@@ -429,9 +429,9 @@ export class AwsS3FileService {
     });
   }
 
-  async completeMultipartUpload(params: {uploadId: string; parts: {ETag: string; PartNumber: number}[]}) {
+  async completeMultipartUpload(params: { uploadId: string; parts: { ETag: string; PartNumber: number }[] }) {
     const file = await this.prisma.s3File.findFirstOrThrow({
-      where: {uploadId: params.uploadId},
+      where: { uploadId: params.uploadId },
     });
 
     const response = await this.s3.completeMultipartUpload({
@@ -442,7 +442,7 @@ export class AwsS3FileService {
     });
 
     return await this.prisma.s3File.update({
-      where: {id: file.id},
+      where: { id: file.id },
       data: {
         s3Response: response as object,
         uploadProgress: 100, // Set progress to 100% after completion
@@ -452,8 +452,8 @@ export class AwsS3FileService {
 
   async abortMultipartUpload(uploadId: string) {
     const file = await this.prisma.s3File.findFirstOrThrow({
-      where: {uploadId},
-      select: {s3Bucket: true, s3Key: true},
+      where: { uploadId },
+      select: { s3Bucket: true, s3Key: true },
     });
 
     return await this.s3.abortMultipartUpload({
@@ -510,7 +510,7 @@ export class AwsS3FileService {
       contentEncoding: params.encoding,
     });
 
-    return {fileId: file.id, signedUploadUrl};
+    return { fileId: file.id, signedUploadUrl };
   }
 
   /*
@@ -521,8 +521,8 @@ export class AwsS3FileService {
    */
   async getSignedDownloadUrl(fileId: string) {
     const file = await this.prisma.s3File.findFirst({
-      where: {id: fileId},
-      select: {s3Bucket: true, s3Key: true},
+      where: { id: fileId },
+      select: { s3Bucket: true, s3Key: true },
     });
 
     if (file) {
@@ -541,12 +541,12 @@ export class AwsS3FileService {
 
   private async deleteFileRecursively(fileId: string) {
     // [step 1] Delete file.
-    await this.prisma.s3File.delete({where: {id: fileId}});
+    await this.prisma.s3File.delete({ where: { id: fileId } });
 
     // [step 2] Delete files in the folder.
     const filesInFolder = await this.prisma.s3File.findMany({
-      where: {parentId: fileId},
-      select: {id: true},
+      where: { parentId: fileId },
+      select: { id: true },
     });
 
     for (let i = 0; i < filesInFolder.length; i++) {
@@ -555,18 +555,18 @@ export class AwsS3FileService {
   }
 
   private async getFilePathString(fileId: string) {
-    let path = '';
+    let path = "";
 
     // [step 1] Get current file.
     const file = await this.prisma.s3File.findFirstOrThrow({
-      where: {id: fileId},
-      select: {id: true, name: true, type: true, parentId: true},
+      where: { id: fileId },
+      select: { id: true, name: true, type: true, parentId: true },
     });
     path = file.name;
 
     // [step 2] Get parent file.
     if (file.parentId) {
-      path = (await this.getFilePathString(file.parentId)) + '/' + path;
+      path = (await this.getFilePathString(file.parentId)) + "/" + path;
     } else {
       // Do nothing.
     }
@@ -574,7 +574,7 @@ export class AwsS3FileService {
     return path;
   }
 
-  private async generateS3Key(params: {name: string; parentId?: string; path?: string}) {
+  private async generateS3Key(params: { name: string; parentId?: string; path?: string }) {
     let s3Key: string;
 
     if (params.parentId) {
@@ -603,14 +603,14 @@ export class AwsS3FileService {
         s3Bucket: this.bucket,
         parentId: destinationParentId,
       },
-      select: {id: true, s3Key: true},
+      select: { id: true, s3Key: true },
     });
 
     // [step 3]  Generate destination s3Key and name based on whether the file exists and the overwrite option.
     if (existingFile) {
       const ext = extname(file.name);
       const randomStr = await generateRandomString(6);
-      if (ext === '') {
+      if (ext === "") {
         file.name += randomStr;
       } else {
         file.name = file.name.slice(0, -ext.length) + randomStr + ext;
@@ -625,8 +625,8 @@ export class AwsS3FileService {
     } else {
       destinationS3Key = file.name;
     }
-    if (file.type === 'folder') {
-      destinationS3Key += '/';
+    if (file.type === "folder") {
+      destinationS3Key += "/";
     }
 
     // [step 4] Copy the object in S3 and create a new record in the database.
@@ -646,7 +646,7 @@ export class AwsS3FileService {
         s3Response: s3CopyResponse as object,
         parentId: destinationParentId,
       },
-      select: {id: true, name: true},
+      select: { id: true, name: true },
     });
   }
 
@@ -662,13 +662,13 @@ export class AwsS3FileService {
 
     // [step 2] Copy files in the folder.
     const filesInFolder = await this.prisma.s3File.findMany({
-      where: {parentId: params.folder.id},
+      where: { parentId: params.folder.id },
     });
 
     for (let i = 0; i < filesInFolder.length; i++) {
       const file = filesInFolder[i];
 
-      if (file.type === 'folder') {
+      if (file.type === "folder") {
         await this.copyFolder({
           folder: file,
           destinationParentId: newFolder.id,

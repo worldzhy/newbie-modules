@@ -1,10 +1,10 @@
-import {ExecutionContext, Injectable} from '@nestjs/common';
-import {Reflector} from '@nestjs/core';
-import {AuthGuard} from '@nestjs/passport';
-import {PUBLIC_ENDPOINT} from '../auth.constants';
+import { ExecutionContext, Injectable } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { AuthGuard } from "@nestjs/passport";
+import { PUBLIC_ENDPOINT } from "../auth.constants";
 
 @Injectable()
-export class SaasAuthGuard extends AuthGuard('saas') {
+export class SaasAuthGuard extends AuthGuard("saas") {
   constructor(private readonly reflector: Reflector) {
     super();
   }

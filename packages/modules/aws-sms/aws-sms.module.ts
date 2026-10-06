@@ -1,5 +1,5 @@
-import {Global, Module} from '@nestjs/common';
-import {AwsSmsService} from './aws-sms.service';
+import { Global, Module } from "@nestjs/common";
+import { AwsSmsService } from "./aws-sms.service";
 
 @Global()
 @Module({

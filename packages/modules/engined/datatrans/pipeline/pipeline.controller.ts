@@ -1,30 +1,30 @@
-import {Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post} from '@nestjs/common';
-import {ApiBearerAuth, ApiBody, ApiTags} from '@nestjs/swagger';
-import {DatatransPipelineService} from './pipeline.service';
-import {PostgresqlDatasourceTableService} from '../../datasource/postgresql/table/table.service';
-import {ElasticsearchDatasourceIndexService} from '../../datasource/elasticsearch/index/index.service';
-import {DatatransPipeline, Prisma} from '@generated/prisma/client';
-import {PrismaService} from '@devbie/newbie/prisma/prisma.service';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from "@nestjs/common";
+import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { DatatransPipelineService } from "./pipeline.service";
+import { PostgresqlDatasourceTableService } from "../../datasource/postgresql/table/table.service";
+import { ElasticsearchDatasourceIndexService } from "../../datasource/elasticsearch/index/index.service";
+import { DatatransPipeline, Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
-@ApiTags('Datatrans Pipeline')
+@ApiTags("Datatrans Pipeline")
 @ApiBearerAuth()
-@Controller('datatrans-pipelines')
+@Controller("datatrans-pipelines")
 export class DatatransPipelineController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pipelineService: DatatransPipelineService,
     private readonly postgresqlDatasourceTableService: PostgresqlDatasourceTableService,
-    private readonly elasticsearchDatasourceIndexService: ElasticsearchDatasourceIndexService
+    private readonly elasticsearchDatasourceIndexService: ElasticsearchDatasourceIndexService,
   ) {}
 
-  @Post('')
+  @Post("")
   @ApiBody({
     description: "The 'name', 'status' and 'clientEmail' are required in request body.",
     examples: {
       a: {
-        summary: '1. Create',
+        summary: "1. Create",
         value: {
-          name: 'pipeline_01',
+          name: "pipeline_01",
           hasManyTables: [],
           belongsToTables: [],
           fromTableId: 1,
@@ -35,14 +35,14 @@ export class DatatransPipelineController {
   })
   async createPipeline(
     @Body()
-    body: Prisma.DatatransPipelineUncheckedCreateInput
+    body: Prisma.DatatransPipelineUncheckedCreateInput,
   ): Promise<DatatransPipeline> {
     // [step 1] Check if the fromTable and toIndex are existed.
     if (!(await this.postgresqlDatasourceTableService.checkExistence(body.fromTableId))) {
-      throw new NotFoundException('Not found the postgresql table.');
+      throw new NotFoundException("Not found the postgresql table.");
     }
     if (!(await this.elasticsearchDatasourceIndexService.checkExistence(body.toIndexId))) {
-      throw new NotFoundException('Not found the elasticsearch index.');
+      throw new NotFoundException("Not found the elasticsearch index.");
     }
 
     // [step 2] Create pipeline.
@@ -51,32 +51,32 @@ export class DatatransPipelineController {
         name: body.name,
         hasManyTables: body.hasManyTables,
         belongsToTables: body.belongsToTables,
-        fromTable: {connect: {id: body.fromTableId}},
-        toIndex: {connect: {id: body.toIndexId}},
+        fromTable: { connect: { id: body.fromTableId } },
+        toIndex: { connect: { id: body.toIndexId } },
       },
     });
   }
 
-  @Get('')
+  @Get("")
   async getPipelines(): Promise<DatatransPipeline[]> {
     return await this.prisma.datatransPipeline.findMany({});
   }
 
-  @Get(':pipelineId')
-  async getPipeline(@Param('pipelineId') pipelineId: string): Promise<DatatransPipeline | null> {
+  @Get(":pipelineId")
+  async getPipeline(@Param("pipelineId") pipelineId: string): Promise<DatatransPipeline | null> {
     return await this.prisma.datatransPipeline.findUnique({
-      where: {id: pipelineId},
+      where: { id: pipelineId },
     });
   }
 
-  @Patch(':pipelineId')
+  @Patch(":pipelineId")
   @ApiBody({
-    description: 'Update pipeline.',
+    description: "Update pipeline.",
     examples: {
       a: {
-        summary: '1. Update name',
+        summary: "1. Update name",
         value: {
-          name: 'pipeline-01',
+          name: "pipeline-01",
           hasManyTables: [],
           belongsToTables: [],
         },
@@ -84,38 +84,38 @@ export class DatatransPipelineController {
     },
   })
   async updatePipeline(
-    @Param('pipelineId') pipelineId: string,
+    @Param("pipelineId") pipelineId: string,
     @Body()
-    body: Prisma.DatatransPipelineUpdateInput
+    body: Prisma.DatatransPipelineUpdateInput,
   ): Promise<DatatransPipeline> {
     return await this.prisma.datatransPipeline.update({
-      where: {id: pipelineId},
+      where: { id: pipelineId },
       data: body,
     });
   }
 
-  @Delete(':pipelineId')
-  async deletePipeline(@Param('pipelineId') pipelineId: string): Promise<DatatransPipeline> {
+  @Delete(":pipelineId")
+  async deletePipeline(@Param("pipelineId") pipelineId: string): Promise<DatatransPipeline> {
     return await this.prisma.datatransPipeline.delete({
-      where: {id: pipelineId},
+      where: { id: pipelineId },
     });
   }
 
-  @Get(':pipelineId/overview')
-  async overviewPipeline(@Param('pipelineId') pipelineId: string): Promise<{
+  @Get(":pipelineId/overview")
+  async overviewPipeline(@Param("pipelineId") pipelineId: string): Promise<{
     table: string;
     numberOfRecords: number;
     recordAverageSize: number;
-    hasMany: {name: string; numberOfRecords: number}[];
-    belongsTo: {name: string; numberOfRecords: number}[];
+    hasMany: { name: string; numberOfRecords: number }[];
+    belongsTo: { name: string; numberOfRecords: number }[];
   }> {
     // [step 1] Get pipeline.
     const pipeline = await this.prisma.datatransPipeline.findUnique({
-      where: {id: pipelineId},
-      include: {fromTable: true},
+      where: { id: pipelineId },
+      include: { fromTable: true },
     });
     if (!pipeline) {
-      throw new NotFoundException('Not found the pipeline.');
+      throw new NotFoundException("Not found the pipeline.");
     }
 
     // [step 2] Update name.

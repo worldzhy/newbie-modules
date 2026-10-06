@@ -1,4 +1,4 @@
-import {Injectable} from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 
 @Injectable()
 export class Null_Stack {
@@ -19,6 +19,6 @@ export class Null_Stack {
   }
 
   static getStackTemplate() {
-    return '';
+    return "";
   }
 }

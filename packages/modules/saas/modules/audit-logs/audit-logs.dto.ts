@@ -1,11 +1,8 @@
-import {ApiProperty} from '@nestjs/swagger';
-import {
-  CommonPaginationReqDto,
-  CommonPaginationResDto,
-} from '@devbie/newbie/common.dto';
-import {AuditLog} from '@prisma/client';
-import {Expose} from '../../helpers/interfaces';
-import {expose} from '../../helpers/expose';
+import { ApiProperty } from "@nestjs/swagger";
+import { CommonPaginationReqDto, CommonPaginationResDto } from "@devbie/newbie/common.dto";
+import { AuditLog } from "@prisma/client";
+import { Expose } from "../../helpers/interfaces";
+import { expose } from "../../helpers/expose";
 
 export class AuditLogsListReqDto extends CommonPaginationReqDto {}
 

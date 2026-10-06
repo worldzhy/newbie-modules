@@ -1,5 +1,5 @@
-import {Global, Module} from '@nestjs/common';
-import {SlackService} from './slack.service';
+import { Global, Module } from "@nestjs/common";
+import { SlackService } from "./slack.service";
 
 @Global()
 @Module({

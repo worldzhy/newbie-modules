@@ -1,5 +1,5 @@
-import {Global, Module} from '@nestjs/common';
-import {GooglePlacesService} from './google-places.service';
+import { Global, Module } from "@nestjs/common";
+import { GooglePlacesService } from "./google-places.service";
 
 @Global()
 @Module({

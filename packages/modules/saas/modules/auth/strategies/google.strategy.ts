@@ -1,14 +1,9 @@
-import {BadRequestException, Injectable} from '@nestjs/common';
-import {PassportStrategy} from '@nestjs/passport';
-import {
-  Strategy,
-  Profile,
-  VerifyCallback,
-  StrategyOptionWithRequest,
-} from 'passport-google-oauth20';
-import {AuthService} from '../auth.service';
-import {ConfigService} from '@nestjs/config';
-import {User} from '@prisma/client';
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { PassportStrategy } from "@nestjs/passport";
+import { Strategy, Profile, VerifyCallback, StrategyOptionWithRequest } from "passport-google-oauth20";
+import { AuthService } from "../auth.service";
+import { ConfigService } from "@nestjs/config";
+import { User } from "@prisma/client";
 
 /**
  * local dev, to change file node_modules/oauth/lib/oauth2.js
@@ -25,16 +20,14 @@ import {User} from '@prisma/client';
 export class GoogleStrategy extends PassportStrategy(Strategy) {
   constructor(
     private readonly authService: AuthService,
-    private readonly configService: ConfigService
+    private readonly configService: ConfigService,
   ) {
     super(<StrategyOptionWithRequest>{
-      clientID: configService.get('modules.saas.googleAuth.clientId'),
-      clientSecret: configService.get(
-        'modules.saas.googleAuth.clientSecret'
-      ),
-      callbackURL: `${configService.get('modules.saas.serverHost')}/auth/google/callback`,
+      clientID: configService.get("modules.saas.googleAuth.clientId"),
+      clientSecret: configService.get("modules.saas.googleAuth.clientSecret"),
+      callbackURL: `${configService.get("modules.saas.serverHost")}/auth/google/callback`,
       // passReqToCallback: true,
-      scope: ['email', 'profile'],
+      scope: ["email", "profile"],
     });
   }
 
@@ -43,16 +36,16 @@ export class GoogleStrategy extends PassportStrategy(Strategy) {
     accessToken: string,
     refreshToken: string,
     profile: Profile,
-    done: VerifyCallback
+    done: VerifyCallback,
   ): Promise<User> {
     if (!profile) {
       throw new BadRequestException();
     }
     const googleId = profile.id;
-    const email = profile.emails[0] ? profile.emails[0].value : '';
+    const email = profile.emails[0] ? profile.emails[0].value : "";
     const firstName = profile.name.givenName;
     const lastName = profile.name.familyName;
-    const avatar = profile.photos[0] ? profile.photos[0].value : '';
+    const avatar = profile.photos[0] ? profile.photos[0].value : "";
     const user: User = await this.authService.findOrCreateAccountByGoogleAuth({
       googleId,
       email,
