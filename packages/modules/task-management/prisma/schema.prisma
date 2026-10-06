@@ -12,12 +12,7 @@ model TaskGroup {
   chatId      String     @unique // Lark group chat ID or other platform group ID
   name        String?    // Group name
   description String?    // Group description
-  
-  projectId   String?    @db.Uuid // Relation to Application Project
-  // Note: We cannot enforce foreign key constraint across schemas easily in Prisma without manual SQL or complex setup if schemas are fully isolated. 
-  // Assuming loose coupling or same DB. If strict relation needed, add `project Project @relation(...)` and import Project model.
-  // For microservice architecture, usually we keep ID reference.
-  
+
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   tasks       Task[]

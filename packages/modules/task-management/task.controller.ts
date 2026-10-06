@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiParam } from "@ne
 import { JwtAuthGuard } from "@modules/security/authentication/jwt/jwt.guard";
 import { TaskService } from "./task.service";
 import { UserRequest } from "@modules/security/security.interface";
-import { TaskCronService } from "./task-cron.service";
+import { TaskReportService } from "./task-report.service";
 import {
   CreateGroupDto,
   CreateTaskApiDto,
@@ -40,7 +40,7 @@ import {
 export class TaskController {
   constructor(
     private readonly taskService: TaskService,
-    private readonly taskCronService: TaskCronService,
+    private readonly taskReportService: TaskReportService,
   ) {}
 
   @Get("users")
@@ -181,26 +181,25 @@ export class TaskController {
       };
     }
 
-    // 2. Fetch tasks for this taskProjectId
-    const result = await this.taskService.listTasks(
-      taskProject.groupId,
-      query.status,
-      query.keyword,
-      query.assigneeName,
-      taskProject.id,
-      true, // includeCompleted
-      page * pageSize,
-      pageSize,
-    );
+    // 2. Fetch tasks and total count for this taskProjectId
+    const filter = {
+      groupId: taskProject.groupId,
+      status: query.status,
+      title: query.keyword,
+      assigneeName: query.assigneeName,
+      taskProjectId: taskProject.id,
+      includeCompleted: true,
+      skip: page * pageSize,
+      take: pageSize,
+    };
+    const [records, total] = await Promise.all([
+      this.taskService.listTasks(filter),
+      this.taskService.countTasks(filter),
+    ]);
 
     return {
       success: true,
-      data: {
-        records: result?.tasks || [],
-        total: result?.total || 0,
-        page,
-        pageSize,
-      },
+      data: { records, total, page, pageSize },
     };
   }
 
@@ -269,7 +268,7 @@ export class TaskController {
     @Param("projectId") projectId: string,
     @Body() dto: GenerateMonthlyReportDto,
   ): Promise<GenerateMonthlyReportResponseDto> {
-    return await this.taskCronService.generateAndSendMonthlyReportForProject(projectId, dto.year, dto.month);
+    return await this.taskReportService.generateAndSendMonthlyReportForProject(projectId, dto.year, dto.month);
   }
 
   @Get("projects/:projectId/reports/weekly")
@@ -287,7 +286,10 @@ export class TaskController {
       return { success: true, data: { records: [], total: 0, page, pageSize } };
     }
 
-    const result = await this.taskService.listWeeklyReports(taskProject.groupId, page * pageSize, pageSize);
+    const result = await this.taskReportService.listWeeklyReports(taskProject.groupId, {
+      skip: page * pageSize,
+      take: pageSize,
+    });
     return { success: true, data: { ...result, page, pageSize } };
   }
 
@@ -306,7 +308,10 @@ export class TaskController {
       return { success: true, data: { records: [], total: 0, page, pageSize } };
     }
 
-    const result = await this.taskService.listMonthlyReports(taskProject.id, page * pageSize, pageSize);
+    const result = await this.taskReportService.listMonthlyReports(taskProject.id, {
+      skip: page * pageSize,
+      take: pageSize,
+    });
     return { success: true, data: { ...result, page, pageSize } };
   }
 
@@ -320,7 +325,7 @@ export class TaskController {
     @Param("reportId") reportId: string,
     @Body() dto: UpdateMonthlyReportDto,
   ): Promise<UpdateMonthlyReportResponseDto> {
-    const result = await this.taskService.updateMonthlyReportContent(reportId, dto.content);
+    const result = await this.taskReportService.updateMonthlyReportContent(reportId, dto.content);
     return { success: true, data: result };
   }
 }

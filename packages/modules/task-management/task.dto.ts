@@ -264,9 +264,6 @@ export class TaskGroupDto {
   @ApiPropertyOptional({ description: "Group description", type: String })
   description?: string | null;
 
-  @ApiPropertyOptional({ description: "Linked Nightwatch Project ID (uuid)", type: String })
-  projectId?: string | null;
-
   @ApiProperty({ type: Date })
   createdAt: Date;
 
