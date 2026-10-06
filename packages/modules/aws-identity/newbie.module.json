@@ -10,7 +10,7 @@
   "env": {},
   "dependencies": {
     "@aws-sdk/client-sts": "latest",
-    "@aws-sdk/credential-providers": "latest"
+    "@aws-sdk/credential-provider-node": "latest"
   },
   "devDependencies": {}
 }

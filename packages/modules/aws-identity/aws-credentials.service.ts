@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { BadGatewayException, BadRequestException, HttpException, Injectable, Logger } from "@nestjs/common";
-import { defaultProvider } from "@aws-sdk/credential-providers";
+import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCrossAccountBinding } from "@generated/prisma/client";
 import { UpsertAwsCrossAccountBindingDto } from "./aws-credentials.dto";
