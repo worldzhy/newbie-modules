@@ -5,6 +5,7 @@
     "file": "aws-sqs.module",
     "className": "AwsSqsModule"
   },
+  "moduleDependencies": ["aws-identity"],
   "config-service": {
     "aws-sqs": {
       "region": "process.env.AWS_SQS_REGION || 'us-east-1'",

@@ -1,20 +1,27 @@
 import { Injectable } from "@nestjs/common";
 import { SQSClient, SendMessageCommand, GetQueueAttributesCommand, QueueAttributeName } from "@aws-sdk/client-sqs";
 import { ConfigService } from "@nestjs/config";
+import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
 
 @Injectable()
 export class AwsSqsService {
   private client: SQSClient;
   private queueUrl: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly credentials: AwsCredentialsService,
+  ) {
     const config = this.configService.getOrThrow<{
       region: string;
       queueUrl: string;
     }>("modules.aws-sqs");
 
     this.queueUrl = config.queueUrl;
-    this.client = new SQSClient({ region: config.region });
+    this.client = new SQSClient({
+      region: config.region,
+      credentials: this.credentials.resolveDefaultCredentials(),
+    });
   }
 
   /**
