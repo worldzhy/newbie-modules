@@ -3,6 +3,9 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { LlmAgentService } from "../llm-agent/llm-agent.service";
 import { LarkBotService } from "../lark-bot/lark-bot.service";
 import dayjs from "dayjs";
+import isoWeek from "dayjs/plugin/isoWeek";
+
+dayjs.extend(isoWeek);
 
 @Injectable()
 export class TaskReportService {
@@ -14,114 +17,154 @@ export class TaskReportService {
     private readonly larkBotService: LarkBotService,
   ) {}
 
-  // --- Weekly Reports ---
+  // --- Weekly Report Management ---
 
-  async listWeeklyReports(
-    groupId: string,
-    options?: { userId?: string; year?: number; week?: number; skip?: number; take?: number },
-  ) {
-    const { userId, year, week, skip = 0, take = 10 } = options || {};
-    const whereClause: any = { groupId };
-    if (userId) whereClause.userId = userId;
-    if (year) whereClause.year = year;
-    if (week) whereClause.week = week;
-
-    const [records, total] = await Promise.all([
-      this.prisma.weeklyReport.findMany({
-        where: whereClause,
-        include: { user: true },
-        orderBy: [{ year: "desc" }, { week: "desc" }],
-        skip,
-        take,
-      }),
-      this.prisma.weeklyReport.count({ where: whereClause }),
-    ]);
-
+  async listWeeklyReports(groupId: string, skip?: number, take?: number) {
+    const total = await this.prisma.weeklyReport.count({
+      where: { groupId },
+    });
+    const records = await this.prisma.weeklyReport.findMany({
+      where: { groupId },
+      include: { user: true },
+      orderBy: [{ year: "desc" }, { week: "desc" }],
+      skip,
+      take,
+    });
     return { records, total };
   }
 
-  async upsertWeeklyReport(groupId: string, userId: string, year: number, week: number, content: string) {
-    return this.prisma.weeklyReport.upsert({
+  async upsertWeeklyReport(groupId: string, userId: string, content: string) {
+    const now = dayjs();
+    const year = now.year();
+    const week = now.isoWeek();
+
+    return await this.prisma.weeklyReport.upsert({
       where: {
-        groupId_userId_year_week: { groupId, userId, year, week },
+        groupId_userId_year_week: {
+          groupId,
+          userId,
+          year,
+          week,
+        },
       },
-      update: { content },
-      create: { groupId, userId, year, week, content },
+      update: {
+        content,
+      },
+      create: {
+        groupId,
+        userId,
+        year,
+        week,
+        content,
+      },
     });
   }
 
-  async getWeeklyReport(groupId: string, userId: string, year: number, week: number) {
-    return this.prisma.weeklyReport.findUnique({
+  async getWeeklyReport(groupId: string, userId: string, weekOffset: number = 0) {
+    const targetDate = dayjs().add(weekOffset, "week");
+    const year = targetDate.year();
+    const week = targetDate.isoWeek();
+
+    return await this.prisma.weeklyReport.findUnique({
       where: {
-        groupId_userId_year_week: { groupId, userId, year, week },
+        groupId_userId_year_week: {
+          groupId,
+          userId,
+          year,
+          week,
+        },
+      },
+      include: {
+        user: true,
       },
     });
   }
 
-  // --- Monthly Reports ---
+  // --- Monthly Report Management ---
 
-  async listMonthlyReports(
-    projectId: string,
-    options?: { year?: number; month?: number; skip?: number; take?: number },
-  ) {
-    const { year, month, skip = 0, take = 10 } = options || {};
-    const whereClause: any = { projectId };
-    if (year) whereClause.year = year;
-    if (month) whereClause.month = month;
-
-    const [records, total] = await Promise.all([
-      this.prisma.monthlyReport.findMany({
-        where: whereClause,
-        orderBy: [{ year: "desc" }, { month: "desc" }],
-        skip,
-        take,
-      }),
-      this.prisma.monthlyReport.count({ where: whereClause }),
-    ]);
-
+  async listMonthlyReports(projectId: string, skip?: number, take?: number) {
+    const total = await this.prisma.monthlyReport.count({
+      where: { projectId },
+    });
+    const records = await this.prisma.monthlyReport.findMany({
+      where: { projectId },
+      orderBy: [{ year: "desc" }, { month: "desc" }],
+      skip,
+      take,
+    });
     return { records, total };
   }
 
-  async updateMonthlyReportContent(id: string, content: string) {
-    return this.prisma.monthlyReport.update({
-      where: { id },
+  async updateMonthlyReportContent(reportId: string, content: string) {
+    return await this.prisma.monthlyReport.update({
+      where: { id: reportId },
       data: { content },
     });
   }
 
   async upsertMonthlyReport(projectId: string, year: number, month: number, content: string) {
-    return this.prisma.monthlyReport.upsert({
+    return await this.prisma.monthlyReport.upsert({
       where: {
-        projectId_year_month: { projectId, year, month },
+        projectId_year_month: {
+          projectId,
+          year,
+          month,
+        },
       },
-      update: { content },
-      create: { projectId, year, month, content },
+      update: {
+        content,
+      },
+      create: {
+        projectId,
+        year,
+        month,
+        content,
+      },
     });
   }
 
   async getMonthlyReport(projectId: string, year: number, month: number) {
-    return this.prisma.monthlyReport.findUnique({
+    return await this.prisma.monthlyReport.findUnique({
       where: {
-        projectId_year_month: { projectId, year, month },
+        projectId_year_month: {
+          projectId,
+          year,
+          month,
+        },
+      },
+      include: {
+        project: true,
       },
     });
   }
 
   async getTasksByProjectAndDateRange(projectId: string, startDate: Date, endDate: Date) {
-    return this.prisma.task.findMany({
+    return await this.prisma.task.findMany({
       where: {
         taskProjectId: projectId,
         deletedAt: null,
-        updatedAt: {
-          gte: startDate,
-          lte: endDate,
-        },
+        OR: [
+          {
+            createdAt: {
+              gte: startDate,
+              lt: endDate,
+            },
+          },
+          {
+            updatedAt: {
+              gte: startDate,
+              lt: endDate,
+            },
+          },
+        ],
       },
       include: {
-        creator: true,
         assignee: true,
+        creator: true,
       },
-      orderBy: { updatedAt: "asc" },
+      orderBy: {
+        updatedAt: "desc",
+      },
     });
   }
 
@@ -174,7 +217,10 @@ Output ONLY the report content in Markdown format. Do not output JSON.
       const startDate = targetMonthDate.startOf("month").toDate();
       const endDate = targetMonthDate.endOf("month").toDate();
 
-      const project = await this.prisma.taskProject.findUnique({ where: { id: projectId } });
+      const project = await this.prisma.taskProject.findUnique({
+        where: { id: projectId },
+        include: { group: true },
+      });
       if (!project) {
         throw new Error(`Project with ID ${projectId} not found.`);
       }
@@ -185,9 +231,8 @@ Output ONLY the report content in Markdown format. Do not output JSON.
 
       this.logger.log(`Successfully generated monthly report for project: ${project.name} (${year}-${month})`);
 
-      const group = await this.prisma.taskGroup.findUnique({ where: { id: project.groupId } });
-      if (group && group.chatId && group.chatId !== "DEFAULT_GROUP") {
-        await this.sendMonthlyReportCard(group.chatId, {
+      if (project.group && project.group.chatId) {
+        await this.sendMonthlyReportCard(project.group.chatId, {
           projectName: project.name,
           year,
           month,

@@ -1,8 +1,8 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TaskStatus } from "@generated/prisma/enums";
-import { Prisma } from "@generated/prisma/client";
 
+// Re-export the Prisma-generated enum so callers can keep importing it from the service module.
 export { TaskStatus };
 
 export interface TaskItem {
@@ -23,34 +23,12 @@ export interface UpdateTaskDto {
   title?: string;
   description?: string;
   assigneeId?: string;
+  taskProjectId?: string;
   dueDate?: Date;
-}
-
-export interface TaskOperationContext {
-  operator?: { id: string; name?: string; source: string };
-  source?: StatusSource;
-}
-
-export type StatusSource = "bot" | "api" | "user" | "unknown";
-
-export interface CreateTasksInput {
-  chatId: string;
-  userId?: string;
-  tasks: TaskItem[];
-  operator?: { id: string; name?: string; source: string };
-  requirementId?: number;
-  taskProjectId?: string;
-}
-
-export interface ListTasksFilter {
-  groupId: string;
-  status?: TaskStatus;
-  title?: string;
-  assigneeName?: string;
-  taskProjectId?: string;
-  includeCompleted?: boolean;
-  skip?: number;
-  take?: number;
+  lastOperatorId?: string;
+  lastOperatorName?: string;
+  lastOperatorSource?: string;
+  deletedAt?: Date;
 }
 
 @Injectable()
@@ -59,357 +37,508 @@ export class TaskService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // --- User Association Management (alias for controller compatibility) ---
+  // --- User Association Management ---
 
   async getTaskUserByUserId(userId: string) {
-    return this.prisma.taskUser.findUnique({ where: { userId } });
+    return await this.prisma.taskUser.findUnique({
+      where: { userId },
+    });
   }
 
   async listTaskUsers() {
-    return this.prisma.taskUser.findMany({
-      select: { id: true, openId: true, userId: true, name: true, avatarUrl: true },
+    return await this.prisma.taskUser.findMany({
+      select: {
+        id: true,
+        openId: true,
+        userId: true,
+        name: true,
+        avatarUrl: true,
+      },
       orderBy: { name: "asc" },
     });
   }
 
-  async linkTaskUser(userId: string, taskUserId: string) {
-    const existingLink = await this.prisma.taskUser.findUnique({ where: { userId } });
-    if (existingLink) {
-      throw new Error("This user is already linked to a TaskUser. Please unlink first.");
+  async listTaskUsersByProjectId(projectId: string) {
+    const taskProject = await this.getTaskProjectByProjectId(projectId);
+    if (!taskProject) {
+      return [];
     }
-    const targetTaskUser = await this.prisma.taskUser.findUnique({ where: { id: taskUserId } });
-    if (!targetTaskUser) {
-      throw new Error("TaskUser not found.");
+
+    const taskProjectId = taskProject.id;
+    const users = await this.prisma.taskUser.findMany({
+      where: {
+        OR: [
+          { createdTasks: { some: { taskProjectId, deletedAt: null } } },
+          { assignedTasks: { some: { taskProjectId, deletedAt: null } } },
+        ],
+      },
+      include: {
+        assignedTasks: {
+          where: { taskProjectId, deletedAt: null },
+          select: { status: true },
+        },
+        createdTasks: {
+          where: { taskProjectId, deletedAt: null },
+          select: { id: true },
+        },
+      },
+      orderBy: { name: "asc" },
+    });
+
+    const userIds = users.map((u) => u.userId).filter(Boolean) as string[];
+    let systemUserMap = new Map<string, any>();
+    if (userIds.length > 0) {
+      const systemUsers = await this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
+      });
+      systemUserMap = new Map(systemUsers.map((u) => [u.id, u]));
     }
-    if (targetTaskUser.userId) {
-      throw new Error("This TaskUser is already linked to another user.");
-    }
-    return this.prisma.taskUser.update({ where: { id: taskUserId }, data: { userId } });
+
+    return users.map((user) => {
+      const tasks = user.assignedTasks;
+      const total = tasks.length;
+      const completed = tasks.filter((t) => t.status === TaskStatus.COMPLETED).length;
+      const inProgress = tasks.filter(
+        (t) => t.status !== TaskStatus.COMPLETED && t.status !== TaskStatus.CANCELLED,
+      ).length;
+
+      const systemUser = user.userId ? systemUserMap.get(user.userId) : null;
+
+      return {
+        id: user.id,
+        name: user.name,
+        avatarUrl: user.avatarUrl,
+        email: systemUser?.email || null,
+        systemUsername: systemUser?.name || null,
+        taskStats: { total, completed, inProgress },
+        createdAt: user.createdAt,
+      };
+    });
   }
 
-  async unlinkTaskUser(userId: string) {
-    const existingLink = await this.prisma.taskUser.findUnique({ where: { userId } });
-    if (!existingLink) {
-      throw new Error("No TaskUser linked to this user.");
-    }
-    return this.prisma.taskUser.update({ where: { id: existingLink.id }, data: { userId: null } });
+  async getTaskProjectByProjectId(projectId: string) {
+    return await this.prisma.taskProject.findUnique({
+      where: { projectId },
+    });
   }
 
   async listTaskProjects() {
-    return this.prisma.taskProject.findMany({
-      select: { id: true, projectId: true, name: true, description: true, groupId: true },
+    return await this.prisma.taskProject.findMany({
+      select: {
+        id: true,
+        projectId: true,
+        name: true,
+        description: true,
+        groupId: true,
+      },
       orderBy: { name: "asc" },
     });
   }
 
   async linkTaskProject(projectId: string, taskProjectId: string) {
-    const existingLink = await this.prisma.taskProject.findUnique({ where: { projectId } });
+    const existingLink = await this.prisma.taskProject.findUnique({
+      where: { projectId },
+    });
     if (existingLink && existingLink.id !== taskProjectId) {
       throw new Error("This project is already linked to a TaskProject. Please unlink first.");
     }
-    const targetTaskProject = await this.prisma.taskProject.findUnique({ where: { id: taskProjectId } });
+
+    const targetTaskProject = await this.prisma.taskProject.findUnique({
+      where: { id: taskProjectId },
+    });
     if (!targetTaskProject) {
       throw new Error("TaskProject not found.");
     }
     if (targetTaskProject.projectId && targetTaskProject.projectId !== projectId) {
       throw new Error("This TaskProject is already linked to another project.");
     }
-    return this.prisma.taskProject.update({ where: { id: taskProjectId }, data: { projectId } });
+
+    return await this.prisma.taskProject.update({
+      where: { id: taskProjectId },
+      data: { projectId },
+    });
   }
 
   async unlinkTaskProject(projectId: string) {
-    const existingLink = await this.prisma.taskProject.findUnique({ where: { projectId } });
+    const existingLink = await this.prisma.taskProject.findUnique({
+      where: { projectId },
+    });
     if (!existingLink) {
       throw new Error("No TaskProject linked to this project.");
     }
-    return this.prisma.taskProject.update({ where: { id: existingLink.id }, data: { projectId: null } });
-  }
 
-  // --- User Association Management ---
-
-  async linkTaskUserToSystemUser(taskUserId: string, systemUserId: string) {
-    const taskUser = await this.prisma.taskUser.findUnique({ where: { id: taskUserId } });
-    if (!taskUser) {
-      throw new Error(`TaskUser with ID ${taskUserId} not found.`);
-    }
-    if (taskUser.userId && taskUser.userId !== systemUserId) {
-      throw new Error(`TaskUser ${taskUserId} is already linked to another system user.`);
-    }
-
-    const existingLinkedTaskUser = await this.prisma.taskUser.findUnique({ where: { userId: systemUserId } });
-    if (existingLinkedTaskUser && existingLinkedTaskUser.id !== taskUserId) {
-      throw new Error(`System user ${systemUserId} is already linked to TaskUser ${existingLinkedTaskUser.id}.`);
-    }
-
-    return this.prisma.taskUser.update({
-      where: { id: taskUserId },
-      data: { userId: systemUserId },
-    });
-  }
-
-  async unlinkTaskUserFromSystemUser(systemUserId: string) {
-    const taskUser = await this.prisma.taskUser.findUnique({ where: { userId: systemUserId } });
-    if (!taskUser) {
-      return null;
-    }
-
-    return this.prisma.taskUser.update({
-      where: { id: taskUser.id },
-      data: { userId: null },
-    });
-  }
-
-  async getLinkedTaskUser(systemUserId: string) {
-    return this.prisma.taskUser.findUnique({
-      where: { userId: systemUserId },
-    });
-  }
-
-  // --- TaskProject Association Management ---
-
-  async linkTaskProjectToSystemProject(taskProjectId: string, systemProjectId: string) {
-    const taskProject = await this.prisma.taskProject.findUnique({ where: { id: taskProjectId } });
-    if (!taskProject) {
-      throw new Error(`TaskProject with ID ${taskProjectId} not found.`);
-    }
-    if (taskProject.projectId && taskProject.projectId !== systemProjectId) {
-      throw new Error(`TaskProject ${taskProjectId} is already linked to another Nightwatch Project.`);
-    }
-
-    const existingLinkedTaskProject = await this.prisma.taskProject.findUnique({
-      where: { projectId: systemProjectId },
-    });
-    if (existingLinkedTaskProject && existingLinkedTaskProject.id !== taskProjectId) {
-      throw new Error(
-        `Nightwatch Project ${systemProjectId} is already linked to TaskProject ${existingLinkedTaskProject.id}.`,
-      );
-    }
-
-    return this.prisma.taskProject.update({
-      where: { id: taskProjectId },
-      data: { projectId: systemProjectId },
-    });
-  }
-
-  async unlinkTaskProjectFromSystemProject(systemProjectId: string) {
-    const taskProject = await this.prisma.taskProject.findUnique({ where: { projectId: systemProjectId } });
-    if (!taskProject) {
-      return null;
-    }
-
-    return this.prisma.taskProject.update({
-      where: { id: taskProject.id },
+    return await this.prisma.taskProject.update({
+      where: { id: existingLink.id },
       data: { projectId: null },
     });
   }
 
-  async getLinkedTaskProjectBySystemProjectId(systemProjectId: string) {
-    return this.prisma.taskProject.findUnique({
-      where: { projectId: systemProjectId },
+  async linkTaskUser(userId: string, taskUserId: string) {
+    // Check whether this nightwatch user is already linked to a TaskUser
+    const existingLink = await this.prisma.taskUser.findUnique({
+      where: { userId },
+    });
+    if (existingLink) {
+      throw new Error("This user is already linked to a TaskUser. Please unlink first.");
+    }
+
+    // Check whether the target TaskUser is already linked by someone else
+    const targetTaskUser = await this.prisma.taskUser.findUnique({
+      where: { id: taskUserId },
+    });
+    if (!targetTaskUser) {
+      throw new Error("TaskUser not found.");
+    }
+    if (targetTaskUser.userId) {
+      throw new Error("This TaskUser is already linked to another user.");
+    }
+
+    return await this.prisma.taskUser.update({
+      where: { id: taskUserId },
+      data: { userId },
+    });
+  }
+
+  async unlinkTaskUser(userId: string) {
+    const existingLink = await this.prisma.taskUser.findUnique({
+      where: { userId },
+    });
+    if (!existingLink) {
+      throw new Error("No TaskUser linked to this user.");
+    }
+
+    return await this.prisma.taskUser.update({
+      where: { id: existingLink.id },
+      data: { userId: null },
     });
   }
 
   // --- Group Management ---
 
   async createOrUpdateGroup(dto: CreateTaskGroupDto) {
-    return this.prisma.taskGroup.upsert({
+    return await this.prisma.taskGroup.upsert({
       where: { chatId: dto.chatId },
       update: { name: dto.name, description: dto.description },
-      create: dto,
+      create: { chatId: dto.chatId, name: dto.name, description: dto.description },
     });
   }
 
+  async getGroupByChatId(chatId: string) {
+    const normalizedChatId = this.normalizeChatId(chatId);
+    if (!normalizedChatId) return null;
+    return await this.prisma.taskGroup.findUnique({
+      where: { chatId: normalizedChatId },
+    });
+  }
+
+  async ensureGroupByChatId(chatId: string, name?: string) {
+    const normalizedChatId = this.normalizeChatId(chatId);
+    if (!normalizedChatId) {
+      throw new Error("chatId is required");
+    }
+
+    const existing = await this.getGroupByChatId(normalizedChatId);
+    if (existing) return existing;
+
+    try {
+      const groupName = (name || "").trim() || `Group ${normalizedChatId.slice(-4)}`;
+      return await this.prisma.taskGroup.create({
+        data: {
+          chatId: normalizedChatId,
+          name: groupName,
+        },
+      });
+    } catch (e) {
+      const created = await this.getGroupByChatId(normalizedChatId);
+      if (created) return created;
+      throw e;
+    }
+  }
+
+  private normalizeChatId(chatId: string) {
+    const trimmed = (chatId || "").trim();
+    if (!trimmed) return "";
+    return trimmed.replace(/^['"]+|['"]+$/g, "");
+  }
+
   async listGroups() {
-    return this.prisma.taskGroup.findMany({
+    return await this.prisma.taskGroup.findMany({
       include: {
         _count: {
           select: { tasks: { where: { deletedAt: null } } },
         },
       },
+      orderBy: { updatedAt: "desc" },
     });
   }
 
-  // --- Project Management ---
-
-  async listProjectsByGroupId(groupId: string) {
-    return this.prisma.taskProject.findMany({
-      where: { groupId, deletedAt: null },
-      orderBy: { createdAt: "asc" },
-    });
-  }
-
-  async createTaskProject(groupId: string, name: string, description?: string) {
-    const existing = await this.prisma.taskProject.findFirst({
-      where: { groupId, name, deletedAt: null },
-    });
-    if (existing) {
-      throw new Error(`Project with name "${name}" already exists in this group.`);
-    }
-
-    return this.prisma.taskProject.create({
+  async createRequirement(dto: {
+    parentMessageId?: string;
+    parentMessageContent?: string;
+    skillId?: string;
+    prompt?: string;
+    groupId?: string;
+  }) {
+    return await this.prisma.requirement.create({
       data: {
-        groupId,
-        name,
-        description,
+        parentMessageId: dto.parentMessageId,
+        parentMessageContent: dto.parentMessageContent,
+        skillId: dto.skillId,
+        prompt: dto.prompt,
+        groupId: dto.groupId,
       },
     });
-  }
-
-  async getTaskProjectByProjectId(projectId: string) {
-    return this.prisma.taskProject.findFirst({
-      where: { projectId, deletedAt: null },
-    });
-  }
-
-  async getAllProjects() {
-    return this.prisma.taskProject.findMany({
-      where: { deletedAt: null },
-      orderBy: { createdAt: "asc" },
-    });
-  }
-
-  async findTaskProjectByNameFuzzy(name: string, groupId: string): Promise<{ id: string; name: string } | null> {
-    const projects = await this.prisma.taskProject.findMany({
-      where: {
-        groupId,
-        deletedAt: null,
-        name: { contains: name, mode: "insensitive" },
-      },
-      take: 2,
-    });
-    if (projects.length === 1) {
-      return projects[0];
-    }
-    return null;
-  }
-
-  async updateTaskProjectAssignment(taskIds: string[], taskProjectId: string) {
-    const project = await this.prisma.taskProject.findUnique({ where: { id: taskProjectId } });
-    if (!project) {
-      throw new Error(`TaskProject with ID ${taskProjectId} not found.`);
-    }
-
-    await this.prisma.task.updateMany({
-      where: { id: { in: taskIds }, deletedAt: null },
-      data: { taskProjectId },
-    });
-
-    return { success: true, count: taskIds.length, projectName: project.name };
-  }
-
-  async getTaskProjectById(id: string) {
-    return this.prisma.taskProject.findUnique({ where: { id } });
-  }
-
-  // --- Task CRUD ---
-
-  async createTasks(input: CreateTasksInput) {
-    const { chatId, userId, tasks, operator, requirementId, taskProjectId } = input;
-    const effectiveChatId = chatId || "DEFAULT_GROUP";
-
-    let group = await this.prisma.taskGroup.findUnique({
-      where: { chatId: effectiveChatId },
-    });
-
-    if (!group) {
-      group = await this.prisma.taskGroup.create({
-        data: {
-          chatId: effectiveChatId,
-          name: effectiveChatId === "DEFAULT_GROUP" ? "Default Project Group" : `Group ${effectiveChatId}`,
-        },
-      });
-    }
-
-    let dbUserId: string | undefined;
-    if (userId) {
-      const taskUser = await this.upsertTaskUser(userId);
-      dbUserId = taskUser.id;
-    }
-
-    const createdTasks = [];
-    for (const item of tasks) {
-      const task = await this.prisma.task.create({
-        data: {
-          title: item.title,
-          description: item.description,
-          status: item.status || TaskStatus.PENDING,
-          groupId: group.id,
-          creatorId: dbUserId,
-          assigneeId: dbUserId,
-          requirementId: requirementId,
-          taskProjectId: taskProjectId,
-          lastOperatorId: operator?.id,
-          lastOperatorName: operator?.name,
-          lastOperatorSource: operator?.source,
-        },
-      });
-      createdTasks.push(task);
-    }
-    return { count: createdTasks.length, groupId: group.id, groupName: group.name };
-  }
-
-  async createRequirementAndTasks(
-    parentMessageId: string,
-    parentMessageContent: string,
-    prompt: string,
-    skillId: string | undefined,
-    chatId: string,
-    tasks: TaskItem[],
-    userId?: string,
-  ) {
-    const group = await this.prisma.taskGroup.upsert({
-      where: { chatId },
-      update: {},
-      create: { chatId, name: `Group ${chatId}` },
-    });
-
-    const requirement = await this.prisma.requirement.create({
-      data: {
-        parentMessageId,
-        parentMessageContent,
-        prompt,
-        skillId,
-        groupId: group.id,
-      },
-    });
-
-    let dbUserId: string | undefined;
-    if (userId) {
-      const taskUser = await this.upsertTaskUser(userId);
-      dbUserId = taskUser.id;
-    }
-
-    const createdTasks = [];
-    for (const item of tasks) {
-      const task = await this.prisma.task.create({
-        data: {
-          title: item.title,
-          description: item.description,
-          status: item.status || TaskStatus.PENDING,
-          groupId: group.id,
-          creatorId: dbUserId,
-          assigneeId: dbUserId,
-          requirementId: requirement.id,
-        },
-      });
-      createdTasks.push(task);
-    }
-
-    return { requirement, count: createdTasks.length, groupId: group.id, groupName: group.name };
   }
 
   async updateRequirementScore(requirementId: number, score: number) {
-    return this.prisma.requirement.update({
+    return await this.prisma.requirement.update({
       where: { id: requirementId },
       data: { score },
     });
   }
 
-  async upsertTaskUser(openId: string, name?: string, avatarUrl?: string) {
-    return this.prisma.taskUser.upsert({
+  // --- Project Management ---
+
+  async createProject(groupId: string, name: string, description?: string) {
+    return await this.prisma.taskProject.create({
+      data: {
+        name,
+        description,
+        groupId,
+      },
+    });
+  }
+
+  async getProjectByName(groupId: string, name: string) {
+    return await this.prisma.taskProject.findFirst({
+      where: {
+        groupId,
+        name: {
+          contains: name,
+          mode: "insensitive",
+        },
+        deletedAt: null,
+      },
+    });
+  }
+
+  async listProjects(groupId: string) {
+    return await this.prisma.taskProject.findMany({
+      where: {
+        groupId,
+        deletedAt: null,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  async getProjectByNameOrId(groupId: string, identifier: string) {
+    return await this.prisma.taskProject.findFirst({
+      where: {
+        groupId,
+        deletedAt: null,
+        OR: [{ id: identifier }, { name: identifier }],
+      },
+    });
+  }
+
+  async updateProjectName(groupId: string, oldNameOrId: string, newName: string) {
+    const project = await this.getProjectByNameOrId(groupId, oldNameOrId);
+    if (!project) {
+      throw new Error("Project not found");
+    }
+
+    return await this.prisma.taskProject.update({
+      where: { id: project.id },
+      data: { name: newName },
+    });
+  }
+
+  // --- User Management ---
+
+  async upsertUser(openId: string, name?: string, avatarUrl?: string) {
+    return await this.prisma.taskUser.upsert({
       where: { openId },
-      update: { name, avatarUrl },
-      create: { openId, name, avatarUrl },
+      update: {
+        name: name || undefined,
+        avatarUrl: avatarUrl || undefined,
+      },
+      create: {
+        openId,
+        name: name || `User ${openId.slice(-4)}`,
+        avatarUrl,
+      },
+    });
+  }
+
+  async getUserByOpenId(openId: string) {
+    return await this.prisma.taskUser.findUnique({
+      where: { openId },
+    });
+  }
+
+  async getUserByName(name: string) {
+    // If the name starts with @, remove it for searching
+    const cleanName = name.replace(/^@/, "").trim();
+    return await this.prisma.taskUser.findFirst({
+      where: {
+        name: {
+          contains: cleanName,
+          mode: "insensitive",
+        },
+      },
+    });
+  }
+
+  async getAllProjects() {
+    return await this.prisma.taskProject.findMany({
+      where: {
+        deletedAt: null,
+      },
+      include: {
+        group: true,
+      },
+    });
+  }
+
+  // --- Task Management ---
+
+  async createTasks(
+    chatId: string,
+    userId: string | undefined,
+    tasks: TaskItem[],
+    operator?: { id: string; name?: string; source: string },
+    requirementId?: number,
+    taskProjectId?: string,
+  ) {
+    try {
+      // 1. Ensure Group exists or use Default
+      let groupId: string;
+      if (chatId) {
+        let group = await this.prisma.taskGroup.findUnique({ where: { chatId } });
+        if (!group) {
+          group = await this.prisma.taskGroup.create({
+            data: { chatId, name: `Project Group ${chatId.slice(-4)}` },
+          });
+        }
+        groupId = group.id;
+      } else {
+        const defaultGroup = await this.prisma.taskGroup.upsert({
+          where: { chatId: "DEFAULT_GROUP" },
+          update: {},
+          create: { chatId: "DEFAULT_GROUP", name: "Default Task Group" },
+        });
+        groupId = defaultGroup.id;
+      }
+
+      // 2. Ensure User exists (if userId is provided)
+      let dbUserId: string | undefined;
+      if (userId) {
+        let user = await this.prisma.taskUser.findUnique({ where: { openId: userId } });
+        if (!user) {
+          user = await this.prisma.taskUser.create({
+            data: { openId: userId, name: `User ${userId.slice(-4)}` },
+          });
+        }
+        dbUserId = user.id;
+      }
+
+      // 3. Create Tasks
+      await this.prisma.task.createMany({
+        data: tasks.map((t) => ({
+          title: t.title,
+          description: t.description,
+          status: t.status,
+          groupId: groupId,
+          creatorId: dbUserId,
+          assigneeId: dbUserId, // Default assignee is the current operator (the person who requested the breakdown)
+          lastOperatorId: operator?.id,
+          lastOperatorName: operator?.name,
+          lastOperatorSource: operator?.source,
+          requirementId: requirementId,
+          taskProjectId: taskProjectId,
+        })),
+      });
+
+      this.logger.log(`Tasks saved to DB for ${chatId || "DEFAULT"}:`, tasks);
+      const group = await this.prisma.taskGroup.findUnique({ where: { id: groupId } });
+      return { count: tasks.length, groupName: group?.name || "Default Group" };
+    } catch (error) {
+      this.logger.error("Failed to save tasks to database", error);
+      throw error;
+    }
+  }
+
+  async listTasks(
+    groupId: string,
+    status?: TaskStatus,
+    title?: string,
+    assigneeName?: string,
+    taskProjectId?: string,
+    includeCompleted?: boolean,
+    skip?: number,
+    take?: number,
+  ) {
+    const whereClause: any = {
+      groupId,
+      deletedAt: null,
+    };
+
+    if (status) {
+      whereClause.status = status;
+    } else if (!includeCompleted) {
+      // If status is not specified and we shouldn't include completed, filter out COMPLETED and CANCELLED
+      whereClause.status = {
+        notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELLED],
+      };
+    }
+
+    if (title) {
+      whereClause.title = {
+        contains: title,
+        mode: "insensitive", // PostgreSQL only, ignore if using SQLite/MySQL without support
+      };
+    }
+
+    if (assigneeName) {
+      const cleanName = assigneeName.replace(/^@/, "").trim();
+      whereClause.assignee = {
+        name: {
+          contains: cleanName,
+          mode: "insensitive",
+        },
+      };
+    }
+
+    if (taskProjectId) {
+      whereClause.taskProjectId = taskProjectId;
+    }
+
+    const total = await this.prisma.task.count({ where: whereClause });
+
+    const tasks = await this.prisma.task.findMany({
+      where: whereClause,
+      include: { creator: true, assignee: true, taskProject: true },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take,
+    });
+
+    return { tasks, total };
+  }
+
+  async getTaskById(taskId: string) {
+    return await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: { creator: true, assignee: true, taskProject: true },
+    });
+  }
+
+  async updateTask(taskId: string, dto: UpdateTaskDto) {
+    return await this.prisma.task.update({
+      where: { id: taskId },
+      data: { ...dto },
     });
   }
 
@@ -423,7 +552,7 @@ export class TaskService {
     dueDate?: Date;
     creatorId?: string;
   }) {
-    return this.prisma.task.create({
+    return await this.prisma.task.create({
       data: {
         title: data.title,
         description: data.description,
@@ -431,34 +560,15 @@ export class TaskService {
         taskProjectId: data.taskProjectId,
         status: data.status || TaskStatus.PENDING,
         assigneeId: data.assigneeId,
-        creatorId: data.creatorId,
         dueDate: data.dueDate,
+        creatorId: data.creatorId,
       },
     });
   }
 
-  async updateTaskStatus(id: string, status: TaskStatus, context?: TaskOperationContext) {
-    return this.prisma.task.update({
-      where: { id },
-      data: {
-        status,
-        lastOperatorId: context?.operator?.id,
-        lastOperatorName: context?.operator?.name,
-        lastOperatorSource: context?.operator?.source,
-      },
-    });
-  }
-
-  async updateTask(id: string, dto: any) {
-    return this.prisma.task.update({
-      where: { id },
-      data: dto,
-    });
-  }
-
-  async deleteTask(id: string, operator?: { id: string; name?: string; source: string }) {
-    return this.prisma.task.update({
-      where: { id },
+  async deleteTask(taskId: string, operator?: { id: string; name?: string; source: string }) {
+    return await this.prisma.task.update({
+      where: { id: taskId },
       data: {
         deletedAt: new Date(),
         lastOperatorId: operator?.id,
@@ -466,145 +576,5 @@ export class TaskService {
         lastOperatorSource: operator?.source,
       },
     });
-  }
-
-  async getTasks(groupId: string) {
-    return this.prisma.task.findMany({
-      where: {
-        groupId,
-        deletedAt: null,
-      },
-      include: {
-        creator: true,
-        assignee: true,
-        taskProject: true,
-      },
-      orderBy: { createdAt: "asc" },
-    });
-  }
-
-  async countTasks(filter: ListTasksFilter): Promise<number> {
-    const { groupId, status, title, assigneeName, taskProjectId, includeCompleted } = filter;
-
-    const whereClause: Prisma.TaskWhereInput = {
-      deletedAt: null,
-      groupId,
-    };
-
-    if (!includeCompleted) {
-      whereClause.status = { notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELLED] };
-    }
-    if (status) whereClause.status = status;
-    if (title) whereClause.title = { contains: title, mode: "insensitive" };
-    if (assigneeName) whereClause.assignee = { name: { contains: assigneeName, mode: "insensitive" } };
-    if (taskProjectId) whereClause.taskProjectId = taskProjectId;
-
-    return this.prisma.task.count({ where: whereClause });
-  }
-
-  async listTasks(filter: ListTasksFilter) {
-    const { groupId, status, title, assigneeName, taskProjectId, includeCompleted, skip = 0, take = 10 } = filter;
-
-    const whereClause: Prisma.TaskWhereInput = {
-      deletedAt: null,
-      groupId,
-    };
-
-    if (!includeCompleted) {
-      whereClause.status = { notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELLED] };
-    }
-    if (status) whereClause.status = status;
-    if (title) whereClause.title = { contains: title, mode: "insensitive" };
-    if (assigneeName) whereClause.assignee = { name: { contains: assigneeName, mode: "insensitive" } };
-    if (taskProjectId) whereClause.taskProjectId = taskProjectId;
-
-    return this.prisma.task.findMany({
-      where: whereClause,
-      include: { creator: true, assignee: true, taskProject: true },
-      orderBy: { createdAt: "asc" },
-      skip,
-      take,
-    });
-  }
-
-  async listTaskUsersByProjectId(systemProjectId: string) {
-    const taskProject = await this.prisma.taskProject.findFirst({
-      where: { projectId: systemProjectId, deletedAt: null },
-    });
-
-    if (!taskProject) {
-      return [];
-    }
-
-    const tasks = await this.prisma.task.findMany({
-      where: {
-        taskProjectId: taskProject.id,
-        deletedAt: null,
-      },
-      select: { assigneeId: true },
-      distinct: ["assigneeId"],
-    });
-
-    const assigneeIds = tasks.map((t) => t.assigneeId).filter((id): id is string => !!id);
-
-    if (assigneeIds.length === 0) {
-      return [];
-    }
-
-    const taskUsers = await this.prisma.taskUser.findMany({
-      where: { id: { in: assigneeIds } },
-    });
-
-    const systemUserIds = taskUsers.map((tu) => tu.userId).filter((id): id is string => !!id);
-    const systemUsers = await this.prisma.user.findMany({
-      where: { id: { in: systemUserIds } },
-      select: { id: true, email: true, username: true },
-    });
-    const systemUserMap = new Map(systemUsers.map((su) => [su.id, su]));
-
-    const usersWithStats = await Promise.all(
-      taskUsers.map(async (user) => {
-        const [total, completed, inProgress] = await Promise.all([
-          this.prisma.task.count({
-            where: {
-              assigneeId: user.id,
-              taskProjectId: taskProject.id,
-              deletedAt: null,
-              status: { notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELLED] },
-            },
-          }),
-          this.prisma.task.count({
-            where: {
-              assigneeId: user.id,
-              taskProjectId: taskProject.id,
-              deletedAt: null,
-              status: TaskStatus.COMPLETED,
-            },
-          }),
-          this.prisma.task.count({
-            where: {
-              assigneeId: user.id,
-              taskProjectId: taskProject.id,
-              deletedAt: null,
-              status: TaskStatus.DEVELOPING,
-            },
-          }),
-        ]);
-
-        const systemUser = user.userId ? systemUserMap.get(user.userId) : null;
-
-        return {
-          id: user.id,
-          name: user.name,
-          avatarUrl: user.avatarUrl,
-          email: systemUser?.email || null,
-          systemUsername: systemUser?.username || null,
-          createdAt: user.createdAt,
-          taskStats: { total, completed, inProgress },
-        };
-      }),
-    );
-
-    return usersWithStats;
   }
 }

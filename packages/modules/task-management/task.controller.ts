@@ -181,25 +181,26 @@ export class TaskController {
       };
     }
 
-    // 2. Fetch tasks and total count for this taskProjectId
-    const filter = {
-      groupId: taskProject.groupId,
-      status: query.status,
-      title: query.keyword,
-      assigneeName: query.assigneeName,
-      taskProjectId: taskProject.id,
-      includeCompleted: true,
-      skip: page * pageSize,
-      take: pageSize,
-    };
-    const [records, total] = await Promise.all([
-      this.taskService.listTasks(filter),
-      this.taskService.countTasks(filter),
-    ]);
+    // 2. Fetch tasks for this taskProjectId
+    const result = await this.taskService.listTasks(
+      taskProject.groupId,
+      query.status,
+      query.keyword,
+      query.assigneeName,
+      taskProject.id,
+      true, // includeCompleted
+      page * pageSize,
+      pageSize,
+    );
 
     return {
       success: true,
-      data: { records, total, page, pageSize },
+      data: {
+        records: result?.tasks || [],
+        total: result?.total || 0,
+        page,
+        pageSize,
+      },
     };
   }
 
@@ -286,10 +287,7 @@ export class TaskController {
       return { success: true, data: { records: [], total: 0, page, pageSize } };
     }
 
-    const result = await this.taskReportService.listWeeklyReports(taskProject.groupId, {
-      skip: page * pageSize,
-      take: pageSize,
-    });
+    const result = await this.taskReportService.listWeeklyReports(taskProject.groupId, page * pageSize, pageSize);
     return { success: true, data: { ...result, page, pageSize } };
   }
 
@@ -308,10 +306,7 @@ export class TaskController {
       return { success: true, data: { records: [], total: 0, page, pageSize } };
     }
 
-    const result = await this.taskReportService.listMonthlyReports(taskProject.id, {
-      skip: page * pageSize,
-      take: pageSize,
-    });
+    const result = await this.taskReportService.listMonthlyReports(taskProject.id, page * pageSize, pageSize);
     return { success: true, data: { ...result, page, pageSize } };
   }
 
