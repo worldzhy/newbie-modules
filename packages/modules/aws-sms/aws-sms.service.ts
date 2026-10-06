@@ -2,7 +2,6 @@ import {Injectable} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {
   PinpointSMSVoiceV2Client,
-  PinpointSMSVoiceV2ClientConfig,
   SendTextMessageCommand,
   SendTextMessageCommandInput,
   SendTextMessageCommandOutput,
@@ -16,26 +15,12 @@ export class AwsSmsService {
 
   constructor(private readonly configService: ConfigService) {
     const config = this.configService.getOrThrow<{
-      accessKeyId?: string;
-      secretAccessKey?: string;
       region: string;
       configurationSetName: string;
     }>('modules.aws-sms');
 
     this.configurationSetName = config.configurationSetName;
-
-    // Create SES Client
-    const clientConfig: PinpointSMSVoiceV2ClientConfig = {
-      region: config.region,
-    };
-    if (config.accessKeyId && config.secretAccessKey) {
-      clientConfig.credentials = {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      };
-    }
-
-    this.client = new PinpointSMSVoiceV2Client(clientConfig);
+    this.client = new PinpointSMSVoiceV2Client({region: config.region});
   }
 
   async sendText(params: SendTextMessageParams): Promise<SendTextMessageCommandOutput> {

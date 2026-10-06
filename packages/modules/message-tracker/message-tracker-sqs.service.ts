@@ -14,25 +14,11 @@ export class MessageTrackerSqsService {
   public textQueueUrl: string;
 
   constructor(private readonly configService: ConfigService) {
-    const accessKeyId = this.configService.getOrThrow<string>(
-      'modules.message-tracker.accessKeyId'
-    );
-    const secretAccessKey = this.configService.getOrThrow<string>(
-      'modules.message-tracker.secretAccessKey'
-    );
     const region = this.configService.getOrThrow<string>(
       'modules.message-tracker.region'
     );
 
-    if (accessKeyId && secretAccessKey && region) {
-      this.client = new SQSClient({
-        credentials: {
-          accessKeyId: accessKeyId,
-          secretAccessKey: secretAccessKey,
-        },
-        region: region,
-      });
-    }
+    this.client = new SQSClient({region});
 
     this.emailQueueUrl = this.configService.getOrThrow<string>(
       'modules.message-tracker.emailQueueUrl'

@@ -20,8 +20,6 @@ export interface SendEmailWithTemplateParams {
 }
 
 export interface EmailServiceConfig {
-  accessKeyId?: string;
-  secretAccessKey?: string;
   region: string;
   configurationSetName?: string;
   fromAddress: string;

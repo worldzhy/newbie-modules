@@ -1,12 +1,6 @@
-import {Injectable} from '@nestjs/common';
-import {
-  SQSClient,
-  SQSClientConfig,
-  SendMessageCommand,
-  GetQueueAttributesCommand,
-  QueueAttributeName,
-} from '@aws-sdk/client-sqs';
-import {ConfigService} from '@nestjs/config';
+import { Injectable } from "@nestjs/common";
+import { SQSClient, SendMessageCommand, GetQueueAttributesCommand, QueueAttributeName } from "@aws-sdk/client-sqs";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class AwsSqsService {
@@ -15,24 +9,12 @@ export class AwsSqsService {
 
   constructor(private readonly configService: ConfigService) {
     const config = this.configService.getOrThrow<{
-      accessKeyId?: string;
-      secretAccessKey?: string;
       region: string;
       queueUrl: string;
-    }>('modules.aws-sqs');
+    }>("modules.aws-sqs");
 
     this.queueUrl = config.queueUrl;
-
-    // Static credentials are optional; when absent the SDK default
-    // credential chain applies (SSO locally, instance profile on EC2).
-    const clientConfig: SQSClientConfig = {region: config.region};
-    if (config.accessKeyId && config.secretAccessKey) {
-      clientConfig.credentials = {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      };
-    }
-    this.client = new SQSClient(clientConfig);
+    this.client = new SQSClient({ region: config.region });
   }
 
   /**
@@ -54,7 +36,7 @@ export class AwsSqsService {
       MessageBody: JSON.stringify(params.body),
     };
 
-    const {MessageGroupId, MessageDeduplicationId} = params;
+    const { MessageGroupId, MessageDeduplicationId } = params;
     if (MessageGroupId) {
       sendMessageRequest.MessageGroupId = MessageGroupId;
     }
@@ -66,18 +48,13 @@ export class AwsSqsService {
     return await this.client.send(new SendMessageCommand(sendMessageRequest));
   }
 
-  async getQueueAttributes(params: {
-    queueUrl?: string;
-    attributeNames: QueueAttributeName[];
-  }) {
+  async getQueueAttributes(params: { queueUrl?: string; attributeNames: QueueAttributeName[] }) {
     const getQueueAttributesRequest = {
       QueueUrl: params.queueUrl ?? this.queueUrl,
       AttributeNames: params.attributeNames,
     };
 
-    const result = await this.client.send(
-      new GetQueueAttributesCommand(getQueueAttributesRequest)
-    );
+    const result = await this.client.send(new GetQueueAttributesCommand(getQueueAttributesRequest));
 
     return result.Attributes;
   }

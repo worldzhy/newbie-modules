@@ -28,18 +28,7 @@ export class AwsS3Service {
     this.region = this.config.getOrThrow<string>('modules.aws-s3.region');
     this.signedUrlExpiresIn = this.config.getOrThrow<number>('modules.aws-s3.signedUrlExpiresIn');
 
-    const accessKeyId = this.config.get<string>('modules.aws-s3.accessKeyId');
-    const secretAccessKey = this.config.get<string>('modules.aws-s3.secretAccessKey');
-    if (accessKeyId && secretAccessKey) {
-      this.client = new S3Client({
-        region: this.region,
-        credentials: {accessKeyId, secretAccessKey},
-      });
-    } else {
-      this.client = new S3Client({
-        region: this.region,
-      });
-    }
+    this.client = new S3Client({region: this.region});
   }
 
   //*********************/

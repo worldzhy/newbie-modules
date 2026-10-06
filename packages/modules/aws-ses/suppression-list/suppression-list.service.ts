@@ -2,7 +2,6 @@ import {Injectable} from '@nestjs/common';
 import {ConfigService} from '@nestjs/config';
 import {
   SESv2Client,
-  SESv2ClientConfig,
   ListSuppressedDestinationsCommand,
   ListSuppressedDestinationsCommandInput,
   DeleteSuppressedDestinationCommand,
@@ -17,23 +16,12 @@ export class AwsSesSuppressionListService {
 
   constructor(private readonly configService: ConfigService) {
     const config = this.configService.getOrThrow<{
-      accessKeyId?: string;
-      secretAccessKey?: string;
       region: string;
       configurationSetName: string;
       fromEmailAddress: string;
     }>('modules.aws-ses');
 
-    // Create SES Client
-    const clientConfig: SESv2ClientConfig = {};
-    if (config.accessKeyId && config.secretAccessKey) {
-      clientConfig.credentials = {
-        accessKeyId: config.accessKeyId,
-        secretAccessKey: config.secretAccessKey,
-      };
-    }
-
-    this.client = new SESv2Client(clientConfig);
+    this.client = new SESv2Client({region: config.region});
   }
 
   async listSuppressedDestinations(params: {reasons?: SuppressionListReason[]; nextToken?: string; pageSize?: number}) {
