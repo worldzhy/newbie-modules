@@ -1,22 +1,22 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCredentialService } from "@modules/aws-core/aws-credential.service";
+import type { AwsCredentialsProvider } from "@modules/aws-core/aws-sts.helper";
 import { AwsRegion } from "@generated/prisma/client";
 
 export interface ResolvedCloudwatchCredential {
   regions: AwsRegion[];
-  accessKeyId: string;
-  secretAccessKey: string;
+  credentials: AwsCredentialsProvider;
 }
 
 /**
- * Resolves the AWS access key used by CloudWatch data collection.
+ * Resolves the cross-account role used by CloudWatch data collection.
  *
- * aws-cloudwatch never stores access keys itself: the single source of truth
+ * aws-cloudwatch never stores credentials itself: the single source of truth
  * is the project-shared ProjectAwsCredential managed by aws-core. An
  * AwsAccount row is linked to a project through Project.awsAccountId, so the
- * linked project is looked up first and its credential is then resolved via
- * AwsCredentialService.
+ * linked project is looked up first and its AssumeRole provider is then
+ * resolved via AwsCredentialService.
  */
 @Injectable()
 export class AwsCloudwatchCredentialService {
@@ -43,8 +43,7 @@ export class AwsCloudwatchCredentialService {
 
     return {
       regions: awsAccount.regions,
-      accessKeyId: credential.accessKeyId,
-      secretAccessKey: credential.secretAccessKey,
+      credentials: credential.credentials,
     };
   }
 }

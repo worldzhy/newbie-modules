@@ -81,8 +81,8 @@ export class AwsAuditAccountDto {
   @ApiPropertyOptional({ description: "Caller ARN from STS", type: String })
   callerArn?: string | null;
 
-  @ApiProperty({ description: "AWS access key ID used for the scan" })
-  accessKeyId: string;
+  @ApiProperty({ description: "Cross-account IAM role ARN assumed for the scan" })
+  roleArn: string;
 
   @ApiProperty({ type: [String], description: "AWS regions scanned" })
   regions: string[];

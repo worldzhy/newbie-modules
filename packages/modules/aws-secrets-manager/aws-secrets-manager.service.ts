@@ -244,7 +244,9 @@ export class AwsSecretsManagerService {
   private async getProjectContext(projectId: string, region?: string): Promise<ProjectContext> {
     const credential = await this.credentialService.resolveProjectCredential(projectId);
     const resolvedRegion = region ?? credential.defaultRegion;
-    const cacheKey = `${projectId}:${resolvedRegion}:${credential.accessKeyId}`;
+    // The key is secret-free: the AssumeRole provider refreshes temporary
+    // credentials inside the long-lived SDK client.
+    const cacheKey = `${projectId}:${resolvedRegion}`;
     const now = Date.now();
 
     const cached = this.clientCache.get(cacheKey);
@@ -258,10 +260,7 @@ export class AwsSecretsManagerService {
 
     const client = new SecretsManagerClient({
       region: resolvedRegion,
-      credentials: {
-        accessKeyId: credential.accessKeyId,
-        secretAccessKey: credential.secretAccessKey,
-      },
+      credentials: credential.credentials,
     });
 
     // Bounded LRU-ish eviction: Map preserves insertion order, so the first

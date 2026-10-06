@@ -2,32 +2,26 @@
 // !!              [Module] AWS Core models                  //
 // !! ------------------------------------------------------------ //
 // * ProjectAwsCredential                                          //
-// * AwsAccessKeyStatus                                            //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
+// Cross-account access is delegated through a customer-managed IAM role.
+// The customer's trust policy allows the platform account to assume the role
+// with the per-project external ID; no long-lived access key is stored.
+// A row may briefly exist with a null roleArn after bootstrap (the external
+// ID has been generated but the role ARN has not been saved yet).
 model ProjectAwsCredential {
-  id                       String             @id @default(uuid()) @db.Uuid
-  projectId                String             @unique @db.Uuid
-  project                  Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  accessKeyId              String             @unique
-  secretAccessKeyEncrypted String
-  awsAccountId             String?
-  iamUserName              String?
-  defaultRegion            String?
-  regions                  String[]
-  status                   AwsAccessKeyStatus @default(ACTIVE)
-  lastVerifiedAt           DateTime?
-  createdAt                DateTime           @default(now())
-  updatedAt                DateTime           @updatedAt
-
-  @@schema("application")
-}
-
-enum AwsAccessKeyStatus {
-  ACTIVE
-  INACTIVE
-  EXPIRED
-  ROTATING
+  id             String    @id @default(uuid()) @db.Uuid
+  projectId      String    @unique @db.Uuid
+  project        Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  roleArn        String?   @unique
+  externalId     String    @unique
+  awsAccountId   String?
+  iamUserName    String?
+  defaultRegion  String?
+  regions        String[]
+  lastVerifiedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@schema("application")
 }

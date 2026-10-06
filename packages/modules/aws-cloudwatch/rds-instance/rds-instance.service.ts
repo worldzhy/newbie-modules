@@ -12,7 +12,7 @@ export class RdsInstanceService {
   ) {}
 
   async fetchRDSInstances(awsAccountId: string) {
-    const { accessKeyId, secretAccessKey, regions } = await this.cloudwatchCredential.resolve(awsAccountId);
+    const { credentials, regions } = await this.cloudwatchCredential.resolve(awsAccountId);
     const rdsInstances: {
       instanceId: string;
       name: string;
@@ -25,10 +25,7 @@ export class RdsInstanceService {
       const region = regions[i].replaceAll("_", "-");
       const client = new RDSClient({
         region,
-        credentials: {
-          accessKeyId,
-          secretAccessKey,
-        },
+        credentials,
       });
 
       const response = await client.send(new DescribeDBInstancesCommand());

@@ -27,7 +27,7 @@ export class RdsMetricService {
     if (!rdsInstances.length) {
       return [];
     }
-    const { regions, accessKeyId, secretAccessKey } = await this.cloudwatchCredential.resolve(awsAccountId);
+    const { regions, credentials } = await this.cloudwatchCredential.resolve(awsAccountId);
 
     const periodNum = Number(period);
     // Check that the period is greater than 60 and divisible by 60.
@@ -53,8 +53,7 @@ export class RdsMetricService {
         period: periodNum,
         metricName,
         statistics,
-        accessKeyId,
-        secretAccessKey,
+        credentials,
       };
       const metricData = await this.cloudwatchService.getRDSInstancesMetric(params);
       results.push(...metricData);

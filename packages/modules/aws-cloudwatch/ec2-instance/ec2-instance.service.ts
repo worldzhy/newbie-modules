@@ -12,17 +12,14 @@ export class Ec2InstanceService {
   ) {}
 
   async fetchEC2Instances(awsAccountId: string) {
-    const { accessKeyId, secretAccessKey, regions } = await this.cloudwatchCredential.resolve(awsAccountId);
+    const { credentials, regions } = await this.cloudwatchCredential.resolve(awsAccountId);
     const ec2InstanceCreateManyInputs: Prisma.Ec2InstanceCreateManyInput[] = [];
 
     for (let i = 0; i < regions.length; i++) {
       const region = regions[i].replaceAll("_", "-");
       const client = new EC2Client({
         region,
-        credentials: {
-          accessKeyId,
-          secretAccessKey,
-        },
+        credentials,
       });
 
       const response = await client.send(new DescribeInstancesCommand());

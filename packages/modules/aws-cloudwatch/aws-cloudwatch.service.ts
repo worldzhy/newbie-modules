@@ -7,35 +7,23 @@ import {
 } from "@aws-sdk/client-cloudwatch";
 import { GetEC2InstancesCPUMetricParams, GetRDSInstancesMetricParams, MetricData } from "./aws-cloudwatch.interface";
 import { CloudwatchEC2MetricName } from "@modules/aws-cloudwatch/aws-cloudwatch.enum";
+import type { AwsCredentialsProvider } from "@modules/aws-core/aws-sts.helper";
 
 @Injectable()
 export class AwsCloudwatchService {
   constructor() {}
 
-  private initCloudwatchClient(args: { accessKeyId?: string; secretAccessKey?: string; region: string }) {
-    const { accessKeyId, secretAccessKey, region } = args;
-    let client: CloudWatchClient;
-    if (accessKeyId && secretAccessKey) {
-      client = new CloudWatchClient({ region, credentials: { accessKeyId, secretAccessKey } });
-    } else {
-      client = new CloudWatchClient({ region });
-    }
-    return client;
+  private initCloudwatchClient(args: { credentials?: AwsCredentialsProvider; region: string }) {
+    const { credentials, region } = args;
+    // Without a provider the client falls back to the SDK default credential
+    // chain (platform-owned environments); cross-account projects pass the
+    // AssumeRole provider resolved from aws-core.
+    return credentials ? new CloudWatchClient({ region, credentials }) : new CloudWatchClient({ region });
   }
 
   async getEC2InstancesMetric(params: GetEC2InstancesCPUMetricParams) {
-    const {
-      ec2InstanceRemoteIds,
-      metricName,
-      accessKeyId,
-      secretAccessKey,
-      region,
-      startTime,
-      endTime,
-      period,
-      statistics,
-    } = params;
-    const cloudwatchClient = this.initCloudwatchClient({ accessKeyId, secretAccessKey, region });
+    const { ec2InstanceRemoteIds, metricName, credentials, region, startTime, endTime, period, statistics } = params;
+    const cloudwatchClient = this.initCloudwatchClient({ credentials, region });
     if (ec2InstanceRemoteIds.length === 0) {
       return [];
     }
@@ -122,18 +110,8 @@ export class AwsCloudwatchService {
   }
 
   async getRDSInstancesMetric(params: GetRDSInstancesMetricParams) {
-    const {
-      rdsInstanceRemoteIds,
-      accessKeyId,
-      secretAccessKey,
-      region,
-      metricName,
-      startTime,
-      endTime,
-      period,
-      statistics,
-    } = params;
-    const cloudwatchClient = this.initCloudwatchClient({ accessKeyId, secretAccessKey, region });
+    const { rdsInstanceRemoteIds, credentials, region, metricName, startTime, endTime, period, statistics } = params;
+    const cloudwatchClient = this.initCloudwatchClient({ credentials, region });
     if (rdsInstanceRemoteIds.length === 0) {
       return [];
     }

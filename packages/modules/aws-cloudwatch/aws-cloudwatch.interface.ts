@@ -1,4 +1,5 @@
 import { MetricDataResult } from "@aws-sdk/client-cloudwatch";
+import type { AwsCredentialsProvider } from "@modules/aws-core/aws-sts.helper";
 import {
   CloudwatchEC2MetricName,
   CloudwatchMetricRDSMetricName,
@@ -13,8 +14,7 @@ export interface GetEC2InstancesCPUMetricParams {
   endTime: Date;
   period: number;
   statistics: CloudwatchMetricStatistics;
-  accessKeyId?: string;
-  secretAccessKey?: string;
+  credentials?: AwsCredentialsProvider;
 }
 
 export interface GetRDSInstancesMetricParams {
@@ -25,8 +25,7 @@ export interface GetRDSInstancesMetricParams {
   endTime: Date;
   period: number;
   statistics: CloudwatchMetricStatistics;
-  accessKeyId?: string;
-  secretAccessKey?: string;
+  credentials?: AwsCredentialsProvider;
 }
 
 export interface MetricData extends MetricDataResult {

@@ -20,7 +20,7 @@ export class Ec2MetricService {
       where: { id: awsAccountId },
       include: { ec2Instances: { where: { isWatching: true }, orderBy: { createdAt: "asc" } } },
     });
-    const { regions, accessKeyId, secretAccessKey } = await this.cloudwatchCredential.resolve(awsAccountId);
+    const { regions, credentials } = await this.cloudwatchCredential.resolve(awsAccountId);
 
     if (awsAccount.ec2Instances.length === 0) {
       return [];
@@ -52,8 +52,7 @@ export class Ec2MetricService {
         endTime: dayjs(endTime).toDate(),
         period: periodNum,
         statistics,
-        accessKeyId,
-        secretAccessKey,
+        credentials,
       };
 
       const metricData = await this.cloudwatchService.getEC2InstancesMetric(params);
