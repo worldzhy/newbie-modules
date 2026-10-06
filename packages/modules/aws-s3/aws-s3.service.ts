@@ -1,5 +1,5 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   S3Client,
   GetObjectCommand,
@@ -13,8 +13,9 @@ import {
   AbortMultipartUploadCommand,
   CreateMultipartUploadCommand,
   CompleteMultipartUploadCommand,
-} from '@aws-sdk/client-s3';
-import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
 
 @Injectable()
 export class AwsS3Service {
@@ -23,12 +24,18 @@ export class AwsS3Service {
   private region: string;
   private signedUrlExpiresIn: number;
 
-  constructor(private readonly config: ConfigService) {
-    this.bucket = this.config.getOrThrow<string>('modules.aws-s3.bucket');
-    this.region = this.config.getOrThrow<string>('modules.aws-s3.region');
-    this.signedUrlExpiresIn = this.config.getOrThrow<number>('modules.aws-s3.signedUrlExpiresIn');
+  constructor(
+    private readonly config: ConfigService,
+    private readonly credentials: AwsCredentialsService,
+  ) {
+    this.bucket = this.config.getOrThrow<string>("modules.aws-s3.bucket");
+    this.region = this.config.getOrThrow<string>("modules.aws-s3.region");
+    this.signedUrlExpiresIn = this.config.getOrThrow<number>("modules.aws-s3.signedUrlExpiresIn");
 
-    this.client = new S3Client({region: this.region});
+    this.client = new S3Client({
+      region: this.region,
+      credentials: this.credentials.resolveDefaultCredentials(),
+    });
   }
 
   //*********************/
@@ -36,27 +43,27 @@ export class AwsS3Service {
   //*********************/
 
   async createBucket(bucketName: string) {
-    return await this.client.send(new CreateBucketCommand({Bucket: bucketName}));
+    return await this.client.send(new CreateBucketCommand({ Bucket: bucketName }));
   }
 
   async deleteBucket(bucketName: string) {
-    return await this.client.send(new DeleteBucketCommand({Bucket: bucketName}));
+    return await this.client.send(new DeleteBucketCommand({ Bucket: bucketName }));
   }
 
   //*********************/
   //* Object operations */
   //*********************/
 
-  async getObject(params: {bucket?: string; key: string}) {
+  async getObject(params: { bucket?: string; key: string }) {
     return await this.client.send(
       new GetObjectCommand({
         Bucket: params.bucket ?? this.bucket,
         Key: params.key,
-      })
+      }),
     );
   }
 
-  async putObject(params: {bucket?: string; key: string; body?: Buffer | string}) {
+  async putObject(params: { bucket?: string; key: string; body?: Buffer | string }) {
     // Explicitly set ContentLength to avoid the SDK warning about
     // "Stream of unknown length" and ensure S3 accepts the request.
     const contentLength = params.body != null ? Buffer.byteLength(params.body) : 0;
@@ -66,56 +73,56 @@ export class AwsS3Service {
         Key: params.key,
         Body: params.body,
         ContentLength: contentLength,
-      })
+      }),
     );
   }
 
-  async copyObject(params: {bucket?: string; sourceKey: string; destinationKey: string}) {
+  async copyObject(params: { bucket?: string; sourceKey: string; destinationKey: string }) {
     return await this.client.send(
       new CopyObjectCommand({
         Bucket: params.bucket ?? this.bucket,
         CopySource: params.bucket ? `${params.bucket}/${params.sourceKey}` : `${this.bucket}/${params.sourceKey}`,
         Key: params.destinationKey,
-      })
+      }),
     );
   }
 
-  async moveObject(params: {bucket?: string; sourceKey: string; destinationKey: string}) {
+  async moveObject(params: { bucket?: string; sourceKey: string; destinationKey: string }) {
     // [step 1] Copy the object to the new location
     await this.client.send(
       new CopyObjectCommand({
         Bucket: params.bucket ?? this.bucket,
         CopySource: params.bucket ? `${params.bucket}/${params.sourceKey}` : `${this.bucket}/${params.sourceKey}`,
         Key: params.destinationKey,
-      })
+      }),
     );
 
     // [step 2] Delete the original object
     await this.client.send(
       new DeleteObjectsCommand({
         Bucket: params.bucket ?? this.bucket,
-        Delete: {Objects: [{Key: params.sourceKey}]},
-      })
+        Delete: { Objects: [{ Key: params.sourceKey }] },
+      }),
     );
   }
 
-  async deleteObject(params: {bucket?: string; key: string}) {
+  async deleteObject(params: { bucket?: string; key: string }) {
     return await this.client.send(
       new DeleteObjectsCommand({
         Bucket: params.bucket ?? this.bucket,
-        Delete: {Objects: [{Key: params.key}]},
-      })
+        Delete: { Objects: [{ Key: params.key }] },
+      }),
     );
   }
 
-  async deleteObjectRecursively(params: {bucket: string; key: string}) {
+  async deleteObjectRecursively(params: { bucket: string; key: string }) {
     try {
       // [step 1] List objects
       const listResponse = await this.client.send(
         new ListObjectsV2Command({
           Bucket: params.bucket ?? this.bucket,
           Prefix: params.key,
-        })
+        }),
       );
       if (!listResponse.Contents || listResponse.Contents.length === 0) {
         return;
@@ -126,11 +133,11 @@ export class AwsS3Service {
         new DeleteObjectsCommand({
           Bucket: params.bucket,
           Delete: {
-            Objects: listResponse.Contents.map(content => {
-              return {Key: content.Key};
+            Objects: listResponse.Contents.map((content) => {
+              return { Key: content.Key };
             }),
           },
-        })
+        }),
       );
 
       // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
@@ -144,24 +151,24 @@ export class AwsS3Service {
     }
   }
 
-  async getObjectsRecursively(params: {bucket?: string; prefix?: string}) {
-    const allKeys: {s3Key: string; size?: number}[] = [];
+  async getObjectsRecursively(params: { bucket?: string; prefix?: string }) {
+    const allKeys: { s3Key: string; size?: number }[] = [];
     try {
       // [step 1] List objects
       const listResponse = await this.client.send(
         new ListObjectsV2Command({
           Bucket: params.bucket ?? this.bucket,
           Prefix: params.prefix,
-        })
+        }),
       );
 
       if (!listResponse.Contents || listResponse.Contents.length === 0) {
         return allKeys;
       } else {
         allKeys.push(
-          ...listResponse.Contents.map(content => {
-            return {s3Key: content.Key!, size: content.Size};
-          })
+          ...listResponse.Contents.map((content) => {
+            return { s3Key: content.Key!, size: content.Size };
+          }),
         );
       }
 
@@ -185,12 +192,12 @@ export class AwsS3Service {
   //* Multipart upload operations */
   //*******************************/
 
-  async createMultipartUpload(params: {bucket?: string; key: string}) {
+  async createMultipartUpload(params: { bucket?: string; key: string }) {
     return await this.client.send(
       new CreateMultipartUploadCommand({
         Bucket: params.bucket ?? this.bucket,
         Key: params.key,
-      })
+      }),
     );
   }
 
@@ -212,7 +219,7 @@ export class AwsS3Service {
         PartNumber: params.partNumber,
         UploadId: params.uploadId,
         ContentLength: contentLength,
-      })
+      }),
     );
 
     return {
@@ -224,26 +231,26 @@ export class AwsS3Service {
   async completeMultipartUpload(params: {
     bucket?: string;
     key: string;
-    parts: {ETag: string; PartNumber: number}[];
+    parts: { ETag: string; PartNumber: number }[];
     uploadId: string;
   }) {
     return await this.client.send(
       new CompleteMultipartUploadCommand({
         Bucket: params.bucket ?? this.bucket,
         Key: params.key,
-        MultipartUpload: {Parts: params.parts},
+        MultipartUpload: { Parts: params.parts },
         UploadId: params.uploadId,
-      })
+      }),
     );
   }
 
-  async abortMultipartUpload(params: {bucket?: string; key: string; uploadId: string}) {
+  async abortMultipartUpload(params: { bucket?: string; key: string; uploadId: string }) {
     return await this.client.send(
       new AbortMultipartUploadCommand({
         Bucket: params.bucket ?? this.bucket,
         Key: params.key,
         UploadId: params.uploadId,
-      })
+      }),
     );
   }
 
@@ -252,7 +259,7 @@ export class AwsS3Service {
   //*****************************/
 
   /** Get a signed URL to access an S3 object for signedUrlExpiresIn seconds */
-  async getSignedDownloadUrl(params: {bucket?: string; key: string}) {
+  async getSignedDownloadUrl(params: { bucket?: string; key: string }) {
     const command = new GetObjectCommand({
       Bucket: params.bucket ?? this.bucket,
       Key: params.key,
@@ -264,7 +271,7 @@ export class AwsS3Service {
   }
 
   /** Get a signed URL to upload an S3 object for signedUrlExpiresIn seconds */
-  async getSignedUploadUrl(params: {bucket?: string; key: string; contentType?: string; contentEncoding?: string}) {
+  async getSignedUploadUrl(params: { bucket?: string; key: string; contentType?: string; contentEncoding?: string }) {
     const command = new PutObjectCommand({
       Bucket: params.bucket ?? this.bucket,
       Key: params.key,
@@ -278,7 +285,7 @@ export class AwsS3Service {
   }
 
   /** Get a signed URL to upload a part in a multipart upload */
-  async getSignedMultipartUploadUrl(params: {bucket?: string; key: string; partNumber: number; uploadId: string}) {
+  async getSignedMultipartUploadUrl(params: { bucket?: string; key: string; partNumber: number; uploadId: string }) {
     const command = new UploadPartCommand({
       Bucket: params.bucket ?? this.bucket,
       Key: params.key,
@@ -297,7 +304,7 @@ export class AwsS3Service {
    * ContentLength explicitly and avoid the "Stream of unknown length" warning.
    */
   private calculateBodyLength(body: Buffer | Uint8Array | Blob | string): number {
-    if (typeof body === 'string') {
+    if (typeof body === "string") {
       return Buffer.byteLength(body);
     }
     if (body instanceof Blob) {

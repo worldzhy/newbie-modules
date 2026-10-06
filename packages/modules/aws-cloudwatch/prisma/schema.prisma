@@ -7,9 +7,10 @@
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 // AWS access keys are no longer stored on this model. CloudWatch data
-// collection resolves the project-shared credential provided by aws-core
-// (ProjectAwsCredential) at runtime. AwsAccount only keeps the monitoring
-// scope: the 12-digit AWS account id anchor and the regions to discover.
+// collection resolves the project-shared cross-account binding provided by
+// aws-identity (AwsCrossAccountBinding) at runtime. AwsAccount only keeps
+// the monitoring scope: the 12-digit AWS account id anchor and the regions
+// to discover.
 model AwsAccount {
   id           String         @id @default(uuid()) @db.Uuid
   awsAccountId String         @unique

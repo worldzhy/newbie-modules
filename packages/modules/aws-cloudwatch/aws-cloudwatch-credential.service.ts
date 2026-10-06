@@ -13,10 +13,10 @@ export interface ResolvedCloudwatchCredential {
  * Resolves the cross-account role used by CloudWatch data collection.
  *
  * aws-cloudwatch never stores credentials itself: the single source of truth
- * is the project-shared ProjectAwsCredential managed by aws-core. An
+ * is the project-shared AwsCrossAccountBinding managed by aws-identity. An
  * AwsAccount row is linked to a project through Project.awsAccountId, so the
  * linked project is looked up first and its AssumeRole provider is then
- * resolved via AwsCredentialService.
+ * resolved via AwsCredentialsService.
  */
 @Injectable()
 export class AwsCloudwatchCredentialService {

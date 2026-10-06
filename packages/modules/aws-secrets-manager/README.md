@@ -4,7 +4,7 @@ A stateless read-through proxy over AWS Secrets Manager. AWS is the single sourc
 
 ## Design
 
-- **Read-through proxy**: every endpoint resolves the project's AWS credential (via the `aws-core` module) and calls AWS Secrets Manager directly. Project isolation comes from the credential itself — each project points at its own AWS account.
+- **Read-through proxy**: every endpoint resolves the project's cross-account binding (via the `aws-identity` module) and calls AWS Secrets Manager directly. Project isolation comes from the credential itself — each project points at its own AWS account.
 - **Tag-based contract**: managed secrets carry two tags, written atomically at creation time:
   - `nightwatch:managed=true` — marks the secret as visible to this management plane
   - `nightwatch:secret-type=<TYPE>` — one of `RDS_CREDENTIALS`, `DOCUMENTDB_CREDENTIALS`, `AWS_API_KEY`, `GENERIC_SECRET`; consumed by the rotation Lambda to pick a strategy

@@ -9,7 +9,8 @@
   "config-service": {},
   "env": {},
   "dependencies": {
-    "@aws-sdk/client-sts": "latest"
+    "@aws-sdk/client-sts": "latest",
+    "@aws-sdk/credential-providers": "latest"
   },
   "devDependencies": {}
 }

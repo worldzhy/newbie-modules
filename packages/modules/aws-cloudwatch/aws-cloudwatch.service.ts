@@ -16,8 +16,8 @@ export class AwsCloudwatchService {
   private initCloudwatchClient(args: { credentials?: AwsCredentialsProvider; region: string }) {
     const { credentials, region } = args;
     // Without a provider the client falls back to the SDK default credential
-    // chain (platform-owned environments); cross-account projects pass the
-    // AssumeRole provider resolved from aws-core.
+    // chain (host-owned environments); cross-account projects pass the
+    // AssumeRole provider resolved from aws-identity.
     return credentials ? new CloudWatchClient({ region, credentials }) : new CloudWatchClient({ region });
   }
 

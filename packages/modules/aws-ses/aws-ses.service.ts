@@ -13,6 +13,7 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import { marked } from "marked";
 import { render } from "mustache";
+import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
 
 @Injectable()
 export class AwsSesService {
@@ -20,7 +21,10 @@ export class AwsSesService {
   private configurationSetName: string;
   private fromAddress: string;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly credentials: AwsCredentialsService,
+  ) {
     const config = this.configService.getOrThrow<{
       region: string;
       configurationSetName: string;
@@ -30,7 +34,10 @@ export class AwsSesService {
     this.configurationSetName = config.configurationSetName;
     this.fromAddress = config.fromEmailAddress;
 
-    this.client = new SESClient({ region: config.region });
+    this.client = new SESClient({
+      region: config.region,
+      credentials: this.credentials.resolveDefaultCredentials(),
+    });
   }
 
   async sendEmail(params: SendEmailParams): Promise<SendEmailCommandOutput> {

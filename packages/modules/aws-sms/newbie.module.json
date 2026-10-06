@@ -5,6 +5,7 @@
     "file": "aws-sms.module",
     "className": "AwsSmsModule"
   },
+  "moduleDependencies": ["aws-identity"],
   "config-service": {
     "aws-sms": {
       "region": "process.env.AWS_SMS_REGION || 'us-east-1'",

@@ -5,6 +5,7 @@
     "file": "aws-ses.module",
     "className": "AwsSesModule"
   },
+  "moduleDependencies": ["aws-identity"],
   "config-service": {
     "aws-ses": {
       "region": "process.env.AWS_SES_REGION || 'us-east-1'",

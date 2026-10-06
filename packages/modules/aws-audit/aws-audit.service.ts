@@ -163,7 +163,7 @@ export class AwsAuditService {
   async getProjectAuditReport(projectId: string, options: { detail: boolean }) {
     await this.ensureProjectExists(projectId);
 
-    const credential = await this.prisma.projectAwsCredential.findUnique({ where: { projectId } });
+    const credential = await this.prisma.awsCrossAccountBinding.findUnique({ where: { projectId } });
     const [currentScan, latestScan, latestSuccessfulScan, latestFailedScan] = await Promise.all([
       this.prisma.awsAuditScan.findFirst({
         where: { projectId, status: { in: ["PENDING", "RUNNING"] } },
@@ -201,7 +201,7 @@ export class AwsAuditService {
   async startProjectAuditScan(projectId: string) {
     const project = await this.ensureProjectExists(projectId);
 
-    const credential = await this.prisma.projectAwsCredential.findUnique({ where: { projectId } });
+    const credential = await this.prisma.awsCrossAccountBinding.findUnique({ where: { projectId } });
     if (!credential?.roleArn) {
       throw new BadRequestException(
         `Project ${project.name} does not have a cross-account AWS role configured. Set it up in the AWS CREDENTIAL tab first.`,
@@ -454,7 +454,7 @@ export class AwsAuditService {
       ...regionalAudits.flatMap((item) => [...item.ec2.findings, ...item.rds.findings]),
     ].sort((left, right) => this.severityRank[right.severity] - this.severityRank[left.severity]);
 
-    await this.prisma.projectAwsCredential.update({
+    await this.prisma.awsCrossAccountBinding.update({
       where: { projectId },
       data: { lastVerifiedAt: new Date() },
     });
@@ -466,7 +466,7 @@ export class AwsAuditService {
         projectName: project.name,
         configuredAwsAccountId: resolved.awsAccountId,
         discoveredAwsAccountId: identity.accountId,
-        iamUserName: identity.iamUserName || resolved.iamUserName,
+        iamUserName: identity.iamUserName || resolved.roleName,
         callerArn: identity.arn,
         roleArn: resolved.roleArn,
         regions,

@@ -5,12 +5,12 @@ const AWS_REGION_PATTERN = /^[a-z]{2}(-gov)?-[a-z]+-\d$/;
 const IAM_ROLE_ARN_PATTERN = /^arn:aws(-gov|-cn)?:iam::\d{12}:role\/[\w+=,.@/-]+$/;
 
 /**
- * Non-sensitive cross-account role fields returned to the client.
+ * Non-sensitive cross-account binding fields returned to the client.
  * The external ID is not a secret: it only protects the customer's trust
  * policy against the confused-deputy problem and is safe to display.
  */
-export class ProjectAwsCredentialDto {
-  @ApiProperty({ description: "Credential record ID" })
+export class AwsCrossAccountBindingDto {
+  @ApiProperty({ description: "Binding record ID" })
   id: string;
 
   @ApiPropertyOptional({
@@ -19,14 +19,14 @@ export class ProjectAwsCredentialDto {
   })
   roleArn?: string | null;
 
-  @ApiProperty({ description: "Per-project external ID required by the role trust policy" })
+  @ApiProperty({ description: "Per-binding external ID required by the role trust policy" })
   externalId: string;
 
-  @ApiPropertyOptional({ description: "AWS account ID resolved via STS after assuming the role", type: String })
+  @ApiPropertyOptional({ description: "Customer AWS account ID resolved via STS after assuming the role", type: String })
   awsAccountId?: string | null;
 
-  @ApiPropertyOptional({ description: "IAM role name resolved via STS", type: String })
-  iamUserName?: string | null;
+  @ApiPropertyOptional({ description: "Customer IAM role name resolved via STS after assuming the role", type: String })
+  roleName?: string | null;
 
   @ApiPropertyOptional({ description: "Default AWS region for API calls", type: String })
   defaultRegion?: string | null;
@@ -44,33 +44,35 @@ export class ProjectAwsCredentialDto {
 /**
  * Response envelope for GET / PUT / DELETE / bootstrap / rotate endpoints.
  * `configured` is true only after a role ARN has been saved and verified.
- * `platformAccountId` is the platform's own account, used to render the
+ * `defaultAccountId` is the host default account, used to render the
  * Principal of the customer-facing role trust policy.
  */
-export class ProjectAwsCredentialResponseDto {
-  @ApiProperty({ description: "Project ID" })
+export class AwsCrossAccountBindingResponseDto {
+  @ApiProperty({ description: "Host scope ID (project id / tenant id / ...)" })
   projectId: string;
 
-  @ApiProperty({ description: "Whether a cross-account role is fully configured for this project" })
+  @ApiProperty({ description: "Whether a cross-account role is fully configured for this host scope" })
   configured: boolean;
 
   @ApiPropertyOptional({
-    description: "Credential details, or null when bootstrap has not run",
-    type: ProjectAwsCredentialDto,
+    description: "Binding details, or null when bootstrap has not run",
+    type: AwsCrossAccountBindingDto,
   })
-  credential?: ProjectAwsCredentialDto | null;
+  credential?: AwsCrossAccountBindingDto | null;
 
   @ApiPropertyOptional({
-    description: "Platform AWS account ID resolved via the SDK default credential chain",
+    description: "Host default AWS account ID resolved via the SDK default credential chain",
     type: String,
   })
-  platformAccountId?: string | null;
+  defaultAccountId?: string | null;
 }
 
 /**
  * Additional STS caller-identity info returned by the verify endpoint.
+ * These fields are the raw GetCallerIdentity result; iamUserName carries a
+ * user name, "root", or an assumed-role name depending on the principal.
  */
-export class AwsCredentialVerificationDto {
+export class AwsCrossAccountBindingVerificationDto {
   @ApiPropertyOptional({ description: "AWS account ID from STS GetCallerIdentity", type: String })
   accountId?: string | null;
 
@@ -80,19 +82,19 @@ export class AwsCredentialVerificationDto {
   @ApiPropertyOptional({ description: "User ID from STS GetCallerIdentity", type: String })
   userId?: string | null;
 
-  @ApiPropertyOptional({ description: "IAM role name from STS GetCallerIdentity", type: String })
+  @ApiPropertyOptional({ description: "Principal name from STS GetCallerIdentity (user / root / role)", type: String })
   iamUserName?: string | null;
 }
 
 /**
- * Response for the verify endpoint: credential details plus live STS verification.
+ * Response for the verify endpoint: binding details plus live STS verification.
  */
-export class VerifyAwsCredentialResponseDto extends ProjectAwsCredentialResponseDto {
+export class VerifyAwsCrossAccountBindingResponseDto extends AwsCrossAccountBindingResponseDto {
   @ApiProperty({ description: "Live STS caller-identity verification result" })
-  verification: AwsCredentialVerificationDto;
+  verification: AwsCrossAccountBindingVerificationDto;
 }
 
-export class UpsertProjectAwsCredentialDto {
+export class UpsertAwsCrossAccountBindingDto {
   @ApiProperty({ description: "Customer-managed IAM role ARN to assume" })
   @IsNotEmpty()
   @IsString()

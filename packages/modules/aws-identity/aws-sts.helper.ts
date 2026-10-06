@@ -29,9 +29,10 @@ const ROLE_SESSION_DURATION_SECONDS = 3600;
 const DEFAULT_STS_REGION = "us-east-1";
 
 /**
- * Assume a customer-managed role. The STS client itself uses the platform
- * default credential chain (SSO / instance profile); only the trust policy on
- * the customer role authorizes the assumption together with the external ID.
+ * Assume a customer-managed role. The STS client itself authenticates with
+ * the host default credentials (the SDK default credential chain: SSO /
+ * instance profile / IRSA); only the trust policy on the customer role
+ * authorizes the assumption together with the external ID.
  */
 export async function assumeRole(params: {
   roleArn: string;
@@ -39,8 +40,9 @@ export async function assumeRole(params: {
   region: string;
   sessionName: string;
   durationSeconds?: number;
+  defaultCredentials?: AwsCredentialsProvider;
 }): Promise<{ credentials: AwsTemporaryCredentials; expiration: Date | null }> {
-  const client = new STSClient({ region: params.region });
+  const client = new STSClient({ region: params.region, credentials: params.defaultCredentials });
   const response = await client.send(
     new AssumeRoleCommand({
       RoleArn: params.roleArn,
@@ -78,12 +80,15 @@ export async function getCallerIdentity(
 }
 
 /**
- * Resolve the platform's own AWS account via the SDK default credential
- * chain. Used to render the Principal in the customer-facing trust policy;
- * the result is informational and must be cached by the caller.
+ * Resolve the host default AWS identity through the supplied default
+ * credential provider. Used to render the Principal in the customer-facing
+ * trust policy; the result is informational and cached by the caller.
  */
-export async function getPlatformCallerIdentity(region = DEFAULT_STS_REGION): Promise<AwsCallerIdentity> {
-  const client = new STSClient({ region });
+export async function getDefaultCallerIdentity(
+  defaultCredentials: AwsCredentialsProvider,
+  region = DEFAULT_STS_REGION,
+): Promise<AwsCallerIdentity> {
+  const client = new STSClient({ region, credentials: defaultCredentials });
   const response = await client.send(new GetCallerIdentityCommand({}));
   return {
     accountId: response.Account || null,

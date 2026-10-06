@@ -1,5 +1,5 @@
-import {Injectable} from '@nestjs/common';
-import {ConfigService} from '@nestjs/config';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   SESv2Client,
   ListSuppressedDestinationsCommand,
@@ -8,23 +8,34 @@ import {
   GetSuppressedDestinationCommand,
   PutSuppressedDestinationCommand,
   SuppressionListReason,
-} from '@aws-sdk/client-sesv2';
+} from "@aws-sdk/client-sesv2";
+import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
 
 @Injectable()
 export class AwsSesSuppressionListService {
   private client: SESv2Client;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly credentials: AwsCredentialsService,
+  ) {
     const config = this.configService.getOrThrow<{
       region: string;
       configurationSetName: string;
       fromEmailAddress: string;
-    }>('modules.aws-ses');
+    }>("modules.aws-ses");
 
-    this.client = new SESv2Client({region: config.region});
+    this.client = new SESv2Client({
+      region: config.region,
+      credentials: this.credentials.resolveDefaultCredentials(),
+    });
   }
 
-  async listSuppressedDestinations(params: {reasons?: SuppressionListReason[]; nextToken?: string; pageSize?: number}) {
+  async listSuppressedDestinations(params: {
+    reasons?: SuppressionListReason[];
+    nextToken?: string;
+    pageSize?: number;
+  }) {
     const input: ListSuppressedDestinationsCommandInput = {
       Reasons: params.reasons,
       NextToken: params.nextToken,
@@ -49,7 +60,7 @@ export class AwsSesSuppressionListService {
     return response;
   }
 
-  async addSuppressedDestination(params: {emailAddress: string; reason: SuppressionListReason}) {
+  async addSuppressedDestination(params: { emailAddress: string; reason: SuppressionListReason }) {
     const command = new PutSuppressedDestinationCommand({
       EmailAddress: params.emailAddress,
       Reason: params.reason,

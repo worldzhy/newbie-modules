@@ -5,7 +5,7 @@ import { AWSRegion } from "@modules/aws-cloudwatch/aws-cloudwatch.enum";
 /**
  * Response DTO for AwsAccount.
  * AWS access keys are not stored here; they resolve from the project-shared
- * aws-core credential at runtime.
+ * aws-identity cross-account binding at runtime.
  */
 export class AwsAccountResponseDto {
   @ApiProperty({ type: String })

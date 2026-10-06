@@ -7,7 +7,8 @@
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 // Audit-specific per-project settings. AWS credentials are NOT stored here;
-// they live in application.ProjectAwsCredential (aws-core).
+// cross-account bindings live in "module/aws-identity".AwsCrossAccountBinding
+// (aws-identity module), keyed by the same host scope projectId.
 model AwsAuditProjectSetting {
   id             String    @id @default(uuid()) @db.Uuid
   projectId      String    @unique @db.Uuid
