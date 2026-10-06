@@ -2,7 +2,6 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Cron } from "@nestjs/schedule";
 import { TaskService } from "./task.service";
 import { LarkBotService } from "../lark-bot/lark-bot.service";
-import { LlmAgentService } from "../llm-agent/llm-agent.service";
 import dayjs from "dayjs";
 import * as chineseDays from "chinese-days";
 
@@ -13,7 +12,6 @@ export class TaskCronService {
   constructor(
     private readonly taskService: TaskService,
     private readonly larkBotService: LarkBotService,
-    private readonly llmAgentService: LlmAgentService,
   ) {}
 
   /**
@@ -117,7 +115,7 @@ export class TaskCronService {
       }
 
       const tasks = await this.taskService.getTasksByProjectAndDateRange(project.id, startDate, endDate);
-      const summaryContent = await this.llmAgentService.generateProjectMonthlySummary(project.name, year, month, tasks);
+      const summaryContent = await this.taskService.generateProjectMonthlySummary(project.name, year, month, tasks);
 
       await this.taskService.upsertMonthlyReport(project.id, year, month, summaryContent);
 

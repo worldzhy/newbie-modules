@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { LlmAgentService } from "../llm-agent/llm-agent.service";
 import { TaskStatus } from "@generated/prisma/enums";
 import dayjs from "dayjs";
 import isoWeek from "dayjs/plugin/isoWeek";
@@ -40,7 +41,49 @@ export interface UpdateTaskDto {
 export class TaskService {
   private readonly logger = new Logger(TaskService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly llmAgentService: LlmAgentService,
+  ) {}
+
+  // --- LLM-powered Project Reporting ---
+
+  async generateProjectMonthlySummary(projectName: string, year: number, month: number, tasks: any[]): Promise<string> {
+    const systemPrompt = `
+You are a project manager. Your task is to write a monthly summary report for the project "${projectName}" for the period of ${year}-${month}.
+
+You are provided with a list of tasks that were active, created, updated, or completed during this month.
+Analyze the tasks and provide a concise, professional, and well-structured summary.
+
+Requirements:
+- Highlight key achievements (completed tasks).
+- Mention ongoing work (developing/testing tasks).
+- Keep it professional, easy to read, and structured (use markdown bullet points).
+- If the task list is empty, simply state that there was no recorded activity for this project in this month.
+
+Output ONLY the report content in Markdown format. Do not output JSON.
+`;
+
+    const userContent =
+      tasks.length > 0
+        ? `Tasks for ${year}-${month}:\n${JSON.stringify(tasks, null, 2)}`
+        : `No tasks found for ${year}-${month}.`;
+
+    try {
+      const response = await this.llmAgentService.callLLM(
+        [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userContent },
+        ],
+        false,
+      );
+
+      return response.content || "Failed to generate report, please try again later.";
+    } catch (e) {
+      this.logger.error("Failed to generate project monthly summary", e);
+      return "An error occurred while generating the report.";
+    }
+  }
 
   // --- User Association Management ---
 
