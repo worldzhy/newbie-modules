@@ -9,7 +9,7 @@ import {
 } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ProjectAwsCredential } from "@generated/prisma/client";
-import { UpsertProjectAwsCredentialDto } from "./aws-credential.dto";
+import { UpsertProjectAwsCredentialDto } from "./aws-credentials.dto";
 import {
   assumeRole,
   AwsCredentialsProvider,
@@ -45,8 +45,8 @@ interface AssumedSession {
 }
 
 @Injectable()
-export class AwsCredentialService {
-  private readonly logger = new Logger(AwsCredentialService.name);
+export class AwsCredentialsService {
+  private readonly logger = new Logger(AwsCredentialsService.name);
   private readonly sessionCache = new Map<string, Promise<AssumedSession>>();
   private platformIdentityPromise: Promise<string | null> | null = null;
 

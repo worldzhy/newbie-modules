@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { AwsCredentialService } from "@modules/aws-core/aws-credential.service";
-import type { AwsCredentialsProvider } from "@modules/aws-core/aws-sts.helper";
+import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import type { AwsCredentialsProvider } from "@modules/aws-identity/aws-sts.helper";
 import { AwsRegion } from "@generated/prisma/client";
 
 export interface ResolvedCloudwatchCredential {
@@ -22,7 +22,7 @@ export interface ResolvedCloudwatchCredential {
 export class AwsCloudwatchCredentialService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly credentialService: AwsCredentialService,
+    private readonly credentialService: AwsCredentialsService,
   ) {}
 
   async resolve(awsAccountId: string): Promise<ResolvedCloudwatchCredential> {

@@ -6,6 +6,7 @@
     "className": "AwsCloudwatchModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["aws-identity"],
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "latest",
     "@aws-sdk/client-ec2": "latest",

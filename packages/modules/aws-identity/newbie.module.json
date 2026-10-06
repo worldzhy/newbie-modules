@@ -1,9 +1,9 @@
 {
-  "key": "aws-core",
+  "key": "aws-identity",
   "layer": "foundation",
   "module": {
-    "file": "aws-core.module",
-    "className": "AwsCoreModule"
+    "file": "aws-identity.module",
+    "className": "AwsIdentityModule"
   },
   "schema": "prisma/schema.prisma",
   "config-service": {},

@@ -1,17 +1,17 @@
 import { Body, Controller, Delete, Get, Param, Post, Put } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { AwsCredentialService } from "./aws-credential.service";
+import { AwsCredentialsService } from "./aws-credentials.service";
 import {
   ProjectAwsCredentialResponseDto,
   UpsertProjectAwsCredentialDto,
   VerifyAwsCredentialResponseDto,
-} from "./aws-credential.dto";
+} from "./aws-credentials.dto";
 
 @ApiTags("AWS Credential")
 @ApiBearerAuth()
 @Controller("aws-credentials/projects")
-export class AwsCredentialController {
-  constructor(private readonly service: AwsCredentialService) {}
+export class AwsCredentialsController {
+  constructor(private readonly service: AwsCredentialsService) {}
 
   @Get(":projectId")
   @ApiOperation({ summary: "Get the cross-account AWS role configured for a project" })

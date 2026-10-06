@@ -1,5 +1,5 @@
 import { MetricDataResult } from "@aws-sdk/client-cloudwatch";
-import type { AwsCredentialsProvider } from "@modules/aws-core/aws-sts.helper";
+import type { AwsCredentialsProvider } from "@modules/aws-identity/aws-sts.helper";
 import {
   CloudwatchEC2MetricName,
   CloudwatchMetricRDSMetricName,
