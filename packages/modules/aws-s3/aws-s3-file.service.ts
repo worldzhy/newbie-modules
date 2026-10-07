@@ -362,16 +362,11 @@ export class AwsS3FileService {
       where: { id: fileId },
     });
 
-    try {
-      await this.s3.deleteObjectRecursively({
-        bucket: file.s3Bucket,
-        key: file.s3Key,
-      });
-      await this.deleteFileRecursively(fileId);
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
-    }
+    await this.s3.deleteObjectRecursively({
+      bucket: file.s3Bucket,
+      key: file.s3Key,
+    });
+    await this.deleteFileRecursively(fileId);
   }
 
   //*******************************/

@@ -116,76 +116,62 @@ export class AwsS3Service {
   }
 
   async deleteObjectRecursively(params: { bucket: string; key: string }) {
-    try {
-      // [step 1] List objects
-      const listResponse = await this.client.send(
-        new ListObjectsV2Command({
-          Bucket: params.bucket ?? this.bucket,
-          Prefix: params.key,
-        }),
-      );
-      if (!listResponse.Contents || listResponse.Contents.length === 0) {
-        return;
-      }
+    // [step 1] List objects
+    const listResponse = await this.client.send(
+      new ListObjectsV2Command({
+        Bucket: params.bucket ?? this.bucket,
+        Prefix: params.key,
+      }),
+    );
+    if (!listResponse.Contents || listResponse.Contents.length === 0) {
+      return;
+    }
 
-      // [step 2] Delete objects
-      await this.client.send(
-        new DeleteObjectsCommand({
-          Bucket: params.bucket,
-          Delete: {
-            Objects: listResponse.Contents.map((content) => {
-              return { Key: content.Key };
-            }),
-          },
-        }),
-      );
+    // [step 2] Delete objects
+    await this.client.send(
+      new DeleteObjectsCommand({
+        Bucket: params.bucket,
+        Delete: {
+          Objects: listResponse.Contents.map((content) => {
+            return { Key: content.Key };
+          }),
+        },
+      }),
+    );
 
-      // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
-      // IsTruncated: Set to false if all of the results were returned. Set to true if more keys are available to return. If the number of results exceeds that specified by MaxKeys, all of the results might not be returned.
-      if (listResponse.IsTruncated) {
-        await this.deleteObjectRecursively(params);
-      }
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
+    // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
+    // IsTruncated: Set to false if all of the results were returned. Set to true if more keys are available to return. If the number of results exceeds that specified by MaxKeys, all of the results might not be returned.
+    if (listResponse.IsTruncated) {
+      await this.deleteObjectRecursively(params);
     }
   }
 
   async getObjectsRecursively(params: { bucket?: string; prefix?: string }) {
     const allKeys: { s3Key: string; size?: number }[] = [];
-    try {
-      // [step 1] List objects
-      const listResponse = await this.client.send(
-        new ListObjectsV2Command({
-          Bucket: params.bucket ?? this.bucket,
-          Prefix: params.prefix,
-        }),
-      );
+    // [step 1] List objects
+    const listResponse = await this.client.send(
+      new ListObjectsV2Command({
+        Bucket: params.bucket ?? this.bucket,
+        Prefix: params.prefix,
+      }),
+    );
 
-      if (!listResponse.Contents || listResponse.Contents.length === 0) {
-        return allKeys;
-      } else {
-        allKeys.push(
-          ...listResponse.Contents.map((content) => {
-            return { s3Key: content.Key!, size: content.Size };
-          }),
-        );
-      }
-
-      // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
-      // IsTruncated: Set to false if all of the results were returned. Set to true if more keys are available to return. If the number of results exceeds that specified by MaxKeys, all of the results might not be returned.
-      if (listResponse.IsTruncated) {
-        const keys = await this.getObjectsRecursively(params);
-        allKeys.push(...keys);
-      } else {
-        return allKeys;
-      }
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
-    } finally {
+    if (!listResponse.Contents || listResponse.Contents.length === 0) {
       return allKeys;
     }
+    allKeys.push(
+      ...listResponse.Contents.map((content) => {
+        return { s3Key: content.Key!, size: content.Size };
+      }),
+    );
+
+    // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
+    // IsTruncated: Set to false if all of the results were returned. Set to true if more keys are available to return. If the number of results exceeds that specified by MaxKeys, all of the results might not be returned.
+    if (listResponse.IsTruncated) {
+      const keys = await this.getObjectsRecursively(params);
+      allKeys.push(...keys);
+    }
+    return allKeys;
   }
 
   //*******************************/

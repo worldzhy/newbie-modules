@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
 import { firstValueFrom } from "rxjs";
 import { GetChatHistoryDto, LarkWebhookDto, SendTextDto, SendCardDto } from "./lark-bot.dto";
+import { decryptLarkEvent } from "./lark-event.util";
 
 type MessageHandler = (
   chatId: string,
@@ -135,8 +136,29 @@ export class LarkBotService {
 
     // 2. Handle Encrypted Event
     if (body.encrypt) {
-      this.logger.warn("Received encrypted event, decryption is not implemented yet.");
-      return { code: 0, msg: "success" };
+      const encryptKey =
+        this.configService.get<string>("LARK_ENCRYPT_KEY") ||
+        this.configService.get<string>("modules.lark-bot.encryptKey");
+      if (!encryptKey) {
+        // Lark still requires a 200 acknowledgement or it keeps retrying, but
+        // without the Encrypt Key the event cannot be processed. Log at error
+        // level so the misconfiguration is discoverable instead of dropping
+        // every encrypted event silently.
+        this.logger.error("Received an encrypted Lark event but LARK_ENCRYPT_KEY is not configured; event dropped.");
+        return { code: 0, msg: "success" };
+      }
+
+      let decrypted: unknown;
+      try {
+        decrypted = decryptLarkEvent(encryptKey, body.encrypt);
+      } catch (error) {
+        this.logger.error("Failed to decrypt Lark webhook event", error);
+        return { code: 0, msg: "success" };
+      }
+
+      // The decrypted body never carries an `encrypt` field, so this
+      // re-dispatch cannot loop; challenge/events flow through the steps below.
+      return await this.handleWebhook(decrypted as LarkWebhookDto);
     }
 
     // 3. Handle Card Action (User clicked a button)

@@ -60,41 +60,27 @@ export class GoogleDriveFileService {
   }
 
   async createFolder(params: { name: string; parentId?: string }) {
-    try {
-      return await this.createFile({
-        name: params.name,
-        type: GoogleFileType.Folder,
-        parentId: params.parentId,
-      });
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
-    }
+    return await this.createFile({
+      name: params.name,
+      type: GoogleFileType.Folder,
+      parentId: params.parentId,
+    });
   }
 
   async createDocument(params: { name: string; parentId?: string }) {
-    try {
-      return await this.createFile({
-        name: params.name,
-        type: GoogleFileType.Document,
-        parentId: params.parentId,
-      });
-    } catch (error) {
-      throw error;
-    }
+    return await this.createFile({
+      name: params.name,
+      type: GoogleFileType.Document,
+      parentId: params.parentId,
+    });
   }
 
   async createSheet(params: { name: string; parentId?: string }) {
-    try {
-      return await this.createFile({
-        name: params.name,
-        type: GoogleFileType.Sheet,
-        parentId: params.parentId,
-      });
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
-    }
+    return await this.createFile({
+      name: params.name,
+      type: GoogleFileType.Sheet,
+      parentId: params.parentId,
+    });
   }
 
   /**
@@ -102,16 +88,11 @@ export class GoogleDriveFileService {
    * https://developers.google.com/drive/api/guides/delete
    */
   async deleteFile(fileId: string) {
-    try {
-      const response = await this.client.files.delete({ fileId, supportsAllDrives: true });
-      if (response.status >= 200 && response.status < 300) {
-        await this.deleteFileRecursively(fileId);
-      } else {
-        throw new InternalServerErrorException("Delete google file failed.");
-      }
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
+    const response = await this.client.files.delete({ fileId, supportsAllDrives: true });
+    if (response.status >= 200 && response.status < 300) {
+      await this.deleteFileRecursively(fileId);
+    } else {
+      throw new InternalServerErrorException("Delete google file failed.");
     }
   }
 
@@ -122,138 +103,118 @@ export class GoogleDriveFileService {
    */
   async downloadFile(params: { fileId: string; res: any }) {
     const { fileId, res } = params;
-    try {
-      // Fetch file metadata for name and size.
-      const metadata = await this.client.files.get({
-        fileId,
-        fields: "name, size, mimeType",
-        supportsAllDrives: true,
-      });
+    // Fetch file metadata for name and size.
+    const metadata = await this.client.files.get({
+      fileId,
+      fields: "name, size, mimeType",
+      supportsAllDrives: true,
+    });
 
-      // Set response headers for file download.
-      const fileName = metadata.data.name || "download";
-      const fileSize = metadata.data.size ? parseInt(metadata.data.size) : undefined;
-      res.setHeader("Content-Type", metadata.data.mimeType || "application/octet-stream");
-      res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(fileName)}"`);
-      if (fileSize) {
-        res.setHeader("Content-Length", fileSize);
-      }
-
-      // Download the file content via the Drive API and pipe to response.
-      const downloadStream = await this.client.files.get(
-        { fileId, alt: "media", supportsAllDrives: true },
-        { responseType: "stream" },
-      );
-      downloadStream.data.pipe(res);
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
+    // Set response headers for file download.
+    const fileName = metadata.data.name || "download";
+    const fileSize = metadata.data.size ? parseInt(metadata.data.size) : undefined;
+    res.setHeader("Content-Type", metadata.data.mimeType || "application/octet-stream");
+    res.setHeader("Content-Disposition", `attachment; filename="${encodeURIComponent(fileName)}"`);
+    if (fileSize) {
+      res.setHeader("Content-Length", fileSize);
     }
+
+    // Download the file content via the Drive API and pipe to response.
+    const downloadStream = await this.client.files.get(
+      { fileId, alt: "media", supportsAllDrives: true },
+      { responseType: "stream" },
+    );
+    downloadStream.data.pipe(res);
   }
 
   async renameFile(params: { fileId: string; name: string }) {
-    try {
-      const response = await this.client.files.update({
-        fileId: params.fileId,
-        requestBody: { name: params.name },
-        supportsAllDrives: true,
-      });
+    const response = await this.client.files.update({
+      fileId: params.fileId,
+      requestBody: { name: params.name },
+      supportsAllDrives: true,
+    });
 
-      if (response.status >= 200 && response.status < 300) {
-        return await this.prisma.googleDriveFile.update({
-          where: { id: params.fileId },
-          data: { name: params.name },
-        });
-      } else {
-        throw new InternalServerErrorException("Rename google file failed.");
-      }
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
+    if (response.status >= 200 && response.status < 300) {
+      return await this.prisma.googleDriveFile.update({
+        where: { id: params.fileId },
+        data: { name: params.name },
+      });
+    } else {
+      throw new InternalServerErrorException("Rename google file failed.");
     }
   }
 
   async uploadFile(params: { file: Express.Multer.File; parentId?: string }) {
-    try {
-      // Create google file. Use file.buffer (not file.stream) because Multer
-      // has already consumed the stream by the time the handler runs; reading
-      // a ended stream would upload 0 bytes. Readable.from re-creates a
-      // fresh stream from the in-memory buffer.
-      //
-      // `driveId` + `supportsAllDrives` are mandatory: service accounts have
-      // no personal storage quota, so the file MUST be created inside a
-      // shared drive. Without `driveId`, the API defaults to the service
-      // account's root and returns 403 storageQuotaExceeded.
-      const file = await this.client.files.create({
-        uploadType: "multipart",
-        media: { body: Readable.from(params.file.buffer) },
-        requestBody: {
-          name: params.file.originalname,
-          parents: params.parentId ? [params.parentId] : [this.googleSharedDriveId],
-        },
-        fields: "id, name, mimeType, size, iconLink, webViewLink, webContentLink",
-        supportsAllDrives: true,
-      });
-      if (!file.data.id) {
-        throw new InternalServerErrorException("Create google file failed.");
-      }
-
-      // Save to database. The create response already includes size and links
-      // thanks to the `fields` parameter, so no separate files.get is needed.
-      return await this.prisma.googleDriveFile.create({
-        data: {
-          id: file.data.id,
-          name: params.file.originalname,
-          type: file.data.mimeType,
-          size: file.data.size ? parseInt(file.data.size) : undefined,
-          iconLink: file.data.iconLink,
-          webViewLink: file.data.webViewLink,
-          webContentLink: file.data.webContentLink,
-          parentId: params.parentId,
-        },
-      });
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
+    // Create google file. Use file.buffer (not file.stream) because Multer
+    // has already consumed the stream by the time the handler runs; reading
+    // a ended stream would upload 0 bytes. Readable.from re-creates a
+    // fresh stream from the in-memory buffer.
+    //
+    // `driveId` + `supportsAllDrives` are mandatory: service accounts have
+    // no personal storage quota, so the file MUST be created inside a
+    // shared drive. Without `driveId`, the API defaults to the service
+    // account's root and returns 403 storageQuotaExceeded.
+    const file = await this.client.files.create({
+      uploadType: "multipart",
+      media: { body: Readable.from(params.file.buffer) },
+      requestBody: {
+        name: params.file.originalname,
+        parents: params.parentId ? [params.parentId] : [this.googleSharedDriveId],
+      },
+      fields: "id, name, mimeType, size, iconLink, webViewLink, webContentLink",
+      supportsAllDrives: true,
+    });
+    if (!file.data.id) {
+      throw new InternalServerErrorException("Create google file failed.");
     }
+
+    // Save to database. The create response already includes size and links
+    // thanks to the `fields` parameter, so no separate files.get is needed.
+    return await this.prisma.googleDriveFile.create({
+      data: {
+        id: file.data.id,
+        name: params.file.originalname,
+        type: file.data.mimeType,
+        size: file.data.size ? parseInt(file.data.size) : undefined,
+        iconLink: file.data.iconLink,
+        webViewLink: file.data.webViewLink,
+        webContentLink: file.data.webContentLink,
+        parentId: params.parentId,
+      },
+    });
   }
 
   private async createFile(params: { name: string; type: GoogleFileType; parentId?: string }) {
-    try {
-      // Create google file. Always place it inside the shared drive: service
-      // accounts have no personal storage quota, so omitting `parents` (or
-      // pointing outside a shared drive) would fail with 403.
-      const file = await this.client.files.create({
-        requestBody: {
-          mimeType: GoogleMimeType[params.type],
-          name: params.name,
-          parents: params.parentId ? [params.parentId] : [this.googleSharedDriveId],
-        },
-        fields: "id, name, mimeType, size, iconLink, webViewLink, webContentLink",
-        supportsAllDrives: true,
-      });
-      if (!file.data.id) {
-        throw new InternalServerErrorException("Create google file failed.");
-      }
-
-      // Save to database. The create response already includes size and links
-      // thanks to the `fields` parameter, so no separate files.get is needed.
-      return await this.prisma.googleDriveFile.create({
-        data: {
-          id: file.data.id,
-          name: params.name,
-          type: params.type,
-          size: file.data.size ? parseInt(file.data.size) : undefined,
-          iconLink: file.data.iconLink,
-          webViewLink: file.data.webViewLink,
-          webContentLink: file.data.webContentLink,
-          parentId: params.parentId,
-        },
-      });
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
+    // Create google file. Always place it inside the shared drive: service
+    // accounts have no personal storage quota, so omitting `parents` (or
+    // pointing outside a shared drive) would fail with 403.
+    const file = await this.client.files.create({
+      requestBody: {
+        mimeType: GoogleMimeType[params.type],
+        name: params.name,
+        parents: params.parentId ? [params.parentId] : [this.googleSharedDriveId],
+      },
+      fields: "id, name, mimeType, size, iconLink, webViewLink, webContentLink",
+      supportsAllDrives: true,
+    });
+    if (!file.data.id) {
+      throw new InternalServerErrorException("Create google file failed.");
     }
+
+    // Save to database. The create response already includes size and links
+    // thanks to the `fields` parameter, so no separate files.get is needed.
+    return await this.prisma.googleDriveFile.create({
+      data: {
+        id: file.data.id,
+        name: params.name,
+        type: params.type,
+        size: file.data.size ? parseInt(file.data.size) : undefined,
+        iconLink: file.data.iconLink,
+        webViewLink: file.data.webViewLink,
+        webContentLink: file.data.webContentLink,
+        parentId: params.parentId,
+      },
+    });
   }
 
   /**
@@ -349,27 +310,15 @@ export class GoogleDriveFileService {
   private async listFilesOnCloud(params: { parentId?: string }) {
     // supported syntax - https://developers.google.com/drive/api/guides/search-files
     const q = params.parentId ? `'${params.parentId}' in parents` : `'root' in parents`;
-
-    try {
-      const response = await this.client.files.list({ q });
-      return response.data;
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
-    }
+    const response = await this.client.files.list({ q });
+    return response.data;
   }
 
   private async searchFilesOnCloud(params: { name: string }) {
     // supported syntax - https://developers.google.com/drive/api/guides/search-files
     const q = params.name ? `name contains '${params.name}'` : undefined;
-
-    try {
-      const response = await this.client.files.list({ q });
-      return response.data;
-    } catch (error) {
-      // TODO (developer) - Handle exception
-      throw error;
-    }
+    const response = await this.client.files.list({ q });
+    return response.data;
   }
 
   /* End */
