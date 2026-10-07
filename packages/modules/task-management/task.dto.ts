@@ -53,20 +53,6 @@ export class ListTasksQueryDto {
   assigneeName?: string;
 }
 
-export class ListReportsQueryDto {
-  @ApiPropertyOptional({ type: Number, description: "Page number, 0-based", default: 0 })
-  @IsNumber()
-  @IsOptional()
-  @Type(() => Number)
-  page?: number;
-
-  @ApiPropertyOptional({ type: Number, description: "Page size", default: 10 })
-  @IsNumber()
-  @IsOptional()
-  @Type(() => Number)
-  pageSize?: number;
-}
-
 export class UpdateTaskApiDto {
   @ApiPropertyOptional({ enum: TaskStatus })
   @IsEnum(TaskStatus)
@@ -121,16 +107,6 @@ export class CreateTaskApiDto {
   dueDate?: Date;
 }
 
-export class GenerateMonthlyReportDto {
-  @ApiProperty({ type: Number, description: "Full year, e.g. 2026" })
-  @IsNumber()
-  year: number;
-
-  @ApiProperty({ type: Number, description: "Month, 1-12" })
-  @IsNumber()
-  month: number;
-}
-
 export class LinkTaskUserDto {
   @ApiProperty({ type: String, description: "TaskUser ID (uuid) to link to the current user" })
   @IsString()
@@ -155,13 +131,6 @@ export class UnlinkTaskProjectDto {
   @IsString()
   @IsNotEmpty()
   projectId: string;
-}
-
-export class UpdateMonthlyReportDto {
-  @ApiProperty({ type: String })
-  @IsString()
-  @IsNotEmpty()
-  content: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -376,60 +345,6 @@ export class TaskMemberDto {
   createdAt: Date;
 }
 
-export class WeeklyReportDto {
-  @ApiProperty({ description: "Weekly report ID (uuid)" })
-  id: string;
-
-  @ApiProperty({ description: "Year, e.g. 2026" })
-  year: number;
-
-  @ApiProperty({ description: "ISO week number" })
-  week: number;
-
-  @ApiProperty({ description: "Weekly report content" })
-  content: string;
-
-  @ApiProperty({ type: Date })
-  createdAt: Date;
-
-  @ApiProperty({ type: Date })
-  updatedAt: Date;
-
-  @ApiProperty({ description: "TaskGroup ID (uuid)" })
-  groupId: string;
-
-  @ApiProperty({ description: "Author TaskUser ID (uuid)" })
-  userId: string;
-}
-
-export class WeeklyReportWithUserDto extends WeeklyReportDto {
-  @ApiProperty({ type: TaskUserDto, description: "Report author" })
-  user: TaskUserDto;
-}
-
-export class MonthlyReportDto {
-  @ApiProperty({ description: "Monthly report ID (uuid)" })
-  id: string;
-
-  @ApiProperty({ description: "Year, e.g. 2026" })
-  year: number;
-
-  @ApiProperty({ description: "Month, 1-12" })
-  month: number;
-
-  @ApiProperty({ description: "Monthly report content" })
-  content: string;
-
-  @ApiProperty({ type: Date })
-  createdAt: Date;
-
-  @ApiProperty({ type: Date })
-  updatedAt: Date;
-
-  @ApiProperty({ description: "TaskProject ID (uuid)" })
-  projectId: string;
-}
-
 // ── Envelope responses ({success, data?[, message]}) ──
 
 export class TaskUsersListResponseDto {
@@ -522,73 +437,4 @@ export class CreateTaskResponseDto {
 
   @ApiProperty({ type: TaskDto })
   data: TaskDto;
-}
-
-export class PaginatedWeeklyReportsDto {
-  @ApiProperty({ type: [WeeklyReportWithUserDto] })
-  records: WeeklyReportWithUserDto[];
-
-  @ApiProperty()
-  total: number;
-
-  @ApiProperty()
-  page: number;
-
-  @ApiProperty()
-  pageSize: number;
-}
-
-export class WeeklyReportsResponseDto {
-  @ApiProperty()
-  success: boolean;
-
-  @ApiProperty({ type: PaginatedWeeklyReportsDto })
-  data: PaginatedWeeklyReportsDto;
-}
-
-export class PaginatedMonthlyReportsDto {
-  @ApiProperty({ type: [MonthlyReportDto] })
-  records: MonthlyReportDto[];
-
-  @ApiProperty()
-  total: number;
-
-  @ApiProperty()
-  page: number;
-
-  @ApiProperty()
-  pageSize: number;
-}
-
-export class MonthlyReportsResponseDto {
-  @ApiProperty()
-  success: boolean;
-
-  @ApiProperty({ type: PaginatedMonthlyReportsDto })
-  data: PaginatedMonthlyReportsDto;
-}
-
-export class UpdateMonthlyReportResponseDto {
-  @ApiProperty()
-  success: boolean;
-
-  @ApiProperty({ type: MonthlyReportDto })
-  data: MonthlyReportDto;
-}
-
-export class GenerateMonthlyReportResponseDto {
-  @ApiProperty()
-  success: boolean;
-
-  @ApiPropertyOptional({ type: String, description: "Success message" })
-  message?: string;
-
-  @ApiPropertyOptional({ type: Number, description: "Report year" })
-  year?: number;
-
-  @ApiPropertyOptional({ type: Number, description: "Report month" })
-  month?: number;
-
-  @ApiPropertyOptional({ type: String, description: "Error message when generation fails" })
-  error?: string;
 }

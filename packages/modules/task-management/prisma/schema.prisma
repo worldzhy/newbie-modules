@@ -18,7 +18,6 @@ model TaskGroup {
   tasks       Task[]
   requirements Requirement[] // Requirements belonging to this group
   taskProjects TaskProject[]  // Projects belonging to this group
-  weeklyReports WeeklyReport[] // Weekly reports belonging to this group
 
   @@schema("module/task-management")
 }
@@ -35,7 +34,6 @@ model TaskProject {
   groupId     String     @db.Uuid
   group       TaskGroup  @relation(fields: [groupId], references: [id])
   tasks       Task[]     // Tasks belonging to this project
-  monthlyReports MonthlyReport[] // Monthly reports belonging to this project
 
   @@schema("module/task-management")
 }
@@ -50,41 +48,7 @@ model TaskUser {
   updatedAt   DateTime   @updatedAt
   createdTasks Task[]    @relation("CreatedTasks") // Tasks created by this user
   assignedTasks Task[]   @relation("AssignedTasks") // Tasks assigned to this user
-  weeklyReports WeeklyReport[] // User's weekly reports
 
-  @@schema("module/task-management")
-}
-
-model WeeklyReport {
-  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  year        Int        // e.g. 2024
-  week        Int        // e.g. 42 (Week number of the year)
-  content     String     // The actual text of the weekly report
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  groupId     String     @db.Uuid
-  group       TaskGroup  @relation(fields: [groupId], references: [id])
-
-  userId      String     @db.Uuid
-  user        TaskUser   @relation(fields: [userId], references: [id])
-
-  @@unique([groupId, userId, year, week]) // One user can only have one report per week in a specific group
-  @@schema("module/task-management")
-}
-
-model MonthlyReport {
-  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  year        Int        // e.g. 2024
-  month       Int        // e.g. 10
-  content     String     // The actual text of the monthly report
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-
-  projectId   String     @db.Uuid
-  project     TaskProject @relation(fields: [projectId], references: [id])
-
-  @@unique([projectId, year, month]) // One project can only have one report per month
   @@schema("module/task-management")
 }
 

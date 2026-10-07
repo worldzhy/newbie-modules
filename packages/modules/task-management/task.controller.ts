@@ -1,23 +1,21 @@
 import { Controller, Get, Post, Patch, Param, Body, UseGuards, Req, BadRequestException, Query } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiParam } from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
 import { JwtAuthGuard } from "@modules/security/authentication/jwt/jwt.guard";
 import { TaskService } from "./task.service";
+import { TaskGroupService } from "./task-group.service";
+import { TaskProjectService } from "./task-project.service";
+import { TaskUserService } from "./task-user.service";
 import { UserRequest } from "@modules/security/security.interface";
-import { TaskReportService } from "./task-report.service";
 import {
   CreateGroupDto,
   CreateTaskApiDto,
   CreateTaskResponseDto,
-  GenerateMonthlyReportDto,
-  GenerateMonthlyReportResponseDto,
   LinkTaskProjectDto,
   LinkTaskProjectResponseDto,
   LinkTaskUserDto,
   LinkTaskUserResponseDto,
-  ListReportsQueryDto,
   ListTasksQueryDto,
   MembersResponseDto,
-  MonthlyReportsResponseDto,
   TaskGroupDto,
   TaskGroupWithCountDto,
   TaskDto,
@@ -27,10 +25,7 @@ import {
   TaskUsersListResponseDto,
   TasksResponseDto,
   UnlinkTaskProjectDto,
-  UpdateMonthlyReportDto,
-  UpdateMonthlyReportResponseDto,
   UpdateTaskApiDto,
-  WeeklyReportsResponseDto,
 } from "./task.dto";
 
 @ApiTags("Task Management")
@@ -40,14 +35,16 @@ import {
 export class TaskController {
   constructor(
     private readonly taskService: TaskService,
-    private readonly taskReportService: TaskReportService,
+    private readonly taskGroupService: TaskGroupService,
+    private readonly taskProjectService: TaskProjectService,
+    private readonly taskUserService: TaskUserService,
   ) {}
 
   @Get("users")
   @ApiOperation({ summary: "List all TaskUsers" })
   @ApiResponse({ status: 200, type: TaskUsersListResponseDto })
   async listTaskUsers(): Promise<TaskUsersListResponseDto> {
-    const taskUsers = await this.taskService.listTaskUsers();
+    const taskUsers = await this.taskUserService.listTaskUsers();
     return { success: true, data: taskUsers };
   }
 
@@ -59,7 +56,7 @@ export class TaskController {
     if (!userId) {
       throw new BadRequestException("User ID not found in request");
     }
-    const taskUser = await this.taskService.getTaskUserByUserId(userId);
+    const taskUser = await this.taskUserService.getTaskUserByUserId(userId);
     return { success: true, data: taskUser };
   }
 
@@ -69,7 +66,7 @@ export class TaskController {
   async linkTaskUser(@Body() dto: LinkTaskUserDto, @Req() req: UserRequest): Promise<LinkTaskUserResponseDto> {
     try {
       const userId = req.user.userId;
-      const result = await this.taskService.linkTaskUser(userId, dto.taskUserId);
+      const result = await this.taskUserService.linkTaskUser(userId, dto.taskUserId);
       return { success: true, data: result };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -83,7 +80,7 @@ export class TaskController {
   async unlinkTaskUser(@Req() req: UserRequest): Promise<LinkTaskUserResponseDto> {
     try {
       const userId = req.user.userId;
-      const result = await this.taskService.unlinkTaskUser(userId);
+      const result = await this.taskUserService.unlinkTaskUser(userId);
       return { success: true, data: result };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -95,7 +92,7 @@ export class TaskController {
   @ApiOperation({ summary: "List all TaskProjects" })
   @ApiResponse({ status: 200, type: TaskProjectsListResponseDto })
   async listTaskProjects(): Promise<TaskProjectsListResponseDto> {
-    const taskProjects = await this.taskService.listTaskProjects();
+    const taskProjects = await this.taskProjectService.listTaskProjects();
     return { success: true, data: taskProjects };
   }
 
@@ -103,7 +100,7 @@ export class TaskController {
   @ApiOperation({ summary: "Get the TaskProject linked to the given Nightwatch project" })
   @ApiResponse({ status: 200, type: TaskProjectDataResponseDto })
   async getLinkedTaskProject(@Param("projectId") projectId: string): Promise<TaskProjectDataResponseDto> {
-    const taskProject = await this.taskService.getTaskProjectByProjectId(projectId);
+    const taskProject = await this.taskProjectService.getTaskProjectByProjectId(projectId);
     return { success: true, data: taskProject };
   }
 
@@ -112,7 +109,7 @@ export class TaskController {
   @ApiResponse({ status: 200, type: LinkTaskProjectResponseDto })
   async linkTaskProject(@Body() dto: LinkTaskProjectDto): Promise<LinkTaskProjectResponseDto> {
     try {
-      const result = await this.taskService.linkTaskProject(dto.projectId, dto.taskProjectId);
+      const result = await this.taskProjectService.linkTaskProject(dto.projectId, dto.taskProjectId);
       return { success: true, data: result };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -125,7 +122,7 @@ export class TaskController {
   @ApiResponse({ status: 200, type: LinkTaskProjectResponseDto })
   async unlinkTaskProject(@Body() dto: UnlinkTaskProjectDto): Promise<LinkTaskProjectResponseDto> {
     try {
-      const result = await this.taskService.unlinkTaskProject(dto.projectId);
+      const result = await this.taskProjectService.unlinkTaskProject(dto.projectId);
       return { success: true, data: result };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -137,21 +134,21 @@ export class TaskController {
   @ApiOperation({ summary: "Create or update a Task Project Group" })
   @ApiResponse({ status: 200, type: TaskGroupDto })
   async createGroup(@Body() dto: CreateGroupDto): Promise<TaskGroupDto> {
-    return await this.taskService.createOrUpdateGroup(dto);
+    return await this.taskGroupService.createOrUpdateGroup(dto);
   }
 
   @Get("groups")
   @ApiOperation({ summary: "List all Task Project Groups" })
   @ApiResponse({ status: 200, type: [TaskGroupWithCountDto] })
   async listGroups(): Promise<TaskGroupWithCountDto[]> {
-    return await this.taskService.listGroups();
+    return await this.taskGroupService.listGroups();
   }
 
   @Get("projects/:projectId/members")
   @ApiOperation({ summary: "List project members by Nightwatch projectId" })
   @ApiResponse({ status: 200, type: MembersResponseDto })
   async listProjectMembers(@Param("projectId") projectId: string): Promise<MembersResponseDto> {
-    const members = await this.taskService.listTaskUsersByProjectId(projectId);
+    const members = await this.taskUserService.listTaskUsersByProjectId(projectId);
     return { success: true, data: members };
   }
 
@@ -166,7 +163,7 @@ export class TaskController {
     const pageSize = query.pageSize ?? 10;
 
     // 1. Find the linked taskProjectId
-    const taskProject = await this.taskService.getTaskProjectByProjectId(projectId);
+    const taskProject = await this.taskProjectService.getTaskProjectByProjectId(projectId);
 
     if (!taskProject) {
       // If not linked, return empty paginated result
@@ -212,12 +209,12 @@ export class TaskController {
     @Body() dto: CreateTaskApiDto,
     @Req() req: UserRequest,
   ): Promise<CreateTaskResponseDto> {
-    const taskProject = await this.taskService.getTaskProjectByProjectId(projectId);
+    const taskProject = await this.taskProjectService.getTaskProjectByProjectId(projectId);
     if (!taskProject) {
       throw new BadRequestException("Project not linked to any TaskProject");
     }
     const creatorId = req.user.userId;
-    const taskUser = await this.taskService.getTaskUserByUserId(creatorId);
+    const taskUser = await this.taskUserService.getTaskUserByUserId(creatorId);
 
     const result = await this.taskService.createTask({
       ...dto,
@@ -260,67 +257,5 @@ export class TaskController {
       source: "SYSTEM",
     };
     return await this.taskService.deleteTask(taskId, operator);
-  }
-
-  @Post("projects/:projectId/monthly-report")
-  @ApiOperation({ summary: "Manually trigger monthly report generation for a project" })
-  @ApiResponse({ status: 200, type: GenerateMonthlyReportResponseDto })
-  async generateMonthlyReport(
-    @Param("projectId") projectId: string,
-    @Body() dto: GenerateMonthlyReportDto,
-  ): Promise<GenerateMonthlyReportResponseDto> {
-    return await this.taskReportService.generateAndSendMonthlyReportForProject(projectId, dto.year, dto.month);
-  }
-
-  @Get("projects/:projectId/reports/weekly")
-  @ApiOperation({ summary: "List weekly reports for a project" })
-  @ApiResponse({ status: 200, type: WeeklyReportsResponseDto })
-  async listWeeklyReports(
-    @Param("projectId") projectId: string,
-    @Query() query: ListReportsQueryDto,
-  ): Promise<WeeklyReportsResponseDto> {
-    const page = query.page ?? 0;
-    const pageSize = query.pageSize ?? 10;
-
-    const taskProject = await this.taskService.getTaskProjectByProjectId(projectId);
-    if (!taskProject) {
-      return { success: true, data: { records: [], total: 0, page, pageSize } };
-    }
-
-    const result = await this.taskReportService.listWeeklyReports(taskProject.groupId, page * pageSize, pageSize);
-    return { success: true, data: { ...result, page, pageSize } };
-  }
-
-  @Get("projects/:projectId/reports/monthly")
-  @ApiOperation({ summary: "List monthly reports for a project" })
-  @ApiResponse({ status: 200, type: MonthlyReportsResponseDto })
-  async listMonthlyReports(
-    @Param("projectId") projectId: string,
-    @Query() query: ListReportsQueryDto,
-  ): Promise<MonthlyReportsResponseDto> {
-    const page = query.page ?? 0;
-    const pageSize = query.pageSize ?? 10;
-
-    const taskProject = await this.taskService.getTaskProjectByProjectId(projectId);
-    if (!taskProject) {
-      return { success: true, data: { records: [], total: 0, page, pageSize } };
-    }
-
-    const result = await this.taskReportService.listMonthlyReports(taskProject.id, page * pageSize, pageSize);
-    return { success: true, data: { ...result, page, pageSize } };
-  }
-
-  @Patch("projects/:projectId/reports/monthly/:reportId")
-  @ApiOperation({ summary: "Update a monthly report" })
-  // The method only binds :reportId, but the route also needs :projectId for the URL.
-  // Declare it explicitly so the generated request type covers every path placeholder.
-  @ApiParam({ name: "projectId", description: "Project ID (uuid)", type: String })
-  @ApiResponse({ status: 200, type: UpdateMonthlyReportResponseDto })
-  async updateMonthlyReport(
-    @Param("reportId") reportId: string,
-    @Body() dto: UpdateMonthlyReportDto,
-  ): Promise<UpdateMonthlyReportResponseDto> {
-    const result = await this.taskReportService.updateMonthlyReportContent(reportId, dto.content);
-    return { success: true, data: result };
   }
 }
