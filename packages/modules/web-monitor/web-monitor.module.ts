@@ -1,8 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 // ScheduleModule.forRoot() is owned by the job-scheduler module when both
 // modules are assembled: a second forRoot would register every @Cron twice.
-// Shared MongoDB connection module, consumed via the microservices path alias.
-import { MongoModule } from "@modules/mongo/mongo.module";
 import { RedisModule } from "./models/redis/redis.module";
 import { MonitorClickhouseModule } from "./models/clickhouse/monitor-clickhouse.module";
 import { SharedModule } from "./shared/shared.module";
@@ -16,7 +14,6 @@ import { RemoveModule } from "./modules/remove/remove.module";
 @Global()
 @Module({
   imports: [
-    MongoModule,
     RedisModule,
     MonitorClickhouseModule,
     MonitorModelsModule,

@@ -1,5 +1,4 @@
 import { Module } from "@nestjs/common";
-import { ConfigModule } from "@nestjs/config";
 import { MonitorClickhouseModule } from "../../models/clickhouse/monitor-clickhouse.module";
 import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
 import { SharedModule } from "../../shared/shared.module";
@@ -33,7 +32,6 @@ import { WebIpTaskService } from "./services/ip-task.service";
 
 @Module({
   imports: [
-    ConfigModule,
     MonitorClickhouseModule,
     MonitorModelsModule,
     SharedModule,

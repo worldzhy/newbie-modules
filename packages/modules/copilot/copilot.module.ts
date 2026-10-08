@@ -1,5 +1,4 @@
 import { Global, Module } from "@nestjs/common";
-import { PrismaModule } from "@devbie/newbie/prisma/prisma.module";
 import { CopilotModelController } from "./model/management/copilot-model.controller";
 import { CopilotModelService } from "./model/management/copilot-model.service";
 import { ActiveChatModelResolver } from "./model/active-chat-model.resolver";
@@ -28,7 +27,6 @@ import { CopilotAuditLogger } from "./observability/copilot-audit.logger";
  */
 @Global()
 @Module({
-  imports: [PrismaModule],
   controllers: [CopilotModelController],
   providers: [
     CopilotModelService,
