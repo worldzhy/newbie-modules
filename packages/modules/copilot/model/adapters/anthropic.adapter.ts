@@ -8,7 +8,7 @@
  */
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { ChatModelPort } from "../../kernel/chat-model.port";
-import { createSdkChatModel } from "./sdk-chat-model.bridge";
+import { createSdkChatModel } from "./ai-sdk.bridge";
 
 export interface AnthropicChatModelConfig {
   /** Upstream model identifier, e.g. claude-sonnet-4-5. */
