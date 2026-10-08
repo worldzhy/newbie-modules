@@ -115,36 +115,4 @@ export class LarkWebhookDto {
   open_message_id?: string;
 }
 
-export class CreateLarkGroupDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  chatId: string;
 
-  @ApiProperty()
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsOptional()
-  description?: string;
-}
-
-export class UpdateLarkTaskDto {
-  @ApiProperty({ enum: ["pending", "in_progress", "completed"] })
-  @IsString()
-  @IsOptional()
-  status?: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsOptional()
-  title?: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsOptional()
-  description?: string;
-}

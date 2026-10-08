@@ -3,6 +3,17 @@ import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { LarkBotService } from "./lark-bot.service";
 
+/**
+ * Lark WebSocket long-connection client. Receives im.message.receive_v1
+ * events via the SDK and dispatches them directly through
+ * LarkBotService.dispatchMessage — the same path webhook events take — so
+ * message parsing, bot-mention detection, and deduplication stay in one
+ * place.
+ *
+ * The previous implementation constructed a mock webhook body and called
+ * handleWebhook, which duplicated the message-parsing logic and lost the
+ * SDK's typed payload. This rewrite delegates to dispatchMessage directly.
+ */
 @Injectable()
 export class LarkWsService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(LarkWsService.name);
@@ -15,9 +26,11 @@ export class LarkWsService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const appId =
-      this.configService.get<string>("LARK_APP_ID") || this.configService.get<string>("modules.lark-bot.appId");
+      this.configService.get<string>("LARK_APP_ID") ||
+      this.configService.get<string>("modules.lark-bot.appId");
     const appSecret =
-      this.configService.get<string>("LARK_APP_SECRET") || this.configService.get<string>("modules.lark-bot.appSecret");
+      this.configService.get<string>("LARK_APP_SECRET") ||
+      this.configService.get<string>("modules.lark-bot.appSecret");
 
     if (!appId || !appSecret) {
       this.logger.warn("Lark App ID or Secret is missing, skipping WebSocket client initialization.");
@@ -39,88 +52,34 @@ export class LarkWsService implements OnModuleInit, OnModuleDestroy {
             const message = data.message;
             if (!message) return;
 
-            const chatType = message.chat_type;
+            const chatType = message.chat_type || "";
+            const msgType = message.message_type || "";
             const mentions = message.mentions || [];
 
-            // Filter: Only process messages that mention the bot in a group chat
-            if (chatType === "group" && (!mentions || mentions.length === 0)) {
-              this.logger.debug(`[WS] Ignored group message without mentions: ${message.message_id}`);
+            if (msgType !== "text" && msgType !== "post") {
+              this.logger.debug(`[WS] Ignored non-text message (type: ${msgType}): ${message.message_id}`);
               return;
             }
 
-            const chatId = message.chat_id;
-            const msgType = message.message_type || (message as any).msg_type;
-            const parentId = message.parent_id;
+            const senderOpenId = data.sender?.sender_id?.open_id || "unknown";
 
-            this.logger.log(`[WS] Received message: ${message.message_id} from chat: ${chatId}, parentId: ${parentId}`);
+            this.logger.log(
+              `[WS] Received message: ${message.message_id} from chat: ${message.chat_id}`,
+            );
 
-            if (msgType === "text" || msgType === "post") {
-              let text = "";
-              try {
-                const content = JSON.parse(message.content);
-
-                if (msgType === "text") {
-                  text = content.text;
-                } else if (msgType === "post") {
-                  const postContent = content.content || [];
-                  let extractedText = "";
-
-                  let blocksToProcess: any[] = [];
-                  if (Array.isArray(postContent)) {
-                    blocksToProcess = postContent;
-                  } else {
-                    const langKey = postContent.zh_cn ? "zh_cn" : Object.keys(postContent)[0];
-                    if (langKey) {
-                      blocksToProcess = postContent[langKey] || [];
-                    }
-                  }
-
-                  for (const block of blocksToProcess) {
-                    if (Array.isArray(block)) {
-                      for (const element of block) {
-                        if (element.tag === "text") {
-                          extractedText += element.text;
-                        } else if (element.tag === "at") {
-                          extractedText += element.user_name ? `@${element.user_name}` : "@user";
-                        } else if (element.tag === "a") {
-                          extractedText += element.text;
-                        }
-                      }
-                      extractedText += "\n";
-                    }
-                  }
-
-                  text = extractedText;
-                }
-
-                // Filter out @mentions (e.g., "@_user_1 ")
-                if (text) {
-                  text = text.replace(/^@\w+\s*/, "").trim();
-                }
-
-                this.logger.log(`[WS] Message content (cleaned): ${text}`);
-              } catch (e) {
-                this.logger.error(`[WS] Failed to parse message content: ${message.content}`, e);
-                return; // Stop processing if parsing fails
-              }
-
-              try {
-                // Delegate command processing to LarkBotService via webhook mock
-                // We'll invoke the messageHandler directly if we could, but since we use handleWebhook, let's construct a mock body
-                const mockWebhookBody = {
-                  header: { event_type: "im.message.receive_v1" },
-                  event: {
-                    message: {
-                      ...message,
-                      msg_type: msgType,
-                    },
-                    sender: data.sender,
-                  },
-                };
-                await this.larkBotService.handleWebhook(mockWebhookBody as any);
-              } catch (e) {
-                this.logger.error("[WS] Error processing command", e);
-              }
+            try {
+              await this.larkBotService.dispatchMessage({
+                chatId: message.chat_id,
+                chatType,
+                msgType,
+                content: message.content,
+                mentions,
+                senderOpenId,
+                parentMessageId: message.parent_id,
+                messageId: message.message_id,
+              });
+            } catch (error) {
+              this.logger.error(`[WS] Error dispatching message ${message.message_id}`, error);
             }
           },
         }),
@@ -133,9 +92,6 @@ export class LarkWsService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    // There is no explicit stop method in the current SDK version for WSClient,
-    // but typically we should handle cleanup if possible.
-    // Assuming the SDK handles disconnection on process exit.
     this.logger.log("Lark WebSocket Client stopped.");
   }
 }
