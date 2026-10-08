@@ -424,7 +424,7 @@ export class TaskProjectDataResponseDto {
   success: boolean;
 
   @ApiPropertyOptional({ type: TaskProjectDto, description: "Linked TaskProject, null when not linked" })
-  data?: TaskProjectDto;
+  data?: TaskProjectDto | null;
 }
 
 export class LinkTaskProjectResponseDto {
