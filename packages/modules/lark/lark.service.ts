@@ -5,7 +5,13 @@ import { firstValueFrom } from "rxjs";
 import { GetChatHistoryDto, SendTextDto, SendCardDto } from "./lark.dto";
 import { decryptLarkEvent } from "./lark-event.util";
 import { parseMessage, resolveSenderOpenId } from "./lark-message-parser";
-import type { LarkWebhookBody, LarkCardAction, LarkMessage } from "./lark-types";
+import type {
+  LarkWebhookBody,
+  LarkCardAction,
+  LarkCardActionMeta,
+  LarkCardActionResult,
+  LarkMessage,
+} from "./lark-types";
 
 type MessageHandler = (
   chatId: string,
@@ -14,7 +20,7 @@ type MessageHandler = (
   parentId?: string,
   messageId?: string,
 ) => Promise<void>;
-type CardActionHandler = (payload: LarkCardAction) => Promise<unknown>;
+type CardActionHandler = (payload: LarkCardAction, meta: LarkCardActionMeta) => Promise<LarkCardActionResult | void>;
 
 interface MessageDispatchInput {
   chatId: string;
@@ -53,8 +59,7 @@ export class LarkService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
   ) {
-    this.botOpenId =
-      this.configService.get<string>("modules.lark.botOpenId");
+    this.botOpenId = this.configService.get<string>("modules.lark.botOpenId");
   }
 
   /**
@@ -66,6 +71,13 @@ export class LarkService {
     this.messageHandler = handler;
   }
 
+  /**
+   * Register the single card-action handler. The handler receives both the
+   * button payload and envelope metadata (real clicker openId, message id).
+   * Identity must only be taken from `meta`, never from the button value.
+   * Return a result to control the webhook response (e.g. a toast); returning
+   * void yields a plain success envelope.
+   */
   onCardActionReceived(handler: CardActionHandler): void {
     this.cardActionHandler = handler;
   }
@@ -88,10 +100,8 @@ export class LarkService {
   }
 
   private async fetchTenantAccessToken(): Promise<string> {
-    const appId =
-      this.configService.get<string>("modules.lark.appId");
-    const appSecret =
-      this.configService.get<string>("modules.lark.appSecret");
+    const appId = this.configService.get<string>("modules.lark.appId");
+    const appSecret = this.configService.get<string>("modules.lark.appSecret");
 
     if (!appId || !appSecret) {
       throw new Error("Lark App ID or Secret is not configured");
@@ -165,8 +175,7 @@ export class LarkService {
     // 2. Encrypted event — decrypt and re-dispatch (the decrypted body has no
     //    `encrypt` field, so this cannot loop).
     if (body.encrypt) {
-      const encryptKey =
-        this.configService.get<string>("modules.lark.encryptKey");
+      const encryptKey = this.configService.get<string>("modules.lark.encryptKey");
       if (!encryptKey) {
         this.logger.error("Received an encrypted Lark event but LARK_ENCRYPT_KEY is not configured; event dropped.");
         return { code: 0, msg: "success" };
@@ -192,7 +201,11 @@ export class LarkService {
       this.logger.log("Received card action trigger");
       if (this.cardActionHandler) {
         try {
-          return await this.cardActionHandler(body.action);
+          const result = await this.cardActionHandler(body.action, {
+            openId: body.open_id,
+            openMessageId: body.open_message_id,
+          });
+          if (result) return result;
         } catch (error) {
           this.logger.error("Error processing card action", error);
         }
@@ -273,13 +286,7 @@ export class LarkService {
     this.logger.log(`Message content (cleaned): ${parsed.text}`);
 
     if (this.messageHandler) {
-      await this.messageHandler(
-        input.chatId,
-        parsed.text,
-        input.senderOpenId,
-        input.parentMessageId,
-        input.messageId,
-      );
+      await this.messageHandler(input.chatId, parsed.text, input.senderOpenId, input.parentMessageId, input.messageId);
     }
   }
 

@@ -61,6 +61,28 @@ export interface LarkCardAction {
   [key: string]: unknown;
 }
 
+/**
+ * Callback metadata for a card action. Button `value` is card-author-controlled
+ * and must never carry identity; these fields come from the webhook envelope.
+ */
+export interface LarkCardActionMeta {
+  /** Real clicker, from the webhook body root (`body.open_id`). */
+  openId?: string;
+  /** Card message id (`body.open_message_id`); redelivery dedupe key. */
+  openMessageId?: string;
+}
+
+/**
+ * Optional structured result a card handler returns as the webhook response.
+ * A void result makes LarkService answer with a plain success envelope.
+ */
+export interface LarkCardActionResult {
+  toast?: {
+    type: "success" | "error" | "info";
+    content: string;
+  };
+}
+
 /** Webhook header present on v2 event callbacks. */
 export interface LarkWebhookHeader {
   event_id: string;
