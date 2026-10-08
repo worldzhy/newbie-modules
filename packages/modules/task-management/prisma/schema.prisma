@@ -7,8 +7,8 @@
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 model TaskSpace {
-  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId   String  @unique @db.Uuid // 1:1 link to the Nightwatch Project
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String   @unique @db.Uuid // 1:1 link to the Nightwatch Project
   name        String? // Space name; the caller passes the project name at creation
   description String? // Space description
 
@@ -37,25 +37,25 @@ model TaskParticipant {
 }
 
 model Task {
-  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String // Task title
   description String? // Task details
-  status      TaskStatus @default(PENDING) // Current workflow status
+  status      TaskStatus        @default(PENDING) // Current workflow status
   dueDate     DateTime? // Expected completion time
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
   deletedAt   DateTime? // Soft delete timestamp
 
-  spaceId String    @db.Uuid
-  space   TaskSpace @relation(fields: [spaceId], references: [id])
+  spaceId   String    @db.Uuid
+  space     TaskSpace @relation(fields: [spaceId], references: [id])
 
   // Direct link to the Nightwatch Project (flattened; no TaskProject indirection).
   projectId String @db.Uuid
 
-  creatorId String?          @db.Uuid
-  creator   TaskParticipant? @relation("CreatedTasks", fields: [creatorId], references: [id])
+  creatorId  String?         @db.Uuid
+  creator    TaskParticipant? @relation("CreatedTasks", fields: [creatorId], references: [id])
 
-  assigneeId String?          @db.Uuid
+  assigneeId String?         @db.Uuid
   assignee   TaskParticipant? @relation("AssignedTasks", fields: [assigneeId], references: [id])
 
   // Last Operation Tracking
