@@ -1,29 +1,54 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TaskStatus } from "@generated/prisma/enums";
+import { CreateTaskItemDto, UpdateTaskRequestDto } from "./task.dto";
 
 // Re-export the Prisma-generated enum so callers can keep importing it from the service module.
 export { TaskStatus };
 
-export interface TaskItem {
+export interface Operator {
   id: string;
-  title: string;
-  description: string;
-  status: TaskStatus;
+  name?: string;
+  source: string;
 }
 
-export interface UpdateTaskDto {
-  status?: TaskStatus;
-  title?: string;
+export interface CreateTaskInput {
+  title: string;
   description?: string;
-  assigneeId?: string;
+  groupId: string;
   taskProjectId?: string;
+  status?: TaskStatus;
+  assigneeId?: string;
   dueDate?: Date;
-  lastOperatorId?: string;
-  lastOperatorName?: string;
-  lastOperatorSource?: string;
-  deletedAt?: Date;
+  creatorId?: string;
 }
+
+export interface CreateTasksBatchInput {
+  groupId: string;
+  taskProjectId?: string;
+  creatorId?: string;
+  tasks: CreateTaskItemDto[];
+}
+
+export interface ListTasksFilter {
+  groupId: string;
+  status?: TaskStatus;
+  keyword?: string;
+  assigneeName?: string;
+  taskProjectId?: string;
+  includeCompleted?: boolean;
+  skip?: number;
+  take?: number;
+}
+
+const TASK_STATUS_TRANSITIONS: Readonly<Record<TaskStatus, ReadonlySet<TaskStatus>>> = {
+  [TaskStatus.PENDING]: new Set([TaskStatus.DEVELOPING, TaskStatus.CANCELLED]),
+  [TaskStatus.DEVELOPING]: new Set([TaskStatus.TESTING, TaskStatus.CANCELLED]),
+  [TaskStatus.TESTING]: new Set([TaskStatus.DEVELOPING, TaskStatus.DEPLOYED, TaskStatus.CANCELLED]),
+  [TaskStatus.DEPLOYED]: new Set([TaskStatus.DEVELOPING, TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
+  [TaskStatus.COMPLETED]: new Set<TaskStatus>(),
+  [TaskStatus.CANCELLED]: new Set<TaskStatus>(),
+};
 
 @Injectable()
 export class TaskService {
@@ -31,156 +56,7 @@ export class TaskService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  // --- Task Management ---
-
-  async createTasks(
-    chatId: string,
-    userId: string | undefined,
-    tasks: TaskItem[],
-    operator?: { id: string; name?: string; source: string },
-    requirementId?: number,
-    taskProjectId?: string,
-  ) {
-    try {
-      // 1. Ensure Group exists or use Default
-      let groupId: string;
-      if (chatId) {
-        let group = await this.prisma.taskGroup.findUnique({ where: { chatId } });
-        if (!group) {
-          group = await this.prisma.taskGroup.create({
-            data: { chatId, name: `Project Group ${chatId.slice(-4)}` },
-          });
-        }
-        groupId = group.id;
-      } else {
-        const defaultGroup = await this.prisma.taskGroup.upsert({
-          where: { chatId: "DEFAULT_GROUP" },
-          update: {},
-          create: { chatId: "DEFAULT_GROUP", name: "Default Task Group" },
-        });
-        groupId = defaultGroup.id;
-      }
-
-      // 2. Ensure User exists (if userId is provided)
-      let dbUserId: string | undefined;
-      if (userId) {
-        let user = await this.prisma.taskUser.findUnique({ where: { openId: userId } });
-        if (!user) {
-          user = await this.prisma.taskUser.create({
-            data: { openId: userId, name: `User ${userId.slice(-4)}` },
-          });
-        }
-        dbUserId = user.id;
-      }
-
-      // 3. Create Tasks
-      await this.prisma.task.createMany({
-        data: tasks.map((t) => ({
-          title: t.title,
-          description: t.description,
-          status: t.status,
-          groupId: groupId,
-          creatorId: dbUserId,
-          assigneeId: dbUserId, // Default assignee is the current operator (the person who requested the breakdown)
-          lastOperatorId: operator?.id,
-          lastOperatorName: operator?.name,
-          lastOperatorSource: operator?.source,
-          requirementId: requirementId,
-          taskProjectId: taskProjectId,
-        })),
-      });
-
-      this.logger.log(`Tasks saved to DB for ${chatId || "DEFAULT"}:`, tasks);
-      const group = await this.prisma.taskGroup.findUnique({ where: { id: groupId } });
-      return { count: tasks.length, groupName: group?.name || "Default Group" };
-    } catch (error) {
-      this.logger.error("Failed to save tasks to database", error);
-      throw error;
-    }
-  }
-
-  async listTasks(
-    groupId: string,
-    status?: TaskStatus,
-    title?: string,
-    assigneeName?: string,
-    taskProjectId?: string,
-    includeCompleted?: boolean,
-    skip?: number,
-    take?: number,
-  ) {
-    const whereClause: any = {
-      groupId,
-      deletedAt: null,
-    };
-
-    if (status) {
-      whereClause.status = status;
-    } else if (!includeCompleted) {
-      // If status is not specified and we shouldn't include completed, filter out COMPLETED and CANCELLED
-      whereClause.status = {
-        notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELLED],
-      };
-    }
-
-    if (title) {
-      whereClause.title = {
-        contains: title,
-        mode: "insensitive", // PostgreSQL only, ignore if using SQLite/MySQL without support
-      };
-    }
-
-    if (assigneeName) {
-      const cleanName = assigneeName.replace(/^@/, "").trim();
-      whereClause.assignee = {
-        name: {
-          contains: cleanName,
-          mode: "insensitive",
-        },
-      };
-    }
-
-    if (taskProjectId) {
-      whereClause.taskProjectId = taskProjectId;
-    }
-
-    const total = await this.prisma.task.count({ where: whereClause });
-
-    const tasks = await this.prisma.task.findMany({
-      where: whereClause,
-      include: { creator: true, assignee: true, taskProject: true },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take,
-    });
-
-    return { tasks, total };
-  }
-
-  async getTaskById(taskId: string) {
-    return await this.prisma.task.findUnique({
-      where: { id: taskId },
-      include: { creator: true, assignee: true, taskProject: true },
-    });
-  }
-
-  async updateTask(taskId: string, dto: UpdateTaskDto) {
-    return await this.prisma.task.update({
-      where: { id: taskId },
-      data: { ...dto },
-    });
-  }
-
-  async createTask(data: {
-    title: string;
-    description?: string;
-    groupId: string;
-    taskProjectId?: string;
-    status?: TaskStatus;
-    assigneeId?: string;
-    dueDate?: Date;
-    creatorId?: string;
-  }) {
+  async createTask(data: CreateTaskInput) {
     return await this.prisma.task.create({
       data: {
         title: data.title,
@@ -195,14 +71,129 @@ export class TaskService {
     });
   }
 
-  async deleteTask(taskId: string, operator?: { id: string; name?: string; source: string }) {
+  async createTasksBatch(input: CreateTasksBatchInput): Promise<{ count: number }> {
+    await this.prisma.task.createMany({
+      data: input.tasks.map((task) => ({
+        title: task.title,
+        description: task.description,
+        status: task.status || TaskStatus.PENDING,
+        groupId: input.groupId,
+        taskProjectId: input.taskProjectId,
+        creatorId: input.creatorId,
+        assigneeId: task.assigneeId,
+        dueDate: task.dueDate,
+      })),
+    });
+
+    this.logger.log(`Batch created ${input.tasks.length} tasks in group ${input.groupId}`);
+    return { count: input.tasks.length };
+  }
+
+  async listTasks(filter: ListTasksFilter) {
+    const whereClause: any = {
+      groupId: filter.groupId,
+      deletedAt: null,
+    };
+
+    if (filter.status) {
+      whereClause.status = filter.status;
+    } else if (!filter.includeCompleted) {
+      // If status is not specified and we shouldn't include completed, filter out COMPLETED and CANCELLED
+      whereClause.status = {
+        notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELLED],
+      };
+    }
+
+    if (filter.keyword) {
+      whereClause.title = {
+        contains: filter.keyword,
+        mode: "insensitive", // PostgreSQL only, ignore if using SQLite/MySQL without support
+      };
+    }
+
+    if (filter.assigneeName) {
+      const cleanName = filter.assigneeName.replace(/^@/, "").trim();
+      whereClause.assignee = {
+        name: {
+          contains: cleanName,
+          mode: "insensitive",
+        },
+      };
+    }
+
+    if (filter.taskProjectId) {
+      whereClause.taskProjectId = filter.taskProjectId;
+    }
+
+    const total = await this.prisma.task.count({ where: whereClause });
+
+    const tasks = await this.prisma.task.findMany({
+      where: whereClause,
+      include: { creator: true, assignee: true, taskProject: true },
+      orderBy: { createdAt: "desc" },
+      skip: filter.skip,
+      take: filter.take,
+    });
+
+    return { tasks, total };
+  }
+
+  async getTaskById(taskId: string) {
+    return await this.prisma.task.findUnique({
+      where: { id: taskId },
+      include: { creator: true, assignee: true, taskProject: true },
+    });
+  }
+
+  async updateTask(taskId: string, dto: UpdateTaskRequestDto, operator: Operator) {
+    let nextStatus: TaskStatus | undefined;
+
+    if (dto.status !== undefined) {
+      const current = await this.prisma.task.findUnique({
+        where: { id: taskId },
+        select: { status: true, deletedAt: true },
+      });
+
+      if (!current) {
+        throw new NotFoundException("Task not found");
+      }
+      if (current.deletedAt !== null) {
+        throw new ConflictException("Cannot update a deleted task");
+      }
+
+      if (current.status === dto.status) {
+        // Idempotent: keep the current status but still allow updating other fields.
+        nextStatus = current.status;
+      } else if (!TASK_STATUS_TRANSITIONS[current.status].has(dto.status)) {
+        throw new ConflictException(`Invalid task status transition: ${current.status} -> ${dto.status}`);
+      } else {
+        nextStatus = dto.status;
+      }
+    }
+
+    return await this.prisma.task.update({
+      where: { id: taskId },
+      data: {
+        title: dto.title,
+        description: dto.description,
+        assigneeId: dto.assigneeId,
+        dueDate: dto.dueDate,
+        ...(nextStatus !== undefined ? { status: nextStatus } : {}),
+        lastOperatorId: operator.id,
+        lastOperatorName: operator.name,
+        lastOperatorSource: operator.source,
+      },
+    });
+  }
+
+  async deleteTask(taskId: string, operator: Operator) {
     return await this.prisma.task.update({
       where: { id: taskId },
       data: {
         deletedAt: new Date(),
-        lastOperatorId: operator?.id,
-        lastOperatorName: operator?.name,
-        lastOperatorSource: operator?.source,
+        lastOperatorId: operator.id,
+        lastOperatorName: operator.name,
+        lastOperatorSource: operator.source,
       },
     });
   }

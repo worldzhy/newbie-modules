@@ -1,13 +1,24 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsDateString, IsUUID } from "class-validator";
+import {
+  ArrayMinSize,
+  IsArray,
+  IsDateString,
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateNested,
+} from "class-validator";
 import { TaskStatus } from "./task.service";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Request DTOs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class CreateGroupDto {
+export class CreateGroupRequestDto {
   @ApiProperty({ type: String, description: "Lark group chat ID or other platform group ID" })
   @IsString()
   @IsNotEmpty()
@@ -53,34 +64,7 @@ export class ListTasksQueryDto {
   assigneeName?: string;
 }
 
-export class UpdateTaskApiDto {
-  @ApiPropertyOptional({ enum: TaskStatus })
-  @IsEnum(TaskStatus)
-  @IsOptional()
-  status?: TaskStatus;
-
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  title?: string;
-
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  description?: string;
-
-  @ApiPropertyOptional({ type: String, description: "Assignee TaskUser ID (uuid)" })
-  @IsUUID("4")
-  @IsOptional()
-  assigneeId?: string;
-
-  @ApiPropertyOptional({ type: String, format: "date-time", description: "ISO 8601 due date" })
-  @IsDateString()
-  @IsOptional()
-  dueDate?: Date;
-}
-
-export class CreateTaskApiDto {
+export class CreateTaskItemDto {
   @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
@@ -107,14 +91,67 @@ export class CreateTaskApiDto {
   dueDate?: Date;
 }
 
-export class LinkTaskUserDto {
+export class CreateTaskRequestDto extends CreateTaskItemDto {}
+
+export class UpdateTaskRequestDto {
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  title?: string;
+
+  @ApiPropertyOptional({ type: String })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
+  @ApiPropertyOptional({ enum: TaskStatus })
+  @IsEnum(TaskStatus)
+  @IsOptional()
+  status?: TaskStatus;
+
+  @ApiPropertyOptional({ type: String, description: "Assignee TaskUser ID (uuid)" })
+  @IsUUID("4")
+  @IsOptional()
+  assigneeId?: string;
+
+  @ApiPropertyOptional({ type: String, format: "date-time", description: "ISO 8601 due date" })
+  @IsDateString()
+  @IsOptional()
+  dueDate?: Date;
+}
+
+export class CreateTasksBatchRequestDto {
+  @ApiProperty({ type: String, description: "Owning TaskGroup ID (uuid)" })
+  @IsString()
+  @IsNotEmpty()
+  groupId: string;
+
+  @ApiPropertyOptional({ type: String, description: "Owning TaskProject ID (uuid)" })
+  @IsUUID("4")
+  @IsOptional()
+  taskProjectId?: string;
+
+  @ApiPropertyOptional({ type: String, description: "Creator TaskUser ID (uuid)" })
+  @IsUUID("4")
+  @IsOptional()
+  creatorId?: string;
+
+  @ApiProperty({ type: [CreateTaskItemDto] })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateTaskItemDto)
+  tasks: CreateTaskItemDto[];
+}
+
+export class LinkTaskUserRequestDto {
   @ApiProperty({ type: String, description: "TaskUser ID (uuid) to link to the current user" })
   @IsString()
   @IsNotEmpty()
   taskUserId: string;
 }
 
-export class LinkTaskProjectDto {
+export class LinkTaskProjectRequestDto {
   @ApiProperty({ type: String, description: "Nightwatch Project ID (uuid)" })
   @IsString()
   @IsNotEmpty()
@@ -126,7 +163,7 @@ export class LinkTaskProjectDto {
   taskProjectId: string;
 }
 
-export class UnlinkTaskProjectDto {
+export class UnlinkTaskProjectRequestDto {
   @ApiProperty({ type: String, description: "Nightwatch Project ID (uuid)" })
   @IsString()
   @IsNotEmpty()
@@ -387,7 +424,7 @@ export class TaskProjectDataResponseDto {
   success: boolean;
 
   @ApiPropertyOptional({ type: TaskProjectDto, description: "Linked TaskProject, null when not linked" })
-  data?: TaskProjectDto | null;
+  data?: TaskProjectDto;
 }
 
 export class LinkTaskProjectResponseDto {
@@ -437,4 +474,14 @@ export class CreateTaskResponseDto {
 
   @ApiProperty({ type: TaskDto })
   data: TaskDto;
+}
+
+export class BatchCreateTasksResponseDto {
+  @ApiProperty()
+  success: boolean;
+
+  @ApiProperty({ type: Object, description: "Batch creation result" })
+  data: {
+    count: number;
+  };
 }
