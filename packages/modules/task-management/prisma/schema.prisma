@@ -3,7 +3,7 @@
 // !! ------------------------------------------------------------ //
 // * TaskSpace (1:1 companion space for a Nightwatch Project)       //
 // * Task (Work Item)                                              //
-// * TaskUser (User Reference)                                     //
+// * TaskParticipant (Actor referenced by an external identity)    //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 model TaskSpace {
@@ -19,17 +19,20 @@ model TaskSpace {
   @@schema("module/task-management")
 }
 
-model TaskUser {
-  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  openId        String   @unique // External user ID (e.g. Lark open_id)
-  userId        String?  @unique @db.Uuid // Linked Nightwatch User ID
-  name          String? // User display name
-  avatarUrl     String? // User avatar URL
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  createdTasks  Task[]   @relation("CreatedTasks") // Tasks created by this user
-  assignedTasks Task[]   @relation("AssignedTasks") // Tasks assigned to this user
+model TaskParticipant {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Opaque, host-defined identity source (e.g. the host account system or an IM platform).
+  identitySource String
+  // Participant ID within that source. Opaque string: host IDs are not assumed to be UUIDs.
+  externalId     String
+  name           String? // Participant display name snapshot
+  avatarUrl      String? // Participant avatar URL snapshot
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdTasks   Task[]   @relation("CreatedTasks") // Tasks created by this participant
+  assignedTasks  Task[]   @relation("AssignedTasks") // Tasks assigned to this participant
 
+  @@unique([identitySource, externalId])
   @@schema("module/task-management")
 }
 
@@ -49,11 +52,11 @@ model Task {
   // Direct link to the Nightwatch Project (flattened; no TaskProject indirection).
   projectId String @db.Uuid
 
-  creatorId String?   @db.Uuid
-  creator   TaskUser? @relation("CreatedTasks", fields: [creatorId], references: [id])
+  creatorId String?          @db.Uuid
+  creator   TaskParticipant? @relation("CreatedTasks", fields: [creatorId], references: [id])
 
-  assigneeId String?   @db.Uuid
-  assignee   TaskUser? @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  assigneeId String?          @db.Uuid
+  assignee   TaskParticipant? @relation("AssignedTasks", fields: [assigneeId], references: [id])
 
   // Last Operation Tracking
   lastOperatorId     String? // User ID or External ID of the last modifier

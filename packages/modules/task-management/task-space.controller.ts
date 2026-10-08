@@ -4,7 +4,7 @@ import { JwtAuthGuard } from "@modules/security/authentication/jwt/jwt.guard";
 import { UserRequest } from "@modules/security/security.interface";
 import { TaskSpaceService } from "./task-space.service";
 import { TaskService } from "./task.service";
-import { TaskUserService } from "./task-user.service";
+import { HOST_IDENTITY_SOURCE, TaskParticipantService } from "./task-participant.service";
 import {
   CreateTaskRequestDto,
   CreateTaskResponseDto,
@@ -23,7 +23,7 @@ export class TaskSpaceController {
   constructor(
     private readonly taskSpaceService: TaskSpaceService,
     private readonly taskService: TaskService,
-    private readonly taskUserService: TaskUserService,
+    private readonly taskParticipantService: TaskParticipantService,
   ) {}
 
   @Get()
@@ -52,7 +52,7 @@ export class TaskSpaceController {
     const pageSize = query.pageSize ?? 10;
 
     // Every project implicitly owns its companion TaskSpace.
-    const space = await this.taskSpaceService.ensureSpaceForProject(projectId);
+    await this.taskSpaceService.ensureSpaceForProject(projectId);
 
     const result = await this.taskService.listTasks({
       projectId,
@@ -84,23 +84,25 @@ export class TaskSpaceController {
     @Req() req: UserRequest,
   ): Promise<CreateTaskResponseDto> {
     const space = await this.taskSpaceService.ensureSpaceForProject(projectId);
-    const creatorId = req.user.userId;
-    const taskUser = await this.taskUserService.getTaskUserByUserId(creatorId);
+    const creator = await this.taskParticipantService.ensureParticipant({
+      identitySource: HOST_IDENTITY_SOURCE,
+      externalId: req.user.userId,
+    });
 
     const result = await this.taskService.createTask({
       ...dto,
       spaceId: space.id,
       projectId,
-      creatorId: taskUser?.id,
+      creatorId: creator.id,
     });
     return { success: true, data: result };
   }
 
   @Get("by-project/:projectId/members")
-  @ApiOperation({ summary: "List project members with task stats by Nightwatch projectId" })
+  @ApiOperation({ summary: "List project participants with task stats by Nightwatch projectId" })
   @ApiResponse({ status: 200, type: MembersResponseDto })
   async listProjectMembers(@Param("projectId") projectId: string): Promise<MembersResponseDto> {
-    const members = await this.taskUserService.listTaskUsersByProjectId(projectId);
+    const members = await this.taskParticipantService.listParticipantsByProjectId(projectId);
     return { success: true, data: members };
   }
 }

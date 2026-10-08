@@ -1,17 +1,17 @@
 import { Global, Module } from "@nestjs/common";
 import { TaskService } from "./task.service";
 import { TaskSpaceService } from "./task-space.service";
-import { TaskUserService } from "./task-user.service";
+import { TaskParticipantService } from "./task-participant.service";
 import { TaskController } from "./task.controller";
 import { TaskSpaceController } from "./task-space.controller";
-import { TaskUserController } from "./task-user.controller";
+import { TaskParticipantController } from "./task-participant.controller";
 import { PrismaModule } from "@devbie/newbie/prisma/prisma.module";
 
 @Global()
 @Module({
   imports: [PrismaModule],
-  controllers: [TaskController, TaskSpaceController, TaskUserController],
-  providers: [TaskService, TaskSpaceService, TaskUserService],
-  exports: [TaskService, TaskSpaceService, TaskUserService],
+  controllers: [TaskController, TaskSpaceController, TaskParticipantController],
+  providers: [TaskService, TaskSpaceService, TaskParticipantService],
+  exports: [TaskService, TaskSpaceService, TaskParticipantService],
 })
 export class TaskManagementModule {}

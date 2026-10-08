@@ -18,6 +18,18 @@ import { TaskStatus } from "./task.service";
 // Request DTOs
 // ─────────────────────────────────────────────────────────────────────────────
 
+export class LookupParticipantQueryDto {
+  @ApiProperty({ type: String, description: "Opaque identity source (host-defined)" })
+  @IsString()
+  @IsNotEmpty()
+  identitySource: string;
+
+  @ApiProperty({ type: String, description: "Participant ID within that source" })
+  @IsString()
+  @IsNotEmpty()
+  externalId: string;
+}
+
 export class ListTasksQueryDto {
   @ApiPropertyOptional({ type: Number, description: "Page number, 0-based", default: 0 })
   @IsNumber()
@@ -63,7 +75,7 @@ export class CreateTaskItemDto {
   @IsOptional()
   status?: TaskStatus;
 
-  @ApiPropertyOptional({ type: String, description: "Assignee TaskUser ID (uuid)" })
+  @ApiPropertyOptional({ type: String, description: "Assignee TaskParticipant ID (uuid)" })
   @IsUUID("4")
   @IsOptional()
   assigneeId?: string;
@@ -92,7 +104,7 @@ export class UpdateTaskRequestDto {
   @IsOptional()
   status?: TaskStatus;
 
-  @ApiPropertyOptional({ type: String, description: "Assignee TaskUser ID (uuid)" })
+  @ApiPropertyOptional({ type: String, description: "Assignee TaskParticipant ID (uuid)" })
   @IsUUID("4")
   @IsOptional()
   assigneeId?: string;
@@ -114,7 +126,7 @@ export class CreateTasksBatchRequestDto {
   @IsNotEmpty()
   projectId: string;
 
-  @ApiPropertyOptional({ type: String, description: "Creator TaskUser ID (uuid)" })
+  @ApiPropertyOptional({ type: String, description: "Creator TaskParticipant ID (uuid)" })
   @IsUUID("4")
   @IsOptional()
   creatorId?: string;
@@ -127,31 +139,24 @@ export class CreateTasksBatchRequestDto {
   tasks: CreateTaskItemDto[];
 }
 
-export class LinkTaskUserRequestDto {
-  @ApiProperty({ type: String, description: "TaskUser ID (uuid) to link to the current user" })
-  @IsString()
-  @IsNotEmpty()
-  taskUserId: string;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Response DTOs (no class-validator decorators: validation applies to inbound payloads only)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class TaskUserDto {
-  @ApiProperty({ description: "TaskUser ID (uuid)" })
+export class TaskParticipantDto {
+  @ApiProperty({ description: "TaskParticipant ID (uuid)" })
   id: string;
 
-  @ApiProperty({ description: "External user ID, e.g. Lark open_id" })
-  openId: string;
+  @ApiProperty({ description: "Opaque identity source (host-defined)" })
+  identitySource: string;
 
-  @ApiPropertyOptional({ description: "Linked Nightwatch User ID (uuid), null when unlinked", type: String })
-  userId?: string | null;
+  @ApiProperty({ description: "Participant ID within that source" })
+  externalId: string;
 
-  @ApiPropertyOptional({ description: "Display name", type: String })
+  @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;
 
-  @ApiPropertyOptional({ description: "Avatar URL", type: String })
+  @ApiPropertyOptional({ description: "Avatar URL snapshot", type: String })
   avatarUrl?: string | null;
 
   @ApiProperty({ type: Date })
@@ -161,20 +166,20 @@ export class TaskUserDto {
   updatedAt: Date;
 }
 
-export class TaskUserListItemDto {
-  @ApiProperty({ description: "TaskUser ID (uuid)" })
+export class TaskParticipantListItemDto {
+  @ApiProperty({ description: "TaskParticipant ID (uuid)" })
   id: string;
 
-  @ApiProperty({ description: "External user ID, e.g. Lark open_id" })
-  openId: string;
+  @ApiProperty({ description: "Opaque identity source (host-defined)" })
+  identitySource: string;
 
-  @ApiPropertyOptional({ description: "Linked Nightwatch User ID (uuid)", type: String })
-  userId?: string | null;
+  @ApiProperty({ description: "Participant ID within that source" })
+  externalId: string;
 
-  @ApiPropertyOptional({ description: "Display name", type: String })
+  @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;
 
-  @ApiPropertyOptional({ description: "Avatar URL", type: String })
+  @ApiPropertyOptional({ description: "Avatar URL snapshot", type: String })
   avatarUrl?: string | null;
 }
 
@@ -239,10 +244,10 @@ export class TaskDto {
   @ApiProperty({ description: "Nightwatch Project ID (uuid)" })
   projectId: string;
 
-  @ApiPropertyOptional({ description: "Creator TaskUser ID (uuid)", type: String })
+  @ApiPropertyOptional({ description: "Creator TaskParticipant ID (uuid)", type: String })
   creatorId?: string | null;
 
-  @ApiPropertyOptional({ description: "Assignee TaskUser ID (uuid)", type: String })
+  @ApiPropertyOptional({ description: "Assignee TaskParticipant ID (uuid)", type: String })
   assigneeId?: string | null;
 
   @ApiPropertyOptional({ description: "ID of the last operator", type: String })
@@ -256,11 +261,11 @@ export class TaskDto {
 }
 
 export class TaskWithRelationsDto extends TaskDto {
-  @ApiPropertyOptional({ type: TaskUserDto, description: "Task creator" })
-  creator?: TaskUserDto | null;
+  @ApiPropertyOptional({ type: TaskParticipantDto, description: "Task creator" })
+  creator?: TaskParticipantDto | null;
 
-  @ApiPropertyOptional({ type: TaskUserDto, description: "Task assignee" })
-  assignee?: TaskUserDto | null;
+  @ApiPropertyOptional({ type: TaskParticipantDto, description: "Task assignee" })
+  assignee?: TaskParticipantDto | null;
 
   @ApiPropertyOptional({ type: TaskSpaceDto, description: "Owning task space" })
   space?: TaskSpaceDto | null;
@@ -278,20 +283,14 @@ export class TaskMemberStatsDto {
 }
 
 export class TaskMemberDto {
-  @ApiProperty({ description: "TaskUser ID (uuid)" })
+  @ApiProperty({ description: "TaskParticipant ID (uuid)" })
   id: string;
 
-  @ApiPropertyOptional({ description: "Display name", type: String })
+  @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;
 
-  @ApiPropertyOptional({ description: "Avatar URL", type: String })
+  @ApiPropertyOptional({ description: "Avatar URL snapshot", type: String })
   avatarUrl?: string | null;
-
-  @ApiPropertyOptional({ description: "Nightwatch account email, null when unlinked", type: String })
-  email?: string | null;
-
-  @ApiPropertyOptional({ description: "Nightwatch display name/username, null when unlinked", type: String })
-  systemUsername?: string | null;
 
   @ApiProperty({ type: TaskMemberStatsDto })
   taskStats: TaskMemberStatsDto;
@@ -302,31 +301,20 @@ export class TaskMemberDto {
 
 // ── Envelope responses ({success, data?[, message]}) ──
 
-export class TaskUsersListResponseDto {
+export class TaskParticipantsListResponseDto {
   @ApiProperty()
   success: boolean;
 
-  @ApiProperty({ type: [TaskUserListItemDto] })
-  data: TaskUserListItemDto[];
+  @ApiProperty({ type: [TaskParticipantListItemDto] })
+  data: TaskParticipantListItemDto[];
 }
 
-export class TaskUserDataResponseDto {
+export class TaskParticipantDataResponseDto {
   @ApiProperty()
   success: boolean;
 
-  @ApiPropertyOptional({ type: TaskUserDto, description: "Linked TaskUser, null when not linked" })
-  data?: TaskUserDto | null;
-}
-
-export class LinkTaskUserResponseDto {
-  @ApiProperty()
-  success: boolean;
-
-  @ApiPropertyOptional({ type: TaskUserDto, description: "Present on success" })
-  data?: TaskUserDto;
-
-  @ApiPropertyOptional({ type: String, description: "Error message, present when success is false" })
-  message?: string;
+  @ApiPropertyOptional({ type: TaskParticipantDto, description: "Participant, null when not found" })
+  data?: TaskParticipantDto | null;
 }
 
 export class MembersResponseDto {
