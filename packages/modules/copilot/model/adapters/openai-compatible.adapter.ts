@@ -7,7 +7,7 @@
  */
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { ChatModelPort } from "../../kernel/chat-model.port";
-import { createSdkChatModel } from "./sdk-chat-model";
+import { createSdkChatModel } from "./sdk-chat-model.bridge";
 
 export interface OpenAiCompatibleChatModelConfig {
   /** Upstream model identifier, e.g. deepseek-chat. */
