@@ -26,10 +26,8 @@ export class LarkWsService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const appId =
-      this.configService.get<string>("LARK_APP_ID") ||
       this.configService.get<string>("modules.lark.appId");
     const appSecret =
-      this.configService.get<string>("LARK_APP_SECRET") ||
       this.configService.get<string>("modules.lark.appSecret");
 
     if (!appId || !appSecret) {

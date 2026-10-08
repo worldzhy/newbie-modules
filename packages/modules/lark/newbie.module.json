@@ -6,6 +6,20 @@
     "className": "LarkModule"
   },
   "moduleDependencies": ["security"],
+  "config-service": {
+    "lark": {
+      "appId": "process.env.LARK_APP_ID",
+      "appSecret": "process.env.LARK_APP_SECRET",
+      "botOpenId": "process.env.LARK_BOT_OPEN_ID",
+      "encryptKey": "process.env.LARK_ENCRYPT_KEY"
+    }
+  },
+  "env": {
+    "LARK_APP_ID": "",
+    "LARK_APP_SECRET": "",
+    "LARK_BOT_OPEN_ID": "",
+    "LARK_ENCRYPT_KEY": ""
+  },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.59.0"
   }

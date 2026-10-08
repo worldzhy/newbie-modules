@@ -1,5 +1,6 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsNotEmpty, IsOptional, IsString, IsNumber } from "class-validator";
+import type { LarkCardAction, LarkMessageEvent, LarkWebhookHeader } from "./lark-types";
 
 export class GetChatHistoryDto {
   @ApiProperty({ description: "The ID of the chat group", required: true })
@@ -58,7 +59,7 @@ export class SendCardDto {
 
   @ApiProperty({ description: "Card content (JSON object or string)" })
   @IsNotEmpty()
-  card: any;
+  card: Record<string, unknown>;
 }
 
 export class LarkWebhookDto {
@@ -68,18 +69,11 @@ export class LarkWebhookDto {
 
   @ApiProperty()
   @IsOptional()
-  header?: {
-    event_id: string;
-    token: string;
-    create_time: string;
-    event_type: string;
-    tenant_key: string;
-    app_id: string;
-  };
+  header?: LarkWebhookHeader;
 
   @ApiProperty()
   @IsOptional()
-  event?: any;
+  event?: LarkMessageEvent;
 
   @ApiProperty()
   @IsOptional()
@@ -96,7 +90,7 @@ export class LarkWebhookDto {
   // For Card Actions
   @ApiProperty()
   @IsOptional()
-  action?: any;
+  action?: LarkCardAction;
 
   @ApiProperty()
   @IsOptional()
@@ -114,5 +108,3 @@ export class LarkWebhookDto {
   @IsOptional()
   open_message_id?: string;
 }
-
-
