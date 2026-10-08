@@ -128,9 +128,6 @@ export function parseMessage(message: LarkMessage, botOpenId?: string): ParsedMe
 }
 
 /** Extract the sender open_id from a webhook event or SDK payload. */
-export function resolveSenderOpenId(
-  message: LarkMessage,
-  sender?: LarkSender,
-): string {
+export function resolveSenderOpenId(message: LarkMessage, sender?: LarkSender): string {
   return sender?.sender_id?.open_id || message.sender?.sender_id?.open_id || "unknown";
 }

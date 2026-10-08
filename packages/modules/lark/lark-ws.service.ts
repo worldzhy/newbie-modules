@@ -25,10 +25,8 @@ export class LarkWsService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit() {
-    const appId =
-      this.configService.get<string>("modules.lark.appId");
-    const appSecret =
-      this.configService.get<string>("modules.lark.appSecret");
+    const appId = this.configService.get<string>("modules.lark.appId");
+    const appSecret = this.configService.get<string>("modules.lark.appSecret");
 
     if (!appId || !appSecret) {
       this.logger.warn("Lark App ID or Secret is missing, skipping WebSocket client initialization.");
@@ -61,9 +59,7 @@ export class LarkWsService implements OnModuleInit, OnModuleDestroy {
 
             const senderOpenId = data.sender?.sender_id?.open_id || "unknown";
 
-            this.logger.log(
-              `[WS] Received message: ${message.message_id} from chat: ${message.chat_id}`,
-            );
+            this.logger.log(`[WS] Received message: ${message.message_id} from chat: ${message.chat_id}`);
 
             try {
               await this.larkService.dispatchMessage({
