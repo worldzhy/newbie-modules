@@ -1,8 +1,10 @@
 import { Global, Module } from "@nestjs/common";
+import { HttpModule } from "@nestjs/axios";
 import { TwoFactorModule } from "../modules/two-factor/two-factor.module";
 
 import { LoginByApprovedSubnetController } from "./login-by-approved-subnet.controller";
 import { LoginByGoogleController } from "./login-by-google.controller";
+import { LoginByLarkController } from "./login-by-lark.controller";
 import { LoginByPasswordController } from "./login-by-password.controller";
 import { LoginByTotpController } from "./login-by-totp.controller";
 import { LoginByVerificationCodeController } from "./login-by-verificationcode.controller";
@@ -14,6 +16,7 @@ import { WechatAuthController } from "./wechat/auth.controller";
 
 import { AuthService } from "./auth.service";
 import { WechatAuthService } from "./wechat/auth.service";
+import { LarkAuthService } from "./lark/lark-auth.service";
 
 // Login-flow passport strategies. They live in account (not in the security
 // foundation module) because they orchestrate account data: users, sessions,
@@ -25,10 +28,11 @@ import { GoogleStrategy } from "./strategies/google.strategy";
 
 @Global()
 @Module({
-  imports: [TwoFactorModule],
+  imports: [TwoFactorModule, HttpModule],
   controllers: [
     LoginByApprovedSubnetController,
     LoginByGoogleController,
+    LoginByLarkController,
     LoginByPasswordController,
     LoginByTotpController,
     LoginByVerificationCodeController,
@@ -41,11 +45,12 @@ import { GoogleStrategy } from "./strategies/google.strategy";
   providers: [
     AuthService,
     WechatAuthService,
+    LarkAuthService,
     PasswordStrategy,
     VerificationCodeStrategy,
     RefreshTokenStrategy,
     GoogleStrategy,
   ],
-  exports: [AuthService, WechatAuthService],
+  exports: [AuthService, WechatAuthService, LarkAuthService],
 })
 export class AuthModule {}

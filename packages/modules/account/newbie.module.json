@@ -29,6 +29,11 @@
       "wechat": {
         "appId": "process.env.WECHAT_APP_ID || 'your-app-id'",
         "appSecret": "process.env.WECHAT_APP_SECRET || 'your-app-secret'"
+      },
+      "larkAuth": {
+        "appId": "process.env.LARK_APP_ID",
+        "appSecret": "process.env.LARK_APP_SECRET",
+        "callbackURL": "process.env.LARK_AUTH_CALLBACK_URL"
       }
     }
   },
@@ -40,9 +45,11 @@
     "GOOGLE_AUTH_CLIENT_SECRET": "",
     "GOOGLE_AUTH_CALLBACK_URL": "",
     "WECHAT_APP_ID": "",
-    "WECHAT_APP_SECRET": ""
+    "WECHAT_APP_SECRET": "",
+    "LARK_AUTH_CALLBACK_URL": ""
   },
   "dependencies": {
+    "@nestjs/axios": "latest",
     "@nestjs/passport": "latest",
     "geolite2-redist": "latest",
     "ioredis": "latest",

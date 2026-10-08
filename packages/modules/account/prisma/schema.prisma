@@ -46,6 +46,12 @@ model User {
   wechatUnionId    String? // Unique WeChat Open Platform identifier
   wechatSessionKey String? // WeChat session key
 
+  // Feishu/Lark OAuth fields. larkOpenId is app-scoped and the primary SSO
+  // handle; it must share the same Feishu app as the bot so a webhook open_id
+  // resolves to the same account.
+  larkOpenId  String? @unique
+  larkUnionId String?
+
   @@schema("module/account")
 }
 
