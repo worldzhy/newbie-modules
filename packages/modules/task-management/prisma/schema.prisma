@@ -1,108 +1,64 @@
 // !! ------------------------------------------------------------ //
 // !!            [Module] Task Management models             //
 // !! ------------------------------------------------------------ //
-// * TaskGroup (Project Group)                                     //
+// * TaskSpace (1:1 companion space for a Nightwatch Project)       //
 // * Task (Work Item)                                              //
 // * TaskUser (User Reference)                                     //
-// * Requirement (Breakdown Attempt & Feedback)                    //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-model TaskGroup {
-  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  chatId      String     @unique // Lark group chat ID or other platform group ID
-  name        String?    // Group name
-  description String?    // Group description
+model TaskSpace {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId   String  @unique @db.Uuid // 1:1 link to the Nightwatch Project
+  name        String? // Space name; the caller passes the project name at creation
+  description String? // Space description
 
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  tasks       Task[]
-  requirements Requirement[] // Requirements belonging to this group
-  taskProjects TaskProject[]  // Projects belonging to this group
-
-  @@schema("module/task-management")
-}
-
-model TaskProject {
-  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId   String?    @unique @db.Uuid // Linked Nightwatch Project ID
-  name        String     // Project name
-  description String?    // Project description
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  deletedAt   DateTime?  // Soft delete timestamp
-
-  groupId     String     @db.Uuid
-  group       TaskGroup  @relation(fields: [groupId], references: [id])
-  tasks       Task[]     // Tasks belonging to this project
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tasks     Task[]
 
   @@schema("module/task-management")
 }
 
 model TaskUser {
-  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  openId      String     @unique // External user ID (e.g. Lark open_id)
-  userId      String?    @unique @db.Uuid // Linked Nightwatch User ID
-  name        String?    // User display name
-  avatarUrl   String?    // User avatar URL
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  createdTasks Task[]    @relation("CreatedTasks") // Tasks created by this user
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  openId        String   @unique // External user ID (e.g. Lark open_id)
+  userId        String?  @unique @db.Uuid // Linked Nightwatch User ID
+  name          String? // User display name
+  avatarUrl     String? // User avatar URL
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdTasks  Task[]   @relation("CreatedTasks") // Tasks created by this user
   assignedTasks Task[]   @relation("AssignedTasks") // Tasks assigned to this user
 
   @@schema("module/task-management")
 }
 
 model Task {
-  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title       String         // Task title
-  description String?        // Task details
-  status      TaskStatus     @default(PENDING) // Current workflow status
-  dueDate     DateTime?      // Expected completion time
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  deletedAt   DateTime?      // Soft delete timestamp
-  
-  groupId     String         @db.Uuid
-  group       TaskGroup      @relation(fields: [groupId], references: [id])
-  
-  taskProjectId String?      @db.Uuid
-  taskProject   TaskProject? @relation(fields: [taskProjectId], references: [id])
-  
-  creatorId   String?        @db.Uuid
-  creator     TaskUser?      @relation("CreatedTasks", fields: [creatorId], references: [id])
-  
-  assigneeId  String?        @db.Uuid
-  assignee    TaskUser?      @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title       String // Task title
+  description String? // Task details
+  status      TaskStatus @default(PENDING) // Current workflow status
+  dueDate     DateTime? // Expected completion time
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  deletedAt   DateTime? // Soft delete timestamp
 
-  // Relation to the requirement breakdown attempt
-  requirementId Int?           
-  requirement   Requirement?   @relation(fields: [requirementId], references: [id])
+  spaceId String    @db.Uuid
+  space   TaskSpace @relation(fields: [spaceId], references: [id])
+
+  // Direct link to the Nightwatch Project (flattened; no TaskProject indirection).
+  projectId String @db.Uuid
+
+  creatorId String?   @db.Uuid
+  creator   TaskUser? @relation("CreatedTasks", fields: [creatorId], references: [id])
+
+  assigneeId String?   @db.Uuid
+  assignee   TaskUser? @relation("AssignedTasks", fields: [assigneeId], references: [id])
 
   // Last Operation Tracking
   lastOperatorId     String? // User ID or External ID of the last modifier
   lastOperatorName   String? // Display Name of the last modifier
-  lastOperatorSource String? // "LARK" | "SYSTEM"
-
-  @@schema("module/task-management")
-}
-
-model Requirement {
-  id            Int        @id @default(autoincrement())
-  
-  // Original Message / Requirement Content
-  parentMessageId      String? // Original Lark message_id
-  parentMessageContent String? // The raw text content of the requirement (from parent message)
-  
-  skillId       String?    // The skill used for breakdown
-  prompt        String?    // The prompt used to trigger breakdown (user input)
-  score         Int?       // Feedback score (1-5)
-  
-  groupId       String?    @db.Uuid
-  group         TaskGroup? @relation(fields: [groupId], references: [id])
-
-  tasks         Task[]     // Tasks resulting from this breakdown attempt
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  lastOperatorSource String? // "LARK" | "SYSTEM" | "WEB"
 
   @@schema("module/task-management")
 }
