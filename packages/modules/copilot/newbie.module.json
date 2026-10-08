@@ -6,7 +6,7 @@
     "className": "CopilotModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["lark-bot"],
+  "moduleDependencies": ["lark"],
   "config-service": {},
   "env": {},
   "dependencies": {
