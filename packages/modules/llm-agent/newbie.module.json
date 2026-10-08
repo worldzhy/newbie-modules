@@ -1,9 +1,0 @@
-{
-  "key": "llm-agent",
-  "layer": "capability",
-  "module": {
-    "file": "llm-agent.module",
-    "className": "LlmAgentModule"
-  },
-  "schema": "prisma/schema.prisma"
-}
