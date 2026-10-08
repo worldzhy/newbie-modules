@@ -66,7 +66,7 @@ The mutating and value-read routes emit their own business audit events for ever
 
 - Enabling rotation calls `RotateSecret` with the Lambda ARN from Project Settings and a day interval (default 30); AWS both configures the schedule and starts the first rotation.
 - Disabling calls `CancelRotateSecret`, which turns off automatic rotation and cancels any in-progress one.
-- The rotation Lambda source lives in the `aws-secrets-manager` module (deployed via `newbie secrets deploy-rotation`) and routes strategies by reading the `nightwatch:secret-type` tag via `DescribeSecret`.
+- The rotation Lambda source ships inside the `@devbie/aws-secrets-cli` package (deployed via `newbie secrets deploy-rotation`) and routes strategies by reading the `nightwatch:secret-type` tag via `DescribeSecret`.
 
 ## Error mapping
 

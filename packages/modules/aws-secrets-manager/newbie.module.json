@@ -11,7 +11,8 @@
   },
   "env": {},
   "dependencies": {
-    "@aws-sdk/client-secrets-manager": "latest"
+    "@aws-sdk/client-secrets-manager": "latest",
+    "@devbie/aws-secrets-cli": "^0.1.0"
   },
   "devDependencies": {},
   "cli": "secrets"
