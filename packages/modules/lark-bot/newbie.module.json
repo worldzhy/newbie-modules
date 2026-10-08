@@ -5,6 +5,7 @@
     "file": "lark-bot.module",
     "className": "LarkBotModule"
   },
+  "moduleDependencies": ["security"],
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.59.0"
   }
