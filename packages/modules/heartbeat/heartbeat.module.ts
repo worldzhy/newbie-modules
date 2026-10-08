@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 
 import { InstallationController } from "./controllers/installation.controller";
 import { PingController } from "./controllers/ping.controller";
@@ -16,6 +16,7 @@ import { HeartbeatInstallationService } from "./services/installation.service";
  * process, or any other node service can each hold a heartbeat token
  * independently of backend-monitor / module-hub.
  */
+@Global()
 @Module({
   controllers: [InstallationController, PingController],
   providers: [HeartbeatInstallationService],

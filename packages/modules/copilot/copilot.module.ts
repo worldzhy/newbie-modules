@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 import { PrismaModule } from "@devbie/newbie/prisma/prisma.module";
 import { CopilotModelController } from "./model/management/copilot-model.controller";
 import { CopilotModelService } from "./model/management/copilot-model.service";
@@ -26,6 +26,7 @@ import { CopilotAuditLogger } from "./observability/copilot-audit.logger";
  * inject ActiveChatModelResolver / AgentRunner / etc. from this module's
  * exports.
  */
+@Global()
 @Module({
   imports: [PrismaModule],
   controllers: [CopilotModelController],

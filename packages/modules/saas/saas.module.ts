@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
 import { AuditLogger } from "./interceptors/audit-log.interceptor";
@@ -25,6 +25,7 @@ import { GoogleMapsModule } from "./providers/google-maps/google-maps.module";
 import { TasksModule } from "./providers/tasks/tasks.module";
 import { MetricsModule } from "./modules/metrics/metrics.module";
 
+@Global()
 @Module({
   imports: [
     ScheduleModule.forRoot(),

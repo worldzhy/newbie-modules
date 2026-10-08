@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Global, Module } from "@nestjs/common";
 
 import { InstallationController } from "./controllers/installation.controller";
 import { ReportController } from "./controllers/report.controller";
@@ -16,6 +16,7 @@ import { ModuleHubReleaseService } from "./services/release.service";
  *   `newbie update` + deploy; the resulting snapshot IS the receipt.
  * - WebhookController: registry push ingestion. HMAC verified.
  */
+@Global()
 @Module({
   controllers: [InstallationController, ReportController, WebhookController],
   providers: [ModuleHubInstallationService, ModuleHubReleaseService],
