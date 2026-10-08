@@ -1,0 +1,27 @@
+// !! ------------------------------------------------------------ //
+// !!            [Module] Copilot models                     //
+// !! ------------------------------------------------------------ //
+// * CopilotModel (AI model configuration for the Copilot agent)   //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+// Web Copilot model configuration. The Copilot module owns its own Postgres
+// schema; the single-active guarantee lives in a partial unique index
+// (Postgres WHERE clause) that is created by the host-side migration that
+// renames the legacy "copilot" schema to "module/copilot".
+model CopilotModel {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(255)
+  // Wire protocol: "openai-compatible" or "anthropic". Kept as a string so
+  // a future provider kind does not require an enum migration.
+  provider  String   @default("openai-compatible") @db.VarChar(40)
+  model     String   @db.VarChar(255)
+  // Required for openai-compatible. Empty string for anthropic means the
+  // official https://api.anthropic.com endpoint (column stays NOT NULL).
+  baseUrl   String   @db.VarChar(255)
+  apiKey    String   @db.VarChar(500)
+  isActive  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/copilot")
+}

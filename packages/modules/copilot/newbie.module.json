@@ -1,0 +1,18 @@
+{
+  "key": "copilot",
+  "layer": "capability",
+  "module": {
+    "file": "copilot.module",
+    "className": "CopilotModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["lark-bot"],
+  "config-service": {},
+  "env": {},
+  "dependencies": {
+    "ai": "latest",
+    "@ai-sdk/openai-compatible": "latest",
+    "@ai-sdk/anthropic": "latest"
+  },
+  "devDependencies": {}
+}
