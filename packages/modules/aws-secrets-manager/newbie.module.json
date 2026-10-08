@@ -13,5 +13,6 @@
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "latest"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "cli": "secrets"
 }
