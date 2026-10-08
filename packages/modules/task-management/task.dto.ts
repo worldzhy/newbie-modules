@@ -151,25 +151,6 @@ export class LinkTaskUserRequestDto {
   taskUserId: string;
 }
 
-export class LinkTaskProjectRequestDto {
-  @ApiProperty({ type: String, description: "Nightwatch Project ID (uuid)" })
-  @IsString()
-  @IsNotEmpty()
-  projectId: string;
-
-  @ApiProperty({ type: String, description: "TaskProject ID (uuid)" })
-  @IsString()
-  @IsNotEmpty()
-  taskProjectId: string;
-}
-
-export class UnlinkTaskProjectRequestDto {
-  @ApiProperty({ type: String, description: "Nightwatch Project ID (uuid)" })
-  @IsString()
-  @IsNotEmpty()
-  projectId: string;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Response DTOs (no class-validator decorators: validation applies to inbound payloads only)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -235,23 +216,6 @@ export class TaskProjectDto {
 
   @ApiPropertyOptional({ description: "Soft-delete timestamp", type: Date })
   deletedAt?: Date | null;
-
-  @ApiProperty({ description: "Owning TaskGroup ID (uuid)" })
-  groupId: string;
-}
-
-export class TaskProjectListItemDto {
-  @ApiProperty({ description: "TaskProject ID (uuid)" })
-  id: string;
-
-  @ApiPropertyOptional({ description: "Linked Nightwatch Project ID (uuid)", type: String })
-  projectId?: string | null;
-
-  @ApiProperty({ description: "Project name" })
-  name: string;
-
-  @ApiPropertyOptional({ description: "Project description", type: String })
-  description?: string | null;
 
   @ApiProperty({ description: "Owning TaskGroup ID (uuid)" })
   groupId: string;
@@ -406,33 +370,6 @@ export class LinkTaskUserResponseDto {
 
   @ApiPropertyOptional({ type: TaskUserDto, description: "Present on success" })
   data?: TaskUserDto;
-
-  @ApiPropertyOptional({ type: String, description: "Error message, present when success is false" })
-  message?: string;
-}
-
-export class TaskProjectsListResponseDto {
-  @ApiProperty()
-  success: boolean;
-
-  @ApiProperty({ type: [TaskProjectListItemDto] })
-  data: TaskProjectListItemDto[];
-}
-
-export class TaskProjectDataResponseDto {
-  @ApiProperty()
-  success: boolean;
-
-  @ApiPropertyOptional({ type: TaskProjectDto, description: "Linked TaskProject, null when not linked" })
-  data?: TaskProjectDto | null;
-}
-
-export class LinkTaskProjectResponseDto {
-  @ApiProperty()
-  success: boolean;
-
-  @ApiPropertyOptional({ type: TaskProjectDto, description: "Present on success" })
-  data?: TaskProjectDto;
 
   @ApiPropertyOptional({ type: String, description: "Error message, present when success is false" })
   message?: string;

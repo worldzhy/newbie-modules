@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "@modules/security/authentication/jwt/jwt.guard";
 import { UserRequest } from "@modules/security/security.interface";
@@ -8,14 +8,9 @@ import { TaskUserService } from "./task-user.service";
 import {
   CreateTaskRequestDto,
   CreateTaskResponseDto,
-  LinkTaskProjectRequestDto,
-  LinkTaskProjectResponseDto,
   ListTasksQueryDto,
   MembersResponseDto,
-  TaskProjectDataResponseDto,
-  TaskProjectsListResponseDto,
   TasksResponseDto,
-  UnlinkTaskProjectRequestDto,
 } from "./task.dto";
 
 @ApiTags("Task Management")
@@ -29,50 +24,8 @@ export class TaskProjectController {
     private readonly taskUserService: TaskUserService,
   ) {}
 
-  @Get()
-  @ApiOperation({ summary: "List all TaskProjects" })
-  @ApiResponse({ status: 200, type: TaskProjectsListResponseDto })
-  async listTaskProjects(): Promise<TaskProjectsListResponseDto> {
-    const taskProjects = await this.taskProjectService.listTaskProjects();
-    return { success: true, data: taskProjects };
-  }
-
-  @Get("by-project/:projectId")
-  @ApiOperation({ summary: "Get the TaskProject linked to the given Nightwatch project" })
-  @ApiResponse({ status: 200, type: TaskProjectDataResponseDto })
-  async getLinkedTaskProject(@Param("projectId") projectId: string): Promise<TaskProjectDataResponseDto> {
-    const taskProject = await this.taskProjectService.getTaskProjectByProjectId(projectId);
-    return { success: true, data: taskProject };
-  }
-
-  @Post("link")
-  @ApiOperation({ summary: "Link Nightwatch project to a TaskProject" })
-  @ApiResponse({ status: 200, type: LinkTaskProjectResponseDto })
-  async linkTaskProject(@Body() dto: LinkTaskProjectRequestDto): Promise<LinkTaskProjectResponseDto> {
-    try {
-      const result = await this.taskProjectService.linkTaskProject(dto.projectId, dto.taskProjectId);
-      return { success: true, data: result };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { success: false, message };
-    }
-  }
-
-  @Post("unlink")
-  @ApiOperation({ summary: "Unlink Nightwatch project from its TaskProject" })
-  @ApiResponse({ status: 200, type: LinkTaskProjectResponseDto })
-  async unlinkTaskProject(@Body() dto: UnlinkTaskProjectRequestDto): Promise<LinkTaskProjectResponseDto> {
-    try {
-      const result = await this.taskProjectService.unlinkTaskProject(dto.projectId);
-      return { success: true, data: result };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return { success: false, message };
-    }
-  }
-
   @Get("by-project/:projectId/tasks")
-  @ApiOperation({ summary: "List tasks under the TaskProject linked to a Nightwatch project" })
+  @ApiOperation({ summary: "List tasks of a Nightwatch project (companion task space is ensured)" })
   @ApiResponse({ status: 200, type: TasksResponseDto })
   async listTasksByProjectId(
     @Param("projectId") projectId: string,
@@ -81,23 +34,9 @@ export class TaskProjectController {
     const page = query.page ?? 0;
     const pageSize = query.pageSize ?? 10;
 
-    // 1. Find the linked taskProject
-    const taskProject = await this.taskProjectService.getTaskProjectByProjectId(projectId);
+    // Every project implicitly owns its companion TaskProject.
+    const taskProject = await this.taskProjectService.ensureTaskProjectForProject(projectId);
 
-    if (!taskProject) {
-      // If not linked, return empty paginated result
-      return {
-        success: true,
-        data: {
-          records: [],
-          total: 0,
-          page,
-          pageSize,
-        },
-      };
-    }
-
-    // 2. Fetch tasks for this taskProjectId
     const result = await this.taskService.listTasks({
       groupId: taskProject.groupId,
       status: query.status,
@@ -121,17 +60,14 @@ export class TaskProjectController {
   }
 
   @Post("by-project/:projectId/tasks")
-  @ApiOperation({ summary: "Create a new task under the TaskProject linked to a Nightwatch project" })
+  @ApiOperation({ summary: "Create a task under the Nightwatch project (companion task space is ensured)" })
   @ApiResponse({ status: 200, type: CreateTaskResponseDto })
   async createTask(
     @Param("projectId") projectId: string,
     @Body() dto: CreateTaskRequestDto,
     @Req() req: UserRequest,
   ): Promise<CreateTaskResponseDto> {
-    const taskProject = await this.taskProjectService.getTaskProjectByProjectId(projectId);
-    if (!taskProject) {
-      throw new BadRequestException("Project not linked to any TaskProject");
-    }
+    const taskProject = await this.taskProjectService.ensureTaskProjectForProject(projectId);
     const creatorId = req.user.userId;
     const taskUser = await this.taskUserService.getTaskUserByUserId(creatorId);
 
@@ -148,7 +84,8 @@ export class TaskProjectController {
   @ApiOperation({ summary: "List project members with task stats by Nightwatch projectId" })
   @ApiResponse({ status: 200, type: MembersResponseDto })
   async listProjectMembers(@Param("projectId") projectId: string): Promise<MembersResponseDto> {
-    const members = await this.taskUserService.listTaskUsersByProjectId(projectId);
+    const taskProject = await this.taskProjectService.ensureTaskProjectForProject(projectId);
+    const members = await this.taskUserService.listTaskUsersByProjectId(taskProject.id);
     return { success: true, data: members };
   }
 }

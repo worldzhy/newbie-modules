@@ -25,15 +25,7 @@ export class TaskUserService {
     });
   }
 
-  async listTaskUsersByProjectId(projectId: string) {
-    const taskProject = await this.prisma.taskProject.findUnique({
-      where: { projectId },
-    });
-    if (!taskProject) {
-      return [];
-    }
-
-    const taskProjectId = taskProject.id;
+  async listTaskUsersByProjectId(taskProjectId: string) {
     const users = await this.prisma.taskUser.findMany({
       where: {
         OR: [
