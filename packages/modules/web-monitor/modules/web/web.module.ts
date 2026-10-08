@@ -31,14 +31,7 @@ import { WebPvuvipTaskService } from "./services/pvuvip-task.service";
 import { WebIpTaskService } from "./services/ip-task.service";
 
 @Module({
-  imports: [
-    MonitorClickhouseModule,
-    MonitorModelsModule,
-    SharedModule,
-    DayReportModule,
-    RedisModule,
-    SiteModule,
-  ],
+  imports: [MonitorClickhouseModule, MonitorModelsModule, SharedModule, DayReportModule, RedisModule, SiteModule],
   controllers: [
     WebReportController,
     AjaxController,
@@ -69,6 +62,17 @@ import { WebIpTaskService } from "./services/ip-task.service";
   ],
   // WebInstallationService is re-exported by the root WebMonitorModule for
   // consuming projects whose application layer provisions installations.
-  exports: [WebReportTaskService, WebPvuvipTaskService, WebIpTaskService, WebInstallationService],
+  // PvuvipService/PageService/AnalysisService are read services exported for
+  // consuming-project application layers that read aggregated web metrics
+  // (e.g. the nightwatch copilot frontend-monitoring data source).
+  exports: [
+    WebReportTaskService,
+    WebPvuvipTaskService,
+    WebIpTaskService,
+    WebInstallationService,
+    PvuvipService,
+    PageService,
+    AnalysisService,
+  ],
 })
 export class WebModule {}
