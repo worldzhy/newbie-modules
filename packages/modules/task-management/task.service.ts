@@ -15,8 +15,8 @@ export interface Operator {
 export interface CreateTaskInput {
   title: string;
   description?: string;
-  groupId: string;
-  taskProjectId?: string;
+  spaceId: string;
+  projectId: string;
   status?: TaskStatus;
   assigneeId?: string;
   dueDate?: Date;
@@ -24,18 +24,17 @@ export interface CreateTaskInput {
 }
 
 export interface CreateTasksBatchInput {
-  groupId: string;
-  taskProjectId?: string;
+  spaceId: string;
+  projectId: string;
   creatorId?: string;
   tasks: CreateTaskItemDto[];
 }
 
 export interface ListTasksFilter {
-  groupId: string;
+  projectId: string;
   status?: TaskStatus;
   keyword?: string;
   assigneeName?: string;
-  taskProjectId?: string;
   includeCompleted?: boolean;
   skip?: number;
   take?: number;
@@ -61,8 +60,8 @@ export class TaskService {
       data: {
         title: data.title,
         description: data.description,
-        groupId: data.groupId,
-        taskProjectId: data.taskProjectId,
+        spaceId: data.spaceId,
+        projectId: data.projectId,
         status: data.status || TaskStatus.PENDING,
         assigneeId: data.assigneeId,
         dueDate: data.dueDate,
@@ -77,21 +76,21 @@ export class TaskService {
         title: task.title,
         description: task.description,
         status: task.status || TaskStatus.PENDING,
-        groupId: input.groupId,
-        taskProjectId: input.taskProjectId,
+        spaceId: input.spaceId,
+        projectId: input.projectId,
         creatorId: input.creatorId,
         assigneeId: task.assigneeId,
         dueDate: task.dueDate,
       })),
     });
 
-    this.logger.log(`Batch created ${input.tasks.length} tasks in group ${input.groupId}`);
+    this.logger.log(`Batch created ${input.tasks.length} tasks in space ${input.spaceId}`);
     return { count: input.tasks.length };
   }
 
   async listTasks(filter: ListTasksFilter) {
     const whereClause: any = {
-      groupId: filter.groupId,
+      projectId: filter.projectId,
       deletedAt: null,
     };
 
@@ -121,15 +120,11 @@ export class TaskService {
       };
     }
 
-    if (filter.taskProjectId) {
-      whereClause.taskProjectId = filter.taskProjectId;
-    }
-
     const total = await this.prisma.task.count({ where: whereClause });
 
     const tasks = await this.prisma.task.findMany({
       where: whereClause,
-      include: { creator: true, assignee: true, taskProject: true },
+      include: { creator: true, assignee: true, space: true },
       orderBy: { createdAt: "desc" },
       skip: filter.skip,
       take: filter.take,
@@ -141,7 +136,7 @@ export class TaskService {
   async getTaskById(taskId: string) {
     return await this.prisma.task.findUnique({
       where: { id: taskId },
-      include: { creator: true, assignee: true, taskProject: true },
+      include: { creator: true, assignee: true, space: true },
     });
   }
 

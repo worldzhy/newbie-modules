@@ -18,23 +18,6 @@ import { TaskStatus } from "./task.service";
 // Request DTOs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class CreateGroupRequestDto {
-  @ApiProperty({ type: String, description: "Lark group chat ID or other platform group ID" })
-  @IsString()
-  @IsNotEmpty()
-  chatId: string;
-
-  @ApiPropertyOptional({ type: String, description: "Group name" })
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiPropertyOptional({ type: String, description: "Group description" })
-  @IsString()
-  @IsOptional()
-  description?: string;
-}
-
 export class ListTasksQueryDto {
   @ApiPropertyOptional({ type: Number, description: "Page number, 0-based", default: 0 })
   @IsNumber()
@@ -121,15 +104,15 @@ export class UpdateTaskRequestDto {
 }
 
 export class CreateTasksBatchRequestDto {
-  @ApiProperty({ type: String, description: "Owning TaskGroup ID (uuid)" })
-  @IsString()
-  @IsNotEmpty()
-  groupId: string;
-
-  @ApiPropertyOptional({ type: String, description: "Owning TaskProject ID (uuid)" })
+  @ApiProperty({ type: String, description: "Owning TaskSpace ID (uuid)" })
   @IsUUID("4")
-  @IsOptional()
-  taskProjectId?: string;
+  @IsNotEmpty()
+  spaceId: string;
+
+  @ApiProperty({ type: String, description: "Nightwatch Project ID (uuid)" })
+  @IsUUID("4")
+  @IsNotEmpty()
+  projectId: string;
 
   @ApiPropertyOptional({ type: String, description: "Creator TaskUser ID (uuid)" })
   @IsUUID("4")
@@ -195,43 +178,17 @@ export class TaskUserListItemDto {
   avatarUrl?: string | null;
 }
 
-export class TaskProjectDto {
-  @ApiProperty({ description: "TaskProject ID (uuid)" })
+export class TaskSpaceDto {
+  @ApiProperty({ description: "TaskSpace ID (uuid)" })
   id: string;
 
-  @ApiPropertyOptional({ description: "Linked Nightwatch Project ID (uuid), null when unlinked", type: String })
-  projectId?: string | null;
+  @ApiProperty({ description: "Nightwatch Project ID (uuid), 1:1 companion space" })
+  projectId: string;
 
-  @ApiProperty({ description: "Project name" })
-  name: string;
-
-  @ApiPropertyOptional({ description: "Project description", type: String })
-  description?: string | null;
-
-  @ApiProperty({ type: Date })
-  createdAt: Date;
-
-  @ApiProperty({ type: Date })
-  updatedAt: Date;
-
-  @ApiPropertyOptional({ description: "Soft-delete timestamp", type: Date })
-  deletedAt?: Date | null;
-
-  @ApiProperty({ description: "Owning TaskGroup ID (uuid)" })
-  groupId: string;
-}
-
-export class TaskGroupDto {
-  @ApiProperty({ description: "TaskGroup ID (uuid)" })
-  id: string;
-
-  @ApiProperty({ description: "Lark group chat ID or other platform group ID" })
-  chatId: string;
-
-  @ApiPropertyOptional({ description: "Group name", type: String })
+  @ApiPropertyOptional({ description: "Space name", type: String })
   name?: string | null;
 
-  @ApiPropertyOptional({ description: "Group description", type: String })
+  @ApiPropertyOptional({ description: "Space description", type: String })
   description?: string | null;
 
   @ApiProperty({ type: Date })
@@ -241,14 +198,14 @@ export class TaskGroupDto {
   updatedAt: Date;
 }
 
-export class TaskGroupCountDto {
-  @ApiProperty({ description: "Number of non-deleted tasks in the group" })
+export class TaskSpaceCountDto {
+  @ApiProperty({ description: "Number of non-deleted tasks in the space" })
   tasks: number;
 }
 
-export class TaskGroupWithCountDto extends TaskGroupDto {
-  @ApiProperty({ type: TaskGroupCountDto, description: "Relation counts" })
-  _count: TaskGroupCountDto;
+export class TaskSpaceWithCountDto extends TaskSpaceDto {
+  @ApiProperty({ type: TaskSpaceCountDto, description: "Relation counts" })
+  _count: TaskSpaceCountDto;
 }
 
 export class TaskDto {
@@ -276,11 +233,11 @@ export class TaskDto {
   @ApiPropertyOptional({ type: Date, description: "Soft-delete timestamp" })
   deletedAt?: Date | null;
 
-  @ApiProperty({ description: "Owning TaskGroup ID (uuid)" })
-  groupId: string;
+  @ApiProperty({ description: "Owning TaskSpace ID (uuid)" })
+  spaceId: string;
 
-  @ApiPropertyOptional({ description: "Owning TaskProject ID (uuid)", type: String })
-  taskProjectId?: string | null;
+  @ApiProperty({ description: "Nightwatch Project ID (uuid)" })
+  projectId: string;
 
   @ApiPropertyOptional({ description: "Creator TaskUser ID (uuid)", type: String })
   creatorId?: string | null;
@@ -288,16 +245,13 @@ export class TaskDto {
   @ApiPropertyOptional({ description: "Assignee TaskUser ID (uuid)", type: String })
   assigneeId?: string | null;
 
-  @ApiPropertyOptional({ description: "Source requirement breakdown attempt ID", type: Number })
-  requirementId?: number | null;
-
   @ApiPropertyOptional({ description: "ID of the last operator", type: String })
   lastOperatorId?: string | null;
 
   @ApiPropertyOptional({ description: "Display name of the last operator", type: String })
   lastOperatorName?: string | null;
 
-  @ApiPropertyOptional({ description: "Source of the last operator, e.g. LARK | SYSTEM", type: String })
+  @ApiPropertyOptional({ description: "Source of the last operator, e.g. LARK | SYSTEM | WEB", type: String })
   lastOperatorSource?: string | null;
 }
 
@@ -308,8 +262,8 @@ export class TaskWithRelationsDto extends TaskDto {
   @ApiPropertyOptional({ type: TaskUserDto, description: "Task assignee" })
   assignee?: TaskUserDto | null;
 
-  @ApiPropertyOptional({ type: TaskProjectDto, description: "Owning task project" })
-  taskProject?: TaskProjectDto | null;
+  @ApiPropertyOptional({ type: TaskSpaceDto, description: "Owning task space" })
+  space?: TaskSpaceDto | null;
 }
 
 export class TaskMemberStatsDto {
@@ -403,6 +357,14 @@ export class TasksResponseDto {
 
   @ApiProperty({ type: PaginatedTasksDto })
   data: PaginatedTasksDto;
+}
+
+export class TaskSpaceResponseDto {
+  @ApiProperty()
+  success: boolean;
+
+  @ApiProperty({ type: TaskSpaceDto })
+  data: TaskSpaceDto;
 }
 
 export class CreateTaskResponseDto {

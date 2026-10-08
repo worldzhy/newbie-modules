@@ -13,7 +13,7 @@ export class TaskController {
   constructor(private readonly taskService: TaskService) {}
 
   @Post("batch")
-  @ApiOperation({ summary: "Batch create tasks in an existing task group" })
+  @ApiOperation({ summary: "Batch create tasks in an existing task space" })
   @ApiResponse({ status: 200, type: BatchCreateTasksResponseDto })
   async createTasksBatch(@Body() dto: CreateTasksBatchRequestDto): Promise<BatchCreateTasksResponseDto> {
     const result = await this.taskService.createTasksBatch(dto);

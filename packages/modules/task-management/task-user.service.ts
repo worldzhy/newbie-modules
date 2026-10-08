@@ -25,21 +25,21 @@ export class TaskUserService {
     });
   }
 
-  async listTaskUsersByProjectId(taskProjectId: string) {
+  async listTaskUsersByProjectId(projectId: string) {
     const users = await this.prisma.taskUser.findMany({
       where: {
         OR: [
-          { createdTasks: { some: { taskProjectId, deletedAt: null } } },
-          { assignedTasks: { some: { taskProjectId, deletedAt: null } } },
+          { createdTasks: { some: { projectId, deletedAt: null } } },
+          { assignedTasks: { some: { projectId, deletedAt: null } } },
         ],
       },
       include: {
         assignedTasks: {
-          where: { taskProjectId, deletedAt: null },
+          where: { projectId, deletedAt: null },
           select: { status: true },
         },
         createdTasks: {
-          where: { taskProjectId, deletedAt: null },
+          where: { projectId, deletedAt: null },
           select: { id: true },
         },
       },
