@@ -10,9 +10,9 @@
   "config-service": {},
   "env": {},
   "dependencies": {
-    "ai": "latest",
-    "@ai-sdk/openai-compatible": "latest",
-    "@ai-sdk/anthropic": "latest"
+    "ai": "^6.0.301",
+    "@ai-sdk/openai-compatible": "^2.0.81",
+    "@ai-sdk/anthropic": "^3.0.128"
   },
   "devDependencies": {}
 }
