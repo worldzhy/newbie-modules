@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
-import { CopilotModelService } from "../management/copilot-model.service";
-import { ANTHROPIC_PROVIDER } from "../management/copilot-providers";
+import { CopilotModelService } from "./management/copilot-model.service";
+import { ANTHROPIC_PROVIDER } from "./management/copilot-providers";
 import { createAnthropicChatModel } from "./adapters/anthropic-chat-model.adapter";
 import { createOpenAiCompatibleChatModel } from "./adapters/openai-compatible-chat-model.adapter";
 import { ChatModelPort, NoActiveModelError } from "../kernel/chat-model.port";
