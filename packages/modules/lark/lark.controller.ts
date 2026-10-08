@@ -1,14 +1,14 @@
 import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
-import { LarkBotService } from "./lark-bot.service";
-import { GetChatHistoryDto, LarkWebhookDto, SendTextDto } from "./lark-bot.dto";
+import { LarkService } from "./lark.service";
+import { GetChatHistoryDto, LarkWebhookDto, SendTextDto } from "./lark.dto";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 
-@ApiTags("Lark Bot")
-@Controller("lark-bot")
-export class LarkBotController {
-  constructor(private readonly larkBotService: LarkBotService) {}
+@ApiTags("Lark")
+@Controller("lark")
+export class LarkController {
+  constructor(private readonly larkService: LarkService) {}
 
   @Post("history")
   @ApiOperation({ summary: "Get chat history from Lark group" })
@@ -16,7 +16,7 @@ export class LarkBotController {
   @ApiResponse({ type: Object })
   @UseGuards(AuthGuard("jwt"))
   async getChatHistory(@Body() dto: GetChatHistoryDto) {
-    return await this.larkBotService.getChatHistory(dto);
+    return await this.larkService.getChatHistory(dto);
   }
 
   @Post("send-text")
@@ -25,7 +25,7 @@ export class LarkBotController {
   @ApiResponse({ type: Object })
   @UseGuards(AuthGuard("jwt"))
   async sendText(@Body() dto: SendTextDto) {
-    return await this.larkBotService.sendText(dto);
+    return await this.larkService.sendText(dto);
   }
 
   /**
@@ -40,6 +40,6 @@ export class LarkBotController {
   @HttpCode(HttpStatus.OK)
   @NoGuard()
   async webhook(@Body() dto: LarkWebhookDto) {
-    return await this.larkBotService.handleWebhook(dto);
+    return await this.larkService.handleWebhook(dto);
   }
 }

@@ -1,12 +1,12 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
-import { LarkBotService } from "./lark-bot.service";
+import { LarkService } from "./lark.service";
 
 /**
  * Lark WebSocket long-connection client. Receives im.message.receive_v1
  * events via the SDK and dispatches them directly through
- * LarkBotService.dispatchMessage — the same path webhook events take — so
+ * LarkService.dispatchMessage — the same path webhook events take — so
  * message parsing, bot-mention detection, and deduplication stay in one
  * place.
  *
@@ -21,16 +21,16 @@ export class LarkWsService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly larkBotService: LarkBotService,
+    private readonly larkService: LarkService,
   ) {}
 
   async onModuleInit() {
     const appId =
       this.configService.get<string>("LARK_APP_ID") ||
-      this.configService.get<string>("modules.lark-bot.appId");
+      this.configService.get<string>("modules.lark.appId");
     const appSecret =
       this.configService.get<string>("LARK_APP_SECRET") ||
-      this.configService.get<string>("modules.lark-bot.appSecret");
+      this.configService.get<string>("modules.lark.appSecret");
 
     if (!appId || !appSecret) {
       this.logger.warn("Lark App ID or Secret is missing, skipping WebSocket client initialization.");
@@ -68,7 +68,7 @@ export class LarkWsService implements OnModuleInit, OnModuleDestroy {
             );
 
             try {
-              await this.larkBotService.dispatchMessage({
+              await this.larkService.dispatchMessage({
                 chatId: message.chat_id,
                 chatType,
                 msgType,

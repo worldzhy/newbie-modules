@@ -1,7 +1,7 @@
 /**
  * Typed shapes for Lark/Feishu webhook events, card actions, and message
  * payloads. These replace the `any` types that previously flowed through
- * LarkBotService and LarkWsService, giving downstream consumers (notably the
+ * LarkService and LarkWsService, giving downstream consumers (notably the
  * Copilot Lark transport) compile-time safety on webhook/card-action data.
  *
  * Reference: https://open.feishu.cn/document/server-docs/im-v1/message/events

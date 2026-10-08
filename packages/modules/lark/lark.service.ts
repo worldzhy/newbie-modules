@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
 import { firstValueFrom } from "rxjs";
-import { GetChatHistoryDto, SendTextDto, SendCardDto } from "./lark-bot.dto";
+import { GetChatHistoryDto, SendTextDto, SendCardDto } from "./lark.dto";
 import { decryptLarkEvent } from "./lark-event.util";
 import { parseMessage, resolveSenderOpenId } from "./lark-message-parser";
 import type { LarkWebhookBody, LarkCardAction, LarkMessage } from "./lark-types";
@@ -36,8 +36,8 @@ interface MessageDispatchInput {
  * survive Lark's retry redelivery.
  */
 @Injectable()
-export class LarkBotService {
-  private readonly logger = new Logger(LarkBotService.name);
+export class LarkService {
+  private readonly logger = new Logger(LarkService.name);
   private tenantAccessToken: string | null = null;
   private tokenExpiresAt: number = 0;
   private tokenPromise?: Promise<string>;
@@ -55,7 +55,7 @@ export class LarkBotService {
   ) {
     this.botOpenId =
       this.configService.get<string>("LARK_BOT_OPEN_ID") ||
-      this.configService.get<string>("modules.lark-bot.botOpenId");
+      this.configService.get<string>("modules.lark.botOpenId");
   }
 
   /**
@@ -91,10 +91,10 @@ export class LarkBotService {
   private async fetchTenantAccessToken(): Promise<string> {
     const appId =
       this.configService.get<string>("LARK_APP_ID") ||
-      this.configService.get<string>("modules.lark-bot.appId");
+      this.configService.get<string>("modules.lark.appId");
     const appSecret =
       this.configService.get<string>("LARK_APP_SECRET") ||
-      this.configService.get<string>("modules.lark-bot.appSecret");
+      this.configService.get<string>("modules.lark.appSecret");
 
     if (!appId || !appSecret) {
       throw new Error("Lark App ID or Secret is not configured");
@@ -170,7 +170,7 @@ export class LarkBotService {
     if (body.encrypt) {
       const encryptKey =
         this.configService.get<string>("LARK_ENCRYPT_KEY") ||
-        this.configService.get<string>("modules.lark-bot.encryptKey");
+        this.configService.get<string>("modules.lark.encryptKey");
       if (!encryptKey) {
         this.logger.error("Received an encrypted Lark event but LARK_ENCRYPT_KEY is not configured; event dropped.");
         return { code: 0, msg: "success" };

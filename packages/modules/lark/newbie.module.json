@@ -1,9 +1,9 @@
 {
-  "key": "lark-bot",
+  "key": "lark",
   "layer": "foundation",
   "module": {
-    "file": "lark-bot.module",
-    "className": "LarkBotModule"
+    "file": "lark.module",
+    "className": "LarkModule"
   },
   "moduleDependencies": ["security"],
   "dependencies": {

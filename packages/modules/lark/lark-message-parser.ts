@@ -1,7 +1,7 @@
 import type { LarkMention, LarkMessage, LarkSender, ParsedMessage } from "./lark-types";
 
 /**
- * Unified Lark message parsing. Both the webhook path (LarkBotService) and the
+ * Unified Lark message parsing. Both the webhook path (LarkService) and the
  * WebSocket path (LarkWsService) previously duplicated this logic with subtle
  * divergences; this module is the single source of truth for extracting clean
  * text and detecting whether the bot was mentioned.
