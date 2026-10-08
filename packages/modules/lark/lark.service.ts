@@ -20,7 +20,10 @@ type MessageHandler = (
   parentId?: string,
   messageId?: string,
 ) => Promise<void>;
-type CardActionHandler = (payload: LarkCardAction, meta: LarkCardActionMeta) => Promise<LarkCardActionResult | void>;
+type CardActionHandler = (
+  payload: LarkCardAction,
+  meta: LarkCardActionMeta,
+) => Promise<LarkCardActionResult | void>;
 
 interface MessageDispatchInput {
   chatId: string;
@@ -59,7 +62,8 @@ export class LarkService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
   ) {
-    this.botOpenId = this.configService.get<string>("modules.lark.botOpenId");
+    this.botOpenId =
+      this.configService.get<string>("modules.lark.botOpenId");
   }
 
   /**
@@ -100,8 +104,10 @@ export class LarkService {
   }
 
   private async fetchTenantAccessToken(): Promise<string> {
-    const appId = this.configService.get<string>("modules.lark.appId");
-    const appSecret = this.configService.get<string>("modules.lark.appSecret");
+    const appId =
+      this.configService.get<string>("modules.lark.appId");
+    const appSecret =
+      this.configService.get<string>("modules.lark.appSecret");
 
     if (!appId || !appSecret) {
       throw new Error("Lark App ID or Secret is not configured");
@@ -175,7 +181,8 @@ export class LarkService {
     // 2. Encrypted event — decrypt and re-dispatch (the decrypted body has no
     //    `encrypt` field, so this cannot loop).
     if (body.encrypt) {
-      const encryptKey = this.configService.get<string>("modules.lark.encryptKey");
+      const encryptKey =
+        this.configService.get<string>("modules.lark.encryptKey");
       if (!encryptKey) {
         this.logger.error("Received an encrypted Lark event but LARK_ENCRYPT_KEY is not configured; event dropped.");
         return { code: 0, msg: "success" };
@@ -286,7 +293,13 @@ export class LarkService {
     this.logger.log(`Message content (cleaned): ${parsed.text}`);
 
     if (this.messageHandler) {
-      await this.messageHandler(input.chatId, parsed.text, input.senderOpenId, input.parentMessageId, input.messageId);
+      await this.messageHandler(
+        input.chatId,
+        parsed.text,
+        input.senderOpenId,
+        input.parentMessageId,
+        input.messageId,
+      );
     }
   }
 
