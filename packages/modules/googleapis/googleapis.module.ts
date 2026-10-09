@@ -1,4 +1,5 @@
 import { Global, Module } from "@nestjs/common";
+import { HttpModule } from "@nestjs/axios";
 import { GoogleDriveFileController } from "./google-drive/google-drive-file.controller";
 import { GoogleDriveFileService } from "./google-drive/google-drive-file.service";
 import { GoogleDrivePermissionController } from "./google-drive/google-drive-permission.controller";
@@ -9,6 +10,7 @@ import { GoogleTimezoneService } from "./google-timezone.service";
 
 @Global()
 @Module({
+  imports: [HttpModule],
   controllers: [GoogleDriveFileController, GoogleDrivePermissionController],
   providers: [
     GoogleDriveFileService,

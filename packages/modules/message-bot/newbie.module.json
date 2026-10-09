@@ -8,5 +8,5 @@
   "schema": "prisma/schema.prisma",
   "config-service": {},
   "env": {},
-  "dependencies": {}
+  "dependencies": { "@nestjs/axios": "latest" }
 }
