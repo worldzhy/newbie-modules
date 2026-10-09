@@ -62,6 +62,17 @@ export class SendCardDto {
   card: Record<string, unknown>;
 }
 
+export class UpdateCardDto {
+  @ApiProperty({ description: "The message ID of the card to update", required: true })
+  @IsString()
+  @IsNotEmpty()
+  messageId: string;
+
+  @ApiProperty({ description: "New card content (JSON object)" })
+  @IsNotEmpty()
+  card: Record<string, unknown>;
+}
+
 export class LarkWebhookDto {
   @ApiProperty()
   @IsOptional()

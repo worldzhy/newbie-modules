@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
-import { GetChatHistoryDto, SendTextDto, SendCardDto } from "./lark.dto";
+import { GetChatHistoryDto, SendTextDto, SendCardDto, UpdateCardDto } from "./lark.dto";
 import { decryptLarkEvent } from "./lark-event.util";
 import { parseMessage, resolveSenderOpenId } from "./lark-message-parser";
 import type {
@@ -340,6 +340,29 @@ export class LarkService {
       return res.data;
     } catch (error) {
       this.logger.error("Error sending card message", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update a previously sent interactive card in place (PATCH
+   * /im/v1/messages/:message_id). Only cards sent by this bot can be updated.
+   */
+  async updateCard(dto: UpdateCardDto) {
+    try {
+      const res = await this.client.im.message.patch({
+        path: { message_id: dto.messageId },
+        data: {
+          content: JSON.stringify(dto.card),
+        },
+      });
+
+      if (res.code !== 0) {
+        throw new Error(`Failed to update card message: ${res.msg}`);
+      }
+      return res.data;
+    } catch (error) {
+      this.logger.error("Error updating card message", error);
       throw error;
     }
   }
