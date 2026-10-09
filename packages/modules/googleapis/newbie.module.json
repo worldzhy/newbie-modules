@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@googleapis/drive": "latest",
-    "@nestjs/axios": "latest",
     "multer": "latest",
     "@googleapis/forms": "latest",
     "@googleapis/sheets": "latest"
