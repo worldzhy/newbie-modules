@@ -4,7 +4,7 @@ import { JwtAuthGuard } from "@modules/security/authentication/jwt/jwt.guard";
 import { UserRequest } from "@modules/security/security.interface";
 import { TaskSpaceService } from "./task-space.service";
 import { TaskService } from "./task.service";
-import { HOST_IDENTITY_SOURCE, TaskParticipantService } from "./task-participant.service";
+import { TaskParticipantService } from "./task-participant.service";
 import {
   CreateTaskRequestDto,
   CreateTaskResponseDto,
@@ -84,9 +84,8 @@ export class TaskSpaceController {
     @Req() req: UserRequest,
   ): Promise<CreateTaskResponseDto> {
     const space = await this.taskSpaceService.ensureSpaceForProject(projectId);
-    const creator = await this.taskParticipantService.ensureParticipant({
-      identitySource: HOST_IDENTITY_SOURCE,
-      externalId: req.user.userId,
+    const creator = await this.taskParticipantService.ensureHostParticipant({
+      userId: req.user.userId,
     });
 
     const result = await this.taskService.createTask({

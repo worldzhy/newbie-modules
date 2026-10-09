@@ -65,6 +65,29 @@ export class TaskParticipantService {
     }
   }
 
+  /**
+   * Resolve the participant for a host-authenticated actor (JWT), snapshotting
+   * the display name and avatar from the account User on first creation so
+   * task rows stay readable even if the account later changes. A missing User
+   * row degrades to a nameless participant instead of blocking the write.
+   *
+   * The account module is a declared moduleDependency; the cross-schema read
+   * follows the same pattern as organization membership.
+   */
+  async ensureHostParticipant(input: { userId: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: input.userId },
+      select: { name: true, uiAvatarsUrl: true },
+    });
+
+    return await this.ensureParticipant({
+      identitySource: HOST_IDENTITY_SOURCE,
+      externalId: input.userId,
+      ...(user?.name ? { name: user.name } : {}),
+      ...(user?.uiAvatarsUrl ? { avatarUrl: user.uiAvatarsUrl } : {}),
+    });
+  }
+
   async getParticipantByName(name: string) {
     const cleanName = name.replace(/^@/, "").trim();
     return await this.prisma.taskParticipant.findFirst({
