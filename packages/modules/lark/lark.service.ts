@@ -414,6 +414,44 @@ export class LarkService {
     }
   }
 
+  /**
+   * List the chats the bot is a member of (im.chat.list), paginating through
+   * all pages. Hosts use this to offer pickable chats when managing chat
+   * bindings, so a chat id is never hand-typed.
+   */
+  async listBotChats(): Promise<Array<{ chatId: string; name: string }>> {
+    const chats: Array<{ chatId: string; name: string }> = [];
+    let pageToken: string | undefined;
+    let hasMore = true;
+
+    try {
+      while (hasMore) {
+        const res = await this.client.im.chat.list({
+          params: {
+            page_size: 100,
+            ...(pageToken ? { page_token: pageToken } : {}),
+          },
+        });
+
+        if (res.code !== 0) {
+          throw new Error(`Failed to list bot chats: ${res.msg}`);
+        }
+
+        for (const item of res.data?.items ?? []) {
+          if (item.chat_id) {
+            chats.push({ chatId: item.chat_id, name: item.name ?? "" });
+          }
+        }
+        hasMore = res.data?.has_more ?? false;
+        pageToken = res.data?.page_token;
+      }
+      return chats;
+    } catch (error) {
+      this.logger.error("Error listing bot chats", error);
+      throw error;
+    }
+  }
+
   async addReaction(messageId: string, emojiType: string = "OK") {
     try {
       const res = await this.client.im.messageReaction.create({
