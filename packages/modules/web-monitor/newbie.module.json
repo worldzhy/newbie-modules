@@ -1,6 +1,7 @@
 {
   "key": "web-monitor",
   "layer": "domain",
+  "role": "observer",
   "module": {
     "file": "web-monitor.module",
     "className": "WebMonitorModule"

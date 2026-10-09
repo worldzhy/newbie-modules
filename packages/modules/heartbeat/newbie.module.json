@@ -1,6 +1,7 @@
 {
   "key": "heartbeat",
   "layer": "capability",
+  "role": "observer",
   "module": {
     "file": "heartbeat.module",
     "className": "HeartbeatModule"
