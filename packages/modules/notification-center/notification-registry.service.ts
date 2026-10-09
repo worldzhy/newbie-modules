@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { SEVERITIES } from "./notification-center.constants";
+import { SEVERITIES, type NotificationScope } from "./notification-center.constants";
 
 /**
  * Shape a business module passes when declaring a notification at startup.
@@ -19,8 +19,13 @@ export interface NotificationDeclaration {
   defaultSeverity: (typeof SEVERITIES)[number];
   /** Whether push is on for this notification by default. */
   defaultPushEnabled?: boolean;
-  /** Optional default message-bot channel group for this notification. */
-  defaultChannelGroupId?: string;
+  /**
+   * Delivery scope: "system" notifications are platform-wide (no owning
+   * project) and configured at the top level; "project" notifications are
+   * produced by a project and routed to that project's bound chats by the
+   * host. Defaults to "project".
+   */
+  scope?: NotificationScope;
 }
 
 export interface RegisteredNotification extends NotificationDeclaration {}
@@ -30,7 +35,7 @@ export interface RegisteredNotification extends NotificationDeclaration {}
  * code-side counterpart to the database NotificationSetting rows: it holds the
  * templates and defaults that cannot be safely edited at runtime. The database
  * row (see NotificationSettingService) owns the runtime-editable delivery
- * settings (defaultSeverity, pushEnabled, channelGroupId).
+ * settings (defaultSeverity, pushEnabled).
  *
  * Business code typically declares a notification by subclassing the abstract
  * Notification base class, which registers itself here on module init.

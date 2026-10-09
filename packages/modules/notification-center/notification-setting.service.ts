@@ -1,6 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException, OnApplicationBootstrap } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { DEFAULT_NOTIFICATION_PUSH_ENABLED, PG_UNIQUE_VIOLATION, SEVERITIES } from "./notification-center.constants";
+import {
+  DEFAULT_NOTIFICATION_PUSH_ENABLED,
+  DEFAULT_NOTIFICATION_SCOPE,
+  PG_UNIQUE_VIOLATION,
+  SEVERITIES,
+} from "./notification-center.constants";
 import { NotificationRegistryService } from "./notification-registry.service";
 
 export interface NotificationSettingListItem {
@@ -10,8 +15,7 @@ export interface NotificationSettingListItem {
   detailTemplate: string | null;
   defaultSeverity: string;
   pushEnabled: boolean;
-  channelGroupId: string | null;
-  channelIds: string[];
+  scope: string;
 }
 
 /**
@@ -39,8 +43,8 @@ export class NotificationSettingService implements OnApplicationBootstrap {
   /**
    * Persist default settings for every notification registered in memory. Only
    * rows that do not exist yet are created; existing rows (including their
-   * runtime-edited defaultSeverity / pushEnabled / channelGroupId) are left
-   * untouched so operator edits survive restarts.
+   * runtime-edited defaultSeverity / pushEnabled) are left untouched so
+   * operator edits survive restarts.
    */
   async reconcileDeclarations(): Promise<void> {
     for (const declared of this.registry.getAll()) {
@@ -57,7 +61,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
             detailTemplate: declared.detailTemplate ?? null,
             defaultSeverity: declared.defaultSeverity,
             pushEnabled: declared.defaultPushEnabled ?? DEFAULT_NOTIFICATION_PUSH_ENABLED,
-            channelGroupId: declared.defaultChannelGroupId ?? null,
+            scope: declared.scope ?? DEFAULT_NOTIFICATION_SCOPE,
           },
         });
       } catch (error: any) {
@@ -70,13 +74,6 @@ export class NotificationSettingService implements OnApplicationBootstrap {
 
   async listSettings(): Promise<NotificationSettingListItem[]> {
     const rows = await this.prisma.notificationSetting.findMany({ orderBy: { name: "asc" } });
-    const links = await this.prisma.notificationSettingChannel.findMany();
-    const channelIdsByNotification = new Map<string, string[]>();
-    for (const link of links) {
-      const list = channelIdsByNotification.get(link.notificationKey) ?? [];
-      list.push(link.channelId);
-      channelIdsByNotification.set(link.notificationKey, list);
-    }
     return rows.map((row) => ({
       key: row.key,
       name: row.name,
@@ -84,8 +81,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       detailTemplate: row.detailTemplate,
       defaultSeverity: row.defaultSeverity,
       pushEnabled: row.pushEnabled,
-      channelGroupId: row.channelGroupId,
-      channelIds: channelIdsByNotification.get(row.key) ?? [],
+      scope: row.scope,
     }));
   }
 
@@ -94,8 +90,6 @@ export class NotificationSettingService implements OnApplicationBootstrap {
     updates: {
       defaultSeverity?: string;
       pushEnabled?: boolean;
-      channelGroupId?: string | null;
-      channelIds?: string[];
     },
   ): Promise<NotificationSettingListItem> {
     const row = await this.prisma.notificationSetting.findUnique({ where: { key } });
@@ -109,57 +103,12 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       );
     }
 
-    let channelGroupId = row.channelGroupId;
-    if (updates.channelGroupId !== undefined) {
-      channelGroupId = updates.channelGroupId;
-      if (channelGroupId) {
-        const group = await this.prisma.messageBotChannelGroup.findUnique({ where: { id: channelGroupId } });
-        if (!group) {
-          throw new BadRequestException(`Message channel group not found: ${channelGroupId}`);
-        }
-      }
-    }
-
-    // Explicit channel selection is a full replace: validate every id exists,
-    // then swap the join rows in one transaction.
-    if (updates.channelIds !== undefined) {
-      const uniqueIds = [...new Set(updates.channelIds)];
-      if (uniqueIds.length > 0) {
-        const channels = await this.prisma.messageBotChannel.findMany({
-          where: { id: { in: uniqueIds } },
-          select: { id: true },
-        });
-        const existingIds = new Set(channels.map((channel) => channel.id));
-        const missing = uniqueIds.find((id) => !existingIds.has(id));
-        if (missing) {
-          throw new BadRequestException(`Message channel not found: ${missing}`);
-        }
-      }
-      await this.prisma.$transaction([
-        this.prisma.notificationSettingChannel.deleteMany({ where: { notificationKey: key } }),
-        ...(uniqueIds.length > 0
-          ? [
-              this.prisma.notificationSettingChannel.createMany({
-                data: uniqueIds.map((channelId) => ({ notificationKey: key, channelId })),
-                skipDuplicates: true,
-              }),
-            ]
-          : []),
-      ]);
-    }
-
     const updated = await this.prisma.notificationSetting.update({
       where: { key },
       data: {
         ...(updates.defaultSeverity !== undefined ? { defaultSeverity: updates.defaultSeverity } : {}),
         ...(updates.pushEnabled !== undefined ? { pushEnabled: updates.pushEnabled } : {}),
-        ...(updates.channelGroupId !== undefined ? { channelGroupId } : {}),
       },
-    });
-
-    const notificationChannels = await this.prisma.notificationSettingChannel.findMany({
-      where: { notificationKey: key },
-      select: { channelId: true },
     });
 
     return {
@@ -169,8 +118,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       detailTemplate: updated.detailTemplate,
       defaultSeverity: updated.defaultSeverity,
       pushEnabled: updated.pushEnabled,
-      channelGroupId: updated.channelGroupId,
-      channelIds: notificationChannels.map((link) => link.channelId),
+      scope: updated.scope,
     };
   }
 }

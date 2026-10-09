@@ -1,7 +1,7 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID } from "class-validator";
+import { IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
-import { SEVERITIES } from "./notification-center.constants";
+import { NOTIFICATION_SCOPES, SEVERITIES } from "./notification-center.constants";
 
 // ---------------------------------------------------------------------------
 // Notification record DTOs
@@ -161,15 +161,12 @@ export class NotificationSettingDto {
   @ApiProperty()
   pushEnabled: boolean;
 
-  @ApiProperty({ type: String, required: false, nullable: true })
-  channelGroupId: string | null;
-
   @ApiProperty({
-    type: [String],
+    enum: NOTIFICATION_SCOPES,
     description:
-      "Explicit push channels for this notification. When non-empty, delivery goes to these channels directly, bypassing the notification group and the center default group.",
+      "Delivery scope: system notifications push through the host-configured system chats; project notifications are routed to the owning project's bound chats by the host.",
   })
-  channelIds: string[];
+  scope: string;
 }
 
 export class UpdateNotificationSettingDto {
@@ -183,21 +180,6 @@ export class UpdateNotificationSettingDto {
   @IsOptional()
   @IsBoolean()
   pushEnabled?: boolean;
-
-  @ApiProperty({ required: false, nullable: true, type: String })
-  @IsOptional()
-  @IsString()
-  channelGroupId?: string | null;
-
-  @ApiProperty({
-    type: [String],
-    required: false,
-    description: "Full-replace list of explicit channel ids; pass an empty array to clear",
-  })
-  @IsOptional()
-  @IsArray()
-  @IsUUID(4, { each: true })
-  channelIds?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -208,22 +190,11 @@ export class NotificationCenterSettingDto {
   @ApiProperty()
   inAppEnabled: boolean;
 
-  @ApiProperty({ description: "Master switch for Lark/Slack push via message-bot" })
+  @ApiProperty({ description: "Master switch for chat push through the host-provided push adapter" })
   pushEnabled: boolean;
 
   @ApiProperty({ enum: SEVERITIES })
   minimumSeverity: string;
-
-  @ApiProperty({
-    type: String,
-    required: false,
-    nullable: true,
-    description: "Default message-bot channel group for notifications without their own",
-  })
-  channelGroupId: string | null;
-
-  @ApiProperty({ required: false, type: Number, nullable: true })
-  availableChannelCount: number | null;
 }
 
 export class UpdateNotificationCenterSettingDto {
@@ -242,17 +213,12 @@ export class UpdateNotificationCenterSettingDto {
   @IsString()
   @IsIn(SEVERITIES as unknown as string[])
   minimumSeverity?: string;
-
-  @ApiProperty({ required: false, nullable: true, type: String })
-  @IsOptional()
-  @IsString()
-  channelGroupId?: string | null;
 }
 
 export class TestPushResultDto {
-  @ApiProperty({ description: "Number of channels that accepted the test message" })
+  @ApiProperty({ description: "Number of system chats that accepted the test message" })
   succeeded: number;
 
-  @ApiProperty({ description: "Number of channels that rejected the test message" })
+  @ApiProperty({ description: "Number of system chats that rejected the test message" })
   failed: number;
 }

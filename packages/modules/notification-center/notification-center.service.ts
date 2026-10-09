@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
@@ -6,6 +6,7 @@ import {
   DEFAULT_IN_APP_ENABLED,
   DEFAULT_MINIMUM_SEVERITY,
   DEFAULT_PUSH_ENABLED,
+  NOTIFICATION_PUSH_PORT,
   PG_UNIQUE_VIOLATION,
   SEVERITIES,
   SEVERITY_LEVEL,
@@ -21,7 +22,20 @@ import {
   UpdateNotificationCenterSettingDto,
 } from "./notification-center.dto";
 import { NotificationRegistryService } from "./notification-registry.service";
-import { MessagePushService } from "./services/message-push.service";
+
+/**
+ * Host-provided push adapter, injected under the NOTIFICATION_PUSH_PORT token.
+ * The notification-center module owns in-app delivery and per-notification
+ * settings; the actual chat push is supplied by the host application, which
+ * knows its chat platform and its system-chat bindings.
+ */
+export interface NotificationPushPort {
+  /**
+   * Push a system-scope text message to the host-configured system chats.
+   * Returns per-chat delivery counts.
+   */
+  pushSystemText(text: string): Promise<{ succeeded: number; failed: number }>;
+}
 
 export interface NotifyInput {
   /** Key of a registered notification. */
@@ -72,8 +86,10 @@ function renderTemplate(template: string, context?: Record<string, unknown>): st
 export class NotificationCenterService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly messagePush: MessagePushService,
     private readonly registry: NotificationRegistryService,
+    @Optional()
+    @Inject(NOTIFICATION_PUSH_PORT)
+    private readonly pushPort?: NotificationPushPort,
   ) {}
 
   // --- Delivery ------------------------------------------------------------
@@ -82,8 +98,9 @@ export class NotificationCenterService {
    * Produce one notification record from a registered notification. The
    * notification's templates are rendered with `context`, severity is resolved
    * from the override or the notification default, and delivery respects the
-   * center minimum-severity floor. Push routing is driven by the notification
-   * row's runtime settings, falling back to the center default channel group.
+   * center minimum-severity floor. System-scope notifications are pushed
+   * through the host-provided push port; project-scope push routing is owned
+   * by the host (per-project chat bindings) and does not pass through here.
    */
   async notify(input: NotifyInput): Promise<NotifyResult> {
     const declared = this.registry.get(input.notificationKey);
@@ -143,77 +160,44 @@ export class NotificationCenterService {
     }
 
     if (!deduplicated) {
-      // Explicit per-notification channels take priority over the notification
-      // group, which in turn takes priority over the center default group.
-      const notificationChannels = await this.prisma.notificationSettingChannel.findMany({
-        where: { notificationKey: input.notificationKey },
-        select: { channelId: true },
-      });
-      const explicitChannelIds = notificationChannels.map((link) => link.channelId);
-      await this.dispatchPush(explicitChannelIds, setting.channelGroupId, setting.pushEnabled, center, title, detail);
+      await this.dispatchPush(setting.scope, setting.pushEnabled, center, title, detail);
     }
 
     return { id: recordId, deduplicated, dropped: false };
   }
 
   private async dispatchPush(
-    explicitChannelIds: string[],
-    notificationChannelGroupId: string | null,
+    scope: string,
     notificationPushEnabled: boolean,
-    center: { pushEnabled: boolean; channelGroupId: string | null },
+    center: { pushEnabled: boolean },
     title: string,
     detail: string | null,
   ): Promise<void> {
-    if (!notificationPushEnabled || !center.pushEnabled) {
+    if (!notificationPushEnabled || !center.pushEnabled || !this.pushPort) {
+      return;
+    }
+    // Only system-scope notifications push through the center; project-scope
+    // deliveries are routed to the owning project's bound chats by the host.
+    if (scope !== "system") {
       return;
     }
     const text = detail ? `${title}\n${detail}` : title;
-    // 1) Explicit per-notification channels win when at least one is selected.
-    if (explicitChannelIds.length > 0) {
-      await this.messagePush.dispatchToChannelIds(explicitChannelIds, text);
-      return;
-    }
-    // 2) Otherwise fall back to the notification group, then the center group.
-    const channelGroupId = notificationChannelGroupId ?? center.channelGroupId;
-    if (!channelGroupId) {
-      return;
-    }
-    await this.messagePush.dispatchToGroup(channelGroupId, text);
+    await this.pushPort.pushSystemText(text);
   }
 
   // --- Center settings -----------------------------------------------------
 
-  async getCenterSettings(): Promise<NotificationCenterSettingDto & { availableChannelCount: number | null }> {
+  async getCenterSettings(): Promise<NotificationCenterSettingDto> {
     const setting = await this.ensureCenterSetting();
-    const availableChannelCount = setting.channelGroupId
-      ? await this.messagePush.countChannels(setting.channelGroupId)
-      : null;
     return {
       inAppEnabled: setting.inAppEnabled,
       pushEnabled: setting.pushEnabled,
       minimumSeverity: setting.minimumSeverity,
-      channelGroupId: setting.channelGroupId,
-      availableChannelCount,
     };
   }
 
   async updateCenterSettings(body: UpdateNotificationCenterSettingDto): Promise<NotificationCenterSettingDto> {
     const setting = await this.ensureCenterSetting();
-
-    let channelGroupId = setting.channelGroupId;
-    if (body.channelGroupId !== undefined) {
-      channelGroupId = body.channelGroupId;
-      if (channelGroupId) {
-        const group = await this.prisma.messageBotChannelGroup.findUnique({ where: { id: channelGroupId } });
-        if (!group) {
-          throw new BadRequestException(`Message channel group not found: ${channelGroupId}`);
-        }
-      }
-    }
-
-    if (body.pushEnabled && !channelGroupId) {
-      throw new BadRequestException("A message channel group is required before push can be enabled.");
-    }
 
     const updated = await this.prisma.notificationCenterSetting.update({
       where: { id: setting.id },
@@ -221,7 +205,6 @@ export class NotificationCenterService {
         ...(body.inAppEnabled !== undefined ? { inAppEnabled: body.inAppEnabled } : {}),
         ...(body.pushEnabled !== undefined ? { pushEnabled: body.pushEnabled } : {}),
         ...(body.minimumSeverity !== undefined ? { minimumSeverity: body.minimumSeverity } : {}),
-        ...(body.channelGroupId !== undefined ? { channelGroupId } : {}),
       },
     });
 
@@ -229,22 +212,18 @@ export class NotificationCenterService {
       inAppEnabled: updated.inAppEnabled,
       pushEnabled: updated.pushEnabled,
       minimumSeverity: updated.minimumSeverity,
-      channelGroupId: updated.channelGroupId,
-      availableChannelCount: updated.channelGroupId
-        ? await this.messagePush.countChannels(updated.channelGroupId)
-        : null,
     };
   }
 
   async testPush(): Promise<TestPushResultDto> {
     const setting = await this.ensureCenterSetting();
-    if (!setting.pushEnabled || !setting.channelGroupId) {
-      throw new BadRequestException("Push is disabled or no message channel group is configured.");
+    if (!setting.pushEnabled) {
+      throw new BadRequestException("Push is disabled.");
     }
-    return this.messagePush.dispatchToGroup(
-      setting.channelGroupId,
-      "Notification center test message: the push channel is working.",
-    );
+    if (!this.pushPort) {
+      throw new BadRequestException("No push adapter is configured by the host application.");
+    }
+    return this.pushPort.pushSystemText("Notification center test message: the push channel is working.");
   }
 
   private async ensureCenterSetting() {

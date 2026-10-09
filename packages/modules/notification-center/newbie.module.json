@@ -6,7 +6,6 @@
     "className": "NotificationCenterModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["message-bot"],
   "config-service": {},
   "env": {},
   "dependencies": {}

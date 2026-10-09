@@ -112,7 +112,7 @@ export class NotificationCenterController {
   }
 
   @Post("notification-center-setting/test-push")
-  @ApiOperation({ summary: "Send a test message to the configured push channel group" })
+  @ApiOperation({ summary: "Send a test message to the host-configured system chats" })
   @ApiResponse({ status: 200, type: TestPushResultDto })
   testPush(): Promise<TestPushResultDto> {
     return this.notificationCenter.testPush();

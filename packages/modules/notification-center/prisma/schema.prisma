@@ -2,7 +2,6 @@
 // !!            [Module] Notification Center models         //
 // !! ------------------------------------------------------------ //
 // * NotificationSetting                                          //
-// * NotificationSettingChannel                                   //
 // * NotificationRecord                                           //
 // * NotificationReceipt                                          //
 // * NotificationCenterSetting                                    //
@@ -12,7 +11,7 @@
 // at startup (a Notification subclass registering itself through
 // NotificationRegistryService) and NotificationSettingService persists one
 // row per key. The database row wins for runtime-editable fields
-// (defaultSeverity, pushEnabled, channelGroupId): declarations only create
+// (defaultSeverity, pushEnabled): declarations only create
 // missing rows, never override operator edits.
 model NotificationSetting {
   key            String    @id @db.VarChar(100)
@@ -22,33 +21,17 @@ model NotificationSetting {
   // Optional multi-line detail template.
   detailTemplate String?   @db.Text
   defaultSeverity String   @db.VarChar(10)
-  // Per-notification push master switch; falls back to the center setting
-  // when the row does not specify a channel group.
+  // Per-notification push master switch; the center master switch must also
+  // be on for a push to fire.
   pushEnabled    Boolean   @default(true)
-  // Optional message-bot channel group override for this notification.
-  channelGroupId String?   @db.Uuid
+  // Delivery scope: "system" notifications are platform-wide and pushed
+  // through the host-provided push port; "project" notifications are routed
+  // to the owning project's bound chats by the host.
+  scope          String    @default("project") @db.VarChar(10)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@schema("module/notification-center")
-}
-
-// Explicit per-notification channel selection (finer granularity than a
-// channel group). When a notification has at least one row here, push
-// delivery goes to these channels directly, bypassing both the notification
-// group and the center default.
-// Scalar ids only: no cross-schema relation to message-bot.
-model NotificationSettingChannel {
-  id              String @id @default(uuid()) @db.Uuid
-  notificationKey String @db.VarChar(100)
-  // Scalar id of a message-bot channel.
-  channelId       String @db.Uuid
-
-  createdAt DateTime @default(now())
-
-  @@unique([notificationKey, channelId])
-  @@index([notificationKey])
   @@schema("module/notification-center")
 }
 
@@ -108,15 +91,12 @@ model NotificationCenterSetting {
   id      Int @id
 
   inAppEnabled Boolean @default(true)
-  // Master switch for Lark/Slack push through the message-bot module. A
+  // Master switch for chat push through the host-provided push port. A
   // notification push only fires when both this switch and the notification's
   // own pushEnabled are on.
   pushEnabled Boolean @default(false)
   // Notifications below this severity are dropped before delivery.
   minimumSeverity String @default("high") @db.VarChar(10)
-  // Default message-bot channel group for notifications that do not declare
-  // their own.
-  channelGroupId String? @db.Uuid
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
