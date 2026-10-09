@@ -1,7 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { HttpService } from "@nestjs/axios";
-import { firstValueFrom } from "rxjs";
+import * as Lark from "@larksuiteoapi/node-sdk";
 import { GetChatHistoryDto, SendTextDto, SendCardDto } from "./lark.dto";
 import { decryptLarkEvent } from "./lark-event.util";
 import { parseMessage, resolveSenderOpenId } from "./lark-message-parser";
@@ -20,10 +19,9 @@ type MessageHandler = (
   parentId?: string,
   messageId?: string,
 ) => Promise<void>;
-type CardActionHandler = (
-  payload: LarkCardAction,
-  meta: LarkCardActionMeta,
-) => Promise<LarkCardActionResult | void>;
+type CardActionHandler = (payload: LarkCardAction, meta: LarkCardActionMeta) => Promise<LarkCardActionResult | void>;
+
+type ReceiveIdType = "open_id" | "user_id" | "union_id" | "email" | "chat_id";
 
 interface MessageDispatchInput {
   chatId: string;
@@ -37,19 +35,18 @@ interface MessageDispatchInput {
 }
 
 /**
- * Lark/Feishu integration service: REST API calls + webhook dispatch.
+ * Lark/Feishu integration service: OpenAPI calls + webhook dispatch.
  *
- * The webhook path and the WebSocket path both funnel through `dispatchMessage`
- * so message parsing and bot-mention detection stay in one place. Token
- * acquisition is concurrency-safe; webhook event ids are deduplicated to
- * survive Lark's retry redelivery.
+ * REST calls go through the official SDK client, which owns tenant access
+ * token acquisition, caching and refresh. The webhook path and the WebSocket
+ * path both funnel through `dispatchMessage` so message parsing and
+ * bot-mention detection stay in one place. Webhook event ids are deduplicated
+ * to survive Lark's retry redelivery.
  */
 @Injectable()
 export class LarkService {
   private readonly logger = new Logger(LarkService.name);
-  private tenantAccessToken: string | null = null;
-  private tokenExpiresAt: number = 0;
-  private tokenPromise?: Promise<string>;
+  private clientInstance?: Lark.Client;
 
   private messageHandler?: MessageHandler;
   private cardActionHandler?: CardActionHandler;
@@ -58,12 +55,29 @@ export class LarkService {
   private readonly processedEventIds = new Map<string, number>();
   private readonly EVENT_ID_TTL_MS = 5 * 60_000;
 
-  constructor(
-    private readonly configService: ConfigService,
-    private readonly httpService: HttpService,
-  ) {
-    this.botOpenId =
-      this.configService.get<string>("modules.lark.botOpenId");
+  constructor(private readonly configService: ConfigService) {
+    this.botOpenId = this.configService.get<string>("modules.lark.botOpenId");
+  }
+
+  /**
+   * Lazily constructed SDK client so a missing Lark config only fails the
+   * first API call, not application bootstrap (same contract as the previous
+   * hand-written token acquisition).
+   */
+  private get client(): Lark.Client {
+    if (!this.clientInstance) {
+      const appId = this.configService.get<string>("modules.lark.appId");
+      const appSecret = this.configService.get<string>("modules.lark.appSecret");
+      if (!appId || !appSecret) {
+        throw new Error("Lark App ID or Secret is not configured");
+      }
+      this.clientInstance = new Lark.Client({
+        appId,
+        appSecret,
+        loggerLevel: Lark.LoggerLevel.warn,
+      });
+    }
+    return this.clientInstance;
   }
 
   /**
@@ -86,81 +100,23 @@ export class LarkService {
     this.cardActionHandler = handler;
   }
 
-  /**
-   * Concurrency-safe tenant access token acquisition. Concurrent callers share
-   * the same in-flight request instead of racing to fetch duplicate tokens.
-   */
-  private async getTenantAccessToken(): Promise<string> {
-    if (this.tenantAccessToken && Date.now() < this.tokenExpiresAt) {
-      return this.tenantAccessToken;
-    }
-    if (this.tokenPromise) {
-      return this.tokenPromise;
-    }
-    this.tokenPromise = this.fetchTenantAccessToken().finally(() => {
-      this.tokenPromise = undefined;
-    });
-    return this.tokenPromise;
-  }
-
-  private async fetchTenantAccessToken(): Promise<string> {
-    const appId =
-      this.configService.get<string>("modules.lark.appId");
-    const appSecret =
-      this.configService.get<string>("modules.lark.appSecret");
-
-    if (!appId || !appSecret) {
-      throw new Error("Lark App ID or Secret is not configured");
-    }
-
-    try {
-      const response = await firstValueFrom(
-        this.httpService.post("https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal", {
-          app_id: appId,
-          app_secret: appSecret,
-        }),
-      );
-
-      const { code, msg, tenant_access_token, expire } = response.data;
-      if (code !== 0) {
-        throw new Error(`Failed to get tenant access token: ${msg}`);
-      }
-
-      this.tenantAccessToken = tenant_access_token;
-      this.tokenExpiresAt = Date.now() + (expire - 300) * 1000;
-      return this.tenantAccessToken!;
-    } catch (error) {
-      this.logger.error("Error fetching tenant access token", error);
-      throw error;
-    }
-  }
-
   async getChatHistory(dto: GetChatHistoryDto) {
-    const token = await this.getTenantAccessToken();
-
-    const params: Record<string, unknown> = {
-      container_id_type: "chat",
-      container_id: dto.chatId,
-    };
-
-    if (dto.startTime) params.start_time = dto.startTime;
-    if (dto.endTime) params.end_time = dto.endTime;
-    if (dto.pageToken) params.page_token = dto.pageToken;
-    if (dto.pageSize) params.page_size = dto.pageSize;
-
     try {
-      const response = await firstValueFrom(
-        this.httpService.get("https://open.feishu.cn/open-apis/im/v1/messages", {
-          headers: { Authorization: `Bearer ${token}` },
-          params,
-        }),
-      );
+      const res = await this.client.im.message.list({
+        params: {
+          container_id_type: "chat",
+          container_id: dto.chatId,
+          ...(dto.startTime ? { start_time: dto.startTime } : {}),
+          ...(dto.endTime ? { end_time: dto.endTime } : {}),
+          ...(dto.pageToken ? { page_token: dto.pageToken } : {}),
+          ...(dto.pageSize ? { page_size: dto.pageSize } : {}),
+        },
+      });
 
-      const { code, msg, data } = response.data;
-      if (code !== 0) {
-        throw new Error(`Failed to get chat history: ${msg}`);
+      if (res.code !== 0) {
+        throw new Error(`Failed to get chat history: ${res.msg}`);
       }
-      return data;
+      return res.data;
     } catch (error) {
       this.logger.error("Error fetching chat history", error);
       throw error;
@@ -181,8 +137,7 @@ export class LarkService {
     // 2. Encrypted event — decrypt and re-dispatch (the decrypted body has no
     //    `encrypt` field, so this cannot loop).
     if (body.encrypt) {
-      const encryptKey =
-        this.configService.get<string>("modules.lark.encryptKey");
+      const encryptKey = this.configService.get<string>("modules.lark.encryptKey");
       if (!encryptKey) {
         this.logger.error("Received an encrypted Lark event but LARK_ENCRYPT_KEY is not configured; event dropped.");
         return { code: 0, msg: "success" };
@@ -293,13 +248,7 @@ export class LarkService {
     this.logger.log(`Message content (cleaned): ${parsed.text}`);
 
     if (this.messageHandler) {
-      await this.messageHandler(
-        input.chatId,
-        parsed.text,
-        input.senderOpenId,
-        input.parentMessageId,
-        input.messageId,
-      );
+      await this.messageHandler(input.chatId, parsed.text, input.senderOpenId, input.parentMessageId, input.messageId);
     }
   }
 
@@ -324,28 +273,22 @@ export class LarkService {
   }
 
   async sendText(dto: SendTextDto) {
-    const token = await this.getTenantAccessToken();
     try {
-      const response = await firstValueFrom(
-        this.httpService.post(
-          "https://open.feishu.cn/open-apis/im/v1/messages",
-          {
-            receive_id: dto.receiveId,
-            msg_type: "text",
-            content: JSON.stringify({ text: dto.text }),
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { receive_id_type: dto.receiveIdType || "chat_id" },
-          },
-        ),
-      );
+      const res = await this.client.im.message.create({
+        params: {
+          receive_id_type: (dto.receiveIdType || "chat_id") as ReceiveIdType,
+        },
+        data: {
+          receive_id: dto.receiveId,
+          msg_type: "text",
+          content: JSON.stringify({ text: dto.text }),
+        },
+      });
 
-      const { code, msg, data } = response.data;
-      if (code !== 0) {
-        throw new Error(`Failed to send text message: ${msg}`);
+      if (res.code !== 0) {
+        throw new Error(`Failed to send text message: ${res.msg}`);
       }
-      return data;
+      return res.data;
     } catch (error) {
       this.logger.error("Error sending text message", error);
       throw error;
@@ -353,28 +296,22 @@ export class LarkService {
   }
 
   async sendCard(dto: SendCardDto) {
-    const token = await this.getTenantAccessToken();
     try {
-      const response = await firstValueFrom(
-        this.httpService.post(
-          "https://open.feishu.cn/open-apis/im/v1/messages",
-          {
-            receive_id: dto.receiveId,
-            msg_type: "interactive",
-            content: JSON.stringify(dto.card),
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            params: { receive_id_type: dto.receiveIdType || "chat_id" },
-          },
-        ),
-      );
+      const res = await this.client.im.message.create({
+        params: {
+          receive_id_type: (dto.receiveIdType || "chat_id") as ReceiveIdType,
+        },
+        data: {
+          receive_id: dto.receiveId,
+          msg_type: "interactive",
+          content: JSON.stringify(dto.card),
+        },
+      });
 
-      const { code, msg, data } = response.data;
-      if (code !== 0) {
-        throw new Error(`Failed to send card message: ${msg}`);
+      if (res.code !== 0) {
+        throw new Error(`Failed to send card message: ${res.msg}`);
       }
-      return data;
+      return res.data;
     } catch (error) {
       this.logger.error("Error sending card message", error);
       throw error;
@@ -382,19 +319,15 @@ export class LarkService {
   }
 
   async getMessageContent(messageId: string) {
-    const token = await this.getTenantAccessToken();
     try {
-      const response = await firstValueFrom(
-        this.httpService.get(`https://open.feishu.cn/open-apis/im/v1/messages/${messageId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      );
+      const res = await this.client.im.message.get({
+        path: { message_id: messageId },
+      });
 
-      const { code, msg, data } = response.data;
-      if (code !== 0) {
-        throw new Error(`Failed to get message content: ${msg}`);
+      if (res.code !== 0) {
+        throw new Error(`Failed to get message content: ${res.msg}`);
       }
-      return data.items[0];
+      return res.data?.items?.[0];
     } catch (error) {
       this.logger.error(`Error fetching message content for ID: ${messageId}`, error);
       throw error;
@@ -402,32 +335,28 @@ export class LarkService {
   }
 
   async getChatMembers(chatId: string) {
-    const token = await this.getTenantAccessToken();
     const members: unknown[] = [];
-    let pageToken = "";
+    let pageToken: string | undefined;
     let hasMore = true;
 
     try {
       while (hasMore) {
-        const response = await firstValueFrom(
-          this.httpService.get(`https://open.feishu.cn/open-apis/im/v1/chats/${chatId}/members`, {
-            headers: { Authorization: `Bearer ${token}` },
-            params: {
-              member_id_type: "open_id",
-              page_size: 100,
-              ...(pageToken ? { page_token: pageToken } : {}),
-            },
-          }),
-        );
+        const res = await this.client.im.chatMembers.get({
+          path: { chat_id: chatId },
+          params: {
+            member_id_type: "open_id",
+            page_size: 100,
+            ...(pageToken ? { page_token: pageToken } : {}),
+          },
+        });
 
-        const { code, msg, data } = response.data;
-        if (code !== 0) {
-          throw new Error(`Failed to get chat members: ${msg}`);
+        if (res.code !== 0) {
+          throw new Error(`Failed to get chat members: ${res.msg}`);
         }
 
-        members.push(...data.items);
-        hasMore = data.has_more;
-        pageToken = data.page_token;
+        members.push(...(res.data?.items ?? []));
+        hasMore = res.data?.has_more ?? false;
+        pageToken = res.data?.page_token;
       }
       return members;
     } catch (error) {
@@ -437,26 +366,16 @@ export class LarkService {
   }
 
   async addReaction(messageId: string, emojiType: string = "OK") {
-    const token = await this.getTenantAccessToken();
     try {
-      const response = await firstValueFrom(
-        this.httpService.post(
-          `https://open.feishu.cn/open-apis/im/v1/messages/${messageId}/reactions`,
-          {
-            reaction_type: { emoji_type: emojiType },
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json; charset=utf-8",
-            },
-          },
-        ),
-      );
+      const res = await this.client.im.messageReaction.create({
+        path: { message_id: messageId },
+        data: {
+          reaction_type: { emoji_type: emojiType },
+        },
+      });
 
-      const { code, msg } = response.data;
-      if (code !== 0) {
-        this.logger.warn(`Failed to add reaction to message ${messageId}: ${msg}`);
+      if (res.code !== 0) {
+        this.logger.warn(`Failed to add reaction to message ${messageId}: ${res.msg}`);
       }
     } catch (error) {
       this.logger.warn(`Error adding reaction to message ${messageId}: ${(error as Error)?.message}`);
