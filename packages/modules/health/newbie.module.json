@@ -1,7 +1,7 @@
 {
   "key": "health",
   "layer": "capability",
-  "role": "observer",
+  "role": "collector",
   "module": {
     "file": "health.module",
     "className": "HealthModule"

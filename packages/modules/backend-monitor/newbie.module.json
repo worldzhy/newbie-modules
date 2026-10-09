@@ -1,7 +1,7 @@
 {
   "key": "backend-monitor",
   "layer": "capability",
-  "role": "observer",
+  "role": "collector",
   "module": {
     "file": "backend-monitor.module",
     "className": "BackendMonitorModule"

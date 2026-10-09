@@ -1,6 +1,6 @@
 {
   "key": "module-hub",
-  "role": "observer",
+  "role": "collector",
   "module": {
     "file": "module-hub.module",
     "className": "ModuleHubModule"
