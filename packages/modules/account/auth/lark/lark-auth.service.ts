@@ -1,7 +1,6 @@
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { HttpService } from "@nestjs/axios";
-import { firstValueFrom } from "rxjs";
+import * as Lark from "@larksuiteoapi/node-sdk";
 import { Response } from "express";
 import { UserStatus } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -13,8 +12,6 @@ import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
 
 const FEISHU_AUTHORIZE_URL = "https://accounts.feishu.cn/open-apis/authen/v1/authorize";
-const FEISHU_TOKEN_URL = "https://open.feishu.cn/open-apis/authen/v2/oauth/token";
-const FEISHU_USER_INFO_URL = "https://open.feishu.cn/open-apis/authen/v1/user_info";
 
 interface LarkUserInfo {
   openId: string;
@@ -24,32 +21,16 @@ interface LarkUserInfo {
   email?: string;
 }
 
-interface LarkTokenResponse {
-  code: number;
-  msg: string;
-  access_token: string;
-  expires_in: number;
-  refresh_token: string;
-}
-
-interface LarkUserInfoResponse {
-  code: number;
-  msg: string;
-  data: {
-    name?: string;
-    avatar_url?: string;
-    open_id: string;
-    union_id?: string;
-    email?: string;
-    enterprise_email?: string;
-  };
-}
-
 /**
  * Feishu/Lark OAuth login service.
  *
- * Implements the web authorization-code flow with hand-written HTTP (no
- * Passport). The same LARK_APP_ID/SECRET that the lark foundation module uses
+ * Uses the official SDK client for the authen endpoints: the authorization
+ * code is exchanged via oidcAccessToken.create (the SDK auto-injects a
+ * tenant_access_token, which the v1 endpoint accepts) and the profile is
+ * fetched via authen.v1.userInfo.get with the user_access_token passed
+ * through withUserAccessToken.
+ *
+ * The same LARK_APP_ID/SECRET that the lark foundation module uses
  * is reused so that an app-scoped open_id from a group webhook resolves to the
  * same user account created here.
  *
@@ -61,10 +42,10 @@ interface LarkUserInfoResponse {
 @Injectable()
 export class LarkAuthService {
   private readonly logger = new Logger(LarkAuthService.name);
+  private clientInstance?: Lark.Client;
 
   constructor(
     private readonly config: ConfigService,
-    private readonly httpService: HttpService,
     private readonly prisma: PrismaService,
     private readonly sessionService: SessionService,
     private readonly tokenService: TokenService,
@@ -83,6 +64,17 @@ export class LarkAuthService {
 
   private get callbackURL(): string {
     return this.config.getOrThrow<string>("modules.account.larkAuth.callbackURL");
+  }
+
+  private get client(): Lark.Client {
+    if (!this.clientInstance) {
+      this.clientInstance = new Lark.Client({
+        appId: this.appId,
+        appSecret: this.appSecret,
+        loggerLevel: Lark.LoggerLevel.warn,
+      });
+    }
+    return this.clientInstance;
   }
 
   /**
@@ -108,35 +100,30 @@ export class LarkAuthService {
    */
   async exchangeCodeForUserInfo(code: string): Promise<LarkUserInfo | null> {
     try {
-      const tokenRes = await firstValueFrom(
-        this.httpService.post<LarkTokenResponse>(FEISHU_TOKEN_URL, {
-          grant_type: "authorization_code",
-          client_id: this.appId,
-          client_secret: this.appSecret,
-          code,
-          redirect_uri: this.callbackURL,
-        }),
-      );
+      const tokenRes = await this.client.authen.v1.oidcAccessToken.create({
+        data: { grant_type: "authorization_code", code },
+      });
 
-      if (tokenRes.data.code !== 0) {
-        this.logger.error(`Lark token exchange failed: ${tokenRes.data.msg}`);
+      if (tokenRes.code !== 0 || !tokenRes.data) {
+        this.logger.error(`Lark token exchange failed: ${tokenRes.msg}`);
         return null;
       }
 
-      const userAccessToken = tokenRes.data.access_token;
-
-      const userRes = await firstValueFrom(
-        this.httpService.get<LarkUserInfoResponse>(FEISHU_USER_INFO_URL, {
-          headers: { Authorization: `Bearer ${userAccessToken}` },
-        }),
+      const userRes = await this.client.authen.v1.userInfo.get(
+        {},
+        Lark.withUserAccessToken(tokenRes.data.access_token),
       );
 
-      if (userRes.data.code !== 0) {
-        this.logger.error(`Lark user_info failed: ${userRes.data.msg}`);
+      if (userRes.code !== 0 || !userRes.data) {
+        this.logger.error(`Lark user_info failed: ${userRes.msg}`);
         return null;
       }
 
-      const data = userRes.data.data;
+      const data = userRes.data;
+      if (!data.open_id) {
+        this.logger.error("Lark user_info returned no open_id");
+        return null;
+      }
       return {
         openId: data.open_id,
         unionId: data.union_id,

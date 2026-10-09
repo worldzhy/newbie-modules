@@ -49,6 +49,7 @@
     "LARK_AUTH_CALLBACK_URL": ""
   },
   "dependencies": {
+    "@larksuiteoapi/node-sdk": "^1.59.0",
     "@nestjs/axios": "latest",
     "@nestjs/passport": "latest",
     "geolite2-redist": "latest",
