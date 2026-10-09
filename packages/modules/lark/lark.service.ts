@@ -155,11 +155,10 @@ export class LarkService {
 
     // 3. Card action (button click on an interactive card). Card actions do
     //    not carry header.event_type; they have `action` at the root.
+    //    No dedup here: card callbacks carry only the card's open_message_id
+    //    (identical across repeat clicks), so dedup would swallow legitimate
+    //    repeat clicks that must reach the handler for the not-found toast.
     if (body.action && body.action.value) {
-      if (this.isDuplicateEvent(body.open_message_id)) {
-        this.logger.debug(`Duplicate card action ignored: ${body.open_message_id}`);
-        return { code: 0, msg: "success" };
-      }
       this.logger.log("Received card action trigger");
       if (this.cardActionHandler) {
         try {
@@ -250,6 +249,33 @@ export class LarkService {
     if (this.messageHandler) {
       await this.messageHandler(input.chatId, parsed.text, input.senderOpenId, input.parentMessageId, input.messageId);
     }
+  }
+
+  /**
+   * Card action dispatch for the WebSocket long-connection path. The SDK
+   * normalizes the payload differently than the webhook envelope, so this
+   * adapter bridges the gap and funnels into the same registered handler.
+   */
+  async dispatchCardAction(input: {
+    action: LarkCardAction;
+    operatorOpenId?: string;
+    messageId?: string;
+  }): Promise<LarkCardActionResult | undefined> {
+    // The WebSocket client base64-encodes a handler's return value into the
+    // response frame, which is how Lark delivers the toast in
+    // long-connection mode — so the result must propagate.
+    if (this.cardActionHandler) {
+      try {
+        const result = await this.cardActionHandler(input.action, {
+          openId: input.operatorOpenId,
+          openMessageId: input.messageId,
+        });
+        return result ?? undefined;
+      } catch (error) {
+        this.logger.error("Error processing card action", error);
+      }
+    }
+    return undefined;
   }
 
   private isDuplicateEvent(eventId?: string): boolean {

@@ -1,7 +1,7 @@
 /**
  * Typed shapes for Lark/Feishu webhook events, card actions, and message
  * payloads. These replace the `any` types that previously flowed through
- * LarkService and LarkWsService, giving downstream consumers (notably the
+ * LarkService and LarkWebSocketService, giving downstream consumers (notably the
  * Copilot Lark transport) compile-time safety on webhook/card-action data.
  *
  * Reference: https://open.feishu.cn/document/server-docs/im-v1/message/events
@@ -21,7 +21,7 @@ export interface LarkMention {
   };
 }
 
-/** Sender identity block embedded in every webhook/WS message event. */
+/** Sender identity block embedded in every webhook/WebSocket message event. */
 export interface LarkSender {
   sender_id: {
     open_id?: string;
@@ -43,7 +43,7 @@ export interface LarkMessage {
   content: string;
   parent_id?: string;
   mentions?: LarkMention[];
-  /** Fallback for SDK WS payloads where the field is named differently. */
+  /** Fallback for SDK WebSocket payloads where the field is named differently. */
   sender?: LarkSender;
 }
 
