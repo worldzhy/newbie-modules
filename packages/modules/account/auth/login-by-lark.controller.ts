@@ -78,6 +78,7 @@ export class LoginByLarkController {
       openId: userInfo.openId,
       unionId: userInfo.unionId,
       email: userInfo.email,
+      phone: userInfo.phone,
       displayName: userInfo.name,
       avatarUrl: userInfo.avatarUrl,
       ipAddress,

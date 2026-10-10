@@ -19,6 +19,7 @@ interface LarkUserInfo {
   name?: string;
   avatarUrl?: string;
   email?: string;
+  phone?: string;
 }
 
 /**
@@ -80,8 +81,9 @@ export class LarkAuthService {
   /**
    * Build the Feishu authorization URL. No user scope is requested: the
    * user_info endpoint returns open_id/union_id/name/avatar by default, and
-   * the email field is gated by the tenant-level "获取用户邮箱信息" app
-   * permission (enabled in the Feishu console, not user-granted).
+   * the email and mobile fields are gated by the tenant-level "获取用户邮箱信息"
+   * and "获取用户手机号" app permissions (enabled in the Feishu console, not
+   * user-granted).
    */
   buildAuthorizeUrl(state: string): string {
     const params = new URLSearchParams({
@@ -130,6 +132,7 @@ export class LarkAuthService {
         name: data.name,
         avatarUrl: data.avatar_url,
         email: data.email || data.enterprise_email,
+        phone: data.mobile || undefined,
       };
     } catch (error) {
       this.logger.error(`Lark OAuth exchange failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -146,13 +149,14 @@ export class LarkAuthService {
     openId: string;
     unionId?: string;
     email?: string;
+    phone?: string;
     displayName?: string;
     avatarUrl?: string;
     ipAddress: string;
     userAgent: string;
     response: Response;
   }): Promise<{ token: string; tokenExpiresInSeconds: number }> {
-    const { openId, unionId, email, displayName, avatarUrl, ipAddress, userAgent, response } = params;
+    const { openId, unionId, email, phone, displayName, avatarUrl, ipAddress, userAgent, response } = params;
 
     // [step 1] openId lookup — the primary SSO handle.
     let user = await this.prisma.user.findUnique({ where: { larkOpenId: openId } });
@@ -164,7 +168,31 @@ export class LarkAuthService {
       if (existing) {
         user = await this.prisma.user.update({
           where: { id: existing.id },
-          data: { larkOpenId: openId, larkUnionId: unionId ?? undefined, lastLoginAt: new Date() },
+          data: {
+            larkOpenId: openId,
+            larkUnionId: unionId ?? undefined,
+            phone: existing.phone ?? phone ?? undefined,
+            lastLoginAt: new Date(),
+          },
+        });
+      }
+    }
+
+    // [step 2b] phone merge — when email did not resolve and the app has the
+    // mobile permission, attach the Lark identity to the account owning that
+    // phone. Mirrors the email merge so a tenant-imported phone still resolves
+    // to the same account and avoids a unique-constraint collision below.
+    if (!user && phone) {
+      const existing = await this.prisma.user.findUnique({ where: { phone } });
+      if (existing) {
+        user = await this.prisma.user.update({
+          where: { id: existing.id },
+          data: {
+            larkOpenId: openId,
+            larkUnionId: unionId ?? undefined,
+            email: existing.email ?? email ?? undefined,
+            lastLoginAt: new Date(),
+          },
         });
       }
     }
@@ -180,6 +208,7 @@ export class LarkAuthService {
           name: displayName || null,
           uiAvatarsUrl,
           email: email || undefined,
+          phone: phone || undefined,
           emails: email ? { create: { email, isVerified: true } } : undefined,
           lastLoginAt: new Date(),
         },
@@ -190,7 +219,9 @@ export class LarkAuthService {
     } else if (user.status === UserStatus.INACTIVE) {
       throw new UnauthorizedException("The account is not active.");
     } else {
-      // Refresh the profile snapshot on returning logins.
+      // Refresh the profile snapshot on returning logins. Email/phone are
+      // backfilled only when missing so a user-set value is never overwritten by
+      // the tenant-imported contact from Feishu (which is not user-verified).
       await this.prisma.user.update({
         where: { id: user.id },
         data: {
@@ -198,6 +229,8 @@ export class LarkAuthService {
           name: user.name ?? displayName ?? undefined,
           uiAvatarsUrl: user.uiAvatarsUrl ?? avatarUrl ?? undefined,
           larkUnionId: user.larkUnionId ?? unionId ?? undefined,
+          email: user.email ?? email ?? undefined,
+          phone: user.phone ?? phone ?? undefined,
         },
       });
     }
