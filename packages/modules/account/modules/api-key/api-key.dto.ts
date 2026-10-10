@@ -26,17 +26,6 @@ export class UpdateApiKeyDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  name?: string;
-
-  @ApiPropertyOptional({ type: [String] })
-  @IsArray()
-  @IsString({ each: true })
-  @IsOptional()
-  scopes?: string[];
-
   @ApiPropertyOptional({ type: [String] })
   @IsArray()
   @IsString({ each: true })
@@ -55,17 +44,6 @@ export class ReplaceApiKeyDto {
   @IsString()
   @IsNotEmpty()
   description!: string;
-
-  @ApiProperty({ type: String })
-  @IsString()
-  @IsNotEmpty()
-  name!: string;
-
-  @ApiProperty({ type: [String] })
-  @IsArray()
-  @IsString({ each: true })
-  @IsNotEmpty()
-  scopes!: string[];
 
   @ApiProperty({ type: [String] })
   @IsArray()
