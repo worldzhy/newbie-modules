@@ -31,6 +31,7 @@ export const AuditEvent = {
   PASSWORD_RESET: "account.password_reset",
   ROLES_CHANGED: "admin.roles_changed",
   API_KEY_CREATED: "api-key.created",
+  API_KEY_UPDATED: "api-key.updated",
   API_KEY_DELETED: "api-key.deleted",
   SESSION_REVOKED: "session.revoked",
   MFA_ENABLED: "mfa.enabled",

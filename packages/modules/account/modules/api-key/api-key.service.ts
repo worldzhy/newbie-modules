@@ -100,7 +100,7 @@ export class ApiKeyService {
   }
 
   async updateApiKey(userId: string, id: number, data: Prisma.ApiKeyUpdateInput): Promise<Expose<ApiKey>> {
-    return await this.updateOwnedApiKey({ userId }, id, data);
+    return await this.updateOwnedApiKey({ userId }, id, data, { actorId: userId });
   }
 
   async deleteApiKey(
@@ -108,19 +108,24 @@ export class ApiKeyService {
     id: number,
     requestContext?: { ipAddress?: string; userAgent?: string },
   ): Promise<Expose<ApiKey>> {
-    return await this.deleteOwnedApiKey({ userId }, id, requestContext);
+    return await this.deleteOwnedApiKey({ userId }, id, { ...requestContext, actorId: userId });
   }
 
   async updateApiKeyForOrganization(
     organizationId: string,
     id: number,
     data: Prisma.ApiKeyUpdateInput,
+    actorId?: string,
   ): Promise<Expose<ApiKey>> {
-    return await this.updateOwnedApiKey({ organizationId }, id, data);
+    return await this.updateOwnedApiKey({ organizationId }, id, data, { actorId });
   }
 
-  async deleteApiKeyForOrganization(organizationId: string, id: number): Promise<Expose<ApiKey>> {
-    return await this.deleteOwnedApiKey({ organizationId }, id);
+  async deleteApiKeyForOrganization(
+    organizationId: string,
+    id: number,
+    actorId?: string,
+  ): Promise<Expose<ApiKey>> {
+    return await this.deleteOwnedApiKey({ organizationId }, id, { actorId });
   }
 
   async getApiKeyLogsForOrganization(organizationId: string, id: number, params: ApiKeyLogsQuery) {
@@ -158,6 +163,7 @@ export class ApiKeyService {
     owner: ApiKeyOwner,
     id: number,
     data: Prisma.ApiKeyUpdateInput,
+    attribution?: { actorId?: string },
   ): Promise<Expose<ApiKey>> {
     const ownedApiKey = await this.getOwnedApiKey(owner, id);
     const apiKey = await this.prisma.apiKey.update({
@@ -165,13 +171,19 @@ export class ApiKeyService {
       data,
     });
     this.lru.delete(ownedApiKey.key);
+    await this.auditLogService.record(AuditEvent.API_KEY_UPDATED, {
+      actorId: attribution?.actorId,
+      resourceType: "api-key",
+      resourceId: String(id),
+      detail: { updatedFields: Object.keys(data) },
+    });
     return expose<ApiKey>(apiKey);
   }
 
   private async deleteOwnedApiKey(
     owner: ApiKeyOwner,
     id: number,
-    requestContext?: { ipAddress?: string; userAgent?: string },
+    attribution?: { actorId?: string; ipAddress?: string; userAgent?: string },
   ): Promise<Expose<ApiKey>> {
     const ownedApiKey = await this.getOwnedApiKey(owner, id);
     const apiKey = await this.prisma.apiKey.delete({
@@ -179,11 +191,11 @@ export class ApiKeyService {
     });
     this.lru.delete(ownedApiKey.key);
     await this.auditLogService.record(AuditEvent.API_KEY_DELETED, {
-      actorId: "organizationId" in owner ? undefined : owner.userId,
+      actorId: attribution?.actorId,
       resourceType: "api-key",
       resourceId: String(id),
-      ipAddress: requestContext?.ipAddress,
-      userAgent: requestContext?.userAgent,
+      ipAddress: attribution?.ipAddress,
+      userAgent: attribution?.userAgent,
     });
     return expose<ApiKey>(apiKey);
   }
