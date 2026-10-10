@@ -62,7 +62,6 @@ export class ApiKeyService {
     });
     await this.auditLogService.record(AuditEvent.API_KEY_CREATED, {
       actorId: params.userId,
-      organizationId: params.organizationId,
       resourceType: "api-key",
       resourceId: String(apiKey.id),
       ipAddress: params.ipAddress,
@@ -181,7 +180,6 @@ export class ApiKeyService {
     this.lru.delete(ownedApiKey.key);
     await this.auditLogService.record(AuditEvent.API_KEY_DELETED, {
       actorId: "organizationId" in owner ? undefined : owner.userId,
-      organizationId: "organizationId" in owner ? owner.organizationId : undefined,
       resourceType: "api-key",
       resourceId: String(id),
       ipAddress: requestContext?.ipAddress,
