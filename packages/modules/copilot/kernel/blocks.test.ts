@@ -102,7 +102,10 @@ test("TR-3.1: blocks returned by a non-opted-in skill are never forwarded", asyn
   };
   const registry = new SkillRegistry([sneaky], silentLogger);
   const runner = new AgentRunner(registry);
-  const events = await collect(runner, scriptedModel([{ id: "c1", name: "sneaky_blocks", arguments: '{"value":"x"}' }]));
+  const events = await collect(
+    runner,
+    scriptedModel([{ id: "c1", name: "sneaky_blocks", arguments: '{"value":"x"}' }]),
+  );
   const finished = events.find((event) => event.type === "tool-finished");
   if (finished?.type === "tool-finished") assert.equal("blocks" in finished, false);
 });
@@ -150,18 +153,19 @@ test("TR-3.2: chart points and table rows are capped and marked truncated", () =
   const bounded = boundBlocks([chart, table]);
   const boundedChart = bounded[0];
   assert.equal(boundedChart.kind, "chart");
-  if (boundedChart.kind === "chart") {
-    assert.equal(boundedChart.labels.length, CHART_POINT_CAP);
-    assert.equal(boundedChart.datasets[0].data.length, CHART_POINT_CAP);
-    assert.equal(boundedChart.truncated, true);
-  }
+  // Custom blocks share the union, so literal === checks no longer narrow the
+  // known shapes in types; the runtime assert above pins the kind, the cast
+  // restores the shape.
+  const chartShape = boundedChart as Extract<CopilotSkillBlock, { kind: "chart" }>;
+  assert.equal(chartShape.labels.length, CHART_POINT_CAP);
+  assert.equal(chartShape.datasets[0].data.length, CHART_POINT_CAP);
+  assert.equal(chartShape.truncated, true);
   const boundedTable = bounded[1];
   assert.equal(boundedTable.kind, "table");
-  if (boundedTable.kind === "table") {
-    assert.equal(boundedTable.rows.length, TABLE_ROW_CAP);
-    assert.equal(boundedTable.totalRows, TABLE_ROW_CAP + 25);
-    assert.equal(boundedTable.truncated, true);
-  }
+  const tableShape = boundedTable as Extract<CopilotSkillBlock, { kind: "table" }>;
+  assert.equal(tableShape.rows.length, TABLE_ROW_CAP);
+  assert.equal(tableShape.totalRows, TABLE_ROW_CAP + 25);
+  assert.equal(tableShape.truncated, true);
 });
 
 test("TR-3.2: the serialized block array never exceeds the byte budget", () => {
@@ -188,4 +192,37 @@ test("summarizeBlocks records template id and counts, never payloads", () => {
   assert.match(summary, /table\(2\/2 rows\)/);
   assert.ok(!summary.includes("password"));
   assert.ok(!summary.includes("s3cr3t-title"));
+});
+
+test("TR-3.3: custom blocks pass through boundBlocks uncapped and are summarized by kind", () => {
+  const custom: CopilotSkillBlock = {
+    kind: "task-list",
+    title: "Tasks",
+    items: Array.from({ length: 50 }, (_, index) => ({ id: `t${index}` })),
+    total: 50,
+  };
+  const bounded = boundBlocks([custom]);
+  assert.equal(bounded.length, 1);
+  const passed = bounded[0];
+  assert.equal(passed.kind, "task-list");
+  // The kernel applies no per-block cap and no truncated marker to shapes it
+  // does not know; host-side capping is the host's responsibility.
+  assert.equal((passed as unknown as { items: unknown[] }).items.length, 50);
+  assert.equal(passed.truncated, undefined);
+
+  const summary = summarizeBlocks([custom]);
+  assert.match(summary, /task-list\(custom\)/);
+  assert.ok(!summary.includes("Tasks"));
+});
+
+test("TR-3.3: an oversize custom block only gets the generic title trim", () => {
+  const big = "x".repeat(BLOCKS_SERIALIZED_CAP_BYTES);
+  const custom: CopilotSkillBlock = { kind: "huge-custom", title: big, payload: big };
+  const bounded = boundBlocks([custom]);
+  assert.equal(bounded.length, 1);
+  assert.equal(bounded[0].kind, "huge-custom");
+  assert.equal(bounded[0].truncated, true);
+  // Beyond the title trim the kernel cannot shrink a shape it does not know;
+  // the block is returned as-is rather than dropped.
+  assert.equal((bounded[0].title as string).length, 1024);
 });

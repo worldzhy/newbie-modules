@@ -72,7 +72,24 @@ export interface CopilotErrorBlock {
   truncated?: boolean;
 }
 
-export type CopilotSkillBlock = CopilotChartBlock | CopilotTableBlock | CopilotQueryBlock | CopilotErrorBlock;
+/**
+ * Open extension point for host-defined blocks. A host declares its own block
+ * shape (e.g. a task list with per-row interactions) by extending this type
+ * with a distinct `kind` literal; the kernel carries custom blocks opaquely —
+ * it never inspects the payload, applies no per-block cap, and renders
+ * nothing. Capping before emission and transport-side rendering are the
+ * host's responsibility. Custom blocks still participate in the whole-array
+ * serialized budget in boundBlocks like any other block.
+ */
+export interface CopilotCustomBlock {
+  kind: string;
+  /** True when the host cut the payload to its own cap before emission. */
+  truncated?: boolean;
+  [key: string]: unknown;
+}
+
+export type CopilotSkillBlock =
+  CopilotChartBlock | CopilotTableBlock | CopilotQueryBlock | CopilotErrorBlock | CopilotCustomBlock;
 
 export interface AgentUsage {
   promptTokens: number;
