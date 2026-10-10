@@ -118,6 +118,7 @@ export class AuditLogService {
       ...(query.actorId ? { actorId: query.actorId } : {}),
       ...(query.action ? { action: query.action } : {}),
       ...(query.resourceType ? { resourceType: query.resourceType } : {}),
+      ...(query.resourceId ? { resourceId: query.resourceId } : {}),
       ...(query.result ? { result: query.result } : {}),
       ...(query.startTime || query.endTime
         ? {

@@ -6,7 +6,7 @@
     "className": "ModuleHubModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
+  "moduleDependencies": ["audit", "security"],
   "dependencies": {},
   "devDependencies": {}
 }

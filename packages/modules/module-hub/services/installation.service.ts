@@ -2,9 +2,25 @@ import { createHash, randomUUID } from "node:crypto";
 
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
 
 /** An installation reports every 60s; three missed intervals marks it offline (design §4.2). */
 export const ONLINE_THRESHOLD_SECONDS = 180;
+
+/**
+ * Module-hub audit events. The audit module's event set is open (domain
+ * modules define their own `domain.action` strings); these are the ones the
+ * hub emits. Routine reports (ping/full) are NOT audited.
+ */
+export const ModuleHubAuditEvent = {
+  INSTALLATION_ENROLL: "installation.enroll",
+  INSTALLATION_TARGET_SPEC: "installation.target-spec",
+  INSTALLATION_ROTATE: "installation.rotate",
+  INSTALLATION_REVOKE: "installation.revoke",
+} as const;
+
+/** Resource type for installation-scoped audit rows. */
+const INSTALLATION_RESOURCE_TYPE = "module-hub-installation";
 
 export function hashInstallationToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -124,7 +140,10 @@ export function compareTargetWithSnapshot(
  */
 @Injectable()
 export class ModuleHubInstallationService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {}
 
   private withDerivedState(row: any) {
     const online =
@@ -146,9 +165,12 @@ export class ModuleHubInstallationService {
         tokenHash: hashInstallationToken(token),
       },
     });
-    await this.audit(row.id, "installation.enroll", `host:${input.actor ?? "unknown"}`, {
-      label: input.label,
-      externalRef: input.externalRef ?? null,
+    await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_ENROLL, {
+      resourceType: INSTALLATION_RESOURCE_TYPE,
+      resourceId: row.id,
+      actorType: "host",
+      actorId: input.actor ?? "unknown",
+      detail: { label: input.label, externalRef: input.externalRef ?? null },
     });
     return { ...this.withDerivedState(row), token };
   }
@@ -200,7 +222,13 @@ export class ModuleHubInstallationService {
       where: { id },
       data: { targetSpec: spec as any },
     });
-    await this.audit(id, "installation.target-spec", `host:${actor ?? "unknown"}`, { spec });
+    await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_TARGET_SPEC, {
+      resourceType: INSTALLATION_RESOURCE_TYPE,
+      resourceId: id,
+      actorType: "host",
+      actorId: actor ?? "unknown",
+      detail: { spec },
+    });
     return { id, targetSpec: spec };
   }
 
@@ -212,7 +240,12 @@ export class ModuleHubInstallationService {
       where: { id },
       data: { tokenHash: hashInstallationToken(token) },
     });
-    await this.audit(id, "installation.rotate", `host:${actor ?? "unknown"}`);
+    await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_ROTATE, {
+      resourceType: INSTALLATION_RESOURCE_TYPE,
+      resourceId: id,
+      actorType: "host",
+      actorId: actor ?? "unknown",
+    });
     return { id, token };
   }
 
@@ -220,7 +253,12 @@ export class ModuleHubInstallationService {
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
     await this.prisma.moduleHubInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
-    await this.audit(id, "installation.revoke", `host:${actor ?? "unknown"}`);
+    await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_REVOKE, {
+      resourceType: INSTALLATION_RESOURCE_TYPE,
+      resourceId: id,
+      actorType: "host",
+      actorId: actor ?? "unknown",
+    });
     return { id, revoked: true };
   }
 
@@ -279,35 +317,5 @@ export class ModuleHubInstallationService {
           "updatedAt" = ${now}
       WHERE "id" = ${id}::uuid
     `;
-  }
-
-  async audit(installationId: string | null, action: string, actor: string, detail?: any) {
-    await this.prisma.hubAuditLog.create({
-      data: { installationId, action, actor, detail: detail ?? undefined },
-    });
-  }
-
-  /** Audit trail of one installation (lifecycle events), newest first. */
-  async listAuditForInstallation(id: string, limit = 50) {
-    await this.getOrThrow(id);
-    return this.prisma.hubAuditLog.findMany({
-      where: { installationId: id },
-      orderBy: { createdAt: "desc" },
-      take: limit,
-    });
-  }
-
-  /**
-   * Global audit feed. With no filter this returns the newest lifecycle and
-   * registry events across all installations; `action` narrows it (e.g.
-   * "release.ingest" for registry publications, which carry null
-   * installationId and never appear in installation-scoped feeds).
-   */
-  async listAuditFeed(query: { action?: string; limit?: number }) {
-    return this.prisma.hubAuditLog.findMany({
-      where: query.action ? { action: query.action } : undefined,
-      orderBy: { createdAt: "desc" },
-      take: query.limit ?? 50,
-    });
   }
 }

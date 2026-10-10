@@ -1,14 +1,18 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-
-import { ModuleHubInstallationService } from "./installation.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
 
 /** Fallback registry sync cadence (design: every 10 minutes). */
 const FALLBACK_SYNC_INTERVAL_MS = 10 * 60 * 1000;
 /** Registry module directory prefix inside the registry monorepo. */
 const REGISTRY_MODULES_PREFIX = "packages/modules/";
 const MODULE_MANIFEST_FILE = "newbie.module.json";
+
+/** Audit event emitted when a registry release is ingested. */
+const RELEASE_INGEST_EVENT = "release.ingest";
+/** Resource type for release-ingest audit rows. */
+const RELEASE_RESOURCE_TYPE = "module-hub-release";
 
 interface ManifestShape {
   key?: string;
@@ -32,7 +36,7 @@ export class ModuleHubReleaseService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
-    private readonly installations: ModuleHubInstallationService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   onModuleInit(): void {
@@ -70,7 +74,13 @@ export class ModuleHubReleaseService implements OnModuleInit, OnModuleDestroy {
       update: {},
       create: { moduleKey, sourceCommit, manifest: manifest as any },
     });
-    await this.installations.audit(null, "release.ingest", actor, { moduleKey, sourceCommit });
+    await this.auditLogService.record(RELEASE_INGEST_EVENT, {
+      resourceType: RELEASE_RESOURCE_TYPE,
+      resourceId: moduleKey,
+      actorType: "system",
+      actorId: actor,
+      detail: { moduleKey, sourceCommit },
+    });
     return row;
   }
 

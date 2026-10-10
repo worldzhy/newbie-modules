@@ -3,7 +3,6 @@
 // ! ------------------------------------------------------------ //
 // * ModuleHubInstallation                                                //
 // * HubModuleRelease                                               //
-// * HubAuditLog                                                    //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 // Module-hub observer-plane models. PostgreSQL schema: "module/module-hub".
@@ -63,8 +62,6 @@ model ModuleHubInstallation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  auditLogs HubAuditLog[]
-
   @@schema("module/module-hub")
 }
 
@@ -82,26 +79,5 @@ model HubModuleRelease {
   publishedAt DateTime @default(now())
 
   @@unique([moduleKey, sourceCommit])
-  @@schema("module/module-hub")
-}
-
-// Append-only audit trail (enrollment, token rotation/revocation, release
-// ingestion, target-spec edits). Routine reports are NOT audited.
-model HubAuditLog {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-
-  installationId String?          @db.Uuid
-  installation   ModuleHubInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
-
-  // Dot-namespaced, e.g. "installation.enroll", "installation.revoke",
-  // "installation.target-spec", "release.ingest".
-  action String @db.VarChar(128)
-  // "host:<actor>", "instance:<installationId>", "webhook".
-  actor  String @db.VarChar(255)
-  detail Json?
-
-  createdAt DateTime @default(now())
-
-  @@index([installationId, createdAt])
   @@schema("module/module-hub")
 }

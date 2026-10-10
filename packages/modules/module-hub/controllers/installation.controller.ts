@@ -2,12 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query } from "@nestjs/
 import { ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 
-import {
-  CreateHubInstallationDto,
-  ListHubAuditQueryDto,
-  ListHubInstallationsQueryDto,
-  SetHubTargetSpecDto,
-} from "../module-hub.dto";
+import { CreateHubInstallationDto, ListHubInstallationsQueryDto, SetHubTargetSpecDto } from "../module-hub.dto";
 import { ModuleHubInstallationService } from "../services/installation.service";
 import { ModuleHubReleaseService } from "../services/release.service";
 
@@ -52,11 +47,6 @@ export class InstallationController {
     return this.installations.getModules(params.id);
   }
 
-  @Get("installations/:id/audit")
-  async installationAudit(@Param() params: CommonGetByStringIdRequestDto, @Query() query: ListHubAuditQueryDto) {
-    return this.installations.listAuditForInstallation(params.id, query.limit ?? 50);
-  }
-
   @Put("installations/:id/target-spec")
   async setTargetSpec(
     @Param() params: CommonGetByStringIdRequestDto,
@@ -86,12 +76,5 @@ export class InstallationController {
   @Get("catalog/:moduleKey/releases")
   async moduleReleases(@Param("moduleKey") moduleKey: string) {
     return this.releases.getReleasesForModule(moduleKey);
-  }
-
-  // -- Audit -----------------------------------------------------------------
-
-  @Get("audit")
-  async auditFeed(@Query() query: ListHubAuditQueryDto) {
-    return this.installations.listAuditFeed({ action: query.action, limit: query.limit });
   }
 }
