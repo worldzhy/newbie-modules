@@ -40,7 +40,6 @@ export const AuditEvent = {
 export type AuditLogRecordParams = {
   actorType?: string;
   actorId?: string | null;
-  organizationId?: string | null;
   action?: string;
   resourceType?: string;
   resourceId?: string;
@@ -91,7 +90,6 @@ export class AuditLogService {
           detail: params.detail as Prisma.InputJsonValue,
           actorType: params.actorType,
           actorId: params.actorId ?? undefined,
-          organizationId: params.organizationId ?? undefined,
           ipAddress: params.ipAddress,
           userAgent: params.userAgent,
           city: location?.city?.names?.en,
@@ -112,10 +110,9 @@ export class AuditLogService {
     }
   }
 
-  /** Query audit logs within an organization or for a single actor. */
-  async findMany(scope: { organizationId?: string; actorId?: string }, query: AuditLogQueryDto) {
+  /** Query audit logs across the platform. */
+  async findMany(query: AuditLogQueryDto) {
     const where: Prisma.AuditLogWhereInput = {
-      ...scope,
       ...(query.event ? { event: query.event } : {}),
       ...(query.actorId ? { actorId: query.actorId } : {}),
       ...(query.action ? { action: query.action } : {}),

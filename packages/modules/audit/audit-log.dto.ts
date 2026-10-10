@@ -106,9 +106,6 @@ export class AuditLogResponseDto {
   actorId?: string | null;
 
   @ApiPropertyOptional({ type: String })
-  organizationId?: string | null;
-
-  @ApiPropertyOptional({ type: String })
   ipAddress?: string | null;
 
   @ApiPropertyOptional({ type: String })

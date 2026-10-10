@@ -22,7 +22,6 @@ model AuditLog {
   detail         Json?
   actorType      String?
   actorId        String?
-  organizationId String?  @db.Uuid
   ipAddress      String?
   userAgent      String?
   city           String?
@@ -34,10 +33,8 @@ model AuditLog {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  @@index([organizationId])
   @@index([actorId])
   @@index([event])
   @@index([createdAt])
-  @@index([organizationId, createdAt])
   @@schema("module/audit")
 }
