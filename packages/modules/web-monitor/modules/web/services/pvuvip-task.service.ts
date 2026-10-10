@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { SiteService } from "../../../modules/site/site.service";
 import { PvuvipService } from "./pvuvip.service";
-import { func } from "../../../shared/utils";
+import { func, mapWithConcurrency } from "../../../shared/utils";
 
 function cronMinuteInterval(cronExp: string) {
   const m = cronExp.split(" ")[1] || "*/2";
@@ -14,6 +14,7 @@ function cronMinuteInterval(cronExp: string) {
 @Injectable()
 export class WebPvuvipTaskService {
   private cfg: any;
+  private readonly logger = new Logger(WebPvuvipTaskService.name);
   constructor(
     private readonly config: ConfigService,
     private readonly site: SiteService,
@@ -30,13 +31,20 @@ export class WebPvuvipTaskService {
     const systems = await this.site.getWebSiteList();
     if (!systems || !systems.length) return;
 
-    const jobs = systems.map(async (sys: any) => {
+    // Bounded worker pool: keep at most pvuvipTaskConcurrency sites in flight
+    // so a large site list cannot stampede Mongo/ClickHouse at once.
+    const concurrency = Number(this.cfg.pvuvipTaskConcurrency) || 5;
+    await mapWithConcurrency(systems, concurrency, async (sys: any) => {
       const appId = sys.appId;
       if (!appId) return;
-      const data = await this.pvuvip.getPvUvIpSurvey(appId, beginTime, endTime);
-      await this.pvuvip.savePvUvIpData(appId, endTime, 1, data);
+      try {
+        const data = await this.pvuvip.getPvUvIpSurvey(appId, beginTime, endTime);
+        await this.pvuvip.savePvUvIpData(appId, endTime, 1, data);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.error(`Pvuvip minute task failed for site ${appId}: ${message}`);
+      }
     });
-    await Promise.all(jobs);
   }
 
   async getWebPvUvIpByDay() {

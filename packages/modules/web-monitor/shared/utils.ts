@@ -115,3 +115,21 @@ export const func = {
 
 const ips = ["118.112.75.70", "119.57.35.106", "221.231.219.26", "140.206.142.182"];
 export const getRandomIp = () => ips[Math.floor(Math.random() * ips.length)];
+
+// Run an async worker over items with a bounded number of in-flight tasks so a
+// large list cannot stampede downstream stores (Mongo/ClickHouse) at once.
+export const mapWithConcurrency = async <T>(
+  items: T[],
+  concurrencyLimit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> => {
+  let nextIndex = 0;
+  const limit = Math.min(Math.max(Math.floor(concurrencyLimit) || 1, 1), items.length);
+  const workers = Array.from({ length: limit }, async () => {
+    while (nextIndex < items.length) {
+      const item = items[nextIndex++];
+      await worker(item);
+    }
+  });
+  await Promise.all(workers);
+};
