@@ -11,7 +11,6 @@ export const SEVERITY_LEVEL: Record<string, number> = {
 };
 
 export const CENTER_SETTING_SINGLETON_ID = 1;
-export const DEFAULT_IN_APP_ENABLED = true;
 export const DEFAULT_PUSH_ENABLED = false;
 export const DEFAULT_MINIMUM_SEVERITY = "high";
 export const DEFAULT_NOTIFICATION_PUSH_ENABLED = true;

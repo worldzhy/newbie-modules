@@ -90,7 +90,6 @@ model NotificationReceipt {
 model NotificationCenterSetting {
   id      Int @id
 
-  inAppEnabled Boolean @default(true)
   // Master switch for chat push through the host-provided push port. A
   // notification push only fires when both this switch and the notification's
   // own pushEnabled are on.

@@ -3,7 +3,6 @@ import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   CENTER_SETTING_SINGLETON_ID,
-  DEFAULT_IN_APP_ENABLED,
   DEFAULT_MINIMUM_SEVERITY,
   DEFAULT_PUSH_ENABLED,
   NOTIFICATION_PUSH_PORT,
@@ -190,7 +189,6 @@ export class NotificationCenterService {
   async getCenterSettings(): Promise<NotificationCenterSettingDto> {
     const setting = await this.ensureCenterSetting();
     return {
-      inAppEnabled: setting.inAppEnabled,
       pushEnabled: setting.pushEnabled,
       minimumSeverity: setting.minimumSeverity,
     };
@@ -202,14 +200,12 @@ export class NotificationCenterService {
     const updated = await this.prisma.notificationCenterSetting.update({
       where: { id: setting.id },
       data: {
-        ...(body.inAppEnabled !== undefined ? { inAppEnabled: body.inAppEnabled } : {}),
         ...(body.pushEnabled !== undefined ? { pushEnabled: body.pushEnabled } : {}),
         ...(body.minimumSeverity !== undefined ? { minimumSeverity: body.minimumSeverity } : {}),
       },
     });
 
     return {
-      inAppEnabled: updated.inAppEnabled,
       pushEnabled: updated.pushEnabled,
       minimumSeverity: updated.minimumSeverity,
     };
@@ -236,7 +232,6 @@ export class NotificationCenterService {
     return this.prisma.notificationCenterSetting.create({
       data: {
         id: CENTER_SETTING_SINGLETON_ID,
-        inAppEnabled: DEFAULT_IN_APP_ENABLED,
         pushEnabled: DEFAULT_PUSH_ENABLED,
         minimumSeverity: DEFAULT_MINIMUM_SEVERITY,
       },

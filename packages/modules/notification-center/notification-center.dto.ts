@@ -187,9 +187,6 @@ export class UpdateNotificationSettingDto {
 // ---------------------------------------------------------------------------
 
 export class NotificationCenterSettingDto {
-  @ApiProperty()
-  inAppEnabled: boolean;
-
   @ApiProperty({ description: "Master switch for chat push through the host-provided push adapter" })
   pushEnabled: boolean;
 
@@ -198,11 +195,6 @@ export class NotificationCenterSettingDto {
 }
 
 export class UpdateNotificationCenterSettingDto {
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsBoolean()
-  inAppEnabled?: boolean;
-
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
