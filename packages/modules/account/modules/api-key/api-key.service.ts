@@ -175,7 +175,9 @@ export class ApiKeyService {
       actorId: attribution?.actorId,
       resourceType: "api-key",
       resourceId: String(id),
-      detail: { updatedFields: Object.keys(data) },
+      // The validation pipe materializes every declared DTO property (as
+      // undefined when absent); only fields actually provided were updated.
+      detail: { updatedFields: Object.keys(data).filter((field) => data[field] !== undefined) },
     });
     return expose<ApiKey>(apiKey);
   }
