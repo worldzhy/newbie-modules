@@ -81,6 +81,14 @@ export interface LarkCardActionResult {
     type: "success" | "error" | "info";
     content: string;
   };
+  /**
+   * Updated card content delivered atomically with the toast as part of the
+   * callback response frame. Lark replaces the card immediately — no
+   * separate PATCH /im/v1/messages/:message_id call, so the card can never
+   * race the Lark platform's internal card refresh (which reverts a PATCH
+   * to the original pending state).
+   */
+  card?: Record<string, unknown>;
 }
 
 /** Webhook header present on v2 event callbacks. */
