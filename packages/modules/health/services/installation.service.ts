@@ -291,7 +291,7 @@ export class HealthInstallationService {
 
   private withDerivedState(row: HealthInstallation) {
     const state = this.deriveState(row.lastSnapshotAt, row.lastSnapshotStatus);
-    const { tokenHash, ...rest } = row;
+    const { tokenHash: _tokenHash, ...rest } = row;
     return { ...rest, state };
   }
 

@@ -73,7 +73,7 @@ export class AgentRunner {
 
         steps += 1;
         let text = "";
-        let toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
+        const toolCalls: Array<{ id: string; name: string; arguments: string }> = [];
         let finishReason: ModelFinishReason = "stop";
         let stepUsage: ModelUsage | undefined;
         const callStartedAt = Date.now();

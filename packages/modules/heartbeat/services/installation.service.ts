@@ -222,7 +222,7 @@ export class HeartbeatInstallationService {
       !row.revokedAt &&
       row.lastSeenAt != null &&
       Date.now() - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS;
-    const { tokenHash, ...rest } = row;
+    const { tokenHash: _tokenHash, ...rest } = row;
     return { ...rest, online };
   }
 

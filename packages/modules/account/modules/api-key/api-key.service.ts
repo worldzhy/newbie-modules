@@ -211,7 +211,7 @@ export class ApiKeyService {
     return { user: { id: owner.userId }, organizationId: null };
   }
 
-  private async getApiLogsFromKey(apiKey: string, params: ApiKeyLogsQuery): Promise<Record<string, unknown>[]> {
+  private async getApiLogsFromKey(_apiKey: string, _params: ApiKeyLogsQuery): Promise<Record<string, unknown>[]> {
     // API key usage logs are not wired to a log store yet; return empty until
     // a backend (previously elasticsearch) is integrated again.
     return [];

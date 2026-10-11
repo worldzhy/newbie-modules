@@ -23,7 +23,8 @@ export class TokenService {
     secret?: string | null;
     options: { subject: string; expiresIn: string | number; jwtid?: string };
   }) {
-    let { payload, secret, options } = params;
+    let { payload, secret } = params;
+    const { options } = params;
     if (typeof payload === "number") payload = payload.toString();
     secret = secret ?? (this.tokenConfig.defaultSecret as string);
     return sign(payload, secret, options as any);
@@ -33,7 +34,8 @@ export class TokenService {
    * Verify and decode a JWT
    */
   verify<T>(params: { token: string; secret?: string | null; options: { subject: string } }) {
-    let { token, secret, options } = params;
+    const { token, options } = params;
+    let { secret } = params;
     secret = secret ?? (this.tokenConfig.defaultSecret as string);
 
     try {

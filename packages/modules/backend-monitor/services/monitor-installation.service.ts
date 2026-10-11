@@ -28,7 +28,7 @@ export class MonitorInstallationService {
       !row.revokedAt &&
       row.lastSeenAt != null &&
       Date.now() - new Date(row.lastSeenAt).getTime() <= ONLINE_THRESHOLD_SECONDS * 1000;
-    const { tokenHash, ...rest } = row;
+    const { tokenHash: _tokenHash, ...rest } = row;
     return { ...rest, online };
   }
 

@@ -34,7 +34,7 @@ export class GoogleFormService {
         for (let i = 0; i < responses.length; i++) {
           const response = responses[i];
           const answers = response.answers;
-          for (let key in answers) {
+          for (const key in answers) {
             const answer = answers[key];
             answer.questionId;
           }

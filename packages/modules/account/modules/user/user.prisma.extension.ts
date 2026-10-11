@@ -8,7 +8,7 @@ export const userPrismaExtension = Prisma.defineExtension((prisma) =>
   prisma.$extends({
     query: {
       user: {
-        async $allOperations({ model, operation, args, query }) {
+        async $allOperations({ model: _model, operation, args, query }) {
           if (operation === "create" || operation === "update") {
             if (args.data) {
               const { email, password, firstName, lastName, middleName, dateOfBirth } = args.data;

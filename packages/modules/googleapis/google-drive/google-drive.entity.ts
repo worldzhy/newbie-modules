@@ -43,7 +43,7 @@ export class GoogleDrivePermissionEntity {
   type: string;
 
   @ApiProperty({ type: String })
-  role: String;
+  role: string;
 
   @ApiProperty({ type: String })
   email: string;

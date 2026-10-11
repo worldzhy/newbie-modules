@@ -297,7 +297,6 @@ export class WebReportTaskService {
   }
 
   private async handleWebData(query: Record<string, any>) {
-    const type = query.type || ReportType.PagePerf;
     let item: Record<string, any> = {
       appId: query.appId,
       createTime: new Date(query.time),

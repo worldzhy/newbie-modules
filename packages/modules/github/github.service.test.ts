@@ -22,7 +22,7 @@ type OctokitMethods = {
 function makeOctokitMock(handlers: Partial<OctokitMethods>) {
   const calls: Record<string, any[]> = {};
   const wrap =
-    (name: string, fn?: Function) =>
+    (name: string, fn?: (...args: any[]) => any) =>
     (...args: any[]) => {
       (calls[name] ??= []).push(args);
       return fn ? fn(...args) : Promise.resolve();
@@ -152,10 +152,8 @@ describe("GitHubService.ensureRepoExists", () => {
   });
 
   it("warns and continues when repo not readable after 3 retries", async () => {
-    let getCall = 0;
     const m = makeOctokitMock({
       "repos.get": async () => {
-        getCall++;
         // first call: initial 404, then 3 retries all 404
         throw httpError(404);
       },

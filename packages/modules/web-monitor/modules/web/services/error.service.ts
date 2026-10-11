@@ -24,7 +24,7 @@ export class ErrorService {
       uid,
       phone,
     } = query;
-    let pageNo = Number(query.pageNo || 1);
+    const pageNo = Number(query.pageNo || 1);
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
     if (resourceUrl) {
@@ -92,8 +92,8 @@ export class ErrorService {
 
   async getOneErrorList(query: Record<string, any>) {
     const { appId, url, name = "", status = "", type = "", beginTime, endTime, phone = "", uid = "" } = query;
-    let pageNo = Number(query.pageNo || 1);
-    let pageSize = Number(query.pageSize || this.cfg.pageSize);
+    const pageNo = Number(query.pageNo || 1);
+    const pageSize = Number(query.pageSize || this.cfg.pageSize);
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
     if (url) {

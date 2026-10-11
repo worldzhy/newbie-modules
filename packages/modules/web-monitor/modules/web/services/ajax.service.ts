@@ -50,7 +50,7 @@ export class AjaxService {
 
   async getAverageAjaxList(query: Record<string, any>) {
     const { appId, beginTime, endTime, type = 1, url, pageSize = this.cfg.pageSize } = query;
-    let pageNo = Number(query.pageNo || 1);
+    const pageNo = Number(query.pageNo || 1);
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
     if (parseInt(type) === 2) wheres.push("duration > 2000");

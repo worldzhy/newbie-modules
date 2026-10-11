@@ -28,7 +28,7 @@ export class UserService {
   }
 
   withoutPassword(user: User) {
-    const { password, ...others } = user;
+    const { password: _password, ...others } = user;
     return others;
   }
 

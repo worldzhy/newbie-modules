@@ -39,7 +39,6 @@ import {
 } from "@aws-sdk/client-iam";
 
 type Severity = "high" | "medium" | "low";
-type ScanStatus = "PENDING" | "RUNNING" | "SUCCESS" | "FAILED";
 
 interface AwsClientContext {
   // Project-scoped, secret-free cache key.

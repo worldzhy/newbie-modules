@@ -1,6 +1,4 @@
-import { Injectable, MiddlewareConsumer, RequestMethod } from "@nestjs/common";
-import * as passport from "passport";
-import { RouteInfo } from "@nestjs/common/interfaces";
+import { Injectable, RequestMethod } from "@nestjs/common";
 import { GuardType } from "./guard.types";
 
 export interface RouteMethodConfig {

@@ -1,6 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { IsNumber, IsString, IsOptional, IsEnum } from "class-validator";
-import { Type } from "class-transformer";
+import { IsString, IsOptional, IsEnum } from "class-validator";
 import { EmailTemplate } from "./aws-ses.interface";
 
 export class SendEmailRequestDto {

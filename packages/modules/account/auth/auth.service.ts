@@ -17,7 +17,6 @@ import {
   USER_NOT_FOUND,
 } from "@devbie/newbie/exceptions/errors.constants";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { SignUpDto } from "@modules/account/auth/auth.dto";
 import { Expose, expose } from "@modules/account/helpers/expose";
 import { verifyEmail } from "@modules/account/helpers/validator";

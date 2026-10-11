@@ -69,9 +69,9 @@ export class WebIpTaskService {
   }
 
   private async getIpData(ip: string, _id: string, appId: string) {
-    let _copyip = ip.split(".");
+    const _copyip = ip.split(".");
     const copyip = `${_copyip[0]}.${_copyip[1]}.${_copyip[2]}`;
-    let datas = await this.redis.get(copyip);
+    const datas = await this.redis.get(copyip);
     if (datas) {
       try {
         const json = JSON.parse(datas);
