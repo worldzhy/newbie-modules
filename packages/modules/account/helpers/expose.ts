@@ -1,14 +1,13 @@
-import { Session, User } from "@generated/prisma/client";
-
 /** Delete sensitive keys from an object */
 export function expose<T>(item: T): Expose<T> {
   if (!item) return {} as T;
 
-  if ((item as any as Partial<User>).password) (item as any).hasPassword = true;
-  delete (item as any as Partial<User>).password;
-  delete (item as any as Partial<Session>).refreshToken;
+  const record = item as unknown as Record<string, unknown>;
+  if (record.password) record.hasPassword = true;
+  delete record.password;
+  delete record.refreshToken;
   // API key secrets are stored hashed and must never be serialized to clients.
-  delete (item as { secret?: unknown }).secret;
+  delete record.secret;
 
   return item;
 }
