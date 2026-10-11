@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 
@@ -21,6 +22,12 @@ interface ManifestShape {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   [k: string]: unknown;
+}
+
+/** Subset of the GitHub push webhook payload consumed by this service. */
+interface GithubPushPayload {
+  after?: string;
+  commits?: { added?: string[]; modified?: string[] }[];
 }
 
 /**
@@ -72,7 +79,7 @@ export class ModuleHubReleaseService implements OnModuleInit, OnModuleDestroy {
     const row = await this.prisma.hubModuleRelease.upsert({
       where: { moduleKey_sourceCommit: { moduleKey, sourceCommit } },
       update: {},
-      create: { moduleKey, sourceCommit, manifest: manifest as any },
+      create: { moduleKey, sourceCommit, manifest: manifest as Prisma.InputJsonValue },
     });
     await this.auditLogService.record(RELEASE_INGEST_EVENT, {
       resourceType: RELEASE_RESOURCE_TYPE,
@@ -116,14 +123,14 @@ export class ModuleHubReleaseService implements OnModuleInit, OnModuleDestroy {
    * GitHub push event: collect the modules touched under packages/modules/ at
    * the head commit and ingest each one's manifest at that commit.
    */
-  async handleGithubPush(payload: any): Promise<{ ingested: string[] }> {
-    const headCommit: string | undefined = payload?.after;
+  async handleGithubPush(payload: GithubPushPayload): Promise<{ ingested: string[] }> {
+    const headCommit = payload?.after;
     if (!headCommit || !Array.isArray(payload?.commits)) return { ingested: [] };
 
     const keys = new Set<string>();
     for (const commit of payload.commits) {
       for (const file of [...(commit.added ?? []), ...(commit.modified ?? [])]) {
-        const match = /^packages\/modules\/([^/]+)\//.exec(file as string);
+        const match = /^packages\/modules\/([^/]+)\//.exec(file);
         if (match) keys.add(match[1]);
       }
     }

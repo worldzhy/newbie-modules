@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { ModuleHubInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 
@@ -145,7 +146,7 @@ export class ModuleHubInstallationService {
     private readonly auditLogService: AuditLogService,
   ) {}
 
-  private withDerivedState(row: any) {
+  private withDerivedState(row: ModuleHubInstallation) {
     const online =
       !row.revokedAt &&
       row.lastSeenAt != null &&
@@ -216,11 +217,11 @@ export class ModuleHubInstallationService {
    */
   async setTargetSpec(id: string, spec: Record<string, unknown> | null, actor?: string) {
     await this.getOrThrow(id);
-    // Prisma's Json? column type narrows null/objects at runtime; cast to any
-    // to accept both null (clears) and arbitrary JSON objects (sets).
+    // Nullable Json columns distinguish "clear the value" (DbNull) from
+    // "store an object" (InputJsonValue); plain null is not accepted.
     await this.prisma.moduleHubInstallation.update({
       where: { id },
-      data: { targetSpec: spec as any },
+      data: { targetSpec: spec === null ? Prisma.DbNull : (spec as Prisma.InputJsonValue) },
     });
     await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_TARGET_SPEC, {
       resourceType: INSTALLATION_RESOURCE_TYPE,
