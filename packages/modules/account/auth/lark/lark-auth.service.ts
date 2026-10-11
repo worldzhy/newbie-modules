@@ -9,6 +9,7 @@ import { TokenService } from "@modules/security/token/token.service";
 import { CookieService } from "@modules/security/cookie/cookie.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
 import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
+import { recordLoginFailure } from "@modules/account/auth/login-audit";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
 
 const FEISHU_AUTHORIZE_URL = "https://accounts.feishu.cn/open-apis/authen/v1/authorize";
@@ -217,6 +218,15 @@ export class LarkAuthService {
       // the location gate on subsequent password logins.
       await this.approvedSubnetService.approveNewSubnet(user.id, ipAddress);
     } else if (user.status === UserStatus.INACTIVE) {
+      // Lark OAuth proved control of the identity, so this is a login
+      // rejection of a known account rather than an upstream handshake
+      // failure (mirrors the Google OAuth INACTIVE branch in auth.service.ts).
+      await recordLoginFailure(this.auditLogService, {
+        actorId: user.id,
+        ipAddress,
+        userAgent,
+        detail: { reason: "inactive_user", provider: "lark" },
+      });
       throw new UnauthorizedException("The account is not active.");
     } else {
       // Refresh the profile snapshot on returning logins. Email/phone are

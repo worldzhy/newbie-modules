@@ -191,7 +191,15 @@ export class AuthService {
       where: { id: params.userId },
       select: { email: true, name: true, emails: true, checkLocationOnLogin: true },
     });
-    if (!user) throw new NotFoundException(USER_NOT_FOUND);
+    if (!user) {
+      await recordLoginFailure(this.auditLogService, {
+        actorId: params.userId,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        detail: { reason: "user_not_found" },
+      });
+      throw new NotFoundException(USER_NOT_FOUND);
+    }
 
     if (!user.emails.find((i) => i.email === user.email)?.isVerified) {
       await recordLoginFailure(this.auditLogService, {

@@ -3,6 +3,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { TokenService } from "@modules/security/token/token.service";
 import { expose } from "@modules/account/helpers/expose";
+import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 
 @Injectable()
 export class WechatAuthService {
@@ -10,6 +11,7 @@ export class WechatAuthService {
     private readonly prisma: PrismaService,
     private readonly sessionService: SessionService,
     private readonly tokenService: TokenService,
+    private readonly auditLogService: AuditLogService,
   ) {}
 
   async login(params: { ipAddress: string; userAgent: string; phone: string; openId: string }) {
@@ -41,6 +43,8 @@ export class WechatAuthService {
     });
 
     const accessTokenInfo = this.tokenService.verifyUserAccessToken(session.accessToken);
+
+    await this.auditLogService.record(AuditEvent.LOGIN, { actorId: user.id, ipAddress, userAgent });
 
     // [step 4] Return tokens.
     return {
