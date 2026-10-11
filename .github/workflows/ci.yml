@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      # Module business-logic tests (e.g. account/auth/login-audit-coverage.test.ts)
+      # cannot run standalone here: this registry has no NestJS/zod/etc.
+      # dependencies installed, by design (modules are copied into a consumer
+      # project via `newbie install`, not built in place). The real
+      # enforcement point for those tests is the consumer's own CI
+      # (see nightwatch-backend/.github/workflows/ci.yml `npm test`), which
+      # picks them up once the module is assembled.
