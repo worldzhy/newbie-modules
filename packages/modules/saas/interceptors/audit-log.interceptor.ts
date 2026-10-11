@@ -5,9 +5,9 @@ import { getClientIp } from "request-ip";
 import { Observable } from "rxjs";
 import { tap } from "rxjs/operators";
 import { UAParser } from "ua-parser-js";
-import { AUDIT_LOG_DATA } from "../modules/audit-logs/audit-log.constants";
-import { UserRequest } from "../modules/auth/auth.interface";
-import { WebhooksService } from "../modules/webhooks/webhooks.service";
+import { AUDIT_LOG_DATA } from "@modules/saas/modules/audit-logs/audit-log.constants";
+import { UserRequest } from "@modules/saas/modules/auth/auth.interface";
+import { WebhooksService } from "@modules/saas/modules/webhooks/webhooks.service";
 import { GeolocationService } from "../providers/geolocation/geolocation.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 

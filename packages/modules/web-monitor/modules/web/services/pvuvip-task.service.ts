@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { SiteService } from "../../../modules/site/site.service";
+import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { PvuvipService } from "./pvuvip.service";
 import { func, mapWithConcurrency } from "../../../shared/utils";
 

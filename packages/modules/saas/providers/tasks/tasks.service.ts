@@ -1,9 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { DomainsService } from "../../modules/domains/domains.service";
-import { MetricsService } from "../../modules/metrics/metrics.service";
-import { UsersService } from "../../modules/users/users.service";
+import { DomainsService } from "@modules/saas/modules/domains/domains.service";
+import { MetricsService } from "@modules/saas/modules/metrics/metrics.service";
+import { UsersService } from "@modules/saas/modules/users/users.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ElasticsearchService } from "@modules/elasticsearch/elasticsearch.service";
 

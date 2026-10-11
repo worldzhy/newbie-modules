@@ -1,5 +1,5 @@
 import { Global, Module } from "@nestjs/common";
-import { TwoFactorModule } from "../modules/two-factor/two-factor.module";
+import { TwoFactorModule } from "@modules/account/modules/two-factor/two-factor.module";
 
 import { LoginByApprovedSubnetController } from "./login-by-approved-subnet.controller";
 import { LoginByGoogleController } from "./login-by-google.controller";

@@ -1,10 +1,10 @@
 import { BadRequestException, Controller, HttpException, HttpStatus, Post, Req, Headers, Body } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
-import { SiteService } from "../../modules/site/site.service";
+import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { ConfigService } from "@nestjs/config";
 import { func, getRandomIp } from "../../shared/utils";
-import { DayReportNumService } from "../../modules/day-report/day-report-num.service";
+import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { RedisService } from "../../models/redis/redis.service";
 import { RedisKeys } from "../../models/enum";
 import { WebTokenResolver } from "../../services/web-token.resolver";

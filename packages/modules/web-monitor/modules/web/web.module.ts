@@ -2,9 +2,9 @@ import { Module } from "@nestjs/common";
 import { MonitorClickhouseModule } from "../../models/clickhouse/monitor-clickhouse.module";
 import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
 import { SharedModule } from "../../shared/shared.module";
-import { DayReportModule } from "../../modules/day-report/day-report.module";
+import { DayReportModule } from "@modules/web-monitor/modules/day-report/day-report.module";
 import { RedisModule } from "../../models/redis/redis.module";
-import { SiteModule } from "../../modules/site/site.module";
+import { SiteModule } from "@modules/web-monitor/modules/site/site.module";
 import { WebInstallationService } from "../../services/web-installation.service";
 import { WebTokenResolver } from "../../services/web-token.resolver";
 

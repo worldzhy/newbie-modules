@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { RedisService } from "../../../models/redis/redis.service";
-import { SiteService } from "../../../modules/site/site.service";
+import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { MonitorClickhouseService } from "../../../models/clickhouse/monitor-clickhouse.service";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
 import { func } from "../../../shared/utils";

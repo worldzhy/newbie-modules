@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
 import { RedisService } from "../../../models/redis/redis.service";
-import { SiteService } from "../../../modules/site/site.service";
+import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { func } from "../../../shared/utils";
 import https from "https";
 import { RedisKeyPrefix } from "../../../models/enum";

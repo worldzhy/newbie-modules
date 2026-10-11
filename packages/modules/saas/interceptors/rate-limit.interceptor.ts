@@ -5,7 +5,7 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { getClientIp } from "request-ip";
 import { Observable } from "rxjs";
 import { RATE_LIMIT_EXCEEDED } from "../errors/errors.constants";
-import { UserRequest } from "../modules/auth/auth.interface";
+import { UserRequest } from "@modules/saas/modules/auth/auth.interface";
 
 @Injectable()
 export class RateLimitInterceptor implements NestInterceptor {

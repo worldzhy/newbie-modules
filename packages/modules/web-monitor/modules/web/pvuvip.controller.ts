@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
-import { DayReportNumService } from "../../modules/day-report/day-report-num.service";
+import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { func } from "../../shared/utils";
 import { PvuvipService } from "./services/pvuvip.service";
 import { WebMonitorPvUvIpResponseDto } from "./pvuvip.dto";
