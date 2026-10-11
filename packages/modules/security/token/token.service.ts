@@ -1,15 +1,22 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import cryptoRandomString from "crypto-random-string";
-import { sign, verify } from "jsonwebtoken";
+import { JwtPayload, sign, SignOptions, verify } from "jsonwebtoken";
 import { v4 } from "uuid";
 import { INVALID_TOKEN } from "@devbie/newbie/exceptions/errors.constants";
 import { TokenSubject } from "./token.constants";
 import express from "express";
 
+/** Shape of the `modules.security.token` configuration subtree. */
+interface TokenModuleConfig {
+  defaultSecret: string;
+  userAccess: { secret: string; expiresIn: SignOptions["expiresIn"] };
+  userRefresh: { secret: string; expiresIn: SignOptions["expiresIn"] };
+}
+
 @Injectable()
 export class TokenService {
-  private tokenConfig: any;
+  private tokenConfig: TokenModuleConfig;
 
   constructor(private config: ConfigService) {
     this.tokenConfig = this.config.getOrThrow("modules.security.token");
@@ -18,28 +25,28 @@ export class TokenService {
   /**
    * Sign a JWT
    */
-  sign(params: {
-    payload: number | string | object | Buffer;
-    secret?: string | null;
-    options: { subject: string; expiresIn: string | number; jwtid?: string };
-  }) {
+  sign(params: { payload: number | string | object | Buffer; secret?: string | null; options: SignOptions }) {
     let { payload, secret } = params;
     const { options } = params;
     if (typeof payload === "number") payload = payload.toString();
-    secret = secret ?? (this.tokenConfig.defaultSecret as string);
-    return sign(payload, secret, options as any);
+    secret = secret ?? this.tokenConfig.defaultSecret;
+    return sign(payload, secret, options);
   }
 
   /**
    * Verify and decode a JWT
    */
-  verify<T>(params: { token: string; secret?: string | null; options: { subject: string } }) {
+  verify<T extends JwtPayload | string>(params: {
+    token: string;
+    secret?: string | null;
+    options: { subject: string };
+  }) {
     const { token, options } = params;
     let { secret } = params;
-    secret = secret ?? (this.tokenConfig.defaultSecret as string);
+    secret = secret ?? this.tokenConfig.defaultSecret;
 
     try {
-      return verify(token, secret, options) as any as T;
+      return verify(token, secret, options) as T;
     } catch (error) {
       throw new UnauthorizedException(INVALID_TOKEN);
     }
@@ -106,7 +113,7 @@ export class TokenService {
   /**
    * Sign user refresh token
    */
-  signUserRefreshToken(payload: { userId: string }, options?: { expiresIn: string | number }) {
+  signUserRefreshToken(payload: { userId: string }, options?: { expiresIn: SignOptions["expiresIn"] }) {
     return this.sign({
       payload,
       secret: this.tokenConfig.userRefresh.secret || this.tokenConfig.defaultSecret,

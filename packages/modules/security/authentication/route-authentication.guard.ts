@@ -1,4 +1,4 @@
-import { Injectable, ExecutionContext } from "@nestjs/common";
+import { Injectable, ExecutionContext, CanActivate } from "@nestjs/common";
 import { RouteAuthenticationService } from "./route-authentication.service";
 import { GuardType } from "./guard.types";
 import { ApiKeyAuthGuard } from "./api-key/api-key.guard";
@@ -28,7 +28,7 @@ export class RouteAuthenticationGuard {
       return true;
     }
 
-    let guard: any;
+    let guard: CanActivate;
     switch (guardType) {
       case GuardType.API_KEY:
         guard = this.apiKeyAuthGuard;
@@ -53,7 +53,8 @@ export class RouteAuthenticationGuard {
     }
 
     if (guard) {
-      return guard.canActivate(context) as boolean;
+      // None of the concrete guards return an Observable; narrow the union away.
+      return guard.canActivate(context) as boolean | Promise<boolean>;
     }
     return true;
   }

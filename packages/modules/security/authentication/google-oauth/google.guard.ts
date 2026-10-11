@@ -50,7 +50,7 @@ export class GoogleAuthGuard extends AuthGuard(GuardType.GOOGLE) {
     return { state, session: false };
   }
 
-  handleRequest(err: BadRequestException, user: any) {
+  handleRequest<TUser>(err: BadRequestException | null, user: TUser): TUser {
     if (err) throw new BadRequestException("Google authorization verification failed");
     return user;
   }
