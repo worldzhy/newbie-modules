@@ -102,10 +102,11 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
     try {
       const result = await this.query({ query: `DESCRIBE TABLE ${table}`, format: "JSONEachRow" });
       return (await result.json()) as ClickhouseColumnMeta[];
-    } catch (err: any) {
-      const msg = String(err?.message || err);
+    } catch (err: unknown) {
+      const e = err as { message?: string; code?: number };
+      const msg = String(e?.message || err);
       // ClickHouse error code 60 / "doesn't exist" / "does not exist" → table missing.
-      if (msg.includes("does not exist") || msg.includes("doesn't exist") || err?.code === 60) {
+      if (msg.includes("does not exist") || msg.includes("doesn't exist") || e?.code === 60) {
         return null;
       }
       throw err; // Re-throw unexpected errors (network, auth, etc.).

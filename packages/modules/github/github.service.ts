@@ -18,6 +18,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Octokit HTTP errors (RequestError) carry a numeric `status`. Extract it
+// from an unknown thrown value without a bare `any` cast.
+function octokitStatus(error: unknown): number | undefined {
+  return (error as { status?: number }).status;
+}
+
 // Extract the env-var key from a placeholder line. Accepts:
 //   "# FOO=..." / "# FOO = ..." / "FOO=..." / "  #FOO=..."
 // Returns null for lines without an `KEY=` pattern.
@@ -103,8 +109,8 @@ export class GitHubService {
     try {
       const { data } = await this.octokit.repos.get({ owner: org, repo: name });
       return { cloneUrl: data.clone_url, generated: false };
-    } catch (e: any) {
-      if (e.status !== 404) throw e;
+    } catch (e: unknown) {
+      if (octokitStatus(e) !== 404) throw e;
     }
 
     // 2. Generate from template. 422 here means the name is taken by a repo
@@ -120,8 +126,8 @@ export class GitHubService {
         private: true,
       });
       gen = resp.data;
-    } catch (e: any) {
-      if (e.status === 422) throw new RepoNameConflictError(org, name);
+    } catch (e: unknown) {
+      if (octokitStatus(e) === 422) throw new RepoNameConflictError(org, name);
       throw e;
     }
 
@@ -132,8 +138,8 @@ export class GitHubService {
       try {
         await this.octokit.repos.get({ owner: org, repo: name });
         break;
-      } catch (e: any) {
-        if (e.status !== 404) throw e;
+      } catch (e: unknown) {
+        if (octokitStatus(e) !== 404) throw e;
         if (i === 2) {
           this.logger.warn(`Repo ${org}/${name} not ready after 3 retries, continuing anyway`);
         }
@@ -155,8 +161,8 @@ export class GitHubService {
         return null;
       }
       return Buffer.from(data.content, "base64").toString("utf-8");
-    } catch (e: any) {
-      if (e.status === 404) return null;
+    } catch (e: unknown) {
+      if (octokitStatus(e) === 404) return null;
       throw e;
     }
   }
@@ -186,8 +192,8 @@ export class GitHubService {
         sha = data.sha;
         existing = Buffer.from(data.content, "base64").toString("utf-8");
       }
-    } catch (e: any) {
-      if (e.status !== 404) throw e;
+    } catch (e: unknown) {
+      if (octokitStatus(e) !== 404) throw e;
       // 404 → file does not exist yet; create it below.
     }
 
@@ -218,8 +224,8 @@ export class GitHubService {
   async deleteRepo(org: string, repo: string): Promise<void> {
     try {
       await this.octokit.repos.delete({ owner: org, repo });
-    } catch (e: any) {
-      if (e.status !== 404) throw e;
+    } catch (e: unknown) {
+      if (octokitStatus(e) !== 404) throw e;
     }
   }
 }

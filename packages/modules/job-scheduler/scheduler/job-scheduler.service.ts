@@ -170,9 +170,9 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
           declaration.timezone ?? DEFAULT_TIMEZONE
         })`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Concurrent declaration (e.g. another process bootstrapping) won the race.
-      if (error?.code !== PG_UNIQUE_VIOLATION) {
+      if ((error as { code?: string })?.code !== PG_UNIQUE_VIOLATION) {
         throw error;
       }
     }

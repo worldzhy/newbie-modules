@@ -64,8 +64,8 @@ export class NotificationSettingService implements OnApplicationBootstrap {
             scope: declared.scope ?? DEFAULT_NOTIFICATION_SCOPE,
           },
         });
-      } catch (error: any) {
-        if (error?.code !== PG_UNIQUE_VIOLATION) {
+      } catch (error: unknown) {
+        if ((error as { code?: string })?.code !== PG_UNIQUE_VIOLATION) {
           throw error;
         }
       }

@@ -303,7 +303,7 @@ export class AwsAuditService {
 
       await this.upsertFindings(projectId, scanId, report.findings);
       this.eventEmitter.emit("aws-audit.scan-completed", { projectId, scanId });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await this.prisma.awsAuditScan.update({
         where: { id: scanId },
         data: {
@@ -1145,8 +1145,8 @@ export class AwsAuditService {
         passwordReusePrevention: policy.PasswordReusePrevention || null,
         hardExpiry: policy.HardExpiry || false,
       };
-    } catch (error: any) {
-      if (error?.name === "NoSuchEntityException") {
+    } catch (error: unknown) {
+      if (this.getAwsErrorName(error) === "NoSuchEntityException") {
         return null;
       }
       throw error;
@@ -1622,16 +1622,17 @@ export class AwsAuditService {
   private async safeBucketCall<T>(fn: () => Promise<T>) {
     try {
       return await fn();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const name = this.getAwsErrorName(error);
       if (
-        error?.name === "NoSuchPublicAccessBlockConfiguration" ||
-        error?.name === "ServerSideEncryptionConfigurationNotFoundError" ||
-        error?.name === "NoSuchBucketPolicy" ||
-        error?.name === "NoSuchBucket"
+        name === "NoSuchPublicAccessBlockConfiguration" ||
+        name === "ServerSideEncryptionConfigurationNotFoundError" ||
+        name === "NoSuchBucketPolicy" ||
+        name === "NoSuchBucket"
       ) {
         return null;
       }
-      if (error?.$metadata?.httpStatusCode === 404) {
+      if (this.getAwsHttpStatus(error) === 404) {
         return null;
       }
       throw error;
@@ -1779,7 +1780,7 @@ export class AwsAuditService {
   ) {
     try {
       return await fn();
-    } catch (error: any) {
+    } catch (error: unknown) {
       errors.push({
         service,
         message: this.getErrorMessage(error),
@@ -1788,8 +1789,20 @@ export class AwsAuditService {
     }
   }
 
-  private getErrorMessage(error: any) {
-    return error?.message || error?.name || "Unknown AWS audit error";
+  private getErrorMessage(error: unknown): string {
+    const e = error as { message?: string; name?: string };
+    return e?.message || e?.name || "Unknown AWS audit error";
+  }
+
+  // AWS SDK v3 service exceptions carry a `name`; extract it from an unknown
+  // thrown value without a bare `any` cast.
+  private getAwsErrorName(error: unknown): string | undefined {
+    return (error as { name?: string })?.name;
+  }
+
+  // AWS SDK v3 errors expose the HTTP status via `$metadata.httpStatusCode`.
+  private getAwsHttpStatus(error: unknown): number | undefined {
+    return (error as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
   }
 
   private normalizeRegion(region: string) {

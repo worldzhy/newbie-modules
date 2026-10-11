@@ -246,7 +246,7 @@ export class DependencyScanService {
       this.logger.log(
         `Dependency scan ${scanId} finished for application ${application.name}: ${result.findings.length} findings across ${result.packageCount} packages`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       const errorMessage = this.getErrorMessage(error);
       await this.prisma.dependencyScan.update({
         where: { id: scanId },
@@ -562,7 +562,8 @@ export class DependencyScanService {
     return { owner: match[1], repo: match[2] };
   }
 
-  private getErrorMessage(error: any) {
-    return error?.message || error?.name || "Unknown dependency scan error";
+  private getErrorMessage(error: unknown): string {
+    const e = error as { message?: string; name?: string };
+    return e?.message || e?.name || "Unknown dependency scan error";
   }
 }
