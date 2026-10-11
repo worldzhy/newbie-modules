@@ -17,6 +17,17 @@ export function hashHeartbeatToken(token: string): string {
 }
 
 /**
+ * Normalized liveness snapshot of one externalRef, ready for host-side
+ * aggregation. `online` is true when at least one non-revoked installation
+ * sharing the ref has pinged within the online threshold; `lastSeenAt`
+ * carries the newest ping across them (null until the first contact).
+ */
+export interface HeartbeatLivenessSnapshot {
+  online: boolean;
+  lastSeenAt: Date | null;
+}
+
+/**
  * Installation registry for the heartbeat module. One token = one deployment
  * endpoint; the host pre-creates rows and distributes the plaintext token out
  * of band, and the running process touches lastSeenAt on every ping.
@@ -98,24 +109,34 @@ export class HeartbeatInstallationService {
   // -------------------------------------------------------------------------
 
   /**
-   * Batch liveness lookup for host-side list views: externalRef -> online.
-   * One query for the whole set; an externalRef with no online installation
-   * (or none at all) is simply absent from the map.
+   * Batch liveness lookup for host-side list views: externalRef -> snapshot.
+   * One query for the whole set; an externalRef with no non-revoked
+   * installation is absent from the map. Refs with installations that have
+   * never pinged are present with online=false and lastSeenAt=null.
    */
-  async getOnlineByExternalRefs(externalRefs: string[]): Promise<Map<string, boolean>> {
+  async getLivenessByExternalRefs(externalRefs: string[]): Promise<Map<string, HeartbeatLivenessSnapshot>> {
     if (externalRefs.length === 0) return new Map();
     const rows = await this.prisma.heartbeatInstallation.findMany({
       where: { externalRef: { in: externalRefs }, revokedAt: null },
       select: { externalRef: true, lastSeenAt: true },
     });
-    const online = new Map<string, boolean>();
+    const snapshots = new Map<string, HeartbeatLivenessSnapshot>();
     const now = Date.now();
     for (const row of rows) {
-      if (!row.externalRef || !row.lastSeenAt) continue;
-      const isOnline = now - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS;
-      online.set(row.externalRef, (online.get(row.externalRef) ?? false) || isOnline);
+      if (!row.externalRef) continue;
+      const prev = snapshots.get(row.externalRef);
+      // Any online installation keeps the whole ref online; lastSeenAt is
+      // the newest ping across the installations sharing the ref.
+      const lastSeenAt =
+        row.lastSeenAt && (!prev?.lastSeenAt || row.lastSeenAt > prev.lastSeenAt)
+          ? row.lastSeenAt
+          : (prev?.lastSeenAt ?? null);
+      const online =
+        (prev?.online ?? false) ||
+        (row.lastSeenAt != null && now - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS);
+      snapshots.set(row.externalRef, { online, lastSeenAt });
     }
-    return online;
+    return snapshots;
   }
 
   /**
