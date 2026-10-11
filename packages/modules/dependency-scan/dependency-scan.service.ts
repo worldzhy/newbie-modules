@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
+import { DependencyScan, DependencyScanFinding, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { GitHubService } from "@modules/github/github.service";
 
@@ -11,7 +12,7 @@ interface LockedPackage {
   dev: boolean;
 }
 
-interface DependencyScanFindingInput {
+type DependencyScanFindingInput = {
   packageName: string;
   packageVersion: string;
   isDev: boolean;
@@ -21,6 +22,23 @@ interface DependencyScanFindingInput {
   title: string;
   detail?: string;
   fixedVersion?: string | null;
+};
+
+interface LockfilePackageEntry {
+  version?: string;
+  dev?: boolean;
+}
+
+/** Subset of the OSV vulnerability record consumed by this module. */
+interface OsvVulnerability {
+  aliases?: string[];
+  summary?: string;
+  details?: string;
+  database_specific?: { severity?: string };
+  affected?: {
+    package?: { name?: string };
+    ranges?: { events?: { fixed?: string }[] }[];
+  }[];
 }
 
 const OSV_API_BASE = "https://api.osv.dev";
@@ -169,7 +187,7 @@ export class DependencyScanService {
     };
   }
 
-  private serializeScan(scan: any) {
+  private serializeScan(scan: DependencyScan) {
     return {
       id: scan.id,
       applicationId: scan.applicationId,
@@ -187,7 +205,7 @@ export class DependencyScanService {
     };
   }
 
-  private serializeFinding(finding: any) {
+  private serializeFinding(finding: DependencyScanFinding) {
     return {
       id: finding.id,
       packageName: finding.packageName,
@@ -228,8 +246,8 @@ export class DependencyScanService {
         where: { id: scanId },
         data: {
           status: "SUCCESS",
-          summary: result.report.summary as any,
-          report: result.report as any,
+          summary: result.report.summary as Prisma.InputJsonValue,
+          report: result.report as Prisma.InputJsonValue,
           lockfilePath: result.lockfilePath,
           packageCount: result.packageCount,
           finishedAt: new Date(),
@@ -362,14 +380,14 @@ export class DependencyScanService {
    * not usable for precise vulnerability matching.
    */
   private parsePackageLock(content: string): LockedPackage[] {
-    const lock = JSON.parse(content);
+    const lock = JSON.parse(content) as { packages?: Record<string, LockfilePackageEntry> } | null;
     const packages = lock?.packages;
     if (!packages || typeof packages !== "object") {
       throw new Error("Unsupported package-lock.json format: missing packages map (lockfileVersion 2+ required).");
     }
 
     const result = new Map<string, LockedPackage>();
-    for (const [path, meta] of Object.entries(packages) as [string, any][]) {
+    for (const [path, meta] of Object.entries(packages)) {
       if (!path) continue; // root entry
       const marker = "node_modules/";
       const index = path.lastIndexOf(marker);
@@ -411,8 +429,8 @@ export class DependencyScanService {
     return results;
   }
 
-  private async fetchVulnDetails(vulnIds: string[]): Promise<Map<string, any>> {
-    const details = new Map<string, any>();
+  private async fetchVulnDetails(vulnIds: string[]): Promise<Map<string, OsvVulnerability>> {
+    const details = new Map<string, OsvVulnerability>();
     for (let index = 0; index < vulnIds.length; index += VULN_DETAIL_CONCURRENCY) {
       const chunk = vulnIds.slice(index, index + VULN_DETAIL_CONCURRENCY);
       const responses = await Promise.all(
@@ -431,7 +449,11 @@ export class DependencyScanService {
     return details;
   }
 
-  private buildFinding(pkg: LockedPackage, vulnId: string, vuln: any): DependencyScanFindingInput {
+  private buildFinding(
+    pkg: LockedPackage,
+    vulnId: string,
+    vuln: OsvVulnerability | undefined,
+  ): DependencyScanFindingInput {
     return {
       packageName: pkg.name,
       packageVersion: pkg.version,
@@ -448,7 +470,7 @@ export class DependencyScanService {
     };
   }
 
-  private extractSeverity(vuln: any): Severity {
+  private extractSeverity(vuln: OsvVulnerability | undefined): Severity {
     const raw = vuln?.database_specific?.severity;
     if (typeof raw === "string") {
       const value = raw.toLowerCase();
@@ -462,7 +484,7 @@ export class DependencyScanService {
     return "unknown";
   }
 
-  private extractFixedVersion(vuln: any, packageName: string): string | null {
+  private extractFixedVersion(vuln: OsvVulnerability | undefined, packageName: string): string | null {
     const affected = Array.isArray(vuln?.affected) ? vuln.affected : [];
     for (const entry of affected) {
       const affectedName = entry?.package?.name;
