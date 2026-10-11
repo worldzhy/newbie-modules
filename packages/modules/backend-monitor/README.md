@@ -35,7 +35,7 @@ The module owns its own token table, `BackendMonitorInstallation`
   ingest (PG write throttled to 30s; positive/negative token caches 60s/10s).
 
 The reporter side ships in `@newbie/core` (`BackendMonitorModule.forRoot`,
-env `BACKEND_MONITOR_API_URL` / `BACKEND_MONITOR_REPORT_TOKEN`); it POSTs to
+env `BACKEND_MONITOR_ENDPOINT` / `BACKEND_MONITOR_TOKEN`); it POSTs to
 `/backend-monitor/ingest` with `X-Backend-Monitor-Token`.
 
 ## Storage
