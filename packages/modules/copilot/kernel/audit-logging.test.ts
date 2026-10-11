@@ -157,12 +157,14 @@ describe("Copilot audit logging", () => {
         : { text: "confirmed and written" },
     );
 
-    const iterator = runner.run({ model, context: makeContext(), userMessage: "run", history: [] })[
-      Symbol.asyncIterator
-    ]();
+    const iterator = runner
+      .run({ model, context: makeContext(), userMessage: "run", history: [] })
+      [Symbol.asyncIterator]();
     for (let i = 0; i < 3; i += 1) await iterator.next();
     // Third event is confirm-required; read it back from the audit trail.
-    const required = sink.entries.find((entry) => entry.category === "copilot.confirmation" && entry.phase === "required");
+    const required = sink.entries.find(
+      (entry) => entry.category === "copilot.confirmation" && entry.phase === "required",
+    );
     assert.ok(required);
     if (!required || required.category !== "copilot.confirmation") throw new Error("unreachable");
     assert.equal(required.skillName, "gated_audit_write");

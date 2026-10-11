@@ -2,14 +2,8 @@ import { Global, Module } from "@nestjs/common";
 import { CopilotModelController } from "./model/management/copilot-model.controller";
 import { CopilotModelService } from "./model/management/copilot-model.service";
 import { ActiveChatModelResolver } from "./model/active-chat-model.resolver";
-import {
-  CONFIRMATION_MANAGER,
-  InMemoryConfirmationManager,
-} from "./kernel/confirmation-manager";
-import {
-  CONVERSATION_STORE,
-  InMemoryConversationStore,
-} from "./kernel/conversation-store";
+import { CONFIRMATION_MANAGER, InMemoryConfirmationManager } from "./kernel/confirmation-manager";
+import { CONVERSATION_STORE, InMemoryConversationStore } from "./kernel/conversation-store";
 import { CopilotAuditLogger } from "./observability/copilot-audit.logger";
 
 /**
@@ -35,12 +29,6 @@ import { CopilotAuditLogger } from "./observability/copilot-audit.logger";
     { provide: CONVERSATION_STORE, useClass: InMemoryConversationStore },
     { provide: CONFIRMATION_MANAGER, useFactory: () => new InMemoryConfirmationManager() },
   ],
-  exports: [
-    CopilotModelService,
-    ActiveChatModelResolver,
-    CopilotAuditLogger,
-    CONVERSATION_STORE,
-    CONFIRMATION_MANAGER,
-  ],
+  exports: [CopilotModelService, ActiveChatModelResolver, CopilotAuditLogger, CONVERSATION_STORE, CONFIRMATION_MANAGER],
 })
 export class CopilotModule {}

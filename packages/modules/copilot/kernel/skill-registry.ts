@@ -6,8 +6,13 @@ import type { CopilotAuditSink, SkillAuditStatus } from "./audit-sink";
 import { NOOP_AUDIT_SINK } from "./audit-sink";
 import { summarizeBlocks } from "./blocks";
 import { summarizeForLog } from "./redaction";
-import { GENERAL_PAGE_ROUTE, type SkillCatalogEntry, type SkillDefinition, type SkillResult, type SkillResultKind } from
-  "./skill";
+import {
+  GENERAL_PAGE_ROUTE,
+  type SkillCatalogEntry,
+  type SkillDefinition,
+  type SkillResult,
+  type SkillResultKind,
+} from "./skill";
 import type { ToolSpecification } from "./chat-model.port";
 
 /** Minimal logging seam so the kernel never imports NestJS logging types. */

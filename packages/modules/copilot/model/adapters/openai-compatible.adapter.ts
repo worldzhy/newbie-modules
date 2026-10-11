@@ -16,9 +16,7 @@ export interface OpenAiCompatibleChatModelConfig {
   apiKey: string;
 }
 
-export function createOpenAiCompatibleChatModel(
-  config: OpenAiCompatibleChatModelConfig,
-): ChatModelPort {
+export function createOpenAiCompatibleChatModel(config: OpenAiCompatibleChatModelConfig): ChatModelPort {
   const provider = createOpenAICompatible({
     name: "copilot-active-model",
     baseURL: config.baseUrl,

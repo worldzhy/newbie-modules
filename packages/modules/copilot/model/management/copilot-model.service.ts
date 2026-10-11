@@ -7,11 +7,7 @@ import {
   TestCopilotModelResponseDto,
   UpdateCopilotModelDto,
 } from "./copilot-model.dto";
-import {
-  ANTHROPIC_PROVIDER,
-  ANTHROPIC_API_VERSION,
-  DEFAULT_ANTHROPIC_BASE_URL,
-} from "./copilot-providers";
+import { ANTHROPIC_PROVIDER, ANTHROPIC_API_VERSION, DEFAULT_ANTHROPIC_BASE_URL } from "./copilot-providers";
 
 type CopilotModelRecord = {
   id: string;

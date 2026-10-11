@@ -191,7 +191,10 @@ describe("SkillRegistry registration", () => {
         .sort(),
       ["page_specific"],
     );
-    assert.deepEqual(registry.listFor("web", "/elsewhere").map((s) => s.name), []);
+    assert.deepEqual(
+      registry.listFor("web", "/elsewhere").map((s) => s.name),
+      [],
+    );
   });
 });
 
@@ -309,9 +312,9 @@ async function driveUntilConfirmation(
   model: ChatModelPort,
 ): Promise<{ events: AgentEvent[]; rest: AsyncIterator<AgentEvent> }> {
   const events: AgentEvent[] = [];
-  const rest = runner.run({ model, context: makeContext(), userMessage: "do the write", history: [] })[
-    Symbol.asyncIterator
-  ]();
+  const rest = runner
+    .run({ model, context: makeContext(), userMessage: "do the write", history: [] })
+    [Symbol.asyncIterator]();
   for (let i = 0; i < 3; i += 1) {
     const current = await rest.next();
     assert.equal(current.done, false);
@@ -428,9 +431,7 @@ describe("AgentRunner confirmation gate", () => {
     assert.equal(finished?.type === "tool-finished" && finished.status, "denied");
     assert.match(finished?.type === "tool-finished" ? finished.summary : "", /Declined by the user/);
     assert.deepEqual(modelSawAfterDeny?.role, "tool");
-    const toolResult = modelSawAfterDeny?.toolResult as
-      | { ok: boolean; result?: { structured?: unknown } }
-      | undefined;
+    const toolResult = modelSawAfterDeny?.toolResult as { ok: boolean; result?: { structured?: unknown } } | undefined;
     assert.equal(toolResult?.ok, true);
     assert.deepEqual(toolResult?.result?.structured, { confirmation: "denied", reason: "user" });
   });

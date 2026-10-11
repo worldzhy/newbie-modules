@@ -45,7 +45,10 @@ export interface ConfirmationManager {
    * Registers a pending confirmation tied to the run's abort signal and
    * resolves when the user decides, the timeout elapses, or the run aborts.
    */
-  request(input: ConfirmationRequestInput, signal: AbortSignal): {
+  request(
+    input: ConfirmationRequestInput,
+    signal: AbortSignal,
+  ): {
     confirmationId: string;
     pending: PendingConfirmation;
     settled: Promise<ConfirmationOutcome>;
@@ -74,7 +77,10 @@ export class InMemoryConfirmationManager implements ConfirmationManager {
     this.timeoutMs = timeoutMs;
   }
 
-  request(input: ConfirmationRequestInput, signal: AbortSignal): {
+  request(
+    input: ConfirmationRequestInput,
+    signal: AbortSignal,
+  ): {
     confirmationId: string;
     pending: PendingConfirmation;
     settled: Promise<ConfirmationOutcome>;

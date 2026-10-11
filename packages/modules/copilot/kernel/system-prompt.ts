@@ -29,10 +29,7 @@ How to answer
  * business-specific prompt sections (e.g. monitoring analysis instructions)
  * without leaking host data dependencies into the kernel.
  */
-export type PromptSectionProvider = (
-  pageContext?: AgentPageContext,
-  skillNames?: readonly string[],
-) => string | null;
+export type PromptSectionProvider = (pageContext?: AgentPageContext, skillNames?: readonly string[]) => string | null;
 
 /**
  * Assemble the per-run system prompt. The base prompt is static; when the

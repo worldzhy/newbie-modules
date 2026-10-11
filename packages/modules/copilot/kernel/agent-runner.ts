@@ -13,7 +13,11 @@ import type { CopilotAuditSink } from "./audit-sink";
 import { NOOP_AUDIT_SINK } from "./audit-sink";
 import { boundBlocks } from "./blocks";
 import { redactValue, summarizeForLog } from "./redaction";
-import { InMemoryConfirmationManager, type ConfirmationManager, type ConfirmationOutcome } from "./confirmation-manager";
+import {
+  InMemoryConfirmationManager,
+  type ConfirmationManager,
+  type ConfirmationOutcome,
+} from "./confirmation-manager";
 import type { SkillEnvelope, SkillExecution } from "./skill-registry";
 import { SkillRegistry } from "./skill-registry";
 import type { SkillResultKind } from "./skill";
@@ -243,12 +247,7 @@ export class AgentRunner {
               ? this.deniedExecution(toolCall.name, denied)
               : await this.registry.executePrepared(context, toolCall.name, prepared.data, prepared.startedAt);
           } else {
-            execution = await this.registry.executePrepared(
-              context,
-              toolCall.name,
-              prepared.data,
-              prepared.startedAt,
-            );
+            execution = await this.registry.executePrepared(context, toolCall.name, prepared.data, prepared.startedAt);
           }
 
           // FR-7: blocks are forwarded only for skills that opted in, and
