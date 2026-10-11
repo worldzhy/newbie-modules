@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { BackendMonitorInstallation } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 /** Probes flush roughly every 5s; three minutes without a batch marks stale. */
@@ -23,7 +24,7 @@ export function hashMonitorToken(token: string): string {
 export class MonitorInstallationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private withDerivedState(row: any) {
+  private withDerivedState(row: BackendMonitorInstallation) {
     const online =
       !row.revokedAt &&
       row.lastSeenAt != null &&

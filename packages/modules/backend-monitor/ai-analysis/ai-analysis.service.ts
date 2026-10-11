@@ -33,6 +33,26 @@ interface ExecutedQuerySummary {
   rows: Array<Record<string, unknown>>;
 }
 
+/** SSE emitter callback shared by the streaming chat pipeline. */
+type AiAnalysisEmit = (event: string, data: unknown) => void;
+
+/** A single block of the AI query-plan response (text / chart / table). */
+interface AiResponseBlock {
+  type?: string;
+  text?: string;
+  sql?: string;
+  chart?: {
+    chartType: string;
+    title: string;
+    labelField: string;
+    dataFields?: { field: string; label: string }[];
+  };
+  table?: {
+    title: string;
+    columns: { field: string; headerName?: string; width?: number }[];
+  };
+}
+
 /** Forbidden SQL keywords to prevent destructive operations. */
 const FORBIDDEN_KEYWORDS =
   /\b(INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|TRUNCATE|GRANT|REVOKE|EXEC|EXECUTE|MERGE|CALL)\b/i;
@@ -146,12 +166,12 @@ export class AiAnalysisService {
   /**
    * Executes a validated ClickHouse query and returns the results.
    */
-  private async executeQuery(sql: string): Promise<any[]> {
+  private async executeQuery(sql: string): Promise<Record<string, unknown>[]> {
     const result = await this.clickhouse.query({
       query: sql,
       format: "JSONEachRow",
     });
-    return (await result.json()) as any[];
+    return (await result.json()) as Record<string, unknown>[];
   }
 
   /**
@@ -274,7 +294,7 @@ Example 5 — Specific date filter (April 21):
    *    a second streaming DeepSeek call to generate a data-backed insight summary
    *    (the "post-query analysis" pass using real numbers from the database)
    */
-  async chatStream(dto: AiAnalysisChatDto, emit: (event: string, data: any) => void): Promise<void> {
+  async chatStream(dto: AiAnalysisChatDto, emit: AiAnalysisEmit): Promise<void> {
     // Step 1: Validate application ID
     await this.resolveApplication(dto.applicationId);
 
@@ -322,7 +342,7 @@ Example 5 — Specific date filter (April 21):
     emit("status", { phase: "querying" });
 
     const aiResponse = fullContent.trim();
-    let parsed: { blocks: any[] };
+    let parsed: { blocks?: AiResponseBlock[] };
     try {
       // Try to extract a JSON object even when the model wraps it in markdown fences
       // or adds prose before/after. Strategy:
@@ -378,33 +398,32 @@ Example 5 — Specific date filter (April 21):
         }
 
         if (block.type === "chart" && block.sql && block.chart) {
+          const { chart } = block;
           const safeSql = this.validateQuery(block.sql, dto.applicationId);
           const rows = await this.executeQuery(safeSql);
 
           // Emit a text notice instead of an empty chart when there's no data
           if (rows.length === 0) {
             emit("text-token", {
-              content: `No data found for "${block.chart.title}". There may be no records matching the query criteria for the selected time range.`,
+              content: `No data found for "${chart.title}". There may be no records matching the query criteria for the selected time range.`,
             });
             emit("text-done", {});
             continue;
           }
 
-          const labels = rows.map((r) => String(r[block.chart.labelField] ?? ""));
-          const datasets = (block.chart.dataFields || []).map(
-            (df: { field: string; label: string }, index: number) => ({
-              label: df.label,
-              data: rows.map((r) => Number(r[df.field]) || 0),
-              backgroundColor: this.getChartColors(block.chart.chartType, rows.length, index),
-              borderColor: this.getChartBorderColor(index),
-            }),
-          );
+          const labels = rows.map((r) => String(r[chart.labelField] ?? ""));
+          const datasets = (chart.dataFields || []).map((df: { field: string; label: string }, index: number) => ({
+            label: df.label,
+            data: rows.map((r) => Number(r[df.field]) || 0),
+            backgroundColor: this.getChartColors(chart.chartType, rows.length, index),
+            borderColor: this.getChartBorderColor(index),
+          }));
 
           emit("block", {
             type: "chart",
             chart: {
-              chartType: block.chart.chartType,
-              title: block.chart.title,
+              chartType: chart.chartType,
+              title: chart.title,
               labels,
               datasets,
             },
@@ -414,7 +433,7 @@ Example 5 — Specific date filter (April 21):
           if (executedSummaries.length < MAX_ANALYSIS_QUERIES) {
             const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
             executedSummaries.push({
-              title: block.chart.title,
+              title: chart.title,
               blockType: "chart",
               columns,
               rows: rows.slice(0, MAX_ANALYSIS_ROWS_PER_QUERY),
@@ -554,7 +573,7 @@ P95 Response Time:
   private async generateAnalysisSummary(
     dto: AiAnalysisChatDto,
     summaries: ExecutedQuerySummary[],
-    emit: (event: string, data: any) => void,
+    emit: AiAnalysisEmit,
   ): Promise<void> {
     // Build a compact data-context string from all collected query summaries.
     // Each summary includes the query title, column names, and up to

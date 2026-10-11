@@ -41,7 +41,7 @@ export class AiAnalysisController {
     res.flushHeaders();
 
     try {
-      await this.aiAnalysisService.chatStream(body, (event: string, data: any) => {
+      await this.aiAnalysisService.chatStream(body, (event: string, data: unknown) => {
         if (event === "__keepalive__") {
           // SSE comment — keeps the connection alive, clients ignore it
           res.write(": keepalive\n\n");
