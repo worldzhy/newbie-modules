@@ -120,11 +120,7 @@ export class ApiKeyService {
     return await this.updateOwnedApiKey({ organizationId }, id, data, { actorId });
   }
 
-  async deleteApiKeyForOrganization(
-    organizationId: string,
-    id: number,
-    actorId?: string,
-  ): Promise<Expose<ApiKey>> {
+  async deleteApiKeyForOrganization(organizationId: string, id: number, actorId?: string): Promise<Expose<ApiKey>> {
     return await this.deleteOwnedApiKey({ organizationId }, id, { actorId });
   }
 

@@ -45,14 +45,6 @@ export class VoilaNorbertService {
         "Content-Type": "application/x-www-form-urlencoded",
       },
     };
-    // this.SearchEmailByDomain({
-    //   name: 'yiwen',
-    //   company: 'inceptionpad',
-    //   domain: 'inceptionpad.com',
-    // }).then(res => {
-    //   console.log(res);
-    // });
-    // this.verifyEmail({email: 'yiwen@inceptionpad.com', webhook: ''});
   }
 
   /**

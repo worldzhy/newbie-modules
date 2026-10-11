@@ -1,3 +1,4 @@
+import { Logger } from "@nestjs/common";
 import { OnQueueCompleted, Process, Processor } from "@nestjs/bull";
 import { Job } from "bull";
 import { AvailabilityExpressionStatus } from "@generated/prisma/client";
@@ -8,6 +9,7 @@ export const EventSchedulingQueue = "event-scheduling";
 
 @Processor(EventSchedulingQueue)
 export class AvailabilityJobProcessor {
+  private readonly logger = new Logger(AvailabilityJobProcessor.name);
   constructor(
     private readonly prisma: PrismaService,
     private availabilityService: AvailabilityService,
@@ -46,6 +48,6 @@ export class AvailabilityJobProcessor {
 
   @OnQueueCompleted()
   onCompleted(job: Job, result: any) {
-    console.log("Availability job " + job.id + " is completed.");
+    this.logger.log(`Availability job ${job.id} is completed.`);
   }
 }

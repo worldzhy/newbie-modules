@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import * as path from "node:path";
 import { ensureDir, readdir, readFileSync, remove } from "fs-extra";
 import { PDFDocument, PDFPageDrawTextOptions } from "pdf-lib";
@@ -8,6 +8,7 @@ const TEMP_PDF2PIC_DIR = path.join(process.cwd(), "temp/pdf2pic");
 
 @Injectable()
 export class PdfService {
+  private readonly logger = new Logger(PdfService.name);
   async drawTextOnPage(params: {
     pdfPath: string;
     pdfPage: number;
@@ -56,7 +57,7 @@ export class PdfService {
       const fileNames = await readdir(savePath);
       return fileNames.map((fileName) => path.join(savePath, fileName));
     } catch (error) {
-      console.error("PDF conversion to images failed: " + error.message);
+      this.logger.error("PDF conversion to images failed: " + (error instanceof Error ? error.message : String(error)));
       return [];
     }
   }
@@ -65,7 +66,7 @@ export class PdfService {
     try {
       await remove(TEMP_PDF2PIC_DIR);
     } catch (error) {
-      console.error("Remove temp images error:", error);
+      this.logger.error("Remove temp images error:", error instanceof Error ? error.message : String(error));
     }
   }
 
@@ -79,7 +80,7 @@ export class PdfService {
       const info = await convert.bulk(-1, { responseType: "buffer" });
       return info.length || 1; // Fall back to 1 page when the count cannot be obtained
     } catch (error) {
-      console.error("Failed to get PDF page count:", error);
+      this.logger.error("Failed to get PDF page count:", error instanceof Error ? error.message : String(error));
       return 1; // Fall back to 1 page on error
     }
   }

@@ -1,9 +1,10 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { HttpService } from "@nestjs/axios";
 
 @Injectable()
 export class GoogleTimezoneService {
+  private readonly logger = new Logger(GoogleTimezoneService.name);
   constructor(
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
@@ -44,7 +45,7 @@ export class GoogleTimezoneService {
         return timezoneResponse.data.timeZoneId as string;
       }
     } catch (error) {
-      console.log(error);
+      this.logger.error("timezone search failed", error instanceof Error ? error.message : String(error));
     }
 
     return "";

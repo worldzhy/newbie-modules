@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AvailabilityTimeslotStatus, Event, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -14,6 +14,7 @@ const CronParser = require("cron-parser");
 @Injectable()
 export class AvailabilityService {
   public MINUTES_Of_TIMESLOT_UNIT: number;
+  private readonly logger = new Logger(AvailabilityService.name);
 
   constructor(
     private readonly configService: ConfigService,
@@ -248,7 +249,7 @@ export class AvailabilityService {
         }
       }
     } catch (error) {
-      console.error(error);
+      this.logger.error("parseAvailabilityExpression failed", error instanceof Error ? error.message : String(error));
     }
 
     return timeslots;

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException } from "@nestjs/common";
+import { Injectable, InternalServerErrorException, Logger } from "@nestjs/common";
 import { Readable } from "stream";
 import { auth, drive, drive_v3 } from "@googleapis/drive";
 import { ConfigService } from "@nestjs/config";
@@ -23,6 +23,7 @@ type FilePathNode = {
 @Injectable()
 export class GoogleDriveFileService {
   private client: drive_v3.Drive;
+  private readonly logger = new Logger(GoogleDriveFileService.name);
   // Service accounts have NO storage quota. All files must live inside a
   // shared drive, so this ID is mandatory. Fail fast on startup if it is
   // missing — otherwise every upload would fail with 403 storageQuotaExceeded.
@@ -53,7 +54,7 @@ export class GoogleDriveFileService {
     const file = await this.prisma.googleDriveFile.findFirst({ where: { name } });
     if (file) {
       const response = await this.client.files.get({ fileId: file.id, supportsAllDrives: true });
-      console.log(response);
+      this.logger.log("getFile response", JSON.stringify(response?.data ?? {}));
     }
 
     return file;

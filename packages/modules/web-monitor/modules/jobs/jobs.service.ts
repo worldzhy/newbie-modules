@@ -418,7 +418,7 @@ export class JobsService implements OnModuleInit {
       const systems = await this.site.getSiteList();
       this.nodeCache.updateAllSiteCache(systems as any);
     } catch (e) {
-      console.error("IO error: failed to update cached appId info", e?.message || e);
+      this.logger.error("IO error: failed to update cached appId info", e instanceof Error ? e.message : String(e));
     }
   }
 
@@ -445,7 +445,7 @@ export class JobsService implements OnModuleInit {
     try {
       if (this.cfg.is_web_consume_task_run) await this.consumeWebQueue();
     } catch (e) {
-      console.error("Consumer queue exception", e?.message || e);
+      this.logger.error("Consumer queue exception", e instanceof Error ? e.message : String(e));
     }
     // Can later be split into a standalone cron job if needed
   }

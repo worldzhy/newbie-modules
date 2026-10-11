@@ -1,10 +1,11 @@
-import { Injectable, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 
 @Injectable()
 export class RedisService implements OnModuleInit {
   private client!: Redis;
+  private readonly logger = new Logger(RedisService.name);
 
   constructor(private readonly configService: ConfigService) {}
 
@@ -29,7 +30,7 @@ export class RedisService implements OnModuleInit {
       db: cfg.db,
     });
     this.client.connect().catch((err) => {
-      console.error("Redis connect error:", err?.message || err);
+      this.logger.error("Redis connect error:", err instanceof Error ? err.message : String(err));
     });
   }
 

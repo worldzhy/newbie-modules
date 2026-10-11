@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { auth, sheets, sheets_v4 } from "@googleapis/sheets";
 import { ConfigService } from "@nestjs/config";
 import { generateRandomNumber, number2alphabet } from "@devbie/newbie/utilities/common.util";
@@ -23,6 +23,7 @@ const DEFAULT_SHEET_TITLE = "Sheet1";
 @Injectable()
 export class GoogleSheetService {
   private client: sheets_v4.Sheets;
+  private readonly logger = new Logger(GoogleSheetService.name);
 
   constructor(private readonly config: ConfigService) {
     // Create a new JWT client using the key file downloaded from the Google Developer Console.
@@ -45,7 +46,7 @@ export class GoogleSheetService {
         requests: [{ addSheet: { properties: params.properties } }],
       },
     });
-    console.log(response);
+    this.logger.log("addSheet response", JSON.stringify(response?.data ?? {}));
     // if (params.headings && params.headings.length > 0) {
     //   await this.updateRow({
     //     fileId: file.id,

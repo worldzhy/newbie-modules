@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { RedisService } from "../../../models/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
@@ -26,6 +26,7 @@ interface DrainBuckets {
 @Injectable()
 export class WebReportTaskService {
   private cfg: Record<string, any>;
+  private readonly logger = new Logger(WebReportTaskService.name);
   constructor(
     private readonly config: ConfigService,
     private readonly redis: RedisService,
@@ -251,7 +252,7 @@ export class WebReportTaskService {
         await this.collectQueueItem(raw, buckets);
       } catch (e: unknown) {
         // A single malformed/poisoned item must not abort the rest of the batch.
-        console.error("web report item processing failed", e instanceof Error ? e.message : e);
+        this.logger.error("web report item processing failed", e instanceof Error ? e.message : String(e));
       }
     }
     await this.flushBuckets(buckets);
@@ -263,7 +264,7 @@ export class WebReportTaskService {
         await write();
       } catch (e: unknown) {
         // One failing destination must not suppress the remaining flushes.
-        console.error(`web report flush failed (${label})`, e instanceof Error ? e.message : e);
+        this.logger.error(`web report flush failed (${label})`, e instanceof Error ? e.message : String(e));
       }
     };
     for (const appId of Object.keys(buckets.appAjaxs)) {

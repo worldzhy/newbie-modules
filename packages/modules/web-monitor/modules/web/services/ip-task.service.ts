@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
 import { RedisService } from "../../../models/redis/redis.service";
@@ -10,6 +10,7 @@ import { RedisKeyPrefix } from "../../../models/enum";
 @Injectable()
 export class WebIpTaskService {
   private cfg: Record<string, any>;
+  private readonly logger = new Logger(WebIpTaskService.name);
   constructor(
     private readonly config: ConfigService,
     private readonly models: MonitorModelsService,
@@ -52,7 +53,7 @@ export class WebIpTaskService {
         await this.redis.set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`, new Date().toString());
       }
     } catch (err) {
-      console.log(err);
+      this.logger.error("saveWebGetIpDatasByOne failed", err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -116,7 +117,7 @@ export class WebIpTaskService {
       }
       return {};
     } catch (err) {
-      console.log(`Tencent API call error: ${err}`);
+      this.logger.error(`Tencent API call error: ${err instanceof Error ? err.message : err}`);
       return {};
     }
   }
