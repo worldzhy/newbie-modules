@@ -14,17 +14,31 @@ export class AjaxService {
 
   async getPageAjaxsAvg(appId: string, url?: string, beginTime?: string, endTime?: string) {
     const wheres: string[] = [];
-    if (url) wheres.push(`callUrl='${url}'`);
-    if (beginTime) wheres.push(`createTime>=toDateTime('${beginTime}')`);
-    if (endTime) wheres.push(`createTime<=toDateTime('${endTime}')`);
-    const where = wheres.length ? wheres.join(" and ") : undefined;
+    const queryParams: Record<string, unknown> = {};
+    if (url) {
+      wheres.push(`callUrl = {url:String}`);
+      queryParams.url = url;
+    }
+    if (beginTime) {
+      wheres.push(`createTime >= toDateTime({beginTime:String})`);
+      queryParams.beginTime = beginTime;
+    }
+    if (endTime) {
+      wheres.push(`createTime <= toDateTime({endTime:String})`);
+      queryParams.endTime = endTime;
+    }
+    const where = wheres.length ? wheres.join(" AND ") : undefined;
     const model = await this.ch.WebAjax(appId);
-    const countQuery = model.find([{ where, select: "url", groupBy: "url,method" }, { select: "count() as total" }]);
+    const countQuery = model.find([
+      { where, select: "url", groupBy: "url,method", queryParams },
+      { select: "count() as total" },
+    ]);
     const listQuery = model.find({
       where,
       select: "url,method,count() as count,floor(avg(duration)) as durationAvg,floor(avg(bodySize)) as bodySize",
       groupBy: "url,method",
       orderBy: "durationAvg DESC",
+      queryParams,
     });
     const [count, list] = await Promise.all([countQuery, listQuery]);
     list.forEach((item: any) => {
@@ -38,13 +52,26 @@ export class AjaxService {
     const { appId, beginTime, endTime, type = 1, url, pageSize = this.cfg.pageSize } = query;
     let pageNo = Number(query.pageNo || 1);
     const wheres: string[] = [];
-    if (parseInt(type) === 2) wheres.push("duration>2000");
-    if (url) wheres.push(`ilike(url,'%${url}%')`);
-    if (beginTime) wheres.push(`createTime>=toDateTime('${beginTime}')`);
-    if (endTime) wheres.push(`createTime<=toDateTime('${endTime}')`);
-    const where = wheres.length ? wheres.join(" and ") : undefined;
+    const queryParams: Record<string, unknown> = {};
+    if (parseInt(type) === 2) wheres.push("duration > 2000");
+    if (url) {
+      wheres.push(`ilike(url, {url:String})`);
+      queryParams.url = `%${url}%`;
+    }
+    if (beginTime) {
+      wheres.push(`createTime >= toDateTime({beginTime:String})`);
+      queryParams.beginTime = beginTime;
+    }
+    if (endTime) {
+      wheres.push(`createTime <= toDateTime({endTime:String})`);
+      queryParams.endTime = endTime;
+    }
+    const where = wheres.length ? wheres.join(" AND ") : undefined;
     const model = await this.ch.WebAjax(appId);
-    const countQuery = model.find([{ where, select: "url", groupBy: "url,method" }, { select: "count() as total" }]);
+    const countQuery = model.find([
+      { where, select: "url", groupBy: "url,method", queryParams },
+      { select: "count() as total" },
+    ]);
     const listQuery = model.find({
       where,
       select: "url,method,count() as count,floor(avg(duration)) as durationAvg,floor(avg(bodySize)) as bodySize",
@@ -52,6 +79,7 @@ export class AjaxService {
       limit: pageSize,
       skip: (pageNo - 1) * pageSize,
       orderBy: "durationAvg DESC",
+      queryParams,
     });
     const [count, list] = await Promise.all([countQuery, listQuery]);
     list.forEach((item: any) => {
@@ -74,19 +102,30 @@ export class AjaxService {
     pageSize = Number(pageSize);
     type = Number(type || 1);
     const wheres: string[] = [];
-    if (parseInt(String(type)) === 2) wheres.push("duration>2000");
-    if (url) wheres.push(`ilike(url,'%${url}%')`);
-    if (beginTime) wheres.push(`createTime>=toDateTime('${beginTime}')`);
-    if (endTime) wheres.push(`createTime<=toDateTime('${endTime}')`);
-    const where = wheres.length ? wheres.join(" and ") : undefined;
+    const queryParams: Record<string, unknown> = {};
+    if (parseInt(String(type)) === 2) wheres.push("duration > 2000");
+    if (url) {
+      wheres.push(`ilike(url, {url:String})`);
+      queryParams.url = `%${url}%`;
+    }
+    if (beginTime) {
+      wheres.push(`createTime >= toDateTime({beginTime:String})`);
+      queryParams.beginTime = beginTime;
+    }
+    if (endTime) {
+      wheres.push(`createTime <= toDateTime({endTime:String})`);
+      queryParams.endTime = endTime;
+    }
+    const where = wheres.length ? wheres.join(" AND ") : undefined;
     const model = await this.ch.WebAjax(appId);
-    const countQuery = model.find([{ where, select: "url" }, { select: "count() as total" }]);
+    const countQuery = model.find([{ where, select: "url", queryParams }, { select: "count() as total" }]);
     const listQuery = model.find({
       where,
       select: "*",
       limit: pageSize,
       skip: (pageNo - 1) * pageSize,
       orderBy: "createTime DESC",
+      queryParams,
     });
     const [count, list] = await Promise.all([countQuery, listQuery]);
     return { dataList: list, totalNum: count?.[0]?.total || 0, pageNo };
@@ -94,12 +133,22 @@ export class AjaxService {
 
   async getMarkUserAjaxList(appId: string, opts: { markUser?: string; beginTime?: string; endTime?: string }) {
     const wheres: string[] = [];
-    if (opts.markUser) wheres.push(`markUser='${opts.markUser}'`);
-    if (opts.beginTime) wheres.push(`createTime>=toDateTime('${opts.beginTime}')`);
-    if (opts.endTime) wheres.push(`createTime<toDateTime('${opts.endTime}')`);
-    const where = wheres.length ? wheres.join(" and ") : undefined;
+    const queryParams: Record<string, unknown> = {};
+    if (opts.markUser) {
+      wheres.push(`markUser = {markUser:String}`);
+      queryParams.markUser = opts.markUser;
+    }
+    if (opts.beginTime) {
+      wheres.push(`createTime >= toDateTime({beginTime:String})`);
+      queryParams.beginTime = opts.beginTime;
+    }
+    if (opts.endTime) {
+      wheres.push(`createTime < toDateTime({endTime:String})`);
+      queryParams.endTime = opts.endTime;
+    }
+    const where = wheres.length ? wheres.join(" AND ") : undefined;
     const model = await this.ch.WebAjax(appId);
-    const list = await model.find({ where, select: "*", orderBy: "createTime ASC" });
+    const list = await model.find({ where, select: "*", orderBy: "createTime ASC", queryParams });
     return { list };
   }
 }

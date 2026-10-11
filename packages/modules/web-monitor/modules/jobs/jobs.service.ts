@@ -218,8 +218,9 @@ export class JobsService implements OnModuleInit {
       const ajaxModel = await this.clickhouse.WebAjax(system.appId);
       const thresholdMs = (system.slowAjaxTime ?? 2) * 1000;
       const timeFilter = this.buildClickhouseTimeFilter(windowStart, windowEnd);
-      const filter = `${timeFilter} AND duration >= ${thresholdMs}`;
-      const countRows = await ajaxModel.find({ where: filter, select: "count() AS total" });
+      const filter = `${timeFilter.where} AND duration >= {thresholdMs:UInt32}`;
+      const queryParams = { ...timeFilter.queryParams, thresholdMs };
+      const countRows = await ajaxModel.find({ where: filter, select: "count() AS total", queryParams });
       const count = parseInt(countRows[0]?.total ?? "0", 10);
       if (count >= JobsService.MIN_SLOW_AJAX_COUNT) {
         const topRows = await ajaxModel.find({
@@ -228,6 +229,7 @@ export class JobsService implements OnModuleInit {
           groupBy: "url",
           orderBy: "count DESC",
           limit: JobsService.TOP_ITEMS_LIMIT,
+          queryParams,
         });
         this.emitAlert({
           ...base,
@@ -249,19 +251,21 @@ export class JobsService implements OnModuleInit {
       // traffic (empty markUser) cannot be attributed, so the user gate only
       // applies when at least one visitor in the window is identifiable.
       const countRows = await errorModel.find({
-        where: timeFilter,
+        where: timeFilter.where,
         select: "count() AS total, uniqExactIf(markUser, markUser != '') AS markedUsers",
+        queryParams: timeFilter.queryParams,
       });
       const count = parseInt(countRows[0]?.total ?? "0", 10);
       const markedUsers = parseInt(countRows[0]?.markedUsers ?? "0", 10);
       const enoughUsers = markedUsers === 0 || markedUsers >= JobsService.JS_ERROR_SPIKE_USER_COUNT;
       if (count >= JobsService.JS_ERROR_SPIKE_COUNT && enoughUsers) {
         const topRows = await errorModel.find({
-          where: timeFilter,
+          where: timeFilter.where,
           select: "name, type, resourceUrl, COUNT() AS count",
           groupBy: "name, type, resourceUrl",
           orderBy: "count DESC",
           limit: JobsService.TOP_ITEMS_LIMIT,
+          queryParams: timeFilter.queryParams,
         });
         this.emitAlert({
           ...base,
@@ -285,11 +289,12 @@ export class JobsService implements OnModuleInit {
       const errorModel = await this.clickhouse.WebError(system.appId);
       const timeFilter = this.buildClickhouseTimeFilter(windowStart, windowEnd);
       const groups = await errorModel.find({
-        where: timeFilter,
+        where: timeFilter.where,
         select: "name, resourceUrl, line, type, COUNT() AS count, uniqExactIf(markUser, markUser != '') AS users",
         groupBy: "name, resourceUrl, line, type",
         orderBy: "count DESC",
         limit: JobsService.NEW_ERROR_LIMIT,
+        queryParams: timeFilter.queryParams,
       });
       for (const row of groups) {
         const name = String(row.name ?? "Unknown error");
@@ -298,11 +303,10 @@ export class JobsService implements OnModuleInit {
         const fingerprint = this.errorFingerprint(name, resourceUrl, line);
         const beforeFilter = this.buildClickhouseBeforeFilter(windowStart);
         const existedRows = await errorModel.find({
-          where:
-            `${beforeFilter} AND name = ${this.chLiteral(name)} ` +
-            `AND resourceUrl = ${this.chLiteral(resourceUrl)} AND line = ${this.chLiteral(line)}`,
+          where: `${beforeFilter.where} AND name = {name:String} AND resourceUrl = {resourceUrl:String} AND line = {line:String}`,
           select: "1",
           limit: 1,
+          queryParams: { ...beforeFilter.queryParams, name, resourceUrl, line },
         });
         if (existedRows.length > 0) continue;
         this.emitAlert({
@@ -343,21 +347,27 @@ export class JobsService implements OnModuleInit {
     }
   }
 
-  private buildClickhouseTimeFilter(windowStart: Date, windowEnd: Date): string {
-    return (
-      `createTime >= toDateTime('${this.toShanghaiDateTime(windowStart)}', 'Asia/Shanghai') ` +
-      `AND createTime < toDateTime('${this.toShanghaiDateTime(windowEnd)}', 'Asia/Shanghai')`
-    );
+  private buildClickhouseTimeFilter(
+    windowStart: Date,
+    windowEnd: Date,
+  ): { where: string; queryParams: Record<string, unknown> } {
+    return {
+      where:
+        `createTime >= toDateTime({windowStart:String}, 'Asia/Shanghai') ` +
+        `AND createTime < toDateTime({windowEnd:String}, 'Asia/Shanghai')`,
+      queryParams: {
+        windowStart: this.toShanghaiDateTime(windowStart),
+        windowEnd: this.toShanghaiDateTime(windowEnd),
+      },
+    };
   }
 
   /** Upper-bound filter for checking whether an error fingerprint existed earlier. */
-  private buildClickhouseBeforeFilter(windowStart: Date): string {
-    return `createTime < toDateTime('${this.toShanghaiDateTime(windowStart)}', 'Asia/Shanghai')`;
-  }
-
-  /** Escapes a value as a ClickHouse single-quoted string literal. */
-  private chLiteral(value: string): string {
-    return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+  private buildClickhouseBeforeFilter(windowStart: Date): { where: string; queryParams: Record<string, unknown> } {
+    return {
+      where: `createTime < toDateTime({windowStart:String}, 'Asia/Shanghai')`,
+      queryParams: { windowStart: this.toShanghaiDateTime(windowStart) },
+    };
   }
 
   /** Compact stable hash (FNV-1a, hex) of an error name/url/line fingerprint. */

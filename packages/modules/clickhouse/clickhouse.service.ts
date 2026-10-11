@@ -191,18 +191,28 @@ export class ClickhouseModel<T = any> {
   async find(qObjArray: ClickhouseQueryObject | ClickhouseQueryObject[]): Promise<T[]> {
     if (!Array.isArray(qObjArray)) qObjArray = [qObjArray];
     let sql = "";
+    const queryParams: Record<string, unknown> = {};
     qObjArray.forEach((qObj, i) => {
       const target = i === 0 ? this.table : `(${sql})`;
       sql = this.objectToSql(target, qObj);
+      // Merge bound parameters from every subquery (later keys win on clash).
+      if (qObj.queryParams) Object.assign(queryParams, qObj.queryParams);
     });
-    const result = await this.ch.query({ query: sql, format: "JSONEachRow" });
+    const result = await this.ch.query({
+      query: sql,
+      format: "JSONEachRow",
+      ...(Object.keys(queryParams).length ? { query_params: queryParams } : {}),
+    });
     return (await result.json()) as T[];
   }
 
   // ALTER TABLE ... DELETE WHERE ...
   async delete(delObj: ClickhouseDeleteObject): Promise<void> {
     const sql = `ALTER TABLE ${this.table} DELETE WHERE ${delObj.where}`;
-    await this.ch.query({ query: sql });
+    await this.ch.query({
+      query: sql,
+      ...(delObj.queryParams ? { query_params: delObj.queryParams } : {}),
+    });
   }
 
   // INSERT INTO ... VALUES (for SDK ingestion endpoints if needed).
@@ -221,7 +231,11 @@ export class ClickhouseModel<T = any> {
     const where = q.where ? ` WHERE ${q.where}` : "";
     const groupBy = q.groupBy ? ` GROUP BY ${q.groupBy}` : "";
     const orderBy = q.orderBy ? ` ORDER BY ${q.orderBy}` : "";
-    const limit = q.limit ? ` LIMIT ${q.skip ? `${q.skip},` : ""}${q.limit}` : "";
+    // Coerce limit/skip to finite numbers so callers passing string-typed
+    // query params cannot inject into the LIMIT clause.
+    const limitNum = Number.isFinite(q.limit) ? Math.trunc(q.limit as number) : undefined;
+    const skipNum = Number.isFinite(q.skip) ? Math.trunc(q.skip as number) : undefined;
+    const limit = limitNum ? ` LIMIT ${skipNum ? `${skipNum},` : ""}${limitNum}` : "";
     return `SELECT ${q.select || "*"} FROM ${table}${where}${groupBy}${orderBy}${limit}`;
   }
 }

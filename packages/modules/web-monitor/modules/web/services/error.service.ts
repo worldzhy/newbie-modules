@@ -26,26 +26,43 @@ export class ErrorService {
     } = query;
     let pageNo = Number(query.pageNo || 1);
     const wheres: string[] = [];
-    if (resourceUrl) wheres.push(`ilike(resourceUrl,'%${resourceUrl}%')`);
-    if (phone) wheres.push(`ilike(phone,'%${phone}%')`);
-    if (uid) wheres.push(`ilike(uid,'%${uid}%')`);
-    if (beginTime) wheres.push(`createTime>=toDateTime('${beginTime}')`);
-    if (endTime) wheres.push(`createTime<=toDateTime('${endTime}')`);
-    if (type) {
-      const typeArr = String(type).split("|").join("','");
-      wheres.push(`type IN('${typeArr}')`);
+    const queryParams: Record<string, unknown> = {};
+    if (resourceUrl) {
+      wheres.push(`ilike(resourceUrl, {resourceUrl:String})`);
+      queryParams.resourceUrl = `%${resourceUrl}%`;
     }
-    const where = wheres.length ? wheres.join(" and ") : undefined;
+    if (phone) {
+      wheres.push(`ilike(phone, {phone:String})`);
+      queryParams.phone = `%${phone}%`;
+    }
+    if (uid) {
+      wheres.push(`ilike(uid, {uid:String})`);
+      queryParams.uid = `%${uid}%`;
+    }
+    if (beginTime) {
+      wheres.push(`createTime >= toDateTime({beginTime:String})`);
+      queryParams.beginTime = beginTime;
+    }
+    if (endTime) {
+      wheres.push(`createTime <= toDateTime({endTime:String})`);
+      queryParams.endTime = endTime;
+    }
+    if (type) {
+      wheres.push(`type IN ({typeArr:Array(String)})`);
+      queryParams.typeArr = String(type).split("|");
+    }
+    const where = wheres.length ? wheres.join(" AND ") : undefined;
     const model = await this.ch.WebError(appId);
 
     if (String(realTime) === "1") {
-      const total = await model.find({ where, select: "count() as total" });
+      const total = await model.find({ where, select: "count() as total", queryParams });
       const list = await model.find({
         where,
         select: "*",
         limit: pageSize,
         skip: (pageNo - 1) * pageSize,
         orderBy: "createTime DESC",
+        queryParams,
       });
       list.forEach((item: any) => (item._id = { ...item }));
       return { dataList: list, totalNum: total?.[0]?.total || 0, pageNo };
@@ -58,7 +75,7 @@ export class ErrorService {
     else if (type === "bussiness-ajax|bussiness-fetch") groupBy = "resourceUrl,status,type";
     else if (type === "log") groupBy = "resourceUrl,type";
 
-    const countQuery = model.find([{ where, groupBy, select: "COUNT()" }, { select: "count() as total" }]);
+    const countQuery = model.find([{ where, groupBy, select: "COUNT()", queryParams }, { select: "count() as total" }]);
     const listQuery = model.find({
       where,
       select: `${groupBy}, MAX(createTime) AS lastCreateTime,COUNT() AS count,COUNT(DISTINCT markUser) AS userNum,groupArray(msg)[1] AS lastMsg`,
@@ -66,6 +83,7 @@ export class ErrorService {
       limit: pageSize,
       skip: (pageNo - 1) * pageSize,
       orderBy: "count DESC",
+      queryParams,
     });
     const [count, list] = await Promise.all([countQuery, listQuery]);
     list.forEach((item: any) => (item._id = { ...item }));
@@ -77,23 +95,49 @@ export class ErrorService {
     let pageNo = Number(query.pageNo || 1);
     let pageSize = Number(query.pageSize || this.cfg.pageSize);
     const wheres: string[] = [];
-    if (url) wheres.push(`resourceUrl='${url}'`);
-    if (name) wheres.push(`name='${name}'`);
-    if (status) wheres.push(`status='${status}'`);
-    if (type) wheres.push(`type='${type}'`);
-    if (phone) wheres.push(`ilike(phone,'%${phone}%')`);
-    if (uid) wheres.push(`ilike(uid,'%${uid}%')`);
-    if (beginTime) wheres.push(`createTime>=toDateTime('${beginTime}')`);
-    if (endTime) wheres.push(`createTime<=toDateTime('${endTime}')`);
-    const where = wheres.length ? wheres.join(" and ") : undefined;
+    const queryParams: Record<string, unknown> = {};
+    if (url) {
+      wheres.push(`resourceUrl = {url:String}`);
+      queryParams.url = url;
+    }
+    if (name) {
+      wheres.push(`name = {name:String}`);
+      queryParams.name = name;
+    }
+    if (status) {
+      wheres.push(`status = {status:String}`);
+      queryParams.status = status;
+    }
+    if (type) {
+      wheres.push(`type = {type:String}`);
+      queryParams.type = type;
+    }
+    if (phone) {
+      wheres.push(`ilike(phone, {phone:String})`);
+      queryParams.phone = `%${phone}%`;
+    }
+    if (uid) {
+      wheres.push(`ilike(uid, {uid:String})`);
+      queryParams.uid = `%${uid}%`;
+    }
+    if (beginTime) {
+      wheres.push(`createTime >= toDateTime({beginTime:String})`);
+      queryParams.beginTime = beginTime;
+    }
+    if (endTime) {
+      wheres.push(`createTime <= toDateTime({endTime:String})`);
+      queryParams.endTime = endTime;
+    }
+    const where = wheres.length ? wheres.join(" AND ") : undefined;
     const model = await this.ch.WebError(appId);
-    const countQuery = model.find({ where, select: "count() as total" });
+    const countQuery = model.find({ where, select: "count() as total", queryParams });
     const listQuery = model.find({
       where,
       select: "*",
       limit: pageSize,
       skip: (pageNo - 1) * pageSize,
       orderBy: "createTime DESC",
+      queryParams,
     });
     const groupBy = "resourceUrl";
     const otherQuery = model.find({
@@ -101,6 +145,7 @@ export class ErrorService {
       select: `${groupBy},MIN(createTime) AS first,MAX(createTime) AS last,COUNT() AS count,COUNT(DISTINCT markUser) AS userNum`,
       limit: pageSize,
       groupBy,
+      queryParams,
     });
     const [count, list, other] = await Promise.all([countQuery, listQuery, otherQuery]);
     list.forEach((item: any) => (item._id = { ...item }));
@@ -117,12 +162,22 @@ export class ErrorService {
 
   async getMarkUserErrorListCH(appId: string, opts: { markUser?: string; beginTime?: string; endTime?: string }) {
     const wheres: string[] = [];
-    if (opts.markUser) wheres.push(`markUser='${opts.markUser}'`);
-    if (opts.beginTime) wheres.push(`createTime>=toDateTime('${opts.beginTime}')`);
-    if (opts.endTime) wheres.push(`createTime<toDateTime('${opts.endTime}')`);
-    const where = wheres.length ? wheres.join(" and ") : undefined;
+    const queryParams: Record<string, unknown> = {};
+    if (opts.markUser) {
+      wheres.push(`markUser = {markUser:String}`);
+      queryParams.markUser = opts.markUser;
+    }
+    if (opts.beginTime) {
+      wheres.push(`createTime >= toDateTime({beginTime:String})`);
+      queryParams.beginTime = opts.beginTime;
+    }
+    if (opts.endTime) {
+      wheres.push(`createTime < toDateTime({endTime:String})`);
+      queryParams.endTime = opts.endTime;
+    }
+    const where = wheres.length ? wheres.join(" AND ") : undefined;
     const model = await this.ch.WebError(appId);
-    const list = await model.find({ where, select: "*", orderBy: "createTime ASC" });
+    const list = await model.find({ where, select: "*", orderBy: "createTime ASC", queryParams });
     return { list };
   }
 }

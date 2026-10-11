@@ -44,14 +44,20 @@ export interface ClickhouseSchemaDiff {
 // Query builder object for SELECT statements.
 export interface ClickhouseQueryObject {
   select?: string;
+  // WHERE clause as raw SQL. User-supplied values MUST use {name:Type}
+  // placeholders and be supplied via queryParams — never interpolate directly.
   where?: string;
   limit?: number;
   skip?: number;
   orderBy?: string;
   groupBy?: string;
+  // Bound parameters for {name:Type} placeholders in where/select/etc.
+  queryParams?: Record<string, unknown>;
 }
 
 // Delete object — ALTER TABLE ... DELETE WHERE ...
 export interface ClickhouseDeleteObject {
+  // WHERE clause. Same parameterization rule as ClickhouseQueryObject.where.
   where: string;
+  queryParams?: Record<string, unknown>;
 }

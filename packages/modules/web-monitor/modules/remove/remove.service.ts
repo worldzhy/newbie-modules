@@ -36,14 +36,15 @@ export class RemoveService {
       return null;
     }
 
-    const chWhere = `createTime<=toDateTime('${endTime}') and createTime>=toDateTime('${startTime}')`;
+    const chWhere = `createTime <= toDateTime({endTime:String}) AND createTime >= toDateTime({startTime:String})`;
+    const chQueryParams = { startTime, endTime };
     const deletions: Promise<unknown>[] = [];
 
     for (const item of resource) {
       switch (item) {
         case "ajax": {
           const ajaxModel = await this.clickhouse.WebAjax(appId);
-          deletions.push(ajaxModel.delete({ where: chWhere }));
+          deletions.push(ajaxModel.delete({ where: chWhere, queryParams: chQueryParams }));
           break;
         }
         case "page":
@@ -54,7 +55,7 @@ export class RemoveService {
           break;
         case "err": {
           const errorModel = await this.clickhouse.WebError(appId);
-          deletions.push(errorModel.delete({ where: chWhere }));
+          deletions.push(errorModel.delete({ where: chWhere, queryParams: chQueryParams }));
           break;
         }
         case "resource":

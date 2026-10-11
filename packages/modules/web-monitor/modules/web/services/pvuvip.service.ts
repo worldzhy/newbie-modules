@@ -160,7 +160,8 @@ export class PvuvipService {
     const model = await this.ch.WebAjax(appId);
     const rows = await model.find({
       select: "count() as count",
-      where: `createTime>=toDateTime('${beginStr}') and createTime<=toDateTime('${endStr}')`,
+      where: `createTime >= toDateTime({beginTime:String}) AND createTime <= toDateTime({endTime:String})`,
+      queryParams: { beginTime: beginStr, endTime: endStr },
     });
     return rows?.[0]?.count || 0;
   }
@@ -223,7 +224,8 @@ export class PvuvipService {
     const model = await this.ch.WebAjax(appId);
     const rows = await model.find({
       select: "sum(bodySize) as sum",
-      where: `createTime>=toDateTime('${beginStr}') and createTime<=toDateTime('${endStr}')`,
+      where: `createTime >= toDateTime({beginTime:String}) AND createTime <= toDateTime({endTime:String})`,
+      queryParams: { beginTime: beginStr, endTime: endStr },
     });
     return rows?.[0]?.sum || 0;
   }
