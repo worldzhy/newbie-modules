@@ -20,12 +20,12 @@ interface DrainBuckets {
   appEnvironments: Record<string, any[]>;
   appResources: Record<string, any[]>;
   appCustoms: Record<string, any[]>;
-  sdkErrors: any[];
+  sdkErrors: Record<string, any>[];
 }
 
 @Injectable()
 export class WebReportTaskService {
-  private cfg: any;
+  private cfg: Record<string, any>;
   constructor(
     private readonly config: ConfigService,
     private readonly redis: RedisService,
@@ -33,17 +33,17 @@ export class WebReportTaskService {
     private readonly models: MonitorModelsService,
     private readonly ch: MonitorClickhouseService,
   ) {
-    this.cfg = this.config.get("modules.web-monitor");
+    this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
-  private pushRow(bucket: Record<string, any[]>, appId: string, row: any) {
+  private pushRow(bucket: Record<string, any[]>, appId: string, row: Record<string, any>) {
     const rows = bucket[appId];
     if (rows) rows.push(row);
     else bucket[appId] = [row];
   }
 
   private async collectQueueItem(raw: string, buckets: DrainBuckets) {
-    let query: any;
+    let query: Record<string, any>;
     try {
       query = JSON.parse(raw);
     } catch {
@@ -66,7 +66,7 @@ export class WebReportTaskService {
     this.collectCustoms(item, buckets.appCustoms);
   }
 
-  private collectPages(item: any, slowPageTime = 5, appPages: Record<string, any[]>) {
+  private collectPages(item: Record<string, any>, slowPageTime = 5, appPages: Record<string, any[]>) {
     const performance = item.performance || {};
     let newName = "";
     try {
@@ -99,7 +99,7 @@ export class WebReportTaskService {
     this.pushRow(appPages, item.appId, page);
   }
 
-  private collectCustoms(data: any, appCustoms: Record<string, any[]>) {
+  private collectCustoms(data: Record<string, any>, appCustoms: Record<string, any[]>) {
     if (!data.customs || !data.customs.length) return;
     for (const item of data.customs) {
       if (item.customFilter && Object.prototype.toString.apply(item.customFilter) === "[object Object]") {
@@ -122,7 +122,12 @@ export class WebReportTaskService {
     }
   }
 
-  private collectResource(data: any, item: any, system: any, appResources: Record<string, any[]>) {
+  private collectResource(
+    data: Record<string, any>,
+    item: Record<string, any>,
+    system: Record<string, any>,
+    appResources: Record<string, any[]>,
+  ) {
     let slowTime = 2;
     let speedType = 1;
     let duration = Math.floor(Math.abs(item.duration || 0));
@@ -159,12 +164,12 @@ export class WebReportTaskService {
     this.pushRow(appResources, data.appId, resource);
   }
 
-  private async collectEnvironment(data: any, appEnvironments: Record<string, any[]>) {
+  private async collectEnvironment(data: Record<string, any>, appEnvironments: Record<string, any[]>) {
     const ip = data.ip;
     if (!ip) return;
     let copyip = ip.split(".");
     copyip = `${copyip[0]}.${copyip[1]}.${copyip[2]}`;
-    let datas: any = null;
+    let datas: Record<string, any> | null = null;
     try {
       const s = await this.redis.get(copyip);
       if (s) datas = JSON.parse(s);
@@ -200,7 +205,7 @@ export class WebReportTaskService {
     this.pushRow(appEnvironments, data.appId, environment);
   }
 
-  private collectSdkError(data: any, sdkErrors: any[]) {
+  private collectSdkError(data: Record<string, any>, sdkErrors: Record<string, any>[]) {
     const sdkErr: Record<string, any> = {
       appId: data.appId,
       createTime: data.createTime,
@@ -223,7 +228,7 @@ export class WebReportTaskService {
     sdkErrors.push(sdkErr);
   }
 
-  private setUser(obj: any, data: any) {
+  private setUser(obj: Record<string, any>, data: Record<string, any>) {
     if (data.uid) obj.uid = String(data.uid);
     if (data.p) obj.phone = func.decryptPhone(data.p);
   }
@@ -244,9 +249,9 @@ export class WebReportTaskService {
     for (const raw of raws) {
       try {
         await this.collectQueueItem(raw, buckets);
-      } catch (e: any) {
+      } catch (e: unknown) {
         // A single malformed/poisoned item must not abort the rest of the batch.
-        console.error("web report item processing failed", e?.message || e);
+        console.error("web report item processing failed", e instanceof Error ? e.message : e);
       }
     }
     await this.flushBuckets(buckets);
@@ -256,9 +261,9 @@ export class WebReportTaskService {
     const flush = async (label: string, write: () => Promise<unknown>) => {
       try {
         await write();
-      } catch (e: any) {
+      } catch (e: unknown) {
         // One failing destination must not suppress the remaining flushes.
-        console.error(`web report flush failed (${label})`, e?.message || e);
+        console.error(`web report flush failed (${label})`, e instanceof Error ? e.message : e);
       }
     };
     for (const appId of Object.keys(buckets.appAjaxs)) {
@@ -290,9 +295,9 @@ export class WebReportTaskService {
     }
   }
 
-  private async handleWebData(query: any) {
+  private async handleWebData(query: Record<string, any>) {
     const type = query.type || ReportType.PagePerf;
-    let item: any = {
+    let item: Record<string, any> = {
       appId: query.appId,
       createTime: new Date(query.time),
       userAgent: query.userAgent,
@@ -322,9 +327,9 @@ export class WebReportTaskService {
     return item;
   }
 
-  private forEachResources(data: any, system: any, buckets: DrainBuckets) {
+  private forEachResources(data: Record<string, any>, system: Record<string, any>, buckets: DrainBuckets) {
     if (!data.resourceList || !data.resourceList.length) return;
-    data.resourceList.forEach((item: any) => {
+    data.resourceList.forEach((item: Record<string, any>) => {
       if (item.type === "xmlhttprequest" || item.type === "fetchrequest" || item.type === "fetch") {
         this.saveAjaxs(data, item, buckets.appAjaxs);
       } else {
@@ -333,7 +338,7 @@ export class WebReportTaskService {
     });
   }
 
-  private saveAjaxs(data: any, item: any, appAjaxs: Record<string, any[]>) {
+  private saveAjaxs(data: Record<string, any>, item: Record<string, any>, appAjaxs: Record<string, any[]>) {
     let newName = "";
     try {
       const newurl = new URL(func.urlHelper(item.name));
@@ -369,7 +374,7 @@ export class WebReportTaskService {
     this.pushRow(appAjaxs, data.appId, _ajax);
   }
 
-  private collectErrors(data: any, appErrors: Record<string, any[]>) {
+  private collectErrors(data: Record<string, any>, appErrors: Record<string, any[]>) {
     if (!data.errorList || !data.errorList.length) return;
     for (const item of data.errorList) {
       if (item?.data?.resourceUrl && item.data.resourceUrl.startsWith("data://image")) continue;

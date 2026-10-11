@@ -32,7 +32,7 @@ export class PvuvipService {
       .sort({ createTime: -1 })
       .limit(5)
       .exec();
-    const result = data.map(async (item: any) => {
+    const result = data.map(async (item: Record<string, any>) => {
       const obj = JSON.parse(JSON.stringify(item));
       if (item.createTime) {
         const num = await this.dayReportNum.getDayFromMongo(item.appId, item.createTime, item.createTime);
@@ -46,7 +46,7 @@ export class PvuvipService {
   async getHistoryPvUvIplistByRange(appId: string, beginTime: Date, endTime: Date) {
     const start = new Date(func.format(beginTime, "yyyy/MM/dd 00:00:00"));
     const end = new Date(func.format(endTime, "yyyy/MM/dd 23:59:59"));
-    const days: any[] = [];
+    const days: Record<string, any>[] = [];
     for (let d = new Date(start); d.valueOf() <= end.valueOf(); d.setDate(d.getDate() + 1)) {
       const dayStart = new Date(func.format(d, "yyyy/MM/dd 00:00:00"));
       const dayEnd = new Date(func.format(d, "yyyy/MM/dd 23:59:59"));
@@ -77,7 +77,7 @@ export class PvuvipService {
     }
     const data = await this.models.WebPvuvip().findOne(query).read("secondaryPreferred").exec();
     if (data) {
-      const obj: any = data.toObject();
+      const obj: Record<string, any> = data.toObject();
       obj.num = num;
       return obj;
     }
@@ -120,7 +120,7 @@ export class PvuvipService {
     }
   }
 
-  async savePvUvIpData(appId: string, endTime: Date, type: number, pvuvipdata: any) {
+  async savePvUvIpData(appId: string, endTime: Date, type: number, pvuvipdata: Record<string, any>) {
     const pvuvipModel = this.models.WebPvuvip();
     const pvuvip = new pvuvipModel();
     pvuvip.appId = appId;
@@ -137,8 +137,8 @@ export class PvuvipService {
   }
 
   getMatch(beginTime?: Date | string, endTime?: Date | string) {
-    const $match: any = {};
-    const createTime: any = {};
+    const $match: Record<string, any> = {};
+    const createTime: Record<string, any> = {};
     if (beginTime) {
       createTime.$gte = new Date(beginTime as any);
       $match.createTime = createTime;
@@ -150,7 +150,7 @@ export class PvuvipService {
     return $match;
   }
 
-  async pv(appId: string, querydata: any) {
+  async pv(appId: string, querydata: Record<string, any>) {
     return this.models.WebPage(appId).count(querydata).read("secondaryPreferred").exec();
   }
 
@@ -166,7 +166,7 @@ export class PvuvipService {
     return rows?.[0]?.count || 0;
   }
 
-  async uv(appId: string, querydata: any) {
+  async uv(appId: string, querydata: Record<string, any>) {
     return this.models
       .WebEnvironment(appId)
       .aggregate([
@@ -178,7 +178,7 @@ export class PvuvipService {
       .exec();
   }
 
-  async ip(appId: string, querydata: any) {
+  async ip(appId: string, querydata: Record<string, any>) {
     return this.models
       .WebEnvironment(appId)
       .aggregate([
@@ -191,7 +191,7 @@ export class PvuvipService {
       .exec();
   }
 
-  async user(appId: string, querydata: any) {
+  async user(appId: string, querydata: Record<string, any>) {
     return this.models
       .WebEnvironment(appId)
       .aggregate([
@@ -204,7 +204,7 @@ export class PvuvipService {
       .exec();
   }
 
-  async bounce(appId: string, $match: any) {
+  async bounce(appId: string, $match: Record<string, any>) {
     const result = await this.models
       .WebEnvironment(appId)
       .aggregate([

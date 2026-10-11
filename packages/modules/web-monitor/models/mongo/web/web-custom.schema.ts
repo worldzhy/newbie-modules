@@ -10,7 +10,7 @@ export class WebCustom {
   @Prop() path: string; // Path
   @Prop() customName: string; // Custom name for grouping
   @Prop() customContent: string; // Custom info (stringified object)
-  @Prop({ type: MongooseSchema.Types.Mixed }) customFilter: any; // Custom filter defined by biz
+  @Prop({ type: MongooseSchema.Types.Mixed }) customFilter: Record<string, any>; // Custom filter defined by biz
   @Prop() phone: string; // User phone
   @Prop() uid: string; // User ID
 }

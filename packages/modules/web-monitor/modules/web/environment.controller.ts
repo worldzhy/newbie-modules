@@ -12,7 +12,7 @@ export class EnvironmentController {
   @Get("/getDataGroupBy")
   @ApiOperation({ summary: "Get environment data grouped by type" })
   @ApiResponse({ type: WebMonitorEnvironmentGroupByItemResponseDto, isArray: true })
-  async getDataGroupBy(@Query() q: any) {
+  async getDataGroupBy(@Query() q: Record<string, any>) {
     const { appId, url, beginTime, endTime, type = 1 } = q;
     if (!appId) throw new Error("Page performance list: appId must not be empty");
     if (!url) throw new Error("Page performance list: url must not be empty");
@@ -23,7 +23,7 @@ export class EnvironmentController {
   @Get("/getEnvironmentForPage")
   @ApiOperation({ summary: "Get environment info for a page" })
   @ApiResponse({ type: WebMonitorEnvironmentResponseDto })
-  async getEnvironmentForPage(@Query() q: any) {
+  async getEnvironmentForPage(@Query() q: Record<string, any>) {
     const { appId, markPage } = q;
     if (!appId) throw new Error("Get user system info by markPage: appId must not be empty");
     if (!markPage) throw new Error("Get user system info by markPage: markPage must not be empty");

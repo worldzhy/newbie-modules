@@ -12,7 +12,7 @@ export class CustomController {
   @Get("/getCustomFilterList")
   @ApiOperation({ summary: "Get custom filter list" })
   @ApiResponse({ type: WebMonitorCustomFilterListResponseDto })
-  async getCustomFilterList(@Query() q: any) {
+  async getCustomFilterList(@Query() q: Record<string, any>) {
     const { appId } = q;
     if (!appId) throw new Error("Get custom filters: appId must not be empty");
     const result = await this.webCustom.getCustomFilterList(appId);
@@ -22,7 +22,7 @@ export class CustomController {
   @Post("/addCustomFilter")
   @ApiOperation({ summary: "Add a custom filter" })
   @ApiResponse({ type: Boolean })
-  async addCustomFilter(@Body() body: any) {
+  async addCustomFilter(@Body() body: Record<string, any>) {
     const { appId, filterKey, filterDesc } = body;
     const ok = await this.webCustom.addCustomFilter(appId, filterKey, filterDesc);
     return func.result({ data: ok });
@@ -31,7 +31,7 @@ export class CustomController {
   @Post("/delCustomFilter")
   @ApiOperation({ summary: "Delete a custom filter" })
   @ApiResponse({ type: Boolean })
-  async delCustomFilter(@Body() body: any) {
+  async delCustomFilter(@Body() body: Record<string, any>) {
     const { appId, _id } = body;
     const ok = await this.webCustom.delCustomFilter(appId, _id);
     return func.result({ data: ok });
@@ -40,7 +40,7 @@ export class CustomController {
   @Get("/getAverageCustomList")
   @ApiOperation({ summary: "Get average custom category list" })
   @ApiResponse({ type: WebMonitorCustomAverageListResponseDto })
-  async getAverageCustomList(@Query() q: any) {
+  async getAverageCustomList(@Query() q: Record<string, any>) {
     const { appId, pageNo = 1, pageSize = 15, beginTime, endTime, customName, customFilter } = q;
     if (!appId) throw new Error("Get custom category list: appId must not be empty");
     const result = await this.webCustom.getAverageCustomList(

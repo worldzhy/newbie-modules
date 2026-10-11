@@ -11,7 +11,7 @@ export class ResourceController {
   @Get("/getResourceForType")
   @ApiOperation({ summary: "Get resource performance list by type" })
   @ApiResponse({ type: Object })
-  async getResourceForType(@Query() q: any) {
+  async getResourceForType(@Query() q: Record<string, any>) {
     const { appId, url, type = 1, pageNo = 1, pageSize = 15, beginTime, endTime } = q;
     if (!appId) throw new Error("Single page resource performance list: appId must not be empty");
     if (!url) throw new Error("Single page resource performance list: url must not be empty");
@@ -30,7 +30,7 @@ export class ResourceController {
   @Get("/getAverageResourceList")
   @ApiOperation({ summary: "Get average resource performance list" })
   @ApiResponse({ type: Object })
-  async getAverageResourceList(@Query() q: any) {
+  async getAverageResourceList(@Query() q: Record<string, any>) {
     const { appId } = q;
     if (!appId) throw new Error("Get resource average performance list: appId must not be empty");
     const result = await this.resourceSrv.getAverageResourceList(q);
@@ -40,7 +40,7 @@ export class ResourceController {
   @Get("/getOneResourceAvg")
   @ApiOperation({ summary: "Get single resource average performance" })
   @ApiResponse({ type: Object })
-  async getOneResourceAvg(@Query() q: any) {
+  async getOneResourceAvg(@Query() q: Record<string, any>) {
     const { appId, url, beginTime, endTime } = q;
     if (!appId) throw new Error("Single resource average performance data: appId must not be empty");
     if (!url) throw new Error("Single resource average performance data: api url must not be empty");
@@ -51,7 +51,7 @@ export class ResourceController {
   @Get("/getOneResourceList")
   @ApiOperation({ summary: "Get single resource performance list" })
   @ApiResponse({ type: Object })
-  async getOneResourceList(@Query() q: any) {
+  async getOneResourceList(@Query() q: Record<string, any>) {
     const { appId, url, pageNo = 1, pageSize = 15, beginTime, endTime } = q;
     if (!appId) throw new Error("Single resource performance list data: appId must not be empty");
     if (!url) throw new Error("Single resource performance list data: api url must not be empty");
@@ -69,7 +69,7 @@ export class ResourceController {
   @Get("/getOneResourceDetail")
   @ApiOperation({ summary: "Get single resource details" })
   @ApiResponse({ type: Object })
-  async getOneResourceDetail(@Query() q: any) {
+  async getOneResourceDetail(@Query() q: Record<string, any>) {
     const { appId, id } = q;
     if (!id) throw new Error("Get single resource details: id must not be empty");
     if (!appId) throw new Error("Get single resource details: appId must not be empty");

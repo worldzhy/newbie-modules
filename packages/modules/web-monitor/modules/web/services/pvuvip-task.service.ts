@@ -13,14 +13,14 @@ function cronMinuteInterval(cronExp: string) {
 
 @Injectable()
 export class WebPvuvipTaskService {
-  private cfg: any;
+  private cfg: Record<string, any>;
   private readonly logger = new Logger(WebPvuvipTaskService.name);
   constructor(
     private readonly config: ConfigService,
     private readonly site: SiteService,
     private readonly pvuvip: PvuvipService,
   ) {
-    this.cfg = this.config.get("modules.web-monitor");
+    this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
   async getWebPvUvIpByMinute() {
@@ -34,7 +34,7 @@ export class WebPvuvipTaskService {
     // Bounded worker pool: keep at most pvuvipTaskConcurrency sites in flight
     // so a large site list cannot stampede Mongo/ClickHouse at once.
     const concurrency = Number(this.cfg.pvuvipTaskConcurrency) || 5;
-    await mapWithConcurrency(systems, concurrency, async (sys: any) => {
+    await mapWithConcurrency(systems, concurrency, async (sys: Record<string, any>) => {
       const appId = sys.appId;
       if (!appId) return;
       try {
@@ -56,7 +56,13 @@ export class WebPvuvipTaskService {
     await this.groupData(systems, 2, beginTime, endTime, beginTime);
   }
 
-  private async groupData(datas: any[], type: number, beginTime: Date, endTime: Date, createTime: Date) {
+  private async groupData(
+    datas: Record<string, any>[],
+    type: number,
+    beginTime: Date,
+    endTime: Date,
+    createTime: Date,
+  ) {
     for (const sys of datas) {
       const appId = sys.appId;
       if (!appId) continue;

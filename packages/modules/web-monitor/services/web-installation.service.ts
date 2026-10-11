@@ -25,7 +25,7 @@ export function hashWebToken(token: string): string {
 export class WebInstallationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private withDerivedState(row: any) {
+  private withDerivedState<T extends Record<string, any>>(row: T): Omit<T, "tokenHash"> & { online: boolean } {
     const online =
       !row.revokedAt &&
       row.lastSeenAt != null &&

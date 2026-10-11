@@ -27,7 +27,7 @@ export default function WebSdkError(clickhouse: ClickhouseService, dbName: strin
     autoSync: true,
   };
 
-  let _model: any = null;
+  let _model: Record<string, any> | null = null;
   return async () => {
     if (!_model) {
       _model = await clickhouse.createModel(schema, dbName);

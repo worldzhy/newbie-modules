@@ -12,7 +12,7 @@ import { WebTokenResolver } from "../../services/web-token.resolver";
 @ApiTags("Frontend Monitor / Web / Report")
 @Controller("/api/v1")
 export class WebReportController {
-  private config: any;
+  private config: Record<string, any>;
 
   constructor(
     private readonly site: SiteService,
@@ -21,14 +21,18 @@ export class WebReportController {
     private readonly redis: RedisService,
     private readonly tokenResolver: WebTokenResolver,
   ) {
-    this.config = this.configService.get("modules.web-monitor");
+    this.config = this.configService.get("modules.web-monitor") || {};
   }
 
   @Post("/report/web")
   @ApiOperation({ summary: "Web SDK data report endpoint" })
   @ApiResponse({ type: String })
-  async webReport(@Req() req: Request, @Headers() headers: Record<string, string | undefined>, @Body() body: any) {
-    let query: any = body;
+  async webReport(
+    @Req() req: Request,
+    @Headers() headers: Record<string, string | undefined>,
+    @Body() body: Record<string, any> | string,
+  ) {
+    let query: Record<string, any> = typeof body === "string" ? JSON.parse(body) : body;
 
     if (req.headers["content-type"] && req.headers["content-type"].includes("text/plain")) {
       query = JSON.parse(body as string);
@@ -52,7 +56,7 @@ export class WebReportController {
     return func.result({ data: "ok" });
   }
 
-  private async saveWebReportDataForRedis(query: any) {
+  private async saveWebReportDataForRedis(query: Record<string, any>) {
     const limit = this.config.redis_consumption?.total_limit_web;
     if (limit) {
       const length = await this.redis.llen(RedisKeys.WEB_REPORT_DATAS);

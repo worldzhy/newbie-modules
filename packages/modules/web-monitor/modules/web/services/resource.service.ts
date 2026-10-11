@@ -4,12 +4,12 @@ import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class ResourceService {
-  private cfg: any;
+  private cfg: Record<string, any>;
   constructor(
     private readonly models: MonitorModelsService,
     private readonly config: ConfigService,
   ) {
-    this.cfg = this.config.get("modules.web-monitor");
+    this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
   async getResourceForType(
@@ -21,7 +21,7 @@ export class ResourceService {
     beginTime?: string,
     endTime?: string,
   ) {
-    const match: any = { url, speedType: Number(speedType) };
+    const match: Record<string, any> = { url, speedType: Number(speedType) };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
     const count = await this.models.WebResource(appId).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models
@@ -37,12 +37,12 @@ export class ResourceService {
     return { dataList, totalNum: count, pageNo: Number(pageNo) };
   }
 
-  async getAverageResourceList(query: any) {
+  async getAverageResourceList(query: Record<string, any>) {
     const { appId, type = 1, pageNo = 1, pageSize = this.cfg.pageSize, beginTime, endTime, url } = query;
-    const match: any = { speedType: Number(type) };
+    const match: Record<string, any> = { speedType: Number(type) };
     if (url) match.name = { $regex: new RegExp(url, "i") };
     if (beginTime || endTime) {
-      const createTime: any = {};
+      const createTime: Record<string, any> = {};
       if (beginTime) createTime.$gte = new Date(beginTime);
       if (endTime) createTime.$lte = new Date(endTime);
       match.createTime = createTime;
@@ -71,7 +71,7 @@ export class ResourceService {
   }
 
   async getOneResourceAvg(appId: string, url: string, beginTime?: string, endTime?: string) {
-    const match: any = { name: url };
+    const match: Record<string, any> = { name: url };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
     const rows = await this.models
       .WebResource(appId)
@@ -92,7 +92,7 @@ export class ResourceService {
     beginTime?: string,
     endTime?: string,
   ) {
-    const match: any = { name: url };
+    const match: Record<string, any> = { name: url };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
     const count = await this.models.WebResource(appId).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models

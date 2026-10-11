@@ -16,7 +16,7 @@ export class WebPage {
   @Prop() dnsTime: number; // DNS time (ms)
   @Prop() tcpTime: number; // TCP connect time (ms)
   @Prop() domTime: number; // DOM build time (ms)
-  @Prop({ type: [MongooseSchema.Types.Mixed], default: [] }) resourceList: any[]; // Resource performance list
+  @Prop({ type: [MongooseSchema.Types.Mixed], default: [] }) resourceList: Record<string, any>[]; // Resource performance list
   @Prop() totalResSize: number; // Total resource size
   @Prop() whiteTime: number; // First paint (ms)
   @Prop() redirectTime: number; // Redirect time

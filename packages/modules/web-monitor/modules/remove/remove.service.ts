@@ -5,7 +5,7 @@ import { MonitorClickhouseService } from "../../models/clickhouse/monitor-clickh
 
 type WebResourceType = "ajax" | "page" | "env" | "err" | "resource";
 
-interface CustomDeleteFilter {
+export interface CustomDeleteFilter {
   appId: string;
   type?: string;
   resource?: WebResourceType[];

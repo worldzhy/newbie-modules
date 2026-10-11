@@ -19,7 +19,7 @@ import ip from "ip";
 
 @Injectable()
 export class JobsService implements OnModuleInit {
-  private cfg: any;
+  private cfg: Record<string, any>;
   private readonly logger = new Logger(JobsService.name);
 
   constructor(
@@ -36,7 +36,7 @@ export class JobsService implements OnModuleInit {
     private readonly clickhouse: MonitorClickhouseService,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    this.cfg = this.configService.get("modules.web-monitor");
+    this.cfg = this.configService.get("modules.web-monitor") || {};
   }
 
   // Periodic scheduling lives in the consumer's application layer
@@ -80,7 +80,7 @@ export class JobsService implements OnModuleInit {
     const acquired = await this.redisLock(RedisKeys.ALERT_EVALUATION_TASK_LOCK, this.cfg.alertTaskLockTime);
     if (!acquired) return;
 
-    let systems: any[];
+    let systems: Record<string, any>[];
     try {
       systems = await this.site.getWebSiteList();
     } catch (error) {
@@ -111,7 +111,7 @@ export class JobsService implements OnModuleInit {
     await Promise.all(workers);
   }
 
-  private async evaluateSystem(system: any, windowStart: Date, windowEnd: Date, windowMs: number) {
+  private async evaluateSystem(system: Record<string, any>, windowStart: Date, windowEnd: Date, windowMs: number) {
     const base = {
       appId: system.appId,
       systemName: system.systemName || system.appId,
@@ -140,7 +140,8 @@ export class JobsService implements OnModuleInit {
           count,
           thresholdMs: (system.slowPageTime ?? 5) * 1000,
           topItems: topRows.map(
-            (row: any) => `${row._id || "Unknown page"} — ${row.count} load(s), max ${row.maxLoadTime ?? 0}ms`,
+            (row: Record<string, any>) =>
+              `${row._id || "Unknown page"} — ${row.count} load(s), max ${row.maxLoadTime ?? 0}ms`,
           ),
         });
       }
@@ -167,7 +168,7 @@ export class JobsService implements OnModuleInit {
           count,
           thresholdMs: paintThresholdMs,
           topItems: topRows.map(
-            (row: any) =>
+            (row: Record<string, any>) =>
               `${row._id || "Unknown page"} — ${row.count} load(s), max first paint ${row.maxWhiteTime ?? 0}ms`,
           ),
         });
@@ -207,7 +208,8 @@ export class JobsService implements OnModuleInit {
             count,
             thresholdMs: thresholdSeconds * 1000,
             topItems: topRows.map(
-              (row: any) => `${row._id || "Unknown resource"} — ${row.count} load(s), max ${row.maxDuration ?? 0}ms`,
+              (row: Record<string, any>) =>
+                `${row._id || "Unknown resource"} — ${row.count} load(s), max ${row.maxDuration ?? 0}ms`,
             ),
           });
         }
@@ -238,7 +240,8 @@ export class JobsService implements OnModuleInit {
           count,
           thresholdMs,
           topItems: topRows.map(
-            (row: any) => `${row.url || "Unknown endpoint"} — ${row.count} call(s), max ${row.maxDuration ?? 0}ms`,
+            (row: Record<string, any>) =>
+              `${row.url || "Unknown endpoint"} — ${row.count} call(s), max ${row.maxDuration ?? 0}ms`,
           ),
         });
       }
@@ -274,7 +277,7 @@ export class JobsService implements OnModuleInit {
           count,
           affectedUsers: markedUsers,
           topItems: topRows.map(
-            (row: any) =>
+            (row: Record<string, any>) =>
               `[${row.type || "Error"}] ${row.name || "Unknown error"} @ ${row.resourceUrl || ""} — ${row.count}`,
           ),
         });

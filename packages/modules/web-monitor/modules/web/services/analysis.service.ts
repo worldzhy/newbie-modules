@@ -4,12 +4,12 @@ import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class AnalysisService {
-  private cfg: any;
+  private cfg: Record<string, any>;
   constructor(
     private readonly models: MonitorModelsService,
     private readonly config: ConfigService,
   ) {
-    this.cfg = this.config.get("modules.web-monitor");
+    this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
   async getAnalysislist(
@@ -18,10 +18,10 @@ export class AnalysisService {
     endTime?: string,
     filter?: { phone?: string; uid?: string },
   ) {
-    const query: any = { $match: {} };
+    const query: { $match: Record<string, any> } = { $match: {} };
     if (filter?.phone) query.$match.phone = filter.phone;
     if (filter?.uid) query.$match.uid = filter.uid;
-    const createTime: any = {};
+    const createTime: Record<string, any> = {};
     if (beginTime) {
       createTime.$gte = new Date(beginTime);
       query.$match.createTime = createTime;
@@ -65,8 +65,8 @@ export class AnalysisService {
   }
 
   private getMatch(beginTime?: string, endTime?: string) {
-    const $match: any = {};
-    const createTime: any = {};
+    const $match: Record<string, any> = {};
+    const createTime: Record<string, any> = {};
     if (beginTime) {
       createTime.$gte = new Date(beginTime);
       $match.createTime = createTime;

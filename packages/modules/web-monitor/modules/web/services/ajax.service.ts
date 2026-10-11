@@ -4,12 +4,12 @@ import { MonitorClickhouseService } from "../../../models/clickhouse/monitor-cli
 
 @Injectable()
 export class AjaxService {
-  private cfg: any;
+  private cfg: Record<string, any>;
   constructor(
     private readonly ch: MonitorClickhouseService,
     private readonly config: ConfigService,
   ) {
-    this.cfg = this.config.get("modules.web-monitor");
+    this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
   async getPageAjaxsAvg(appId: string, url?: string, beginTime?: string, endTime?: string) {
@@ -41,14 +41,14 @@ export class AjaxService {
       queryParams,
     });
     const [count, list] = await Promise.all([countQuery, listQuery]);
-    list.forEach((item: any) => {
+    list.forEach((item: Record<string, any>) => {
       item._id = { method: item.method, url: item.url };
       item.duration = item.durationAvg;
     });
     return { dataList: list, totalNum: count?.[0]?.total || 0, pageNo: 1 };
   }
 
-  async getAverageAjaxList(query: any) {
+  async getAverageAjaxList(query: Record<string, any>) {
     const { appId, beginTime, endTime, type = 1, url, pageSize = this.cfg.pageSize } = query;
     let pageNo = Number(query.pageNo || 1);
     const wheres: string[] = [];
@@ -82,7 +82,7 @@ export class AjaxService {
       queryParams,
     });
     const [count, list] = await Promise.all([countQuery, listQuery]);
-    list.forEach((item: any) => {
+    list.forEach((item: Record<string, any>) => {
       item._id = { method: item.method, url: item.url };
       item.duration = item.durationAvg;
     });

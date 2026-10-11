@@ -10,7 +10,7 @@ export class SiteService {
     private readonly nodeCache: NodeCacheService,
   ) {}
 
-  async saveSiteData(body: any) {
+  async saveSiteData(body: Record<string, any>) {
     const type = body.type;
     if (!body.projectId) return func.errResult({ desc: "A new system must belong to a project" });
     if (!body.systemDomain && type === "web")
@@ -44,7 +44,7 @@ export class SiteService {
     return func.result({ data: result });
   }
 
-  async updateSiteData(body: any) {
+  async updateSiteData(body: Record<string, any>) {
     const appId = body.appId;
     if (!appId) return func.errResult({ desc: "Update system: appId must not be empty" });
 
@@ -95,9 +95,9 @@ export class SiteService {
     return (await this.models.System().findOne({ appId: appId }).exec()) || ({} as any);
   }
 
-  async getSitesForUserId(query: any) {
+  async getSitesForUserId(query: Record<string, any>) {
     const { systemName, type, projectId } = query;
-    const param: any = {};
+    const param: Record<string, any> = {};
     if (systemName) param.systemName = new RegExp(systemName);
     if (type) param.type = type;
     if (projectId) param.projectId = projectId;

@@ -8,13 +8,13 @@ import { RedisKeyPrefix } from "../../models/enum";
 
 @Injectable()
 export class DayReportNumService {
-  private cfg: any;
+  private cfg: Record<string, any>;
   constructor(
     private readonly models: MonitorModelsService,
     private readonly redis: RedisService,
     private readonly configService: ConfigService,
   ) {
-    this.cfg = this.configService.get("modules.web-monitor");
+    this.cfg = this.configService.get("modules.web-monitor") || {};
   }
 
   async numCountTask() {

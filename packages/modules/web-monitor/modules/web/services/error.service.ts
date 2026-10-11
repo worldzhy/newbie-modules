@@ -4,15 +4,15 @@ import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class ErrorService {
-  private cfg: any;
+  private cfg: Record<string, any>;
   constructor(
     private readonly ch: MonitorClickhouseService,
     private readonly config: ConfigService,
   ) {
-    this.cfg = this.config.get("modules.web-monitor");
+    this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
-  async getAverageErrorList(query: any) {
+  async getAverageErrorList(query: Record<string, any>) {
     const {
       appId,
       beginTime,
@@ -64,7 +64,7 @@ export class ErrorService {
         orderBy: "createTime DESC",
         queryParams,
       });
-      list.forEach((item: any) => (item._id = { ...item }));
+      list.forEach((item: Record<string, any>) => (item._id = { ...item }));
       return { dataList: list, totalNum: total?.[0]?.total || 0, pageNo };
     }
 
@@ -86,11 +86,11 @@ export class ErrorService {
       queryParams,
     });
     const [count, list] = await Promise.all([countQuery, listQuery]);
-    list.forEach((item: any) => (item._id = { ...item }));
+    list.forEach((item: Record<string, any>) => (item._id = { ...item }));
     return { dataList: list, totalNum: count?.[0]?.total || 0, pageNo };
   }
 
-  async getOneErrorList(query: any) {
+  async getOneErrorList(query: Record<string, any>) {
     const { appId, url, name = "", status = "", type = "", beginTime, endTime, phone = "", uid = "" } = query;
     let pageNo = Number(query.pageNo || 1);
     let pageSize = Number(query.pageSize || this.cfg.pageSize);
@@ -148,7 +148,7 @@ export class ErrorService {
       queryParams,
     });
     const [count, list, other] = await Promise.all([countQuery, listQuery, otherQuery]);
-    list.forEach((item: any) => (item._id = { ...item }));
+    list.forEach((item: Record<string, any>) => (item._id = { ...item }));
     let userNum = 0,
       first = "",
       last = "";

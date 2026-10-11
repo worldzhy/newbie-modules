@@ -10,19 +10,19 @@ import parser from "cron-parser";
 @ApiTags("Frontend Monitor / Web / PvUvIp")
 @Controller("/api/v1/pvuvip")
 export class PvuvipController {
-  private cfg: any;
+  private cfg: Record<string, any>;
   constructor(
     private readonly configService: ConfigService,
     private readonly pvuvipSrv: PvuvipService,
     private readonly dayReportNum: DayReportNumService,
   ) {
-    this.cfg = this.configService.get("modules.web-monitor");
+    this.cfg = this.configService.get("modules.web-monitor") || {};
   }
 
   @Get("/getPvUvIpSurveyToday")
   @ApiOperation({ summary: "Get today's PV/UV/IP survey" })
   @ApiResponse({ type: Object })
-  async getPvUvIpSurveyToday(@Query() q: any) {
+  async getPvUvIpSurveyToday(@Query() q: Record<string, any>) {
     const { appId } = q;
     if (!appId) throw new Error("PV/UV/IP overview: appId must not be empty");
     const interval = parser.parseExpression(this.cfg.pvuvip_task_minute_cron_time);
@@ -41,7 +41,7 @@ export class PvuvipController {
   @Get("/getPvUvIpSurveyOne")
   @ApiOperation({ summary: "Get PV/UV/IP survey for a time range" })
   @ApiResponse({ type: WebMonitorPvUvIpResponseDto })
-  async getPvUvIpSurveyOne(@Query() q: any) {
+  async getPvUvIpSurveyOne(@Query() q: Record<string, any>) {
     const { appId, beginTime, endTime } = q;
     if (!appId) throw new Error("PV/UV/IP overview: appId must not be empty");
     if (!beginTime) throw new Error("PV/UV/IP overview: beginTime must not be empty");
@@ -53,7 +53,7 @@ export class PvuvipController {
   @Get("/getHistoryPvUvIplist")
   @ApiOperation({ summary: "Get history PV/UV/IP list" })
   @ApiResponse({ type: WebMonitorPvUvIpResponseDto, isArray: true })
-  async getHistoryPvUvIplist(@Query() q: any) {
+  async getHistoryPvUvIplist(@Query() q: Record<string, any>) {
     const { appId, beginTime, endTime } = q;
     if (!appId) throw new Error("PV/UV/IP historical overview: appId must not be empty");
     if (!beginTime) throw new Error("PV/UV/IP historical overview: beginTime must not be empty");
@@ -69,7 +69,7 @@ export class PvuvipController {
   @Get("/getPvUvIpList")
   @ApiOperation({ summary: "Get PV/UV/IP data list" })
   @ApiResponse({ type: Object })
-  async getPvUvIpList(@Query() q: any) {
+  async getPvUvIpList(@Query() q: Record<string, any>) {
     const { appId, beginTime, endTime } = q;
     if (!appId) throw new Error("UI PV/UV/IP query: appId must not be empty");
     const interval = parser.parseExpression(this.cfg.pvuvip_task_minute_cron_time);
@@ -85,7 +85,7 @@ export class PvuvipController {
   @Get("/getPvUvIpOne")
   @ApiOperation({ summary: "Get single PV/UV/IP survey" })
   @ApiResponse({ type: Object })
-  async getPvUvIpOne(@Query() q: any) {
+  async getPvUvIpOne(@Query() q: Record<string, any>) {
     const { appId, beginTime, endTime } = q;
     if (!appId) throw new Error("UI PV/UV/IP query: appId must not be empty");
     const interval = parser.parseExpression(this.cfg.pvuvip_task_minute_cron_time);

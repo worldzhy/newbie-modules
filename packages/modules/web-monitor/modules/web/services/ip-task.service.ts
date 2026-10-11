@@ -9,14 +9,14 @@ import { RedisKeyPrefix } from "../../../models/enum";
 
 @Injectable()
 export class WebIpTaskService {
-  private cfg: any;
+  private cfg: Record<string, any>;
   constructor(
     private readonly config: ConfigService,
     private readonly models: MonitorModelsService,
     private readonly redis: RedisService,
     private readonly site: SiteService,
   ) {
-    this.cfg = this.config.get("modules.web-monitor");
+    this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
   async saveWebGetIpDatas() {
@@ -31,7 +31,7 @@ export class WebIpTaskService {
 
   private async saveWebGetIpDatasByOne(appId: string) {
     try {
-      const query: any = { city: { $exists: false } };
+      const query: Record<string, any> = { city: { $exists: false } };
       const beginTime = await this.redis.get(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`);
       query.createTime = {
         $gt: beginTime ? new Date(beginTime) : new Date(Date.now() - this.cfg.ip_task_space_time),
@@ -56,7 +56,7 @@ export class WebIpTaskService {
     }
   }
 
-  private async handleDatas(appId: string, data: any[], lastLen: number) {
+  private async handleDatas(appId: string, data: Record<string, any>[], lastLen: number) {
     if (!data || !data.length) return;
     for (let i = 0; i < data.length; i++) {
       const ip = data[i].ip;
@@ -104,7 +104,7 @@ export class WebIpTaskService {
     if (func.isSkipIp(ip) || !this.cfg.TENCENTMAPKEY) return;
     try {
       const url = `https://apis.map.qq.com/ws/location/v1/ip?ip=${ip}&key=${this.cfg.TENCENTMAPKEY}`;
-      const result: any = await this.httpGetJson(url);
+      const result: Record<string, any> = await this.httpGetJson(url);
       if (result?.status === 0 && result?.result) {
         const json = {
           _ip: ip,
@@ -121,7 +121,7 @@ export class WebIpTaskService {
     }
   }
 
-  private async updateWebEnvironment(data: any, id: string, appId: string) {
+  private async updateWebEnvironment(data: Record<string, any>, id: string, appId: string) {
     return await this.models
       .WebEnvironment(appId)
       .updateOne({ _id: id }, { $set: { province: data.province, city: data.city } }, { upsert: true })

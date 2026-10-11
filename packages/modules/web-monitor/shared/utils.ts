@@ -1,4 +1,4 @@
-const decryptP = {
+const decryptP: Record<string, number> = {
   QR: 0,
   xa: 1,
   cL: 2,
@@ -75,17 +75,17 @@ export const func = {
     }
   },
   // Added: object check (arrays included)
-  isObject(input: any) {
+  isObject(input: unknown) {
     return input !== null && typeof input === "object";
   },
-  filterKeyWord(input: any) {
+  filterKeyWord(input: unknown) {
     try {
       return typeof input === "string" ? input : JSON.stringify(input);
     } catch {
       return "";
     }
   },
-  decryptPhone(str) {
+  decryptPhone(str: unknown) {
     if (typeof str !== "string") return str;
     let t = "";
     return str
@@ -100,8 +100,8 @@ export const func = {
       })
       .join("");
   },
-  setMatchTime(query, $match) {
-    const createTime: any = {};
+  setMatchTime(query: Record<string, any>, $match: Record<string, any>) {
+    const createTime: Record<string, any> = {};
     if (query.beginTime) {
       createTime.$gte = new Date(query.beginTime);
       $match.createTime = createTime;

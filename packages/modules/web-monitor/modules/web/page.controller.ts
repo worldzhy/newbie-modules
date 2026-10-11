@@ -17,7 +17,7 @@ export class PageController {
   @Get("/getAveragePageList")
   @ApiOperation({ summary: "Get average page performance list" })
   @ApiResponse({ type: WebMonitorPageAverageListResponseDto })
-  async getAveragePageList(@Query() q: any) {
+  async getAveragePageList(@Query() q: Record<string, any>) {
     const { appId } = q;
     if (!appId) throw new Error("Average page performance list: appId must not be empty");
     const result = await this.pageSrv.getAveragePageList(q);
@@ -27,7 +27,7 @@ export class PageController {
   @Get("/getRealTimeAveragePageList")
   @ApiOperation({ summary: "Get real-time average page performance list" })
   @ApiResponse({ type: WebMonitorRealTimePageItemResponseDto, isArray: true })
-  async getRealTimeAveragePageList(@Query() q: any) {
+  async getRealTimeAveragePageList(@Query() q: Record<string, any>) {
     const { appId } = q;
     if (!appId) throw new Error("Realtime average page performance list: appId must not be empty");
     if (!q.beginTime || !q.endTime)
@@ -44,7 +44,7 @@ export class PageController {
   @Get("/getOnePageList")
   @ApiOperation({ summary: "Get single page performance or visit list" })
   @ApiResponse({ type: WebMonitorPageVisitListResponseDto })
-  async getOnePageList(@Query() q: any) {
+  async getOnePageList(@Query() q: Record<string, any>) {
     const { appId, url } = q;
     if (!appId) throw new Error("Single page performance or visit list: appId must not be empty");
     if (!url) throw new Error("Single page performance or visit list: url must not be empty");
@@ -55,7 +55,7 @@ export class PageController {
   @Get("/getPageDetails")
   @ApiOperation({ summary: "Get single page details" })
   @ApiResponse({ type: WebMonitorPageDetailResponseDto })
-  async getPageDetails(@Query() q: any) {
+  async getPageDetails(@Query() q: Record<string, any>) {
     const { appId, id } = q;
     if (!id) throw new Error("Single page details: id must not be empty");
     if (!appId) throw new Error("Single page details: appId must not be empty");

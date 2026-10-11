@@ -5,17 +5,17 @@ import { func } from "../../../shared/utils";
 
 @Injectable()
 export class PageService {
-  private cfg: any;
+  private cfg: Record<string, any>;
   constructor(
     private readonly models: MonitorModelsService,
     private readonly config: ConfigService,
   ) {
-    this.cfg = this.config.get("modules.web-monitor");
+    this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
-  async getAveragePageList(query: any) {
+  async getAveragePageList(query: Record<string, any>) {
     const { appId, type = "", pageNo = 1, pageSize = this.cfg.pageSize, url, isFirstIn } = query;
-    const match: any = {};
+    const match: Record<string, any> = {};
     if (isFirstIn !== undefined && isFirstIn !== "") {
       match.isFirstIn = isFirstIn === "true" ? true : false;
     }
@@ -28,12 +28,12 @@ export class PageService {
       : await this.getPages(appId, match, Number(pageNo), Number(pageSize));
   }
 
-  private async getPages(appId: string, match: any, pageNo: number, pageSize: number) {
+  private async getPages(appId: string, match: Record<string, any>, pageNo: number, pageSize: number) {
     const model = this.models.WebPage(appId);
     const distinct = (await model.distinct("url", match).read("secondaryPreferred").exec()) || [];
     const copdistinct = distinct.slice();
     const slice = distinct.slice((pageNo - 1) * pageSize, (pageNo - 1) * pageSize + pageSize);
-    let $group: any = {
+    let $group: Record<string, any> = {
       _id: { url: "$url" },
       count: { $sum: 1 },
     };
@@ -66,7 +66,13 @@ export class PageService {
     return { dataList: result, totalNum: copdistinct.length, pageNo };
   }
 
-  private async oneThread(appId: string, match: any, pageNo: number, pageSize: number, group_id: any) {
+  private async oneThread(
+    appId: string,
+    match: Record<string, any>,
+    pageNo: number,
+    pageSize: number,
+    group_id: Record<string, any>,
+  ) {
     const count = await this.models.WebPage(appId).distinct("url", match).read("secondaryPreferred").exec();
     const dataList = await this.models
       .WebPage(appId)
@@ -95,11 +101,11 @@ export class PageService {
     return { dataList, totalNum: count.length, pageNo };
   }
 
-  async getRealTimeAveragePageList(query: any) {
+  async getRealTimeAveragePageList(query: Record<string, any>) {
     const { appId, type = "", beginTime, endTime } = query;
-    const match: any = { isFirstIn: true };
+    const match: Record<string, any> = { isFirstIn: true };
     if (type) match.speedType = Number(type);
-    const _querys: any = this.getSpaceTime(beginTime, endTime, 60000);
+    const _querys: Record<string, any>[] = this.getSpaceTime(beginTime, endTime, 60000);
     const result = await this.models
       .WebPage(appId)
       .aggregate([
@@ -163,9 +169,9 @@ export class PageService {
     }));
   }
 
-  async getOnePageList(query: any) {
+  async getOnePageList(query: Record<string, any>) {
     const { appId, type, pageNo = 1, pageSize = this.cfg.pageSize, url, isFirstIn, beginTime, endTime } = query;
-    const match: any = { url };
+    const match: Record<string, any> = { url };
     if (isFirstIn !== undefined && isFirstIn !== "") {
       const isFirstInNum = Number(isFirstIn);
       if (!isNaN(isFirstInNum)) {
@@ -201,7 +207,7 @@ export class PageService {
   private getSpaceTime(beginTime?: string, endTime?: string, spaceTime = 60000) {
     const begin = new Date(beginTime || new Date()).getTime();
     const end = new Date(endTime || new Date()).getTime();
-    const list: any = [];
+    const list: Record<string, any>[] = [];
     for (let t = begin; t <= end; t += spaceTime) {
       list.push({ beginTime: t, endTime: t + spaceTime, result: null });
     }

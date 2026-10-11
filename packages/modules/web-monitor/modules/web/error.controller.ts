@@ -16,7 +16,7 @@ export class ErrorController {
   @Get("/getAverageErrorList")
   @ApiOperation({ summary: "Get average error category list" })
   @ApiResponse({ type: WebMonitorErrorListResponseDto })
-  async getAverageErrorList(@Query() q: any) {
+  async getAverageErrorList(@Query() q: Record<string, any>) {
     const { appId } = q;
     if (!appId) throw new Error("Get error category list: appId must not be empty");
     const result = await this.errorSrv.getAverageErrorList(q);
@@ -26,7 +26,7 @@ export class ErrorController {
   @Get("/getOneErrorList")
   @ApiOperation({ summary: "Get single error resource list" })
   @ApiResponse({ type: WebMonitorErrorOneListResponseDto })
-  async getOneErrorList(@Query() q: any) {
+  async getOneErrorList(@Query() q: Record<string, any>) {
     const { appId, url } = q;
     if (!appId) throw new Error("Get single ERROR resource list: appId must not be empty");
     if (!url) throw new Error("Get single ERROR resource list: url must not be empty");
@@ -37,7 +37,7 @@ export class ErrorController {
   @Get("/getMarkUserErrorList")
   @ApiOperation({ summary: "Get marked user error list" })
   @ApiResponse({ type: WebMonitorErrorMarkUserListResponseDto })
-  async getMarkUserErrorList(@Query() q: any) {
+  async getMarkUserErrorList(@Query() q: Record<string, any>) {
     const { appId, markUser, beginTime, endTime } = q;
     if (!markUser) throw new Error("markUser must not be empty");
     if (!appId) throw new Error("Get single ajax details: appId must not be empty");
