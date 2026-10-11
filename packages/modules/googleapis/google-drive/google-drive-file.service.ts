@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger } from "@nestjs/common";
 import { Readable } from "stream";
+import { Response } from "express";
 import { auth, drive, drive_v3 } from "@googleapis/drive";
 import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -102,7 +103,7 @@ export class GoogleDriveFileService {
    * the raw bytes to the HTTP response. This avoids redirecting users to the
    * Google Drive web UI (which would require per-user access permissions).
    */
-  async downloadFile(params: { fileId: string; res: any }) {
+  async downloadFile(params: { fileId: string; res: Response }) {
     const { fileId, res } = params;
     // Fetch file metadata for name and size.
     const metadata = await this.client.files.get({

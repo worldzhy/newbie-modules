@@ -15,7 +15,7 @@ import {
   UploadGoogleDriveFileBodyDto,
 } from "./google-drive-file.dto";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { Express } from "express";
+import { Express, Response } from "express";
 
 @ApiTags("Google Drive / File")
 @ApiBearerAuth()
@@ -94,7 +94,7 @@ export class GoogleDriveFileController {
   @Get(":fileId/download")
   @ApiOperation({ summary: "Download a file from Google Drive via service account" })
   @ApiResponse({ status: 200, description: "File stream" })
-  async downloadFile(@Param() params: GetGoogleDriveFileRequestDto, @Res() res: any) {
+  async downloadFile(@Param() params: GetGoogleDriveFileRequestDto, @Res() res: Response) {
     await this.googleDriveFile.downloadFile({ fileId: params.fileId, res });
   }
 

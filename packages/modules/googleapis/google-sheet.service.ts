@@ -149,7 +149,7 @@ export class GoogleSheetService {
     }
   }
 
-  async appendRows(params: { fileId: string; sheetTitle?: string; data: any[][] }) {
+  async appendRows(params: { fileId: string; sheetTitle?: string; data: (string | number | boolean | null)[][] }) {
     try {
       const response = await this.client.spreadsheets.values.append({
         spreadsheetId: params.fileId,
