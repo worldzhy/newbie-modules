@@ -38,6 +38,7 @@ const LOGIN_ENTRY_FILES = [
   "lark/lark-auth.service.ts",
   "wechat/auth.service.ts",
   "login-by-approved-subnet.controller.ts",
+  "strategies/refresh-token.strategy.ts",
 ];
 
 const REJECTION_PATTERN = /throw new (UnauthorizedException|ForbiddenException|NewbieException|NotFoundException)/;
