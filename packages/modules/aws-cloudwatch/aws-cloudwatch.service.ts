@@ -4,6 +4,7 @@ import {
   GetMetricDataCommand,
   GetMetricDataCommandOutput,
   ListMetricsCommand,
+  MetricStat,
 } from "@aws-sdk/client-cloudwatch";
 import { GetEC2InstancesCPUMetricParams, GetRDSInstancesMetricParams, MetricData } from "./aws-cloudwatch.interface";
 import { CloudwatchEC2MetricName } from "@modules/aws-cloudwatch/aws-cloudwatch.enum";
@@ -28,7 +29,7 @@ export class AwsCloudwatchService {
       return [];
     }
 
-    const metricQueries: any[] = [];
+    const metricQueries: MetricStat[] = [];
 
     if (metricName === CloudwatchEC2MetricName.CPU_UTILIZATION) {
       ec2InstanceRemoteIds.forEach((remoteId) => {

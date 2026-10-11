@@ -97,7 +97,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       throw new NotFoundException(`Notification setting not found: ${key}`);
     }
 
-    if (updates.defaultSeverity !== undefined && !SEVERITIES.includes(updates.defaultSeverity as any)) {
+    if (updates.defaultSeverity !== undefined && !(SEVERITIES as readonly string[]).includes(updates.defaultSeverity)) {
       throw new BadRequestException(
         `Invalid defaultSeverity: ${updates.defaultSeverity}. Must be one of ${SEVERITIES.join(", ")}.`,
       );

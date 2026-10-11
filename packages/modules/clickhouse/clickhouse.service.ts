@@ -77,7 +77,10 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
   // dbName is optional; when omitted, falls back to the connection's default database
   // (microservices.clickhouse.database). If both are unset, the bare table name is
   // used and ClickHouse resolves it against the user's default database.
-  async createModel<T = any>(config: ClickhouseTableConfig, dbName?: string): Promise<ClickhouseModel<T>> {
+  async createModel<T = Record<string, unknown>>(
+    config: ClickhouseTableConfig,
+    dbName?: string,
+  ): Promise<ClickhouseModel<T>> {
     const resolvedDbName = dbName ?? this.defaultDbName;
     const table = resolvedDbName ? `${resolvedDbName}.${config.tableName}` : config.tableName;
     if (config.autoCreate !== false) {
@@ -181,7 +184,7 @@ function normalizeType(type: string): string {
  * Model bound to a single ClickHouse table. Provides a query builder for find()
  * and an ALTER TABLE DELETE helper for delete().
  */
-export class ClickhouseModel<T = any> {
+export class ClickhouseModel<T = Record<string, unknown>> {
   constructor(
     private readonly ch: ClickhouseService,
     private readonly table: string,
@@ -222,7 +225,9 @@ export class ClickhouseModel<T = any> {
     const columns = Object.keys(this.config.schema);
     await this.ch.insert({
       table: this.table,
-      values: rows.map((r) => columns.reduce((obj, col) => ({ ...obj, [col]: (r as any)[col] ?? null }), {})),
+      values: rows.map((r) =>
+        columns.reduce((obj, col) => ({ ...obj, [col]: (r as Record<string, unknown>)[col] ?? null }), {}),
+      ),
       format: "JSONEachRow",
     });
   }

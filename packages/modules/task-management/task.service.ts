@@ -1,5 +1,6 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { Prisma } from "@generated/prisma/client";
 import { TaskStatus } from "@generated/prisma/enums";
 import { CreateTaskItemDto, UpdateTaskRequestDto } from "./task.dto";
 
@@ -89,7 +90,7 @@ export class TaskService {
   }
 
   async listTasks(filter: ListTasksFilter) {
-    const whereClause: any = {
+    const whereClause: Prisma.TaskWhereInput = {
       projectId: filter.projectId,
       deletedAt: null,
     };

@@ -9,6 +9,7 @@ import {
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { EventEmitter2 } from "@nestjs/event-emitter";
+import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { JobHandlerRegistryService, JobHandler } from "./handler-registry.service";
 
@@ -161,7 +162,9 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
           cronExpr: declaration.cronExpr,
           timezone: declaration.timezone ?? DEFAULT_TIMEZONE,
           enabled: declaration.enabled ?? true,
-          payload: (declaration.payload ?? null) as any,
+          // Nullable Json column: DbNull stores NULL; an object must satisfy
+          // InputJsonValue. Plain null is rejected by Prisma's input types.
+          payload: declaration.payload == null ? Prisma.DbNull : (declaration.payload as Prisma.InputJsonValue),
           createdVia: "declaration",
         },
       });

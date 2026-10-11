@@ -23,7 +23,7 @@ export class FileEntity {
   s3Key: string;
 
   @ApiProperty({ type: Object })
-  s3Response: any;
+  s3Response: object;
 
   @ApiProperty({ type: String })
   parentId: string | null;
