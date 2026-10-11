@@ -38,14 +38,28 @@ export class RedisService implements OnModuleInit {
     return this.client;
   }
 
-  async set(...args: unknown[]) {
-    return (this.client as any).set(...args);
+  async set(key: string, value: string): Promise<string | null>;
+  async set(key: string, value: string, expiryToken: "EX", seconds: number): Promise<string | null>;
+  async set(
+    key: string,
+    value: string,
+    expiryToken: "EX",
+    seconds: number,
+    conditionToken: "NX",
+  ): Promise<string | null>;
+  async set(
+    ...args: [string, string] | [string, string, "EX", number] | [string, string, "EX", number, "NX"]
+  ): Promise<string | null> {
+    if (args.length === 2) return this.client.set(args[0], args[1]);
+    const [key, value, expiryToken, seconds, conditionToken] = args;
+    if (conditionToken === undefined) return this.client.set(key, value, expiryToken, seconds);
+    return this.client.set(key, value, expiryToken, seconds, conditionToken);
   }
   async get(key: string) {
     return this.client.get(key);
   }
   async del(key: string | string[]) {
-    return this.client.del(key as any);
+    return this.client.del(...(Array.isArray(key) ? key : [key]));
   }
   async llen(key: string) {
     return this.client.llen(key);
@@ -61,6 +75,6 @@ export class RedisService implements OnModuleInit {
   }
   /** Pops up to `count` items in one round trip (RPOP key count, Redis >= 6.2). */
   async rpopBatch(key: string, count: number): Promise<string[]> {
-    return ((await (this.client as any).rpop(key, count)) as string[] | null) || [];
+    return (await this.client.rpop(key, count)) || [];
   }
 }

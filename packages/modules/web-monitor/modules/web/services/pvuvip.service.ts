@@ -140,11 +140,11 @@ export class PvuvipService {
     const $match: Record<string, any> = {};
     const createTime: Record<string, any> = {};
     if (beginTime) {
-      createTime.$gte = new Date(beginTime as any);
+      createTime.$gte = new Date(beginTime);
       $match.createTime = createTime;
     }
     if (endTime) {
-      createTime.$lte = new Date(endTime as any);
+      createTime.$lte = new Date(endTime);
       $match.createTime = createTime;
     }
     return $match;

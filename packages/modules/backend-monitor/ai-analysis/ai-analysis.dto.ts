@@ -86,7 +86,7 @@ export interface AiResponseBlock {
   table?: {
     title: string;
     columns: Array<{ field: string; headerName: string; width?: number }>;
-    rows: Array<Record<string, any>>;
+    rows: Array<Record<string, unknown>>;
   };
 }
 

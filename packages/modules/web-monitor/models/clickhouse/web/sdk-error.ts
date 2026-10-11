@@ -1,5 +1,5 @@
 import { ClickhouseDataType } from "@modules/clickhouse/clickhouse.types";
-import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickhouseModel, ClickhouseService } from "@modules/clickhouse/clickhouse.service";
 import { ClickHouseTablePrefix } from "../../enum";
 
 export default function WebSdkError(clickhouse: ClickhouseService, dbName: string) {
@@ -27,7 +27,7 @@ export default function WebSdkError(clickhouse: ClickhouseService, dbName: strin
     autoSync: true,
   };
 
-  let _model: Record<string, any> | null = null;
+  let _model: ClickhouseModel | null = null;
   return async () => {
     if (!_model) {
       _model = await clickhouse.createModel(schema, dbName);

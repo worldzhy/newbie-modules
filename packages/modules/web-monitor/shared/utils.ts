@@ -50,8 +50,9 @@ export const func = {
     }
     return fmt;
   },
-  getRealIp(headers: Record<string, any>, ip?: string) {
-    if (headers["x-real-ip"]) return headers["x-real-ip"];
+  getRealIp(headers: Record<string, string | string[] | undefined>, ip?: string) {
+    const realIp = headers["x-real-ip"];
+    if (typeof realIp === "string" && realIp) return realIp;
     const forwardedFor = headers["x-forwarded-for"];
     // X-Forwarded-For may be a comma-separated chain ("client, proxy1, ...");
     // the first hop is the original client address.

@@ -1,5 +1,5 @@
 import { ClickhouseDataType } from "@modules/clickhouse/clickhouse.types";
-import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickhouseModel, ClickhouseService } from "@modules/clickhouse/clickhouse.service";
 import { ClickHouseTablePrefix } from "../../enum";
 
 export default function WebAjax(clickhouse: ClickhouseService, dbName: string) {
@@ -28,8 +28,8 @@ export default function WebAjax(clickhouse: ClickhouseService, dbName: string) {
     autoSync: true,
   };
 
-  const models: Record<string, any> = {};
-  const modelCreates: Record<string, Promise<any>> = {};
+  const models: Record<string, ClickhouseModel> = {};
+  const modelCreates: Record<string, Promise<ClickhouseModel>> = {};
   return async (appId: string) => {
     if (!models[appId]) {
       if (!modelCreates[appId]) {

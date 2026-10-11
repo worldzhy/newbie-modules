@@ -43,7 +43,7 @@ export class WebReportController {
     const { appKey } = await this.tokenResolver.resolve(query.token);
     query.appId = appKey;
 
-    query.ip = func.getRealIp(req.headers as any, req.ip);
+    query.ip = func.getRealIp(req.headers, req.ip);
     if (this.config.isLocalDev) query.ip = getRandomIp();
 
     query.url = query.url || headers["referer"];

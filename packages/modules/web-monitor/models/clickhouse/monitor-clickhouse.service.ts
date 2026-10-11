@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickhouseModel, ClickhouseService } from "@modules/clickhouse/clickhouse.service";
 
 import WebAjaxFactory from "./web/ajax";
 import WebErrorFactory from "./web/error";
@@ -8,9 +8,9 @@ import WebSdkErrorFactory from "./web/sdk-error";
 
 @Injectable()
 export class MonitorClickhouseService implements OnModuleInit {
-  private webAjaxFactory: (appId: string) => Promise<any>;
-  private webErrorFactory: (appId: string) => Promise<any>;
-  private webSdkErrorFactory: () => Promise<any>;
+  private webAjaxFactory: (appId: string) => Promise<ClickhouseModel>;
+  private webErrorFactory: (appId: string) => Promise<ClickhouseModel>;
+  private webSdkErrorFactory: () => Promise<ClickhouseModel>;
 
   constructor(
     private readonly configService: ConfigService,

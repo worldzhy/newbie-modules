@@ -31,5 +31,5 @@ export class SendEmailWithTemplateRequestDto {
 
   @ApiProperty({ type: Object, required: false })
   @IsOptional()
-  templateParams?: Record<string, any>;
+  templateParams?: Record<string, unknown>;
 }

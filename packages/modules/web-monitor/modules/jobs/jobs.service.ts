@@ -223,7 +223,7 @@ export class JobsService implements OnModuleInit {
       const filter = `${timeFilter.where} AND duration >= {thresholdMs:UInt32}`;
       const queryParams = { ...timeFilter.queryParams, thresholdMs };
       const countRows = await ajaxModel.find({ where: filter, select: "count() AS total", queryParams });
-      const count = parseInt(countRows[0]?.total ?? "0", 10);
+      const count = parseInt(String(countRows[0]?.total ?? "0"), 10);
       if (count >= JobsService.MIN_SLOW_AJAX_COUNT) {
         const topRows = await ajaxModel.find({
           where: filter,
@@ -258,8 +258,8 @@ export class JobsService implements OnModuleInit {
         select: "count() AS total, uniqExactIf(markUser, markUser != '') AS markedUsers",
         queryParams: timeFilter.queryParams,
       });
-      const count = parseInt(countRows[0]?.total ?? "0", 10);
-      const markedUsers = parseInt(countRows[0]?.markedUsers ?? "0", 10);
+      const count = parseInt(String(countRows[0]?.total ?? "0"), 10);
+      const markedUsers = parseInt(String(countRows[0]?.markedUsers ?? "0"), 10);
       const enoughUsers = markedUsers === 0 || markedUsers >= JobsService.JS_ERROR_SPIKE_USER_COUNT;
       if (count >= JobsService.JS_ERROR_SPIKE_COUNT && enoughUsers) {
         const topRows = await errorModel.find({
@@ -316,8 +316,8 @@ export class JobsService implements OnModuleInit {
           ...base,
           signal: "js-error-first-seen",
           severity: "high",
-          count: parseInt(row.count ?? "0", 10),
-          affectedUsers: parseInt(row.users ?? "0", 10),
+          count: parseInt(String(row.count ?? "0"), 10),
+          affectedUsers: parseInt(String(row.users ?? "0"), 10),
           errorName: name,
           resourceUrl,
           fingerprint,

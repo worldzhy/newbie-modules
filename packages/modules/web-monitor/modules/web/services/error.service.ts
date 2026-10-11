@@ -153,9 +153,9 @@ export class ErrorService {
       first = "",
       last = "";
     if (other.length > 0) {
-      userNum = other[0].userNum;
-      first = other[0].first;
-      last = other[0].last;
+      userNum = Number(other[0].userNum) || 0;
+      first = String(other[0].first ?? "");
+      last = String(other[0].last ?? "");
     }
     return { dataList: list, totalNum: count?.[0]?.total || 0, pageNo, first, last, userNum };
   }
