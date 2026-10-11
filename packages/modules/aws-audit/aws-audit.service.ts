@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
+import { AwsAuditScan, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
 import { getCallerIdentity } from "@modules/aws-identity/aws-sts.helper";
@@ -8,6 +9,7 @@ import { EC2Client, DescribeInstancesCommand, DescribeSecurityGroupsCommand, Sec
 import { RDSClient, DescribeDBInstancesCommand } from "@aws-sdk/client-rds";
 import {
   GetBucketAclCommand,
+  GetBucketAclCommandOutput,
   GetBucketEncryptionCommand,
   GetBucketLocationCommand,
   GetBucketPolicyStatusCommand,
@@ -25,6 +27,7 @@ import {
   GetPolicyVersionCommand,
   GetRolePolicyCommand,
   GetUserPolicyCommand,
+  Group,
   IAMClient,
   ListAttachedGroupPoliciesCommand,
   ListAttachedRolePoliciesCommand,
@@ -36,6 +39,8 @@ import {
   ListRolesCommand,
   ListUserPoliciesCommand,
   ListUsersCommand,
+  Role,
+  User,
 } from "@aws-sdk/client-iam";
 
 type Severity = "high" | "medium" | "low";
@@ -95,6 +100,45 @@ interface ManagedPolicyAnalysis {
   policyName: string;
   policyArn: string;
   findings: PolicyRisk[];
+}
+
+// Flattened per-instance resource rows stored in the report JSON.
+interface Ec2InstanceResource {
+  instanceId: string | null;
+  name: string;
+  state: string | null;
+  instanceType: string | null;
+  publicIpAddress: string | null;
+  privateIpAddress: string | null;
+  securityGroupIds: string[];
+}
+
+interface RdsInstanceResource {
+  dbInstanceIdentifier: string | null;
+  dbiResourceId: string | null;
+  engine: string | null;
+  engineVersion: string | null;
+  status: string | null;
+  publiclyAccessible: boolean;
+  storageEncrypted: boolean;
+  deletionProtection: boolean;
+  masterUsername: string | null;
+  manageMasterUserPassword: boolean;
+  masterUserSecretArn: string | null;
+  multiAz: boolean;
+}
+
+// IAM policy document shapes parsed from JSON. Action/NotAction/Resource may be
+// a single string or an array per the IAM policy grammar.
+interface IamPolicyStatement {
+  Effect?: string;
+  Action?: string | string[];
+  NotAction?: string | string[];
+  Resource?: string | string[];
+}
+
+interface IamPolicyDocument {
+  Statement?: IamPolicyStatement | IamPolicyStatement[];
 }
 
 @Injectable()
@@ -192,7 +236,7 @@ export class AwsAuditService {
       report: latestSuccessfulScan?.report
         ? options.detail
           ? latestSuccessfulScan.report
-          : this.omitReportResources(latestSuccessfulScan.report as Record<string, any>)
+          : this.omitReportResources(latestSuccessfulScan.report as Prisma.JsonObject)
         : null,
     };
   }
@@ -247,7 +291,7 @@ export class AwsAuditService {
     };
   }
 
-  private serializeScan(scan: any) {
+  private serializeScan(scan: AwsAuditScan) {
     return {
       id: scan.id,
       projectId: scan.projectId,
@@ -255,14 +299,14 @@ export class AwsAuditService {
       errorMessage: scan.errorMessage,
       summary: scan.summary,
       hasReport: Boolean(scan.report),
-      createdAt: scan.createdAt,
-      updatedAt: scan.updatedAt,
-      startedAt: scan.startedAt,
-      finishedAt: scan.finishedAt,
+      createdAt: scan.createdAt.toISOString(),
+      updatedAt: scan.updatedAt.toISOString(),
+      startedAt: scan.startedAt?.toISOString() ?? null,
+      finishedAt: scan.finishedAt?.toISOString() ?? null,
     };
   }
 
-  private omitReportResources(report: Record<string, any>) {
+  private omitReportResources(report: Prisma.JsonObject) {
     return {
       ...report,
       resources: undefined,
@@ -293,8 +337,8 @@ export class AwsAuditService {
         where: { id: scanId },
         data: {
           status: "SUCCESS",
-          summary: report.summary as any,
-          report: report as any,
+          summary: report.summary as Prisma.InputJsonValue,
+          report: report as unknown as Prisma.InputJsonValue,
           finishedAt: new Date(),
           errorMessage: null,
         },
@@ -851,7 +895,7 @@ export class AwsAuditService {
       () => new EC2Client({ region, credentials: clientContext.credentials }),
     );
     const findings: AuditFinding[] = [];
-    const instances: any[] = [];
+    const instances: Ec2InstanceResource[] = [];
     const securityGroupIds = new Set<string>();
 
     let nextToken: string | undefined;
@@ -914,7 +958,7 @@ export class AwsAuditService {
       () => new RDSClient({ region, credentials: clientContext.credentials }),
     );
     const findings: AuditFinding[] = [];
-    const instances: any[] = [];
+    const instances: RdsInstanceResource[] = [];
 
     let marker: string | undefined;
     do {
@@ -1080,7 +1124,11 @@ export class AwsAuditService {
    * least one security group that allows ingress from 0.0.0.0/0 or ::/0.
    * Stopped instances report no public IP, so they are naturally excluded.
    */
-  private collectPublicInstanceFindings(instances: any[], securityGroups: SecurityGroup[], region: string) {
+  private collectPublicInstanceFindings(
+    instances: Ec2InstanceResource[],
+    securityGroups: SecurityGroup[],
+    region: string,
+  ) {
     const publicIngressByGroup = new Map<string, boolean>();
     for (const group of securityGroups) {
       if (!group.GroupId) {
@@ -1175,7 +1223,7 @@ export class AwsAuditService {
   }
 
   private async listIamUsers(client: IAMClient) {
-    const items: any[] = [];
+    const items: User[] = [];
     let marker: string | undefined;
 
     do {
@@ -1188,7 +1236,7 @@ export class AwsAuditService {
   }
 
   private async listIamGroups(client: IAMClient) {
-    const items: any[] = [];
+    const items: Group[] = [];
     let marker: string | undefined;
 
     do {
@@ -1201,7 +1249,7 @@ export class AwsAuditService {
   }
 
   private async listIamRoles(client: IAMClient) {
-    const items: any[] = [];
+    const items: Role[] = [];
     let marker: string | undefined;
 
     do {
@@ -1214,7 +1262,7 @@ export class AwsAuditService {
   }
 
   private async listGroupsForUser(client: IAMClient, userName: string) {
-    const items: any[] = [];
+    const items: Group[] = [];
     let marker: string | undefined;
 
     do {
@@ -1638,9 +1686,9 @@ export class AwsAuditService {
     }
   }
 
-  private hasPublicAclGrant(acl: any) {
+  private hasPublicAclGrant(acl: GetBucketAclCommandOutput | null) {
     const grants = acl?.Grants || [];
-    return grants.some((grant: any) => {
+    return grants.some((grant) => {
       const uri = grant.Grantee?.URI;
       return (
         uri === "http://acs.amazonaws.com/groups/global/AllUsers" ||
@@ -1649,12 +1697,12 @@ export class AwsAuditService {
     });
   }
 
-  private parsePolicyDocument(document: unknown) {
+  private parsePolicyDocument(document: unknown): IamPolicyDocument | null {
     if (!document) {
       return null;
     }
     if (typeof document === "object") {
-      return document as Record<string, any>;
+      return document as IamPolicyDocument;
     }
     if (typeof document !== "string") {
       return null;
