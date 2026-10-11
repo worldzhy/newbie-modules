@@ -19,6 +19,23 @@ export function hashHealthToken(token: string): string {
 /** Derived health state of an installation. */
 export type HealthState = "unknown" | "healthy" | "degraded" | "offline";
 
+/** One failing dependency indicator from the latest snapshot. */
+export interface HealthDownIndicator {
+  name: string;
+  message: string | null;
+}
+
+/**
+ * Normalized liveness snapshot of one externalRef, ready for host-side
+ * aggregation. `downIndicators` lists the dependencies reported as "down"
+ * in the latest snapshot (empty for every state except "degraded").
+ */
+export interface HealthLivenessSnapshot {
+  state: HealthState;
+  lastSnapshotAt: Date | null;
+  downIndicators: HealthDownIndicator[];
+}
+
 /**
  * Installation registry for the health module. One token = one running
  * deployment endpoint; the host pre-creates rows and distributes the
@@ -106,25 +123,52 @@ export class HealthInstallationService {
   // -------------------------------------------------------------------------
 
   /**
-   * Batch health-state lookup for host-side list views: externalRef -> state.
+   * Batch liveness lookup for host-side list views: externalRef -> snapshot.
    * One query for the whole set; an externalRef with no installation (or none
-   * at all) is simply absent from the map.
+   * at all) is simply absent from the map. When multiple installations share
+   * an externalRef, the worst state wins; ties keep the newest snapshot.
    */
-  async getHealthByExternalRefs(externalRefs: string[]): Promise<Map<string, HealthState>> {
+  async getLivenessByExternalRefs(externalRefs: string[]): Promise<Map<string, HealthLivenessSnapshot>> {
     if (externalRefs.length === 0) return new Map();
     const rows = await this.prisma.healthInstallation.findMany({
       where: { externalRef: { in: externalRefs }, revokedAt: null },
-      select: { externalRef: true, lastSnapshotAt: true, lastSnapshotStatus: true },
+      select: {
+        externalRef: true,
+        lastSnapshotAt: true,
+        lastSnapshotStatus: true,
+        lastSnapshotInfo: true,
+      },
     });
-    const states = new Map<string, HealthState>();
+    const snapshots = new Map<string, HealthLivenessSnapshot>();
     for (const row of rows) {
       if (!row.externalRef) continue;
       const state = this.deriveState(row.lastSnapshotAt, row.lastSnapshotStatus);
-      const prev = states.get(row.externalRef);
-      // "worse" state wins across multiple installations sharing an externalRef.
-      states.set(row.externalRef, prev ? this.worseState(prev, state) : state);
+      const candidate: HealthLivenessSnapshot = {
+        state,
+        lastSnapshotAt: row.lastSnapshotAt,
+        // Indicator detail is only meaningful while the process is reporting;
+        // an offline process's stale info must not masquerade as live faults.
+        downIndicators: state === "degraded" ? this.extractDownIndicators(row.lastSnapshotInfo) : [],
+      };
+      const prev = snapshots.get(row.externalRef);
+      if (!prev) {
+        snapshots.set(row.externalRef, candidate);
+        continue;
+      }
+      // Worst state wins across installations; on a tie the newer snapshot
+      // carries the more current indicators.
+      const worse = this.worseState(prev.state, state);
+      if (worse === state && worse !== prev.state) {
+        snapshots.set(row.externalRef, candidate);
+      } else if (
+        worse === state &&
+        candidate.lastSnapshotAt &&
+        (!prev.lastSnapshotAt || candidate.lastSnapshotAt > prev.lastSnapshotAt)
+      ) {
+        snapshots.set(row.externalRef, candidate);
+      }
     }
-    return states;
+    return snapshots;
   }
 
   /**
@@ -148,11 +192,7 @@ export class HealthInstallationService {
     const rows = await this.prisma.healthInstallation.findMany({
       where: {
         revokedAt: null,
-        OR: [
-          { lastSnapshotStatus: "error" },
-          { lastSnapshotAt: { not: null, lt: cutoff } },
-          { lastSnapshotAt: null },
-        ],
+        OR: [{ lastSnapshotStatus: "error" }, { lastSnapshotAt: { not: null, lt: cutoff } }, { lastSnapshotAt: null }],
       },
       select: {
         id: true,
@@ -227,6 +267,26 @@ export class HealthInstallationService {
   private worseState(a: HealthState, b: HealthState): HealthState {
     const order: Record<HealthState, number> = { unknown: 0, healthy: 1, degraded: 2, offline: 3 };
     return order[a] >= order[b] ? a : b;
+  }
+
+  /**
+   * Pull the failing indicators out of a snapshot info JSON blob.
+   * Malformed/non-object payloads (defensive: the column accepts arbitrary
+   * JSON) yield an empty list rather than a runtime error.
+   */
+  private extractDownIndicators(info: Prisma.JsonValue | null): HealthDownIndicator[] {
+    if (!info || typeof info !== "object" || Array.isArray(info)) return [];
+    const result: HealthDownIndicator[] = [];
+    for (const [name, entry] of Object.entries(info as Record<string, unknown>)) {
+      if (!entry || typeof entry !== "object") continue;
+      const indicator = entry as { status?: unknown; message?: unknown };
+      if (indicator.status !== "down") continue;
+      result.push({
+        name,
+        message: typeof indicator.message === "string" ? indicator.message : null,
+      });
+    }
+    return result;
   }
 
   private withDerivedState(row: HealthInstallation) {
