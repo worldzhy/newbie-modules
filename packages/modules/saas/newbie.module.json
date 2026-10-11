@@ -1,6 +1,7 @@
 {
   "key": "saas",
   "layer": "capability",
+  "deprecated": "Superseded by the platform-level account/security/notification modules; do not adopt in new projects.",
   "module": {
     "file": "saas.module",
     "className": "SaasModule"
