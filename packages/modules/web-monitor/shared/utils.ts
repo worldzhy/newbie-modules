@@ -60,7 +60,8 @@ export const func = {
     return ip;
   },
   // Simplified: replace pure numeric path segments with *
-  urlHelper(input: string) {
+  urlHelper(raw: unknown) {
+    const input = typeof raw === "string" ? raw : String(raw ?? "");
     try {
       const schemeIdx = input.indexOf("://");
       if (schemeIdx !== -1) {
@@ -76,8 +77,14 @@ export const func = {
     }
   },
   // Added: object check (arrays included)
-  isObject(input: unknown) {
+  isObject(input: unknown): input is Record<string, unknown> {
     return input !== null && typeof input === "object";
+  },
+  // Coerce an untyped ingest value to Date; numeric values are epoch ms.
+  toDate(value: unknown) {
+    if (value instanceof Date) return value;
+    if (typeof value === "number") return new Date(value);
+    return new Date(String(value));
   },
   filterKeyWord(input: unknown) {
     try {
@@ -101,14 +108,14 @@ export const func = {
       })
       .join("");
   },
-  setMatchTime(query: Record<string, any>, $match: Record<string, any>) {
-    const createTime: Record<string, any> = {};
+  setMatchTime(query: Record<string, unknown>, $match: Record<string, unknown>) {
+    const createTime: Record<string, unknown> = {};
     if (query.beginTime) {
-      createTime.$gte = new Date(query.beginTime);
+      createTime.$gte = new Date(String(query.beginTime));
       $match.createTime = createTime;
     }
     if (query.endTime) {
-      createTime.$lte = new Date(query.endTime);
+      createTime.$lte = new Date(String(query.endTime));
       $match.createTime = createTime;
     }
   },

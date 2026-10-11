@@ -59,7 +59,7 @@ export class WebMonitorCustomItemResponseDto {
   customContent?: string;
 
   @ApiPropertyOptional({ type: Object, additionalProperties: true, description: "Custom filter key/value pairs" })
-  customFilter?: Record<string, any>;
+  customFilter?: Record<string, unknown>;
 
   @ApiPropertyOptional({ type: String, description: "User phone" })
   phone?: string;

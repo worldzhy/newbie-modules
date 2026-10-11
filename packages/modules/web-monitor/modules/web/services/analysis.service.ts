@@ -1,15 +1,21 @@
 import { Injectable } from "@nestjs/common";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
 import { ConfigService } from "@nestjs/config";
+import { func } from "../../../shared/utils";
 
 @Injectable()
 export class AnalysisService {
-  private cfg: Record<string, any>;
+  private cfg: Record<string, unknown>;
   constructor(
     private readonly models: MonitorModelsService,
     private readonly config: ConfigService,
   ) {
     this.cfg = this.config.get("modules.web-monitor") || {};
+  }
+
+  private get topAnalysisLimit() {
+    const size = this.cfg.top_alalysis_size;
+    return func.isObject(size) ? Number(size.web) || 10 : 10;
   }
 
   async getAnalysislist(
@@ -18,10 +24,10 @@ export class AnalysisService {
     endTime?: string,
     filter?: { phone?: string; uid?: string },
   ) {
-    const query: { $match: Record<string, any> } = { $match: {} };
+    const query: { $match: Record<string, unknown> } = { $match: {} };
     if (filter?.phone) query.$match.phone = filter.phone;
     if (filter?.uid) query.$match.uid = filter.uid;
-    const createTime: Record<string, any> = {};
+    const createTime: Record<string, unknown> = {};
     if (beginTime) {
       createTime.$gte = new Date(beginTime);
       query.$match.createTime = createTime;
@@ -65,8 +71,8 @@ export class AnalysisService {
   }
 
   private getMatch(beginTime?: string, endTime?: string) {
-    const $match: Record<string, any> = {};
-    const createTime: Record<string, any> = {};
+    const $match: Record<string, unknown> = {};
+    const createTime: Record<string, unknown> = {};
     if (beginTime) {
       createTime.$gte = new Date(beginTime);
       $match.createTime = createTime;
@@ -86,7 +92,7 @@ export class AnalysisService {
         { $match: { ...$match } },
         { $group: { _id: { url: "$url" }, count: { $sum: 1 } } },
         { $sort: { count: -1 } },
-        { $limit: this.cfg.top_alalysis_size?.web || 10 },
+        { $limit: this.topAnalysisLimit },
       ])
       .read("secondaryPreferred")
       .exec();
@@ -102,7 +108,7 @@ export class AnalysisService {
         { $match: { count: 1 } },
         { $group: { _id: { value: { $arrayElemAt: ["$urls", 0] } }, count: { $sum: 1 } } },
         { $sort: { count: -1 } },
-        { $limit: this.cfg.top_alalysis_size?.web || 10 },
+        { $limit: this.topAnalysisLimit },
       ])
       .read("secondaryPreferred")
       .exec();
@@ -116,7 +122,7 @@ export class AnalysisService {
         { $match: { ...$match } },
         { $group: { _id: { browser: "$browser" }, count: { $sum: 1 } } },
         { $sort: { count: -1 } },
-        { $limit: this.cfg.top_alalysis_size?.web || 10 },
+        { $limit: this.topAnalysisLimit },
       ])
       .read("secondaryPreferred")
       .exec();
@@ -130,7 +136,7 @@ export class AnalysisService {
         { $match: { ...$match } },
         { $group: { _id: { province: "$province" }, count: { $sum: 1 } } },
         { $sort: { count: -1 } },
-        { $limit: this.cfg.top_alalysis_size?.web || 10 },
+        { $limit: this.topAnalysisLimit },
       ])
       .read("secondaryPreferred")
       .exec();

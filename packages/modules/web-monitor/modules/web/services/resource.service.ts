@@ -1,10 +1,11 @@
 import { Injectable } from "@nestjs/common";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
 import { ConfigService } from "@nestjs/config";
+import { func } from "../../../shared/utils";
 
 @Injectable()
 export class ResourceService {
-  private cfg: Record<string, any>;
+  private cfg: Record<string, unknown>;
   constructor(
     private readonly models: MonitorModelsService,
     private readonly config: ConfigService,
@@ -21,7 +22,7 @@ export class ResourceService {
     beginTime?: string,
     endTime?: string,
   ) {
-    const match: Record<string, any> = { url, speedType: Number(speedType) };
+    const match: Record<string, unknown> = { url, speedType: Number(speedType) };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
     const count = await this.models.WebResource(appId).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models
@@ -37,20 +38,24 @@ export class ResourceService {
     return { dataList, totalNum: count, pageNo: Number(pageNo) };
   }
 
-  async getAverageResourceList(query: Record<string, any>) {
+  async getAverageResourceList(query: Record<string, unknown>) {
     const { appId, type = 1, pageNo = 1, pageSize = this.cfg.pageSize, beginTime, endTime, url } = query;
-    const match: Record<string, any> = { speedType: Number(type) };
-    if (url) match.name = { $regex: new RegExp(url, "i") };
+    const match: Record<string, unknown> = { speedType: Number(type) };
+    if (url) match.name = { $regex: new RegExp(String(url), "i") };
     if (beginTime || endTime) {
-      const createTime: Record<string, any> = {};
-      if (beginTime) createTime.$gte = new Date(beginTime);
-      if (endTime) createTime.$lte = new Date(endTime);
+      const createTime: Record<string, unknown> = {};
+      if (beginTime) createTime.$gte = func.toDate(beginTime);
+      if (endTime) createTime.$lte = func.toDate(endTime);
       match.createTime = createTime;
     }
     const group_id = { url: "$name", method: "$method" };
-    const count = await this.models.WebResource(appId).distinct("name", match).read("secondaryPreferred").exec();
+    const count = await this.models
+      .WebResource(String(appId))
+      .distinct("name", match)
+      .read("secondaryPreferred")
+      .exec();
     const dataList = await this.models
-      .WebResource(appId)
+      .WebResource(String(appId))
       .aggregate([
         { $match: match },
         {
@@ -71,7 +76,7 @@ export class ResourceService {
   }
 
   async getOneResourceAvg(appId: string, url: string, beginTime?: string, endTime?: string) {
-    const match: Record<string, any> = { name: url };
+    const match: Record<string, unknown> = { name: url };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
     const rows = await this.models
       .WebResource(appId)
@@ -92,7 +97,7 @@ export class ResourceService {
     beginTime?: string,
     endTime?: string,
   ) {
-    const match: Record<string, any> = { name: url };
+    const match: Record<string, unknown> = { name: url };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
     const count = await this.models.WebResource(appId).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models

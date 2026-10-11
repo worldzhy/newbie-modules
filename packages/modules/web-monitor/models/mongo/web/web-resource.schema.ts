@@ -8,7 +8,7 @@ export class WebResource {
   @Prop() url: string; // Page URL
   @Prop() fullUrl: string; // Full resource URL
   @Prop() speedType: number; // 1: normal, 2: slow
-  @Prop({ type: MongooseSchema.Types.Mixed }) resourceDatas: Record<string, any>; // All loaded resources JSON
+  @Prop({ type: MongooseSchema.Types.Mixed }) resourceDatas: Record<string, unknown>; // All loaded resources JSON
   @Prop() name: string; // Resource name
   @Prop({ default: "GET" }) method: string; // Request method
   @Prop() type: string; // Resource type

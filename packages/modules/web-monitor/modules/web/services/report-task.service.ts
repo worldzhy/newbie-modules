@@ -4,6 +4,7 @@ import { RedisService } from "../../../models/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { MonitorClickhouseService } from "../../../models/clickhouse/monitor-clickhouse.service";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
+import { SystemDocument } from "../../../models/mongo/system.schema";
 import { func } from "../../../shared/utils";
 import { UAParser } from "ua-parser-js";
 import { RedisKeys, ReportType } from "../../../models/enum";
@@ -14,18 +15,53 @@ import { RedisKeys, ReportType } from "../../../models/enum";
  * tick costs O(apps) writes instead of O(reports) single-document saves.
  */
 interface DrainBuckets {
-  appAjaxs: Record<string, any[]>;
-  appErrors: Record<string, any[]>;
-  appPages: Record<string, any[]>;
-  appEnvironments: Record<string, any[]>;
-  appResources: Record<string, any[]>;
-  appCustoms: Record<string, any[]>;
-  sdkErrors: Record<string, any>[];
+  appAjaxs: Record<string, Record<string, unknown>[]>;
+  appErrors: Record<string, Record<string, unknown>[]>;
+  appPages: Record<string, Record<string, unknown>[]>;
+  appEnvironments: Record<string, Record<string, unknown>[]>;
+  appResources: Record<string, Record<string, unknown>[]>;
+  appCustoms: Record<string, Record<string, unknown>[]>;
+  sdkErrors: Record<string, unknown>[];
+}
+
+/**
+ * Normalized report item produced by handleWebData from one raw SDK payload.
+ * Fields not present in the payload stay undefined; numeric performance
+ * entries and resource/error list items keep their raw per-key values.
+ */
+interface WebReportItem {
+  appId: string;
+  createTime: Date;
+  userAgent: string;
+  ip?: string;
+  markPage: string;
+  markUser: string;
+  markUv: string;
+  markDevice: string;
+  url: string;
+  p?: unknown;
+  uid?: unknown;
+  isFirstIn: boolean;
+  errorList?: Record<string, unknown>[];
+  resourceList?: Record<string, unknown>[];
+  customs?: Record<string, unknown>[];
+  preUrl?: string;
+  performance?: Record<string, unknown>;
+  screenWidth?: unknown;
+  screenHeight?: unknown;
+  // SDK-error payloads only (never populated by handleWebData today).
+  sdkVersion?: unknown;
+  name?: unknown;
+  msg?: unknown;
+  stack?: unknown;
+  // Geo fields: not populated by handleWebData today, kept for row shape parity.
+  county?: unknown;
+  province?: unknown;
 }
 
 @Injectable()
 export class WebReportTaskService {
-  private cfg: Record<string, any>;
+  private cfg: Record<string, unknown>;
   private readonly logger = new Logger(WebReportTaskService.name);
   constructor(
     private readonly config: ConfigService,
@@ -37,25 +73,26 @@ export class WebReportTaskService {
     this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
-  private pushRow(bucket: Record<string, any[]>, appId: string, row: Record<string, any>) {
+  private pushRow(bucket: Record<string, Record<string, unknown>[]>, appId: string, row: Record<string, unknown>) {
     const rows = bucket[appId];
     if (rows) rows.push(row);
     else bucket[appId] = [row];
   }
 
   private async collectQueueItem(raw: string, buckets: DrainBuckets) {
-    let query: Record<string, any>;
+    let query: Record<string, unknown>;
     try {
       query = JSON.parse(raw);
     } catch {
       return;
     }
     const querytype = query.type || ReportType.PagePerf;
-    const item = await this.handleWebData(query);
+    const item = this.handleWebData(query);
     if (query.type === ReportType.SdkError) {
       this.collectSdkError(item, buckets.sdkErrors);
       return;
     }
+    if (!item.appId) return;
     const system = await this.site.getSiteForAppId(item.appId);
     if (!system) return;
     // All anomaly-relevant data is always persisted; thresholds define what an
@@ -67,7 +104,7 @@ export class WebReportTaskService {
     this.collectCustoms(item, buckets.appCustoms);
   }
 
-  private collectPages(item: Record<string, any>, slowPageTime = 5, appPages: Record<string, any[]>) {
+  private collectPages(item: WebReportItem, slowPageTime = 5, appPages: Record<string, Record<string, unknown>[]>) {
     const performance = item.performance || {};
     let newName = "";
     try {
@@ -77,8 +114,8 @@ export class WebReportTaskService {
       newName = item.url || "";
     }
     slowPageTime = slowPageTime * 1000;
-    const speedType = performance.lodt >= slowPageTime ? 2 : 1;
-    const page: Record<string, any> = {
+    const speedType = Number(performance.lodt) >= slowPageTime ? 2 : 1;
+    const page: Record<string, unknown> = {
       appId: item.appId,
       createTime: item.createTime,
       url: newName,
@@ -100,15 +137,16 @@ export class WebReportTaskService {
     this.pushRow(appPages, item.appId, page);
   }
 
-  private collectCustoms(data: Record<string, any>, appCustoms: Record<string, any[]>) {
+  private collectCustoms(data: WebReportItem, appCustoms: Record<string, Record<string, unknown>[]>) {
     if (!data.customs || !data.customs.length) return;
     for (const item of data.customs) {
-      if (item.customFilter && Object.prototype.toString.apply(item.customFilter) === "[object Object]") {
-        Object.keys(item.customFilter).forEach((key) => {
-          if (typeof item.customFilter[key] === "number") item.customFilter[key] = String(item.customFilter[key]);
+      const customFilter = item.customFilter;
+      if (func.isObject(customFilter)) {
+        Object.keys(customFilter).forEach((key) => {
+          if (typeof customFilter[key] === "number") customFilter[key] = String(customFilter[key]);
         });
       }
-      const custom: Record<string, any> = {
+      const custom: Record<string, unknown> = {
         appId: data.appId,
         createTime: data.createTime,
         markPage: data.markPage,
@@ -124,14 +162,14 @@ export class WebReportTaskService {
   }
 
   private collectResource(
-    data: Record<string, any>,
-    item: Record<string, any>,
-    system: Record<string, any>,
-    appResources: Record<string, any[]>,
+    data: WebReportItem,
+    item: Record<string, unknown>,
+    system: SystemDocument,
+    appResources: Record<string, Record<string, unknown>[]>,
   ) {
     let slowTime = 2;
     let speedType = 1;
-    let duration = Math.floor(Math.abs(item.duration || 0));
+    let duration = Math.floor(Math.abs(Number(item.duration) || 0));
     if (duration > 60000) duration = 60000;
     if (item.type === "link" || item.type === "css") slowTime = (system.slowCssTime || 2) * 1000;
     else if (item.type === "script") slowTime = (system.slowJsTime || 2) * 1000;
@@ -144,11 +182,11 @@ export class WebReportTaskService {
       const u = new URL(func.urlHelper(item.name));
       newName = `${u.protocol}//${u.host}${u.pathname}`;
     } catch {
-      newName = item.name || "";
+      newName = typeof item.name === "string" ? item.name : "";
     }
-    const resource: Record<string, any> = {
+    const resource: Record<string, unknown> = {
       appId: data.appId,
-      createTime: item.requestTime ? new Date(item.requestTime) : data.createTime,
+      createTime: item.requestTime ? func.toDate(item.requestTime) : data.createTime,
       url: data.url,
       fullUrl: item.name,
       speedType,
@@ -165,19 +203,19 @@ export class WebReportTaskService {
     this.pushRow(appResources, data.appId, resource);
   }
 
-  private async collectEnvironment(data: Record<string, any>, appEnvironments: Record<string, any[]>) {
+  private async collectEnvironment(data: WebReportItem, appEnvironments: Record<string, Record<string, unknown>[]>) {
     const ip = data.ip;
     if (!ip) return;
-    let copyip = ip.split(".");
-    copyip = `${copyip[0]}.${copyip[1]}.${copyip[2]}`;
-    let datas: Record<string, any> | null = null;
+    const ipParts = ip.split(".");
+    const copyip = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
+    let datas: Record<string, unknown> | null = null;
     try {
       const s = await this.redis.get(copyip);
       if (s) datas = JSON.parse(s);
     } catch {
       datas = null;
     }
-    const environment: Record<string, any> = {
+    const environment: Record<string, unknown> = {
       appId: data.appId,
       createTime: data.createTime,
       url: data.url,
@@ -206,8 +244,8 @@ export class WebReportTaskService {
     this.pushRow(appEnvironments, data.appId, environment);
   }
 
-  private collectSdkError(data: Record<string, any>, sdkErrors: Record<string, any>[]) {
-    const sdkErr: Record<string, any> = {
+  private collectSdkError(data: WebReportItem, sdkErrors: Record<string, unknown>[]) {
+    const sdkErr: Record<string, unknown> = {
       appId: data.appId,
       createTime: data.createTime,
       markUser: data.markUser,
@@ -229,13 +267,14 @@ export class WebReportTaskService {
     sdkErrors.push(sdkErr);
   }
 
-  private setUser(obj: Record<string, any>, data: Record<string, any>) {
+  private setUser(obj: Record<string, unknown>, data: WebReportItem) {
     if (data.uid) obj.uid = String(data.uid);
     if (data.p) obj.phone = func.decryptPhone(data.p);
   }
 
   async saveWebReportDatasForRedis() {
-    const count = this.cfg.redis_consumption?.thread_web || 1000;
+    const consumption = func.isObject(this.cfg.redis_consumption) ? this.cfg.redis_consumption : {};
+    const count = Number(consumption.thread_web) || 1000;
     const buckets: DrainBuckets = {
       appAjaxs: {},
       appErrors: {},
@@ -296,40 +335,37 @@ export class WebReportTaskService {
     }
   }
 
-  private async handleWebData(query: Record<string, any>) {
-    let item: Record<string, any> = {
-      appId: query.appId,
-      createTime: new Date(query.time),
-      userAgent: query.userAgent,
-      ip: query.ip,
-      markPage: query.markPage || func.randomString(),
-      markUser: query.markUser || "",
-      markUv: query.markUv || "",
-      markDevice: query.markDevice || "",
-      url: query.url,
+  private handleWebData(query: Record<string, unknown>): WebReportItem {
+    const str = (value: unknown, fallback = "") => (typeof value === "string" && value ? value : fallback);
+    const item: WebReportItem = {
+      appId: str(query.appId),
+      createTime: func.toDate(query.time),
+      userAgent: str(query.userAgent),
+      ip: str(query.ip) || undefined,
+      markPage: str(query.markPage, func.randomString()),
+      markUser: str(query.markUser),
+      markUv: str(query.markUv),
+      markDevice: str(query.markDevice),
+      url: str(query.url),
       p: query.p,
       uid: query.uid,
+      isFirstIn: Boolean(query.isFirstIn),
+      errorList: Array.isArray(query.errorList) ? query.errorList : undefined,
+      resourceList: Array.isArray(query.resourceList) ? query.resourceList : undefined,
+      customs: Array.isArray(query.customs) ? query.customs : undefined,
     };
-    item = Object.assign(item, {
-      isFirstIn: query.isFirstIn || false,
-      errorList: query.errorList,
-      resourceList: query.resourceList,
-      customs: query.customs,
-    });
     if (query.isFirstIn) {
-      item = Object.assign(item, {
-        preUrl: query.preUrl,
-        performance: query.performance,
-        screenWidth: query.screenWidth,
-        screenHeight: query.screenHeight,
-      });
+      item.preUrl = str(query.preUrl);
+      item.performance = func.isObject(query.performance) ? query.performance : undefined;
+      item.screenWidth = query.screenWidth;
+      item.screenHeight = query.screenHeight;
     }
     return item;
   }
 
-  private forEachResources(data: Record<string, any>, system: Record<string, any>, buckets: DrainBuckets) {
+  private forEachResources(data: WebReportItem, system: SystemDocument, buckets: DrainBuckets) {
     if (!data.resourceList || !data.resourceList.length) return;
-    data.resourceList.forEach((item: Record<string, any>) => {
+    data.resourceList.forEach((item) => {
       if (item.type === "xmlhttprequest" || item.type === "fetchrequest" || item.type === "fetch") {
         this.saveAjaxs(data, item, buckets.appAjaxs);
       } else {
@@ -338,19 +374,23 @@ export class WebReportTaskService {
     });
   }
 
-  private saveAjaxs(data: Record<string, any>, item: Record<string, any>, appAjaxs: Record<string, any[]>) {
+  private saveAjaxs(
+    data: WebReportItem,
+    item: Record<string, unknown>,
+    appAjaxs: Record<string, Record<string, unknown>[]>,
+  ) {
     let newName = "";
     try {
       const newurl = new URL(func.urlHelper(item.name));
       newName = `${newurl.protocol}//${newurl.host}${newurl.pathname}`;
     } catch {
-      newName = item.name || "";
+      newName = typeof item.name === "string" ? item.name : "";
     }
-    const duration = Math.floor(Math.abs(item.duration || 0));
+    const duration = Math.floor(Math.abs(Number(item.duration) || 0));
 
-    const _ajax: Record<string, any> = {
+    const _ajax: Record<string, unknown> = {
       appId: data.appId,
-      createTime: item.requestTime ? new Date(item.requestTime) : data.createTime,
+      createTime: item.requestTime ? func.toDate(item.requestTime) : data.createTime,
     };
     _ajax.url = newName || "";
     _ajax.fullUrl = item.name || "";
@@ -360,7 +400,7 @@ export class WebReportTaskService {
     _ajax.callUrl = data.url || "";
     if (item.options) _ajax.options = func.filterKeyWord(item.options);
     try {
-      const newurl = new URL(item.name);
+      const newurl = new URL(String(item.name));
       if (newurl.searchParams.toString()) _ajax.query = newurl.searchParams.toString();
     } catch {
       // Expected failure: the URL may be malformed — skip query extraction.
@@ -374,24 +414,27 @@ export class WebReportTaskService {
     this.pushRow(appAjaxs, data.appId, _ajax);
   }
 
-  private collectErrors(data: Record<string, any>, appErrors: Record<string, any[]>) {
+  private collectErrors(data: WebReportItem, appErrors: Record<string, Record<string, unknown>[]>) {
     if (!data.errorList || !data.errorList.length) return;
     for (const item of data.errorList) {
-      if (item?.data?.resourceUrl && item.data.resourceUrl.startsWith("data://image")) continue;
+      const rawItemData: unknown = item?.data;
+      const itemData = func.isObject(rawItemData) ? rawItemData : {};
+      const resourceUrl = typeof itemData.resourceUrl === "string" ? itemData.resourceUrl : "";
+      if (resourceUrl.startsWith("data://image")) continue;
 
       let newName = "";
       try {
-        const newurl = new URL(func.urlHelper(item?.data?.resourceUrl || ""));
+        const newurl = new URL(func.urlHelper(resourceUrl));
         newName = `${newurl.protocol}//${newurl.host}${newurl.pathname}`;
       } catch {
-        newName = item?.data?.resourceUrl || "";
+        newName = resourceUrl;
       }
 
-      const errors: Record<string, any> = {};
+      const errors: Record<string, unknown> = {};
       errors.resourceUrl = newName || "";
-      errors.fullUrl = item?.data?.resourceUrl || "";
+      errors.fullUrl = resourceUrl;
       errors.url = data.url || "";
-      errors.createTime = item.createTime ? new Date(item.createTime) : data.createTime;
+      errors.createTime = item.createTime ? func.toDate(item.createTime) : data.createTime;
 
       if (typeof item.msg === "object") errors.msg = JSON.stringify(item.msg);
       else if (typeof item.msg === "string") errors.msg = item.msg;
@@ -401,14 +444,14 @@ export class WebReportTaskService {
       errors.name = item.name || "";
       errors.api = item.api || "";
       if (Array.isArray(item.stack)) errors.stack = JSON.stringify(item.stack);
-      errors.target = item?.data?.target || "";
-      errors.status = item?.data?.status ? String(item.data.status) : "";
-      errors.col = item?.data?.col ? String(item.data.col) : "";
-      errors.line = item?.data?.line ? String(item.data.line) : "";
+      errors.target = itemData.target || "";
+      errors.status = itemData.status ? String(itemData.status) : "";
+      errors.col = itemData.col ? String(itemData.col) : "";
+      errors.line = itemData.line ? String(itemData.line) : "";
       errors.method = item.method || "";
 
       try {
-        const u = new URL(item?.data?.resourceUrl || "");
+        const u = new URL(resourceUrl);
         if (u.searchParams.toString()) errors.query = u.searchParams.toString();
       } catch {
         // Expected failure: the URL may be malformed — skip query extraction.

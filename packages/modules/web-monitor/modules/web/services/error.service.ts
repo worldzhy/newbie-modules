@@ -4,7 +4,7 @@ import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class ErrorService {
-  private cfg: Record<string, any>;
+  private cfg: Record<string, unknown>;
   constructor(
     private readonly ch: MonitorClickhouseService,
     private readonly config: ConfigService,
@@ -12,7 +12,7 @@ export class ErrorService {
     this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
-  async getAverageErrorList(query: Record<string, any>) {
+  async getAverageErrorList(query: Record<string, unknown>) {
     const {
       appId,
       beginTime,
@@ -52,19 +52,19 @@ export class ErrorService {
       queryParams.typeArr = String(type).split("|");
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebError(appId);
+    const model = await this.ch.WebError(String(appId));
 
     if (String(realTime) === "1") {
       const total = await model.find({ where, select: "count() as total", queryParams });
       const list = await model.find({
         where,
         select: "*",
-        limit: pageSize,
-        skip: (pageNo - 1) * pageSize,
+        limit: Number(pageSize),
+        skip: (pageNo - 1) * Number(pageSize),
         orderBy: "createTime DESC",
         queryParams,
       });
-      list.forEach((item: Record<string, any>) => (item._id = { ...item }));
+      list.forEach((item: Record<string, unknown>) => (item._id = { ...item }));
       return { dataList: list, totalNum: total?.[0]?.total || 0, pageNo };
     }
 
@@ -80,17 +80,17 @@ export class ErrorService {
       where,
       select: `${groupBy}, MAX(createTime) AS lastCreateTime,COUNT() AS count,COUNT(DISTINCT markUser) AS userNum,groupArray(msg)[1] AS lastMsg`,
       groupBy,
-      limit: pageSize,
-      skip: (pageNo - 1) * pageSize,
+      limit: Number(pageSize),
+      skip: (pageNo - 1) * Number(pageSize),
       orderBy: "count DESC",
       queryParams,
     });
     const [count, list] = await Promise.all([countQuery, listQuery]);
-    list.forEach((item: Record<string, any>) => (item._id = { ...item }));
+    list.forEach((item: Record<string, unknown>) => (item._id = { ...item }));
     return { dataList: list, totalNum: count?.[0]?.total || 0, pageNo };
   }
 
-  async getOneErrorList(query: Record<string, any>) {
+  async getOneErrorList(query: Record<string, unknown>) {
     const { appId, url, name = "", status = "", type = "", beginTime, endTime, phone = "", uid = "" } = query;
     const pageNo = Number(query.pageNo || 1);
     const pageSize = Number(query.pageSize || this.cfg.pageSize);
@@ -129,7 +129,7 @@ export class ErrorService {
       queryParams.endTime = endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebError(appId);
+    const model = await this.ch.WebError(String(appId));
     const countQuery = model.find({ where, select: "count() as total", queryParams });
     const listQuery = model.find({
       where,
@@ -148,7 +148,7 @@ export class ErrorService {
       queryParams,
     });
     const [count, list, other] = await Promise.all([countQuery, listQuery, otherQuery]);
-    list.forEach((item: Record<string, any>) => (item._id = { ...item }));
+    list.forEach((item: Record<string, unknown>) => (item._id = { ...item }));
     let userNum = 0,
       first = "",
       last = "";

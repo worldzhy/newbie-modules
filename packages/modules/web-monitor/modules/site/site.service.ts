@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { DeleteResult } from "mongodb";
 import { MonitorModelsService } from "../../models/mongo/monitor-models.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
 import { func } from "../../shared/utils";
@@ -10,43 +11,47 @@ export class SiteService {
     private readonly nodeCache: NodeCacheService,
   ) {}
 
-  async saveSiteData(body: Record<string, any>) {
-    const type = body.type;
+  async saveSiteData(body: Record<string, unknown>) {
+    const type = typeof body.type === "string" ? body.type : undefined;
     if (!body.projectId) return func.errResult({ desc: "A new system must belong to a project" });
     if (!body.systemDomain && type === "web")
       return func.errResult({ desc: "Add system: system domain must not be empty" });
     if (!body.systemName) return func.errResult({ desc: "Add system: system name must not be empty" });
 
     if (type === "web") {
-      const search = await this.models.System().findOne({ systemDomain: body.systemDomain }).exec();
+      const search = await this.models
+        .System()
+        .findOne({ systemDomain: String(body.systemDomain) })
+        .exec();
       if (search && search.systemDomain) return func.errResult({ desc: "Add system: system already exists" });
     }
 
-    const appId = body.appId ? body.appId : func.randomString();
+    const appId = body.appId ? String(body.appId) : func.randomString();
     const SystemModel = this.models.System();
     const system = new SystemModel();
-    system.projectId = body.projectId;
-    system.systemDomain = body.systemDomain;
-    system.systemName = body.systemName;
-    system.type = body.type;
+    system.projectId = String(body.projectId);
+    system.systemDomain = typeof body.systemDomain === "string" ? body.systemDomain : "";
+    system.systemName = String(body.systemName);
+    system.type = type || "web";
     system.appId = appId;
-    system.userId = [body.token || ""];
+    system.userId = [typeof body.token === "string" ? body.token : ""];
     system.createTime = new Date();
-    system.slowPageTime = body.slowPageTime || 5;
-    system.slowWhiteTime = body.slowWhiteTime || 2;
-    system.slowJsTime = body.slowJsTime || 2;
-    system.slowCssTime = body.slowCssTime || 2;
-    system.slowImgTime = body.slowImgTime || 2;
-    system.slowAjaxTime = body.slowAjaxTime || 2;
+    system.slowPageTime = Number(body.slowPageTime) || 5;
+    system.slowWhiteTime = Number(body.slowWhiteTime) || 2;
+    system.slowJsTime = Number(body.slowJsTime) || 2;
+    system.slowCssTime = Number(body.slowCssTime) || 2;
+    system.slowImgTime = Number(body.slowImgTime) || 2;
+    system.slowAjaxTime = Number(body.slowAjaxTime) || 2;
 
     const result = await system.save();
     await this.updateSiteNodeCache(appId);
     return func.result({ data: result });
   }
 
-  async updateSiteData(body: Record<string, any>) {
+  async updateSiteData(body: Record<string, unknown>) {
     const appId = body.appId;
     if (!appId) return func.errResult({ desc: "Update system: appId must not be empty" });
+    const appIdStr = String(appId);
 
     const update = {
       $set: {
@@ -61,14 +66,14 @@ export class SiteService {
         slowAjaxTime: body.slowAjaxTime || 2,
       },
     };
-    const result = await this.models.System().updateOne({ appId: appId }, update, { multi: true }).exec();
-    await this.updateSiteNodeCache(appId);
+    const result = await this.models.System().updateOne({ appId: appIdStr }, update, { multi: true }).exec();
+    await this.updateSiteNodeCache(appIdStr);
     return func.result({ data: result });
   }
 
   async updateSiteNodeCache(appId: string) {
     const system = await this.getSiteForDb(appId);
-    this.nodeCache.updateSiteCache(system as any);
+    if (system) this.nodeCache.updateSiteCache(system);
   }
 
   /**
@@ -92,13 +97,13 @@ export class SiteService {
 
   async getSiteForDb(appId: string) {
     if (!appId) throw new Error("Query a system: appId must not be empty");
-    return (await this.models.System().findOne({ appId: appId }).exec()) || ({} as any);
+    return await this.models.System().findOne({ appId: appId }).exec();
   }
 
-  async getSitesForUserId(query: Record<string, any>) {
+  async getSitesForUserId(query: Record<string, unknown>) {
     const { systemName, type, projectId } = query;
-    const param: Record<string, any> = {};
-    if (systemName) param.systemName = new RegExp(systemName);
+    const param: Record<string, unknown> = {};
+    if (systemName) param.systemName = new RegExp(String(systemName));
     if (type) param.type = type;
     if (projectId) param.projectId = projectId;
     return (await this.models.System().find(param).exec()) || [];
@@ -111,7 +116,7 @@ export class SiteService {
     // Cache miss (cold start, or a site created outside the API): fall back to
     // Mongo and backfill so ingest never rejects a legitimate appId with a 500.
     const system = await this.getSiteForDb(appId);
-    if (system?.appId) this.nodeCache.updateSiteCache(system as any);
+    if (system) this.nodeCache.updateSiteCache(system);
     return system;
   }
 
@@ -136,7 +141,7 @@ export class SiteService {
       .exec();
   }
 
-  async deleteSite(appId: string, type: string): Promise<any> {
+  async deleteSite(appId: string, type: string): Promise<DeleteResult> {
     const result = await this.models.System().deleteOne({ appId: appId, type }).exec();
     this.nodeCache.removeAppInfo(appId);
     return result;

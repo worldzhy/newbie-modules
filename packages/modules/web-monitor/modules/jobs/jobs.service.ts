@@ -14,12 +14,13 @@ import { WebPvuvipTaskService } from "@modules/web-monitor/modules/web/services/
 import { WebIpTaskService } from "@modules/web-monitor/modules/web/services/ip-task.service";
 import { MonitorModelsService } from "../../models/mongo/monitor-models.service";
 import { MonitorClickhouseService } from "../../models/clickhouse/monitor-clickhouse.service";
+import { SystemDocument } from "../../models/mongo/system.schema";
 import { WEB_THRESHOLD_ALERT_EVENT, WebThresholdAlertCategory, WebThresholdAlertEvent } from "./threshold-alert.event";
 import ip from "ip";
 
 @Injectable()
 export class JobsService implements OnModuleInit {
-  private cfg: Record<string, any>;
+  private cfg: Record<string, unknown>;
   private readonly logger = new Logger(JobsService.name);
 
   constructor(
@@ -48,7 +49,8 @@ export class JobsService implements OnModuleInit {
   }
 
   private registerReportStoreTask() {
-    const expr = this.cfg.redis_consumption?.task_time || "*/10 * * * * *";
+    const consumption = func.isObject(this.cfg.redis_consumption) ? this.cfg.redis_consumption : {};
+    const expr = typeof consumption.task_time === "string" ? consumption.task_time : "*/10 * * * * *";
     const job = new CronJob(
       expr,
       async () => {
@@ -77,10 +79,10 @@ export class JobsService implements OnModuleInit {
   private static readonly TOP_ITEMS_LIMIT = 3;
 
   async evaluateThresholdAlerts() {
-    const acquired = await this.redisLock(RedisKeys.ALERT_EVALUATION_TASK_LOCK, this.cfg.alertTaskLockTime);
+    const acquired = await this.redisLock(RedisKeys.ALERT_EVALUATION_TASK_LOCK, Number(this.cfg.alertTaskLockTime));
     if (!acquired) return;
 
-    let systems: Record<string, any>[];
+    let systems: SystemDocument[];
     try {
       systems = await this.site.getWebSiteList();
     } catch (error) {
@@ -111,7 +113,7 @@ export class JobsService implements OnModuleInit {
     await Promise.all(workers);
   }
 
-  private async evaluateSystem(system: Record<string, any>, windowStart: Date, windowEnd: Date, windowMs: number) {
+  private async evaluateSystem(system: SystemDocument, windowStart: Date, windowEnd: Date, windowMs: number) {
     const base = {
       appId: system.appId,
       systemName: system.systemName || system.appId,
@@ -140,7 +142,7 @@ export class JobsService implements OnModuleInit {
           count,
           thresholdMs: (system.slowPageTime ?? 5) * 1000,
           topItems: topRows.map(
-            (row: Record<string, any>) =>
+            (row: Record<string, unknown>) =>
               `${row._id || "Unknown page"} — ${row.count} load(s), max ${row.maxLoadTime ?? 0}ms`,
           ),
         });
@@ -168,7 +170,7 @@ export class JobsService implements OnModuleInit {
           count,
           thresholdMs: paintThresholdMs,
           topItems: topRows.map(
-            (row: Record<string, any>) =>
+            (row: Record<string, unknown>) =>
               `${row._id || "Unknown page"} — ${row.count} load(s), max first paint ${row.maxWhiteTime ?? 0}ms`,
           ),
         });
@@ -208,7 +210,7 @@ export class JobsService implements OnModuleInit {
             count,
             thresholdMs: thresholdSeconds * 1000,
             topItems: topRows.map(
-              (row: Record<string, any>) =>
+              (row: Record<string, unknown>) =>
                 `${row._id || "Unknown resource"} — ${row.count} load(s), max ${row.maxDuration ?? 0}ms`,
             ),
           });
@@ -240,7 +242,7 @@ export class JobsService implements OnModuleInit {
           count,
           thresholdMs,
           topItems: topRows.map(
-            (row: Record<string, any>) =>
+            (row: Record<string, unknown>) =>
               `${row.url || "Unknown endpoint"} — ${row.count} call(s), max ${row.maxDuration ?? 0}ms`,
           ),
         });
@@ -277,7 +279,7 @@ export class JobsService implements OnModuleInit {
           count,
           affectedUsers: markedUsers,
           topItems: topRows.map(
-            (row: Record<string, any>) =>
+            (row: Record<string, unknown>) =>
               `[${row.type || "Error"}] ${row.name || "Unknown error"} @ ${row.resourceUrl || ""} — ${row.count}`,
           ),
         });
@@ -394,7 +396,7 @@ export class JobsService implements OnModuleInit {
   }
 
   private async redisLock(redisKey: string, ttl: number) {
-    const lock = `${ip.address()}:${this.cfg.port}:${func.randomString(3)}`;
+    const lock = `${ip.address()}:${String(this.cfg.port)}:${func.randomString(3)}`;
     const res = await this.redis.set(redisKey, lock, "EX", ttl, "NX");
     if (!res) {
       // Lock is held by another instance — normal in multi-instance deployments.
@@ -416,26 +418,32 @@ export class JobsService implements OnModuleInit {
   async updateAppInfoCache() {
     try {
       const systems = await this.site.getSiteList();
-      this.nodeCache.updateAllSiteCache(systems as any);
+      this.nodeCache.updateAllSiteCache(systems);
     } catch (e) {
       this.logger.error("IO error: failed to update cached appId info", e instanceof Error ? e.message : String(e));
     }
   }
 
   async pvuvipMinuteCount() {
-    const getLock = await this.redisLock(RedisKeys.PVUVIP_PRE_MINUTE_LOCK, this.cfg.pvuvip_task_minute_lock_time);
+    const getLock = await this.redisLock(
+      RedisKeys.PVUVIP_PRE_MINUTE_LOCK,
+      Number(this.cfg.pvuvip_task_minute_lock_time),
+    );
     if (!getLock) return;
     await this.webPvuvipTask.getWebPvUvIpByMinute();
   }
 
   async ipTask() {
-    const getLock = await this.redisLock(RedisKeys.IP_TASK_LOCK, this.cfg.ip_task_lock_time);
+    const getLock = await this.redisLock(RedisKeys.IP_TASK_LOCK, Number(this.cfg.ip_task_lock_time));
     if (!getLock) return;
     await this.webIpTask.saveWebGetIpDatas();
   }
 
   async dayReportNumTask() {
-    const getLock = await this.redisLock(RedisKeys.DAY_REPORT_NUM_TASK_LOCK, this.cfg.day_report_num_task_lock_time);
+    const getLock = await this.redisLock(
+      RedisKeys.DAY_REPORT_NUM_TASK_LOCK,
+      Number(this.cfg.day_report_num_task_lock_time),
+    );
     if (!getLock) return;
     await this.dayReportNum.numCountTask();
   }

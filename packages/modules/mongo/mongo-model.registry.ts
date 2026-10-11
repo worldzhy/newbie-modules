@@ -28,7 +28,7 @@ export class MongoModelRegistry {
    * @param collection Optional explicit collection name, for cases where the
    *   default pluralized model name is not desired.
    */
-  getOrCreateModel<T = any>(name: string, schema: MongooseSchema, collection?: string): Model<T> {
+  getOrCreateModel<T = unknown>(name: string, schema: MongooseSchema, collection?: string): Model<T> {
     const existing = this.connection.models[name] as Model<T> | undefined;
     if (existing) {
       return existing;

@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { PvuvipService } from "./pvuvip.service";
 import { func, mapWithConcurrency } from "../../../shared/utils";
+import { SystemDocument } from "../../../models/mongo/system.schema";
 
 function cronMinuteInterval(cronExp: string) {
   const m = cronExp.split(" ")[1] || "*/2";
@@ -13,7 +14,7 @@ function cronMinuteInterval(cronExp: string) {
 
 @Injectable()
 export class WebPvuvipTaskService {
-  private cfg: Record<string, any>;
+  private cfg: Record<string, unknown>;
   private readonly logger = new Logger(WebPvuvipTaskService.name);
   constructor(
     private readonly config: ConfigService,
@@ -24,7 +25,7 @@ export class WebPvuvipTaskService {
   }
 
   async getWebPvUvIpByMinute() {
-    const between = cronMinuteInterval(this.cfg.pvuvip_task_minute_cron_time);
+    const between = cronMinuteInterval(String(this.cfg.pvuvip_task_minute_cron_time));
     const endTime = new Date();
     const beginTime = new Date(endTime.getTime() - between);
 
@@ -34,7 +35,7 @@ export class WebPvuvipTaskService {
     // Bounded worker pool: keep at most pvuvipTaskConcurrency sites in flight
     // so a large site list cannot stampede Mongo/ClickHouse at once.
     const concurrency = Number(this.cfg.pvuvipTaskConcurrency) || 5;
-    await mapWithConcurrency(systems, concurrency, async (sys: Record<string, any>) => {
+    await mapWithConcurrency(systems, concurrency, async (sys) => {
       const appId = sys.appId;
       if (!appId) return;
       try {
@@ -56,13 +57,7 @@ export class WebPvuvipTaskService {
     await this.groupData(systems, 2, beginTime, endTime, beginTime);
   }
 
-  private async groupData(
-    datas: Record<string, any>[],
-    type: number,
-    beginTime: Date,
-    endTime: Date,
-    createTime: Date,
-  ) {
+  private async groupData(datas: SystemDocument[], type: number, beginTime: Date, endTime: Date, createTime: Date) {
     for (const sys of datas) {
       const appId = sys.appId;
       if (!appId) continue;

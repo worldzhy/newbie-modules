@@ -6,7 +6,7 @@ export class EnvironmentService {
   constructor(private readonly models: MonitorModelsService) {}
 
   async getDataGroupBy(type: number, url: string, appId: string, beginTime?: string, endTime?: string) {
-    const match: Record<string, any> = { url };
+    const match: Record<string, unknown> = { url };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
     const group_id = {
       url: "$url",

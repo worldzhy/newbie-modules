@@ -1,11 +1,12 @@
 import { Injectable } from "@nestjs/common";
+import { PipelineStage } from "mongoose";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
 import { ConfigService } from "@nestjs/config";
 import { func } from "../../../shared/utils";
 
 @Injectable()
 export class PageService {
-  private cfg: Record<string, any>;
+  private cfg: Record<string, unknown>;
   constructor(
     private readonly models: MonitorModelsService,
     private readonly config: ConfigService,
@@ -13,27 +14,28 @@ export class PageService {
     this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
-  async getAveragePageList(query: Record<string, any>) {
+  async getAveragePageList(query: Record<string, unknown>) {
     const { appId, type = "", pageNo = 1, pageSize = this.cfg.pageSize, url, isFirstIn } = query;
-    const match: Record<string, any> = {};
+    const appIdStr = String(appId);
+    const match: Record<string, unknown> = {};
     if (isFirstIn !== undefined && isFirstIn !== "") {
       match.isFirstIn = isFirstIn === "true" ? true : false;
     }
     func.setMatchTime(query, match);
     if (type) match.speedType = Number(type);
-    if (url) match.url = { $regex: new RegExp(url, "i") };
+    if (url) match.url = { $regex: new RegExp(String(url), "i") };
     const group_id = { url: "$url" };
     return url
-      ? await this.oneThread(appId, match, Number(pageNo), Number(pageSize), group_id)
-      : await this.getPages(appId, match, Number(pageNo), Number(pageSize));
+      ? await this.oneThread(appIdStr, match, Number(pageNo), Number(pageSize), group_id)
+      : await this.getPages(appIdStr, match, Number(pageNo), Number(pageSize));
   }
 
-  private async getPages(appId: string, match: Record<string, any>, pageNo: number, pageSize: number) {
+  private async getPages(appId: string, match: Record<string, unknown>, pageNo: number, pageSize: number) {
     const model = this.models.WebPage(appId);
     const distinct = (await model.distinct("url", match).read("secondaryPreferred").exec()) || [];
     const copdistinct = distinct.slice();
     const slice = distinct.slice((pageNo - 1) * pageSize, (pageNo - 1) * pageSize + pageSize);
-    let $group: Record<string, any> = {
+    let $group: PipelineStage.Group["$group"] = {
       _id: { url: "$url" },
       count: { $sum: 1 },
     };
@@ -68,10 +70,10 @@ export class PageService {
 
   private async oneThread(
     appId: string,
-    match: Record<string, any>,
+    match: Record<string, unknown>,
     pageNo: number,
     pageSize: number,
-    group_id: Record<string, any>,
+    group_id: Record<string, unknown>,
   ) {
     const count = await this.models.WebPage(appId).distinct("url", match).read("secondaryPreferred").exec();
     const dataList = await this.models
@@ -101,11 +103,12 @@ export class PageService {
     return { dataList, totalNum: count.length, pageNo };
   }
 
-  async getRealTimeAveragePageList(query: Record<string, any>) {
-    const { appId, type = "", beginTime, endTime } = query;
-    const match: Record<string, any> = { isFirstIn: true };
+  async getRealTimeAveragePageList(query: Record<string, unknown>) {
+    const { appId: rawAppId, type = "", beginTime, endTime } = query;
+    const appId = String(rawAppId);
+    const match: Record<string, unknown> = { isFirstIn: true };
     if (type) match.speedType = Number(type);
-    const _querys: Record<string, any>[] = this.getSpaceTime(beginTime, endTime, 60000);
+    const _querys = this.getSpaceTime(beginTime, endTime, 60000);
     const result = await this.models
       .WebPage(appId)
       .aggregate([
@@ -148,7 +151,7 @@ export class PageService {
       .exec();
     for (let i = 0; i < _querys.length; i++) {
       for (let r_i = 0; r_i < result.length; r_i++) {
-        const rDate = new Date(result[r_i].createTime).getTime();
+        const rDate = func.toDate(result[r_i].createTime).getTime();
         if (rDate > _querys[i].beginTime && rDate < _querys[i].endTime) {
           _querys[i].result = result[r_i];
           result.splice(r_i, 1);
@@ -169,9 +172,19 @@ export class PageService {
     }));
   }
 
-  async getOnePageList(query: Record<string, any>) {
-    const { appId, type, pageNo = 1, pageSize = this.cfg.pageSize, url, isFirstIn, beginTime, endTime } = query;
-    const match: Record<string, any> = { url };
+  async getOnePageList(query: Record<string, unknown>) {
+    const {
+      appId: rawAppId,
+      type,
+      pageNo = 1,
+      pageSize = this.cfg.pageSize,
+      url,
+      isFirstIn,
+      beginTime,
+      endTime,
+    } = query;
+    const appId = String(rawAppId);
+    const match: Record<string, unknown> = { url };
     if (isFirstIn !== undefined && isFirstIn !== "") {
       const isFirstInNum = Number(isFirstIn);
       if (!isNaN(isFirstInNum)) {
@@ -183,8 +196,8 @@ export class PageService {
     if (type) match.speedType = Number(type);
     if (beginTime && endTime)
       match.createTime = {
-        $gte: new Date(beginTime),
-        $lte: new Date(endTime),
+        $gte: func.toDate(beginTime),
+        $lte: func.toDate(endTime),
       };
     const count = await this.models.WebPage(appId).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models
@@ -204,10 +217,10 @@ export class PageService {
     return await this.models.WebPage(appId).findOne({ _id: id }).read("secondaryPreferred").exec();
   }
 
-  private getSpaceTime(beginTime?: string, endTime?: string, spaceTime = 60000) {
-    const begin = new Date(beginTime || new Date()).getTime();
-    const end = new Date(endTime || new Date()).getTime();
-    const list: Record<string, any>[] = [];
+  private getSpaceTime(beginTime?: unknown, endTime?: unknown, spaceTime = 60000) {
+    const begin = (beginTime ? func.toDate(beginTime) : new Date()).getTime();
+    const end = (endTime ? func.toDate(endTime) : new Date()).getTime();
+    const list: { beginTime: number; endTime: number; result: Record<string, unknown> | null }[] = [];
     for (let t = begin; t <= end; t += spaceTime) {
       list.push({ beginTime: t, endTime: t + spaceTime, result: null });
     }

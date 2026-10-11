@@ -12,22 +12,28 @@ export class EnvironmentController {
   @Get("/getDataGroupBy")
   @ApiOperation({ summary: "Get environment data grouped by type" })
   @ApiResponse({ type: WebMonitorEnvironmentGroupByItemResponseDto, isArray: true })
-  async getDataGroupBy(@Query() q: Record<string, any>) {
+  async getDataGroupBy(@Query() q: Record<string, unknown>) {
     const { appId, url, beginTime, endTime, type = 1 } = q;
     if (!appId) throw new Error("Page performance list: appId must not be empty");
     if (!url) throw new Error("Page performance list: url must not be empty");
-    const result = await this.envSrv.getDataGroupBy(Number(type), url, appId, beginTime, endTime);
+    const result = await this.envSrv.getDataGroupBy(
+      Number(type),
+      String(url),
+      String(appId),
+      beginTime as string | undefined,
+      endTime as string | undefined,
+    );
     return func.result({ data: result });
   }
 
   @Get("/getEnvironmentForPage")
   @ApiOperation({ summary: "Get environment info for a page" })
   @ApiResponse({ type: WebMonitorEnvironmentResponseDto })
-  async getEnvironmentForPage(@Query() q: Record<string, any>) {
+  async getEnvironmentForPage(@Query() q: Record<string, unknown>) {
     const { appId, markPage } = q;
     if (!appId) throw new Error("Get user system info by markPage: appId must not be empty");
     if (!markPage) throw new Error("Get user system info by markPage: markPage must not be empty");
-    const result = await this.envSrv.getEnvironmentForPage(appId, markPage);
+    const result = await this.envSrv.getEnvironmentForPage(String(appId), String(markPage));
     return func.result({ data: result });
   }
 }

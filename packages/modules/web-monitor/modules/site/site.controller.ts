@@ -12,7 +12,7 @@ export class SiteController {
   @Post("/add")
   @ApiOperation({ summary: "Add a new monitoring system" })
   @ApiResponse({ type: Object })
-  async addNewSite(@Body() body: Record<string, any>) {
+  async addNewSite(@Body() body: Record<string, unknown>) {
     const res = await this.site.saveSiteData(body);
     return res;
   }
@@ -20,7 +20,7 @@ export class SiteController {
   @Post("/update")
   @ApiOperation({ summary: "Update a monitoring system" })
   @ApiResponse({ type: Object })
-  async updateSite(@Body() body: Record<string, any>) {
+  async updateSite(@Body() body: Record<string, unknown>) {
     const res = await this.site.updateSiteData(body);
     return res;
   }
@@ -28,7 +28,7 @@ export class SiteController {
   @Get("/getSysForUserId")
   @ApiOperation({ summary: "Get systems for a user" })
   @ApiResponse({ type: WebMonitorSiteResponseDto, isArray: true })
-  async getSitesForUserId(@Query() query: Record<string, any>) {
+  async getSitesForUserId(@Query() query: Record<string, unknown>) {
     const result = await this.site.getSitesForUserId(query);
     return func.result({ data: result });
   }
@@ -52,35 +52,35 @@ export class SiteController {
   @Post("/deleteUser")
   @ApiOperation({ summary: "Delete a user from a system" })
   @ApiResponse({ type: Object })
-  async deleteWebSiteUser(@Body() body: Record<string, any>) {
+  async deleteWebSiteUser(@Body() body: Record<string, unknown>) {
     const appId = body.appId;
     const userToken = body.userToken;
     if (!appId) throw new Error("Delete a user from the system: appId must not be empty");
     if (!userToken) throw new Error("Delete a user from the system: user token must not be empty");
-    const result = await this.site.deleteWebSiteUser(appId, userToken);
+    const result = await this.site.deleteWebSiteUser(String(appId), String(userToken));
     return func.result({ data: result });
   }
 
   @Post("/addUser")
   @ApiOperation({ summary: "Add a user to a system" })
   @ApiResponse({ type: Object })
-  async addWebSiteUser(@Body() body: Record<string, any>) {
+  async addWebSiteUser(@Body() body: Record<string, unknown>) {
     const appId = body.appId;
     const userToken = body.userToken;
     if (!appId) throw new Error("Add a user to the system: appId must not be empty");
     if (!userToken) throw new Error("Add a user to the system: user token must not be empty");
-    const result = await this.site.addWebSiteUser(appId, userToken);
+    const result = await this.site.addWebSiteUser(String(appId), String(userToken));
     return func.result({ data: result });
   }
 
   @Post("/deleteSystem")
   @ApiOperation({ summary: "Delete a system" })
   @ApiResponse({ type: Object })
-  async deleteSite(@Body() body: Record<string, any>): Promise<Record<string, any>> {
+  async deleteSite(@Body() body: Record<string, unknown>) {
     const appId = body.appId;
     const type = body.type;
     if (!appId) throw new Error("Delete a system: appId must not be empty");
-    const result = await this.site.deleteSite(appId, type);
+    const result = await this.site.deleteSite(String(appId), String(type));
     return func.result({ data: result });
   }
 }

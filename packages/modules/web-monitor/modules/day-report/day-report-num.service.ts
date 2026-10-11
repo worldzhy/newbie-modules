@@ -8,7 +8,7 @@ import { RedisKeyPrefix } from "../../models/enum";
 
 @Injectable()
 export class DayReportNumService {
-  private cfg: Record<string, any>;
+  private cfg: Record<string, unknown>;
   constructor(
     private readonly models: MonitorModelsService,
     private readonly redis: RedisService,
@@ -52,10 +52,7 @@ export class DayReportNumService {
         $lte: new Date(dayjs(endTime).format("YYYY-MM-DD 23:59:59")),
       },
     };
-    return (
-      (await this.models.DayReportNum().findOne(query, { num: 1, dayTime: 1 }).read("secondaryPreferred").exec()) ||
-      ({} as any)
-    );
+    return await this.models.DayReportNum().findOne(query, { num: 1, dayTime: 1 }).read("secondaryPreferred").exec();
   }
 
   async redisCount(appId: string) {

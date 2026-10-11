@@ -1,14 +1,19 @@
 import { Injectable } from "@nestjs/common";
 import { MongoModelRegistry } from "@modules/mongo/mongo-model.registry";
 
-import { SystemSchema } from "./system.schema";
-import { DayReportNumSchema } from "./day-report-num.schema";
+import { SystemSchema, SystemDocument } from "./system.schema";
+import { DayReportNumSchema, DayReportNumDocument } from "./day-report-num.schema";
 
-import { WebEnvironmentSchema } from "./web/web-environment.schema";
-import { WebPageSchema } from "./web/web-page.schema";
-import { WebResourceSchema } from "./web/web-resource.schema";
-import { WebCustomSchema, WebCustomFilterSchema } from "./web/web-custom.schema";
-import { WebPvuvipSchema } from "./web/web-pvuvip.schema";
+import { WebEnvironmentSchema, WebEnvironmentDocument } from "./web/web-environment.schema";
+import { WebPageSchema, WebPageDocument } from "./web/web-page.schema";
+import { WebResourceSchema, WebResourceDocument } from "./web/web-resource.schema";
+import {
+  WebCustomSchema,
+  WebCustomDocument,
+  WebCustomFilterSchema,
+  WebCustomFilterDocument,
+} from "./web/web-custom.schema";
+import { WebPvuvipSchema, WebPvuvipDocument } from "./web/web-pvuvip.schema";
 
 import { MongoCollectionPrefix, MongoStaticCollection } from "../enum";
 
@@ -22,35 +27,47 @@ export class MonitorModelsService {
 
   // Static models
   System() {
-    return this.modelRegistry.getOrCreateModel(MongoStaticCollection.System, SystemSchema);
+    return this.modelRegistry.getOrCreateModel<SystemDocument>(MongoStaticCollection.System, SystemSchema);
   }
 
   DayReportNum() {
-    return this.modelRegistry.getOrCreateModel(MongoStaticCollection.DayReportNum, DayReportNumSchema);
+    return this.modelRegistry.getOrCreateModel<DayReportNumDocument>(
+      MongoStaticCollection.DayReportNum,
+      DayReportNumSchema,
+    );
   }
 
   // WEB dynamic models (by appId)
   WebEnvironment(appId: string) {
-    return this.modelRegistry.getOrCreateModel(
+    return this.modelRegistry.getOrCreateModel<WebEnvironmentDocument>(
       `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appId}`,
       WebEnvironmentSchema,
     );
   }
 
   WebPage(appId: string) {
-    return this.modelRegistry.getOrCreateModel(`${MongoCollectionPrefix.WEB_PAGE}${appId}`, WebPageSchema);
+    return this.modelRegistry.getOrCreateModel<WebPageDocument>(
+      `${MongoCollectionPrefix.WEB_PAGE}${appId}`,
+      WebPageSchema,
+    );
   }
 
   WebResource(appId: string) {
-    return this.modelRegistry.getOrCreateModel(`${MongoCollectionPrefix.WEB_RESOURCE}${appId}`, WebResourceSchema);
+    return this.modelRegistry.getOrCreateModel<WebResourceDocument>(
+      `${MongoCollectionPrefix.WEB_RESOURCE}${appId}`,
+      WebResourceSchema,
+    );
   }
 
   WebCustom(appId: string) {
-    return this.modelRegistry.getOrCreateModel(`${MongoCollectionPrefix.WEB_CUSTOM}${appId}`, WebCustomSchema);
+    return this.modelRegistry.getOrCreateModel<WebCustomDocument>(
+      `${MongoCollectionPrefix.WEB_CUSTOM}${appId}`,
+      WebCustomSchema,
+    );
   }
 
   WebCustomFilter(appId: string) {
-    return this.modelRegistry.getOrCreateModel(
+    return this.modelRegistry.getOrCreateModel<WebCustomFilterDocument>(
       `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appId}`,
       WebCustomFilterSchema,
     );
@@ -58,6 +75,6 @@ export class MonitorModelsService {
 
   // WEB pvuvip is static in v4
   WebPvuvip() {
-    return this.modelRegistry.getOrCreateModel(MongoStaticCollection.WebPvUvIp, WebPvuvipSchema);
+    return this.modelRegistry.getOrCreateModel<WebPvuvipDocument>(MongoStaticCollection.WebPvUvIp, WebPvuvipSchema);
   }
 }

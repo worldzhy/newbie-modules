@@ -54,11 +54,11 @@ export class WebCustomService {
     beginTime?: string,
     endTime?: string,
     customName?: string,
-    customFilter?: Record<string, any>,
+    customFilter?: Record<string, unknown>,
   ) {
-    const filter: Record<string, any> = {};
+    const filter: Record<string, unknown> = {};
     if (customName) filter.customName = { $regex: customName, $options: "i" };
-    const createTime: Record<string, any> = {};
+    const createTime: Record<string, unknown> = {};
     if (beginTime) {
       createTime.$gte = new Date(beginTime);
       filter.createTime = createTime;
