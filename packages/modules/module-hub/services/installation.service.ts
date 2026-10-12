@@ -9,6 +9,23 @@ import { AuditLogService } from "@modules/audit/audit-log.service";
 export const ONLINE_THRESHOLD_SECONDS = 180;
 
 /**
+ * Presence of the installations sharing one externalRef, normalized for the
+ * host-side per-facility dashboards. Several rows can share a ref (rotation
+ * history, multiple instances):
+ * - `enrolled` — at least one non-revoked installation exists.
+ * - `online` — a non-revoked installation reported within the online window.
+ * - `lastSeenAt` — newest report time across the non-revoked installations
+ *   (null until the first contact).
+ * - `revokedOnly` — rows exist but every one is revoked.
+ */
+export interface InstallationPresence {
+  enrolled: boolean;
+  online: boolean;
+  lastSeenAt: Date | null;
+  revokedOnly: boolean;
+}
+
+/**
  * Module-hub audit events. The audit module's event set is open (domain
  * modules define their own `domain.action` strings); these are the ones the
  * hub emits. Routine reports (ping/full) are NOT audited.
@@ -182,6 +199,48 @@ export class ModuleHubInstallationService {
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => this.withDerivedState(row));
+  }
+
+  /**
+   * Batch presence lookup for host-side per-facility views:
+   * externalRef -> InstallationPresence. One query for the whole set; an
+   * externalRef with no installation row at all is absent from the map.
+   * Revoked rows are included so the caller can distinguish NOT_ENABLED
+   * (no rows) from DISABLED (only revoked rows).
+   */
+  async getPresenceByExternalRefs(externalRefs: string[]): Promise<Map<string, InstallationPresence>> {
+    if (externalRefs.length === 0) return new Map();
+    const rows = await this.prisma.moduleHubInstallation.findMany({
+      where: { externalRef: { in: externalRefs } },
+      select: { externalRef: true, lastSeenAt: true, revokedAt: true },
+    });
+    const onlineThresholdMs = ONLINE_THRESHOLD_SECONDS * 1000;
+    const now = Date.now();
+    const presenceByRef = new Map<string, InstallationPresence>();
+    for (const externalRef of externalRefs) {
+      const scoped = rows.filter((row) => row.externalRef === externalRef);
+      if (scoped.length === 0) continue;
+      const active = scoped.filter((row) => !row.revokedAt);
+      let lastSeenAt: Date | null = null;
+      let online = false;
+      for (const row of active) {
+        // Any online installation keeps the whole ref online; lastSeenAt is
+        // the newest report across the non-revoked installations sharing it.
+        if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
+          lastSeenAt = row.lastSeenAt;
+        }
+        if (row.lastSeenAt != null && now - row.lastSeenAt.getTime() <= onlineThresholdMs) {
+          online = true;
+        }
+      }
+      presenceByRef.set(externalRef, {
+        enrolled: active.length > 0,
+        online,
+        lastSeenAt,
+        revokedOnly: active.length === 0,
+      });
+    }
+    return presenceByRef;
   }
 
   async getOrThrow(id: string) {

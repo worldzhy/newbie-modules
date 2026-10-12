@@ -37,6 +37,24 @@ export interface HealthLivenessSnapshot {
 }
 
 /**
+ * Presence of the installations sharing one externalRef, normalized for the
+ * host-side per-facility dashboards. Several rows can share a ref (rotation
+ * history, multiple instances):
+ * - `enrolled` — at least one non-revoked installation exists.
+ * - `online` — a non-revoked installation's latest snapshot is healthy or
+ *   degraded (i.e. the process is reporting within the online window).
+ * - `lastSeenAt` — newest snapshot time across the non-revoked installations
+ *   (null until the first contact).
+ * - `revokedOnly` — rows exist but every one is revoked.
+ */
+export interface InstallationPresence {
+  enrolled: boolean;
+  online: boolean;
+  lastSeenAt: Date | null;
+  revokedOnly: boolean;
+}
+
+/**
  * Installation registry for the health module. One token = one running
  * deployment endpoint; the host pre-creates rows and distributes the
  * plaintext token out of band, and the running process posts a dependency
@@ -169,6 +187,53 @@ export class HealthInstallationService {
       }
     }
     return snapshots;
+  }
+
+  /**
+   * Batch presence lookup for host-side per-facility views:
+   * externalRef -> InstallationPresence. One query for the whole set; an
+   * externalRef with no installation row at all is absent from the map.
+   * Revoked rows are included so the caller can distinguish NOT_ENABLED
+   * (no rows) from DISABLED (only revoked rows). `online` mirrors the
+   * reporting convention used by the settings UI: healthy/degraded counts
+   * as reporting, unknown/offline does not.
+   */
+  async getPresenceByExternalRefs(externalRefs: string[]): Promise<Map<string, InstallationPresence>> {
+    if (externalRefs.length === 0) return new Map();
+    const rows = await this.prisma.healthInstallation.findMany({
+      where: { externalRef: { in: externalRefs } },
+      select: {
+        externalRef: true,
+        lastSnapshotAt: true,
+        lastSnapshotStatus: true,
+        revokedAt: true,
+      },
+    });
+    const presenceByRef = new Map<string, InstallationPresence>();
+    for (const externalRef of externalRefs) {
+      const scoped = rows.filter((row) => row.externalRef === externalRef);
+      if (scoped.length === 0) continue;
+      const active = scoped.filter((row) => !row.revokedAt);
+      let lastSeenAt: Date | null = null;
+      let online = false;
+      for (const row of active) {
+        // Newest snapshot across the non-revoked installations sharing it.
+        if (row.lastSnapshotAt && (!lastSeenAt || row.lastSnapshotAt > lastSeenAt)) {
+          lastSeenAt = row.lastSnapshotAt;
+        }
+        const state = this.deriveState(row.lastSnapshotAt, row.lastSnapshotStatus);
+        if (state === "healthy" || state === "degraded") {
+          online = true;
+        }
+      }
+      presenceByRef.set(externalRef, {
+        enrolled: active.length > 0,
+        online,
+        lastSeenAt,
+        revokedOnly: active.length === 0,
+      });
+    }
+    return presenceByRef;
   }
 
   /**

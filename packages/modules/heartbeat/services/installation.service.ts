@@ -17,14 +17,20 @@ export function hashHeartbeatToken(token: string): string {
 }
 
 /**
- * Normalized liveness snapshot of one externalRef, ready for host-side
- * aggregation. `online` is true when at least one non-revoked installation
- * sharing the ref has pinged within the online threshold; `lastSeenAt`
- * carries the newest ping across them (null until the first contact).
+ * Presence of the installations sharing one externalRef, normalized for the
+ * host-side per-facility dashboards. Several rows can share a ref (rotation
+ * history, multiple instances):
+ * - `enrolled` — at least one non-revoked installation exists.
+ * - `online` — a non-revoked installation pinged within the online window.
+ * - `lastSeenAt` — newest ping across the non-revoked installations
+ *   (null until the first contact).
+ * - `revokedOnly` — rows exist but every one is revoked.
  */
-export interface HeartbeatLivenessSnapshot {
+export interface InstallationPresence {
+  enrolled: boolean;
   online: boolean;
   lastSeenAt: Date | null;
+  revokedOnly: boolean;
 }
 
 /**
@@ -109,34 +115,44 @@ export class HeartbeatInstallationService {
   // -------------------------------------------------------------------------
 
   /**
-   * Batch liveness lookup for host-side list views: externalRef -> snapshot.
-   * One query for the whole set; an externalRef with no non-revoked
-   * installation is absent from the map. Refs with installations that have
-   * never pinged are present with online=false and lastSeenAt=null.
+   * Batch presence lookup for host-side per-facility views:
+   * externalRef -> InstallationPresence. One query for the whole set; an
+   * externalRef with no installation row at all is absent from the map.
+   * Revoked rows are included so the caller can distinguish NOT_ENABLED
+   * (no rows) from DISABLED (only revoked rows).
    */
-  async getLivenessByExternalRefs(externalRefs: string[]): Promise<Map<string, HeartbeatLivenessSnapshot>> {
+  async getPresenceByExternalRefs(externalRefs: string[]): Promise<Map<string, InstallationPresence>> {
     if (externalRefs.length === 0) return new Map();
     const rows = await this.prisma.heartbeatInstallation.findMany({
-      where: { externalRef: { in: externalRefs }, revokedAt: null },
-      select: { externalRef: true, lastSeenAt: true },
+      where: { externalRef: { in: externalRefs } },
+      select: { externalRef: true, lastSeenAt: true, revokedAt: true },
     });
-    const snapshots = new Map<string, HeartbeatLivenessSnapshot>();
     const now = Date.now();
-    for (const row of rows) {
-      if (!row.externalRef) continue;
-      const prev = snapshots.get(row.externalRef);
-      // Any online installation keeps the whole ref online; lastSeenAt is
-      // the newest ping across the installations sharing the ref.
-      const lastSeenAt =
-        row.lastSeenAt && (!prev?.lastSeenAt || row.lastSeenAt > prev.lastSeenAt)
-          ? row.lastSeenAt
-          : (prev?.lastSeenAt ?? null);
-      const online =
-        (prev?.online ?? false) ||
-        (row.lastSeenAt != null && now - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS);
-      snapshots.set(row.externalRef, { online, lastSeenAt });
+    const presenceByRef = new Map<string, InstallationPresence>();
+    for (const externalRef of externalRefs) {
+      const scoped = rows.filter((row) => row.externalRef === externalRef);
+      if (scoped.length === 0) continue;
+      const active = scoped.filter((row) => !row.revokedAt);
+      let lastSeenAt: Date | null = null;
+      let online = false;
+      for (const row of active) {
+        // Any online installation keeps the whole ref online; lastSeenAt is
+        // the newest ping across the non-revoked installations sharing it.
+        if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
+          lastSeenAt = row.lastSeenAt;
+        }
+        if (row.lastSeenAt != null && now - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS) {
+          online = true;
+        }
+      }
+      presenceByRef.set(externalRef, {
+        enrolled: active.length > 0,
+        online,
+        lastSeenAt,
+        revokedOnly: active.length === 0,
+      });
     }
-    return snapshots;
+    return presenceByRef;
   }
 
   /**
