@@ -18,10 +18,19 @@ type MessageHandler = (
   userId?: string,
   parentId?: string,
   messageId?: string,
+  // "p2p" for a user's direct chat with the bot, "group" for a group chat.
+  chatType?: string,
 ) => Promise<void>;
 type CardActionHandler = (payload: LarkCardAction, meta: LarkCardActionMeta) => Promise<LarkCardActionResult | void>;
 
 type ReceiveIdType = "open_id" | "user_id" | "union_id" | "email" | "chat_id";
+
+/** A tenant contact user, flattened for the binding admin picker. */
+export interface LarkDirectoryUser {
+  openId: string;
+  name: string;
+  email: string | null;
+}
 
 interface MessageDispatchInput {
   chatId: string;
@@ -54,6 +63,12 @@ export class LarkService {
   private readonly botOpenId: string | undefined;
   private readonly processedEventIds = new Map<string, number>();
   private readonly EVENT_ID_TTL_MS = 5 * 60_000;
+
+  // The full tenant contact traversal is several paginated calls and changes
+  // rarely, so it is cached briefly for admin-page search sessions.
+  private directoryCache: { users: LarkDirectoryUser[]; expiresAt: number } | null = null;
+  private readonly DIRECTORY_CACHE_TTL_MS = 10 * 60_000;
+  private directoryTraversalInFlight: Promise<LarkDirectoryUser[]> | null = null;
 
   constructor(private readonly configService: ConfigService) {
     this.botOpenId = this.configService.get<string>("modules.lark.botOpenId");
@@ -247,7 +262,14 @@ export class LarkService {
     this.logger.log(`Message content (cleaned): ${parsed.text}`);
 
     if (this.messageHandler) {
-      await this.messageHandler(input.chatId, parsed.text, input.senderOpenId, input.parentMessageId, input.messageId);
+      await this.messageHandler(
+        input.chatId,
+        parsed.text,
+        input.senderOpenId,
+        input.parentMessageId,
+        input.messageId,
+        input.chatType,
+      );
     }
   }
 
@@ -450,6 +472,217 @@ export class LarkService {
       this.logger.error("Error listing bot chats", error);
       throw error;
     }
+  }
+
+  /**
+   * Search tenant contacts by display name or email for the user-binding
+   * admin picker. Backed by a short-lived cache of the full contact
+   * directory: the dedicated contact search endpoints require extra app
+   * scopes, whereas department/user listing run on the base contact scopes.
+   * Throws when the app lacks contact permissions; callers surface that as
+   * an actionable admin error.
+   */
+  async searchDirectoryUsers(query: string, limit = 20): Promise<LarkDirectoryUser[]> {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return [];
+    const users = await this.listDirectoryUsers();
+    return users
+      .filter(
+        (user) =>
+          user.name.toLowerCase().includes(normalized) ||
+          (user.email !== null && user.email.toLowerCase().includes(normalized)),
+      )
+      .slice(0, limit);
+  }
+
+  /**
+   * Whether an app-scoped open_id resolves to a real tenant contact. A
+   * permission/configuration failure is surfaced (the admin must grant
+   * contact scopes); only a genuine not-found resolves to false.
+   */
+  async directoryUserExists(openId: string): Promise<boolean> {
+    try {
+      const res = await this.client.contact.user.get({
+        path: { user_id: openId },
+        params: { user_id_type: "open_id" },
+      } as never);
+      return res.code === 0;
+    } catch (error) {
+      const larkCode = (error as { response?: { data?: { code?: number } } })?.response?.data?.code;
+      if (larkCode === 99991672) {
+        throw new Error(
+          "Lark contact read permission is not granted for the app " +
+            "(contact:contact:readonly_as_app or an equivalent contact scope).",
+        );
+      }
+      this.logger.warn(`Failed to look up Lark user ${openId}: ${(error as Error)?.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * All tenant contact users (cached). Concurrent admin searches during one
+   * traversal share the same in-flight promise.
+   */
+  async listDirectoryUsers(): Promise<LarkDirectoryUser[]> {
+    const now = Date.now();
+    if (this.directoryCache && this.directoryCache.expiresAt > now) {
+      return this.directoryCache.users;
+    }
+    if (this.directoryTraversalInFlight) {
+      return this.directoryTraversalInFlight;
+    }
+    this.directoryTraversalInFlight = this.traverseDirectoryUsers()
+      .then((users) => {
+        this.directoryCache = { users, expiresAt: Date.now() + this.DIRECTORY_CACHE_TTL_MS };
+        return users;
+      })
+      .finally(() => {
+        this.directoryTraversalInFlight = null;
+      });
+    return this.directoryTraversalInFlight;
+  }
+
+  /**
+   * Walk the department tree from root ("0") and flatten every department's
+   * users. Users appearing under multiple departments are deduplicated by
+   * open_id.
+   */
+  private async traverseDirectoryUsers(): Promise<LarkDirectoryUser[]> {
+    // The generated SDK request types drift across minor versions; the
+    // contact v3 shapes here are stable, so cross that boundary loosely.
+    const contact = this.client.contact as unknown as {
+      department: {
+        list: (req: {
+          path: { department_id: string };
+          params: Record<string, unknown>;
+        }) => Promise<{
+          code: number;
+          msg?: string;
+          data?: {
+            has_more?: boolean;
+            page_token?: string;
+            items?: Array<{ open_department_id?: string }>;
+          };
+        }>;
+      };
+      user: {
+        list: (req: {
+          path: { department_id: string };
+          params: Record<string, unknown>;
+        }) => Promise<{
+          code: number;
+          msg?: string;
+          data?: {
+            has_more?: boolean;
+            page_token?: string;
+            items?: Array<{ open_id?: string; name?: string; email?: string; enterprise_email?: string }>;
+          };
+        }>;
+      };
+    };
+
+    let departmentIds: Set<string>;
+    try {
+      departmentIds = await this.listContactDepartmentIds(contact);
+    } catch (error) {
+      throw new Error(this.describeContactError("list departments", error));
+    }
+
+    const byOpenId = new Map<string, LarkDirectoryUser>();
+    for (const departmentId of departmentIds) {
+      let userPageToken: string | undefined;
+      do {
+        let res;
+        try {
+          res = await contact.user.list({
+            path: { department_id: departmentId },
+            params: {
+              department_id_type: "open_department_id",
+              user_id_type: "open_id",
+              page_size: 50,
+              ...(userPageToken ? { page_token: userPageToken } : {}),
+            },
+          });
+        } catch (error) {
+          throw new Error(this.describeContactError(`list users for department ${departmentId}`, error));
+        }
+        if (res.code !== 0) {
+          throw new Error(`Failed to list Lark users for department ${departmentId}: ${res.msg}`);
+        }
+        for (const item of res.data?.items ?? []) {
+          if (!item.open_id) continue;
+          byOpenId.set(item.open_id, {
+            openId: item.open_id,
+            name: item.name ?? "",
+            email: item.email ?? item.enterprise_email ?? null,
+          });
+        }
+        userPageToken = res.data?.has_more ? res.data?.page_token : undefined;
+      } while (userPageToken);
+    }
+    this.logger.log(`Loaded ${byOpenId.size} Lark contact users across ${departmentIds.size} departments`);
+    return [...byOpenId.values()];
+  }
+
+  /** All department ids under root ("0"), including the root itself. */
+  private async listContactDepartmentIds(
+    contact: {
+      department: {
+        list: (req: {
+          path: { department_id: string };
+          params: Record<string, unknown>;
+        }) => Promise<{
+          code: number;
+          msg?: string;
+          data?: {
+            has_more?: boolean;
+            page_token?: string;
+            items?: Array<{ open_department_id?: string }>;
+          };
+        }>;
+      };
+    },
+  ): Promise<Set<string>> {
+    const departmentIds = new Set<string>(["0"]);
+    let pageToken: string | undefined;
+    do {
+      const res = await contact.department.list({
+        path: { department_id: "0" },
+        params: {
+          department_id_type: "open_department_id",
+          fetch_child: true,
+          page_size: 50,
+          ...(pageToken ? { page_token: pageToken } : {}),
+        },
+      });
+      if (res.code !== 0) {
+        throw new Error(`Failed to list Lark departments: ${res.msg}`);
+      }
+      for (const item of res.data?.items ?? []) {
+        if (item.open_department_id) departmentIds.add(item.open_department_id);
+      }
+      pageToken = res.data?.has_more ? res.data?.page_token : undefined;
+    } while (pageToken);
+    return departmentIds;
+  }
+
+  /**
+   * Extract the platform message from an SDK contact-API failure: the SDK
+   * throws axios-style errors whose Lark code/msg live on response.data.
+   */
+  private describeContactError(action: string, error: unknown): string {
+    const lark = (error as {
+      response?: { data?: { code?: number; msg?: string } };
+      code?: number;
+      msg?: string;
+    })?.response?.data;
+    const detail = lark?.msg ?? (error as Error)?.message ?? String(error);
+    const scopeHint =
+      lark?.code === 99991672
+        ? " The app needs contact read scopes granted in the Lark developer console."
+        : "";
+    return `Failed to ${action}: ${detail}.${scopeHint}`;
   }
 
   async addReaction(messageId: string, emojiType: string = "OK") {
