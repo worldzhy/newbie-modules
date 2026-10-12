@@ -15,12 +15,12 @@ export class Ec2MetricService {
   ) {}
 
   async getWatchedInstancesMetric(data: GetWatchedEC2InstancesMetricDto) {
-    const { awsAccountId, metricName, startTime, endTime, period, statistics } = data;
+    const { projectId, metricName, startTime, endTime, period, statistics } = data;
+    const { awsAccountId, regions, credentials } = await this.cloudwatchCredential.resolve(projectId);
     const awsAccount = await this.prisma.awsAccount.findUniqueOrThrow({
       where: { id: awsAccountId },
       include: { ec2Instances: { where: { isWatching: true }, orderBy: { createdAt: "asc" } } },
     });
-    const { regions, credentials } = await this.cloudwatchCredential.resolve(awsAccountId);
 
     if (awsAccount.ec2Instances.length === 0) {
       return [];
@@ -47,7 +47,7 @@ export class Ec2MetricService {
           .filter((item) => item.region === region)
           .map((item) => item.instanceId),
         metricName,
-        region: region.replaceAll("_", "-"),
+        region,
         startTime: dayjs(startTime).toDate(),
         endTime: dayjs(endTime).toDate(),
         period: periodNum,

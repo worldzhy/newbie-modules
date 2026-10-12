@@ -8,15 +8,15 @@
 
 // AWS access keys are no longer stored on this model. CloudWatch data
 // collection resolves the project-shared cross-account binding provided by
-// aws-identity (AwsCrossAccountBinding) at runtime. AwsAccount only keeps
-// the monitoring scope: the 12-digit AWS account id anchor and the regions
-// to discover.
+// aws-identity (AwsCrossAccountBinding) at runtime; the region scope lives
+// on the binding as well. AwsAccount only keeps the 12-digit AWS account id
+// as the anchor for Ec2Instance/RdsInstance foreign keys.
 model AwsAccount {
-  id           String         @id @default(uuid()) @db.Uuid
-  awsAccountId String         @unique
-  regions      AwsRegion[]
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id           String   @id @default(uuid()) @db.Uuid
+  awsAccountId String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
   ec2Instances Ec2Instance[]
   rdsInstances RdsInstance[]
 
@@ -28,7 +28,7 @@ model Ec2Instance {
   instanceId   String     @unique
   name         String
   status       String?
-  region       AwsRegion
+  region       String
   isWatching   Boolean    @default(false)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -43,7 +43,7 @@ model RdsInstance {
   instanceId   String     @unique // DbiResourceId
   name         String // DBInstanceIdentifier
   status       String
-  region       AwsRegion
+  region       String
   isWatching   Boolean    @default(false)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
@@ -51,14 +51,5 @@ model RdsInstance {
   awsAccountId String     @db.Uuid
 
   @@unique([name, region, awsAccountId])
-  @@schema("module/aws-cloudwatch")
-}
-
-enum AwsRegion {
-  us_east_1
-  us_east_2
-  cn_north_1
-  cn_northwest_1
-
   @@schema("module/aws-cloudwatch")
 }

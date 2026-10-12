@@ -11,14 +11,23 @@ export class Ec2InstanceService {
     private readonly cloudwatchCredential: AwsCloudwatchCredentialService,
   ) {}
 
-  async fetchEC2Instances(awsAccountId: string) {
-    const { credentials, regions } = await this.cloudwatchCredential.resolve(awsAccountId);
+  async listEC2Instances(params: { projectId: string; status?: string; isWatching?: boolean }) {
+    const { projectId, status, isWatching } = params;
+    const awsAccountId = await this.cloudwatchCredential.ensureAwsAccount(projectId);
+    return await this.prisma.ec2Instance.findMany({
+      where: { awsAccountId, status, isWatching },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async fetchEC2Instances(projectId: string) {
+    const { awsAccountId, credentials, regions } = await this.cloudwatchCredential.resolve(projectId);
     const ec2InstanceCreateManyInputs: Prisma.Ec2InstanceCreateManyInput[] = [];
 
     for (let i = 0; i < regions.length; i++) {
-      const region = regions[i].replaceAll("_", "-");
+      // Binding regions are stored in AWS SDK form (e.g. "us-east-1").
       const client = new EC2Client({
-        region,
+        region: regions[i],
         credentials,
       });
 
@@ -78,11 +87,12 @@ export class Ec2InstanceService {
   }
 
   async syncEC2InstancesWatch(params: {
-    awsAccountId: string;
+    projectId: string;
     watchEC2InstanceIds: string[];
     unwatchEC2InstanceIds: string[];
   }) {
-    const { awsAccountId, watchEC2InstanceIds, unwatchEC2InstanceIds } = params;
+    const { projectId, watchEC2InstanceIds, unwatchEC2InstanceIds } = params;
+    const awsAccountId = await this.cloudwatchCredential.ensureAwsAccount(projectId);
     let needWatch = false;
     let needUnwatch = false;
     if (watchEC2InstanceIds.length) {

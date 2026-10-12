@@ -2,7 +2,6 @@ import { ArrayMinSize, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, IsU
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { BooleanTransformer } from "@devbie/newbie/transformers/boolean.transformer";
-import { AWSRegion } from "@modules/aws-cloudwatch/aws-cloudwatch.enum";
 
 /**
  * Response DTO for an EC2 instance record.
@@ -20,8 +19,8 @@ export class Ec2InstanceResponseDto {
   @ApiPropertyOptional({ type: String })
   status?: string | null;
 
-  @ApiProperty({ enum: AWSRegion })
-  region: AWSRegion;
+  @ApiProperty({ type: String })
+  region: string;
 
   @ApiProperty({ type: Boolean })
   isWatching: boolean;
@@ -39,7 +38,7 @@ export class Ec2InstanceResponseDto {
 export class ListEC2InstancesDto {
   @ApiProperty()
   @IsUUID()
-  awsAccountId: string;
+  projectId: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -56,13 +55,13 @@ export class ListEC2InstancesDto {
 export class FetchEC2InstancesDto {
   @ApiProperty()
   @IsUUID()
-  awsAccountId: string;
+  projectId: string;
 }
 
 export class SyncEC2InstancesWatchDto {
   @ApiProperty({ type: String })
   @IsUUID()
-  awsAccountId: string;
+  projectId: string;
 
   @ApiProperty({ type: [String], minLength: 0 })
   @IsNotEmpty()

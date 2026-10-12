@@ -15,7 +15,8 @@ export class RdsMetricService {
   ) {}
 
   async getWatchedInstancesMetric(data: GetWatchedRDSInstancesMetricDto) {
-    const { awsAccountId, startTime, endTime, period, metricName, statistics } = data;
+    const { projectId, startTime, endTime, period, metricName, statistics } = data;
+    const { awsAccountId, regions, credentials } = await this.cloudwatchCredential.resolve(projectId);
     const awsAccount = await this.prisma.awsAccount.findUnique({
       where: { id: awsAccountId },
       include: { rdsInstances: { where: { isWatching: true }, orderBy: { createdAt: "asc" } } },
@@ -27,7 +28,6 @@ export class RdsMetricService {
     if (!rdsInstances.length) {
       return [];
     }
-    const { regions, credentials } = await this.cloudwatchCredential.resolve(awsAccountId);
 
     const periodNum = Number(period);
     // Check that the period is greater than 60 and divisible by 60.
@@ -47,7 +47,7 @@ export class RdsMetricService {
     for (const region of regions) {
       const params = {
         rdsInstanceRemoteIds: rdsInstances.filter((item) => item.region === region).map((item) => item.name),
-        region: region.replaceAll("_", "-"),
+        region,
         startTime: dayjs(startTime).toDate(),
         endTime: dayjs(endTime).toDate(),
         period: periodNum,

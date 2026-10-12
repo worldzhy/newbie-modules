@@ -1,7 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { DescribeDBInstancesCommand, RDSClient } from "@aws-sdk/client-rds";
-import { AwsRegion } from "@generated/prisma/client";
 import { AwsCloudwatchCredentialService } from "../aws-cloudwatch-credential.service";
 
 @Injectable()
@@ -11,20 +10,29 @@ export class RdsInstanceService {
     private readonly cloudwatchCredential: AwsCloudwatchCredentialService,
   ) {}
 
-  async fetchRDSInstances(awsAccountId: string) {
-    const { credentials, regions } = await this.cloudwatchCredential.resolve(awsAccountId);
+  async listRDSInstances(params: { projectId: string; status?: string; isWatching?: boolean }) {
+    const { projectId, status, isWatching } = params;
+    const awsAccountId = await this.cloudwatchCredential.ensureAwsAccount(projectId);
+    return await this.prisma.rdsInstance.findMany({
+      where: { awsAccountId, status, isWatching },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  async fetchRDSInstances(projectId: string) {
+    const { awsAccountId, credentials, regions } = await this.cloudwatchCredential.resolve(projectId);
     const rdsInstances: {
       instanceId: string;
       name: string;
       status: string;
-      region: AwsRegion;
+      region: string;
       awsAccountId: string;
     }[] = [];
 
     for (let i = 0; i < regions.length; i++) {
-      const region = regions[i].replaceAll("_", "-");
+      // Binding regions are stored in AWS SDK form (e.g. "us-east-1").
       const client = new RDSClient({
-        region,
+        region: regions[i],
         credentials,
       });
 
@@ -86,11 +94,12 @@ export class RdsInstanceService {
   }
 
   async syncRDSInstancesWatch(params: {
-    awsAccountId: string;
+    projectId: string;
     watchRDSInstanceIds: string[];
     unwatchRDSInstanceIds: string[];
   }) {
-    const { awsAccountId, watchRDSInstanceIds, unwatchRDSInstanceIds } = params;
+    const { projectId, watchRDSInstanceIds, unwatchRDSInstanceIds } = params;
+    const awsAccountId = await this.cloudwatchCredential.ensureAwsAccount(projectId);
     let needWatch = false;
     let needUnwatch = false;
     if (watchRDSInstanceIds.length) {

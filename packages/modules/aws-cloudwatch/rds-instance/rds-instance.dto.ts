@@ -10,10 +10,9 @@ import {
   IsUUID,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { CloudwatchMetricRDSMetricName, CloudwatchMetricStatistics } from "../aws-cloudwatch.enum";
 import { Transform } from "class-transformer";
 import { BooleanTransformer } from "@devbie/newbie/transformers/boolean.transformer";
-import { AWSRegion } from "@modules/aws-cloudwatch/aws-cloudwatch.enum";
+import { CloudwatchMetricRDSMetricName, CloudwatchMetricStatistics } from "../aws-cloudwatch.enum";
 
 /**
  * Response DTO for an RDS instance record.
@@ -31,8 +30,8 @@ export class RdsInstanceResponseDto {
   @ApiProperty({ type: String })
   status: string;
 
-  @ApiProperty({ enum: AWSRegion })
-  region: AWSRegion;
+  @ApiProperty({ type: String })
+  region: string;
 
   @ApiProperty({ type: Boolean })
   isWatching: boolean;
@@ -50,7 +49,7 @@ export class RdsInstanceResponseDto {
 export class ListRDSInstancesDto {
   @ApiProperty()
   @IsUUID()
-  awsAccountId: string;
+  projectId: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -67,13 +66,13 @@ export class ListRDSInstancesDto {
 export class FetchRDSInstancesDto {
   @ApiProperty()
   @IsUUID()
-  awsAccountId: string;
+  projectId: string;
 }
 
 export class SyncRDSInstancesWatchDto {
   @ApiProperty({ type: String })
   @IsUUID()
-  awsAccountId: string;
+  projectId: string;
 
   @ApiProperty({ type: [String], minLength: 0 })
   @IsArray()
@@ -92,7 +91,7 @@ export class GetWatchedRDSInstancesMetricDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsUUID("4")
-  awsAccountId: string;
+  projectId: string;
 
   @ApiProperty({ enum: CloudwatchMetricRDSMetricName })
   @IsNotEmpty()

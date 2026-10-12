@@ -6,7 +6,7 @@ export class GetWatchedEC2InstancesMetricDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsUUID("4")
-  awsAccountId: string;
+  projectId: string;
 
   @ApiProperty({
     enum: CloudwatchEC2MetricName,

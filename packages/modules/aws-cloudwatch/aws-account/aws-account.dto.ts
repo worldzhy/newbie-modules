@@ -1,11 +1,12 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { ArrayMinSize, IsArray, IsEnum, IsNotEmpty, IsString } from "class-validator";
-import { AWSRegion } from "@modules/aws-cloudwatch/aws-cloudwatch.enum";
+import { ApiProperty } from "@nestjs/swagger";
 
 /**
  * Response DTO for AwsAccount.
- * AWS access keys are not stored here; they resolve from the project-shared
- * aws-identity cross-account binding at runtime.
+ *
+ * AwsAccount is an internal anchor row (12-digit AWS account id) referenced
+ * by Ec2Instance/RdsInstance foreign keys. Credentials and the region scope
+ * resolve from the project-shared aws-identity cross-account binding at
+ * runtime; nothing is stored on this model.
  */
 export class AwsAccountResponseDto {
   @ApiProperty({ type: String })
@@ -14,40 +15,9 @@ export class AwsAccountResponseDto {
   @ApiProperty({ type: String })
   awsAccountId: string;
 
-  @ApiProperty({ enum: AWSRegion, isArray: true })
-  regions: AWSRegion[];
-
   @ApiProperty({ type: Date })
   createdAt: Date;
 
   @ApiProperty({ type: Date })
   updatedAt: Date;
-}
-
-export class CreateAWSAccountDto {
-  @ApiProperty({ type: String, required: true })
-  @IsNotEmpty()
-  @IsString()
-  awsAccountId: string;
-
-  @ApiProperty({
-    type: [String],
-    enum: AWSRegion,
-  })
-  @IsNotEmpty()
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsEnum(AWSRegion, { each: true })
-  regions: AWSRegion[];
-}
-
-export class UpdateAWSAccountDto {
-  @ApiPropertyOptional({
-    type: [String],
-    enum: AWSRegion,
-  })
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsEnum(AWSRegion, { each: true })
-  regions: AWSRegion[];
 }

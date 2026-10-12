@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { RdsInstanceService } from "./rds-instance.service";
 import {
   FetchRDSInstancesDto,
@@ -13,27 +12,21 @@ import {
 @ApiBearerAuth()
 @Controller("rds-instances")
 export class RdsInstanceController {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly rdsInstanceService: RdsInstanceService,
-  ) {}
+  constructor(private readonly rdsInstanceService: RdsInstanceService) {}
 
   @Get()
   @ApiOperation({ summary: "List RDS instances with optional filters" })
   @ApiResponse({ type: RdsInstanceResponseDto, isArray: true })
   async listRDSInstances(@Query() query: ListRDSInstancesDto) {
-    const { awsAccountId, status, isWatching } = query;
-    return await this.prisma.rdsInstance.findMany({
-      where: { awsAccountId, status, isWatching },
-      orderBy: { name: "asc" },
-    });
+    const { projectId, status, isWatching } = query;
+    return await this.rdsInstanceService.listRDSInstances({ projectId, status, isWatching });
   }
 
   @Get("fetch")
   @ApiOperation({ summary: "Fetch RDS instances from AWS and sync to DB" })
   @ApiResponse({ type: Boolean })
   async fetchRDSInstances(@Query() query: FetchRDSInstancesDto) {
-    return await this.rdsInstanceService.fetchRDSInstances(query.awsAccountId);
+    return await this.rdsInstanceService.fetchRDSInstances(query.projectId);
   }
 
   @Patch("syncWatch")
