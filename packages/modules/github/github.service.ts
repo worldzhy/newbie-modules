@@ -173,7 +173,7 @@ export class GitHubService {
    * overwrites template content. Idempotent across retries. When the file
    * does not exist (404), it is created.
    *
-   * `placeholderLines` are comment-form lines like `# NIGHTWATCH_TOKEN=...`
+   * `placeholderLines` are comment-form lines like `# NEXT_PUBLIC_WEB_MONITOR_TOKEN=...`
    * (no real secrets); the caller assembles them.
    */
   async upsertEnvExample(org: string, repo: string, placeholderLines: string[]): Promise<void> {

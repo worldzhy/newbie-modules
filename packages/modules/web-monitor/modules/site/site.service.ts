@@ -77,12 +77,12 @@ export class SiteService {
   }
 
   /**
-   * Upserts the Mongo System document backing a WEB_MONITOR agent.
+   * Upserts the Mongo System document backing a web-monitor installation.
    * The document carries the anomaly detection thresholds (config truth source
-   * stays in Mongo); appId equals the agent's immutable appKey. Idempotent by
-   * appId so it can be safely retried after the PG-side agent issuance.
+   * stays in Mongo); appId equals the installation's immutable appKey.
+   * Idempotent by appId so it can be safely retried after credential issuance.
    */
-  async upsertSiteForWebAgent(body: { appId: string; projectId: string; systemName: string }) {
+  async upsertSiteForWebMonitor(body: { appId: string; projectId: string; systemName: string }) {
     const result = await this.models
       .System()
       .findOneAndUpdate(
