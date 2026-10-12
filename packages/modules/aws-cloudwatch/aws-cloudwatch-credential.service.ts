@@ -38,7 +38,7 @@ export class AwsCloudwatchCredentialService {
    * Ensures the anchor AwsAccount row exists for the project credential and
    * that the project links to it, returning the anchor row id. Safe to call
    * repeatedly; keeping Project.awsAccountId pointed at the binding-derived
-   * anchor is also what makes the project's "has AWS monitor" signal true.
+   * anchor is also what drives the project's hasAwsMonitor signal.
    */
   async ensureAwsAccount(projectId: string): Promise<string> {
     const credential = await this.credentialService.resolveProjectCredential(projectId);
