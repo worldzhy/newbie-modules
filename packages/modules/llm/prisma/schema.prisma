@@ -42,11 +42,7 @@ model LlmScopeAssignment {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   scope        String   @unique @db.VarChar(64)
   connectionId String   @db.Uuid
-  connection   LlmConnection @relation(
-    fields: [connectionId],
-    references: [id],
-    onDelete: Cascade
-  )
+  connection   LlmConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
