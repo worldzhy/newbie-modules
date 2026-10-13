@@ -113,6 +113,34 @@ export class CopilotModelResponseDto {
   @ApiProperty()
   isActive: boolean;
 
+  @ApiPropertyOptional({
+    type: Date,
+    nullable: true,
+    description: "When the last model call (any transport) was attempted; null = never called",
+  })
+  lastCallAt?: Date | null;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    nullable: true,
+    description: "Outcome of the last model call; null = never called",
+  })
+  lastCallSuccess?: boolean | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: "Normalized failure category of the last failed call (timeout/auth/rate-limit/bad-request/upstream)",
+  })
+  lastFailureCategory?: string | null;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: "Upstream failure message of the last failed call, capped at 500 chars",
+  })
+  lastFailureMessage?: string | null;
+
   @ApiProperty({ type: Date })
   createdAt: Date;
 

@@ -75,6 +75,12 @@ export type ModelStreamChunk =
 export interface ChatModelPort {
   /** Human-readable provider/model identifier for audit logs. */
   readonly modelId: string;
+  /**
+   * Optional persistence id of the model configuration record backing this
+   * port. Present when the model source is a database record; the kernel
+   * health seam keys on it. Stateless model sources omit it.
+   */
+  readonly modelRecordId?: string;
   complete(request: ChatRequest): Promise<ChatResult>;
   stream(request: ChatRequest): AsyncIterable<ModelStreamChunk>;
 }

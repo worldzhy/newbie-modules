@@ -20,6 +20,13 @@ model CopilotModel {
   baseUrl   String   @db.VarChar(255)
   apiKey    String   @db.VarChar(500)
   isActive  Boolean  @default(false)
+  // Current-state snapshot of the last model-call outcome (any transport;
+  // web SSE and Lark share one kernel runner). History lives in the audit
+  // stream; the UI surfaces only this fold. Null = never called.
+  lastCallAt          DateTime?
+  lastCallSuccess     Boolean?
+  lastFailureCategory String? @db.VarChar(20)
+  lastFailureMessage  String? @db.VarChar(500)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

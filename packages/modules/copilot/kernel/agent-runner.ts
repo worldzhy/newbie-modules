@@ -11,6 +11,8 @@ import type { ChatMessage, ModelFinishReason, ModelStreamChunk, ModelUsage } fro
 import { ModelCallError } from "./chat-model.port";
 import type { CopilotAuditSink } from "./audit-sink";
 import { NOOP_AUDIT_SINK } from "./audit-sink";
+import type { ModelHealthSink } from "./model-health-sink";
+import { NOOP_MODEL_HEALTH_SINK } from "./model-health-sink";
 import { boundBlocks } from "./blocks";
 import { redactValue, summarizeForLog } from "./redaction";
 import {
@@ -39,6 +41,7 @@ export class AgentRunner {
     private readonly auditSink: CopilotAuditSink = NOOP_AUDIT_SINK,
     private readonly confirmations: ConfirmationManager = new InMemoryConfirmationManager(),
     private readonly promptSectionProviders: PromptSectionProvider[] = [],
+    private readonly healthSink: ModelHealthSink = NOOP_MODEL_HEALTH_SINK,
   ) {}
 
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
@@ -114,7 +117,21 @@ export class AgentRunner {
             success: false,
             ...(error instanceof ModelCallError ? { errorCategory: error.category } : {}),
           });
+          // Health seam: same single point as the audit entry. User-initiated
+          // aborts and unclassified internal errors are not model failures.
+          if (model.modelRecordId && error instanceof ModelCallError && error.category !== "aborted") {
+            this.healthSink.recordModelCallOutcome({
+              modelRecordId: model.modelRecordId,
+              success: false,
+              errorCategory: error.category,
+              errorMessage: error.message,
+            });
+          }
           throw error;
+        }
+
+        if (model.modelRecordId) {
+          this.healthSink.recordModelCallOutcome({ modelRecordId: model.modelRecordId, success: true });
         }
 
         this.auditSink.record({

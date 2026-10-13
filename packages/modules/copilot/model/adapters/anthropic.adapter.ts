@@ -16,6 +16,8 @@ export interface AnthropicChatModelConfig {
   apiKey: string;
   /** Custom gateway URL; empty/undefined uses https://api.anthropic.com. */
   baseUrl?: string;
+  /** Persistence id of the backing CopilotModel record; enables the kernel health seam. */
+  recordId?: string;
 }
 
 export function createAnthropicChatModel(config: AnthropicChatModelConfig): ChatModelPort {
@@ -23,5 +25,5 @@ export function createAnthropicChatModel(config: AnthropicChatModelConfig): Chat
     apiKey: config.apiKey,
     ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
   });
-  return createSdkChatModel(config.model, provider.languageModel(config.model));
+  return createSdkChatModel(config.model, provider.languageModel(config.model), config.recordId);
 }

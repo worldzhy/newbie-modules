@@ -8,6 +8,7 @@ import {
   UpdateCopilotModelDto,
 } from "./copilot-model.dto";
 import { ANTHROPIC_PROVIDER, ANTHROPIC_API_VERSION, DEFAULT_ANTHROPIC_BASE_URL } from "./copilot-providers";
+import type { ModelCallOutcome, ModelHealthSink } from "../../kernel/model-health-sink";
 
 type CopilotModelRecord = {
   id: string;
@@ -17,11 +18,16 @@ type CopilotModelRecord = {
   baseUrl: string;
   apiKey: string;
   isActive: boolean;
+  lastCallAt: Date | null;
+  lastCallSuccess: boolean | null;
+  lastFailureCategory: string | null;
+  lastFailureMessage: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
 
 const PING_TIMEOUT_MS = 10_000;
+const FAILURE_MESSAGE_MAX_LENGTH = 500;
 
 /**
  * Host-level Copilot model configuration. Records describe a wire protocol
@@ -29,10 +35,45 @@ const PING_TIMEOUT_MS = 10_000;
  * ActiveChatModelResolver on every run.
  */
 @Injectable()
-export class CopilotModelService {
+export class CopilotModelService implements ModelHealthSink {
   private readonly logger = new Logger(CopilotModelService.name);
 
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Kernel health seam (fire-and-forget, ADR-004): folds the latest model-call
+   * outcome into the record's current-state snapshot. A success clears the
+   * failure fields; a failure records category + capped upstream message.
+   * Never throws into the run loop: a deleted record or transient DB error
+   * only skips the update.
+   */
+  recordModelCallOutcome(outcome: ModelCallOutcome): void {
+    this.prisma.copilotModel
+      .update({
+        where: { id: outcome.modelRecordId },
+        data: outcome.success
+          ? {
+              lastCallAt: new Date(),
+              lastCallSuccess: true,
+              lastFailureCategory: null,
+              lastFailureMessage: null,
+            }
+          : {
+              lastCallAt: new Date(),
+              lastCallSuccess: false,
+              lastFailureCategory: outcome.errorCategory ?? "upstream",
+              lastFailureMessage: outcome.errorMessage
+                ? outcome.errorMessage.slice(0, FAILURE_MESSAGE_MAX_LENGTH)
+                : null,
+            },
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Failed to record Copilot model health for ${outcome.modelRecordId}: ` +
+            `${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+  }
 
   async list(): Promise<CopilotModelResponseDto[]> {
     const records = (await this.prisma.copilotModel.findMany({
@@ -204,6 +245,10 @@ export class CopilotModelService {
       baseUrl: record.baseUrl,
       apiKey: maskApiKey(record.apiKey),
       isActive: record.isActive,
+      lastCallAt: record.lastCallAt,
+      lastCallSuccess: record.lastCallSuccess,
+      lastFailureCategory: record.lastFailureCategory,
+      lastFailureMessage: record.lastFailureMessage,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };

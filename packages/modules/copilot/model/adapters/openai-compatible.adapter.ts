@@ -14,6 +14,8 @@ export interface OpenAiCompatibleChatModelConfig {
   model: string;
   baseUrl: string;
   apiKey: string;
+  /** Persistence id of the backing CopilotModel record; enables the kernel health seam. */
+  recordId?: string;
 }
 
 export function createOpenAiCompatibleChatModel(config: OpenAiCompatibleChatModelConfig): ChatModelPort {
@@ -22,5 +24,5 @@ export function createOpenAiCompatibleChatModel(config: OpenAiCompatibleChatMode
     baseURL: config.baseUrl,
     apiKey: config.apiKey,
   });
-  return createSdkChatModel(config.model, provider.languageModel(config.model));
+  return createSdkChatModel(config.model, provider.languageModel(config.model), config.recordId);
 }

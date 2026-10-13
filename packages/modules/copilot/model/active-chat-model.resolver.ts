@@ -26,12 +26,14 @@ export class ActiveChatModelResolver {
         apiKey: record.apiKey,
         // Empty string means "use the official api.anthropic.com endpoint".
         baseUrl: record.baseUrl || undefined,
+        recordId: record.id,
       });
     }
     return createOpenAiCompatibleChatModel({
       model: record.model,
       baseUrl: record.baseUrl,
       apiKey: record.apiKey,
+      recordId: record.id,
     });
   }
 }

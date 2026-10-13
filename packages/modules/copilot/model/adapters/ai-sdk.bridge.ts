@@ -27,10 +27,16 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 /**
  * Wraps an AI SDK LanguageModel (already bound to a concrete provider,
  * endpoint and credentials) in the provider-neutral ChatModelPort.
+ * `modelRecordId` is optional metadata enabling the kernel health seam.
  */
-export function createSdkChatModel(modelId: string, languageModel: LanguageModel): ChatModelPort {
+export function createSdkChatModel(
+  modelId: string,
+  languageModel: LanguageModel,
+  modelRecordId?: string,
+): ChatModelPort {
   return {
     modelId,
+    ...(modelRecordId ? { modelRecordId } : {}),
 
     async complete(request: ChatRequest): Promise<ChatResult> {
       const { system, messages } = splitSystem(request.messages);
