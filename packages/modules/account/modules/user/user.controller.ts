@@ -12,10 +12,10 @@ import {
   ChangeUserPasswordDto,
   CreateUserResponseDto,
   CreateUserDto,
-  GetUsersQueryDto,
+  ListUsersRequestDto,
+  ListUsersResponseDto,
   UpdateUserDto,
   UserChangePasswordResponseDto,
-  UserListResponseDto,
   UserResponseDto,
 } from "./user.dto";
 import { Request } from "express";
@@ -63,8 +63,8 @@ export class UserController {
   @Get("")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.User)
   @ApiOperation({ summary: "Get users with pagination and filters" })
-  @ApiResponse({ type: UserListResponseDto })
-  async getUsers(@Query() query: GetUsersQueryDto) {
+  @ApiResponse({ type: ListUsersResponseDto })
+  async list(@Query() query: ListUsersRequestDto) {
     const { page, pageSize, name, roles } = query;
 
     // [step 1] Construct where argument. Every filter is optional; in

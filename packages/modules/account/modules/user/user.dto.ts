@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { MfaMethod, UserGender, UserRole, UserStatus } from "@generated/prisma/client";
-import { CommonListResponseDto } from "@devbie/newbie/common.dto";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { Transform, Type } from "class-transformer";
 import {
   IsArray,
@@ -8,12 +8,10 @@ import {
   IsDate,
   IsEmail,
   IsEnum,
-  IsInt,
   IsNotEmpty,
   IsOptional,
   IsPhoneNumber,
   IsString,
-  Min,
   MinLength,
 } from "class-validator";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
@@ -372,34 +370,23 @@ export class UserChangePasswordResponseDto {
 /**
  * Paginated list response for users.
  */
-export class UserListResponseDto extends CommonListResponseDto {
+export class ListUsersResponseDto extends CommonListResponseDto {
   @ApiProperty({ type: UserResponseDto, isArray: true })
   declare records: UserResponseDto[];
 }
 
 /**
- * Query DTO for the paginated user list (admin endpoint).
+ * Request DTO for the paginated user list (admin endpoint).
  *
- * Pagination is required (the framework rejects a missing page/pageSize at
- * query time anyway); name and roles are optional filters. When `roles` is
- * omitted or empty the list is unfiltered by role — callers must never be
- * forced to pass their own roles just to satisfy the contract. `roles`
- * narrows by role overlap (Prisma `hasSome`). Query strings can carry a
- * single value or repeated keys, so the Transform normalises both.
+ * Pagination (required page/pageSize) is inherited from the framework
+ * CommonListRequestDto to match findManyInManyPages; only optional narrowing
+ * filters are declared here. When `roles` is omitted or empty the list is
+ * unfiltered by role — callers must never be forced to pass their own roles
+ * just to satisfy the contract. `roles` narrows by role overlap (Prisma
+ * `hasSome`); query strings can carry a single value or repeated keys, so
+ * the Transform normalises both into an array.
  */
-export class GetUsersQueryDto {
-  @ApiProperty({ type: Number, description: "Page number, starts from 0" })
-  @IsInt()
-  @Min(0)
-  @Type(() => Number)
-  page: number;
-
-  @ApiProperty({ type: Number, description: "Items per page" })
-  @IsInt()
-  @Min(1)
-  @Type(() => Number)
-  pageSize: number;
-
+export class ListUsersRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({ type: String, description: "Fuzzy search by name" })
   @IsOptional()
   @IsString()
