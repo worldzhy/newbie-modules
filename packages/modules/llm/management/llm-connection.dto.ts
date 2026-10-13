@@ -2,16 +2,8 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsIn, IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength, ValidateIf } from "class-validator";
 import { ANTHROPIC_PROVIDER, LLM_PROVIDERS } from "./llm-providers";
 
-export class CreateLlmModelDto {
-  @ApiProperty({
-    description: 'Consumer scope this model serves, e.g. "copilot", "ai-analysis", "jdy". Immutable after creation.',
-  })
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(64)
-  scope: string;
-
-  @ApiProperty({ description: "User-friendly display name for this model" })
+export class CreateLlmConnectionDto {
+  @ApiProperty({ description: "User-friendly display name for this connection" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
@@ -38,8 +30,6 @@ export class CreateLlmModelDto {
       "Required for openai-compatible (without the /chat/completions suffix). " +
       "Optional for anthropic; leave empty to use https://api.anthropic.com.",
   })
-  // ValidateIf (not IsOptional) guards this: an undefined/missing baseUrl must
-  // fail for openai-compatible while being allowed to pass for anthropic.
   @IsString()
   @ValidateIf((dto) => dto.provider !== ANTHROPIC_PROVIDER)
   @IsNotEmpty()
@@ -53,7 +43,7 @@ export class CreateLlmModelDto {
   apiKey: string;
 }
 
-export class UpdateLlmModelDto {
+export class UpdateLlmConnectionDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
@@ -79,8 +69,6 @@ export class UpdateLlmModelDto {
       "Required for openai-compatible. Optional for anthropic; send an empty " +
       "value to fall back to https://api.anthropic.com.",
   })
-  // Only validate when a value is present and the target protocol needs it:
-  // omitted = unchanged, anthropic = empty allowed, openai-compatible = URL.
   @IsString()
   @ValidateIf((dto) => dto.baseUrl !== undefined && dto.provider !== ANTHROPIC_PROVIDER)
   @IsNotEmpty()
@@ -97,12 +85,9 @@ export class UpdateLlmModelDto {
   apiKey?: string;
 }
 
-export class LlmModelResponseDto {
+export class LlmConnectionResponseDto {
   @ApiProperty()
   id: string;
-
-  @ApiProperty({ description: 'Consumer scope this model serves, e.g. "copilot"' })
-  scope: string;
 
   @ApiProperty()
   name: string;
@@ -116,18 +101,18 @@ export class LlmModelResponseDto {
   @ApiProperty()
   baseUrl: string;
 
-  @ApiProperty({
-    description: "Always masked; the raw API key is never returned by the API.",
-  })
+  @ApiProperty({ description: "Always masked; the raw API key is never returned by the API." })
   apiKey: string;
 
-  @ApiProperty({ description: "At most one record per scope is active" })
-  isActive: boolean;
+  @ApiProperty({
+    description: "Consumer scopes bound to this connection (ADR-006). One scope binds to exactly one connection.",
+  })
+  scopes: string[];
 
   @ApiPropertyOptional({
     type: Date,
     nullable: true,
-    description: "When the last model call (any consumer) was attempted; null = never called",
+    description: "When the last model call (any scope sharing this connection) was attempted; null = never called",
   })
   lastCallAt?: Date | null;
 
@@ -141,7 +126,7 @@ export class LlmModelResponseDto {
   @ApiPropertyOptional({
     type: String,
     nullable: true,
-    description: "Normalized failure category of the last failed call (timeout/auth/rate-limit/bad-request/upstream)",
+    description: "Normalized failure category of the last failed call (timeout/auth/rate-limit/bad-request/payment/upstream)",
   })
   lastFailureCategory?: string | null;
 
@@ -159,15 +144,7 @@ export class LlmModelResponseDto {
   updatedAt: Date;
 }
 
-export class ActivateLlmModelResponseDto {
-  @ApiProperty()
-  success: boolean;
-
-  @ApiProperty({ description: "ID of the newly active model" })
-  activeModelId: string;
-}
-
-export class TestLlmModelResponseDto {
+export class TestLlmConnectionResponseDto {
   @ApiProperty({ description: "Whether the minimal chat completion request succeeded" })
   success: boolean;
 

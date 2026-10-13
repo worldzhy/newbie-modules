@@ -1,18 +1,15 @@
 // !! ------------------------------------------------------------ //
 // !!            [Module] LLM models                               //
 // !! ------------------------------------------------------------ //
-// * LlmModel (unified LLM model configuration, one active per scope) //
+// * LlmConnection (provider + model + baseUrl + apiKey —— one AI endpoint) //
+// * LlmScopeAssignment (scope → connectionId —— consumer-to-connection binding) //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// Unified LLM model configuration (ADR-005). The LLM module owns its own
-// Postgres schema; the per-scope single-active guarantee lives in a partial
-// unique index (Postgres WHERE clause) created by the host-side migration
-// that moves the legacy CopilotModel table into "module/llm" as LlmModel.
-model LlmModel {
+// LLM connection configuration (ADR-006). One row = one callable AI endpoint
+// (provider + model + baseUrl + apiKey + health snapshot). Multiple consumer
+// scopes can bind to the same connection via LlmScopeAssignment.
+model LlmConnection {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  // Opaque consumer scope, e.g. "copilot", "ai-analysis", "jdy". Consumers
-  // hardcode their own constant; activation is unique per scope.
-  scope     String   @db.VarChar(64)
   name      String   @db.VarChar(255)
   // Wire protocol: "openai-compatible" or "anthropic". Kept as a string so
   // a future provider kind does not require an enum migration.
@@ -22,14 +19,35 @@ model LlmModel {
   // official https://api.anthropic.com endpoint (column stays NOT NULL).
   baseUrl   String   @db.VarChar(255)
   apiKey    String   @db.VarChar(500)
-  isActive  Boolean  @default(false)
-  // Current-state snapshot of the last model-call outcome (any consumer).
-  // History lives in the audit stream; the UI surfaces only this fold.
+
+  // Health snapshot — shared across all scopes using this connection.
   // Null = never called.
   lastCallAt          DateTime?
   lastCallSuccess     Boolean?
   lastFailureCategory String? @db.VarChar(20)
   lastFailureMessage  String? @db.VarChar(500)
+
+  scopes    LlmScopeAssignment[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/llm")
+}
+
+// Consumer-scope binding (ADR-006). Maps an opaque scope string ("copilot",
+// "ai-analysis", "jdy", ...) to a connection. One scope binds to exactly one
+// connection (scope is unique); a connection can serve many scopes. Deleting
+// a connection cascades to all its assignments.
+model LlmScopeAssignment {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  scope        String   @unique @db.VarChar(64)
+  connectionId String   @db.Uuid
+  connection   LlmConnection @relation(
+    fields: [connectionId],
+    references: [id],
+    onDelete: Cascade
+  )
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

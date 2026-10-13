@@ -1,5 +1,5 @@
-import { Injectable } from "@nestjs/common";
-import { LlmModelService, ModelCallOutcome } from "./management/llm-model.service";
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { LlmConnectionService, ModelCallOutcome, type LlmConnectionRecord } from "./management/llm-connection.service";
 import { ANTHROPIC_PROVIDER } from "./management/llm-providers";
 import { createAnthropicChatModel } from "./adapters/anthropic.adapter";
 import { createOpenAiCompatibleChatModel } from "./adapters/openai-compatible.adapter";
@@ -9,43 +9,60 @@ import {
   ChatResult,
   ModelCallError,
   ModelStreamChunk,
-  NoActiveModelError,
+  NoActiveScopeError,
 } from "./chat-model.port";
 
 /**
- * Builds a ChatModelPort for the active model of a consumer scope. The active
- * record is read on every resolution so admin-side switching takes effect on
- * the next call without a restart. The record's provider protocol decides
- * which adapter factory handles the record.
+ * Builds a ChatModelPort for the connection bound to a consumer scope (ADR-006).
+ * The scope→connection binding is read on every resolution so admin-side changes
+ * (bind/unbind, switch connection) take effect on the next call without a restart.
+ * The connection's provider protocol decides which adapter factory handles it.
  *
- * Every returned port is wrapped in the provider-level health decorator
- * (ADR-005): each call's terminal outcome (success, or a classified failure;
- * user aborts excluded) is folded into the record's health snapshot. This is
- * the single emission point, so health coverage is uniform across consumers.
+ * Every returned port is wrapped in the provider-level health decorator: each
+ * call's terminal outcome (success, or a classified failure; user aborts excluded)
+ * is folded into the connection's health snapshot. Same decorator used by the
+ * periodic status probe, so health coverage is uniform across all consumers.
  */
 @Injectable()
 export class ChatModelResolver {
-  constructor(private readonly llmModels: LlmModelService) {}
+  constructor(private readonly connections: LlmConnectionService) {}
 
   async resolve(scope: string): Promise<ChatModelPort> {
-    const record = await this.llmModels.getActive(scope);
-    if (!record) {
-      throw new NoActiveModelError(scope);
+    const connection = await this.connections.findByScope(scope);
+    if (!connection) {
+      throw new NoActiveScopeError(scope);
     }
+    return this.buildPort(connection);
+  }
+
+  /**
+   * Builds a ChatModelPort for a specific connection (by ID), bypassing scope
+   * resolution. Used by the connection test endpoint so any connection — bound
+   * or not — can be connectivity-tested through the same adapter path.
+   */
+  async resolveById(id: string): Promise<ChatModelPort> {
+    const all = await this.connections.listAll();
+    const connection = all.find((c) => c.id === id);
+    if (!connection) {
+      throw new NotFoundException("LLM connection not found.");
+    }
+    return this.buildPort(connection);
+  }
+
+  private buildPort(connection: LlmConnectionRecord): ChatModelPort {
     const port =
-      record.provider === ANTHROPIC_PROVIDER
+      connection.provider === ANTHROPIC_PROVIDER
         ? createAnthropicChatModel({
-            model: record.model,
-            apiKey: record.apiKey,
-            // Empty string means "use the official api.anthropic.com endpoint".
-            baseUrl: record.baseUrl || undefined,
+            model: connection.model,
+            apiKey: connection.apiKey,
+            baseUrl: connection.baseUrl || undefined,
           })
         : createOpenAiCompatibleChatModel({
-            model: record.model,
-            baseUrl: record.baseUrl,
-            apiKey: record.apiKey,
+            model: connection.model,
+            baseUrl: connection.baseUrl,
+            apiKey: connection.apiKey,
           });
-    return withHealthTracking(port, record.id, (outcome) => this.llmModels.recordModelCallOutcome(outcome));
+    return withHealthTracking(port, connection.id, (outcome) => this.connections.recordModelCallOutcome(outcome));
   }
 }
 
@@ -56,13 +73,13 @@ export class ChatModelResolver {
  */
 function withHealthTracking(
   port: ChatModelPort,
-  modelRecordId: string,
+  connectionId: string,
   record: (outcome: ModelCallOutcome) => void,
 ): ChatModelPort {
   const recordFailure = (error: unknown): void => {
     if (error instanceof ModelCallError && error.category !== "aborted") {
       record({
-        modelRecordId,
+        connectionId,
         success: false,
         errorCategory: error.category,
         errorMessage: error.message,
@@ -76,7 +93,7 @@ function withHealthTracking(
     async complete(request: ChatRequest): Promise<ChatResult> {
       try {
         const result = await port.complete(request);
-        record({ modelRecordId, success: true });
+        record({ connectionId, success: true });
         return result;
       } catch (error) {
         recordFailure(error);
@@ -89,7 +106,7 @@ function withHealthTracking(
         for await (const chunk of port.stream(request)) {
           yield chunk;
         }
-        record({ modelRecordId, success: true });
+        record({ connectionId, success: true });
       } catch (error) {
         recordFailure(error);
         throw error;

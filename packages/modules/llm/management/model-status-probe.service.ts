@@ -1,17 +1,18 @@
 import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@nestjs/common";
 import { ChatModelResolver } from "../chat-model.resolver";
-import { LlmModelService } from "./llm-model.service";
-import { ModelCallError, NoActiveModelError } from "../chat-model.port";
+import { LlmConnectionService, type LlmConnectionRecord } from "./llm-connection.service";
+import { ModelCallError } from "../chat-model.port";
 
 /**
- * Periodically probes the active model of every scope so each status snapshot
- * reflects real-world availability (e.g. an expired quota or a rotated key)
- * even when no consumer call has been made. The probe goes through the same
- * ChatModelResolver path as a real call, so error classification (including
- * the "payment" category) is identical to what consumers record.
+ * Periodically probes every LLM connection so each status snapshot reflects
+ * real-world availability (e.g. an expired quota or a rotated key) even when
+ * no consumer call has been made. The probe goes through the same
+ * ChatModelResolver path as a real call (resolveById, shared adapter), so
+ * error classification is identical to what consumers record.
  *
- * Outcomes are folded into the record by the resolver's health decorator,
+ * Outcomes are folded into the connection by the resolver's health decorator,
  * exactly like a consumer-initiated call; the probe never reports manually.
+ * A single connection serves multiple scopes, so probing once covers all of them.
  */
 @Injectable()
 export class ModelStatusProbeService implements OnModuleInit, OnModuleDestroy {
@@ -23,7 +24,7 @@ export class ModelStatusProbeService implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly resolver: ChatModelResolver,
-    private readonly llmModels: LlmModelService,
+    private readonly connections: LlmConnectionService,
   ) {}
 
   onModuleInit(): void {
@@ -42,15 +43,15 @@ export class ModelStatusProbeService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Probes every scope's active model once. Public so E2E tests and manual
-   * triggers can bypass the interval. A no-op when nothing is active.
+   * Probes every LlmConnection once. Public so E2E tests and manual triggers
+   * can bypass the interval. A no-op when no connections exist.
    */
   async probeNow(): Promise<void> {
-    const activeRecords = await this.llmModels.listActive();
+    const all = await this.connections.listAll();
     await Promise.all(
-      activeRecords.map(async (record) => {
+      all.map(async (connection: LlmConnectionRecord) => {
         try {
-          const model = await this.resolver.resolve(record.scope);
+          const model = await this.resolver.resolveById(connection.id);
           await model.complete({
             messages: [{ role: "user", content: "Hi" }],
             maxTokens: 1,
@@ -58,12 +59,11 @@ export class ModelStatusProbeService implements OnModuleInit, OnModuleDestroy {
           });
         } catch (error) {
           // The resolver's health decorator already recorded the outcome.
-          // NoActiveModelError races with admin-side changes; ModelCallError is
-          // an expected probe result (that is the point of probing).
-          if (!(error instanceof NoActiveModelError) && !(error instanceof ModelCallError)) {
+          // ModelCallError is an expected probe result (that is the point of probing).
+          if (!(error instanceof ModelCallError)) {
             this.logger.warn(
-              `Model status probe for scope "${record.scope}" hit an unexpected error: ` +
-                `${error instanceof Error ? error.message : String(error)}`,
+              `Model status probe for connection ${connection.id} (${connection.provider}/${connection.model}) ` +
+                `hit an unexpected error: ${error instanceof Error ? error.message : String(error)}`,
             );
           }
         }

@@ -99,10 +99,10 @@ export class ModelCallError extends Error {
   }
 }
 
-/** Raised when no active model is configured for the requesting scope. */
-export class NoActiveModelError extends Error {
+/** Raised when no connection is bound to the requesting scope. */
+export class NoActiveScopeError extends Error {
   constructor(readonly scope: string) {
-    super(`No active LLM model is configured for scope "${scope}".`);
-    this.name = "NoActiveModelError";
+    super(`No LLM connection is bound to scope "${scope}". Configure a connection and bind the scope to it.`);
+    this.name = "NoActiveScopeError";
   }
 }
