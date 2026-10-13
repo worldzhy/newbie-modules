@@ -85,7 +85,7 @@ export interface ChatModelPort {
   stream(request: ChatRequest): AsyncIterable<ModelStreamChunk>;
 }
 
-export type ModelErrorCategory = "timeout" | "aborted" | "auth" | "rate-limit" | "bad-request" | "upstream";
+export type ModelErrorCategory = "timeout" | "aborted" | "auth" | "rate-limit" | "bad-request" | "payment" | "upstream";
 
 /** Normalized failure so transports never inspect SDK-specific error shapes. */
 export class ModelCallError extends Error {

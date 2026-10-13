@@ -276,6 +276,9 @@ function classifyError(error: unknown, deadline: { timedOut: boolean; signal: Ab
   if (APICallError.isInstance(error)) {
     const statusCode = error.statusCode;
     const message = error.message || "The upstream model API returned an error.";
+    if (isPaymentFailure(statusCode, message)) {
+      return new ModelCallError("payment", message, statusCode);
+    }
     return new ModelCallError(statusToCategory(statusCode), message, statusCode);
   }
   if (error instanceof Error) {
@@ -293,4 +296,23 @@ function statusToCategory(statusCode: number | undefined): ModelErrorCategory {
   if (statusCode === 429) return "rate-limit";
   if (statusCode === 400 || statusCode === 422) return "bad-request";
   return "upstream";
+}
+
+/**
+ * Detects provider-side payment/quota failures that are not plain rate limits.
+ * DeepSeek and similar OpenAI-compatible gateways return HTTP 402 or embed
+ * "Insufficient balance" / "quota exceeded" in a 400/429 body; matching the
+ * message avoids misclassifying these as bad-request or rate-limit, which
+ * would mislead the admin toward fixing the request instead of billing.
+ */
+function isPaymentFailure(statusCode: number | undefined, message: string): boolean {
+  if (statusCode === 402) return true;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("insufficient balance") ||
+    lower.includes("insufficient_quota") ||
+    lower.includes("quota exceeded") ||
+    lower.includes("out of credits") ||
+    lower.includes("payment required")
+  );
 }

@@ -1,6 +1,7 @@
 import { Global, Module } from "@nestjs/common";
 import { CopilotModelController } from "./model/management/copilot-model.controller";
 import { CopilotModelService } from "./model/management/copilot-model.service";
+import { ModelStatusProbeService } from "./model/management/model-status-probe.service";
 import { ActiveChatModelResolver } from "./model/active-chat-model.resolver";
 import { CONFIRMATION_MANAGER, InMemoryConfirmationManager } from "./kernel/confirmation-manager";
 import { CONVERSATION_STORE, InMemoryConversationStore } from "./kernel/conversation-store";
@@ -25,6 +26,7 @@ import { CopilotAuditLogger } from "./observability/copilot-audit.logger";
   providers: [
     CopilotModelService,
     ActiveChatModelResolver,
+    ModelStatusProbeService,
     CopilotAuditLogger,
     { provide: CONVERSATION_STORE, useClass: InMemoryConversationStore },
     { provide: CONFIRMATION_MANAGER, useFactory: () => new InMemoryConfirmationManager() },
