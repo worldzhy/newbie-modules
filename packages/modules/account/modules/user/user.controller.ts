@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { PermissionAction, Prisma, User, UserRole } from "@generated/prisma/client";
+import { PermissionAction, Prisma, User } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -12,6 +12,7 @@ import {
   ChangeUserPasswordDto,
   CreateUserResponseDto,
   CreateUserDto,
+  GetUsersQueryDto,
   UpdateUserDto,
   UserChangePasswordResponseDto,
   UserListResponseDto,
@@ -63,24 +64,23 @@ export class UserController {
   @RequirePermission(PermissionAction.List, Prisma.ModelName.User)
   @ApiOperation({ summary: "Get users with pagination and filters" })
   @ApiResponse({ type: UserListResponseDto })
-  async getUsers(
-    @Query("page") page: number,
-    @Query("pageSize") pageSize: number,
-    @Query("name") name?: string,
-    @Query("roles") roles?: UserRole[],
-  ) {
-    // [step 1] Construct where argument.
+  async getUsers(@Query() query: GetUsersQueryDto) {
+    const { page, pageSize, name, roles } = query;
+
+    // [step 1] Construct where argument. Every filter is optional; in
+    // particular roles only narrows the list when at least one value is
+    // given, so callers without the filter see every user.
     let where: Prisma.UserWhereInput | undefined;
     const whereConditions: object[] = [];
 
     if (name) {
-      name = name.trim();
-      if (name.length > 0) {
-        whereConditions.push({ name: { search: name } });
+      const trimmedName = name.trim();
+      if (trimmedName.length > 0) {
+        whereConditions.push({ name: { search: trimmedName } });
       }
     }
 
-    if (roles) {
+    if (roles && roles.length > 0) {
       whereConditions.push({ roles: { hasSome: roles } });
     }
 

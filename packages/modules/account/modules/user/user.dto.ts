@@ -1,17 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { MfaMethod, UserGender, UserRole, UserStatus } from "@generated/prisma/client";
 import { CommonListResponseDto } from "@devbie/newbie/common.dto";
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
   IsDate,
   IsEmail,
   IsEnum,
+  IsInt,
   IsNotEmpty,
   IsOptional,
   IsPhoneNumber,
   IsString,
+  Min,
   MinLength,
 } from "class-validator";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
@@ -373,4 +375,49 @@ export class UserChangePasswordResponseDto {
 export class UserListResponseDto extends CommonListResponseDto {
   @ApiProperty({ type: UserResponseDto, isArray: true })
   declare records: UserResponseDto[];
+}
+
+/**
+ * Query DTO for the paginated user list (admin endpoint).
+ *
+ * All fields are optional. When `roles` is omitted the list is unfiltered by
+ * role — callers must never be forced to pass their own roles just to satisfy
+ * the contract. `roles` narrows by role overlap (Prisma `hasSome`); an empty
+ * array is treated as "no filter". Query strings can carry a single value or
+ * repeated keys, so the Transform normalises both into an array.
+ */
+export class GetUsersQueryDto {
+  @ApiPropertyOptional({ type: Number, description: "Page number, starts from 0" })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  page?: number;
+
+  @ApiPropertyOptional({ type: Number, description: "Items per page" })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  pageSize?: number;
+
+  @ApiPropertyOptional({ type: String, description: "Fuzzy search by name" })
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional({
+    enum: UserRole,
+    isArray: true,
+    description: "Filter by role overlap (hasSome); omit for no role filtering",
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }): string[] | undefined => {
+    if (Array.isArray(value)) return value as string[];
+    if (typeof value === "string") return [value];
+    return undefined;
+  })
+  @IsArray()
+  @IsEnum(UserRole, { each: true })
+  roles?: UserRole[];
 }
