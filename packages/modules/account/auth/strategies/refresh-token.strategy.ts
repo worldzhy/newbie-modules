@@ -27,7 +27,8 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.ref
    */
   async validate(req: Request): Promise<boolean> {
     // [step 0] Extract refresh token from cookie or body
-    const refreshToken: string = req.cookies[CookieName.REFRESH_TOKEN] || req.body[CookieName.REFRESH_TOKEN];
+    const refreshToken: string =
+      req.cookies?.[CookieName.REFRESH_TOKEN] || req.body?.[CookieName.REFRESH_TOKEN];
 
     // [step 1] Check if refresh token is provided. No token at all means no
     // identity to attribute a failure to — audit: not required (handshake).
