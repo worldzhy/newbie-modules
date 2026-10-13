@@ -380,26 +380,25 @@ export class UserListResponseDto extends CommonListResponseDto {
 /**
  * Query DTO for the paginated user list (admin endpoint).
  *
- * All fields are optional. When `roles` is omitted the list is unfiltered by
- * role — callers must never be forced to pass their own roles just to satisfy
- * the contract. `roles` narrows by role overlap (Prisma `hasSome`); an empty
- * array is treated as "no filter". Query strings can carry a single value or
- * repeated keys, so the Transform normalises both into an array.
+ * Pagination is required (the framework rejects a missing page/pageSize at
+ * query time anyway); name and roles are optional filters. When `roles` is
+ * omitted or empty the list is unfiltered by role — callers must never be
+ * forced to pass their own roles just to satisfy the contract. `roles`
+ * narrows by role overlap (Prisma `hasSome`). Query strings can carry a
+ * single value or repeated keys, so the Transform normalises both.
  */
 export class GetUsersQueryDto {
-  @ApiPropertyOptional({ type: Number, description: "Page number, starts from 0" })
-  @IsOptional()
+  @ApiProperty({ type: Number, description: "Page number, starts from 0" })
   @IsInt()
   @Min(0)
   @Type(() => Number)
-  page?: number;
+  page: number;
 
-  @ApiPropertyOptional({ type: Number, description: "Items per page" })
-  @IsOptional()
+  @ApiProperty({ type: Number, description: "Items per page" })
   @IsInt()
   @Min(1)
   @Type(() => Number)
-  pageSize?: number;
+  pageSize: number;
 
   @ApiPropertyOptional({ type: String, description: "Fuzzy search by name" })
   @IsOptional()
