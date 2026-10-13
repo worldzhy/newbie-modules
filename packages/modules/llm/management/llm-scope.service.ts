@@ -1,5 +1,6 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { LlmScopeBindingResponseDto } from "./llm-scope.dto";
 
 /**
  * Consumer-scope to LLM connection binding (ADR-006). One scope binds to
@@ -12,7 +13,7 @@ export class LlmScopeService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async bind(scope: string, connectionId: string): Promise<void> {
+  async bind(scope: string, connectionId: string): Promise<LlmScopeBindingResponseDto> {
     // Verify the target connection exists before touching the binding.
     const connection = await this.prisma.llmConnection.findUnique({ where: { id: connectionId } });
     if (!connection) {
@@ -26,19 +27,36 @@ export class LlmScopeService {
       update: { connectionId },
       create: { scope, connectionId },
     });
-    this.logger.log(`LLM scope "${scope}" bound to connection ${connectionId} (${connection.provider}/${connection.model})`);
+    this.logger.log(
+      `LLM scope "${scope}" bound to connection ${connectionId} (${connection.provider}/${connection.model})`,
+    );
+    return {
+      scope,
+      connectionId,
+      connectionName: connection.name,
+      connectionModel: connection.model,
+    };
   }
 
-  async unbind(scope: string): Promise<void> {
-    const assignment = await this.prisma.llmScopeAssignment.findUnique({ where: { scope } });
+  async unbind(scope: string): Promise<LlmScopeBindingResponseDto> {
+    const assignment = await this.prisma.llmScopeAssignment.findUnique({
+      where: { scope },
+      include: { connection: true },
+    });
     if (!assignment) {
       throw new NotFoundException(`No connection bound to scope "${scope}".`);
     }
     await this.prisma.llmScopeAssignment.delete({ where: { scope } });
     this.logger.log(`LLM scope "${scope}" unbound from connection ${assignment.connectionId}`);
+    return {
+      scope,
+      connectionId: assignment.connectionId,
+      connectionName: assignment.connection.name,
+      connectionModel: assignment.connection.model,
+    };
   }
 
-  async list(): Promise<Array<{ scope: string; connectionId: string; connectionName: string; connectionModel: string }>> {
+  async list(): Promise<LlmScopeBindingResponseDto[]> {
     const assignments = await this.prisma.llmScopeAssignment.findMany({
       include: { connection: true },
       orderBy: { scope: "asc" },
@@ -46,8 +64,8 @@ export class LlmScopeService {
     return assignments.map((a) => ({
       scope: a.scope,
       connectionId: a.connectionId,
-      connectionName: (a.connection as { name: string }).name,
-      connectionModel: (a.connection as { model: string }).model,
+      connectionName: a.connection.name,
+      connectionModel: a.connection.model,
     }));
   }
 }

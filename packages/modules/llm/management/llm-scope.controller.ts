@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { IsIn, IsNotEmpty, IsString, MaxLength } from "class-validator";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { LlmScopeBindingResponseDto } from "./llm-scope.dto";
 import { LlmScopeService } from "./llm-scope.service";
 
 /**
@@ -18,11 +18,8 @@ export class LlmScopeController {
 
   @Get()
   @ApiOperation({ summary: "List all scope-to-connection bindings" })
-  @ApiResponse({
-    status: 200,
-    description: "List of scope bindings with their target connection info",
-  })
-  async list(): Promise<Array<{ scope: string; connectionId: string; connectionName: string; connectionModel: string }>> {
+  @ApiResponse({ status: 200, type: [LlmScopeBindingResponseDto] })
+  async list(): Promise<LlmScopeBindingResponseDto[]> {
     return await this.scopes.list();
   }
 
@@ -38,22 +35,22 @@ export class LlmScopeController {
       },
     },
   })
+  @ApiResponse({ status: 200, type: LlmScopeBindingResponseDto })
   async bind(
     @Param("scope") scope: string,
     @Body("connectionId") connectionId: string,
-  ): Promise<{ scope: string; connectionId: string }> {
+  ): Promise<LlmScopeBindingResponseDto> {
     if (!connectionId) {
       throw new Error("connectionId is required");
     }
-    await this.scopes.bind(scope, connectionId);
-    return { scope, connectionId };
+    return await this.scopes.bind(scope, connectionId);
   }
 
   @Delete(":scope")
   @RequirePermission("manage", "LlmScopeAssignment")
   @ApiOperation({ summary: "Remove the binding for a consumer scope (the scope's consumer will stop working)" })
-  async unbind(@Param("scope") scope: string): Promise<{ scope: string }> {
-    await this.scopes.unbind(scope);
-    return { scope };
+  @ApiResponse({ status: 200, type: LlmScopeBindingResponseDto })
+  async unbind(@Param("scope") scope: string): Promise<LlmScopeBindingResponseDto> {
+    return await this.scopes.unbind(scope);
   }
 }
