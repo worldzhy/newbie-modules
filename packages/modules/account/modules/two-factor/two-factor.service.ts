@@ -4,6 +4,7 @@ import QRCode from "qrcode";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { MfaMethod } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { INVALID_TOKEN } from "@devbie/newbie/exceptions/errors.constants";
 import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { TokenService } from "@modules/security/token/token.service";
 import { TokenSubject } from "@modules/security/token/token.constants";
@@ -167,14 +168,17 @@ export class TwoFactorService {
         token: params.token,
         options: { subject: TokenSubject.MULTI_FACTOR_TOKEN },
       });
-    } catch (error) {
+    } catch {
       await recordLoginFailure(this.auditLogService, {
         actorId: null,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
         detail: { reason: "mfa_token_invalid" },
       });
-      throw error;
+      // The challenge token is a credential submitted with the login-by-totp
+      // request: an invalid/expired one is a 400 invalid_grant, not a 401
+      // session-authentication failure (newbie ADR-001).
+      throw new BadRequestException(INVALID_TOKEN);
     }
 
     const attemptKey = payload.userId;

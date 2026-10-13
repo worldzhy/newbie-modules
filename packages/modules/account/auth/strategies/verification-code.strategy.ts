@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-local";
 import type { Request } from "express";
@@ -49,7 +49,7 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
         actorId: null,
         detail: { account, channel, reason: "unknown_account" },
       });
-      throw new UnauthorizedException("The user does not exist.");
+      throw new BadRequestException("The user does not exist.");
     }
 
     // [step 2] Check if the account is active, mirroring the password strategy.
@@ -69,7 +69,7 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
         actorId: user.id,
         detail: { account, channel, reason: "invalid_account" },
       });
-      throw new UnauthorizedException("Invalid account.");
+      throw new BadRequestException("Invalid account.");
     }
 
     // [step 4] Validate verification code.
@@ -91,7 +91,7 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
         actorId: user.id,
         detail: { account, channel, reason: "invalid_code" },
       });
-      throw new UnauthorizedException("Invalid code.");
+      throw new BadRequestException("Invalid code.");
     }
 
     // [step 5] Inactivate the used code to prevent replay attacks.

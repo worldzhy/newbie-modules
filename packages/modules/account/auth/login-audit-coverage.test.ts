@@ -18,7 +18,7 @@ import { join } from "node:path";
  *
  * Three checks run per file:
  * 1. Rejection coverage — every rejection of an *already identified* account
- *    (UnauthorizedException/ForbiddenException/NewbieException/NotFoundException) must have a
+ *    (UnauthorizedException/BadRequestException/ForbiddenException/NewbieException/NotFoundException) must have a
  *    `recordLoginFailure`/`auditLogService.record` call within a few lines
  *    above it. A rejection that happens before any identity is resolved
  *    (e.g. an OAuth handshake returning no profile) is exempt, but only
@@ -45,7 +45,8 @@ const LOGIN_ENTRY_FILES = [
   "strategies/refresh-token.strategy.ts",
 ];
 
-const REJECTION_PATTERN = /throw new (UnauthorizedException|ForbiddenException|NewbieException|NotFoundException)/;
+const REJECTION_PATTERN =
+  /throw new (UnauthorizedException|BadRequestException|ForbiddenException|NewbieException|NotFoundException)/;
 const AUDIT_CALL_PATTERN = /recordLoginFailure\(|auditLogService\.record\(/;
 const EXEMPTION_COMMENT_PATTERN = /handshake|audit: not required/i;
 const LOOKBACK_LINES = 8;

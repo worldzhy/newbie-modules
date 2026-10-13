@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-google-oauth20";
 import { GoogleUserReqDto, GoogleUserResDto } from "@modules/security/authentication/google-oauth/dto/google-user.dto";
@@ -25,7 +25,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
     // handshake cannot establish an account identity.
     const email = emails?.[0]?.value;
     if (!email) {
-      throw new UnauthorizedException("Google did not return an email address.");
+      throw new BadRequestException("Google did not return an email address.");
     }
     const user: GoogleUserResDto = {
       id,
