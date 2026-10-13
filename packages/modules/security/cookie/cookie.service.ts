@@ -8,6 +8,8 @@ export enum CookieName {
   REFRESH_TOKEN = "refreshToken",
   // Short-lived state binding the Google OAuth start and callback requests.
   GOOGLE_OAUTH_STATE = "googleOAuthState",
+  // Short-lived state binding the Lark OAuth start and callback requests.
+  LARK_OAUTH_STATE = "larkOAuthState",
 }
 
 @Injectable()
@@ -28,13 +30,14 @@ export class CookieService {
   }
 
   /**
-   * Build the state cookie for the Google OAuth handshake. It must be sent on
-   * the top-level GET redirect back from Google, so SameSite is Lax (unlike
-   * the refresh token cookie, which stays Strict).
+   * Build the state cookie for an OAuth handshake (Google, Lark, ...). It must
+   * be sent on the top-level GET redirect back from the provider, so SameSite
+   * is Lax (unlike the refresh token cookie, which stays Strict). The cookie is
+   * single-use: consume it only after the callback state has been verified.
    */
-  generateForGoogleOAuthState(state: string) {
+  generateForOAuthState(name: CookieName, state: string) {
     return {
-      name: CookieName.GOOGLE_OAUTH_STATE,
+      name,
       value: state,
       options: {
         ...this.defaultCookieOptions(),
@@ -45,8 +48,8 @@ export class CookieService {
   }
 
   /** Expire the state cookie once the OAuth callback has been verified. */
-  clearGoogleOAuthState(response: Response) {
-    response.cookie(CookieName.GOOGLE_OAUTH_STATE, "", {
+  clearOAuthState(name: CookieName, response: Response) {
+    response.cookie(name, "", {
       ...this.defaultCookieOptions(),
       sameSite: "lax" as const,
       maxAge: 0,

@@ -4,11 +4,8 @@ import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
-import { CookieService } from "@modules/security/cookie/cookie.service";
+import { CookieName, CookieService } from "@modules/security/cookie/cookie.service";
 import { LarkAuthService } from "@modules/account/auth/lark/lark-auth.service";
-
-const LARK_OAUTH_STATE_COOKIE = "larkOAuthState";
-const STATE_TTL_MS = 10 * 60 * 1000;
 
 /**
  * Feishu/Lark OAuth login endpoints.
@@ -36,11 +33,8 @@ export class LoginByLarkController {
   @ApiOperation({ summary: "Initiate Feishu OAuth login (redirects to Feishu)" })
   async signinWithLark(@Res() response: Response): Promise<void> {
     const state = randomUUID();
-    response.cookie(LARK_OAUTH_STATE_COOKIE, state, {
-      ...this.cookieService.defaultCookieOptions(),
-      sameSite: "lax",
-      maxAge: STATE_TTL_MS,
-    });
+    const stateCookie = this.cookieService.generateForOAuthState(CookieName.LARK_OAUTH_STATE, state);
+    response.cookie(stateCookie.name, stateCookie.value, stateCookie.options);
     response.redirect(this.larkAuthService.buildAuthorizeUrl(state));
   }
 
@@ -55,12 +49,7 @@ export class LoginByLarkController {
     @Query("state") queryState?: string,
     @Query("error") error?: string,
   ): Promise<void> {
-    const cookieState = request.cookies?.[LARK_OAUTH_STATE_COOKIE];
-    response.cookie(LARK_OAUTH_STATE_COOKIE, "", {
-      ...this.cookieService.defaultCookieOptions(),
-      sameSite: "lax",
-      maxAge: 0,
-    });
+    const cookieState = request.cookies?.[CookieName.LARK_OAUTH_STATE];
 
     if (error) {
       throw new BadRequestException(`Feishu authorization denied: ${error}`);
@@ -68,6 +57,10 @@ export class LoginByLarkController {
     if (!code || typeof queryState !== "string" || !cookieState || queryState !== cookieState) {
       throw new BadRequestException("Feishu OAuth state verification failed.");
     }
+
+    // State verified — consume the single-use cookie so the handshake cannot
+    // be replayed. A failed verification keeps the cookie intact.
+    this.cookieService.clearOAuthState(CookieName.LARK_OAUTH_STATE, response);
 
     const userInfo = await this.larkAuthService.exchangeCodeForUserInfo(code);
     if (!userInfo) {

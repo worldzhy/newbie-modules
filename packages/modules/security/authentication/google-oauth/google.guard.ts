@@ -22,10 +22,12 @@ export class GoogleAuthGuard extends AuthGuard(GuardType.GOOGLE) {
       // mismatched state indicates a forged or replayed callback (CSRF).
       const queryState = request.query.state;
       const cookieState = request.cookies?.[CookieName.GOOGLE_OAUTH_STATE];
-      this.cookieService.clearGoogleOAuthState(response);
       if (typeof queryState !== "string" || !cookieState || queryState !== cookieState) {
         throw new BadRequestException("Google OAuth state verification failed.");
       }
+      // State verified — consume the single-use cookie so the handshake
+      // cannot be replayed. A failed verification keeps the cookie intact.
+      this.cookieService.clearOAuthState(CookieName.GOOGLE_OAUTH_STATE, response);
     }
 
     return super.canActivate(context);
@@ -45,7 +47,7 @@ export class GoogleAuthGuard extends AuthGuard(GuardType.GOOGLE) {
 
     const response = httpContext.getResponse<Response>();
     const state = randomUUID();
-    const stateCookie = this.cookieService.generateForGoogleOAuthState(state);
+    const stateCookie = this.cookieService.generateForOAuthState(CookieName.GOOGLE_OAUTH_STATE, state);
     response.cookie(stateCookie.name, stateCookie.value, stateCookie.options);
     return { state, session: false };
   }
