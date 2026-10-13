@@ -7,8 +7,8 @@ import { InMemoryConfirmationManager } from "./confirmation-manager";
 import type { SkillDefinition } from "./skill";
 import type { AgentExecutionContext } from "./agent-execution-context";
 import type { CopilotAuditEntry, CopilotAuditSink } from "./audit-sink";
-import type { ChatModelPort, ChatRequest, ModelStreamChunk } from "./chat-model.port";
-import { ModelCallError } from "./chat-model.port";
+import type { ChatModelPort, ChatRequest, ModelStreamChunk } from "@modules/llm/chat-model.port";
+import { ModelCallError } from "@modules/llm/chat-model.port";
 
 /**
  * Audit verification (TR-5.1): one multi-tool run emits complete model_call

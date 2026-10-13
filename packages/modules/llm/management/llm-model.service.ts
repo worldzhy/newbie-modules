@@ -1,17 +1,17 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
-  ActivateCopilotModelResponseDto,
-  CopilotModelResponseDto,
-  CreateCopilotModelDto,
-  TestCopilotModelResponseDto,
-  UpdateCopilotModelDto,
-} from "./copilot-model.dto";
-import { ANTHROPIC_PROVIDER, ANTHROPIC_API_VERSION, DEFAULT_ANTHROPIC_BASE_URL } from "./copilot-providers";
-import type { ModelCallOutcome, ModelHealthSink } from "../../kernel/model-health-sink";
+  ActivateLlmModelResponseDto,
+  CreateLlmModelDto,
+  LlmModelResponseDto,
+  TestLlmModelResponseDto,
+  UpdateLlmModelDto,
+} from "./llm-model.dto";
+import { ANTHROPIC_PROVIDER, ANTHROPIC_API_VERSION, DEFAULT_ANTHROPIC_BASE_URL } from "./llm-providers";
 
-type CopilotModelRecord = {
+export type LlmModelRecord = {
   id: string;
+  scope: string;
   name: string;
   provider: string;
   model: string;
@@ -26,29 +26,44 @@ type CopilotModelRecord = {
   updatedAt: Date;
 };
 
+/**
+ * One model-call outcome for the provider-level health fold. Emitted by the
+ * ChatModelResolver decorator for every consumer, so health coverage is
+ * uniform across scopes (ADR-005).
+ */
+export interface ModelCallOutcome {
+  /** Persistence id of the model record the call ran against. */
+  modelRecordId: string;
+  success: boolean;
+  /** Normalized failure category; present on failure only. */
+  errorCategory?: string;
+  /** Upstream failure message; present on failure only. */
+  errorMessage?: string;
+}
+
 const PING_TIMEOUT_MS = 10_000;
 const FAILURE_MESSAGE_MAX_LENGTH = 500;
 
 /**
- * Host-level Copilot model configuration. Records describe a wire protocol
- * plus credentials; the active record is turned into a ChatModelPort by
- * ActiveChatModelResolver on every run.
+ * Unified LLM model configuration. Records describe a wire protocol plus
+ * credentials scoped to one consumer; the active record for a scope is turned
+ * into a ChatModelPort by ChatModelResolver on every call.
  */
 @Injectable()
-export class CopilotModelService implements ModelHealthSink {
-  private readonly logger = new Logger(CopilotModelService.name);
+export class LlmModelService {
+  private readonly logger = new Logger(LlmModelService.name);
 
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Kernel health seam (fire-and-forget, ADR-004): folds the latest model-call
-   * outcome into the record's current-state snapshot. A success clears the
-   * failure fields; a failure records category + capped upstream message.
-   * Never throws into the run loop: a deleted record or transient DB error
-   * only skips the update.
+   * Provider-level health fold (fire-and-forget, ADR-005): folds the latest
+   * model-call outcome into the record's current-state snapshot. A success
+   * clears the failure fields; a failure records category + capped upstream
+   * message. Never throws into the call path: a deleted record or transient
+   * DB error only skips the update.
    */
   recordModelCallOutcome(outcome: ModelCallOutcome): void {
-    this.prisma.copilotModel
+    this.prisma.llmModel
       .update({
         where: { id: outcome.modelRecordId },
         data: outcome.success
@@ -69,22 +84,23 @@ export class CopilotModelService implements ModelHealthSink {
       })
       .catch((error: unknown) => {
         this.logger.warn(
-          `Failed to record Copilot model health for ${outcome.modelRecordId}: ` +
+          `Failed to record LLM model health for ${outcome.modelRecordId}: ` +
             `${error instanceof Error ? error.message : String(error)}`,
         );
       });
   }
 
-  async list(): Promise<CopilotModelResponseDto[]> {
-    const records = (await this.prisma.copilotModel.findMany({
-      orderBy: { createdAt: "asc" },
-    })) as CopilotModelRecord[];
+  async list(): Promise<LlmModelResponseDto[]> {
+    const records = (await this.prisma.llmModel.findMany({
+      orderBy: [{ scope: "asc" }, { createdAt: "asc" }],
+    })) as LlmModelRecord[];
     return records.map((record) => this.toResponse(record));
   }
 
-  async create(dto: CreateCopilotModelDto): Promise<CopilotModelResponseDto> {
-    const record = (await this.prisma.copilotModel.create({
+  async create(dto: CreateLlmModelDto): Promise<LlmModelResponseDto> {
+    const record = (await this.prisma.llmModel.create({
       data: {
+        scope: dto.scope,
         name: dto.name,
         provider: dto.provider ?? "openai-compatible",
         model: dto.model,
@@ -94,12 +110,12 @@ export class CopilotModelService implements ModelHealthSink {
         apiKey: dto.apiKey,
         isActive: false,
       },
-    })) as CopilotModelRecord;
-    this.logger.log(`Copilot model created: ${record.id} (${record.provider}/${record.model})`);
+    })) as LlmModelRecord;
+    this.logger.log(`LLM model created: ${record.id} (scope=${record.scope}, ${record.provider}/${record.model})`);
     return this.toResponse(record);
   }
 
-  async update(id: string, dto: UpdateCopilotModelDto): Promise<CopilotModelResponseDto> {
+  async update(id: string, dto: UpdateLlmModelDto): Promise<LlmModelResponseDto> {
     await this.requireRecord(id);
 
     // The masked placeholder from a GET response must never overwrite the
@@ -113,67 +129,79 @@ export class CopilotModelService implements ModelHealthSink {
       data.apiKey = dto.apiKey;
     }
 
-    const record = (await this.prisma.copilotModel.update({
+    const record = (await this.prisma.llmModel.update({
       where: { id },
       data,
-    })) as CopilotModelRecord;
-    this.logger.log(`Copilot model updated: ${id}`);
+    })) as LlmModelRecord;
+    this.logger.log(`LLM model updated: ${id}`);
     return this.toResponse(record);
   }
 
-  async remove(id: string): Promise<CopilotModelResponseDto> {
+  async remove(id: string): Promise<LlmModelResponseDto> {
     const record = await this.requireRecord(id);
     if (record.isActive) {
-      throw new ConflictException("The active Copilot model cannot be deleted; activate another model first.");
+      throw new ConflictException(
+        `The active LLM model for scope "${record.scope}" cannot be deleted; activate another model first.`,
+      );
     }
-    await this.prisma.copilotModel.delete({ where: { id } });
-    this.logger.log(`Copilot model deleted: ${id}`);
+    await this.prisma.llmModel.delete({ where: { id } });
+    this.logger.log(`LLM model deleted: ${id}`);
     return this.toResponse(record);
   }
 
-  async activate(id: string): Promise<ActivateCopilotModelResponseDto> {
-    await this.requireRecord(id);
+  async activate(id: string): Promise<ActivateLlmModelResponseDto> {
+    const record = await this.requireRecord(id);
 
-    // Clear every active flag first, then set the target. The partial unique
-    // index in the copilot schema is the structural backstop for this swap.
+    // Clear the active flag within the record's own scope first, then set the
+    // target. The per-scope partial unique index is the structural backstop.
     await this.prisma.$transaction([
-      this.prisma.copilotModel.updateMany({ where: { isActive: true }, data: { isActive: false } }),
-      this.prisma.copilotModel.update({ where: { id }, data: { isActive: true } }),
+      this.prisma.llmModel.updateMany({
+        where: { scope: record.scope, isActive: true },
+        data: { isActive: false },
+      }),
+      this.prisma.llmModel.update({ where: { id }, data: { isActive: true } }),
     ]);
-    this.logger.log(`Copilot active model switched to: ${id}`);
+    this.logger.log(`LLM active model for scope "${record.scope}" switched to: ${id}`);
     return { success: true, activeModelId: id };
   }
 
-  async test(id: string): Promise<TestCopilotModelResponseDto> {
+  async test(id: string): Promise<TestLlmModelResponseDto> {
     const record = await this.requireRecord(id);
     const result = await this.ping(record);
     if (!result.success) {
-      this.logger.warn(`Copilot model connectivity test failed for ${record.id}: ${result.message}`);
+      this.logger.warn(`LLM model connectivity test failed for ${record.id}: ${result.message}`);
     }
     return result;
   }
 
   /**
-   * Used by the agent kernel on every run, so switching the active model in
+   * Used by ChatModelResolver on every call, so switching the active model in
    * the admin UI takes effect for the next request without a restart.
    */
-  async getActive(): Promise<CopilotModelRecord | null> {
-    return (await this.prisma.copilotModel.findFirst({
-      where: { isActive: true },
-    })) as CopilotModelRecord | null;
+  async getActive(scope: string): Promise<LlmModelRecord | null> {
+    return (await this.prisma.llmModel.findFirst({
+      where: { scope, isActive: true },
+    })) as LlmModelRecord | null;
   }
 
-  private async requireRecord(id: string): Promise<CopilotModelRecord> {
-    const record = (await this.prisma.copilotModel.findUnique({
+  /** Every active record across all scopes; drives the periodic status probe. */
+  async listActive(): Promise<LlmModelRecord[]> {
+    return (await this.prisma.llmModel.findMany({
+      where: { isActive: true },
+    })) as LlmModelRecord[];
+  }
+
+  private async requireRecord(id: string): Promise<LlmModelRecord> {
+    const record = (await this.prisma.llmModel.findUnique({
       where: { id },
-    })) as CopilotModelRecord | null;
+    })) as LlmModelRecord | null;
     if (!record) {
-      throw new NotFoundException("Copilot model not found.");
+      throw new NotFoundException("LLM model not found.");
     }
     return record;
   }
 
-  private async ping(record: CopilotModelRecord): Promise<TestCopilotModelResponseDto> {
+  private async ping(record: LlmModelRecord): Promise<TestLlmModelResponseDto> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PING_TIMEOUT_MS);
 
@@ -198,7 +226,7 @@ export class CopilotModelService implements ModelHealthSink {
     }
   }
 
-  private pingEndpoint(record: CopilotModelRecord): string {
+  private pingEndpoint(record: LlmModelRecord): string {
     if (record.provider === ANTHROPIC_PROVIDER) {
       const baseUrl = normalizeBaseUrl(record.baseUrl) || DEFAULT_ANTHROPIC_BASE_URL;
       return `${baseUrl}/v1/messages`;
@@ -206,7 +234,7 @@ export class CopilotModelService implements ModelHealthSink {
     return `${record.baseUrl}/chat/completions`;
   }
 
-  private pingHeaders(record: CopilotModelRecord): Record<string, string> {
+  private pingHeaders(record: LlmModelRecord): Record<string, string> {
     if (record.provider === ANTHROPIC_PROVIDER) {
       return {
         "Content-Type": "application/json",
@@ -220,7 +248,7 @@ export class CopilotModelService implements ModelHealthSink {
     };
   }
 
-  private pingBody(record: CopilotModelRecord): unknown {
+  private pingBody(record: LlmModelRecord): unknown {
     if (record.provider === ANTHROPIC_PROVIDER) {
       return {
         model: record.model,
@@ -236,9 +264,10 @@ export class CopilotModelService implements ModelHealthSink {
     };
   }
 
-  private toResponse(record: CopilotModelRecord): CopilotModelResponseDto {
+  private toResponse(record: LlmModelRecord): LlmModelResponseDto {
     return {
       id: record.id,
+      scope: record.scope,
       name: record.name,
       provider: record.provider,
       model: record.model,
@@ -271,7 +300,7 @@ function normalizeBaseUrl(baseUrl: string): string {
  * shared across protocols; both OpenAI-style and Anthropic error envelopes
  * expose their message under `error.message`, which safeReadErrorDetail reads.
  */
-async function evaluatePingResponse(response: Response): Promise<TestCopilotModelResponseDto> {
+async function evaluatePingResponse(response: Response): Promise<TestLlmModelResponseDto> {
   if (response.ok) {
     return { success: true, message: "Connection successful." };
   }

@@ -5,9 +5,13 @@
  * /chat/completions, hence a separate provider package and adapter.
  * baseUrl is optional: omit it for the official api.anthropic.com endpoint,
  * set it when routing Anthropic traffic through a compatible gateway.
+ *
+ * JSON mode (`responseFormat: "json"`) is declared unsupported: the adapter
+ * rejects such requests with a "bad-request" ModelCallError instead of
+ * silently degrading to free-form text.
  */
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { ChatModelPort } from "../../kernel/chat-model.port";
+import { ChatModelPort } from "../chat-model.port";
 import { createSdkChatModel } from "./ai-sdk.bridge";
 
 export interface AnthropicChatModelConfig {
@@ -16,8 +20,6 @@ export interface AnthropicChatModelConfig {
   apiKey: string;
   /** Custom gateway URL; empty/undefined uses https://api.anthropic.com. */
   baseUrl?: string;
-  /** Persistence id of the backing CopilotModel record; enables the kernel health seam. */
-  recordId?: string;
 }
 
 export function createAnthropicChatModel(config: AnthropicChatModelConfig): ChatModelPort {
@@ -25,5 +27,7 @@ export function createAnthropicChatModel(config: AnthropicChatModelConfig): Chat
     apiKey: config.apiKey,
     ...(config.baseUrl ? { baseURL: config.baseUrl } : {}),
   });
-  return createSdkChatModel(config.model, provider.languageModel(config.model), config.recordId);
+  return createSdkChatModel(config.model, provider.languageModel(config.model), {
+    supportsJsonResponseFormat: false,
+  });
 }

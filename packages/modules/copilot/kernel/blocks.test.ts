@@ -6,7 +6,7 @@ import { SkillRegistry, type KernelLogger } from "./skill-registry";
 import type { AgentEvent, CopilotSkillBlock } from "./agent-events";
 import type { AgentExecutionContext } from "./agent-execution-context";
 import type { SkillDefinition } from "./skill";
-import type { ChatModelPort, ChatRequest, ModelFinishReason, ModelStreamChunk } from "./chat-model.port";
+import type { ChatModelPort, ChatRequest, ModelFinishReason, ModelStreamChunk } from "@modules/llm/chat-model.port";
 import { boundBlocks, summarizeBlocks, BLOCKS_SERIALIZED_CAP_BYTES, CHART_POINT_CAP, TABLE_ROW_CAP } from "./blocks";
 
 /**

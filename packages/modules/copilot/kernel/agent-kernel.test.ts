@@ -7,7 +7,13 @@ import { InMemoryConfirmationManager } from "./confirmation-manager";
 import { GENERAL_PAGE_ROUTE, type SkillDefinition } from "./skill";
 import type { AgentExecutionContext } from "./agent-execution-context";
 import type { AgentEvent } from "./agent-events";
-import type { ChatMessage, ChatModelPort, ChatRequest, ModelFinishReason, ModelStreamChunk } from "./chat-model.port";
+import type {
+  ChatMessage,
+  ChatModelPort,
+  ChatRequest,
+  ModelFinishReason,
+  ModelStreamChunk,
+} from "@modules/llm/chat-model.port";
 
 /**
  * Kernel verification (TR-3.1..TR-3.3): the agent tool loop is exercised with

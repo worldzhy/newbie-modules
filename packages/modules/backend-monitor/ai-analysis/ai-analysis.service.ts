@@ -1,12 +1,20 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
-import OpenAI from "openai";
+import { ChatModelResolver } from "@modules/llm/chat-model.resolver";
 import { AiAnalysisChatDto } from "./ai-analysis.dto";
 
 /** Maximum number of rows returned from a single ClickHouse query to prevent abuse. */
 const MAX_QUERY_ROWS = 500;
+
+/**
+ * Consumer scope of the unified LLM provider (ADR-005). The active model for
+ * this scope is configured on the LLM models admin page.
+ */
+const AI_ANALYSIS_MODEL_SCOPE = "ai-analysis";
+
+/** Hard timeout for a single model call (query plan or post-query analysis). */
+const MODEL_CALL_TIMEOUT_MS = 120_000;
 
 /** Maximum number of rows per query result included in the post-query analysis context. */
 const MAX_ANALYSIS_ROWS_PER_QUERY = 20;
@@ -60,38 +68,12 @@ const FORBIDDEN_KEYWORDS =
 @Injectable()
 export class AiAnalysisService {
   private readonly logger = new Logger(AiAnalysisService.name);
-  private client: OpenAI | null = null;
 
   constructor(
-    private readonly configService: ConfigService,
     private readonly prisma: PrismaService,
     private readonly clickhouse: ClickhouseService,
-  ) {
-    // DeepSeek exposes an OpenAI-compatible API. A missing key must not crash
-    // the whole application at startup — AI analysis is an optional feature.
-    const apiKey = this.configService.get<string>("modules.backendMonitor.deepseekKey");
-    if (!apiKey) {
-      this.logger.warn(
-        "modules.backendMonitor.deepseekKey is not configured; AI analysis endpoints will be unavailable.",
-      );
-      return;
-    }
-    this.client = new OpenAI({
-      apiKey,
-      baseURL: "https://api.deepseek.com",
-    });
-  }
-
-  /**
-   * Returns the initialized OpenAI client or throws a business error when the
-   * DeepSeek key is not configured for this deployment.
-   */
-  private requireClient(): OpenAI {
-    if (!this.client) {
-      throw new BadRequestException("AI analysis is not available: DeepSeek key is not configured.");
-    }
-    return this.client;
-  }
+    private readonly chatModels: ChatModelResolver,
+  ) {}
 
   /**
    * Validates that the application exists in the database by its ID.
@@ -175,7 +157,7 @@ export class AiAnalysisService {
   }
 
   /**
-   * Builds the system prompt that instructs DeepSeek how to behave as a data analyst.
+   * Builds the system prompt that instructs the model how to behave as a data analyst.
    * This prompt is comprehensive and covers:
    *   - Language rules
    *   - Table schema
@@ -287,18 +269,18 @@ Example 5 — Specific date filter (April 21):
    * Flow:
    * 1. Validate the application token
    * 2. Emit a "status" event so the frontend shows a progress indicator
-   * 3. Call DeepSeek (non-streaming internally) to get the full query plan JSON
+   * 3. Call the model (non-streaming internally) to get the full query plan JSON
    * 4. Parse JSON blocks, execute SQL, and emit resolved blocks one by one
    * 5. For text blocks, stream content word-by-word for a typing effect
    * 6. After all blocks are processed, collect the real query results and make
-   *    a second streaming DeepSeek call to generate a data-backed insight summary
+   *    a second streaming model call to generate a data-backed insight summary
    *    (the "post-query analysis" pass using real numbers from the database)
    */
   async chatStream(dto: AiAnalysisChatDto, emit: AiAnalysisEmit): Promise<void> {
     // Step 1: Validate application ID
     await this.resolveApplication(dto.applicationId);
 
-    // Step 2: Build messages for DeepSeek
+    // Step 2: Build messages for the model
     const messages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       { role: "system", content: this.buildSystemPrompt(dto.applicationId) },
     ];
@@ -312,7 +294,7 @@ Example 5 — Specific date filter (April 21):
 
     messages.push({ role: "user", content: dto.message });
 
-    // Step 3: Call DeepSeek (non-streaming). A keepalive timer fires every
+    // Step 3: Call the model (non-streaming). A keepalive timer fires every
     // 15 s to send SSE comment lines so the HTTP connection stays open while
     // we wait for the full response.
     emit("status", { phase: "thinking" });
@@ -320,18 +302,16 @@ Example 5 — Specific date filter (April 21):
     let fullContent = "";
     const keepaliveTimer = setInterval(() => emit("__keepalive__", null), 15000);
     try {
-      const completion = await this.requireClient().chat.completions.create(
-        {
-          model: "deepseek-v4-flash",
-          messages,
-          temperature: 0.1,
-          max_tokens: 4000,
-        },
-        { timeout: 120000 }, // 2 minute hard timeout passed as RequestOptions
-      );
-      fullContent = completion.choices[0]?.message?.content?.trim() ?? "";
+      const model = await this.chatModels.resolve(AI_ANALYSIS_MODEL_SCOPE);
+      const result = await model.complete({
+        messages,
+        temperature: 0.1,
+        maxTokens: 4000,
+        timeoutMs: MODEL_CALL_TIMEOUT_MS,
+      });
+      fullContent = result.text.trim();
     } catch (error) {
-      this.logger.error("DeepSeek API call failed", error);
+      this.logger.error("LLM call failed", error);
       emit("block", { type: "text", text: "Sorry, AI service is currently unavailable. Please try again later." });
       return;
     } finally {
@@ -561,7 +541,7 @@ P95 Response Time:
    *
    * After all chart/table SQL queries have been executed and their results
    * emitted to the frontend, this method makes a second (streaming) call to
-   * DeepSeek with the actual query result data. This allows the AI to write
+   * the model with the actual query result data. This allows the AI to write
    * a concrete analysis with real numbers instead of the qualitative-only text
    * produced in the first pass.
    *
@@ -597,18 +577,15 @@ P95 Response Time:
       emit("analysis-start", {});
 
       // Use streaming for the analysis call to give the user real-time feedback.
-      const stream = await this.requireClient().chat.completions.create({
-        model: "deepseek-v4-flash",
+      const model = await this.chatModels.resolve(AI_ANALYSIS_MODEL_SCOPE);
+      for await (const chunk of model.stream({
         messages: analysisMessages,
         temperature: 0.2,
-        max_tokens: 1200,
-        stream: true,
-      });
-
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content;
-        if (content) {
-          emit("analysis-token", { content });
+        maxTokens: 1200,
+        timeoutMs: MODEL_CALL_TIMEOUT_MS,
+      })) {
+        if (chunk.type === "text-delta" && chunk.text) {
+          emit("analysis-token", { content: chunk.text });
         }
       }
 

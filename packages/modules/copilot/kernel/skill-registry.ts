@@ -13,7 +13,7 @@ import {
   type SkillResult,
   type SkillResultKind,
 } from "./skill";
-import type { ToolSpecification } from "./chat-model.port";
+import type { ToolSpecification } from "@modules/llm/chat-model.port";
 
 /** Minimal logging seam so the kernel never imports NestJS logging types. */
 export interface KernelLogger {

@@ -1,4 +1,4 @@
-import type { ChatModelPort } from "./chat-model.port";
+import type { ChatModelPort } from "@modules/llm/chat-model.port";
 
 /**
  * Server-injected execution context handed to every skill invocation.

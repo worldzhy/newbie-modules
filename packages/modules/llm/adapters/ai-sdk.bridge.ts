@@ -1,13 +1,22 @@
 /**
  * Shared Vercel AI SDK v6 plumbing for every ChatModelPort adapter.
  *
- * This is the ONLY file under model/adapters allowed to import the `ai`
- * core package; concrete adapters import their own provider package
+ * This is the ONLY file under adapters allowed to import the `ai` core
+ * package; concrete adapters import their own provider package
  * (e.g. @ai-sdk/openai-compatible, @ai-sdk/anthropic) and hand the
  * constructed LanguageModel to createSdkChatModel. If the SDK is replaced,
  * this file plus the adapter factories are all that needs to change.
  */
-import { APICallError, type LanguageModel, type ModelMessage, generateText, jsonSchema, streamText } from "ai";
+import {
+  APICallError,
+  defaultSettingsMiddleware,
+  wrapLanguageModel,
+  type LanguageModel,
+  type ModelMessage,
+  generateText,
+  jsonSchema,
+  streamText,
+} from "ai";
 import {
   ChatMessage,
   ChatModelPort,
@@ -20,30 +29,60 @@ import {
   ModelToolCall,
   ModelUsage,
   ToolSpecification,
-} from "../../kernel/chat-model.port";
+} from "../chat-model.port";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
+
+export interface SdkChatModelOptions {
+  /**
+   * Whether the underlying provider honors OpenAI-style JSON mode
+   * (`response_format: { type: "json_object" }`). When false, a request with
+   * `responseFormat: "json"` is rejected with a "bad-request" ModelCallError
+   * instead of silently degrading to free-form text.
+   */
+  supportsJsonResponseFormat?: boolean;
+}
 
 /**
  * Wraps an AI SDK LanguageModel (already bound to a concrete provider,
  * endpoint and credentials) in the provider-neutral ChatModelPort.
- * `modelRecordId` is optional metadata enabling the kernel health seam.
  */
 export function createSdkChatModel(
   modelId: string,
   languageModel: LanguageModel,
-  modelRecordId?: string,
+  options?: SdkChatModelOptions,
 ): ChatModelPort {
+  const supportsJson = options?.supportsJsonResponseFormat ?? false;
+
+  /**
+   * JSON mode is injected through the SDK's default-settings middleware:
+   * openai-compatible providers map `{ type: "json" }` (no schema) onto
+   * `response_format: { type: "json_object" }` upstream.
+   */
+  const modelFor = (request: ChatRequest): LanguageModel =>
+    request.responseFormat === "json"
+      ? wrapLanguageModel({
+          model: languageModel,
+          middleware: defaultSettingsMiddleware({ settings: { responseFormat: { type: "json" } } }),
+        })
+      : languageModel;
+
+  const requireJsonSupport = (request: ChatRequest): void => {
+    if (request.responseFormat === "json" && !supportsJson) {
+      throw new ModelCallError("bad-request", `Model "${modelId}" does not support responseFormat "json".`);
+    }
+  };
+
   return {
     modelId,
-    ...(modelRecordId ? { modelRecordId } : {}),
 
     async complete(request: ChatRequest): Promise<ChatResult> {
+      requireJsonSupport(request);
       const { system, messages } = splitSystem(request.messages);
       const deadline = withTimeout(request.signal, request.timeoutMs ?? DEFAULT_TIMEOUT_MS);
       try {
         const result = await generateText({
-          model: languageModel,
+          model: modelFor(request),
           ...(system ? { system } : {}),
           messages,
           ...(request.tools?.length ? { tools: toSdkTools(request.tools) } : {}),
@@ -59,6 +98,7 @@ export function createSdkChatModel(
           finishReason: mapFinishReason(String(result.finishReason)),
         };
       } catch (error) {
+        if (error instanceof ModelCallError) throw error;
         throw classifyError(error, deadline);
       } finally {
         deadline.cleanup();
@@ -66,11 +106,12 @@ export function createSdkChatModel(
     },
 
     async *stream(request: ChatRequest): AsyncIterable<ModelStreamChunk> {
+      requireJsonSupport(request);
       const { system, messages } = splitSystem(request.messages);
       const deadline = withTimeout(request.signal, request.timeoutMs ?? DEFAULT_TIMEOUT_MS);
       try {
         const result = streamText({
-          model: languageModel,
+          model: modelFor(request),
           ...(system ? { system } : {}),
           messages,
           ...(request.tools?.length ? { tools: toSdkTools(request.tools) } : {}),

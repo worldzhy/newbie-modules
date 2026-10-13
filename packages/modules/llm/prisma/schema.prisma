@@ -1,15 +1,18 @@
 // !! ------------------------------------------------------------ //
-// !!            [Module] Copilot models                     //
+// !!            [Module] LLM models                               //
 // !! ------------------------------------------------------------ //
-// * CopilotModel (AI model configuration for the Copilot agent)   //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+// * LlmModel (unified LLM model configuration, one active per scope) //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// Web Copilot model configuration. The Copilot module owns its own Postgres
-// schema; the single-active guarantee lives in a partial unique index
-// (Postgres WHERE clause) that is created by the host-side migration that
-// renames the legacy "copilot" schema to "module/copilot".
-model CopilotModel {
+// Unified LLM model configuration (ADR-005). The LLM module owns its own
+// Postgres schema; the per-scope single-active guarantee lives in a partial
+// unique index (Postgres WHERE clause) created by the host-side migration
+// that moves the legacy CopilotModel table into "module/llm" as LlmModel.
+model LlmModel {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Opaque consumer scope, e.g. "copilot", "ai-analysis", "jdy". Consumers
+  // hardcode their own constant; activation is unique per scope.
+  scope     String   @db.VarChar(64)
   name      String   @db.VarChar(255)
   // Wire protocol: "openai-compatible" or "anthropic". Kept as a string so
   // a future provider kind does not require an enum migration.
@@ -20,9 +23,9 @@ model CopilotModel {
   baseUrl   String   @db.VarChar(255)
   apiKey    String   @db.VarChar(500)
   isActive  Boolean  @default(false)
-  // Current-state snapshot of the last model-call outcome (any transport;
-  // web SSE and Lark share one kernel runner). History lives in the audit
-  // stream; the UI surfaces only this fold. Null = never called.
+  // Current-state snapshot of the last model-call outcome (any consumer).
+  // History lives in the audit stream; the UI surfaces only this fold.
+  // Null = never called.
   lastCallAt          DateTime?
   lastCallSuccess     Boolean?
   lastFailureCategory String? @db.VarChar(20)
@@ -30,5 +33,5 @@ model CopilotModel {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@schema("module/copilot")
+  @@schema("module/llm")
 }

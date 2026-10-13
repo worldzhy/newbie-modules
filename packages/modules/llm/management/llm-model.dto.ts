@@ -1,8 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsIn, IsNotEmpty, IsOptional, IsString, IsUrl, MaxLength, ValidateIf } from "class-validator";
-import { ANTHROPIC_PROVIDER, COPILOT_PROVIDERS } from "./copilot-providers";
+import { ANTHROPIC_PROVIDER, LLM_PROVIDERS } from "./llm-providers";
 
-export class CreateCopilotModelDto {
+export class CreateLlmModelDto {
+  @ApiProperty({
+    description: 'Consumer scope this model serves, e.g. "copilot", "ai-analysis", "jdy". Immutable after creation.',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(64)
+  scope: string;
+
   @ApiProperty({ description: "User-friendly display name for this model" })
   @IsString()
   @IsNotEmpty()
@@ -10,13 +18,13 @@ export class CreateCopilotModelDto {
   name: string;
 
   @ApiPropertyOptional({
-    enum: COPILOT_PROVIDERS,
+    enum: LLM_PROVIDERS,
     default: "openai-compatible",
     description: "Wire protocol: openai-compatible chat completions or the Anthropic Messages API",
   })
   @IsString()
   @IsOptional()
-  @IsIn(COPILOT_PROVIDERS)
+  @IsIn(LLM_PROVIDERS)
   provider?: string;
 
   @ApiProperty({ description: "Upstream model identifier, e.g. deepseek-chat, qwen-plus" })
@@ -45,7 +53,7 @@ export class CreateCopilotModelDto {
   apiKey: string;
 }
 
-export class UpdateCopilotModelDto {
+export class UpdateLlmModelDto {
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
@@ -53,10 +61,10 @@ export class UpdateCopilotModelDto {
   @MaxLength(255)
   name?: string;
 
-  @ApiPropertyOptional({ enum: COPILOT_PROVIDERS })
+  @ApiPropertyOptional({ enum: LLM_PROVIDERS })
   @IsString()
   @IsOptional()
-  @IsIn(COPILOT_PROVIDERS)
+  @IsIn(LLM_PROVIDERS)
   provider?: string;
 
   @ApiPropertyOptional()
@@ -89,14 +97,17 @@ export class UpdateCopilotModelDto {
   apiKey?: string;
 }
 
-export class CopilotModelResponseDto {
+export class LlmModelResponseDto {
   @ApiProperty()
   id: string;
+
+  @ApiProperty({ description: 'Consumer scope this model serves, e.g. "copilot"' })
+  scope: string;
 
   @ApiProperty()
   name: string;
 
-  @ApiProperty({ enum: COPILOT_PROVIDERS })
+  @ApiProperty({ enum: LLM_PROVIDERS })
   provider: string;
 
   @ApiProperty()
@@ -110,13 +121,13 @@ export class CopilotModelResponseDto {
   })
   apiKey: string;
 
-  @ApiProperty()
+  @ApiProperty({ description: "At most one record per scope is active" })
   isActive: boolean;
 
   @ApiPropertyOptional({
     type: Date,
     nullable: true,
-    description: "When the last model call (any transport) was attempted; null = never called",
+    description: "When the last model call (any consumer) was attempted; null = never called",
   })
   lastCallAt?: Date | null;
 
@@ -148,7 +159,7 @@ export class CopilotModelResponseDto {
   updatedAt: Date;
 }
 
-export class ActivateCopilotModelResponseDto {
+export class ActivateLlmModelResponseDto {
   @ApiProperty()
   success: boolean;
 
@@ -156,7 +167,7 @@ export class ActivateCopilotModelResponseDto {
   activeModelId: string;
 }
 
-export class TestCopilotModelResponseDto {
+export class TestLlmModelResponseDto {
   @ApiProperty({ description: "Whether the minimal chat completion request succeeded" })
   success: boolean;
 

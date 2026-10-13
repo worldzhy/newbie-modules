@@ -7,17 +7,9 @@
     "className": "BackendMonitorModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["clickhouse", "security"],
-  "config-service": {
-    "backendMonitor": {
-      "deepseekKey": "process.env.BACKEND_MONITOR_DEEPSEEK_KEY"
-    }
-  },
-  "env": {
-    "BACKEND_MONITOR_DEEPSEEK_KEY": ""
-  },
-  "dependencies": {
-    "openai": "^6.34.0"
-  },
+  "moduleDependencies": ["clickhouse", "security", "llm"],
+  "config-service": {},
+  "env": {},
+  "dependencies": {},
   "devDependencies": {}
 }

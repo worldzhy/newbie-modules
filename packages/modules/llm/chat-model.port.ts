@@ -1,9 +1,9 @@
 /**
- * Provider-neutral chat model port for the Copilot agent kernel.
+ * Provider-neutral chat model port for the unified LLM provider module.
  *
- * Everything in the kernel (runner, skills, sessions) depends on this
- * interface, never on a concrete SDK. The AI SDK implementation lives in a
- * single adapter file and can be replaced without touching kernel logic.
+ * Every model consumer (copilot agent kernel, ai-analysis, jdy, ...) depends
+ * on this interface, never on a concrete SDK. The AI SDK implementation lives
+ * in a single adapter file and can be replaced without touching consumers.
  */
 
 export type ChatRole = "system" | "user" | "assistant" | "tool";
@@ -11,7 +11,7 @@ export type ChatRole = "system" | "user" | "assistant" | "tool";
 export interface ModelToolCall {
   id: string;
   name: string;
-  /** Raw JSON arguments as emitted by the model. The runner parses and validates. */
+  /** Raw JSON arguments as emitted by the model. The consumer parses and validates. */
   arguments: string;
 }
 
@@ -54,6 +54,12 @@ export interface ChatRequest {
   tools?: ToolSpecification[];
   temperature?: number;
   maxTokens?: number;
+  /**
+   * "json" asks the upstream provider for JSON-mode output (OpenAI-compatible
+   * `response_format: { type: "json_object" }`). Adapters that cannot honor it
+   * reject the call with a ModelCallError of category "bad-request".
+   */
+  responseFormat?: "json";
   /** Default timeout is applied by the adapter when omitted. */
   timeoutMs?: number;
   /** Cancellation propagates to the upstream HTTP request. */
@@ -75,19 +81,13 @@ export type ModelStreamChunk =
 export interface ChatModelPort {
   /** Human-readable provider/model identifier for audit logs. */
   readonly modelId: string;
-  /**
-   * Optional persistence id of the model configuration record backing this
-   * port. Present when the model source is a database record; the kernel
-   * health seam keys on it. Stateless model sources omit it.
-   */
-  readonly modelRecordId?: string;
   complete(request: ChatRequest): Promise<ChatResult>;
   stream(request: ChatRequest): AsyncIterable<ModelStreamChunk>;
 }
 
 export type ModelErrorCategory = "timeout" | "aborted" | "auth" | "rate-limit" | "bad-request" | "payment" | "upstream";
 
-/** Normalized failure so transports never inspect SDK-specific error shapes. */
+/** Normalized failure so consumers never inspect SDK-specific error shapes. */
 export class ModelCallError extends Error {
   constructor(
     readonly category: ModelErrorCategory,
@@ -99,10 +99,10 @@ export class ModelCallError extends Error {
   }
 }
 
-/** Raised when the admin has not configured an active Copilot model. */
+/** Raised when no active model is configured for the requesting scope. */
 export class NoActiveModelError extends Error {
-  constructor() {
-    super("No active Copilot model is configured.");
+  constructor(readonly scope: string) {
+    super(`No active LLM model is configured for scope "${scope}".`);
     this.name = "NoActiveModelError";
   }
 }

@@ -1,0 +1,18 @@
+{
+  "key": "llm",
+  "layer": "foundation",
+  "module": {
+    "file": "llm.module",
+    "className": "LlmModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": [],
+  "config-service": {},
+  "env": {},
+  "dependencies": {
+    "ai": "^6.0.301",
+    "@ai-sdk/openai-compatible": "^2.0.81",
+    "@ai-sdk/anthropic": "^3.0.128"
+  },
+  "devDependencies": {}
+}

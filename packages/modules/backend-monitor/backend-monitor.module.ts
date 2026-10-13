@@ -16,8 +16,9 @@ import { AiAnalysisService } from "./ai-analysis/ai-analysis.service";
  * table instead of reading application.Agent/SERVER_MONITOR), and stores
  * them in ClickHouse. Query endpoints back the monitoring UI's request/error
  * log lists. The ai-analysis sub-feature lets users chat with an LLM
- * (DeepSeek, OpenAI-compatible) that generates ClickHouse SQL against those
- * same tables and streams back chart/table blocks plus an insight summary.
+ * (resolved from the unified llm module under the "ai-analysis" scope) that
+ * generates ClickHouse SQL against those same tables and streams back
+ * chart/table blocks plus an insight summary.
  *
  * ClickHouse DDL lives in the consuming project's clickhouse/migrations
  * directory (ClickHouse has no migration runner).

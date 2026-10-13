@@ -1,5 +1,5 @@
 /**
- * Chat provider protocols supported by the Copilot model config.
+ * Chat provider protocols supported by the LLM model registry.
  *
  * A provider is a wire protocol, not a vendor: every OpenAI-compatible
  * vendor (DeepSeek, Qwen, Kimi, gateways) is one record under
@@ -8,7 +8,7 @@
 export const OPENAI_COMPATIBLE_PROVIDER = "openai-compatible";
 export const ANTHROPIC_PROVIDER = "anthropic";
 
-export const COPILOT_PROVIDERS = [OPENAI_COMPATIBLE_PROVIDER, ANTHROPIC_PROVIDER] as const;
+export const LLM_PROVIDERS = [OPENAI_COMPATIBLE_PROVIDER, ANTHROPIC_PROVIDER] as const;
 
 /** Official Anthropic endpoint, used when a record leaves baseUrl empty. */
 export const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
