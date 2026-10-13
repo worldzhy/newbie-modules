@@ -6,7 +6,7 @@
     "className": "LlmModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": [],
+  "moduleDependencies": ["security"],
   "config-service": {},
   "env": {},
   "dependencies": {

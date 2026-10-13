@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import {
   ActivateLlmModelResponseDto,
   CreateLlmModelDto,
@@ -10,10 +12,13 @@ import {
 import { LlmModelService } from "./llm-model.service";
 
 /**
- * Admin endpoints for the unified LLM model registry. Authorization follows
- * the existing model-management precedent: the global authentication guard
- * requires a logged-in session, while route-level admin permission is managed
- * by the frontend navigation and the platform-wide authorization guards.
+ * Admin endpoints for the unified LLM model registry.
+ *
+ * Read access to GET /llm/models is granted to any authenticated session
+ * (API keys are masked; dock header and model-health dot depend on this).
+ * Write endpoints require the ADMIN role via the global AuthorizationGuard
+ * (AccountPermissionAuthorizer grants all permissions to ADMINs; other
+ * actors would need an explicit Permission row on LlmModel).
  */
 @ApiTags("LLM Model Admin")
 @ApiBearerAuth()
@@ -29,6 +34,7 @@ export class LlmModelController {
   }
 
   @Post()
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.LlmModel)
   @ApiOperation({ summary: "Create an LLM model for a scope (inactive until activated)" })
   @ApiBody({ type: CreateLlmModelDto })
   @ApiResponse({ status: 201, type: LlmModelResponseDto })
@@ -37,6 +43,7 @@ export class LlmModelController {
   }
 
   @Patch(":id")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.LlmModel)
   @ApiOperation({ summary: "Update an LLM model; echoing the masked key keeps it unchanged" })
   @ApiBody({ type: UpdateLlmModelDto })
   @ApiResponse({ status: 200, type: LlmModelResponseDto })
@@ -45,6 +52,7 @@ export class LlmModelController {
   }
 
   @Delete(":id")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.LlmModel)
   @ApiOperation({ summary: "Delete an LLM model (the active one of its scope cannot be deleted)" })
   @ApiResponse({ status: 200, type: LlmModelResponseDto })
   async remove(@Param("id") id: string): Promise<LlmModelResponseDto> {
@@ -52,6 +60,7 @@ export class LlmModelController {
   }
 
   @Post(":id/activate")
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.LlmModel)
   @ApiOperation({ summary: "Make this model the active LLM model for its scope" })
   @ApiResponse({ status: 201, type: ActivateLlmModelResponseDto })
   async activate(@Param("id") id: string): Promise<ActivateLlmModelResponseDto> {
@@ -59,6 +68,7 @@ export class LlmModelController {
   }
 
   @Post(":id/test")
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.LlmModel)
   @ApiOperation({ summary: "Test model connectivity with a minimal chat completion request" })
   @ApiResponse({ status: 200, type: TestLlmModelResponseDto })
   async test(@Param("id") id: string): Promise<TestLlmModelResponseDto> {
