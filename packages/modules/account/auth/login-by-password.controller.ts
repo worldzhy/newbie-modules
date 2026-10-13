@@ -52,7 +52,7 @@ export class LoginByPasswordController {
     // Reset the per-IP login rate limit only when the login completed. An MFA
     // challenge keeps the limits — login is not complete until the TOTP step
     // succeeds.
-    if (!loginResult.multiFactorRequired) {
+    if (!("totpToken" in loginResult)) {
       await this.limitLoginByIpService.delete(ipAddress);
     }
 

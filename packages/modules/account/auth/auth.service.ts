@@ -281,7 +281,7 @@ export class AuthService {
     ipAddress: string;
     userAgent: string;
     response: Response;
-  }): Promise<{ token: string; tokenExpiresInSeconds: number }> {
+  }): Promise<LoginResult> {
     const email = params.email.toLowerCase();
     let user = await this.prisma.user.findUnique({ where: { email } });
 
