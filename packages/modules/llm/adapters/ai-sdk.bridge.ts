@@ -11,12 +11,15 @@ import {
   APICallError,
   defaultSettingsMiddleware,
   wrapLanguageModel,
-  type LanguageModel,
   type ModelMessage,
   generateText,
   jsonSchema,
   streamText,
 } from "ai";
+// wrapLanguageModel is v3-spec only; both provider packages already return
+// LanguageModelV3, so the bridge narrows to it instead of the SDK's
+// string-or-v2-or-v3 `LanguageModel` union.
+import type { LanguageModelV3 } from "@ai-sdk/provider";
 import {
   ChatMessage,
   ChatModelPort,
@@ -49,7 +52,7 @@ export interface SdkChatModelOptions {
  */
 export function createSdkChatModel(
   modelId: string,
-  languageModel: LanguageModel,
+  languageModel: LanguageModelV3,
   options?: SdkChatModelOptions,
 ): ChatModelPort {
   const supportsJson = options?.supportsJsonResponseFormat ?? false;
@@ -59,7 +62,7 @@ export function createSdkChatModel(
    * openai-compatible providers map `{ type: "json" }` (no schema) onto
    * `response_format: { type: "json_object" }` upstream.
    */
-  const modelFor = (request: ChatRequest): LanguageModel =>
+  const modelFor = (request: ChatRequest): LanguageModelV3 =>
     request.responseFormat === "json"
       ? wrapLanguageModel({
           model: languageModel,
