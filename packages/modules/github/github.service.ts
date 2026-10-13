@@ -90,6 +90,31 @@ export class GitHubService {
   }
 
   /**
+   * Deterministic HTTPS clone URL for a repo that will be (or has been)
+   * created under `org`. The target URL has no random component — org comes
+   * from configuration and the repo name is fixed at application creation —
+   * so callers can persist it before the GitHub orchestration confirms the
+   * repo. Shape matches GitHub's own `clone_url` (`https://github.com/o/r.git`).
+   */
+  buildCloneUrl(org: string, repo: string): string {
+    return `https://github.com/${org}/${repo}.git`;
+  }
+
+  /**
+   * Parse a GitHub repository URL into `{ owner, repo }`. Accepts the HTTPS
+   * and SSH forms, with or without a trailing `.git`/slash:
+   *   https://github.com/<owner>/<repo>(.git)(/)
+   *   git@github.com:<owner>/<repo>(.git)
+   * Returns null for anything else (non-GitHub hosts, deeper paths, garbage).
+   * Single parsing entry point for template URLs, provisioning and dep-scan.
+   */
+  parseGitHubUrl(url: string): { owner: string; repo: string } | null {
+    const match = url.trim().match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
+    if (!match) return null;
+    return { owner: match[1], repo: match[2] };
+  }
+
+  /**
    * Ensure a private repo exists under `org` named `name`, generated from the
    * template `(tplOwner, tplRepo)`. Idempotent:
    *   - GET repo → 200: skip, return existing clone_url.

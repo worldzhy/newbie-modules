@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { DependencyScan, DependencyScanFinding, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { GitHubService } from "@modules/github/github.service";
+import { isRepositoryAccessible } from "@modules/github/repository-access";
 
 type Severity = "critical" | "high" | "medium" | "low" | "unknown";
 
@@ -63,7 +64,21 @@ export class DependencyScanService {
 
   async startApplicationScan(applicationId: string) {
     const application = await this.ensureApplicationExists(applicationId);
-    if (!application.repositoryUrl) {
+    // Gate on accessibility, not on repositoryUrl alone (ADR-008): a mode-A
+    // row persists its target URL while the repo is still being created, and
+    // a FAILED row's URL may point at an external same-name repo. The
+    // predicate decides; provisioningStatus below only shapes the message.
+    if (!isRepositoryAccessible(application)) {
+      if (application.provisioningStatus === "PROVISIONING") {
+        throw new ConflictException(
+          `Repository for application ${application.name} is still being provisioned. Start the scan once setup is complete.`,
+        );
+      }
+      if (application.provisioningStatus === "FAILED") {
+        throw new ConflictException(
+          `Repository provisioning for application ${application.name} failed. Retry provisioning or tear the application down before scanning.`,
+        );
+      }
       throw new BadRequestException(
         `Application ${application.name} does not have a repository URL configured. Set it up in the application settings first.`,
       );
@@ -149,12 +164,17 @@ export class DependencyScanService {
       const latestSuccessfulScan = applicationScans.find((scan) => scan.status === "SUCCESS");
       const latestFailedScan = applicationScans.find((scan) => scan.status === "FAILED");
 
+      // PROVISIONING/FAILED rows carry a target URL that must not be presented
+      // as a configured, scannable repository (ADR-008); the report UI's
+      // "No repository URL configured" branch takes over for them.
+      const repositoryReady = isRepositoryAccessible(application);
+
       return {
         applicationId: application.id,
         applicationName: application.name,
         applicationType: application.type,
-        repositoryUrl: application.repositoryUrl,
-        hasRepository: Boolean(application.repositoryUrl),
+        repositoryUrl: repositoryReady ? application.repositoryUrl : null,
+        hasRepository: repositoryReady,
         currentScan: currentScan ? this.serializeScan(currentScan) : null,
         latestSuccessfulScan: latestSuccessfulScan ? this.serializeScan(latestSuccessfulScan) : null,
         latestFailedScan: latestFailedScan ? this.serializeScan(latestFailedScan) : null,
@@ -304,7 +324,7 @@ export class DependencyScanService {
     projectId: string;
     repositoryUrl: string | null;
   }) {
-    const repository = this.parseGitHubRepo(application.repositoryUrl!);
+    const repository = this.gitHubService.parseGitHubUrl(application.repositoryUrl!);
     if (!repository) {
       throw new Error(`Repository URL is not a supported GitHub URL: ${application.repositoryUrl}`);
     }
@@ -574,14 +594,6 @@ export class DependencyScanService {
 
   private packageKey(pkg: LockedPackage) {
     return `${pkg.name}@${pkg.version}`;
-  }
-
-  private parseGitHubRepo(repositoryUrl: string): { owner: string; repo: string } | null {
-    const match = repositoryUrl.trim().match(/github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
-    if (!match) {
-      return null;
-    }
-    return { owner: match[1], repo: match[2] };
   }
 
   private getErrorMessage(error: unknown): string {

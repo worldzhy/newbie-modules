@@ -81,6 +81,64 @@ describe("GitHubService.isConfigured", () => {
   });
 });
 
+describe("GitHubService.buildCloneUrl", () => {
+  it("builds the canonical HTTPS clone URL matching GitHub clone_url shape", () => {
+    const service = makeService(makeOctokitMock({}));
+    assert.equal(service.buildCloneUrl("acme", "atlas-api"), "https://github.com/acme/atlas-api.git");
+  });
+});
+
+describe("GitHubService.parseGitHubUrl", () => {
+  const service = makeService(makeOctokitMock({}));
+
+  it("parses HTTPS URLs without suffix", () => {
+    assert.deepEqual(service.parseGitHubUrl("https://github.com/acme/atlas-api"), {
+      owner: "acme",
+      repo: "atlas-api",
+    });
+  });
+
+  it("parses HTTPS URLs with .git suffix and/or trailing slash", () => {
+    assert.deepEqual(service.parseGitHubUrl("https://github.com/acme/atlas-api.git"), {
+      owner: "acme",
+      repo: "atlas-api",
+    });
+    assert.deepEqual(service.parseGitHubUrl("https://github.com/acme/atlas-api/"), {
+      owner: "acme",
+      repo: "atlas-api",
+    });
+    assert.deepEqual(service.parseGitHubUrl("https://github.com/acme/atlas-api.git/"), {
+      owner: "acme",
+      repo: "atlas-api",
+    });
+  });
+
+  it("parses SSH URLs", () => {
+    assert.deepEqual(service.parseGitHubUrl("git@github.com:acme/atlas-api.git"), {
+      owner: "acme",
+      repo: "atlas-api",
+    });
+    assert.deepEqual(service.parseGitHubUrl("git@github.com:acme/atlas-api"), {
+      owner: "acme",
+      repo: "atlas-api",
+    });
+  });
+
+  it("preserves dots inside repo names", () => {
+    assert.deepEqual(service.parseGitHubUrl("https://github.com/acme/atlas.api"), {
+      owner: "acme",
+      repo: "atlas.api",
+    });
+  });
+
+  it("returns null for non-GitHub hosts, deeper paths and garbage", () => {
+    assert.equal(service.parseGitHubUrl("https://gitlab.com/acme/atlas-api"), null);
+    assert.equal(service.parseGitHubUrl("https://github.com/acme/atlas-api/tree/main"), null);
+    assert.equal(service.parseGitHubUrl("not a url"), null);
+    assert.equal(service.parseGitHubUrl(""), null);
+  });
+});
+
 describe("GitHubService.ensureRepoExists", () => {
   it("returns existing clone_url without calling generate when repo already exists (idempotent)", async () => {
     const m = makeOctokitMock({
