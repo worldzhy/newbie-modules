@@ -1,13 +1,6 @@
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { ChatModelResolver } from "../chat-model.resolver";
-import { ModelCallError } from "../chat-model.port";
-import {
-  CreateLlmConnectionDto,
-  LlmConnectionResponseDto,
-  TestLlmConnectionResponseDto,
-  UpdateLlmConnectionDto,
-} from "./llm-connection.dto";
+import { CreateLlmConnectionDto, LlmConnectionResponseDto, UpdateLlmConnectionDto } from "./llm-connection.dto";
 
 export type LlmConnectionRecord = {
   id: string;
@@ -40,7 +33,6 @@ export interface ModelCallOutcome {
 }
 
 const FAILURE_MESSAGE_MAX_LENGTH = 500;
-const TEST_TIMEOUT_MS = 15_000;
 
 /**
  * LLM connection configuration (ADR-006). One row = one callable AI endpoint
@@ -51,10 +43,7 @@ const TEST_TIMEOUT_MS = 15_000;
 export class LlmConnectionService {
   private readonly logger = new Logger(LlmConnectionService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly resolver: ChatModelResolver,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Provider-level health fold (fire-and-forget): folds the latest model-call
@@ -142,36 +131,10 @@ export class LlmConnectionService {
       where: { id },
       include: { scopes: true },
     })) as LlmConnectionRecord & { scopes: Array<{ scope: string }> };
-    this.logger.log(`LLM connection deleted: ${id} (was bound by scopes: ${record.scopes.map((s) => s.scope).join(", ") || "none"})`);
+    this.logger.log(
+      `LLM connection deleted: ${id} (was bound by scopes: ${record.scopes.map((s) => s.scope).join(", ") || "none"})`,
+    );
     return this.toResponse(record);
-  }
-
-  /**
-   * Connectivity test through the same adapter path as consumer calls. The
-   * health decorator records the outcome, so a failed test updates the health
-   * snapshot immediately.
-   */
-  async test(id: string): Promise<TestLlmConnectionResponseDto> {
-    const connection = await this.requireConnection(id);
-
-    // Build a port for this specific connection (bypasses scope resolution),
-    // then run a minimal chat completion through it.
-    const port = await this.resolver.resolveById(id);
-    try {
-      await port.complete({
-        messages: [{ role: "user", content: "Hi" }],
-        maxTokens: 1,
-        timeoutMs: TEST_TIMEOUT_MS,
-      });
-      return { success: true, message: "Connection successful." };
-    } catch (error) {
-      if (error instanceof ModelCallError) {
-        return { success: false, message: testFailureMessage(error) };
-      }
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`LLM connection test failed for ${connection.id}: ${message}`);
-      return { success: false, message };
-    }
   }
 
   /**
@@ -231,22 +194,4 @@ function maskApiKey(apiKey: string): string {
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, "");
-}
-
-/** Maps a ModelCallError from the test call to a user-facing message. */
-function testFailureMessage(error: ModelCallError): string {
-  switch (error.category) {
-    case "timeout":
-      return `Connection timed out after ${TEST_TIMEOUT_MS / 1000}s.`;
-    case "auth":
-      return "Authentication failed: the API key was rejected (401/403).";
-    case "rate-limit":
-      return "Rate limited by the upstream provider (429); try again later.";
-    case "payment":
-      return `Payment/quota issue: ${error.message}`;
-    case "bad-request":
-      return `The upstream provider rejected the request: ${error.message}`;
-    default:
-      return error.message || "The upstream model API returned an error.";
-  }
 }
