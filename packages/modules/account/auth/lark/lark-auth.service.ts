@@ -8,9 +8,11 @@ import { SessionService } from "@modules/account/modules/session/session.service
 import { TokenService } from "@modules/security/token/token.service";
 import { CookieService } from "@modules/security/cookie/cookie.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
+import { TwoFactorService } from "@modules/account/modules/two-factor/two-factor.service";
 import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "@modules/account/auth/login-audit";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
+import { LoginResult } from "@modules/account/account.interface";
 
 const FEISHU_AUTHORIZE_URL = "https://accounts.feishu.cn/open-apis/authen/v1/authorize";
 
@@ -54,6 +56,7 @@ export class LarkAuthService {
     private readonly cookieService: CookieService,
     private readonly approvedSubnetService: ApprovedSubnetService,
     private readonly auditLogService: AuditLogService,
+    private readonly twoFactorService: TwoFactorService,
   ) {}
 
   private get appId(): string {
@@ -156,7 +159,7 @@ export class LarkAuthService {
     ipAddress: string;
     userAgent: string;
     response: Response;
-  }): Promise<{ token: string; tokenExpiresInSeconds: number }> {
+  }): Promise<LoginResult> {
     const { openId, unionId, email, phone, displayName, avatarUrl, ipAddress, userAgent, response } = params;
 
     // [step 1] openId lookup — the primary SSO handle.
@@ -244,6 +247,13 @@ export class LarkAuthService {
         },
       });
     }
+
+    // [step 3.5] Account-level TOTP gate. Lark OAuth bypasses the email-
+    // verification and location eligibility gates by design, but the
+    // account-level second factor applies to every channel; the client
+    // completes the challenge through /auth/login-by-totp.
+    const mfaChallenge = await this.twoFactorService.evaluateLoginMfaGate(user.id);
+    if (mfaChallenge) return mfaChallenge;
 
     // [step 4] Issue the session. Lark OAuth has already proven identity, so
     // the email-verification and location gates are bypassed (same as the

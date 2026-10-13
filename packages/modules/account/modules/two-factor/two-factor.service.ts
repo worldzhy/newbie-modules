@@ -7,7 +7,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { TokenService } from "@modules/security/token/token.service";
 import { TokenSubject } from "@modules/security/token/token.constants";
-import { MfaTokenPayload } from "../../account.interface";
+import { MfaTokenPayload, TotpTokenResponse } from "../../account.interface";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "../../auth/login-audit";
 
@@ -129,6 +129,25 @@ export class TwoFactorService {
       payload,
       options: { subject: TokenSubject.MULTI_FACTOR_TOKEN, expiresIn: MULTI_FACTOR_TOKEN_TTL_SECONDS },
     });
+  }
+
+  /**
+   * Account-level TOTP gate for login. Returns the MFA challenge payload when
+   * the user must complete TOTP before a session is issued, or null when the
+   * login may proceed. Every session-minting login path must call this gate
+   * exactly once (the shared AuthService.login() calls it internally; Lark and
+   * WeChat mint sessions directly and call it before generating the session) —
+   * the login-audit-coverage contract test enforces this. The TOTP challenge
+   * completion itself passes mfaVerified and skips the gate.
+   */
+  async evaluateLoginMfaGate(userId: string, mfaVerified = false): Promise<TotpTokenResponse | null> {
+    if (mfaVerified) return null;
+    if (!(await this.isTotpEnabled(userId))) return null;
+    return {
+      totpToken: this.issueMfaToken(userId),
+      type: MfaMethod.TOTP,
+      multiFactorRequired: true,
+    };
   }
 
   /**

@@ -41,7 +41,7 @@ export class LoginByGoogleController {
     @Res() response: Response,
     @Ip() ipAddress: string,
   ): Promise<void> {
-    const { token, tokenExpiresInSeconds } = await this.authService.loginByGoogle({
+    const loginResult = await this.authService.loginByGoogle({
       email: request.user.email,
       displayName: request.user.displayName,
       ipAddress,
@@ -49,10 +49,20 @@ export class LoginByGoogleController {
       response,
     });
 
+    const frontendUrl = this.config.getOrThrow<string>("framework.app.frontendUrl");
+
+    // A TOTP-enabled account receives the MFA challenge instead of a session;
+    // the client completes login at /auth/login-by-totp via the dedicated page.
+    if ("totpToken" in loginResult) {
+      response.redirect(
+        `${frontendUrl}/account/login/totp-callback#totpToken=${encodeURIComponent(loginResult.totpToken)}`,
+      );
+      return;
+    }
+
     // Redirect to the frontend landing page; the token travels in the URL hash
     // fragment, which browsers never send to servers and never write to logs.
-    const frontendUrl = this.config.getOrThrow<string>("framework.app.frontendUrl");
-    const hash = `#token=${encodeURIComponent(token)}&expiresIn=${tokenExpiresInSeconds}`;
+    const hash = `#token=${encodeURIComponent(loginResult.token)}&expiresIn=${loginResult.tokenExpiresInSeconds}`;
     response.redirect(`${frontendUrl}/account/login/google-callback${hash}`);
   }
 }

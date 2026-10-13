@@ -97,19 +97,30 @@ export class WechatUserResponseDto {
 /**
  * Response DTO for WeChat login.
  * Returns access token, refresh token, token expiry and the authenticated user.
+ * When the account has TOTP enabled, the MFA challenge fields are returned
+ * instead and the client completes login at /auth/login-by-totp.
  */
 export class WechatLoginResponseDto {
-  @ApiProperty({ type: String })
-  token: string;
+  @ApiPropertyOptional({ type: String })
+  token?: string;
 
-  @ApiProperty({ type: Number })
-  tokenExpiresInSeconds: number;
+  @ApiPropertyOptional({ type: Number })
+  tokenExpiresInSeconds?: number;
 
-  @ApiProperty({ type: String })
-  refreshToken: string;
+  @ApiPropertyOptional({ type: String })
+  refreshToken?: string;
 
-  @ApiProperty({ type: WechatUserResponseDto })
-  user: WechatUserResponseDto;
+  @ApiPropertyOptional({ type: WechatUserResponseDto })
+  user?: WechatUserResponseDto;
+
+  @ApiPropertyOptional({ description: "Short-lived MFA challenge token; returned only when MFA is required." })
+  totpToken?: string;
+
+  @ApiPropertyOptional({ enum: MfaMethod })
+  type?: MfaMethod;
+
+  @ApiPropertyOptional({ description: "True when a second authentication factor is required." })
+  multiFactorRequired?: boolean;
 }
 
 /**

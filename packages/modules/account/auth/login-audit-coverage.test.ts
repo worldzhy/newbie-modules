@@ -16,7 +16,7 @@ import { join } from "node:path";
  * that is the intended, reviewable way to extend this contract (see
  * trae-knowledge memory/user_profile.md, "工程治理").
  *
- * Two checks run per file:
+ * Three checks run per file:
  * 1. Rejection coverage — every rejection of an *already identified* account
  *    (UnauthorizedException/ForbiddenException/NewbieException/NotFoundException) must have a
  *    `recordLoginFailure`/`auditLogService.record` call within a few lines
@@ -26,6 +26,10 @@ import { join } from "node:path";
  *    "handshake" or "audit: not required" — silence is not an exemption.
  * 2. Success coverage — any file that mints a session directly via
  *    `sessionService.generate(` must also record `AuditEvent.LOGIN`.
+ * 3. TOTP gate coverage — any file that mints a session directly must pass
+ *    the account-level TOTP gate (`evaluateLoginMfaGate`, ADR-007) before
+ *    generating it, so enabling TOTP protects every login channel, not just
+ *    the ones routed through the shared AuthService.login().
  */
 
 const AUTH_DIR = __dirname;
@@ -48,6 +52,7 @@ const LOOKBACK_LINES = 8;
 
 const SUCCESS_SESSION_PATTERN = /sessionService\.generate\(/;
 const SUCCESS_AUDIT_PATTERN = /AuditEvent\.LOGIN\b/;
+const TOTP_GATE_PATTERN = /evaluateLoginMfaGate\(/;
 
 function readLines(relativePath: string): string[] {
   return readFileSync(join(AUTH_DIR, relativePath), "utf8").split("\n");
@@ -83,6 +88,17 @@ describe("login audit coverage contract", () => {
       assert.ok(
         SUCCESS_AUDIT_PATTERN.test(content),
         `${relativePath} calls sessionService.generate() but never records AuditEvent.LOGIN.`,
+      );
+    });
+
+    it(`${relativePath}: a directly-minted session passes the account-level TOTP gate`, () => {
+      const content = readLines(relativePath).join("\n");
+      if (!SUCCESS_SESSION_PATTERN.test(content)) return;
+      assert.ok(
+        TOTP_GATE_PATTERN.test(content),
+        `${relativePath} mints a session via sessionService.generate() but never calls ` +
+          `evaluateLoginMfaGate() — every session-minting login path must enforce the ` +
+          `account-level TOTP gate before generating the session (see ADR-007).`,
       );
     });
   }

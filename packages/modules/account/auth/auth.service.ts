@@ -22,6 +22,8 @@ import { Expose, expose } from "@modules/account/helpers/expose";
 import { verifyEmail } from "@modules/account/helpers/validator";
 import { GeolocationService } from "@modules/account/helpers/geolocation.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
+import { TwoFactorService } from "@modules/account/modules/two-factor/two-factor.service";
+import { LoginResult } from "@modules/account/account.interface";
 import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "./login-audit";
 import { SessionService } from "@modules/account/modules/session/session.service";
@@ -47,17 +49,35 @@ export class AuthService {
     private readonly geolocationService: GeolocationService,
     private readonly ses: AwsSesService,
     private readonly limitLoginByUserService: LimitLoginByUserService,
+    private readonly twoFactorService: TwoFactorService,
   ) {
     this.appFrontendUrl = this.config.getOrThrow("framework.app.frontendUrl");
   }
 
-  async login(params: { ipAddress: string; userAgent: string; userId: string; response: Response }) {
+  async login(params: {
+    ipAddress: string;
+    userAgent: string;
+    userId: string;
+    response: Response;
+    /**
+     * True only for the TOTP challenge completion (/auth/login-by-totp), where
+     * the second factor has just been verified and the gate must not loop.
+     */
+    mfaVerified?: boolean;
+  }): Promise<LoginResult> {
     // [step 0] Load the user once and check email verification plus login location.
     await this.checkLoginEligibility({
       userId: params.userId,
       ipAddress: params.ipAddress,
       userAgent: params.userAgent,
     });
+
+    // [step 0.5] Account-level TOTP gate. Sitting inside the shared login exit,
+    // it protects every channel routed through here (password, verification
+    // code, Google, approved-subnet); Lark and WeChat mint sessions directly
+    // and call the same gate from TwoFactorService before generating theirs.
+    const mfaChallenge = await this.twoFactorService.evaluateLoginMfaGate(params.userId, params.mfaVerified);
+    if (mfaChallenge) return mfaChallenge;
 
     // [step 1] Update last login time and generate a new session atomically.
     // Existing sessions are intentionally left intact: the platform supports

@@ -11,6 +11,17 @@ export interface TotpTokenResponse {
   multiFactorRequired: true;
 }
 
+export interface LoginSessionResponse {
+  token: string;
+  tokenExpiresInSeconds: number;
+}
+
+/**
+ * Result of a login attempt: either a completed session, or an MFA challenge
+ * the client must finish at /auth/login-by-totp before any session exists.
+ */
+export type LoginResult = LoginSessionResponse | TotpTokenResponse;
+
 export interface MfaTokenPayload {
   userId: string;
   type: MfaMethod;

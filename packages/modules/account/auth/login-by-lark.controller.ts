@@ -67,7 +67,7 @@ export class LoginByLarkController {
       throw new BadRequestException("Failed to fetch the Feishu user profile. Please try again.");
     }
 
-    const { token, tokenExpiresInSeconds } = await this.larkAuthService.loginByLark({
+    const loginResult = await this.larkAuthService.loginByLark({
       openId: userInfo.openId,
       unionId: userInfo.unionId,
       email: userInfo.email,
@@ -80,7 +80,17 @@ export class LoginByLarkController {
     });
 
     const frontendUrl = this.config.getOrThrow<string>("framework.app.frontendUrl");
-    const hash = `#token=${encodeURIComponent(token)}&expiresIn=${tokenExpiresInSeconds}`;
+
+    // A TOTP-enabled account receives the MFA challenge instead of a session;
+    // the client completes login at /auth/login-by-totp via the dedicated page.
+    if ("totpToken" in loginResult) {
+      response.redirect(
+        `${frontendUrl}/account/login/totp-callback#totpToken=${encodeURIComponent(loginResult.totpToken)}`,
+      );
+      return;
+    }
+
+    const hash = `#token=${encodeURIComponent(loginResult.token)}&expiresIn=${loginResult.tokenExpiresInSeconds}`;
     response.redirect(`${frontendUrl}/account/login/lark-callback${hash}`);
   }
 }

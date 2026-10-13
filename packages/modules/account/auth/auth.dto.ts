@@ -84,11 +84,12 @@ export class LoginByPasswordRequestDto {
 }
 
 export class LoginByPasswordResponseDto {
-  @ApiProperty({ type: String, required: true })
-  token: string;
+  // Present when the login completed; absent when an MFA challenge is returned.
+  @ApiPropertyOptional({ type: String })
+  token?: string;
 
-  @ApiProperty({ type: Number, required: true })
-  tokenExpiresInSeconds: number;
+  @ApiPropertyOptional({ type: Number })
+  tokenExpiresInSeconds?: number;
 
   // Present instead of `token` when the account has TOTP enabled: the client
   // collects the authenticator code and completes login at /auth/login-by-totp.

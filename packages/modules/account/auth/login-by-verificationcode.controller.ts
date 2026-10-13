@@ -164,7 +164,7 @@ export class LoginByVerificationCodeController {
     @Body() body: LoginByVerificationCodeRequestDto,
     @Req() request: UserRequest,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<{ token: string; tokenExpiresInSeconds: number }> {
+  ): Promise<LoginByPasswordResponseDto> {
     return await this.authService.login({
       ipAddress,
       userAgent,

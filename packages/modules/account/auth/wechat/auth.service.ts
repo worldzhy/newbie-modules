@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { TokenService } from "@modules/security/token/token.service";
+import { TwoFactorService } from "@modules/account/modules/two-factor/two-factor.service";
 import { expose } from "@modules/account/helpers/expose";
 import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 
@@ -12,6 +13,7 @@ export class WechatAuthService {
     private readonly sessionService: SessionService,
     private readonly tokenService: TokenService,
     private readonly auditLogService: AuditLogService,
+    private readonly twoFactorService: TwoFactorService,
   ) {}
 
   async login(params: { ipAddress: string; userAgent: string; phone: string; openId: string }) {
@@ -31,6 +33,11 @@ export class WechatAuthService {
         data: { phone, wechatOpenId: openId, lastLoginAt: new Date() },
       });
     }
+
+    // [step 1.5] Account-level TOTP gate — placed before any session teardown
+    // so an unfinished login leaves existing sessions intact.
+    const mfaChallenge = await this.twoFactorService.evaluateLoginMfaGate(user.id);
+    if (mfaChallenge) return mfaChallenge;
 
     // [step 2] Disable active session if existed.
     await this.prisma.session.deleteMany({ where: { userId: user.id } });

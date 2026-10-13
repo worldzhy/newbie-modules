@@ -33,6 +33,8 @@ export class LoginByTotpController {
       ipAddress,
       userAgent,
     });
-    return await this.authService.login({ ipAddress, userAgent, userId, response });
+    // The second factor was just verified, so the account-level TOTP gate
+    // inside login() must not re-challenge.
+    return await this.authService.login({ ipAddress, userAgent, userId, response, mfaVerified: true });
   }
 }

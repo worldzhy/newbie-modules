@@ -2,7 +2,12 @@
 
 Identity, authentication and session management for a host application.
 Supports password, TOTP, approved-subnet, and OAuth login strategies
-(Feishu/Lark, WeChat, Google). The Lark path is documented below; other
+(Feishu/Lark, WeChat, Google). TOTP is an account-level gate: every
+session-minting login path pauses at the shared `evaluateLoginMfaGate()` in
+`two-factor.service.ts` before a session exists — the shared `login()` calls
+it internally, and the direct-minting Lark/WeChat services call it explicitly
+(enforced by `auth/login-audit-coverage.test.ts`, ADR-007 in the host repo's
+`.trae/documents/decisions/`). The Lark path is documented below; other
 strategies are wired in `auth/` and configured through the matching
 `modules.account.*` config blocks.
 
