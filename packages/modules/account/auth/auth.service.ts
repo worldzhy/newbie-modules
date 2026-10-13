@@ -125,6 +125,8 @@ export class AuthService {
     const { email: rawEmail, ...data } = params.userData;
     const email = rawEmail.trim().toLowerCase();
 
+    // audit: not required — signup input validation rejects the request
+    // before any account identity is resolved; this is not a login attempt.
     if (!verifyEmail(email)) {
       throw new BadRequestException(INVALID_EMAIL);
     }
