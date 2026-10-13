@@ -30,9 +30,6 @@ export class Ec2InstanceResponseDto {
 
   @ApiProperty({ type: Date })
   updatedAt: Date;
-
-  @ApiProperty({ type: String })
-  awsAccountId: string;
 }
 
 export class ListEC2InstancesDto {

@@ -12,21 +12,20 @@ export class RdsInstanceService {
 
   async listRDSInstances(params: { projectId: string; status?: string; isWatching?: boolean }) {
     const { projectId, status, isWatching } = params;
-    const awsAccountId = await this.cloudwatchCredential.ensureAwsAccount(projectId);
     return await this.prisma.rdsInstance.findMany({
-      where: { awsAccountId, status, isWatching },
+      where: { projectId, status, isWatching },
       orderBy: { name: "asc" },
     });
   }
 
   async fetchRDSInstances(projectId: string) {
-    const { awsAccountId, credentials, regions } = await this.cloudwatchCredential.resolve(projectId);
+    const { credentials, regions } = await this.cloudwatchCredential.resolve(projectId);
     const rdsInstances: {
       instanceId: string;
       name: string;
       status: string;
       region: string;
-      awsAccountId: string;
+      projectId: string;
     }[] = [];
 
     for (let i = 0; i < regions.length; i++) {
@@ -51,7 +50,7 @@ export class RdsInstanceService {
             name: instance.DBInstanceIdentifier ?? name ?? instance.DbiResourceId!,
             status: instance.DBInstanceStatus!,
             region: regions[i],
-            awsAccountId,
+            projectId,
           });
         }
       }
@@ -60,7 +59,7 @@ export class RdsInstanceService {
     if (rdsInstances.length) {
       await this.prisma.$transaction(async (tx) => {
         const currentRemoteIdObjs = await tx.rdsInstance.findMany({
-          where: { awsAccountId },
+          where: { projectId },
           select: { instanceId: true },
         });
         const rdsInstanceRemoteIds = rdsInstances.map((item) => item.instanceId);
@@ -68,7 +67,7 @@ export class RdsInstanceService {
           .filter((item) => !rdsInstanceRemoteIds.includes(item.instanceId))
           .map((item) => item.instanceId);
         if (deleteIds.length) {
-          await tx.rdsInstance.deleteMany({ where: { awsAccountId, instanceId: { in: deleteIds } } });
+          await tx.rdsInstance.deleteMany({ where: { projectId, instanceId: { in: deleteIds } } });
         }
         for (const rdsInstance of rdsInstances) {
           await tx.rdsInstance.upsert({
@@ -83,7 +82,7 @@ export class RdsInstanceService {
               name: rdsInstance.name,
               status: rdsInstance.status,
               region: rdsInstance.region,
-              awsAccountId,
+              projectId,
             },
           });
         }
@@ -99,12 +98,11 @@ export class RdsInstanceService {
     unwatchRDSInstanceIds: string[];
   }) {
     const { projectId, watchRDSInstanceIds, unwatchRDSInstanceIds } = params;
-    const awsAccountId = await this.cloudwatchCredential.ensureAwsAccount(projectId);
     let needWatch = false;
     let needUnwatch = false;
     if (watchRDSInstanceIds.length) {
       const watchRDSInstances = await this.prisma.rdsInstance.findMany({
-        where: { id: { in: watchRDSInstanceIds }, awsAccountId },
+        where: { id: { in: watchRDSInstanceIds }, projectId },
       });
       if (watchRDSInstances.length !== watchRDSInstanceIds.length) {
         throw new HttpException("The number of RDS instance IDs to watch does not match", HttpStatus.BAD_REQUEST);
@@ -113,7 +111,7 @@ export class RdsInstanceService {
     }
     if (unwatchRDSInstanceIds.length) {
       const unwatchRDSInstances = await this.prisma.rdsInstance.findMany({
-        where: { id: { in: unwatchRDSInstanceIds }, awsAccountId },
+        where: { id: { in: unwatchRDSInstanceIds }, projectId },
       });
       if (unwatchRDSInstances.length !== unwatchRDSInstanceIds.length) {
         throw new HttpException("The number of RDS instance IDs to unwatch does not match", HttpStatus.BAD_REQUEST);
@@ -142,14 +140,5 @@ export class RdsInstanceService {
 
   async unwatchRDSInstance(id: string) {
     return await this.prisma.rdsInstance.update({ where: { id }, data: { isWatching: false } });
-  }
-
-  async getWatchingInstances(awsAccountId: string) {
-    return await this.prisma.rdsInstance.findMany({ where: { awsAccountId, isWatching: true } });
-  }
-
-  async getWatchingInstanceIds(awsAccountId: string) {
-    const instances = await this.prisma.rdsInstance.findMany({ where: { awsAccountId, isWatching: true } });
-    return instances.map((instance) => instance.id);
   }
 }

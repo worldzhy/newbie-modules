@@ -16,16 +16,12 @@ export class RdsMetricService {
 
   async getWatchedInstancesMetric(data: GetWatchedRDSInstancesMetricDto) {
     const { projectId, startTime, endTime, period, metricName, statistics } = data;
-    const { awsAccountId, regions, credentials } = await this.cloudwatchCredential.resolve(projectId);
-    const awsAccount = await this.prisma.awsAccount.findUnique({
-      where: { id: awsAccountId },
-      include: { rdsInstances: { where: { isWatching: true }, orderBy: { createdAt: "asc" } } },
+    const { regions, credentials } = await this.cloudwatchCredential.resolve(projectId);
+    const watchedInstances = await this.prisma.rdsInstance.findMany({
+      where: { projectId, isWatching: true },
+      orderBy: { createdAt: "asc" },
     });
-    if (!awsAccount) {
-      throw new HttpException("AWS Account not found", HttpStatus.BAD_REQUEST);
-    }
-    const { rdsInstances } = awsAccount;
-    if (!rdsInstances.length) {
+    if (!watchedInstances.length) {
       return [];
     }
 
@@ -46,7 +42,7 @@ export class RdsMetricService {
     const results: MetricData[] = [];
     for (const region of regions) {
       const params = {
-        rdsInstanceRemoteIds: rdsInstances.filter((item) => item.region === region).map((item) => item.name),
+        rdsInstanceRemoteIds: watchedInstances.filter((item) => item.region === region).map((item) => item.name),
         region,
         startTime: dayjs(startTime).toDate(),
         endTime: dayjs(endTime).toDate(),

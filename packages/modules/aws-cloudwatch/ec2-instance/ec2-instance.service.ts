@@ -13,15 +13,14 @@ export class Ec2InstanceService {
 
   async listEC2Instances(params: { projectId: string; status?: string; isWatching?: boolean }) {
     const { projectId, status, isWatching } = params;
-    const awsAccountId = await this.cloudwatchCredential.ensureAwsAccount(projectId);
     return await this.prisma.ec2Instance.findMany({
-      where: { awsAccountId, status, isWatching },
+      where: { projectId, status, isWatching },
       orderBy: { name: "asc" },
     });
   }
 
   async fetchEC2Instances(projectId: string) {
-    const { awsAccountId, credentials, regions } = await this.cloudwatchCredential.resolve(projectId);
+    const { credentials, regions } = await this.cloudwatchCredential.resolve(projectId);
     const ec2InstanceCreateManyInputs: Prisma.Ec2InstanceCreateManyInput[] = [];
 
     for (let i = 0; i < regions.length; i++) {
@@ -42,7 +41,7 @@ export class Ec2InstanceService {
                 name: nameTag?.Value ?? instance.InstanceId!,
                 status: instance.State?.Name,
                 region: regions[i],
-                awsAccountId,
+                projectId,
               });
             }
           }
@@ -53,7 +52,7 @@ export class Ec2InstanceService {
     if (ec2InstanceCreateManyInputs.length) {
       await this.prisma.$transaction(async (tx) => {
         const currentInstanceIdObjs = await tx.ec2Instance.findMany({
-          where: { awsAccountId },
+          where: { projectId },
           select: { instanceId: true },
         });
         const ec2InstanceRemoteIds = ec2InstanceCreateManyInputs.map((item) => item.instanceId);
@@ -76,7 +75,7 @@ export class Ec2InstanceService {
               name: ec2Instance.name,
               status: ec2Instance.status,
               region: ec2Instance.region,
-              awsAccountId,
+              projectId,
             },
           });
         }
@@ -92,12 +91,11 @@ export class Ec2InstanceService {
     unwatchEC2InstanceIds: string[];
   }) {
     const { projectId, watchEC2InstanceIds, unwatchEC2InstanceIds } = params;
-    const awsAccountId = await this.cloudwatchCredential.ensureAwsAccount(projectId);
     let needWatch = false;
     let needUnwatch = false;
     if (watchEC2InstanceIds.length) {
       const watchEC2Instances = await this.prisma.ec2Instance.findMany({
-        where: { id: { in: watchEC2InstanceIds }, awsAccountId },
+        where: { id: { in: watchEC2InstanceIds }, projectId },
       });
       if (watchEC2Instances.length !== watchEC2InstanceIds.length) {
         throw new HttpException("The number of EC2 instance IDs to watch does not match", HttpStatus.BAD_REQUEST);
@@ -106,7 +104,7 @@ export class Ec2InstanceService {
     }
     if (unwatchEC2InstanceIds.length) {
       const unwatchEC2Instances = await this.prisma.ec2Instance.findMany({
-        where: { id: { in: unwatchEC2InstanceIds }, awsAccountId },
+        where: { id: { in: unwatchEC2InstanceIds }, projectId },
       });
       if (unwatchEC2Instances.length !== unwatchEC2InstanceIds.length) {
         throw new HttpException("The number of EC2 instance IDs to unwatch does not match", HttpStatus.BAD_REQUEST);
@@ -137,14 +135,5 @@ export class Ec2InstanceService {
 
   async unwatchEC2Instance(id: string) {
     return await this.prisma.ec2Instance.update({ where: { id }, data: { isWatching: false } });
-  }
-
-  async getWatchingInstances(awsAccountId: string) {
-    return await this.prisma.ec2Instance.findMany({ where: { awsAccountId, isWatching: true } });
-  }
-
-  async getWatchingInstanceIds(awsAccountId: string) {
-    const instances = await this.prisma.ec2Instance.findMany({ where: { awsAccountId, isWatching: true } });
-    return instances.map((instance) => instance.id);
   }
 }

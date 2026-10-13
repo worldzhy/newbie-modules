@@ -1,55 +1,42 @@
 // !! ------------------------------------------------------------ //
-// !!            [Module] AWS CloudWatch models              //
+// !!            [Module] AWS CloudWatch models                   //
 // !! ------------------------------------------------------------ //
-// * AwsAccount                                                    //
 // * Ec2Instance                                                   //
 // * RdsInstance                                                   //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// AWS access keys are no longer stored on this model. CloudWatch data
-// collection resolves the project-shared cross-account binding provided by
-// aws-identity (AwsCrossAccountBinding) at runtime; the region scope lives
-// on the binding as well. AwsAccount only keeps the 12-digit AWS account id
-// as the anchor for Ec2Instance/RdsInstance foreign keys.
-model AwsAccount {
-  id           String   @id @default(uuid()) @db.Uuid
-  awsAccountId String   @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  ec2Instances Ec2Instance[]
-  rdsInstances RdsInstance[]
-
-  @@schema("module/aws-cloudwatch")
-}
-
+// CloudWatch data collection resolves the project-shared cross-account
+// binding provided by aws-identity (AwsCrossAccountBinding) at runtime;
+// the region scope lives on the binding as well. Instances are scoped
+// directly by projectId (plain column, no foreign key — the host scope
+// is owned by the host application, not by this module).
 model Ec2Instance {
-  id           String     @id @default(uuid()) @db.Uuid
-  instanceId   String     @unique
-  name         String
-  status       String?
-  region       String
-  isWatching   Boolean    @default(false)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  awsAccount   AwsAccount @relation(fields: [awsAccountId], references: [id])
-  awsAccountId String     @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  instanceId  String   @unique
+  name        String
+  status      String?
+  region      String
+  isWatching  Boolean  @default(false)
+  projectId   String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
+  @@index([projectId])
   @@schema("module/aws-cloudwatch")
 }
 
 model RdsInstance {
-  id           String     @id @default(uuid()) @db.Uuid
-  instanceId   String     @unique // DbiResourceId
-  name         String // DBInstanceIdentifier
-  status       String
-  region       String
-  isWatching   Boolean    @default(false)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  awsAccount   AwsAccount @relation(fields: [awsAccountId], references: [id])
-  awsAccountId String     @db.Uuid
+  id          String   @id @default(uuid()) @db.Uuid
+  instanceId  String   @unique // DbiResourceId
+  name        String // DBInstanceIdentifier
+  status      String
+  region      String
+  isWatching  Boolean  @default(false)
+  projectId   String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  @@unique([name, region, awsAccountId])
+  @@unique([name, region, projectId])
+  @@index([projectId])
   @@schema("module/aws-cloudwatch")
 }

@@ -41,9 +41,6 @@ export class RdsInstanceResponseDto {
 
   @ApiProperty({ type: Date })
   updatedAt: Date;
-
-  @ApiProperty({ type: String })
-  awsAccountId: string;
 }
 
 export class ListRDSInstancesDto {
