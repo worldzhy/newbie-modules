@@ -18,17 +18,20 @@ export enum MongoStaticCollection {
   WebPvUvIp = "WebPvUvIp",
 }
 
+// All web-monitor keys live under a shared namespace because the application
+// owns one Redis connection/database (the redis foundation module).
 export enum RedisKeys {
-  WEB_REPORT_DATAS = "WebReportDatas",
-  PVUVIP_PRE_MINUTE_LOCK = "PvuvipPreMinuteLock",
-  IP_TASK_LOCK = "IpTaskLock",
-  DAY_REPORT_NUM_TASK_LOCK = "DayReportNumTaskLock",
-  ALERT_EVALUATION_TASK_LOCK = "AlertEvaluationTaskLock",
+  WEB_REPORT_DATAS = "web-monitor:WebReportDatas",
+  PVUVIP_PRE_MINUTE_LOCK = "web-monitor:PvuvipPreMinuteLock",
+  IP_TASK_LOCK = "web-monitor:IpTaskLock",
+  DAY_REPORT_NUM_TASK_LOCK = "web-monitor:DayReportNumTaskLock",
+  ALERT_EVALUATION_TASK_LOCK = "web-monitor:AlertEvaluationTaskLock",
 }
 
 export enum RedisKeyPrefix {
-  IP_TASK_BEGIN_TIME = "IpTaskBeginTime_",
-  DAY_REPORT_NUM = "DayReportNum_",
+  IP_TASK_BEGIN_TIME = "web-monitor:IpTaskBeginTime_",
+  DAY_REPORT_NUM = "web-monitor:DayReportNum_",
+  IP_GEO_CACHE = "web-monitor:ip:",
 }
 
 export enum ReportType {

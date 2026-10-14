@@ -5,7 +5,7 @@ import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { ConfigService } from "@nestjs/config";
 import { func, getRandomIp } from "../../shared/utils";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
-import { RedisService } from "../../models/redis/redis.service";
+import { RedisService } from "@modules/redis/redis.service";
 import { RedisKeys } from "../../models/enum";
 import { WebTokenResolver } from "../../services/web-token.resolver";
 
@@ -60,14 +60,14 @@ export class WebReportController {
     const consumption = func.isObject(this.config.redis_consumption) ? this.config.redis_consumption : {};
     const limit = Number(consumption.total_limit_web) || 0;
     if (limit) {
-      const length = await this.redis.llen(RedisKeys.WEB_REPORT_DATAS);
+      const length = await this.redis.getClient().llen(RedisKeys.WEB_REPORT_DATAS);
       if (length >= limit)
         throw new HttpException(
           `redis: ${RedisKeys.WEB_REPORT_DATAS}: rate limit reached (${limit})`,
           HttpStatus.TOO_MANY_REQUESTS,
         );
     }
-    await this.redis.lpush(RedisKeys.WEB_REPORT_DATAS, JSON.stringify(query));
+    await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DATAS, JSON.stringify(query));
     await this.dayReportNum.redisCount(String(query.appId));
   }
 }

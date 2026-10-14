@@ -1,7 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 // ScheduleModule.forRoot() is owned by the job-scheduler module when both
 // modules are assembled: a second forRoot would register every @Cron twice.
-import { RedisModule } from "./models/redis/redis.module";
 import { MonitorClickhouseModule } from "./models/clickhouse/monitor-clickhouse.module";
 import { SharedModule } from "./shared/shared.module";
 import { SiteModule } from "./modules/site/site.module";
@@ -14,7 +13,6 @@ import { RemoveModule } from "./modules/remove/remove.module";
 @Global()
 @Module({
   imports: [
-    RedisModule,
     MonitorClickhouseModule,
     MonitorModelsModule,
     SharedModule,

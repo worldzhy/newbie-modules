@@ -1,0 +1,25 @@
+{
+  "key": "redis",
+  "layer": "foundation",
+  "module": {
+    "file": "redis.module",
+    "className": "RedisModule"
+  },
+  "config-service": {
+    "redis": {
+      "host": "process.env.REDIS_HOST",
+      "port": "int(process.env.REDIS_PORT, 6379)",
+      "password": "process.env.REDIS_PASSWORD",
+      "db": "int(process.env.REDIS_DB, 0)"
+    }
+  },
+  "env": {
+    "REDIS_HOST": "",
+    "REDIS_PORT": "6379",
+    "REDIS_PASSWORD": "",
+    "REDIS_DB": "0"
+  },
+  "dependencies": {
+    "ioredis": "latest"
+  }
+}

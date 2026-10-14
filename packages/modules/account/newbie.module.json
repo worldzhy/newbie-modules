@@ -6,7 +6,7 @@
     "className": "AccountModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["audit", "aws-ses", "aws-sms", "security"],
+  "moduleDependencies": ["audit", "aws-ses", "aws-sms", "security", "redis"],
   "config-service": {
     "account": {
       "cache": {
@@ -52,7 +52,6 @@
     "@larksuiteoapi/node-sdk": "^1.59.0",
     "@nestjs/passport": "latest",
     "geolite2-redist": "latest",
-    "ioredis": "latest",
     "ip-anonymize": "latest",
     "lru-cache": "latest",
     "maxmind": "latest",

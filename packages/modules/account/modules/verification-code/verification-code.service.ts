@@ -5,7 +5,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { currentPlusMinutes } from "@devbie/newbie/utilities/datetime.util";
 import { generateRandomNumbers } from "@devbie/newbie/utilities/common.util";
 import { RateLimiterMemory, RateLimiterRedis } from "rate-limiter-flexible";
-import { Redis } from "ioredis";
+import { RedisService } from "@modules/redis/redis.service";
 
 /** A verification code is bound to either an email address or a phone number. */
 type VerificationCodeTarget = { email: string } | { phone: string };
@@ -19,6 +19,7 @@ export class VerificationCodeService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
   ) {
     this.timeoutMinutes = this.config.getOrThrow<number>("modules.account.verificationCode.timeoutMinutes");
     this.resendMinutes = this.config.getOrThrow<number>("modules.account.verificationCode.resendMinutes");
@@ -31,15 +32,12 @@ export class VerificationCodeService {
       points: maxAttempts,
       duration: this.timeoutMinutes * 60,
     };
-    const redisHost = this.config.get<string>("modules.security.redis.host");
-    const redisPort = this.config.get<number>("modules.security.redis.port");
-    this.attemptLimiter =
-      redisHost && redisPort
-        ? new RateLimiterRedis({
-            storeClient: new Redis({ host: redisHost, port: redisPort }),
-            ...limiterOptions,
-          })
-        : new RateLimiterMemory(limiterOptions);
+    this.attemptLimiter = this.redis.isConfigured()
+      ? new RateLimiterRedis({
+          storeClient: this.redis.getClient(),
+          ...limiterOptions,
+        })
+      : new RateLimiterMemory(limiterOptions);
   }
 
   async generateForEmail(email: string, use: VerificationCodeUse): Promise<VerificationCode> {

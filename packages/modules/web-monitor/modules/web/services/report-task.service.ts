@@ -1,13 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { RedisService } from "../../../models/redis/redis.service";
+import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { MonitorClickhouseService } from "../../../models/clickhouse/monitor-clickhouse.service";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
 import { SystemDocument } from "../../../models/mongo/system.schema";
 import { func } from "../../../shared/utils";
 import { UAParser } from "ua-parser-js";
-import { RedisKeys, ReportType } from "../../../models/enum";
+import { RedisKeys, RedisKeyPrefix, ReportType } from "../../../models/enum";
 
 /**
  * Plain-row accumulators for one drain tick. ClickHouse destinations were
@@ -210,7 +210,7 @@ export class WebReportTaskService {
     const copyip = `${ipParts[0]}.${ipParts[1]}.${ipParts[2]}`;
     let datas: Record<string, unknown> | null = null;
     try {
-      const s = await this.redis.get(copyip);
+      const s = await this.redis.getClient().get(`${RedisKeyPrefix.IP_GEO_CACHE}${copyip}`);
       if (s) datas = JSON.parse(s);
     } catch {
       datas = null;
@@ -284,8 +284,9 @@ export class WebReportTaskService {
       appCustoms: {},
       sdkErrors: [],
     };
-    // One round trip for the whole batch instead of one RPOP per report.
-    const raws = await this.redis.rpopBatch(RedisKeys.WEB_REPORT_DATAS, count);
+    // One round trip for the whole batch instead of one RPOP per report
+    // (RPOP key count, Redis >= 6.2).
+    const raws = (await this.redis.getClient().rpop(RedisKeys.WEB_REPORT_DATAS, count)) || [];
     for (const raw of raws) {
       try {
         await this.collectQueueItem(raw, buckets);

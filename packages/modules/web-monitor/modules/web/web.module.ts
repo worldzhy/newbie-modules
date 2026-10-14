@@ -3,7 +3,6 @@ import { MonitorClickhouseModule } from "../../models/clickhouse/monitor-clickho
 import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
 import { SharedModule } from "../../shared/shared.module";
 import { DayReportModule } from "@modules/web-monitor/modules/day-report/day-report.module";
-import { RedisModule } from "../../models/redis/redis.module";
 import { SiteModule } from "@modules/web-monitor/modules/site/site.module";
 import { WebInstallationService } from "../../services/web-installation.service";
 import { WebTokenResolver } from "../../services/web-token.resolver";
@@ -31,7 +30,7 @@ import { WebPvuvipTaskService } from "./services/pvuvip-task.service";
 import { WebIpTaskService } from "./services/ip-task.service";
 
 @Module({
-  imports: [MonitorClickhouseModule, MonitorModelsModule, SharedModule, DayReportModule, RedisModule, SiteModule],
+  imports: [MonitorClickhouseModule, MonitorModelsModule, SharedModule, DayReportModule, SiteModule],
   controllers: [
     WebReportController,
     AjaxController,

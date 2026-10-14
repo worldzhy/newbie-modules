@@ -3,7 +3,7 @@ import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
-import { RedisService } from "../../models/redis/redis.service";
+import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
 import { func } from "../../shared/utils";
@@ -397,14 +397,14 @@ export class JobsService implements OnModuleInit {
 
   private async redisLock(redisKey: string, ttl: number) {
     const lock = `${ip.address()}:${String(this.cfg.port)}:${func.randomString(3)}`;
-    const res = await this.redis.set(redisKey, lock, "EX", ttl, "NX");
+    const res = await this.redis.getClient().set(redisKey, lock, "EX", ttl, "NX");
     if (!res) {
       // Lock is held by another instance — normal in multi-instance deployments.
       // Log at verbose level so it doesn't spam the console every minute.
       this.logger.verbose(`Lock [${redisKey}] not acquired (held by another instance)`);
       return false;
     }
-    const dbLock = await this.redis.get(redisKey);
+    const dbLock = await this.redis.getClient().get(redisKey);
     if (lock !== dbLock) {
       // Lock verification failed — could indicate a race or Redis issue, worth warning.
       this.logger.warn(`Lock [${redisKey}] verification failed: expected ${lock}, got ${dbLock}`);

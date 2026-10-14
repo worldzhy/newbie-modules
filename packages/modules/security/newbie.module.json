@@ -5,6 +5,7 @@
     "file": "security.module",
     "className": "SecurityModule"
   },
+  "moduleDependencies": ["redis"],
   "config-service": {
     "security": {
       "ratelimiter": {
@@ -19,15 +20,7 @@
         "ipAccessLimiter": {
           "points": 20,
           "durationSeconds": 60
-        },
-        "redis": {
-          "host": "process.env.SECURITY_REDIS_HOST",
-          "port": "int(process.env.SECURITY_REDIS_PORT, 6379)"
         }
-      },
-      "redis": {
-        "host": "process.env.SECURITY_REDIS_HOST",
-        "port": "int(process.env.SECURITY_REDIS_PORT, 6379)"
       },
       "token": {
         "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET || 'your-default-token-secret'",
@@ -47,8 +40,6 @@
     }
   },
   "env": {
-    "SECURITY_REDIS_HOST": "",
-    "SECURITY_REDIS_PORT": "",
     "SECURITY_DEFAULT_TOKEN_SECRET": "",
     "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
     "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
@@ -58,7 +49,6 @@
   "dependencies": {
     "@nestjs/passport": "latest",
     "crypto-random-string": "^5.0.0",
-    "ioredis": "latest",
     "jsonwebtoken": "latest",
     "passport": "latest",
     "passport-custom": "latest",

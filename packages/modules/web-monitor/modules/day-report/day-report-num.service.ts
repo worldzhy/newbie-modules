@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { MonitorModelsService } from "../../models/mongo/monitor-models.service";
-import { RedisService } from "../../models/redis/redis.service";
+import { RedisService } from "@modules/redis/redis.service";
 import { ConfigService } from "@nestjs/config";
 import dayjs from "dayjs";
 import { func } from "../../shared/utils";
@@ -24,7 +24,7 @@ export class DayReportNumService {
 
     for (const app of apps) {
       const key = `${RedisKeyPrefix.DAY_REPORT_NUM}${app.appId}_${yesterday}`;
-      const num = await this.redis.get(key);
+      const num = await this.redis.getClient().get(key);
       if (!num) continue;
 
       const DayModel = this.models.DayReportNum();
@@ -36,12 +36,12 @@ export class DayReportNumService {
       repore.num = Number(num);
       await repore.save();
 
-      await this.redis.del(key);
+      await this.redis.getClient().del(key);
     }
   }
 
   async getTodayFromRedis(appId: string, today: number) {
-    return await this.redis.get(`${RedisKeyPrefix.DAY_REPORT_NUM}${appId}_${today}`);
+    return await this.redis.getClient().get(`${RedisKeyPrefix.DAY_REPORT_NUM}${appId}_${today}`);
   }
 
   async getDayFromMongo(appId: string, beginTime: string | Date, endTime: string | Date) {
@@ -58,6 +58,6 @@ export class DayReportNumService {
   async redisCount(appId: string) {
     const date = new Date();
     const today = new Date(func.format(date, "yyyy/MM/dd")).getTime();
-    await this.redis.incr(`${RedisKeyPrefix.DAY_REPORT_NUM}${appId}_${today}`);
+    await this.redis.getClient().incr(`${RedisKeyPrefix.DAY_REPORT_NUM}${appId}_${today}`);
   }
 }

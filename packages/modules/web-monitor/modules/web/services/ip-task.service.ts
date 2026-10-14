@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
-import { RedisService } from "../../../models/redis/redis.service";
+import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { func } from "../../../shared/utils";
 import https from "https";
@@ -39,7 +39,7 @@ export class WebIpTaskService {
   private async saveWebGetIpDatasByOne(appId: string) {
     try {
       const query: Record<string, unknown> = { city: { $exists: false } };
-      const beginTime = await this.redis.get(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`);
+      const beginTime = await this.redis.getClient().get(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`);
       query.createTime = {
         $gt: beginTime ? new Date(beginTime) : new Date(Date.now() - Number(this.cfg.ip_task_space_time)),
       };
@@ -57,7 +57,7 @@ export class WebIpTaskService {
           await this.handleDatas(appId, newSpit, datas.length);
         }
       } else {
-        await this.redis.set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`, new Date().toString());
+        await this.redis.getClient().set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`, new Date().toString());
       }
     } catch (err) {
       this.logger.error("saveWebGetIpDatasByOne failed", err instanceof Error ? err.message : String(err));
@@ -71,14 +71,16 @@ export class WebIpTaskService {
       await this.getIpData(ip, String(data[i]._id), data[i].appId);
     }
     if (lastLen === 0) {
-      await this.redis.set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`, String(data[data.length - 1].createTime));
+      await this.redis
+        .getClient()
+        .set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`, String(data[data.length - 1].createTime));
     }
   }
 
   private async getIpData(ip: string, _id: string, appId: string) {
     const _copyip = ip.split(".");
     const copyip = `${_copyip[0]}.${_copyip[1]}.${_copyip[2]}`;
-    const datas = await this.redis.get(copyip);
+    const datas = await this.redis.getClient().get(`${RedisKeyPrefix.IP_GEO_CACHE}${copyip}`);
     if (datas) {
       try {
         const json = JSON.parse(datas);
@@ -119,7 +121,9 @@ export class WebIpTaskService {
           province: result.result.ad_info.province,
           city: result.result.ad_info.city,
         };
-        await this.redis.set(copyip, JSON.stringify(json), "EX", Number(this.cfg.ipRedisTTL));
+        await this.redis
+          .getClient()
+          .set(`${RedisKeyPrefix.IP_GEO_CACHE}${copyip}`, JSON.stringify(json), "EX", Number(this.cfg.ipRedisTTL));
         return await this.updateWebEnvironment(json, _id, appId);
       }
       return {};

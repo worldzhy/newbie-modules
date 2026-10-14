@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { RateLimiterMemory, RateLimiterRedis } from "rate-limiter-flexible";
-import { Redis } from "ioredis";
+import { RedisService } from "@modules/redis/redis.service";
 
 enum LimiterType {
   IP_ACCESS = "ip-access",
@@ -16,6 +16,7 @@ abstract class RateLimiterService {
 
   constructor(
     private readonly config: ConfigService,
+    redis: RedisService,
     limiterType: LimiterType,
   ) {
     switch (limiterType) {
@@ -33,24 +34,16 @@ abstract class RateLimiterService {
         break;
     }
 
-    const redisHost = this.config.get<string>("modules.security.redis.host");
-    const redisPort = this.config.get<number>("modules.security.redis.port");
-    if (redisHost && redisPort) {
-      this.limiter = new RateLimiterRedis({
-        storeClient: new Redis({
-          host: redisHost,
-          port: redisPort,
-          keyPrefix: limiterType + "-",
-        }),
-        points: this.points,
-        duration: this.duration,
-      });
-    } else {
-      this.limiter = new RateLimiterMemory({
-        points: this.points,
-        duration: this.duration,
-      });
-    }
+    const options = {
+      keyPrefix: limiterType + "-",
+      points: this.points,
+      duration: this.duration,
+    };
+    // All limiters share the single connection owned by the redis foundation
+    // module; rate-limiter-flexible isolates them via keyPrefix.
+    this.limiter = redis.isConfigured()
+      ? new RateLimiterRedis({ storeClient: redis.getClient(), ...options })
+      : new RateLimiterMemory(options);
   }
 
   async isAllowed(key: string): Promise<boolean> {
@@ -70,21 +63,21 @@ abstract class RateLimiterService {
 
 @Injectable()
 export class LimitAccessByIpService extends RateLimiterService {
-  constructor(private readonly configService: ConfigService) {
-    super(configService, LimiterType.IP_ACCESS);
+  constructor(configService: ConfigService, redisService: RedisService) {
+    super(configService, redisService, LimiterType.IP_ACCESS);
   }
 }
 
 @Injectable()
 export class LimitLoginByIpService extends RateLimiterService {
-  constructor(private readonly configService: ConfigService) {
-    super(configService, LimiterType.IP_LOGIN);
+  constructor(configService: ConfigService, redisService: RedisService) {
+    super(configService, redisService, LimiterType.IP_LOGIN);
   }
 }
 
 @Injectable()
 export class LimitLoginByUserService extends RateLimiterService {
-  constructor(private readonly configService: ConfigService) {
-    super(configService, LimiterType.USER_LOGIN);
+  constructor(configService: ConfigService, redisService: RedisService) {
+    super(configService, redisService, LimiterType.USER_LOGIN);
   }
 }
