@@ -138,7 +138,7 @@ export class MoveFileRequestDto {
   destinationParentId?: string;
 }
 
-export class ListFilePathsResDto {
+export class ListFilePathsResponseDto {
   @ApiProperty({
     type: String,
   })

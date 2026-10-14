@@ -4,7 +4,7 @@ import { Permission, PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import {
-  PermissionListResponseDto,
+  ListPermissionsResponseDto,
   PermissionResponseDto,
   CreatePermissionDto,
   UpdatePermissionDto,
@@ -58,7 +58,7 @@ export class PermissionController {
 
   @Get("")
   @ApiOperation({ summary: "Get permissions with pagination and optional resource filter" })
-  @ApiResponse({ type: PermissionListResponseDto })
+  @ApiResponse({ type: ListPermissionsResponseDto })
   async getPermissions(
     @Query("page") page: number,
     @Query("pageSize") pageSize: number,

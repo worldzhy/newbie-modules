@@ -1,7 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { JobSchedulerService } from "./scheduler/job-scheduler.service";
-import { JobRunDto, JobScheduleDto, ListJobRunsDto, UpdateJobScheduleDto } from "./job-scheduler.dto";
+import { JobRunDto, JobScheduleDto, ListJobRunsQueryDto, UpdateJobScheduleDto } from "./job-scheduler.dto";
 
 @ApiTags("Job Scheduler")
 @ApiBearerAuth()
@@ -19,7 +19,7 @@ export class JobSchedulerController {
   @Get("schedules/:key/runs")
   @ApiOperation({ summary: "List recent execution runs for a job schedule" })
   @ApiResponse({ status: 200, type: [JobRunDto] })
-  listScheduleRuns(@Param("key") key: string, @Query() query: ListJobRunsDto): Promise<JobRunDto[]> {
+  listScheduleRuns(@Param("key") key: string, @Query() query: ListJobRunsQueryDto): Promise<JobRunDto[]> {
     return this.jobScheduler.listScheduleRuns(key, query.limit) as Promise<JobRunDto[]>;
   }
 

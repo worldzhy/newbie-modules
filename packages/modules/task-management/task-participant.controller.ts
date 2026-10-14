@@ -2,7 +2,7 @@ import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "@modules/security/authentication/jwt/jwt.guard";
 import { TaskParticipantService } from "./task-participant.service";
-import { LookupParticipantQueryDto, TaskParticipantDataResponseDto, TaskParticipantsListResponseDto } from "./task.dto";
+import { LookupParticipantQueryDto, TaskParticipantDataResponseDto, ListTaskParticipantsResponseDto } from "./task.dto";
 
 @ApiTags("Task Management")
 @ApiBearerAuth()
@@ -13,8 +13,8 @@ export class TaskParticipantController {
 
   @Get()
   @ApiOperation({ summary: "List all task participants" })
-  @ApiResponse({ status: 200, type: TaskParticipantsListResponseDto })
-  async listParticipants(): Promise<TaskParticipantsListResponseDto> {
+  @ApiResponse({ status: 200, type: ListTaskParticipantsResponseDto })
+  async listParticipants(): Promise<ListTaskParticipantsResponseDto> {
     const participants = await this.taskParticipantService.listParticipants();
     return { success: true, data: participants };
   }

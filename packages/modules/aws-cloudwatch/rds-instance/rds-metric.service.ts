@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { GetWatchedRDSInstancesMetricDto } from "./rds-instance.dto";
+import { GetWatchedRDSInstancesMetricQueryDto } from "./rds-instance.dto";
 import { MetricData } from "../aws-cloudwatch.interface";
 import { AwsCloudwatchService } from "../aws-cloudwatch.service";
 import { AwsCloudwatchCredentialService } from "../aws-cloudwatch-credential.service";
@@ -14,7 +14,7 @@ export class RdsMetricService {
     private readonly cloudwatchService: AwsCloudwatchService,
   ) {}
 
-  async getWatchedInstancesMetric(data: GetWatchedRDSInstancesMetricDto) {
+  async getWatchedInstancesMetric(data: GetWatchedRDSInstancesMetricQueryDto) {
     const { projectId, startTime, endTime, period, metricName, statistics } = data;
     const { regions, credentials } = await this.cloudwatchCredential.resolve(projectId);
     const watchedInstances = await this.prisma.rdsInstance.findMany({

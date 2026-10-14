@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
-export class SessionsListRequestDto extends CommonListRequestDto {}
+export class ListSessionsRequestDto extends CommonListRequestDto {}
 
 /**
  * Response DTO for a single Session record (refreshToken stripped by expose()).
@@ -53,7 +53,7 @@ export class SessionResponseDto {
 /**
  * Paginated list response for sessions.
  */
-export class SessionsListResponseDto extends CommonListResponseDto {
+export class ListSessionsResponseDto extends CommonListResponseDto {
   @ApiProperty({
     type: SessionResponseDto,
     isArray: true,

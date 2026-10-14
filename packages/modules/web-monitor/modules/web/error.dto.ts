@@ -111,7 +111,7 @@ export class WebMonitorErrorItemResponseDto {
  * Paged wrapper for the error list (average / grouped or real-time mode).
  * Shared by the web and wx error endpoints.
  */
-export class WebMonitorErrorListResponseDto {
+export class ListWebMonitorErrorsResponseDto {
   @ApiProperty({ type: WebMonitorErrorItemResponseDto, isArray: true, description: "Error rows" })
   dataList: WebMonitorErrorItemResponseDto[];
 
@@ -126,7 +126,7 @@ export class WebMonitorErrorListResponseDto {
  * Wrapper for the single error detail list, with resource-level statistics.
  * Shared by the web and wx error endpoints.
  */
-export class WebMonitorErrorOneListResponseDto {
+export class ListWebMonitorErrorOnesResponseDto {
   @ApiProperty({ type: WebMonitorErrorItemResponseDto, isArray: true, description: "Error rows" })
   dataList: WebMonitorErrorItemResponseDto[];
 
@@ -150,7 +150,7 @@ export class WebMonitorErrorOneListResponseDto {
  * Wrapper for the marked-user error list (full rows, time ascending).
  * Shared by the web and wx error endpoints.
  */
-export class WebMonitorErrorMarkUserListResponseDto {
+export class ListWebMonitorErrorMarkUsersResponseDto {
   @ApiProperty({ type: WebMonitorErrorItemResponseDto, isArray: true, description: "Error rows" })
   list: WebMonitorErrorItemResponseDto[];
 }

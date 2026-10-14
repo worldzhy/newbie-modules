@@ -3,7 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { AnalysisService } from "./services/analysis.service";
 import {
-  WebMonitorAnalysisUserListResponseDto,
+  ListWebMonitorAnalysisUsersResponseDto,
   WebMonitorProvinceCountResponseDto,
   WebMonitorWebTopDatasResponseDto,
 } from "./analysis.dto";
@@ -16,7 +16,7 @@ export class AnalysisController {
 
   @Get("/getAnalysislist")
   @ApiOperation({ summary: "Get user funnel analysis list" })
-  @ApiResponse({ type: WebMonitorAnalysisUserListResponseDto })
+  @ApiResponse({ type: ListWebMonitorAnalysisUsersResponseDto })
   async getAnalysislist(@Query() q: Record<string, unknown>) {
     const { appId, beginTime, endTime, uid, phone } = q;
     if (!appId) throw new Error("User funnel analysis list: appId must not be empty");

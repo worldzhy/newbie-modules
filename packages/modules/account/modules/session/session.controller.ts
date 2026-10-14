@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagg
 import { Prisma, Session } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Expose, expose } from "../../helpers/expose";
-import { SessionResponseDto, SessionsListRequestDto, SessionsListResponseDto } from "./session.dto";
+import { ListSessionsRequestDto, ListSessionsResponseDto, SessionResponseDto } from "./session.dto";
 import { SESSION_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { UserRequest } from "@modules/security/security.interface";
 import { SelfOnlyGuard } from "@modules/security/self-only/self-only.guard";
@@ -22,12 +22,12 @@ export class SessionController {
   /** Get sessions for a user */
   @Get()
   @ApiOperation({ summary: "Get sessions for a user" })
-  @ApiResponse({ type: SessionsListResponseDto })
+  @ApiResponse({ type: ListSessionsResponseDto })
   async getAll(
     @Req() req: UserRequest,
     @Param("userId") userId: string,
-    @Query() query: SessionsListRequestDto,
-  ): Promise<SessionsListResponseDto> {
+    @Query() query: ListSessionsRequestDto,
+  ): Promise<ListSessionsResponseDto> {
     const { sessionId } = req.user;
     const { page, pageSize } = query;
     const result = await this.prisma.findManyInManyPages({

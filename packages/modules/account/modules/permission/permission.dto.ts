@@ -139,7 +139,7 @@ export class PermissionResponseDto {
 /**
  * Paginated list response for permissions.
  */
-export class PermissionListResponseDto extends CommonListResponseDto {
+export class ListPermissionsResponseDto extends CommonListResponseDto {
   @ApiProperty({ type: PermissionResponseDto, isArray: true })
   declare records: PermissionResponseDto[];
 }

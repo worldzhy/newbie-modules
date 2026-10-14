@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagg
 import { RdsInstanceService } from "./rds-instance.service";
 import {
   FetchRDSInstancesDto,
-  ListRDSInstancesDto,
+  ListRDSInstancesQueryDto,
   RdsInstanceResponseDto,
   SyncRDSInstancesWatchDto,
 } from "./rds-instance.dto";
@@ -17,7 +17,7 @@ export class RdsInstanceController {
   @Get()
   @ApiOperation({ summary: "List RDS instances with optional filters" })
   @ApiResponse({ type: RdsInstanceResponseDto, isArray: true })
-  async listRDSInstances(@Query() query: ListRDSInstancesDto) {
+  async listRDSInstances(@Query() query: ListRDSInstancesQueryDto) {
     const { projectId, status, isWatching } = query;
     return await this.rdsInstanceService.listRDSInstances({ projectId, status, isWatching });
   }

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Body, Query } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { WebCustomService } from "./services/custom.service";
-import { WebMonitorCustomAverageListResponseDto, WebMonitorCustomFilterListResponseDto } from "./custom.dto";
+import { ListWebMonitorCustomAveragesResponseDto, ListWebMonitorCustomFiltersResponseDto } from "./custom.dto";
 
 @ApiTags("Frontend Monitor / Web / Custom")
 @Controller("/api/v1/custom")
@@ -11,7 +11,7 @@ export class CustomController {
 
   @Get("/getCustomFilterList")
   @ApiOperation({ summary: "Get custom filter list" })
-  @ApiResponse({ type: WebMonitorCustomFilterListResponseDto })
+  @ApiResponse({ type: ListWebMonitorCustomFiltersResponseDto })
   async getCustomFilterList(@Query() q: Record<string, unknown>) {
     const { appId } = q;
     if (!appId) throw new Error("Get custom filters: appId must not be empty");
@@ -39,7 +39,7 @@ export class CustomController {
 
   @Get("/getAverageCustomList")
   @ApiOperation({ summary: "Get average custom category list" })
-  @ApiResponse({ type: WebMonitorCustomAverageListResponseDto })
+  @ApiResponse({ type: ListWebMonitorCustomAveragesResponseDto })
   async getAverageCustomList(@Query() q: Record<string, unknown>) {
     const { appId, pageNo = 1, pageSize = 15, beginTime, endTime, customName, customFilter } = q;
     if (!appId) throw new Error("Get custom category list: appId must not be empty");

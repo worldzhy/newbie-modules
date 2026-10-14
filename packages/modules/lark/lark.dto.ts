@@ -2,7 +2,7 @@ import { ApiProperty } from "@nestjs/swagger";
 import { IsNotEmpty, IsOptional, IsString, IsNumber } from "class-validator";
 import type { LarkCardAction, LarkMessageEvent, LarkWebhookHeader } from "./lark-types";
 
-export class GetChatHistoryDto {
+export class GetChatHistoryRequestDto {
   @ApiProperty({ description: "The ID of the chat group", required: true })
   @IsString()
   @IsNotEmpty()

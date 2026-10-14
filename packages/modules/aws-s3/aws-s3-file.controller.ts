@@ -15,7 +15,7 @@ import {
   CreateFileRequestDto,
   CreateFileResponseDto,
   CreateFolderRequestDto,
-  ListFilePathsResDto,
+  ListFilePathsResponseDto,
   ListFilesRequestDto,
   ListFilesResponseDto,
   RenameFileRequestDto,
@@ -87,7 +87,7 @@ export class AwsS3FileController {
 
   @Get(":fileId/path")
   @ApiResponse({
-    type: ListFilePathsResDto,
+    type: ListFilePathsResponseDto,
     isArray: true,
   })
   async getFilePath(@Param("fileId") fileId: string) {

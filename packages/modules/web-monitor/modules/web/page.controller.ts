@@ -3,9 +3,9 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { PageService } from "./services/page.service";
 import {
-  WebMonitorPageAverageListResponseDto,
+  ListWebMonitorPageAveragesResponseDto,
   WebMonitorPageDetailResponseDto,
-  WebMonitorPageVisitListResponseDto,
+  ListWebMonitorPageVisitsResponseDto,
   WebMonitorRealTimePageItemResponseDto,
 } from "./page.dto";
 
@@ -16,7 +16,7 @@ export class PageController {
 
   @Get("/getAveragePageList")
   @ApiOperation({ summary: "Get average page performance list" })
-  @ApiResponse({ type: WebMonitorPageAverageListResponseDto })
+  @ApiResponse({ type: ListWebMonitorPageAveragesResponseDto })
   async getAveragePageList(@Query() q: Record<string, unknown>) {
     const { appId } = q;
     if (!appId) throw new Error("Average page performance list: appId must not be empty");
@@ -43,7 +43,7 @@ export class PageController {
 
   @Get("/getOnePageList")
   @ApiOperation({ summary: "Get single page performance or visit list" })
-  @ApiResponse({ type: WebMonitorPageVisitListResponseDto })
+  @ApiResponse({ type: ListWebMonitorPageVisitsResponseDto })
   async getOnePageList(@Query() q: Record<string, unknown>) {
     const { appId, url } = q;
     if (!appId) throw new Error("Single page performance or visit list: appId must not be empty");

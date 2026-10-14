@@ -301,7 +301,7 @@ export class TaskMemberDto {
 
 // ── Envelope responses ({success, data?[, message]}) ──
 
-export class TaskParticipantsListResponseDto {
+export class ListTaskParticipantsResponseDto {
   @ApiProperty()
   success: boolean;
 

@@ -4,7 +4,7 @@ import { MetricData } from "../aws-cloudwatch.interface";
 import { AwsCloudwatchService } from "../aws-cloudwatch.service";
 import { AwsCloudwatchCredentialService } from "../aws-cloudwatch-credential.service";
 import dayjs from "dayjs";
-import { GetWatchedEC2InstancesMetricDto } from "@modules/aws-cloudwatch/ec2-instance/ec2-metric.dto";
+import { GetWatchedEC2InstancesMetricQueryDto } from "@modules/aws-cloudwatch/ec2-instance/ec2-metric.dto";
 
 @Injectable()
 export class Ec2MetricService {
@@ -14,7 +14,7 @@ export class Ec2MetricService {
     private readonly cloudwatchService: AwsCloudwatchService,
   ) {}
 
-  async getWatchedInstancesMetric(data: GetWatchedEC2InstancesMetricDto) {
+  async getWatchedInstancesMetric(data: GetWatchedEC2InstancesMetricQueryDto) {
     const { projectId, metricName, startTime, endTime, period, statistics } = data;
     const { regions, credentials } = await this.cloudwatchCredential.resolve(projectId);
     const watchedInstances = await this.prisma.ec2Instance.findMany({

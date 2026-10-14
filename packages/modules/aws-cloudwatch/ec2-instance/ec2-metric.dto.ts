@@ -2,7 +2,7 @@ import { IsEnum, IsNotEmpty, IsNumberString, IsUUID } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import { CloudwatchEC2MetricName, CloudwatchMetricStatistics } from "../aws-cloudwatch.enum";
 
-export class GetWatchedEC2InstancesMetricDto {
+export class GetWatchedEC2InstancesMetricQueryDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsUUID("4")

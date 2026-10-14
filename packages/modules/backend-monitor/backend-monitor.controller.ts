@@ -3,11 +3,11 @@ import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 import { BackendMonitorService } from "./backend-monitor.service";
 import {
-  BackendMonitorErrorLogListResponseDto,
-  BackendMonitorRequestLogListResponseDto,
   CreateBackendMonitorIngestDto,
-  ListBackendMonitorErrorLogsDto,
-  ListBackendMonitorRequestLogsDto,
+  ListBackendMonitorErrorLogsRequestDto,
+  ListBackendMonitorErrorLogsResponseDto,
+  ListBackendMonitorRequestLogsRequestDto,
+  ListBackendMonitorRequestLogsResponseDto,
 } from "./backend-monitor.dto";
 
 @ApiTags("Backend Monitor")
@@ -48,17 +48,17 @@ export class BackendMonitorController {
    * sortField/sortOrder) and snake_case row shape.
    */
   @ApiOperation({ summary: "List backend request logs for an application" })
-  @ApiResponse({ status: 200, type: BackendMonitorRequestLogListResponseDto })
+  @ApiResponse({ status: 200, type: ListBackendMonitorRequestLogsResponseDto })
   @Get("request-logs")
-  async listRequestLogs(@Query() query: ListBackendMonitorRequestLogsDto) {
+  async listRequestLogs(@Query() query: ListBackendMonitorRequestLogsRequestDto) {
     return await this.backendMonitorService.listRequestLogs(query);
   }
 
   /** Paginated error logs for one application. */
   @ApiOperation({ summary: "List backend error logs for an application" })
-  @ApiResponse({ status: 200, type: BackendMonitorErrorLogListResponseDto })
+  @ApiResponse({ status: 200, type: ListBackendMonitorErrorLogsResponseDto })
   @Get("error-logs")
-  async listErrorLogs(@Query() query: ListBackendMonitorErrorLogsDto) {
+  async listErrorLogs(@Query() query: ListBackendMonitorErrorLogsRequestDto) {
     return await this.backendMonitorService.listErrorLogs(query);
   }
 }

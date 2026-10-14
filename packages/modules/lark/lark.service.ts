@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
-import { GetChatHistoryDto, SendTextDto, SendCardDto, UpdateCardDto } from "./lark.dto";
+import { GetChatHistoryRequestDto, SendTextDto, SendCardDto, UpdateCardDto } from "./lark.dto";
 import { decryptLarkEvent } from "./lark-event.util";
 import { parseMessage, resolveSenderOpenId } from "./lark-message-parser";
 import type {
@@ -115,7 +115,7 @@ export class LarkService {
     this.cardActionHandler = handler;
   }
 
-  async getChatHistory(dto: GetChatHistoryDto) {
+  async getChatHistory(dto: GetChatHistoryRequestDto) {
     try {
       const res = await this.client.im.message.list({
         params: {

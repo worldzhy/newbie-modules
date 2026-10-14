@@ -144,7 +144,7 @@ export class AuditLogResponseDto {
 /**
  * Paginated list response for audit logs.
  */
-export class AuditLogListResponseDto extends CommonListResponseDto {
+export class ListAuditLogsResponseDto extends CommonListResponseDto {
   @ApiProperty({ type: AuditLogResponseDto, isArray: true })
   declare records: AuditLogResponseDto[];
 }

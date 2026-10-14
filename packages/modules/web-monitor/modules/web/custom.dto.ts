@@ -24,7 +24,7 @@ export class WebMonitorCustomFilterResponseDto {
 /**
  * Wrapper for the custom filter definition list.
  */
-export class WebMonitorCustomFilterListResponseDto {
+export class ListWebMonitorCustomFiltersResponseDto {
   @ApiProperty({ type: WebMonitorCustomFilterResponseDto, isArray: true, description: "Filter definition rows" })
   list: WebMonitorCustomFilterResponseDto[];
 }
@@ -71,7 +71,7 @@ export class WebMonitorCustomItemResponseDto {
 /**
  * Paged wrapper for the custom metric list.
  */
-export class WebMonitorCustomAverageListResponseDto {
+export class ListWebMonitorCustomAveragesResponseDto {
   @ApiProperty({ type: Number, description: "Total record count" })
   totalNum: number;
 

@@ -56,7 +56,7 @@ export class WebMonitorAnalysisUserItemResponseDto {
  * Wrapper for the user funnel analysis list.
  * Shared by the web and wx analysis endpoints.
  */
-export class WebMonitorAnalysisUserListResponseDto {
+export class ListWebMonitorAnalysisUsersResponseDto {
   @ApiProperty({ type: WebMonitorAnalysisUserItemResponseDto, isArray: true, description: "User funnel rows" })
   list: WebMonitorAnalysisUserItemResponseDto[];
 }

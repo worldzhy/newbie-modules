@@ -148,7 +148,7 @@ export class WebMonitorPageAverageItemResponseDto {
 /**
  * Paged wrapper for the average page performance list.
  */
-export class WebMonitorPageAverageListResponseDto {
+export class ListWebMonitorPageAveragesResponseDto {
   @ApiProperty({ type: WebMonitorPageAverageItemResponseDto, isArray: true, description: "Page average rows" })
   dataList: WebMonitorPageAverageItemResponseDto[];
 
@@ -192,7 +192,7 @@ export class WebMonitorRealTimePageItemResponseDto {
 /**
  * Paged wrapper for the single page visit list (raw WebPage documents).
  */
-export class WebMonitorPageVisitListResponseDto {
+export class ListWebMonitorPageVisitsResponseDto {
   @ApiProperty({ type: WebMonitorPageDetailResponseDto, isArray: true, description: "Page visit rows" })
   dataList: WebMonitorPageDetailResponseDto[];
 

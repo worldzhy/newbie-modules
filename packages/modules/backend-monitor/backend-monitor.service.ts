@@ -7,8 +7,8 @@ import {
   BackendMonitorRequestEventDto,
   CreateBackendMonitorIngestDto,
   INGEST_BATCH_LIMIT,
-  ListBackendMonitorErrorLogsDto,
-  ListBackendMonitorRequestLogsDto,
+  ListBackendMonitorErrorLogsRequestDto,
+  ListBackendMonitorRequestLogsRequestDto,
 } from "./backend-monitor.dto";
 
 /** Allowed sort fields for request logs (whitelist guards the ORDER BY clause). */
@@ -207,7 +207,7 @@ export class BackendMonitorService {
   }
 
   /** Queries paginated request logs. All values are bound as query parameters. */
-  async listRequestLogs(query: ListBackendMonitorRequestLogsDto): Promise<{ records: RequestLogRow[]; total: number }> {
+  async listRequestLogs(query: ListBackendMonitorRequestLogsRequestDto): Promise<{ records: RequestLogRow[]; total: number }> {
     const safeField = ALLOWED_REQUEST_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "request_at";
     const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
     const keyword = query.keyword ? `%${query.keyword}%` : "%";
@@ -258,7 +258,7 @@ export class BackendMonitorService {
   }
 
   /** Queries paginated error logs. All values are bound as query parameters. */
-  async listErrorLogs(query: ListBackendMonitorErrorLogsDto): Promise<{ records: ErrorLogRow[]; total: number }> {
+  async listErrorLogs(query: ListBackendMonitorErrorLogsRequestDto): Promise<{ records: ErrorLogRow[]; total: number }> {
     const safeField = ALLOWED_ERROR_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "occurred_at";
     const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
     const keyword = query.keyword ? `%${query.keyword}%` : "%";

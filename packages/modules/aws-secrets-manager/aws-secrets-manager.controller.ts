@@ -8,7 +8,7 @@ import {
   GetSecretRequestDto,
   GetSecretValueResponseDto,
   ListSecretsRequestDto,
-  SecretListResponseDto,
+  ListSecretsResponseDto,
   SecretResponseDto,
   SetRotationRequestDto,
   UpdateSecretDto,
@@ -40,7 +40,7 @@ export class AwsSecretsManagerController {
 
   @Get("")
   @ApiOperation({ summary: "List all managed Secrets (metadata only, no secret values)" })
-  @ApiResponse({ type: SecretListResponseDto })
+  @ApiResponse({ type: ListSecretsResponseDto })
   async listSecrets(@Query() query: ListSecretsRequestDto) {
     return await this.secretsService.listSecrets(query);
   }

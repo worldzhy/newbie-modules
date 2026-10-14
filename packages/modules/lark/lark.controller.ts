@@ -2,7 +2,7 @@ import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from "@nestjs
 import { AuthGuard } from "@nestjs/passport";
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
 import { LarkService } from "./lark.service";
-import { GetChatHistoryDto, LarkWebhookDto, SendTextDto } from "./lark.dto";
+import { GetChatHistoryRequestDto, LarkWebhookDto, SendTextDto } from "./lark.dto";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 
 @ApiTags("Lark")
@@ -15,7 +15,7 @@ export class LarkController {
   @ApiBearerAuth()
   @ApiResponse({ type: Object })
   @UseGuards(AuthGuard("jwt"))
-  async getChatHistory(@Body() dto: GetChatHistoryDto) {
+  async getChatHistory(@Body() dto: GetChatHistoryRequestDto) {
     return await this.larkService.getChatHistory(dto);
   }
 

@@ -89,7 +89,7 @@ export class WebMonitorAjaxAvgItemResponseDto {
  * Paged wrapper for the AJAX average list (also used by getPageAjaxsAvg).
  * Shared by the web and wx ajax endpoints.
  */
-export class WebMonitorAjaxAverageListResponseDto {
+export class ListWebMonitorAjaxAveragesResponseDto {
   @ApiProperty({ type: WebMonitorAjaxAvgItemResponseDto, isArray: true, description: "AJAX average rows" })
   dataList: WebMonitorAjaxAvgItemResponseDto[];
 
@@ -104,7 +104,7 @@ export class WebMonitorAjaxAverageListResponseDto {
  * Paged wrapper for the single AJAX log list (full rows).
  * Shared by the web and wx ajax endpoints.
  */
-export class WebMonitorAjaxOneListResponseDto {
+export class ListWebMonitorAjaxOnesResponseDto {
   @ApiProperty({ type: WebMonitorAjaxRowResponseDto, isArray: true, description: "AJAX log rows" })
   dataList: WebMonitorAjaxRowResponseDto[];
 
@@ -119,7 +119,7 @@ export class WebMonitorAjaxOneListResponseDto {
  * Wrapper for the marked-user AJAX list (full rows, time ascending).
  * Shared by the web and wx ajax endpoints.
  */
-export class WebMonitorAjaxMarkUserListResponseDto {
+export class ListWebMonitorAjaxMarkUsersResponseDto {
   @ApiProperty({ type: WebMonitorAjaxRowResponseDto, isArray: true, description: "AJAX log rows" })
   list: WebMonitorAjaxRowResponseDto[];
 }

@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { GetWatchedRDSInstancesMetricDto } from "./rds-instance.dto";
+import { GetWatchedRDSInstancesMetricQueryDto } from "./rds-instance.dto";
 import { RdsMetricService } from "./rds-metric.service";
 
 @ApiTags("AWS CloudWatch / RDS Metric")
@@ -12,7 +12,7 @@ export class RdsMetricController {
   @Get()
   @ApiOperation({ summary: "Get CloudWatch metrics for watched RDS instances" })
   @ApiResponse({ type: Object, isArray: true })
-  async getWatchedRDSInstancesMetric(@Query() query: GetWatchedRDSInstancesMetricDto) {
+  async getWatchedRDSInstancesMetric(@Query() query: GetWatchedRDSInstancesMetricQueryDto) {
     return await this.rdsMetricService.getWatchedInstancesMetric(query);
   }
 }

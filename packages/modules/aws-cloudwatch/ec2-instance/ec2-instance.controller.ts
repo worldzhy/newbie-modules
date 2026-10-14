@@ -4,7 +4,7 @@ import { Ec2InstanceService } from "./ec2-instance.service";
 import {
   Ec2InstanceResponseDto,
   FetchEC2InstancesDto,
-  ListEC2InstancesDto,
+  ListEC2InstancesQueryDto,
   SyncEC2InstancesWatchDto,
 } from "./ec2-instance.dto";
 
@@ -17,7 +17,7 @@ export class Ec2InstanceController {
   @Get()
   @ApiOperation({ summary: "List EC2 instances with optional filters" })
   @ApiResponse({ type: Ec2InstanceResponseDto, isArray: true })
-  async listEC2Instances(@Query() query: ListEC2InstancesDto) {
+  async listEC2Instances(@Query() query: ListEC2InstancesQueryDto) {
     const { projectId, status, isWatching } = query;
     return await this.ec2InstanceService.listEC2Instances({ projectId, status, isWatching });
   }

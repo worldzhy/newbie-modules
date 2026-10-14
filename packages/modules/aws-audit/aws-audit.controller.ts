@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { AwsAuditService } from "./aws-audit.service";
-import { AwsAuditReportResponseDto, AwsAuditScanStartResponseDto, GetAwsAuditReportDto } from "./aws-audit.dto";
+import { AwsAuditReportResponseDto, AwsAuditScanStartResponseDto, GetAwsAuditReportQueryDto } from "./aws-audit.dto";
 
 @ApiTags("AWS Audit")
 @ApiBearerAuth()
@@ -14,7 +14,7 @@ export class AwsAuditController {
   @ApiResponse({ status: 200, type: AwsAuditReportResponseDto })
   async getProjectReport(
     @Param("projectId") projectId: string,
-    @Query() query: GetAwsAuditReportDto,
+    @Query() query: GetAwsAuditReportQueryDto,
   ): Promise<AwsAuditReportResponseDto> {
     return (await this.awsAuditService.getProjectAuditReport(projectId, {
       detail: query.detail !== "false",

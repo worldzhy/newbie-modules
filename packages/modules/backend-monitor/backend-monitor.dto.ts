@@ -228,7 +228,7 @@ export class CreateBackendMonitorIngestDto {
 }
 
 /** Query parameters for listing backend request logs. */
-export class ListBackendMonitorRequestLogsDto {
+export class ListBackendMonitorRequestLogsRequestDto {
   @ApiProperty({ type: String, description: "Application ID (UUID)" })
   @IsNotEmpty()
   @IsUUID()
@@ -270,7 +270,7 @@ export class ListBackendMonitorRequestLogsDto {
 }
 
 /** Query parameters for listing backend error logs. */
-export class ListBackendMonitorErrorLogsDto {
+export class ListBackendMonitorErrorLogsRequestDto {
   @ApiProperty({ type: String, description: "Application ID (UUID)" })
   @IsNotEmpty()
   @IsUUID()
@@ -386,7 +386,7 @@ export class BackendMonitorErrorLogResponseDto {
   ingested_at: string;
 }
 
-export class BackendMonitorRequestLogListResponseDto {
+export class ListBackendMonitorRequestLogsResponseDto {
   @ApiProperty({ type: [BackendMonitorRequestLogResponseDto] })
   records: BackendMonitorRequestLogResponseDto[];
 
@@ -394,7 +394,7 @@ export class BackendMonitorRequestLogListResponseDto {
   total: number;
 }
 
-export class BackendMonitorErrorLogListResponseDto {
+export class ListBackendMonitorErrorLogsResponseDto {
   @ApiProperty({ type: [BackendMonitorErrorLogResponseDto] })
   records: BackendMonitorErrorLogResponseDto[];
 

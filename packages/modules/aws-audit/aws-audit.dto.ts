@@ -530,7 +530,7 @@ export class AwsAuditScanStartResponseDto {
   scan: AwsAuditScanRecordDto;
 }
 
-export class GetAwsAuditReportDto {
+export class GetAwsAuditReportQueryDto {
   @ApiPropertyOptional({
     description: "When true, include full resource inventory. When false, only returns summary and findings.",
     default: true,

@@ -86,7 +86,7 @@ export class SecretResponseDto {
   createdAt?: Date | null;
 }
 
-export class SecretListResponseDto {
+export class ListSecretsResponseDto {
   @ApiProperty({ type: SecretResponseDto, isArray: true })
   records: SecretResponseDto[];
 
