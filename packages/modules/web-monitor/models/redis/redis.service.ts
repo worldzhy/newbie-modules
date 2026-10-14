@@ -23,13 +23,15 @@ export class RedisService implements OnModuleInit {
       }
       return raw || { host: "127.0.0.1", port: 6379, password: "", db: 1 };
     })();
+    // ioredis connects (and reconnects) automatically on construction.
+    // Calling connect() explicitly rejects with "Redis is already connecting/connected".
     this.client = new Redis({
       host: cfg.host,
       port: cfg.port,
       password: cfg.password,
       db: cfg.db,
     });
-    this.client.connect().catch((err) => {
+    this.client.on("error", (err: Error) => {
       this.logger.error("Redis connect error:", err instanceof Error ? err.message : String(err));
     });
   }
