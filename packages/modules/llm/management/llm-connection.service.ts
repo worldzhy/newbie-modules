@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { CreateLlmConnectionDto, LlmConnectionResponseDto, UpdateLlmConnectionDto } from "./llm-connection.dto";
 
@@ -33,6 +33,8 @@ export interface ModelCallOutcome {
 }
 
 const FAILURE_MESSAGE_MAX_LENGTH = 500;
+const PG_UNIQUE_VIOLATION = "P2002";
+const DUPLICATE_ENDPOINT_MESSAGE = "A connection with this API key already exists for the given endpoint.";
 
 /**
  * LLM connection configuration (ADR-006). One row = one callable AI endpoint
@@ -89,22 +91,30 @@ export class LlmConnectionService {
   }
 
   async create(dto: CreateLlmConnectionDto): Promise<LlmConnectionResponseDto> {
-    const record = (await this.prisma.llmConnection.create({
-      data: {
-        name: dto.name,
-        provider: dto.provider ?? "openai-compatible",
-        model: dto.model,
-        baseUrl: normalizeBaseUrl(dto.baseUrl ?? ""),
-        apiKey: dto.apiKey,
-      },
-      include: { scopes: true },
-    })) as LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+    const baseUrl = normalizeBaseUrl(dto.baseUrl ?? "");
+    await this.requireEndpointAvailable(baseUrl, dto.apiKey);
+
+    let record: LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+    try {
+      record = (await this.prisma.llmConnection.create({
+        data: {
+          name: dto.name,
+          provider: dto.provider ?? "openai-compatible",
+          model: dto.model,
+          baseUrl,
+          apiKey: dto.apiKey,
+        },
+        include: { scopes: true },
+      })) as LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+    } catch (error) {
+      rethrowUniqueAsConflict(error);
+    }
     this.logger.log(`LLM connection created: ${record.id} (${record.provider}/${record.model})`);
     return this.toResponse(record);
   }
 
   async update(id: string, dto: UpdateLlmConnectionDto): Promise<LlmConnectionResponseDto> {
-    await this.requireConnection(id);
+    const existing = await this.requireConnection(id);
 
     // The masked placeholder from a GET response must never overwrite the
     // stored secret. Clients keep the key unchanged by echoing it back.
@@ -117,11 +127,22 @@ export class LlmConnectionService {
       data.apiKey = dto.apiKey;
     }
 
-    const record = (await this.prisma.llmConnection.update({
-      where: { id },
-      data,
-      include: { scopes: true },
-    })) as LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+    // Changing the baseUrl while keeping the stored key can collide with
+    // another row just as much as changing the key itself.
+    const effectiveBaseUrl = data.baseUrl ?? existing.baseUrl;
+    const effectiveApiKey = data.apiKey ?? existing.apiKey;
+    await this.requireEndpointAvailable(effectiveBaseUrl, effectiveApiKey, id);
+
+    let record: LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+    try {
+      record = (await this.prisma.llmConnection.update({
+        where: { id },
+        data,
+        include: { scopes: true },
+      })) as LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+    } catch (error) {
+      rethrowUniqueAsConflict(error);
+    }
     this.logger.log(`LLM connection updated: ${id}`);
     return this.toResponse(record);
   }
@@ -166,6 +187,25 @@ export class LlmConnectionService {
     return record;
   }
 
+  /**
+   * Pre-write guard for the (baseUrl, apiKey) unique invariant: gives clients
+   * a deterministic 409 instead of a raw database error. The unique index
+   * stays the source of truth for concurrent writes, handled via P2002.
+   */
+  private async requireEndpointAvailable(baseUrl: string, apiKey: string, excludeId?: string): Promise<void> {
+    const duplicate = await this.prisma.llmConnection.findFirst({
+      where: {
+        baseUrl,
+        apiKey,
+        ...(excludeId !== undefined ? { NOT: { id: excludeId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ConflictException(DUPLICATE_ENDPOINT_MESSAGE);
+    }
+  }
+
   private toResponse(record: LlmConnectionRecord & { scopes: Array<{ scope: string }> }): LlmConnectionResponseDto {
     return {
       id: record.id,
@@ -194,4 +234,15 @@ function maskApiKey(apiKey: string): string {
 
 function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, "");
+}
+
+/**
+ * Race-window fallback when two concurrent writes pass the pre-check: the
+ * database unique index rejects one of them as Prisma P2002.
+ */
+function rethrowUniqueAsConflict(error: unknown): never {
+  if ((error as { code?: string } | null)?.code === PG_UNIQUE_VIOLATION) {
+    throw new ConflictException(DUPLICATE_ENDPOINT_MESSAGE);
+  }
+  throw error;
 }

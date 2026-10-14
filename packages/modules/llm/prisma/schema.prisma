@@ -31,6 +31,9 @@ model LlmConnection {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // One credential against one upstream endpoint exists at most once. The
+  // same key may back different models, but never a duplicate endpoint row.
+  @@unique([baseUrl, apiKey])
   @@schema("module/llm")
 }
 

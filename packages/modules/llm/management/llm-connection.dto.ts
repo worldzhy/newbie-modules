@@ -36,7 +36,10 @@ export class CreateLlmConnectionDto {
   @IsUrl({ require_tld: false, protocols: ["http", "https"], require_protocol: true })
   baseUrl?: string;
 
-  @ApiProperty({ description: "Upstream API key" })
+  @ApiProperty({
+    description:
+      "Upstream API key. Unique per endpoint (baseUrl): a second connection with the same key and baseUrl is rejected with 409.",
+  })
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
@@ -76,7 +79,8 @@ export class UpdateLlmConnectionDto {
   baseUrl?: string;
 
   @ApiPropertyOptional({
-    description: "New API key. Sending back the masked value from a GET response keeps the stored key unchanged.",
+    description:
+      "New API key. Must stay unique per endpoint (baseUrl). Sending back the masked value from a GET response keeps the stored key unchanged.",
   })
   @IsString()
   @IsOptional()
@@ -126,7 +130,8 @@ export class LlmConnectionResponseDto {
   @ApiPropertyOptional({
     type: String,
     nullable: true,
-    description: "Normalized failure category of the last failed call (timeout/auth/rate-limit/bad-request/payment/upstream)",
+    description:
+      "Normalized failure category of the last failed call (timeout/auth/rate-limit/bad-request/payment/upstream)",
   })
   lastFailureCategory?: string | null;
 
