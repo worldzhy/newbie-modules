@@ -4,6 +4,7 @@ import { Permission, PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import {
+  ListPermissionsRequestDto,
   ListPermissionsResponseDto,
   PermissionResponseDto,
   CreatePermissionDto,
@@ -59,16 +60,14 @@ export class PermissionController {
   @Get("")
   @ApiOperation({ summary: "Get permissions with pagination and optional resource filter" })
   @ApiResponse({ type: ListPermissionsResponseDto })
-  async list(
-    @Query("page") page: number,
-    @Query("pageSize") pageSize: number,
-    @Query("resource") resource?: string,
-  ) {
+  async list(@Query() query: ListPermissionsRequestDto) {
+    const { page, pageSize } = query;
+
     // [step 1] Construct where argument.
     let where: Prisma.PermissionWhereInput | undefined;
     const whereConditions: object[] = [];
-    if (resource) {
-      resource = resource.trim();
+    if (query.resource) {
+      const resource = query.resource.trim();
       if (resource.length > 0) {
         whereConditions.push({ resource: { search: resource } });
       }

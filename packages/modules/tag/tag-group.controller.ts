@@ -2,6 +2,7 @@ import { Controller, Delete, Get, Patch, Post, Body, Param, Query } from "@nestj
 import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { TagGroup, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { ListTagGroupsRequestDto } from "./tag.dto";
 
 @ApiTags("Tag / Group")
 @ApiBearerAuth()
@@ -26,7 +27,8 @@ export class TagGroupController {
   }
 
   @Get("")
-  async list(@Query("page") page: number, @Query("pageSize") pageSize: number) {
+  async list(@Query() query: ListTagGroupsRequestDto) {
+    const { page, pageSize } = query;
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.TagGroup,
       pagination: { page, pageSize },

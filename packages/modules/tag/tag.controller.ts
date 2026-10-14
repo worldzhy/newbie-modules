@@ -2,6 +2,7 @@ import { Controller, Delete, Get, Patch, Post, Body, Param, Query } from "@nestj
 import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { Tag, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { ListTagsRequestDto } from "./tag.dto";
 
 @ApiTags("Tag")
 @ApiBearerAuth()
@@ -53,12 +54,14 @@ export class TagController {
   }
 
   @Get("")
-  async list(@Query("page") page: number, @Query("pageSize") pageSize: number, @Query("name") name?: string) {
+  async list(@Query() query: ListTagsRequestDto) {
+    const { page, pageSize } = query;
+
     // [step 1] Construct where argument.
     let where: Prisma.TagWhereInput | undefined;
     const whereConditions: object[] = [];
-    if (name) {
-      name = name.trim();
+    if (query.name) {
+      const name = query.name.trim();
       if (name.length > 0) {
         whereConditions.push({ name: { contains: name, mode: "insensitive" } });
       }

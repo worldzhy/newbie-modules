@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { PermissionAction, Prisma, UserRole } from "@generated/prisma/client";
-import { CommonListResponseDto } from "@devbie/newbie/common.dto";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from "class-validator";
 
 /**
@@ -142,4 +142,14 @@ export class PermissionResponseDto {
 export class ListPermissionsResponseDto extends CommonListResponseDto {
   @ApiProperty({ type: PermissionResponseDto, isArray: true })
   declare records: PermissionResponseDto[];
+}
+
+/**
+ * Request DTO for listing permissions with pagination and optional resource filter.
+ */
+export class ListPermissionsRequestDto extends CommonListRequestDto {
+  @ApiPropertyOptional({ type: String, description: "Filter permissions by resource name." })
+  @IsOptional()
+  @IsString()
+  resource?: string;
 }

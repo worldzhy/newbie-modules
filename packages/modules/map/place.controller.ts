@@ -2,6 +2,7 @@ import { Controller, Delete, Get, Patch, Post, Body, Param, Query } from "@nestj
 import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { Prisma, Place } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { ListPlacesRequestDto } from "./place.dto";
 
 @ApiTags("Place")
 @ApiBearerAuth()
@@ -40,7 +41,8 @@ export class PlaceController {
   }
 
   @Get("")
-  async list(@Query("page") page: number, @Query("pageSize") pageSize: number) {
+  async list(@Query() query: ListPlacesRequestDto) {
+    const { page, pageSize } = query;
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.Place,
       pagination: { page, pageSize },

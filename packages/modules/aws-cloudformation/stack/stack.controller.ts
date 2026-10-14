@@ -4,6 +4,7 @@ import { AwsResourceStack, AwsResourceStackState, Prisma } from "@generated/pris
 import { CloudFormationStackType } from "@modules/aws-cloudformation/stack/stack.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCloudformationService } from "@modules/aws-cloudformation/cloudformation.service";
+import { ListStacksRequestDto } from "./stack.dto";
 
 @ApiTags("AWS CloudFormation Stack")
 @ApiBearerAuth()
@@ -54,7 +55,8 @@ export class AwsCloudformationStackController {
   }
 
   @Get("")
-  async list(@Query("environmentId") environmentId: number) {
+  async list(@Query() query: ListStacksRequestDto) {
+    const { environmentId } = query;
     return await this.prisma.findManyInOnePage({
       model: Prisma.ModelName.AwsResourceStack,
       findManyArgs: { where: { environmentId } },

@@ -3,6 +3,7 @@ import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { Organization, PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { ListOrganizationsRequestDto } from "./organization.dto";
 
 @ApiTags("Organization")
 @ApiBearerAuth()
@@ -31,15 +32,13 @@ export class OrganizationController {
 
   @Get("")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.Organization)
-  async getOrganizations(
-    @Query("page") page: number,
-    @Query("pageSize") pageSize: number,
-    @Query("name") name?: string,
-  ) {
+  async list(@Query() query: ListOrganizationsRequestDto) {
+    const { page, pageSize } = query;
+
     // [step 1] Construct where argument.
     let where: Prisma.OrganizationWhereInput | undefined;
-    if (name) {
-      name = name.trim();
+    if (query.name) {
+      const name = query.name.trim();
       if (name.length > 0) {
         where = { name: { search: name } };
       }
