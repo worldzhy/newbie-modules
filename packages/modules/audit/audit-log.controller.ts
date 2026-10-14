@@ -21,7 +21,7 @@ export class AuditLogController {
   @RequirePermission(PermissionAction.List, Prisma.ModelName.AuditLog)
   @ApiOperation({ summary: "List audit logs (admin only)" })
   @ApiResponse({ type: ListAuditLogsResponseDto })
-  async getAuditLogs(@Query() query: AuditLogQueryDto) {
+  async list(@Query() query: AuditLogQueryDto) {
     return await this.auditLogService.findMany(query);
   }
 }

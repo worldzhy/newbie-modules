@@ -79,7 +79,7 @@ export class UpdateJobScheduleDto {
   timezone?: string;
 }
 
-export class ListJobRunsQueryDto {
+export class ListJobRunsRequestDto {
   @ApiProperty({ required: false, default: 50, description: "Maximum runs to return (1-200)" })
   limit?: string;
 }

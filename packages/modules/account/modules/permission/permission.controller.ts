@@ -59,7 +59,7 @@ export class PermissionController {
   @Get("")
   @ApiOperation({ summary: "Get permissions with pagination and optional resource filter" })
   @ApiResponse({ type: ListPermissionsResponseDto })
-  async getPermissions(
+  async list(
     @Query("page") page: number,
     @Query("pageSize") pageSize: number,
     @Query("resource") resource?: string,

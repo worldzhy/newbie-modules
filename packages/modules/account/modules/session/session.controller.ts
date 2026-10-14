@@ -23,7 +23,7 @@ export class SessionController {
   @Get()
   @ApiOperation({ summary: "Get sessions for a user" })
   @ApiResponse({ type: ListSessionsResponseDto })
-  async getAll(
+  async list(
     @Req() req: UserRequest,
     @Param("userId") userId: string,
     @Query() query: ListSessionsRequestDto,

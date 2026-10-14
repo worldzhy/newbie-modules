@@ -32,7 +32,7 @@ export class Ec2InstanceResponseDto {
   updatedAt: Date;
 }
 
-export class ListEC2InstancesQueryDto {
+export class ListEC2InstancesRequestDto {
   @ApiProperty()
   @IsUUID()
   projectId: string;

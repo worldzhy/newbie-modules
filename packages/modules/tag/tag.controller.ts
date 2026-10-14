@@ -53,7 +53,7 @@ export class TagController {
   }
 
   @Get("")
-  async getTags(@Query("page") page: number, @Query("pageSize") pageSize: number, @Query("name") name?: string) {
+  async list(@Query("page") page: number, @Query("pageSize") pageSize: number, @Query("name") name?: string) {
     // [step 1] Construct where argument.
     let where: Prisma.TagWhereInput | undefined;
     const whereConditions: object[] = [];

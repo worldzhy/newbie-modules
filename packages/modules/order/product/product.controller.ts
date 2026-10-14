@@ -25,7 +25,7 @@ export class ProductController {
 
   @Get("")
   @ApiResponse({ type: ListProductsResponseDto })
-  async getProducts(@Query() query: ListProductsRequestDto) {
+  async list(@Query() query: ListProductsRequestDto) {
     const { name, ...pagination } = query;
 
     return await this.prisma.findManyInManyPages({

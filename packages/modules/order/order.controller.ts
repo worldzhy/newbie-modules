@@ -64,7 +64,7 @@ export class OrderController {
 
   @Get("")
   @ApiResponse({ type: ListOrdersResponseDto })
-  async getOrders(@Query() query: ListOrdersRequestDto) {
+  async list(@Query() query: ListOrdersRequestDto) {
     const result = await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.Order,
       pagination: query,

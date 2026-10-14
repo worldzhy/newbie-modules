@@ -40,7 +40,7 @@ export class PlaceController {
   }
 
   @Get("")
-  async getPlaces(@Query("page") page: number, @Query("pageSize") pageSize: number) {
+  async list(@Query("page") page: number, @Query("pageSize") pageSize: number) {
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.Place,
       pagination: { page, pageSize },

@@ -35,7 +35,7 @@ export class MembershipController {
     type: ListMembershipsResponseDto,
     description: "List of memberships for the organization",
   })
-  async getAll(@Param("organizationId") organizationId: string, @Query() query: ListMembershipsRequestDto) {
+  async list(@Param("organizationId") organizationId: string, @Query() query: ListMembershipsRequestDto) {
     const { page, pageSize } = query;
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.OrgMembership,

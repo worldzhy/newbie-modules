@@ -54,7 +54,7 @@ export class AwsCloudformationStackController {
   }
 
   @Get("")
-  async getStacks(@Query("environmentId") environmentId: number) {
+  async list(@Query("environmentId") environmentId: number) {
     return await this.prisma.findManyInOnePage({
       model: Prisma.ModelName.AwsResourceStack,
       findManyArgs: { where: { environmentId } },

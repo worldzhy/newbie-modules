@@ -43,7 +43,7 @@ export class RdsInstanceResponseDto {
   updatedAt: Date;
 }
 
-export class ListRDSInstancesQueryDto {
+export class ListRDSInstancesRequestDto {
   @ApiProperty()
   @IsUUID()
   projectId: string;
@@ -84,7 +84,7 @@ export class SyncRDSInstancesWatchDto {
   unwatchRDSInstanceIds: string[];
 }
 
-export class GetWatchedRDSInstancesMetricQueryDto {
+export class GetWatchedRDSInstancesMetricRequestDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsUUID("4")

@@ -26,7 +26,7 @@ export class TagGroupController {
   }
 
   @Get("")
-  async getTagGroups(@Query("page") page: number, @Query("pageSize") pageSize: number) {
+  async list(@Query("page") page: number, @Query("pageSize") pageSize: number) {
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.TagGroup,
       pagination: { page, pageSize },
