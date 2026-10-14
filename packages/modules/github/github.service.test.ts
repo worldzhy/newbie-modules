@@ -344,6 +344,116 @@ describe("GitHubService.upsertEnvExample", () => {
   });
 });
 
+describe("GitHubService.rewritePackageIdentity", () => {
+  const encodeFile = (text: string, sha = "sha-1") => ({
+    data: { type: "file", content: Buffer.from(text).toString("base64"), sha },
+  });
+
+  /** Dispatch getContent by path so package.json and lockfile return distinct files. */
+  function contentByPath(files: Record<string, unknown>) {
+    return async (args: any) => {
+      const hit = files[args.path];
+      if (hit === undefined) throw httpError(404);
+      return hit;
+    };
+  }
+
+  it("rewrites package.json plus both lockfile root name fields in two commits", async () => {
+    const packageJson = { name: "newbie-basic-template", version: "0.1.0" };
+    const lock = {
+      name: "newbie-basic-template",
+      lockfileVersion: 3,
+      packages: { "": { name: "newbie-basic-template", version: "0.1.0" } },
+    };
+    const m = makeOctokitMock({
+      "repos.getContent": contentByPath({
+        "package.json": encodeFile(JSON.stringify(packageJson, null, 2)),
+        "package-lock.json": encodeFile(JSON.stringify(lock, null, 2), "sha-lock"),
+      }),
+      "repos.createOrUpdateFileContents": async () => ({}),
+    });
+    const service = makeService(m);
+
+    await service.rewritePackageIdentity("o", "r", "my-app");
+
+    const writes = m.calls["repos.createOrUpdateFileContents"];
+    assert.equal(writes.length, 2);
+    const [pkgArg, lockArg] = writes.map((w) => w[0]);
+    assert.equal(pkgArg.path, "package.json");
+    assert.equal(pkgArg.sha, "sha-1");
+    assert.equal(JSON.parse(Buffer.from(pkgArg.content, "base64").toString("utf-8")).name, "my-app");
+    assert.equal(lockArg.path, "package-lock.json");
+    assert.equal(lockArg.sha, "sha-lock");
+    const writtenLock = JSON.parse(Buffer.from(lockArg.content, "base64").toString("utf-8"));
+    assert.equal(writtenLock.name, "my-app");
+    assert.equal(writtenLock.packages[""].name, "my-app");
+  });
+
+  it("makes no commits when both files already carry the target name (idempotent retry)", async () => {
+    const m = makeOctokitMock({
+      "repos.getContent": contentByPath({
+        "package.json": encodeFile(JSON.stringify({ name: "my-app" })),
+        "package-lock.json": encodeFile(JSON.stringify({ name: "my-app", packages: { "": { name: "my-app" } } })),
+      }),
+    });
+    const service = makeService(m);
+
+    await service.rewritePackageIdentity("o", "r", "my-app");
+    assert.equal(m.calls["repos.createOrUpdateFileContents"]?.length ?? 0, 0);
+  });
+
+  it("throws when package.json is missing (broken starter) instead of silently skipping", async () => {
+    const m = makeOctokitMock({
+      "repos.getContent": async () => {
+        throw httpError(404);
+      },
+    });
+    const service = makeService(m);
+    await assert.rejects(service.rewritePackageIdentity("o", "r", "my-app"), /package\.json not found/);
+    assert.equal(m.calls["repos.createOrUpdateFileContents"]?.length ?? 0, 0);
+  });
+
+  it("tolerates a missing package-lock.json and only rewrites package.json", async () => {
+    const m = makeOctokitMock({
+      "repos.getContent": contentByPath({
+        "package.json": encodeFile(JSON.stringify({ name: "fewbie-basic-template" })),
+      }),
+      "repos.createOrUpdateFileContents": async () => ({}),
+    });
+    const service = makeService(m);
+
+    await service.rewritePackageIdentity("o", "r", "web-app");
+    const writes = m.calls["repos.createOrUpdateFileContents"];
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0][0].path, "package.json");
+  });
+
+  it("updates only the lock fields that are present", async () => {
+    // Old lockfile shape without packages[""].name.
+    const m = makeOctokitMock({
+      "repos.getContent": contentByPath({
+        "package.json": encodeFile(JSON.stringify({ name: "tpl" })),
+        "package-lock.json": encodeFile(JSON.stringify({ name: "tpl", lockfileVersion: 2 }), "l"),
+      }),
+      "repos.createOrUpdateFileContents": async () => ({}),
+    });
+    const service = makeService(m);
+
+    await service.rewritePackageIdentity("o", "r", "svc");
+    const lockArg = m.calls["repos.createOrUpdateFileContents"][1][0];
+    const writtenLock = JSON.parse(Buffer.from(lockArg.content, "base64").toString("utf-8"));
+    assert.equal(writtenLock.name, "svc");
+    assert.equal(writtenLock.packages, undefined);
+  });
+
+  it("rejects an invalid npm package name before touching the API", async () => {
+    const m = makeOctokitMock({});
+    const service = makeService(m);
+    await assert.rejects(service.rewritePackageIdentity("o", "r", "UPPER-CASE"), /Invalid npm package name/);
+    assert.equal(m.calls["repos.getContent"]?.length ?? 0, 0);
+  });
+});
+
 describe("GitHubService.deleteRepo", () => {
   it("ignores 404 (best-effort deletion)", async () => {
     const m = makeOctokitMock({

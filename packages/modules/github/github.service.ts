@@ -41,6 +41,19 @@ function extractEnvKeys(content: string): Set<string> {
   return keys;
 }
 
+/**
+ * npm package-name rule, mirrored verbatim from the newbie/fewbie CLIs
+ * (`create`/`init` validate the project name with the same regex):
+ * lowercase, URL-safe characters, scoped names allowed.
+ */
+const PACKAGE_NAME_RE = /^(?:@[a-z0-9][a-z0-9-._]*\/)?[a-z0-9][a-z0-9-._]*$/;
+
+/** A regular file fetched from a repository, with the sha needed to update it. */
+interface RepoFile {
+  content: string;
+  sha: string;
+}
+
 @Injectable()
 export class GitHubService {
   private logger = new Logger(GitHubService.name);
@@ -179,17 +192,117 @@ export class GitHubService {
    * Used by dep-scan to fetch lockfiles from application repositories.
    */
   async getFileContent(owner: string, repo: string, path: string): Promise<string | null> {
+    const file = await this.readTextFile(owner, repo, path);
+    return file ? file.content : null;
+  }
+
+  /**
+   * Read a UTF-8 text file together with its blob sha (required by the
+   * Contents API for an update). Returns null when the path does not exist
+   * (404) or is not a regular file.
+   */
+  private async readTextFile(owner: string, repo: string, path: string): Promise<RepoFile | null> {
     try {
       const { data } = await this.octokit.repos.getContent({ owner, repo, path });
       // Content API returns an array for directories; we only care about files.
       if (Array.isArray(data) || data.type !== "file") {
         return null;
       }
-      return Buffer.from(data.content, "base64").toString("utf-8");
+      return { content: Buffer.from(data.content, "base64").toString("utf-8"), sha: data.sha };
     } catch (e: unknown) {
       if (octokitStatus(e) === 404) return null;
       throw e;
     }
+  }
+
+  /**
+   * Rewrite the generated repo's npm package identity so the application
+   * repository no longer carries the starter template's package name. This
+   * is the platform (GitHub generate) counterpart of what the framework
+   * CLIs do locally (`newbie create` / `fewbie init` both overwrite
+   * package.json `name` with the project name): generate copies the starter
+   * wholesale and the provisioning layer never runs the CLI.
+   *
+   * - package.json `name` is always rewritten (a missing package.json means
+   *   the starter is broken — throw rather than silently skipping).
+   * - package-lock.json (shipped intentionally in the starter repos) carries
+   *   the root name in two places — the top-level field and
+   *   `packages[""].name`; both are updated. A missing lockfile is tolerated
+   *   (future starters may not ship one).
+   *
+   * Idempotent: when the names already equal `packageName`, no commit is
+   * made, so provisioning retries converge without churn.
+   */
+  async rewritePackageIdentity(owner: string, repo: string, packageName: string): Promise<void> {
+    if (!PACKAGE_NAME_RE.test(packageName) || packageName.length > 214) {
+      throw new Error(`Invalid npm package name '${packageName}'`);
+    }
+
+    // package.json — required.
+    const packageJsonFile = await this.readTextFile(owner, repo, "package.json");
+    if (!packageJsonFile) {
+      throw new Error(`package.json not found in ${owner}/${repo}; cannot rewrite package name`);
+    }
+    const packageJson = JSON.parse(packageJsonFile.content) as { name?: string; [key: string]: unknown };
+    if (packageJson.name !== packageName) {
+      packageJson.name = packageName;
+      await this.writeTextFile(
+        owner,
+        repo,
+        "package.json",
+        `${JSON.stringify(packageJson, null, 2)}\n`,
+        packageJsonFile.sha,
+        `chore: set package name to ${packageName}`,
+      );
+    }
+
+    // package-lock.json — optional; its two root identity fields must match.
+    const lockFile = await this.readTextFile(owner, repo, "package-lock.json");
+    if (!lockFile) return;
+    const lock = JSON.parse(lockFile.content) as {
+      name?: string;
+      packages?: { ""?: { name?: string } };
+      [key: string]: unknown;
+    };
+    let changed = false;
+    if (typeof lock.name === "string" && lock.name !== packageName) {
+      lock.name = packageName;
+      changed = true;
+    }
+    const rootEntry = lock.packages?.[""];
+    if (rootEntry && typeof rootEntry.name === "string" && rootEntry.name !== packageName) {
+      rootEntry.name = packageName;
+      changed = true;
+    }
+    if (changed) {
+      await this.writeTextFile(
+        owner,
+        repo,
+        "package-lock.json",
+        `${JSON.stringify(lock, null, 2)}\n`,
+        lockFile.sha,
+        `chore: sync package-lock name to ${packageName}`,
+      );
+    }
+  }
+
+  /** Create or update a UTF-8 text file on the default branch via Contents API. */
+  private async writeTextFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    sha: string | undefined,
+    message: string,
+  ): Promise<void> {
+    await this.octokit.repos.createOrUpdateFileContents({
+      owner,
+      repo,
+      path,
+      message,
+      content: Buffer.from(content).toString("base64"),
+      ...(sha ? { sha } : {}),
+    });
   }
 
   /**
@@ -204,23 +317,9 @@ export class GitHubService {
   async upsertEnvExample(org: string, repo: string, placeholderLines: string[]): Promise<void> {
     if (placeholderLines.length === 0) return;
 
-    let sha: string | undefined;
-    let existing = "";
-    try {
-      const { data } = await this.octokit.repos.getContent({
-        owner: org,
-        repo,
-        path: ".env.example",
-      });
-      // Content API returns an array for directories; we only care about files.
-      if (!Array.isArray(data) && data.type === "file") {
-        sha = data.sha;
-        existing = Buffer.from(data.content, "base64").toString("utf-8");
-      }
-    } catch (e: unknown) {
-      if (octokitStatus(e) !== 404) throw e;
-      // 404 → file does not exist yet; create it below.
-    }
+    // 404 → file does not exist yet; create it below without a sha.
+    const existingFile = await this.readTextFile(org, repo, ".env.example");
+    const existing = existingFile?.content ?? "";
 
     const existingKeys = extractEnvKeys(existing);
     const toAdd = placeholderLines.filter((line) => {
@@ -232,14 +331,14 @@ export class GitHubService {
     const separator = existing && !existing.endsWith("\n") ? "\n" : "";
     const updated = existing + separator + toAdd.join("\n") + "\n";
 
-    await this.octokit.repos.createOrUpdateFileContents({
-      owner: org,
+    await this.writeTextFile(
+      org,
       repo,
-      path: ".env.example",
-      message: "chore: add monitoring credential placeholders",
-      content: Buffer.from(updated).toString("base64"),
-      sha,
-    });
+      ".env.example",
+      updated,
+      existingFile?.sha,
+      "chore: add monitoring credential placeholders",
+    );
   }
 
   /**
