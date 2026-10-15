@@ -1,7 +1,7 @@
 /**
  * Provider-neutral chat model port for the unified LLM provider module.
  *
- * Every model consumer (copilot agent kernel, ai-analysis, jdy, ...) depends
+ * Every model consumer (copilot agent kernel, analysis, jdy, ...) depends
  * on this interface, never on a concrete SDK. The AI SDK implementation lives
  * in a single adapter file and can be replaced without touching consumers.
  */

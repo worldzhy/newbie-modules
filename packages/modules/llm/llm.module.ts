@@ -14,7 +14,7 @@ import { ChatModelResolver } from "./chat-model.resolver";
  * the ChatModelResolver with its provider-level health decorator, and the
  * periodic status probe.
  *
- * Consumers (copilot kernel, backend-monitor ai-analysis, host jdy services,
+ * Consumers (copilot kernel, host analysis/jdy services,
  * ...) inject ChatModelResolver and resolve their own hardcoded scope; none of
  * them constructs an SDK client directly. A connection can serve multiple scopes;
  * health is shared across all scopes using that connection.
