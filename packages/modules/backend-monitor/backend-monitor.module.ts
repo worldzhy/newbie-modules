@@ -4,8 +4,6 @@ import { BackendMonitorService } from "./backend-monitor.service";
 import { InstallationController } from "./controllers/installation.controller";
 import { MonitorTokenResolver } from "./monitor-token.resolver";
 import { MonitorInstallationService } from "./services/monitor-installation.service";
-import { AiAnalysisController } from "./ai-analysis/ai-analysis.controller";
-import { AiAnalysisService } from "./ai-analysis/ai-analysis.service";
 
 /**
  * BackendMonitorModule
@@ -15,18 +13,18 @@ import { AiAnalysisService } from "./ai-analysis/ai-analysis.service";
  * token (module-hub design §9.2, Phase 3 pilot — the module owns its token
  * table instead of reading application.Agent/SERVER_MONITOR), and stores
  * them in ClickHouse. Query endpoints back the monitoring UI's request/error
- * log lists. The ai-analysis sub-feature lets users chat with an LLM
- * (resolved from the unified llm module under the "ai-analysis" scope) that
- * generates ClickHouse SQL against those same tables and streams back
- * chart/table blocks plus an insight summary.
+ * log lists. The former ai-analysis sub-feature moved to the consuming
+ * project's application layer as project-level "analysis" (ADR-011 in
+ * nightwatch-backend) — it spans the project roster, web-monitor tables and
+ * the llm module, none of which belong to this module's domain.
  *
  * ClickHouse DDL lives in the consuming project's clickhouse/migrations
  * directory (ClickHouse has no migration runner).
  */
 @Global()
 @Module({
-  controllers: [BackendMonitorController, InstallationController, AiAnalysisController],
-  providers: [BackendMonitorService, MonitorInstallationService, MonitorTokenResolver, AiAnalysisService],
+  controllers: [BackendMonitorController, InstallationController],
+  providers: [BackendMonitorService, MonitorInstallationService, MonitorTokenResolver],
   // MonitorInstallationService is exported for consuming projects whose
   // application layer provisions installations (e.g. nightwatch).
   exports: [BackendMonitorService, MonitorInstallationService],

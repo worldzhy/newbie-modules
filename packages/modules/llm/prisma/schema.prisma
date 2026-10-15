@@ -38,7 +38,7 @@ model LlmConnection {
 }
 
 // Consumer-scope binding (ADR-006). Maps an opaque scope string ("copilot",
-// "ai-analysis", "jdy", ...) to a connection. One scope binds to exactly one
+// "analysis", "jdy", ...) to a connection. One scope binds to exactly one
 // connection (scope is unique); a connection can serve many scopes. Deleting
 // a connection cascades to all its assignments.
 model LlmScopeAssignment {
