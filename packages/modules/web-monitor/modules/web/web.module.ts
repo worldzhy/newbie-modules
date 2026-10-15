@@ -16,13 +16,13 @@ import { ResourceController } from "./resource.controller";
 import { EnvironmentController } from "./environment.controller";
 import { CustomController } from "./custom.controller";
 import { PvuvipController } from "./pvuvip.controller";
-import { AnalysisController } from "./analysis.controller";
+import { WebMonitorAnalysisController } from "./analysis.controller";
 import { AjaxService } from "./services/ajax.service";
 import { ErrorService } from "./services/error.service";
 import { PageService } from "./services/page.service";
 import { ResourceService } from "./services/resource.service";
 import { EnvironmentService } from "./services/environment.service";
-import { AnalysisService } from "./services/analysis.service";
+import { WebMonitorAnalysisService } from "./services/analysis.service";
 import { PvuvipService } from "./services/pvuvip.service";
 import { WebCustomService } from "./services/custom.service";
 import { WebReportTaskService } from "./services/report-task.service";
@@ -40,7 +40,7 @@ import { WebIpTaskService } from "./services/ip-task.service";
     EnvironmentController,
     CustomController,
     PvuvipController,
-    AnalysisController,
+    WebMonitorAnalysisController,
   ],
   providers: [
     AjaxService,
@@ -48,7 +48,7 @@ import { WebIpTaskService } from "./services/ip-task.service";
     PageService,
     ResourceService,
     EnvironmentService,
-    AnalysisService,
+    WebMonitorAnalysisService,
     PvuvipService,
     WebCustomService,
     WebReportTaskService,
@@ -61,7 +61,7 @@ import { WebIpTaskService } from "./services/ip-task.service";
   ],
   // WebInstallationService is re-exported by the root WebMonitorModule for
   // consuming projects whose application layer provisions installations.
-  // PvuvipService/PageService/AnalysisService are read services exported for
+  // PvuvipService/PageService/WebMonitorAnalysisService are read services exported for
   // consuming-project application layers that read aggregated web metrics
   // (e.g. the nightwatch copilot frontend-monitoring data source).
   exports: [
@@ -71,7 +71,7 @@ import { WebIpTaskService } from "./services/ip-task.service";
     WebInstallationService,
     PvuvipService,
     PageService,
-    AnalysisService,
+    WebMonitorAnalysisService,
   ],
 })
 export class WebModule {}

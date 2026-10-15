@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
-import { AnalysisService } from "./services/analysis.service";
+import { WebMonitorAnalysisService } from "./services/analysis.service";
 import {
   ListWebMonitorAnalysisUsersResponseDto,
   WebMonitorProvinceCountResponseDto,
@@ -11,8 +11,8 @@ import { WebMonitorEnvironmentResponseDto } from "./environment.dto";
 
 @ApiTags("Frontend Monitor / Web / Analysis")
 @Controller("/api/v1/analysis")
-export class AnalysisController {
-  constructor(private readonly analysisSrv: AnalysisService) {}
+export class WebMonitorAnalysisController {
+  constructor(private readonly analysisService: WebMonitorAnalysisService) {}
 
   @Get("/getAnalysislist")
   @ApiOperation({ summary: "Get user funnel analysis list" })
@@ -20,7 +20,7 @@ export class AnalysisController {
   async getAnalysislist(@Query() q: Record<string, unknown>) {
     const { appId, beginTime, endTime, uid, phone } = q;
     if (!appId) throw new Error("User funnel analysis list: appId must not be empty");
-    const result = await this.analysisSrv.getAnalysislist(
+    const result = await this.analysisService.getAnalysislist(
       String(appId),
       beginTime as string | undefined,
       endTime as string | undefined,
@@ -36,7 +36,7 @@ export class AnalysisController {
     const { appId, markUser } = q;
     if (!appId) throw new Error("Single user behavior trail list: appId must not be empty");
     if (!markUser) throw new Error("Single user behavior trail list: markUser must not be empty");
-    const result = await this.analysisSrv.getAnalysisOneList(String(appId), String(markUser));
+    const result = await this.analysisService.getAnalysisOneList(String(appId), String(markUser));
     return func.result({ data: result });
   }
 
@@ -46,7 +46,7 @@ export class AnalysisController {
   async getTopDatas(@Query() q: Record<string, unknown>) {
     const { appId, beginTime, endTime } = q;
     if (!appId) throw new Error("appId must not be empty");
-    const data = await this.analysisSrv.getTopDatas(
+    const data = await this.analysisService.getTopDatas(
       String(appId),
       beginTime as string | undefined,
       endTime as string | undefined,
@@ -60,7 +60,7 @@ export class AnalysisController {
   async getProvinceCount(@Query() q: Record<string, unknown>) {
     const { appId, beginTime, endTime } = q;
     if (!appId) throw new Error("appId must not be empty");
-    const result = await this.analysisSrv.getProvinceCount(
+    const result = await this.analysisService.getProvinceCount(
       String(appId),
       beginTime as string | undefined,
       endTime as string | undefined,

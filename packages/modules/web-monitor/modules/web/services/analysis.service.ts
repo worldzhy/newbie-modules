@@ -4,7 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { func } from "../../../shared/utils";
 
 @Injectable()
-export class AnalysisService {
+export class WebMonitorAnalysisService {
   private cfg: Record<string, unknown>;
   constructor(
     private readonly models: MonitorModelsService,
