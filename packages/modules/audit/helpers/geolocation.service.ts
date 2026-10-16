@@ -10,6 +10,7 @@ import { LRUCache } from "lru-cache";
 export class GeolocationService implements OnModuleDestroy {
   private readonly logger = new Logger(GeolocationService.name);
   private reader: Reader<CityResponse> | null;
+  private openFailed = false;
   private lru: LRUCache<string, Partial<CityResponse>>;
 
   constructor(private config: ConfigService) {
@@ -51,17 +52,34 @@ export class GeolocationService implements OnModuleDestroy {
    * Fall back to the managed open only when no cached copy exists yet.
    */
   private async openReader(): Promise<Reader<CityResponse> | null> {
+    if (this.openFailed) return null;
+
     const cachedDatabasePath = this.getCachedDatabasePath();
     if (cachedDatabasePath && existsSync(cachedDatabasePath)) {
       return await maxmind.open<CityResponse>(cachedDatabasePath);
     }
 
-    try {
-      return await geolite2.open(GeoIpDbName.City, (databasePath) => maxmind.open<CityResponse>(databasePath));
-    } catch (error) {
-      this.logger.error(`GeoLite database is unavailable: ${String(error)}`);
+    // geolite2.open() downloads the database and spawns a background
+    // auto-updater before resolving. On hosts where the package directory is
+    // not writable or the download endpoint is slow, that stalls every
+    // request that resolves geolocation (login included) for minutes. Bound
+    // the attempt; the losing promise carries a catch so the eventual
+    // rejection stays handled, and stop retrying after the first failure.
+    const openPromise = geolite2
+      .open(GeoIpDbName.City, (databasePath) => maxmind.open<CityResponse>(databasePath))
+      .catch((error) => {
+        this.logger.error(`GeoLite database is unavailable: ${String(error)}`);
+        return null;
+      });
+    const raced = await Promise.race([
+      openPromise,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
+    ]);
+    if (!raced) {
+      this.openFailed = true;
       return null;
     }
+    return raced;
   }
 
   private getCachedDatabasePath(): string | null {
