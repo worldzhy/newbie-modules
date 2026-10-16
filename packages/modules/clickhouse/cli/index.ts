@@ -28,8 +28,5 @@ export function register(parent: Command, options: { cwd: string }): void {
     .description("Apply pending forward-only ClickHouse migrations from installed modules")
     .action(run("deploy"));
 
-  parent
-    .command("status")
-    .description("Show applied and pending ClickHouse migrations")
-    .action(run("status"));
+  parent.command("status").description("Show applied and pending ClickHouse migrations").action(run("status"));
 }
