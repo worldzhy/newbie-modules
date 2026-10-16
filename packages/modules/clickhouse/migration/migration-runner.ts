@@ -225,7 +225,9 @@ export async function discoverMigrations(modulesRoot: string): Promise<Discovere
 /** Read the applied-history rows (ordered by version) from the target database. */
 export async function readAppliedMigrations(client: ClickHouseClient): Promise<AppliedMigration[]> {
   const result = await client.query({
-    query: `SELECT version, name, checksum, formatDateTime(applied_at, '%Y-%m-%d %H:%M:%S') AS appliedAt
+    // ClickHouse formatDateTime follows MySQL-style specifiers: minute is %i
+    // (%M renders the month name).
+    query: `SELECT version, name, checksum, formatDateTime(applied_at, '%Y-%m-%d %H:%i:%S') AS appliedAt
             FROM ${HISTORY_TABLE} ORDER BY version`,
     format: "JSONEachRow",
   });
