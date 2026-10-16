@@ -16,7 +16,9 @@ import { HttpAccessInterceptor } from "./http-access.interceptor";
     GeolocationService,
     { provide: APP_INTERCEPTOR, useClass: HttpAccessInterceptor },
   ],
-  exports: [AuditLogService, AuditContextService],
+  // GeolocationService is exported so other modules (account session/auth
+  // flows) inject the single shared instance instead of carrying a copy.
+  exports: [AuditLogService, AuditContextService, GeolocationService],
 })
 export class AuditModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

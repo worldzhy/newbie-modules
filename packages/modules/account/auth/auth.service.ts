@@ -20,7 +20,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { SignUpDto } from "@modules/account/auth/auth.dto";
 import { Expose, expose } from "@modules/account/helpers/expose";
 import { verifyEmail } from "@modules/account/helpers/validator";
-import { GeolocationService } from "@modules/account/helpers/geolocation.service";
+import { GeolocationService } from "@modules/audit/helpers/geolocation.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
 import { TwoFactorService } from "@modules/account/modules/two-factor/two-factor.service";
 import { LoginResult } from "@modules/account/account.interface";

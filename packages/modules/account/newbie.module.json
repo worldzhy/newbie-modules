@@ -10,7 +10,6 @@
   "config-service": {
     "account": {
       "cache": {
-        "geolocationLruSize": "int(process.env.CACHE_GEOLOCATION_LRU_SIZE, 100)",
         "apiKeyLruSize": "int(process.env.CACHE_APIKEY_LRU_SIZE, 100)"
       },
       "verificationCode": {
@@ -39,7 +38,6 @@
   },
   "env": {
     "ACCOUNT_APPROVED_SUBNET_HMAC_SECRET": "",
-    "CACHE_GEOLOCATION_LRU_SIZE": "",
     "CACHE_APIKEY_LRU_SIZE": "",
     "GOOGLE_AUTH_CLIENT_ID": "",
     "GOOGLE_AUTH_CLIENT_SECRET": "",
@@ -51,10 +49,8 @@
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.59.0",
     "@nestjs/passport": "latest",
-    "geolite2-redist": "latest",
     "ip-anonymize": "latest",
     "lru-cache": "latest",
-    "maxmind": "latest",
     "otplib": "latest",
     "passport": "latest",
     "passport-custom": "latest",

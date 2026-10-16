@@ -6,7 +6,6 @@ import { LOGIN_ACCOUNT_RESOLVER } from "@modules/security/ports/login-account.re
 
 import { AccountController } from "./account.controller";
 import { AccountService } from "./account.service";
-import { GeolocationService } from "./helpers/geolocation.service";
 import { AuthModule } from "./auth/auth.module";
 
 import { ApiKeyModule } from "./modules/api-key/api-key.module";
@@ -36,9 +35,10 @@ import { AccountLoginAccountResolver } from "./security-ports/login-account.reso
     VerificationCodeModule,
   ],
   controllers: [AccountController],
+  // GeolocationService comes from the audit foundation module (@Global +
+  // exported); account consumes it instead of carrying a duplicate copy.
   providers: [
     AccountService,
-    GeolocationService,
     // Bind account's data layer to security's SPI ports.
     { provide: ACCESS_TOKEN_SESSION_RESOLVER, useClass: AccountAccessTokenSessionResolver },
     { provide: API_KEY_VERIFIER, useClass: AccountApiKeyVerifier },
@@ -47,7 +47,6 @@ import { AccountLoginAccountResolver } from "./security-ports/login-account.reso
   ],
   exports: [
     AccountService,
-    GeolocationService,
     // Re-export the SPI bindings so the security foundation module can inject
     // them (cross-module Symbol-token providers require explicit export).
     ACCESS_TOKEN_SESSION_RESOLVER,

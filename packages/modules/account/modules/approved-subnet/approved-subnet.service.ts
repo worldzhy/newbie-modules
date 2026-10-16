@@ -6,7 +6,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import anonymize from "ip-anonymize";
 import { APPROVED_SUBNET_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
 import { Expose, expose } from "../../helpers/expose";
-import { GeolocationService } from "../../helpers/geolocation.service";
+import { GeolocationService } from "@modules/audit/helpers/geolocation.service";
 import { computeSubnetHmac } from "../../helpers/subnet-hmac";
 import { compareHash, generateHash } from "@devbie/newbie/utilities/common.util";
 
