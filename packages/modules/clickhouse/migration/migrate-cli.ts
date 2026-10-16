@@ -2,7 +2,11 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { getMigrationStatus, runMigrations, type ClickhouseMigrationConfig } from "./migration-runner";
+import {
+  getMigrationStatus,
+  runMigrations,
+  type ClickhouseMigrationConfig,
+} from "./migration-runner";
 
 /**
  * Deployment/standalone frontend for the ClickHouse migration engine.
@@ -48,7 +52,10 @@ export function loadDotEnv(cwd: string): void {
     const key = withoutExport.slice(0, equalsIndex).trim();
     if (!key || process.env[key] !== undefined) continue;
     let value = withoutExport.slice(equalsIndex + 1).trim();
-    if ((value.startsWith("'") && value.endsWith("'")) || (value.startsWith('"') && value.endsWith('"'))) {
+    if (
+      (value.startsWith("'") && value.endsWith("'")) ||
+      (value.startsWith('"') && value.endsWith('"'))
+    ) {
       value = value.slice(1, -1);
     }
     process.env[key] = value;
@@ -68,9 +75,7 @@ export function resolveConfig(cwd: string): ClickhouseMigrationConfig {
 export async function runMigrateCli(argv: string[], options: CliOptions): Promise<number> {
   const command = argv[0];
   const rootFlag = argv.find((arg) => arg.startsWith("--modules-root="));
-  const modulesRoot = rootFlag
-    ? rootFlag.slice("--modules-root=".length)
-    : (options.modulesRoot ?? DEFAULT_MODULES_ROOT);
+  const modulesRoot = rootFlag ? rootFlag.slice("--modules-root=".length) : options.modulesRoot ?? DEFAULT_MODULES_ROOT;
   const cwd = options.cwd;
   const config = resolveConfig(cwd);
   const log = (message: string): void => console.log(`[clickhouse-migrate] ${message}`);

@@ -210,9 +210,7 @@ export async function discoverMigrations(modulesRoot: string): Promise<Discovere
     }
   }
 
-  discovered.sort((a, b) =>
-    a.version === b.version ? a.filename.localeCompare(b.filename) : a.version.localeCompare(b.version),
-  );
+  discovered.sort((a, b) => (a.version === b.version ? a.filename.localeCompare(b.filename) : a.version.localeCompare(b.version)));
 
   const seenVersions = new Set<string>();
   for (const migration of discovered) {
@@ -237,7 +235,10 @@ export async function readAppliedMigrations(client: ClickHouseClient): Promise<A
 }
 
 /** Compute the pending set and validate applied files against the workspace. */
-export function planMigrations(discovered: DiscoveredMigration[], applied: AppliedMigration[]): MigrationPlan {
+export function planMigrations(
+  discovered: DiscoveredMigration[],
+  applied: AppliedMigration[],
+): MigrationPlan {
   const byVersion = new Map(discovered.map((migration) => [migration.version, migration]));
 
   for (const row of applied) {

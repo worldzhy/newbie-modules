@@ -45,11 +45,14 @@ describe("splitStatements", () => {
   });
 
   it("honours backslash escapes and doubled quotes in strings", () => {
-    assert.deepEqual(splitStatements("SELECT 'it''s;x'; SELECT 'a\\';b'"), ["SELECT 'it''s;x'", "SELECT 'a\\';b'"]);
+    assert.deepEqual(splitStatements("SELECT 'it''s;x'; SELECT 'a\\';b'"), [
+      "SELECT 'it''s;x'",
+      "SELECT 'a\\';b'",
+    ]);
   });
 
   it("keeps semicolons inside double-quoted and backtick identifiers", () => {
-    assert.deepEqual(splitStatements('SELECT "weird;name" FROM `t;1`; SELECT 2'), [
+    assert.deepEqual(splitStatements('SELECT "weird;name" FROM `t;1`; SELECT 2', ), [
       'SELECT "weird;name" FROM `t;1`',
       "SELECT 2",
     ]);
@@ -76,19 +79,11 @@ describe("planMigrations", () => {
   it("returns applied rows and pending files in order", () => {
     const discovered = [
       migration(),
-      migration({
-        version: "20261017000000",
-        name: "second",
-        filename: "V20261017000000__second.sql",
-        checksum: "def",
-      }),
+      migration({ version: "20261017000000", name: "second", filename: "V20261017000000__second.sql", checksum: "def" }),
     ];
     const plan = planMigrations(discovered, [applied()]);
     assert.equal(plan.applied.length, 1);
-    assert.deepEqual(
-      plan.pending.map((migration) => migration.version),
-      ["20261017000000"],
-    );
+    assert.deepEqual(plan.pending.map((migration) => migration.version), ["20261017000000"]);
   });
 
   it("rejects a missing file for a recorded migration", () => {
@@ -99,7 +94,10 @@ describe("planMigrations", () => {
   });
 
   it("rejects checksum drift on an applied file", () => {
-    assert.throws(() => planMigrations([migration({ checksum: "changed" })], [applied()]), /Checksum mismatch/);
+    assert.throws(
+      () => planMigrations([migration({ checksum: "changed" })], [applied()]),
+      /Checksum mismatch/,
+    );
   });
 
   it("rejects out-of-order pending versions", () => {

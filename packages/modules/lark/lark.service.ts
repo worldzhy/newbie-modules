@@ -553,10 +553,7 @@ export class LarkService {
     // contact v3 shapes here are stable, so cross that boundary loosely.
     const contact = this.client.contact as unknown as {
       department: {
-        list: (req: {
-          path: { department_id: string };
-          params: Record<string, unknown>;
-        }) => Promise<{
+        list: (req: { path: { department_id: string }; params: Record<string, unknown> }) => Promise<{
           code: number;
           msg?: string;
           data?: {
@@ -567,10 +564,7 @@ export class LarkService {
         }>;
       };
       user: {
-        list: (req: {
-          path: { department_id: string };
-          params: Record<string, unknown>;
-        }) => Promise<{
+        list: (req: { path: { department_id: string }; params: Record<string, unknown> }) => Promise<{
           code: number;
           msg?: string;
           data?: {
@@ -626,24 +620,19 @@ export class LarkService {
   }
 
   /** All department ids under root ("0"), including the root itself. */
-  private async listContactDepartmentIds(
-    contact: {
-      department: {
-        list: (req: {
-          path: { department_id: string };
-          params: Record<string, unknown>;
-        }) => Promise<{
-          code: number;
-          msg?: string;
-          data?: {
-            has_more?: boolean;
-            page_token?: string;
-            items?: Array<{ open_department_id?: string }>;
-          };
-        }>;
-      };
-    },
-  ): Promise<Set<string>> {
+  private async listContactDepartmentIds(contact: {
+    department: {
+      list: (req: { path: { department_id: string }; params: Record<string, unknown> }) => Promise<{
+        code: number;
+        msg?: string;
+        data?: {
+          has_more?: boolean;
+          page_token?: string;
+          items?: Array<{ open_department_id?: string }>;
+        };
+      }>;
+    };
+  }): Promise<Set<string>> {
     const departmentIds = new Set<string>(["0"]);
     let pageToken: string | undefined;
     do {
@@ -672,16 +661,16 @@ export class LarkService {
    * throws axios-style errors whose Lark code/msg live on response.data.
    */
   private describeContactError(action: string, error: unknown): string {
-    const lark = (error as {
-      response?: { data?: { code?: number; msg?: string } };
-      code?: number;
-      msg?: string;
-    })?.response?.data;
+    const lark = (
+      error as {
+        response?: { data?: { code?: number; msg?: string } };
+        code?: number;
+        msg?: string;
+      }
+    )?.response?.data;
     const detail = lark?.msg ?? (error as Error)?.message ?? String(error);
     const scopeHint =
-      lark?.code === 99991672
-        ? " The app needs contact read scopes granted in the Lark developer console."
-        : "";
+      lark?.code === 99991672 ? " The app needs contact read scopes granted in the Lark developer console." : "";
     return `Failed to ${action}: ${detail}.${scopeHint}`;
   }
 
