@@ -148,29 +148,31 @@ export class AwsS3Service {
 
   async getObjectsRecursively(params: { bucket?: string; prefix?: string }) {
     const allKeys: { s3Key: string; size?: number }[] = [];
-    // [step 1] List objects
-    const listResponse = await this.client.send(
-      new ListObjectsV2Command({
-        Bucket: params.bucket ?? this.bucket,
-        Prefix: params.prefix,
-      }),
-    );
-
-    if (!listResponse.Contents || listResponse.Contents.length === 0) {
-      return allKeys;
-    }
-    allKeys.push(
-      ...listResponse.Contents.map((content) => {
-        return { s3Key: content.Key!, size: content.Size };
-      }),
-    );
+    let continuationToken: string | undefined;
 
     // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
-    // IsTruncated: Set to false if all of the results were returned. Set to true if more keys are available to return. If the number of results exceeds that specified by MaxKeys, all of the results might not be returned.
-    if (listResponse.IsTruncated) {
-      const keys = await this.getObjectsRecursively(params);
-      allKeys.push(...keys);
-    }
+    // IsTruncated: Set to false if all of the results were returned. Set to
+    // true if more keys are available; page through with ContinuationToken.
+    do {
+      const listResponse = await this.client.send(
+        new ListObjectsV2Command({
+          Bucket: params.bucket ?? this.bucket,
+          Prefix: params.prefix,
+          ContinuationToken: continuationToken,
+        }),
+      );
+
+      if (listResponse.Contents) {
+        allKeys.push(
+          ...listResponse.Contents.map((content) => {
+            return { s3Key: content.Key!, size: content.Size };
+          }),
+        );
+      }
+
+      continuationToken = listResponse.IsTruncated ? listResponse.NextContinuationToken : undefined;
+    } while (continuationToken);
+
     return allKeys;
   }
 
