@@ -58,8 +58,8 @@ interface MigrationLog {
 
 const HISTORY_TABLE = "_clickhouse_schema_migrations";
 const MIGRATION_DIR_NAME = "clickhouse-migrations";
-// V20261016000000__init_backend_monitor_tables.sql
-const MIGRATION_FILE_PATTERN = /^V(\d{8}(?:_\d{6})?)__([a-z0-9_]+)\.sql$/;
+// V20261016000000__init_backend_monitor_tables.sql (8 or 14 digit timestamp)
+const MIGRATION_FILE_PATTERN = /^V(\d{8}(?:\d{6})?)__([a-z0-9_]+)\.sql$/;
 // Database/table identifiers we generate ourselves must stay injection-safe;
 // they only ever come from CLICKHOUSE_DB env and the constant above.
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_]+$/;
