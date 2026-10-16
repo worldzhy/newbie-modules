@@ -6,7 +6,7 @@
  *   newbie clickhouse status    show applied / pending migrations
  *
  * The deployment-time entry is the compiled migrate-cli (run by the
- * ch-migrate compose service); both frontends share the same engine.
+ * clickhouse-migrate compose service); both frontends share the same engine.
  */
 import type { Command } from "commander";
 
