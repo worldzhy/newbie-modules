@@ -2,7 +2,7 @@
 
 状态：已采纳（2026-10-13 用户批准三项核心决策 + 三项细化决策：在途前端改动先独立提交、页面挪至 /settings/models、health 发射点上移 resolver decorator）
 日期：2026-10-13
-副本注记：本决策原件存于 nightwatch-backend `.trae/documents/decisions/`（nightwatch-backend 侧编号 ADR-005、newbie-modules 侧编号 ADR-004，同文）。
+归属注记：本决策治理 newbie-modules 模块代码，单一源存放于本仓（nightwatch-backend 侧编号 ADR-005，该处现为同编号重定向存根）。2026-10-19 起按单一源规则执行。
 Supersedes：ADR-004 的"health 发射点位于 copilot kernel（AgentRunner 内经 ModelHealthSink seam）"一节（见决策 3）
 
 ## 背景

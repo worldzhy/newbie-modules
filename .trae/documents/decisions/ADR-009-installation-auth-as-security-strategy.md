@@ -2,7 +2,7 @@
 
 状态：已采纳
 日期：2026-10-19
-副本注记：本决策原件存于 nightwatch-backend `.trae/documents/decisions/`（nightwatch-backend 侧编号 ADR-016、newbie-modules 侧编号 ADR-009，同文）。
+归属注记：本决策治理 newbie-modules 模块代码，单一源存放于本仓（nightwatch-backend 侧编号 ADR-016，该处现为同编号重定向存根）。2026-10-19 起按单一源规则执行。
 
 ## 背景
 

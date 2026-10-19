@@ -2,7 +2,7 @@
 
 状态：已采纳（2026-10-13 用户批准方案 B：两表分离）
 日期：2026-10-13
-副本注记：本决策原件存于 nightwatch-backend `.trae/documents/decisions/`（nightwatch-backend 侧编号 ADR-006、newbie-modules 侧编号 ADR-005，同文）。
+归属注记：本决策治理 newbie-modules 模块代码，单一源存放于本仓（nightwatch-backend 侧编号 ADR-006，该处现为同编号重定向存根）。2026-10-19 起按单一源规则执行。
 Supersedes：ADR-005 的决策 2（scope 作为记录固有属性、per-scope 唯一 active 记录）与决策 7 中的 activate 语义
 
 ## 触发问题
