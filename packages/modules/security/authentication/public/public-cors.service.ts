@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, RequestMethod } from "@nestjs/common";
-import { PATH_METADATA, REQUEST_METHOD_METADATA } from "@nestjs/common/constants";
+import { METHOD_METADATA, PATH_METADATA } from "@nestjs/common/constants";
 import { DiscoveryService, MetadataScanner, Reflector } from "@nestjs/core";
 import { NextFunction, Request, Response } from "express";
 import { PUBLIC_CORS_KEY } from "./public-cors.decorator";
@@ -57,7 +57,7 @@ export class PublicCorsService implements OnModuleInit {
         const handler = prototype[name as keyof typeof prototype] as (...args: unknown[]) => unknown;
         const isPublicCors = this.reflector.getAllAndOverride<boolean>(PUBLIC_CORS_KEY, [handler, metatype]);
         if (!isPublicCors) continue;
-        const methodMetadata = this.reflector.get<RequestMethod | undefined>(REQUEST_METHOD_METADATA, handler);
+        const methodMetadata = this.reflector.get<RequestMethod | undefined>(METHOD_METADATA, handler);
         if (methodMetadata === undefined) continue;
         const methodPath = this.reflector.get<string | undefined>(PATH_METADATA, handler) ?? "";
         const path = PublicCorsService.normalizePath(`${controllerPath}/${methodPath}`);
