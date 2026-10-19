@@ -1,6 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 
-import { INSTALLATION_RESOLVERS } from "@modules/security/ports/installation.resolver";
+import { installationResolverToken } from "@modules/security/ports/installation.resolver";
 import { InstallationController } from "./controllers/installation.controller";
 import { PingController } from "./controllers/ping.controller";
 import { HeartbeatInstallationService } from "./services/installation.service";
@@ -24,8 +24,8 @@ import { HeartbeatInstallationService } from "./services/installation.service";
     HeartbeatInstallationService,
     // Bind the installation credential store to security's SPI port (ADR-016);
     // useExisting keeps the singleton so service state is never duplicated.
-    { provide: INSTALLATION_RESOLVERS, useExisting: HeartbeatInstallationService, multi: true },
+    { provide: installationResolverToken("heartbeat"), useExisting: HeartbeatInstallationService },
   ],
-  exports: [HeartbeatInstallationService, INSTALLATION_RESOLVERS],
+  exports: [HeartbeatInstallationService, installationResolverToken("heartbeat")],
 })
 export class HeartbeatModule {}

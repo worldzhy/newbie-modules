@@ -1,6 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 
-import { INSTALLATION_RESOLVERS } from "@modules/security/ports/installation.resolver";
+import { installationResolverToken } from "@modules/security/ports/installation.resolver";
 import { InstallationController } from "./controllers/installation.controller";
 import { SnapshotController } from "./controllers/snapshot.controller";
 import { HealthInstallationService } from "./services/installation.service";
@@ -25,8 +25,8 @@ import { HealthInstallationService } from "./services/installation.service";
     HealthInstallationService,
     // Bind the installation credential store to security's SPI port (ADR-016);
     // useExisting keeps the singleton so service state is never duplicated.
-    { provide: INSTALLATION_RESOLVERS, useExisting: HealthInstallationService, multi: true },
+    { provide: installationResolverToken("health"), useExisting: HealthInstallationService },
   ],
-  exports: [HealthInstallationService, INSTALLATION_RESOLVERS],
+  exports: [HealthInstallationService, installationResolverToken("health")],
 })
 export class HealthModule {}

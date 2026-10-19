@@ -1,6 +1,6 @@
 import { Global, Module } from "@nestjs/common";
 
-import { INSTALLATION_RESOLVERS } from "@modules/security/ports/installation.resolver";
+import { installationResolverToken } from "@modules/security/ports/installation.resolver";
 import { InstallationController } from "./controllers/installation.controller";
 import { ReportController } from "./controllers/report.controller";
 import { WebhookController } from "./controllers/webhook.controller";
@@ -25,8 +25,8 @@ import { ModuleHubReleaseService } from "./services/release.service";
     ModuleHubReleaseService,
     // Bind the installation credential store to security's SPI port (ADR-016);
     // useExisting keeps the singleton so service state is never duplicated.
-    { provide: INSTALLATION_RESOLVERS, useExisting: ModuleHubInstallationService, multi: true },
+    { provide: installationResolverToken("module-hub"), useExisting: ModuleHubInstallationService },
   ],
-  exports: [ModuleHubInstallationService, ModuleHubReleaseService, INSTALLATION_RESOLVERS],
+  exports: [ModuleHubInstallationService, ModuleHubReleaseService, installationResolverToken("module-hub")],
 })
 export class ModuleHubModule {}

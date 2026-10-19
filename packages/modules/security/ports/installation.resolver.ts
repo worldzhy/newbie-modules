@@ -4,9 +4,13 @@
  * during the migration window, or a body field for the web-monitor sendBeacon
  * exception); token hashing, storage and revocation checks belong to the
  * collector that owns the installation table.
+ *
+ * NestJS 12 removed multi-providers, so each collector binds its resolver
+ * under a kind-scoped injection token (its module re-exports the binding into
+ * the global container) and the InstallationAuthGuard resolves it via
+ * ModuleRef.
  */
-
-export const INSTALLATION_RESOLVERS = Symbol("INSTALLATION_RESOLVERS");
+export const installationResolverToken = (kind: string): string => `INSTALLATION_RESOLVER:${kind}`;
 
 export interface InstallationResolver {
   /** Collector module key this resolver authenticates, e.g. "heartbeat". */

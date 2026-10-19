@@ -1,15 +1,13 @@
 import {
   CanActivate,
   ExecutionContext,
-  Inject,
   Injectable,
   InternalServerErrorException,
-  Optional,
   UnauthorizedException,
 } from "@nestjs/common";
-import { Reflector } from "@nestjs/core";
+import { ModuleRef, Reflector } from "@nestjs/core";
 import { Request } from "express";
-import { INSTALLATION_RESOLVERS, InstallationResolver } from "../../ports/installation.resolver";
+import { InstallationResolver, installationResolverToken } from "../../ports/installation.resolver";
 import { INSTALLATION_AUTH_KEY } from "./installation.decorator";
 
 const BEARER_PATTERN = /^bearer\s+(.+)$/i;
@@ -33,9 +31,7 @@ const BEARER_PATTERN = /^bearer\s+(.+)$/i;
 export class InstallationAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    @Optional()
-    @Inject(INSTALLATION_RESOLVERS)
-    private readonly resolvers?: InstallationResolver[],
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -49,8 +45,13 @@ export class InstallationAuthGuard implements CanActivate {
       );
     }
 
-    const resolver = this.resolvers?.find((candidate) => candidate.kind === kind);
-    if (!resolver) {
+    // NestJS 12 has no multi-providers: each collector binds its resolver
+    // under installationResolverToken(kind) and exports it into the global
+    // container, so a strict:false lookup finds the single binding.
+    let resolver: InstallationResolver;
+    try {
+      resolver = this.moduleRef.get<InstallationResolver>(installationResolverToken(kind), { strict: false });
+    } catch {
       throw new InternalServerErrorException(
         `@InstallationAuth("${kind}") is active but no installation resolver is bound for that kind. Did the collector module load?`,
       );
