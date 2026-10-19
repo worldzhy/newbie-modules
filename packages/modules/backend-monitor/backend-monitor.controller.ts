@@ -1,7 +1,10 @@
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req } from "@nestjs/common";
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { NoGuard } from "@modules/security/authentication/public/public.decorator";
+import { Request } from "express";
+import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
+import { PublicCors } from "@modules/security/authentication/public/public-cors.decorator";
 import { BackendMonitorService } from "./backend-monitor.service";
+import { ResolvedMonitorToken } from "./monitor-token.resolver";
 import {
   CreateBackendMonitorIngestDto,
   ListBackendMonitorErrorLogsRequestDto,
@@ -16,30 +19,32 @@ export class BackendMonitorController {
   constructor(private readonly backendMonitorService: BackendMonitorService) {}
 
   /**
-   * Batched ingestion endpoint for backend applications.
-   * Open route (no user JWT); authentication is the BackendMonitorInstallation
-   * report token presented via X-Backend-Monitor-Token (module-hub design
-   * §9.2). One call carries request metrics and/or errors, enabling one auth
-   * lookup and at most one insert per table.
+   * Batched ingestion endpoint for backend applications (ADR-016).
+   * Authentication is the BackendMonitorInstallation report token presented
+   * as `Authorization: Bearer <token>` (X-Backend-Monitor-Token is a
+   * deprecated alias during the SDK migration window), resolved by the
+   * InstallationAuthGuard. One call carries request metrics and/or errors,
+   * enabling at most one insert per table.
    */
   @ApiOperation({ summary: "Ingest a batch of backend request/error events" })
   @ApiHeader({
     name: "X-Backend-Monitor-Token",
-    description: "The plaintext report token returned once at installation enrollment",
-    required: true,
+    description: "Deprecated alias; prefer Authorization: Bearer <token>",
+    required: false,
   })
   @ApiResponse({ status: 204, description: "Batch accepted." })
   @ApiResponse({ status: 400, description: "Empty batch or invalid event payload." })
   @ApiResponse({ status: 401, description: "Invalid or missing monitor installation token." })
   @ApiResponse({ status: 413, description: "An event array exceeds the batch limit." })
   @HttpCode(HttpStatus.NO_CONTENT)
-  @NoGuard()
+  @InstallationAuth("backend-monitor")
+  @PublicCors()
   @Post("ingest")
   async ingest(
-    @Headers("x-backend-monitor-token") reportToken: string,
+    @Req() req: Request & { installation: ResolvedMonitorToken },
     @Body() body: CreateBackendMonitorIngestDto,
   ): Promise<void> {
-    await this.backendMonitorService.ingest(reportToken, body);
+    await this.backendMonitorService.ingest(req.installation, body);
   }
 
   /**

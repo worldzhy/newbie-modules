@@ -1,4 +1,5 @@
 import { Global, Module } from "@nestjs/common";
+import { INSTALLATION_RESOLVERS } from "@modules/security/ports/installation.resolver";
 import { BackendMonitorController } from "./backend-monitor.controller";
 import { BackendMonitorService } from "./backend-monitor.service";
 import { InstallationController } from "./controllers/installation.controller";
@@ -24,9 +25,16 @@ import { MonitorInstallationService } from "./services/monitor-installation.serv
 @Global()
 @Module({
   controllers: [BackendMonitorController, InstallationController],
-  providers: [BackendMonitorService, MonitorInstallationService, MonitorTokenResolver],
+  providers: [
+    BackendMonitorService,
+    MonitorInstallationService,
+    MonitorTokenResolver,
+    // Bind the report-token resolver to security's SPI port (ADR-016);
+    // useExisting keeps the singleton so the token cache is never duplicated.
+    { provide: INSTALLATION_RESOLVERS, useExisting: MonitorTokenResolver, multi: true },
+  ],
   // MonitorInstallationService is exported for consuming projects whose
   // application layer provisions installations (e.g. nightwatch).
-  exports: [BackendMonitorService, MonitorInstallationService],
+  exports: [BackendMonitorService, MonitorInstallationService, INSTALLATION_RESOLVERS],
 })
 export class BackendMonitorModule {}

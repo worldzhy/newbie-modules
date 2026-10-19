@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 
+import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 import { MonitorInstallationService } from "./services/monitor-installation.service";
 
 /** Positive token cache lifetime. Tokens rarely change, so 60s saves a PG hit per batch. */
@@ -51,9 +52,17 @@ export interface IngestFacts {
  * ("projectId/applicationId"). The ingest path is high-volume, so results are
  * cached in-process and liveness writes are throttled — a revoked token may
  * still be accepted for up to POSITIVE_TTL_MS, which is acceptable here.
+ *
+ * Implements security's InstallationResolver port (ADR-016): the
+ * InstallationAuthGuard calls resolve(); the throttled liveness touch runs
+ * separately via touchOnIngest() once the controller's facts are parsed.
  */
 @Injectable()
-export class MonitorTokenResolver {
+export class MonitorTokenResolver implements InstallationResolver {
+  readonly kind = "backend-monitor";
+  /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
+  readonly legacyHeader = "x-backend-monitor-token";
+
   private readonly cache = new Map<string, CachedToken>();
   private readonly lastTouchAt = new Map<string, number>();
 
@@ -61,15 +70,10 @@ export class MonitorTokenResolver {
 
   /**
    * Validates the token and returns installationId plus the mapped
-   * applicationId. Throws UnauthorizedException when missing, malformed,
-   * unknown, revoked, or when the installation has no parseable application
-   * mapping. Performs the throttled liveness touch.
+   * applicationId. Throws UnauthorizedException when malformed, unknown,
+   * revoked, or when the installation has no parseable application mapping.
    */
-  async resolve(token: string | undefined, facts: IngestFacts): Promise<ResolvedMonitorToken> {
-    if (!token) {
-      throw new UnauthorizedException("Missing backend monitor report token.");
-    }
-
+  async resolve(token: string): Promise<ResolvedMonitorToken> {
     const now = Date.now();
 
     // Reject malformed tokens up front to protect the open endpoint from
@@ -86,7 +90,6 @@ export class MonitorTokenResolver {
       } else if (!cached.installationId || !cached.applicationId) {
         throw new UnauthorizedException("Invalid backend monitor report token.");
       } else {
-        await this.touch(cached.installationId, facts);
         return { installationId: cached.installationId, applicationId: cached.applicationId };
       }
     }
@@ -103,8 +106,16 @@ export class MonitorTokenResolver {
       applicationId,
       expiresAt: now + POSITIVE_TTL_MS,
     });
-    await this.touch(installation.id, facts);
     return { installationId: installation.id, applicationId };
+  }
+
+  /** Throttled liveness/fact refresh, at most once per TOUCH_THROTTLE_MS. */
+  async touchOnIngest(installationId: string, facts: IngestFacts): Promise<void> {
+    const nowMs = Date.now();
+    const last = this.lastTouchAt.get(installationId) ?? 0;
+    if (nowMs - last < TOUCH_THROTTLE_MS) return;
+    await this.installations.touchOnIngest(installationId, facts);
+    this.lastTouchAt.set(installationId, nowMs);
   }
 
   /** Extracts the applicationId segment of a "projectId/applicationId" ref. */
@@ -124,14 +135,5 @@ export class MonitorTokenResolver {
       applicationId: null,
       expiresAt: now + NEGATIVE_TTL_MS,
     });
-  }
-
-  /** Throttled liveness/fact refresh, at most once per TOUCH_THROTTLE_MS. */
-  private async touch(installationId: string, facts: IngestFacts): Promise<void> {
-    const nowMs = Date.now();
-    const last = this.lastTouchAt.get(installationId) ?? 0;
-    if (nowMs - last < TOUCH_THROTTLE_MS) return;
-    await this.installations.touchOnIngest(installationId, facts);
-    this.lastTouchAt.set(installationId, nowMs);
   }
 }

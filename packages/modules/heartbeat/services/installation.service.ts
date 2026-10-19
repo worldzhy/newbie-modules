@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { HeartbeatInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** Requested interval between client pings; echoed back in the ping response. */
 export const PING_INTERVAL_SECONDS = 30;
@@ -39,7 +40,11 @@ export interface InstallationPresence {
  * of band, and the running process touches lastSeenAt on every ping.
  */
 @Injectable()
-export class HeartbeatInstallationService {
+export class HeartbeatInstallationService implements InstallationResolver {
+  readonly kind = "heartbeat";
+  /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
+  readonly legacyHeader = "x-heartbeat-token";
+
   constructor(private readonly prisma: PrismaService) {}
 
   // -------------------------------------------------------------------------
@@ -197,24 +202,44 @@ export class HeartbeatInstallationService {
   // -------------------------------------------------------------------------
 
   /**
-   * Authenticate a ping and advance liveness in a single round trip: the
-   * token hash and the revocation check live in the UPDATE's WHERE clause.
-   * Returns false for an unknown or revoked token so callers respond 401;
-   * the two cases are intentionally indistinguishable.
-   *
-   * firstSeenAt is written exactly once (COALESCE), lastSeenAt always
-   * advances, runtime facts refresh when sent.
+   * Look up a non-revoked installation by its plaintext token. Unknown and
+   * revoked tokens both return null so the two cases stay indistinguishable.
+   */
+  async resolveByToken(token: string): Promise<HeartbeatInstallation | null> {
+    return this.prisma.heartbeatInstallation.findFirst({
+      where: { tokenHash: hashHeartbeatToken(token), revokedAt: null },
+    });
+  }
+
+  /**
+   * InstallationResolver port (ADR-016): authenticate a report token for the
+   * InstallationAuthGuard. Throws UnauthorizedException for unknown or
+   * revoked tokens.
+   */
+  async resolve(token: string): Promise<HeartbeatInstallation> {
+    const installation = await this.resolveByToken(token);
+    if (!installation) {
+      throw new UnauthorizedException("Invalid or revoked installation token.");
+    }
+    return installation;
+  }
+
+  /**
+   * Advance liveness for an already-authenticated installation in a single
+   * round trip. Authentication happens upstream in the InstallationAuthGuard
+   * (ADR-016). firstSeenAt is written exactly once (COALESCE), lastSeenAt
+   * always advances, runtime facts refresh when sent.
    */
   async recordPing(
-    token: string,
+    installationId: string,
     facts: {
       appVersion?: string;
       env?: string;
       instanceId?: string;
     },
-  ): Promise<boolean> {
+  ): Promise<void> {
     const now = new Date();
-    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+    await this.prisma.$queryRaw`
       UPDATE "module/heartbeat"."HeartbeatInstallation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
@@ -222,11 +247,8 @@ export class HeartbeatInstallationService {
           "env" = COALESCE(${facts.env ?? null}, "env"),
           "instanceId" = COALESCE(${facts.instanceId ?? null}, "instanceId"),
           "updatedAt" = ${now}
-      WHERE "tokenHash" = ${hashHeartbeatToken(token)}
-        AND "revokedAt" IS NULL
-      RETURNING "id"
+      WHERE "id" = ${installationId}
     `;
-    return rows.length === 1;
   }
 
   // -------------------------------------------------------------------------

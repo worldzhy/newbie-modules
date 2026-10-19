@@ -3,12 +3,24 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { ConfigService } from "@nestjs/config";
+import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
+import { PublicCors } from "@modules/security/authentication/public/public-cors.decorator";
 import { func, getRandomIp } from "../../shared/utils";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { RedisService } from "@modules/redis/redis.service";
 import { RedisKeys } from "../../models/enum";
-import { WebTokenResolver } from "../../services/web-token.resolver";
+import { ResolvedWebToken, WebTokenResolver } from "../../services/web-token.resolver";
 
+/**
+ * Token-only public endpoint for web-monitor ingestion (ADR-016), peer to
+ * heartbeat/health/backend-monitor/module-hub. The secret
+ * WebMonitorInstallation token travels in the request body because the
+ * browser SDK posts via navigator.sendBeacon, which cannot set headers —
+ * the documented exception to the Bearer standard. The InstallationAuthGuard
+ * resolves it to the public appKey (storage partition key); appId is no
+ * longer a credential. Resolution is cached and liveness writes are
+ * throttled.
+ */
 @ApiTags("Frontend Monitor / Web / Report")
 @Controller("/api/v1")
 export class WebReportController {
@@ -25,10 +37,12 @@ export class WebReportController {
   }
 
   @Post("/report/web")
+  @InstallationAuth("web-monitor")
+  @PublicCors()
   @ApiOperation({ summary: "Web SDK data report endpoint" })
   @ApiResponse({ type: String })
   async webReport(
-    @Req() req: Request,
+    @Req() req: Request & { installation: ResolvedWebToken },
     @Headers() headers: Record<string, string | undefined>,
     @Body() body: Record<string, unknown> | string,
   ) {
@@ -37,10 +51,9 @@ export class WebReportController {
     if (req.headers["content-type"] && req.headers["content-type"].includes("text/plain")) {
       query = JSON.parse(body as string);
     }
-    // The SDK presents the secret WebMonitorInstallation token; the server resolves
-    // the public appKey (storage partition key) from it. appId is no longer a
-    // credential. Resolution is cached and liveness writes are throttled.
-    const { appKey } = await this.tokenResolver.resolve(query.token as string | undefined);
+
+    const { installationId, appKey } = req.installation;
+    await this.tokenResolver.touchOnReport(installationId);
     query.appId = appKey;
 
     query.ip = func.getRealIp(req.headers, req.ip);

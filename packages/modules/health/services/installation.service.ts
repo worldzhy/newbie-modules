@@ -1,8 +1,9 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { HealthInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** Requested interval between client snapshots; echoed back in the response. */
 export const SNAPSHOT_INTERVAL_SECONDS = 30;
@@ -65,7 +66,11 @@ export interface InstallationPresence {
  * (unknown / healthy / degraded / offline) at read time.
  */
 @Injectable()
-export class HealthInstallationService {
+export class HealthInstallationService implements InstallationResolver {
+  readonly kind = "health";
+  /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
+  readonly legacyHeader = "x-health-token";
+
   constructor(private readonly prisma: PrismaService) {}
 
   // -------------------------------------------------------------------------
@@ -281,16 +286,36 @@ export class HealthInstallationService {
   // -------------------------------------------------------------------------
 
   /**
-   * Authenticate a snapshot and persist it in a single round trip: the
-   * token hash and the revocation check live in the UPDATE's WHERE clause.
-   * Returns false for an unknown or revoked token so callers respond 401;
-   * the two cases are intentionally indistinguishable.
-   *
-   * firstSeenAt is written exactly once (COALESCE), lastSeenAt always
-   * advances, runtime facts and snapshot refresh on every report.
+   * Look up a non-revoked installation by its plaintext token. Unknown and
+   * revoked tokens both return null so the two cases stay indistinguishable.
+   */
+  async resolveByToken(token: string): Promise<HealthInstallation | null> {
+    return this.prisma.healthInstallation.findFirst({
+      where: { tokenHash: hashHealthToken(token), revokedAt: null },
+    });
+  }
+
+  /**
+   * InstallationResolver port (ADR-016): authenticate a report token for the
+   * InstallationAuthGuard. Throws UnauthorizedException for unknown or
+   * revoked tokens.
+   */
+  async resolve(token: string): Promise<HealthInstallation> {
+    const installation = await this.resolveByToken(token);
+    if (!installation) {
+      throw new UnauthorizedException("Invalid or revoked installation token.");
+    }
+    return installation;
+  }
+
+  /**
+   * Record a dependency snapshot for an already-authenticated installation in
+   * a single round trip. Authentication happens upstream in the
+   * InstallationAuthGuard (ADR-016). firstSeenAt is written exactly once
+   * (COALESCE); the lastSnapshot* columns always advance.
    */
   async recordSnapshot(
-    token: string,
+    installationId: string,
     facts: {
       appVersion?: string;
       env?: string;
@@ -298,9 +323,9 @@ export class HealthInstallationService {
       status: string;
       info: Record<string, { status: string; message?: string }>;
     },
-  ): Promise<boolean> {
+  ): Promise<void> {
     const now = new Date();
-    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+    await this.prisma.$queryRaw`
       UPDATE "module/health"."HealthInstallation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
@@ -311,11 +336,8 @@ export class HealthInstallationService {
           "lastSnapshotInfo" = ${JSON.stringify(facts.info)}::jsonb,
           "lastSnapshotAt" = ${now},
           "updatedAt" = ${now}
-      WHERE "tokenHash" = ${hashHealthToken(token)}
-        AND "revokedAt" IS NULL
-      RETURNING "id"
+      WHERE "id" = ${installationId}
     `;
-    return rows.length === 1;
   }
 
   // -------------------------------------------------------------------------

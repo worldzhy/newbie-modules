@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, PayloadTooLargeException } from "@nestjs/common";
 import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
 import { computeErrorFingerprint } from "./error-fingerprint.util";
-import { MonitorTokenResolver } from "./monitor-token.resolver";
+import { MonitorTokenResolver, ResolvedMonitorToken } from "./monitor-token.resolver";
 import {
   BackendMonitorErrorEventDto,
   BackendMonitorRequestEventDto,
@@ -81,12 +81,15 @@ export class BackendMonitorService {
    * application_id is mapped from the installation's externalRef so existing
    * application-scoped queries keep working unchanged.
    */
-  async ingest(reportToken: string | undefined, body: CreateBackendMonitorIngestDto): Promise<void> {
+  async ingest(resolved: ResolvedMonitorToken, body: CreateBackendMonitorIngestDto): Promise<void> {
     const env = body.env ?? "";
     const instanceId = body.instanceId ?? "";
     const appVersion = body.appVersion ?? "";
 
-    const { installationId, applicationId } = await this.monitorTokenResolver.resolve(reportToken, {
+    // Authentication happened upstream in the InstallationAuthGuard (ADR-016);
+    // refresh liveness/facts under the resolver's write throttle.
+    const { installationId, applicationId } = resolved;
+    await this.monitorTokenResolver.touchOnIngest(installationId, {
       env: env || undefined,
       appVersion: appVersion || undefined,
       instanceId: instanceId || undefined,

@@ -4,6 +4,7 @@ import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
 import { SharedModule } from "../../shared/shared.module";
 import { DayReportModule } from "@modules/web-monitor/modules/day-report/day-report.module";
 import { SiteModule } from "@modules/web-monitor/modules/site/site.module";
+import { INSTALLATION_RESOLVERS } from "@modules/security/ports/installation.resolver";
 import { WebInstallationService } from "../../services/web-installation.service";
 import { WebTokenResolver } from "../../services/web-token.resolver";
 
@@ -58,6 +59,9 @@ import { WebIpTaskService } from "./services/ip-task.service";
     // WebReportController can resolve WebTokenResolver without a module cycle.
     WebInstallationService,
     WebTokenResolver,
+    // Bind the report-token resolver to security's SPI port (ADR-016);
+    // useExisting keeps the singleton so the token cache is never duplicated.
+    { provide: INSTALLATION_RESOLVERS, useExisting: WebTokenResolver, multi: true },
   ],
   // WebInstallationService is re-exported by the root WebMonitorModule for
   // consuming projects whose application layer provisions installations.
@@ -72,6 +76,7 @@ import { WebIpTaskService } from "./services/ip-task.service";
     PvuvipService,
     PageService,
     WebMonitorAnalysisService,
+    INSTALLATION_RESOLVERS,
   ],
 })
 export class WebModule {}

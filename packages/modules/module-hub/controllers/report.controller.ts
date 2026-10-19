@@ -1,16 +1,21 @@
-import { Body, Controller, Headers, Post, UnauthorizedException } from "@nestjs/common";
+import { Body, Controller, Post, Req } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
-import { NoGuard } from "@modules/security/authentication/public/public.decorator";
+import { Request } from "express";
+import { ModuleHubInstallation } from "@generated/prisma/client";
+import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
+import { PublicCors } from "@modules/security/authentication/public/public-cors.decorator";
 
 import { HubReportDto, HubReportResponseDto } from "../module-hub.dto";
 import { ModuleHubInstallationService } from "../services/installation.service";
 import { ModuleHubReleaseService } from "../services/release.service";
 
 /**
- * Token-only public endpoint for installation self-reports.
+ * Token-only public endpoint for installation self-reports (ADR-016).
  *
- * Host auth (JWT/Guard) is bypassed here: authentication is the
- * X-Module-Hub-Token header, resolved against ModuleHubInstallation.tokenHash.
+ * Authentication is the installation token presented as
+ * `Authorization: Bearer <token>` (the X-Module-Hub-Token header is a
+ * deprecated alias during the SDK migration window), resolved against
+ * ModuleHubInstallation.tokenHash by the InstallationAuthGuard.
  *
  * One endpoint carries two report kinds (design doc §4.2):
  * - "full": process-start self-registration with runtime facts and snapshot;
@@ -28,19 +33,13 @@ export class ReportController {
   ) {}
 
   @Post("report")
-  @NoGuard()
+  @InstallationAuth("module-hub")
+  @PublicCors()
   async report(
-    @Headers("x-module-hub-token") token: string,
+    @Req() req: Request & { installation: ModuleHubInstallation },
     @Body() body: HubReportDto,
   ): Promise<HubReportResponseDto> {
-    if (!token) {
-      throw new UnauthorizedException("Missing X-Module-Hub-Token header.");
-    }
-
-    const installation = await this.installations.resolveByToken(token);
-    if (!installation) {
-      throw new UnauthorizedException("Invalid or revoked installation token.");
-    }
+    const installation = req.installation;
 
     // Extract a representative registry sourceCommit from the first module
     // entry, if any. The hub stores it as a convenience column for

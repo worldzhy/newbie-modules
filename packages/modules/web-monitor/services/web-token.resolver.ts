@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 
+import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 import { WebInstallationService } from "./web-installation.service";
 
 /** Positive token cache lifetime. Tokens rarely change, so 60s saves a PG hit per batch. */
@@ -36,9 +37,19 @@ interface CachedToken {
  * The ingest path is high-volume, so results are cached in-process and
  * liveness writes are throttled — a revoked token may still be accepted for
  * up to POSITIVE_TTL_MS, which is acceptable here.
+ *
+ * Implements security's InstallationResolver port (ADR-016): the
+ * InstallationAuthGuard calls resolve(); the throttled liveness touch runs
+ * separately via touchOnReport() once the controller's payload is parsed.
+ * The token arrives in the request body (bodyTokenField "token") because the
+ * browser SDK posts via navigator.sendBeacon, which cannot set headers.
  */
 @Injectable()
-export class WebTokenResolver {
+export class WebTokenResolver implements InstallationResolver {
+  readonly kind = "web-monitor";
+  /** sendBeacon cannot set headers, so the body token IS the standard (ADR-016 documented exception). */
+  readonly bodyTokenField = "token";
+
   private readonly cache = new Map<string, CachedToken>();
   private readonly lastTouchAt = new Map<string, number>();
 
@@ -46,14 +57,9 @@ export class WebTokenResolver {
 
   /**
    * Validates the token and returns installationId plus appKey.
-   * Throws UnauthorizedException when missing, malformed, unknown, or revoked.
-   * Performs the throttled liveness touch.
+   * Throws UnauthorizedException when malformed, unknown, or revoked.
    */
-  async resolve(token: string | undefined): Promise<ResolvedWebToken> {
-    if (!token) {
-      throw new UnauthorizedException("Missing web monitor report token.");
-    }
-
+  async resolve(token: string): Promise<ResolvedWebToken> {
     const now = Date.now();
 
     // Reject malformed tokens up front to protect the open endpoint from
@@ -70,7 +76,6 @@ export class WebTokenResolver {
       } else if (!cached.installationId || !cached.appKey) {
         throw new UnauthorizedException("Invalid web monitor report token.");
       } else {
-        await this.touch(cached.installationId);
         return { installationId: cached.installationId, appKey: cached.appKey };
       }
     }
@@ -86,8 +91,16 @@ export class WebTokenResolver {
       appKey: installation.appKey,
       expiresAt: now + POSITIVE_TTL_MS,
     });
-    await this.touch(installation.id);
     return { installationId: installation.id, appKey: installation.appKey };
+  }
+
+  /** Throttled liveness touch, at most once per TOUCH_THROTTLE_MS. */
+  async touchOnReport(installationId: string): Promise<void> {
+    const nowMs = Date.now();
+    const last = this.lastTouchAt.get(installationId) ?? 0;
+    if (nowMs - last < TOUCH_THROTTLE_MS) return;
+    await this.installations.touchOnReport(installationId);
+    this.lastTouchAt.set(installationId, nowMs);
   }
 
   /** Stores a negative cache entry with the size cap applied. */
@@ -101,14 +114,5 @@ export class WebTokenResolver {
       appKey: null,
       expiresAt: now + NEGATIVE_TTL_MS,
     });
-  }
-
-  /** Throttled liveness touch, at most once per TOUCH_THROTTLE_MS. */
-  private async touch(installationId: string): Promise<void> {
-    const nowMs = Date.now();
-    const last = this.lastTouchAt.get(installationId) ?? 0;
-    if (nowMs - last < TOUCH_THROTTLE_MS) return;
-    await this.installations.touchOnReport(installationId);
-    this.lastTouchAt.set(installationId, nowMs);
   }
 }

@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ModuleHubInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
+import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** An installation reports every 60s; three missed intervals marks it offline (design §4.2). */
 export const ONLINE_THRESHOLD_SECONDS = 180;
@@ -157,7 +158,11 @@ export function compareTargetWithSnapshot(
  * report (process-start hook, design §5.1).
  */
 @Injectable()
-export class ModuleHubInstallationService {
+export class ModuleHubInstallationService implements InstallationResolver {
+  readonly kind = "module-hub";
+  /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
+  readonly legacyHeader = "x-module-hub-token";
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
@@ -329,6 +334,19 @@ export class ModuleHubInstallationService {
     });
     if (!row || row.revokedAt) return null;
     return row;
+  }
+
+  /**
+   * InstallationResolver port (ADR-016): authenticate a report token for the
+   * InstallationAuthGuard. Throws UnauthorizedException for unknown or
+   * revoked tokens so the two cases stay indistinguishable.
+   */
+  async resolve(token: string): Promise<ModuleHubInstallation> {
+    const installation = await this.resolveByToken(token);
+    if (!installation) {
+      throw new UnauthorizedException("Invalid or revoked installation token.");
+    }
+    return installation;
   }
 
   /**
