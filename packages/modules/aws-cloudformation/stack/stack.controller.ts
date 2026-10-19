@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
 import { AwsResourceStack, AwsResourceStackState, Prisma } from "@generated/prisma/client";
 import { CloudFormationStackType } from "@modules/aws-cloudformation/stack/stack.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { AwsCloudformationService } from "@modules/aws-cloudformation/cloudformation.service";
+import { AwsCloudformationService } from "@modules/aws-cloudformation/aws-cloudformation.service";
 import { ListStacksRequestDto } from "./stack.dto";
 
 @ApiTags("AWS CloudFormation Stack")
