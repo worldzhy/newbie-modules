@@ -9,11 +9,11 @@
 registry 中 Redis 连接由三个模块各自 `new Redis()` 建立，实测同一宿主
 （nightwatch）共 5 条连接：
 
-| 建连方 | 配置来源 | db | 连接数 |
-| --- | --- | --- | --- |
-| web-monitor `models/redis/RedisService` | `WEB_MONITOR_REDIS`（`host:port:password:db` 弱契约字符串） | 1 | 1 |
-| security `RateLimiterService` 三个子类 | `SECURITY_REDIS_HOST/PORT` | 0 | 3 |
-| account `VerificationCodeService` | **跨模块读 `modules.security.redis`**（隐式耦合） | 0 | 1 |
+| 建连方                                  | 配置来源                                                    | db  | 连接数 |
+| --------------------------------------- | ----------------------------------------------------------- | --- | ------ |
+| web-monitor `models/redis/RedisService` | `WEB_MONITOR_REDIS`（`host:port:password:db` 弱契约字符串） | 1   | 1      |
+| security `RateLimiterService` 三个子类  | `SECURITY_REDIS_HOST/PORT`                                  | 0   | 3      |
+| account `VerificationCodeService`       | **跨模块读 `modules.security.redis`**（隐式耦合）           | 0   | 1      |
 
 问题：
 

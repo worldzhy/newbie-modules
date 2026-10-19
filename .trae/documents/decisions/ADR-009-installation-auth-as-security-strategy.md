@@ -45,11 +45,13 @@ nightwatch 有五个 body-token 上报端点（heartbeat/ping、health/snapshot�
 ## 影响
 
 **更容易**：
+
 - 加第六个上报端点 = 一张自己的表 + 实现 `installation.resolver` port + controller 上一个 `@InstallationAuth(kind)` 装饰器；不再需要发明 header 名、写解析代码、登记 openApiRoutes。
 - 认证决策收口：端点用什么认证，看 controller 装饰器一处即可。
 - SDK 侧格式统一：后端 SDK 一律 `Authorization: Bearer`，web SDK 继续 body token；legacy 私有 header 进入过渡期后删除。
 
 **更难 / 后续工作**：
+
 - 改动面跨 registry（security + heartbeat/health/backend-monitor/module-hub/web-monitor 六模块）+ 消费仓 nightwatch-backend + 五个 SDK 仓库（@devbie/heartbeat-sdk 等），需按 registry-first 流程分里程碑交付。
 - legacy header（X-Heartbeat-Token 等）需保留一个过渡期，SDK 全量升级后删除；过渡期长度单独拍板。
 - 实施顺序：先 security 模块的 installation 策略与 `@PublicCors()`，再逐 collector 切换；每步保持旧路径可用。

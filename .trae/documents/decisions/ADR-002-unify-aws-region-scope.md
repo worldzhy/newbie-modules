@@ -8,10 +8,10 @@
 
 项目当前存在两份独立的 AWS region 列表，语义相同、来源与消费方分裂：
 
-| 列表 | 存储 | 编辑入口 | 消费方 |
-|---|---|---|---|
-| binding.regions | aws-identity `AwsCrossAccountBinding.regions` | AWS Credential tab | aws-audit 逐 region 迭代审计（aws-audit.service.ts L454）；secrets-manager 取 defaultRegion；STS verify 取 regions[0] |
-| AwsAccount.regions | aws-cloudwatch 模块自有 schema | AWS Monitor tab | aws-cloudwatch-credential.service.resolve() → ec2/rds-instance discovery 逐 region 迭代 |
+| 列表               | 存储                                          | 编辑入口           | 消费方                                                                                                                |
+| ------------------ | --------------------------------------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| binding.regions    | aws-identity `AwsCrossAccountBinding.regions` | AWS Credential tab | aws-audit 逐 region 迭代审计（aws-audit.service.ts L454）；secrets-manager 取 defaultRegion；STS verify 取 regions[0] |
+| AwsAccount.regions | aws-cloudwatch 模块自有 schema                | AWS Monitor tab    | aws-cloudwatch-credential.service.resolve() → ec2/rds-instance discovery 逐 region 迭代                               |
 
 两份列表由两个 tab 分别编辑，互不引用、互不校验子集关系；契约层已出现为桥接两个概念而生造的词（`ProjectListItemDto.hasAwsMonitor` 的 Swagger 描述 "AWS monitor account"）。AWS Monitor tab 还承担第二个职责：EC2/RDS per-instance watch 开关（`isWatching`，被 `getWatchingInstanceIds` 的指标采集消费）。
 

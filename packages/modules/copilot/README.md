@@ -9,6 +9,7 @@ under the hardcoded scope `"copilot"`.
 ## Scope
 
 Included:
+
 - `kernel/` — framework-free agent loop, conversation store, skills registry,
   audit sink, system prompt, redaction, blocks. Model access goes through the
   `ChatModelPort` interface imported from `@modules/llm/chat-model.port`.
@@ -16,6 +17,7 @@ Included:
   audit seam to Nest's Logger.
 
 Excluded (host-owned):
+
 - Web transport (SSE) — uses `req.user.userId` host auth.
 - Lark transport — assembles LarkBot webhook → kernel; depends on lark-bot
   module wiring chosen by the host.

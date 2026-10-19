@@ -9,11 +9,11 @@ Supersedes：ADR-004 的"health 发射点位于 copilot kernel（AgentRunner 内
 
 架构原则（用户声明）：**系统中只能有一个 AI model 提供者**。现状违反该原则——存在三处独立的模型客户端与三份凭证来源：
 
-| 消费方 | 现状 | model |
-|--------|------|-------|
-| backend-monitor/ai-analysis | `new OpenAI()`，env `BACKEND_MONITOR_DEEPSEEK_KEY` | 写死 `deepseek-v4-flash` |
-| application/jdy（receipt/statement 两处） | `new OpenAI()`，env `JDY_DEEPSEEK_API_KEY`，依赖 `response_format: json_object` | 写死 `deepseek-chat` |
-| copilot | ChatModelPort + adapter + CopilotModel 动态管理 + health（ADR-004） | DB 动态配置 |
+| 消费方                                    | 现状                                                                            | model                    |
+| ----------------------------------------- | ------------------------------------------------------------------------------- | ------------------------ |
+| backend-monitor/ai-analysis               | `new OpenAI()`，env `BACKEND_MONITOR_DEEPSEEK_KEY`                              | 写死 `deepseek-v4-flash` |
+| application/jdy（receipt/statement 两处） | `new OpenAI()`，env `JDY_DEEPSEEK_API_KEY`，依赖 `response_format: json_object` | 写死 `deepseek-chat`     |
+| copilot                                   | ChatModelPort + adapter + CopilotModel 动态管理 + health（ADR-004）             | DB 动态配置              |
 
 copilot 的 model port 已是"唯一提供者"雏形，但存在三个结构性缺口：
 

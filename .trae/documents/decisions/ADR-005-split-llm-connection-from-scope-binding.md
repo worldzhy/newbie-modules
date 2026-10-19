@@ -11,12 +11,12 @@ ADR-005 把 scope 维度放在了 LlmModel 记录上——一条记录 = 一个 
 
 这个设计有一个隐含假设：**不同消费方可能需要不同的连接配置**。但当多个消费方恰好使用完全相同的 provider/model/baseUrl/apiKey 时，就暴露出结构性冗余：
 
-| 问题 | 表现 |
-|------|------|
-| 凭证冗余 | jdy 和 copilot 用同一个 DeepSeek 端点，API Key 存两份，改 key 要改两处 |
-| health 冗余 | 同一条连接的健康状态被记录两次，且可能不一致（一条刚 probe 过、另一条还没） |
-| Test Connection 冗余 | 同一条连接的可用性测试要做两次 |
-| activate 冗余 | 想让所有 scope 共用一个新模型，得逐条 activate |
+| 问题                 | 表现                                                                        |
+| -------------------- | --------------------------------------------------------------------------- |
+| 凭证冗余             | jdy 和 copilot 用同一个 DeepSeek 端点，API Key 存两份，改 key 要改两处      |
+| health 冗余          | 同一条连接的健康状态被记录两次，且可能不一致（一条刚 probe 过、另一条还没） |
+| Test Connection 冗余 | 同一条连接的可用性测试要做两次                                              |
+| activate 冗余        | 想让所有 scope 共用一个新模型，得逐条 activate                              |
 
 根本原因：scope 是"谁使用这条连接"的**分配关系**，不是连接的**固有属性**。把两者绑在同一张表上，等于在每条记录里嵌入了一个隐式的一对一分配关系，导致"多对一共享"无法自然表达。
 
@@ -89,6 +89,7 @@ model LlmScopeAssignment {
 ```
 
 关键设计：
+
 - scope 是 LlmScopeAssignment 的唯一键——一个 scope 只能绑定一条 connection，不存在 isActive 字段（assignment 存在即激活）
 - health 字段从 LlmModel 移到 LlmConnection——健康是连接的状态，不是 scope 的；同一条连接被多 scope 共享时 health 自然共享
 - LlmConnection 删除时级联删除所有引用它的 LlmScopeAssignment
@@ -127,15 +128,15 @@ DROP TABLE "module/llm"."LlmModel";
 
 ### 3. API 契约重构
 
-| 旧端点 | 新端点 | 语义变化 |
-|--------|--------|----------|
-| `GET /llm/models` | `GET /llm/connections` | 返回所有连接，每项带 `scopes: string[]` |
-| `POST /llm/models` | `POST /llm/connections` | 创建连接配置，不再带 scope |
-| `PATCH /llm/models/:id` | `PATCH /llm/connections/:id` | 更新连接 |
-| `DELETE /llm/models/:id` | `DELETE /llm/connections/:id` | 删除连接（级联解绑） |
-| `POST /llm/models/:id/test` | `POST /llm/connections/:id/test` | 测试连接（同上一次提交的统一 adapter 路径） |
+| 旧端点                          | 新端点                                          | 语义变化                                                                                |
+| ------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `GET /llm/models`               | `GET /llm/connections`                          | 返回所有连接，每项带 `scopes: string[]`                                                 |
+| `POST /llm/models`              | `POST /llm/connections`                         | 创建连接配置，不再带 scope                                                              |
+| `PATCH /llm/models/:id`         | `PATCH /llm/connections/:id`                    | 更新连接                                                                                |
+| `DELETE /llm/models/:id`        | `DELETE /llm/connections/:id`                   | 删除连接（级联解绑）                                                                    |
+| `POST /llm/models/:id/test`     | `POST /llm/connections/:id/test`                | 测试连接（同上一次提交的统一 adapter 路径）                                             |
 | `POST /llm/models/:id/activate` | `PATCH /llm/scopes/:scope` → `{ connectionId }` | activate 语义变为"scope X 绑定到连接 Y"；旧的 per-scope deactivate 由新 assignment 覆盖 |
-| —— | `DELETE /llm/scopes/:scope` | 解绑 scope（该 scope 的消费方报 NoActiveScopeError） |
+| ——                              | `DELETE /llm/scopes/:scope`                     | 解绑 scope（该 scope 的消费方报 NoActiveScopeError）                                    |
 
 DTO 重命名：`LlmModelResponseDto` → `LlmConnectionResponseDto`（新增 `scopes: string[]`）；新增 `AssignScopeDto`（`connectionId: string`）。
 
