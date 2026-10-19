@@ -241,14 +241,14 @@ export class ChangeUserPasswordDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
   @IsNotEmpty()
-  currentPassword: string;
+  currentPassword!: string;
 
   @ApiProperty({ type: String, required: true })
   @IsString()
   @IsNotEmpty()
   @MinLength(8)
   @IsStrongPassword()
-  newPassword: string;
+  newPassword!: string;
 }
 
 /**
@@ -258,13 +258,13 @@ export class ChangeUserPasswordDto {
  */
 export class UserResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: Boolean })
-  checkLocationOnLogin: boolean;
+  checkLocationOnLogin!: boolean;
 
   @ApiProperty({ enum: UserStatus })
-  status: UserStatus;
+  status!: UserStatus;
 
   @ApiPropertyOptional({ type: String })
   email?: string | null;
@@ -273,7 +273,7 @@ export class UserResponseDto {
   phone?: string | null;
 
   @ApiProperty({ enum: UserRole, isArray: true })
-  roles: UserRole[];
+  roles!: UserRole[];
 
   @ApiPropertyOptional({ type: String })
   name?: string | null;
@@ -300,10 +300,10 @@ export class UserResponseDto {
   uiAvatarsUrl?: string | null;
 
   @ApiProperty({ type: String })
-  timezone: string;
+  timezone!: string;
 
   @ApiProperty({ enum: MfaMethod })
-  twoFactorMethod: MfaMethod;
+  twoFactorMethod!: MfaMethod;
 
   @ApiPropertyOptional({ type: String })
   twoFactorPhone?: string | null;
@@ -312,10 +312,10 @@ export class UserResponseDto {
   lastLoginAt?: Date | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @ApiPropertyOptional({ type: String })
   wechatOpenId?: string | null;
@@ -329,7 +329,7 @@ export class UserResponseDto {
  */
 export class CreateUserResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiPropertyOptional({ type: String })
   email?: string | null;
@@ -338,7 +338,7 @@ export class CreateUserResponseDto {
   phone?: string | null;
 
   @ApiProperty({ enum: UserStatus })
-  status: UserStatus;
+  status!: UserStatus;
 
   @ApiPropertyOptional({ type: String })
   name?: string | null;
@@ -358,7 +358,7 @@ export class CreateUserResponseDto {
  */
 export class UserChangePasswordResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiPropertyOptional({ type: String })
   email?: string | null;

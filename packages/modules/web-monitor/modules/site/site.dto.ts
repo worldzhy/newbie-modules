@@ -6,16 +6,16 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
  */
 export class WebMonitorSiteResponseDto {
   @ApiProperty({ type: String, description: "MongoDB document ID" })
-  _id: string;
+  _id!: string;
 
   @ApiProperty({ type: String, description: "System domain" })
-  systemDomain: string;
+  systemDomain!: string;
 
   @ApiProperty({ type: String, description: "Owning Nightwatch project ID" })
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({ type: String, description: "System display name" })
-  systemName: string;
+  systemName!: string;
 
   @ApiPropertyOptional({ type: String, description: "Legacy sub type (only in old documents)" })
   subType?: string;
@@ -24,32 +24,32 @@ export class WebMonitorSiteResponseDto {
   systemCommonName?: string;
 
   @ApiProperty({ type: String, description: "Unique application ID used by the SDK" })
-  appId: string;
+  appId!: string;
 
   @ApiProperty({ type: String, description: "Application type: web / wx" })
-  type: string;
+  type!: string;
 
   @ApiProperty({ type: String, isArray: true, description: "Owner user IDs" })
-  userId: string[];
+  userId!: string[];
 
   @ApiProperty({ type: String, description: "Creation time" })
-  createTime: string;
+  createTime!: string;
 
   @ApiProperty({ type: Number, description: "Slow page threshold (seconds)" })
-  slowPageTime: number;
+  slowPageTime!: number;
 
   @ApiProperty({ type: Number, description: "Slow first-paint threshold (seconds)" })
-  slowWhiteTime: number;
+  slowWhiteTime!: number;
 
   @ApiProperty({ type: Number, description: "Slow JS threshold (seconds)" })
-  slowJsTime: number;
+  slowJsTime!: number;
 
   @ApiProperty({ type: Number, description: "Slow CSS threshold (seconds)" })
-  slowCssTime: number;
+  slowCssTime!: number;
 
   @ApiProperty({ type: Number, description: "Slow image threshold (seconds)" })
-  slowImgTime: number;
+  slowImgTime!: number;
 
   @ApiProperty({ type: Number, description: "Slow AJAX threshold (seconds)" })
-  slowAjaxTime: number;
+  slowAjaxTime!: number;
 }

@@ -10,7 +10,7 @@ export interface XlsxSheetMatrix {
 
 @Injectable()
 export class XLSXService {
-  private workbook: XLSX.WorkBook;
+  private workbook!: XLSX.WorkBook;
 
   createWorkbook() {
     this.workbook = XLSX.utils.book_new();

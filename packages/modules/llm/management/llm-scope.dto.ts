@@ -7,14 +7,14 @@ import { ApiProperty } from "@nestjs/swagger";
  */
 export class LlmScopeBindingResponseDto {
   @ApiProperty({ example: "copilot", description: "Opaque consumer scope" })
-  scope: string;
+  scope!: string;
 
   @ApiProperty({ format: "uuid", description: "ID of the connection the scope is bound to" })
-  connectionId: string;
+  connectionId!: string;
 
   @ApiProperty({ description: "Display name of the bound connection" })
-  connectionName: string;
+  connectionName!: string;
 
   @ApiProperty({ description: "Upstream model ID of the bound connection" })
-  connectionModel: string;
+  connectionModel!: string;
 }

@@ -57,7 +57,7 @@ interface RepoFile {
 @Injectable()
 export class GitHubService {
   private logger = new Logger(GitHubService.name);
-  octokit: Octokit;
+  octokit!: Octokit;
   private readonly appId?: string;
   private readonly privateKey?: string;
   private readonly installationId?: string;

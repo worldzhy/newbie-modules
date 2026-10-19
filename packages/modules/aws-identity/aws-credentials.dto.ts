@@ -11,7 +11,7 @@ const IAM_ROLE_ARN_PATTERN = /^arn:aws(-gov|-cn)?:iam::\d{12}:role\/[\w+=,.@/-]+
  */
 export class AwsCrossAccountBindingDto {
   @ApiProperty({ description: "Binding record ID" })
-  id: string;
+  id!: string;
 
   @ApiPropertyOptional({
     description: "Customer-managed IAM role ARN assumed via STS; null until setup is completed",
@@ -20,7 +20,7 @@ export class AwsCrossAccountBindingDto {
   roleArn?: string | null;
 
   @ApiProperty({ description: "Per-binding external ID required by the role trust policy" })
-  externalId: string;
+  externalId!: string;
 
   @ApiPropertyOptional({
     description: "Customer AWS account ID resolved via STS after assuming the role",
@@ -35,13 +35,13 @@ export class AwsCrossAccountBindingDto {
   defaultRegion?: string | null;
 
   @ApiProperty({ type: [String], description: "Configured AWS regions" })
-  regions: string[];
+  regions!: string[];
 
   @ApiPropertyOptional({ description: "Last verification timestamp (ISO)", type: String })
   lastVerifiedAt?: string | null;
 
   @ApiProperty({ description: "Last update timestamp (ISO)" })
-  updatedAt: string;
+  updatedAt!: string;
 }
 
 /**
@@ -52,10 +52,10 @@ export class AwsCrossAccountBindingDto {
  */
 export class AwsCrossAccountBindingResponseDto {
   @ApiProperty({ description: "Host scope ID (project id / tenant id / ...)" })
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({ description: "Whether a cross-account role is fully configured for this host scope" })
-  configured: boolean;
+  configured!: boolean;
 
   @ApiPropertyOptional({
     description: "Binding details, or null when bootstrap has not run",
@@ -94,7 +94,7 @@ export class AwsCrossAccountBindingVerificationDto {
  */
 export class VerifyAwsCrossAccountBindingResponseDto extends AwsCrossAccountBindingResponseDto {
   @ApiProperty({ description: "Live STS caller-identity verification result" })
-  verification: AwsCrossAccountBindingVerificationDto;
+  verification!: AwsCrossAccountBindingVerificationDto;
 }
 
 export class UpsertAwsCrossAccountBindingDto {
@@ -102,7 +102,7 @@ export class UpsertAwsCrossAccountBindingDto {
   @IsNotEmpty()
   @IsString()
   @Matches(IAM_ROLE_ARN_PATTERN, { message: "roleArn must be a valid IAM role ARN" })
-  roleArn: string;
+  roleArn!: string;
 
   @ApiPropertyOptional({
     description: "Optional default region. If omitted, falls back to the first region in regions[].",

@@ -15,7 +15,7 @@ export class WebMonitorEnvironmentResponseDto {
   createTime?: string;
 
   @ApiProperty({ type: String, description: "Page URL" })
-  url: string;
+  url!: string;
 
   @ApiPropertyOptional({ type: String, description: "Page mark" })
   markPage?: string;
@@ -66,16 +66,16 @@ export class WebMonitorEnvironmentResponseDto {
  */
 export class WebMonitorEnvironmentGroupByKeyResponseDto {
   @ApiProperty({ type: String, description: "Page URL" })
-  url: string;
+  url!: string;
 
   @ApiProperty({ type: String, description: "City (empty string when not the selected dimension)" })
-  city: string;
+  city!: string;
 
   @ApiProperty({ type: String, description: "Browser (empty string when not the selected dimension)" })
-  browser: string;
+  browser!: string;
 
   @ApiProperty({ type: String, description: "OS (empty string when not the selected dimension)" })
-  system: string;
+  system!: string;
 }
 
 /**
@@ -83,8 +83,8 @@ export class WebMonitorEnvironmentGroupByKeyResponseDto {
  */
 export class WebMonitorEnvironmentGroupByItemResponseDto {
   @ApiProperty({ type: WebMonitorEnvironmentGroupByKeyResponseDto, description: "Group-by key" })
-  _id: WebMonitorEnvironmentGroupByKeyResponseDto;
+  _id!: WebMonitorEnvironmentGroupByKeyResponseDto;
 
   @ApiProperty({ type: Number, description: "Occurrence count" })
-  count: number;
+  count!: number;
 }

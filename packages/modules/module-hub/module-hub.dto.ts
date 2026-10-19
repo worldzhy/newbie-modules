@@ -9,7 +9,7 @@ import { IsArray, IsIn, IsObject, IsOptional, IsString, ValidateIf } from "class
 export class CreateHubInstallationDto {
   @ApiProperty({ description: 'Human-readable label, e.g. "nightwatch-prod"' })
   @IsString()
-  label: string;
+  label!: string;
 
   @ApiPropertyOptional({ description: "Source repository URL of the installation" })
   @IsOptional()
@@ -50,7 +50,7 @@ export class SetHubTargetSpecDto {
   })
   @ValidateIf((o) => o.spec !== null && o.spec !== undefined)
   @IsObject()
-  spec: Record<string, unknown> | null;
+  spec!: Record<string, unknown> | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -62,7 +62,7 @@ export class HubReportDto {
   // "ping": periodic liveness touch without snapshot.
   @ApiProperty({ enum: ["full", "ping"] })
   @IsIn(["full", "ping"])
-  kind: "full" | "ping";
+  kind!: "full" | "ping";
 
   // --- kind="full" fields below; "ping" omits them ---
 
@@ -107,12 +107,12 @@ export class HubReportDto {
 
 export class HubReportResponseDto {
   @ApiProperty()
-  serverTime: Date;
+  serverTime!: Date;
 
   // Requested report interval (seconds) for "ping" reports. v1 fixed 60;
   // reserved for hub-side throttling without a client upgrade.
   @ApiProperty()
-  reportIntervalSeconds: number;
+  reportIntervalSeconds!: number;
 
   // Latest registry HEAD commit known to the hub (webhook/fallback ingested).
   // Lets clients/ops see upgradability without a catalog query.

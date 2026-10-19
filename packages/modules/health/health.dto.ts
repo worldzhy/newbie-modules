@@ -11,7 +11,7 @@ export class CreateHealthInstallationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
-  label: string;
+  label!: string;
 
   @ApiPropertyOptional({ description: "Opaque host-owned tag (e.g. projectId/applicationId); never parsed here" })
   @IsOptional()
@@ -57,7 +57,7 @@ export class HealthSnapshotDto {
   @ApiProperty({ description: "Aggregated status: ok | error" })
   @IsString()
   @IsNotEmpty()
-  status: string;
+  status!: string;
 
   // Per-indicator results, keyed by indicator name (e.g. "prisma", "mongo").
   // Each entry has status ("up" | "down") and an optional message.
@@ -73,15 +73,15 @@ export class HealthSnapshotDto {
     },
   })
   @IsObject()
-  info: Record<string, { status: string; message?: string }>;
+  info!: Record<string, { status: string; message?: string }>;
 }
 
 export class HealthSnapshotResponseDto {
   @ApiProperty()
-  serverTime: Date;
+  serverTime!: Date;
 
   // Requested snapshot interval (seconds). v1 fixed 30; reserved for server-side
   // throttling without a client upgrade.
   @ApiProperty()
-  reportIntervalSeconds: number;
+  reportIntervalSeconds!: number;
 }

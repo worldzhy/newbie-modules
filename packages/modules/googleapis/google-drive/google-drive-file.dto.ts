@@ -17,7 +17,7 @@ export class ListGoogleDriveFilesResponseDto extends CommonListResponseDto {
 export class CreateGoogleDriveFileRequestDto {
   @ApiProperty({ type: String, required: true, description: "The name of the file to create." })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String, required: false, description: "The ID of the parent folder to create the file in." })
   @IsOptional()
@@ -37,14 +37,14 @@ export class UploadGoogleDriveFileBodyDto {
 export class RenameGoogleDriveFileRequestDto {
   @ApiProperty({ type: String, required: true, description: "The new name of the file." })
   @IsString()
-  name: string;
+  name!: string;
 }
 export class RenameGoogleDriveFileResponseDto extends GoogleDriveFileEntity {}
 
 export class GetGoogleDriveFileRequestDto {
   @ApiProperty({ type: String, required: true, description: "The ID of the file to get the path for." })
   @IsString()
-  fileId: string;
+  fileId!: string;
 }
 
 /**
@@ -54,10 +54,10 @@ export class GetGoogleDriveFileRequestDto {
  */
 export class GetFilePathResponseDto {
   @ApiProperty({ type: String, description: "The file/folder ID." })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: String, description: "The file/folder name." })
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String, required: false, description: "The MIME type of the file." })
   type?: string | null;

@@ -27,10 +27,10 @@ export class WebMonitorTopCountKeyResponseDto {
  */
 export class WebMonitorTopCountItemResponseDto {
   @ApiProperty({ type: WebMonitorTopCountKeyResponseDto, description: "Group-by key" })
-  _id: WebMonitorTopCountKeyResponseDto;
+  _id!: WebMonitorTopCountKeyResponseDto;
 
   @ApiProperty({ type: Number, description: "Occurrence count" })
-  count: number;
+  count!: number;
 }
 
 /**
@@ -38,7 +38,7 @@ export class WebMonitorTopCountItemResponseDto {
  */
 export class WebMonitorAnalysisUserKeyResponseDto {
   @ApiProperty({ type: String, description: "User mark" })
-  markUser: string;
+  markUser!: string;
 }
 
 /**
@@ -46,10 +46,10 @@ export class WebMonitorAnalysisUserKeyResponseDto {
  */
 export class WebMonitorAnalysisUserItemResponseDto {
   @ApiProperty({ type: WebMonitorAnalysisUserKeyResponseDto, description: "Group-by key {markUser}" })
-  _id: WebMonitorAnalysisUserKeyResponseDto;
+  _id!: WebMonitorAnalysisUserKeyResponseDto;
 
   @ApiProperty({ type: String, description: "First visit time (ISO string)" })
-  visitTime: string;
+  visitTime!: string;
 }
 
 /**
@@ -58,7 +58,7 @@ export class WebMonitorAnalysisUserItemResponseDto {
  */
 export class ListWebMonitorAnalysisUsersResponseDto {
   @ApiProperty({ type: WebMonitorAnalysisUserItemResponseDto, isArray: true, description: "User funnel rows" })
-  list: WebMonitorAnalysisUserItemResponseDto[];
+  list!: WebMonitorAnalysisUserItemResponseDto[];
 }
 
 /**
@@ -67,7 +67,7 @@ export class ListWebMonitorAnalysisUsersResponseDto {
  */
 export class WebMonitorProvinceCountResponseDto {
   @ApiProperty({ type: WebMonitorTopCountItemResponseDto, isArray: true, description: "Province count rows" })
-  provinces: WebMonitorTopCountItemResponseDto[];
+  provinces!: WebMonitorTopCountItemResponseDto[];
 }
 
 /**
@@ -75,16 +75,16 @@ export class WebMonitorProvinceCountResponseDto {
  */
 export class WebMonitorWebTopDatasResponseDto {
   @ApiProperty({ type: WebMonitorTopCountItemResponseDto, isArray: true, description: "Top visited pages" })
-  top_pages: WebMonitorTopCountItemResponseDto[];
+  top_pages!: WebMonitorTopCountItemResponseDto[];
 
   @ApiProperty({ type: WebMonitorTopCountItemResponseDto, isArray: true, description: "Top jump-out pages" })
-  top_jump_out: WebMonitorTopCountItemResponseDto[];
+  top_jump_out!: WebMonitorTopCountItemResponseDto[];
 
   @ApiProperty({ type: WebMonitorTopCountItemResponseDto, isArray: true, description: "Top browsers" })
-  top_browser: WebMonitorTopCountItemResponseDto[];
+  top_browser!: WebMonitorTopCountItemResponseDto[];
 
   @ApiProperty({ type: WebMonitorTopCountItemResponseDto, isArray: true, description: "Province count rows" })
-  provinces: WebMonitorTopCountItemResponseDto[];
+  provinces!: WebMonitorTopCountItemResponseDto[];
 }
 
 /**
@@ -93,14 +93,14 @@ export class WebMonitorWebTopDatasResponseDto {
  */
 export class WebMonitorWxTopDatasResponseDto {
   @ApiProperty({ type: WebMonitorTopCountItemResponseDto, isArray: true, description: "Top visited pages" })
-  top_pages: WebMonitorTopCountItemResponseDto[];
+  top_pages!: WebMonitorTopCountItemResponseDto[];
 
   @ApiProperty({ type: WebMonitorTopCountItemResponseDto, isArray: true, description: "Top jump-out pages" })
-  top_jump_out: WebMonitorTopCountItemResponseDto[];
+  top_jump_out!: WebMonitorTopCountItemResponseDto[];
 
   @ApiProperty({ type: WebMonitorTopCountItemResponseDto, isArray: true, description: "Top device brands" })
-  top_brand: WebMonitorTopCountItemResponseDto[];
+  top_brand!: WebMonitorTopCountItemResponseDto[];
 
   @ApiProperty({ type: WebMonitorTopCountItemResponseDto, isArray: true, description: "Province count rows" })
-  provinces: WebMonitorTopCountItemResponseDto[];
+  provinces!: WebMonitorTopCountItemResponseDto[];
 }

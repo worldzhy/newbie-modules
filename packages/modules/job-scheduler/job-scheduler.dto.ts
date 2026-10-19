@@ -3,63 +3,63 @@ import { IsBoolean, IsOptional, IsString } from "class-validator";
 
 export class JobScheduleDto {
   @ApiProperty()
-  id: number;
+  id!: number;
 
   @ApiProperty({ description: "Unique schedule key, e.g. aws-audit" })
-  key: string;
+  key!: string;
 
   @ApiProperty({ description: "Human-readable display name declared by the job", example: "AWS Audit Scan" })
-  name: string;
+  name!: string;
 
   @ApiProperty({ description: "Key of the in-process job handler that executes the schedule" })
-  handlerKey: string;
+  handlerKey!: string;
 
   @ApiProperty({ description: "Cron expression, e.g. 0 3 * * *" })
-  cronExpr: string;
+  cronExpr!: string;
 
   @ApiProperty()
-  timezone: string;
+  timezone!: string;
 
   @ApiProperty()
-  enabled: boolean;
+  enabled!: boolean;
 
   @ApiProperty({ type: Object, required: false, nullable: true })
   payload?: unknown;
 
   @ApiProperty({ description: "How the schedule was created", example: "declaration" })
-  createdVia: string;
+  createdVia!: string;
 
   @ApiProperty()
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty()
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 export class JobRunDto {
   @ApiProperty()
-  id: number;
+  id!: number;
 
   @ApiProperty()
-  scheduleId: number;
+  scheduleId!: number;
 
   @ApiProperty({ enum: ["schedule", "manual"] })
-  trigger: string;
+  trigger!: string;
 
   @ApiProperty({ enum: ["running", "success", "failed", "skipped"] })
-  status: string;
+  status!: string;
 
   @ApiProperty()
-  startedAt: Date;
+  startedAt!: Date;
 
   @ApiProperty({ nullable: true, type: String, format: "date-time" })
-  finishedAt: Date | null;
+  finishedAt!: Date | null;
 
   @ApiProperty({ nullable: true, type: Number })
-  durationMs: number | null;
+  durationMs!: number | null;
 
   @ApiProperty({ nullable: true, type: String })
-  error: string | null;
+  error!: string | null;
 }
 
 export class UpdateJobScheduleDto {

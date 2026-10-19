@@ -9,7 +9,7 @@ import { LRUCache } from "lru-cache";
 @Injectable()
 export class GeolocationService implements OnModuleDestroy {
   private readonly logger = new Logger(GeolocationService.name);
-  private reader: Reader<CityResponse> | null;
+  private reader!: Reader<CityResponse> | null;
   private openFailed = false;
   private lru: LRUCache<string, Partial<CityResponse>>;
 

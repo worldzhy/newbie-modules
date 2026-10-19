@@ -65,10 +65,10 @@ export class ReplaceApiKeyDto {
  */
 export class ApiKeyResponseDto {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ type: String })
-  key: string;
+  key!: string;
 
   @ApiPropertyOptional({ type: String, description: "Plaintext secret, returned only once on creation." })
   secret?: string;
@@ -83,13 +83,13 @@ export class ApiKeyResponseDto {
   referrerRestrictions?: object | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @ApiProperty({ type: String })
-  userId: string;
+  userId!: string;
 
   @ApiPropertyOptional({ type: String })
   organizationId?: string | null;
@@ -101,5 +101,5 @@ export class ApiKeyResponseDto {
  */
 export class ApiKeyLogResponseDto {
   @ApiProperty({ type: Object })
-  data: object;
+  data!: object;
 }

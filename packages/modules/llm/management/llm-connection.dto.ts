@@ -7,7 +7,7 @@ export class CreateLlmConnectionDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({
     enum: LLM_PROVIDERS,
@@ -23,7 +23,7 @@ export class CreateLlmConnectionDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
-  model: string;
+  model!: string;
 
   @ApiProperty({
     description:
@@ -43,7 +43,7 @@ export class CreateLlmConnectionDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(500)
-  apiKey: string;
+  apiKey!: string;
 }
 
 export class UpdateLlmConnectionDto {
@@ -91,27 +91,27 @@ export class UpdateLlmConnectionDto {
 
 export class LlmConnectionResponseDto {
   @ApiProperty()
-  id: string;
+  id!: string;
 
   @ApiProperty()
-  name: string;
+  name!: string;
 
   @ApiProperty({ enum: LLM_PROVIDERS })
-  provider: string;
+  provider!: string;
 
   @ApiProperty()
-  model: string;
+  model!: string;
 
   @ApiProperty()
-  baseUrl: string;
+  baseUrl!: string;
 
   @ApiProperty({ description: "Always masked; the raw API key is never returned by the API." })
-  apiKey: string;
+  apiKey!: string;
 
   @ApiProperty({
     description: "Consumer scopes bound to this connection (ADR-006). One scope binds to exactly one connection.",
   })
-  scopes: string[];
+  scopes!: string[];
 
   @ApiPropertyOptional({
     type: Date,
@@ -143,16 +143,16 @@ export class LlmConnectionResponseDto {
   lastFailureMessage?: string | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 export class TestLlmConnectionResponseDto {
   @ApiProperty({ description: "Whether the minimal chat completion request succeeded" })
-  success: boolean;
+  success!: boolean;
 
   @ApiProperty({ description: "Human-readable test result, including a normalized failure reason" })
-  message: string;
+  message!: string;
 }

@@ -9,16 +9,16 @@ export class WebMonitorAjaxRowResponseDto {
   createTime?: string;
 
   @ApiProperty({ type: String, description: "AJAX URL" })
-  url: string;
+  url!: string;
 
   @ApiProperty({ type: String, description: "Request method" })
-  method: string;
+  method!: string;
 
   @ApiProperty({ type: Number, description: "Response time (ms)" })
-  duration: number;
+  duration!: number;
 
   @ApiProperty({ type: Number, description: "Response size (bytes)" })
-  bodySize: number;
+  bodySize!: number;
 
   @ApiPropertyOptional({ type: String, description: "Request body options" })
   options?: string;
@@ -53,10 +53,10 @@ export class WebMonitorAjaxRowResponseDto {
  */
 export class WebMonitorAjaxAvgKeyResponseDto {
   @ApiProperty({ type: String, description: "Request method" })
-  method: string;
+  method!: string;
 
   @ApiProperty({ type: String, description: "AJAX URL" })
-  url: string;
+  url!: string;
 }
 
 /**
@@ -64,25 +64,25 @@ export class WebMonitorAjaxAvgKeyResponseDto {
  */
 export class WebMonitorAjaxAvgItemResponseDto {
   @ApiProperty({ type: String, description: "AJAX URL" })
-  url: string;
+  url!: string;
 
   @ApiProperty({ type: String, description: "Request method" })
-  method: string;
+  method!: string;
 
   @ApiProperty({ type: Number, description: "Occurrence count" })
-  count: number;
+  count!: number;
 
   @ApiProperty({ type: Number, description: "Average response time (ms, floored)" })
-  durationAvg: number;
+  durationAvg!: number;
 
   @ApiProperty({ type: Number, description: "Average response size (bytes, floored)" })
-  bodySize: number;
+  bodySize!: number;
 
   @ApiProperty({ type: WebMonitorAjaxAvgKeyResponseDto, description: "Group-by key {method, url}" })
-  _id: WebMonitorAjaxAvgKeyResponseDto;
+  _id!: WebMonitorAjaxAvgKeyResponseDto;
 
   @ApiProperty({ type: Number, description: "Alias of durationAvg kept for legacy consumers" })
-  duration: number;
+  duration!: number;
 }
 
 /**
@@ -91,13 +91,13 @@ export class WebMonitorAjaxAvgItemResponseDto {
  */
 export class ListWebMonitorAjaxAveragesResponseDto {
   @ApiProperty({ type: WebMonitorAjaxAvgItemResponseDto, isArray: true, description: "AJAX average rows" })
-  dataList: WebMonitorAjaxAvgItemResponseDto[];
+  dataList!: WebMonitorAjaxAvgItemResponseDto[];
 
   @ApiProperty({ type: Number, description: "Total record count" })
-  totalNum: number;
+  totalNum!: number;
 
   @ApiProperty({ type: Number, description: "Current page number" })
-  pageNo: number;
+  pageNo!: number;
 }
 
 /**
@@ -106,13 +106,13 @@ export class ListWebMonitorAjaxAveragesResponseDto {
  */
 export class ListWebMonitorAjaxOnesResponseDto {
   @ApiProperty({ type: WebMonitorAjaxRowResponseDto, isArray: true, description: "AJAX log rows" })
-  dataList: WebMonitorAjaxRowResponseDto[];
+  dataList!: WebMonitorAjaxRowResponseDto[];
 
   @ApiProperty({ type: Number, description: "Total record count" })
-  totalNum: number;
+  totalNum!: number;
 
   @ApiProperty({ type: Number, description: "Current page number" })
-  pageNo: number;
+  pageNo!: number;
 }
 
 /**
@@ -121,5 +121,5 @@ export class ListWebMonitorAjaxOnesResponseDto {
  */
 export class ListWebMonitorAjaxMarkUsersResponseDto {
   @ApiProperty({ type: WebMonitorAjaxRowResponseDto, isArray: true, description: "AJAX log rows" })
-  list: WebMonitorAjaxRowResponseDto[];
+  list!: WebMonitorAjaxRowResponseDto[];
 }

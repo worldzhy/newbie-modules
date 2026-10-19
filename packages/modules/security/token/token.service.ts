@@ -47,7 +47,7 @@ export class TokenService {
 
     try {
       return verify(token, secret, options) as T;
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException(INVALID_TOKEN);
     }
   }

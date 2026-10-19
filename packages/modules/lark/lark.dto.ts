@@ -6,7 +6,7 @@ export class GetChatHistoryRequestDto {
   @ApiProperty({ description: "The ID of the chat group", required: true })
   @IsString()
   @IsNotEmpty()
-  chatId: string;
+  chatId!: string;
 
   @ApiProperty({ description: "Start time in seconds (timestamp)", required: false })
   @IsString()
@@ -33,7 +33,7 @@ export class SendTextDto {
   @ApiProperty({ description: "The ID of the chat group or user", required: true })
   @IsString()
   @IsNotEmpty()
-  receiveId: string;
+  receiveId!: string;
 
   @ApiProperty({ description: "Type of receive_id (open_id, chat_id, etc.)", default: "chat_id" })
   @IsString()
@@ -43,14 +43,14 @@ export class SendTextDto {
   @ApiProperty({ description: "Text content to send" })
   @IsString()
   @IsNotEmpty()
-  text: string;
+  text!: string;
 }
 
 export class SendCardDto {
   @ApiProperty({ description: "The ID of the chat group or user", required: true })
   @IsString()
   @IsNotEmpty()
-  receiveId: string;
+  receiveId!: string;
 
   @ApiProperty({ description: "Type of receive_id (open_id, chat_id, etc.)", default: "chat_id" })
   @IsString()
@@ -59,18 +59,18 @@ export class SendCardDto {
 
   @ApiProperty({ description: "Card content (JSON object or string)" })
   @IsNotEmpty()
-  card: Record<string, unknown>;
+  card!: Record<string, unknown>;
 }
 
 export class UpdateCardDto {
   @ApiProperty({ description: "The message ID of the card to update", required: true })
   @IsString()
   @IsNotEmpty()
-  messageId: string;
+  messageId!: string;
 
   @ApiProperty({ description: "New card content (JSON object)" })
   @IsNotEmpty()
-  card: Record<string, unknown>;
+  card!: Record<string, unknown>;
 }
 
 export class LarkWebhookDto {

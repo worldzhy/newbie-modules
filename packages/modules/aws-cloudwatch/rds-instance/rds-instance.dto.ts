@@ -19,34 +19,34 @@ import { CloudwatchMetricRDSMetricName, CloudwatchMetricStatistics } from "../aw
  */
 export class RdsInstanceResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: String })
-  instanceId: string;
+  instanceId!: string;
 
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String })
-  status: string;
+  status!: string;
 
   @ApiProperty({ type: String })
-  region: string;
+  region!: string;
 
   @ApiProperty({ type: Boolean })
-  isWatching: boolean;
+  isWatching!: boolean;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 export class ListRDSInstancesRequestDto {
   @ApiProperty()
   @IsUUID()
-  projectId: string;
+  projectId!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -63,52 +63,52 @@ export class ListRDSInstancesRequestDto {
 export class FetchRDSInstancesDto {
   @ApiProperty()
   @IsUUID()
-  projectId: string;
+  projectId!: string;
 }
 
 export class SyncRDSInstancesWatchDto {
   @ApiProperty({ type: String })
   @IsUUID()
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({ type: [String], minLength: 0 })
   @IsArray()
   @ArrayMinSize(0)
   @IsUUID("4", { each: true })
-  watchRDSInstanceIds: string[];
+  watchRDSInstanceIds!: string[];
 
   @ApiProperty({ type: [String], minLength: 0 })
   @IsArray()
   @ArrayMinSize(0)
   @IsUUID("4", { each: true })
-  unwatchRDSInstanceIds: string[];
+  unwatchRDSInstanceIds!: string[];
 }
 
 export class GetWatchedRDSInstancesMetricRequestDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsUUID("4")
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({ enum: CloudwatchMetricRDSMetricName })
   @IsNotEmpty()
   @IsEnum(CloudwatchMetricRDSMetricName)
-  metricName: CloudwatchMetricRDSMetricName;
+  metricName!: CloudwatchMetricRDSMetricName;
 
   @ApiProperty()
   @IsNotEmpty()
-  startTime: string;
+  startTime!: string;
 
   @ApiProperty()
   @IsNotEmpty()
-  endTime: string;
+  endTime!: string;
 
   @ApiProperty({ description: "The period must be a multiple of 60" })
   @IsNumberString()
-  period: string;
+  period!: string;
 
   @ApiProperty({ enum: CloudwatchMetricStatistics })
   @IsNotEmpty()
   @IsEnum(CloudwatchMetricStatistics)
-  statistics: CloudwatchMetricStatistics;
+  statistics!: CloudwatchMetricStatistics;
 }

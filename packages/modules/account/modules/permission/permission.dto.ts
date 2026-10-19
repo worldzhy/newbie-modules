@@ -10,12 +10,12 @@ import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, I
 export class CreatePermissionDto {
   @ApiProperty({ enum: PermissionAction, description: "The action allowed or forbidden by this rule." })
   @IsEnum(PermissionAction)
-  action: PermissionAction;
+  action!: PermissionAction;
 
   @ApiProperty({ type: String, description: "The resource (Prisma model name) the rule applies to." })
   @IsString()
   @IsNotEmpty()
-  resource: string;
+  resource!: string;
 
   @ApiPropertyOptional({
     type: Object,
@@ -103,13 +103,13 @@ export class UpdatePermissionDto {
  */
 export class PermissionResponseDto {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ enum: PermissionAction })
-  action: PermissionAction;
+  action!: PermissionAction;
 
   @ApiProperty({ type: String })
-  resource: string;
+  resource!: string;
 
   @ApiPropertyOptional({ type: Object })
   where?: object | null;
@@ -130,10 +130,10 @@ export class PermissionResponseDto {
   trustedMembershipId?: number | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 /**

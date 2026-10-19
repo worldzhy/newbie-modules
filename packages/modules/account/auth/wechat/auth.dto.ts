@@ -5,11 +5,11 @@ import { IsString } from "class-validator";
 export class WechatLoginDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  openId: string;
+  openId!: string;
 
   @ApiProperty({ type: String, required: true })
   @IsString()
-  phone: string;
+  phone!: string;
 }
 
 export class WechatCodeLoginDto {
@@ -17,7 +17,7 @@ export class WechatCodeLoginDto {
    * Temporary credential for WeChat login
    */
   @IsString()
-  code: string;
+  code!: string;
 }
 
 /**
@@ -25,13 +25,13 @@ export class WechatCodeLoginDto {
  */
 export class WechatUserResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: Boolean })
-  checkLocationOnLogin: boolean;
+  checkLocationOnLogin!: boolean;
 
   @ApiProperty({ enum: UserStatus })
-  status: UserStatus;
+  status!: UserStatus;
 
   @ApiPropertyOptional({ type: String })
   email?: string | null;
@@ -40,7 +40,7 @@ export class WechatUserResponseDto {
   phone?: string | null;
 
   @ApiProperty({ enum: UserRole, isArray: true })
-  roles: UserRole[];
+  roles!: UserRole[];
 
   @ApiPropertyOptional({ type: String })
   name?: string | null;
@@ -67,10 +67,10 @@ export class WechatUserResponseDto {
   uiAvatarsUrl?: string | null;
 
   @ApiProperty({ type: String })
-  timezone: string;
+  timezone!: string;
 
   @ApiProperty({ enum: MfaMethod })
-  twoFactorMethod: MfaMethod;
+  twoFactorMethod!: MfaMethod;
 
   @ApiPropertyOptional({ type: String })
   twoFactorPhone?: string | null;
@@ -79,10 +79,10 @@ export class WechatUserResponseDto {
   lastLoginAt?: Date | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @ApiPropertyOptional({ type: String })
   wechatOpenId?: string | null;
@@ -91,7 +91,7 @@ export class WechatUserResponseDto {
   wechatUnionId?: string | null;
 
   @ApiProperty({ type: Boolean })
-  hasPassword: boolean;
+  hasPassword!: boolean;
 }
 
 /**
@@ -128,11 +128,11 @@ export class WechatLoginResponseDto {
  */
 export class WechatRefreshAccessTokenResponseDto {
   @ApiProperty({ type: String })
-  token: string;
+  token!: string;
 
   @ApiProperty({ type: Number })
-  tokenExpiresInSeconds: number;
+  tokenExpiresInSeconds!: number;
 
   @ApiProperty({ type: String })
-  refreshToken: string;
+  refreshToken!: string;
 }

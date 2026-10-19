@@ -5,7 +5,7 @@ import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 
 export class GetCurrentUserResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiPropertyOptional({ type: String })
   email?: string | null;
@@ -14,7 +14,7 @@ export class GetCurrentUserResponseDto {
   phone?: string | null;
 
   @ApiProperty({ type: String, isArray: true })
-  roles: UserRole[];
+  roles!: UserRole[];
 
   @ApiPropertyOptional({ enum: MfaMethod })
   twoFactorMethod?: MfaMethod;
@@ -41,7 +41,7 @@ export class GetCurrentUserResponseDto {
  */
 export class PasswordChangeResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiPropertyOptional({ type: String })
   email?: string | null;

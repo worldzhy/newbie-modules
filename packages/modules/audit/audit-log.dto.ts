@@ -84,10 +84,10 @@ export class AuditLogQueryDto {
  */
 export class AuditLogResponseDto {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ type: String })
-  event: string;
+  event!: string;
 
   @ApiPropertyOptional({ type: String })
   action?: string | null;
@@ -99,7 +99,7 @@ export class AuditLogResponseDto {
   resourceId?: string | null;
 
   @ApiProperty({ type: String })
-  result: string;
+  result!: string;
 
   @ApiPropertyOptional({ type: Object, description: "Structured event detail payload" })
   detail?: Record<string, unknown> | null;
@@ -135,10 +135,10 @@ export class AuditLogResponseDto {
   operatingSystem?: string | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 /**

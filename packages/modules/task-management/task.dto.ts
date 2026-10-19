@@ -22,12 +22,12 @@ export class LookupParticipantQueryDto {
   @ApiProperty({ type: String, description: "Opaque identity source (host-defined)" })
   @IsString()
   @IsNotEmpty()
-  identitySource: string;
+  identitySource!: string;
 
   @ApiProperty({ type: String, description: "Participant ID within that source" })
   @IsString()
   @IsNotEmpty()
-  externalId: string;
+  externalId!: string;
 }
 
 export class ListTasksQueryDto {
@@ -63,7 +63,7 @@ export class CreateTaskItemDto {
   @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
-  title: string;
+  title!: string;
 
   @ApiPropertyOptional({ type: String })
   @IsString()
@@ -119,12 +119,12 @@ export class CreateTasksBatchRequestDto {
   @ApiProperty({ type: String, description: "Owning TaskSpace ID (uuid)" })
   @IsUUID("4")
   @IsNotEmpty()
-  spaceId: string;
+  spaceId!: string;
 
   @ApiProperty({ type: String, description: "Nightwatch Project ID (uuid)" })
   @IsUUID("4")
   @IsNotEmpty()
-  projectId: string;
+  projectId!: string;
 
   @ApiPropertyOptional({ type: String, description: "Creator TaskParticipant ID (uuid)" })
   @IsUUID("4")
@@ -136,7 +136,7 @@ export class CreateTasksBatchRequestDto {
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => CreateTaskItemDto)
-  tasks: CreateTaskItemDto[];
+  tasks!: CreateTaskItemDto[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -145,13 +145,13 @@ export class CreateTasksBatchRequestDto {
 
 export class TaskParticipantDto {
   @ApiProperty({ description: "TaskParticipant ID (uuid)" })
-  id: string;
+  id!: string;
 
   @ApiProperty({ description: "Opaque identity source (host-defined)" })
-  identitySource: string;
+  identitySource!: string;
 
   @ApiProperty({ description: "Participant ID within that source" })
-  externalId: string;
+  externalId!: string;
 
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;
@@ -160,21 +160,21 @@ export class TaskParticipantDto {
   avatarUrl?: string | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 export class TaskParticipantListItemDto {
   @ApiProperty({ description: "TaskParticipant ID (uuid)" })
-  id: string;
+  id!: string;
 
   @ApiProperty({ description: "Opaque identity source (host-defined)" })
-  identitySource: string;
+  identitySource!: string;
 
   @ApiProperty({ description: "Participant ID within that source" })
-  externalId: string;
+  externalId!: string;
 
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;
@@ -185,10 +185,10 @@ export class TaskParticipantListItemDto {
 
 export class TaskSpaceDto {
   @ApiProperty({ description: "TaskSpace ID (uuid)" })
-  id: string;
+  id!: string;
 
   @ApiProperty({ description: "Nightwatch Project ID (uuid), 1:1 companion space" })
-  projectId: string;
+  projectId!: string;
 
   @ApiPropertyOptional({ description: "Space name", type: String })
   name?: string | null;
@@ -197,52 +197,52 @@ export class TaskSpaceDto {
   description?: string | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 export class TaskSpaceCountDto {
   @ApiProperty({ description: "Number of non-deleted tasks in the space" })
-  tasks: number;
+  tasks!: number;
 }
 
 export class TaskSpaceWithCountDto extends TaskSpaceDto {
   @ApiProperty({ type: TaskSpaceCountDto, description: "Relation counts" })
-  _count: TaskSpaceCountDto;
+  _count!: TaskSpaceCountDto;
 }
 
 export class TaskDto {
   @ApiProperty({ description: "Task ID (uuid)" })
-  id: string;
+  id!: string;
 
   @ApiProperty({ description: "Task title" })
-  title: string;
+  title!: string;
 
   @ApiPropertyOptional({ description: "Task details", type: String })
   description?: string | null;
 
   @ApiProperty({ enum: TaskStatus })
-  status: TaskStatus;
+  status!: TaskStatus;
 
   @ApiPropertyOptional({ type: Date, description: "Expected completion time" })
   dueDate?: Date | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @ApiPropertyOptional({ type: Date, description: "Soft-delete timestamp" })
   deletedAt?: Date | null;
 
   @ApiProperty({ description: "Owning TaskSpace ID (uuid)" })
-  spaceId: string;
+  spaceId!: string;
 
   @ApiProperty({ description: "Nightwatch Project ID (uuid)" })
-  projectId: string;
+  projectId!: string;
 
   @ApiPropertyOptional({ description: "Creator TaskParticipant ID (uuid)", type: String })
   creatorId?: string | null;
@@ -273,18 +273,18 @@ export class TaskWithRelationsDto extends TaskDto {
 
 export class TaskMemberStatsDto {
   @ApiProperty({ description: "Total active tasks assigned" })
-  total: number;
+  total!: number;
 
   @ApiProperty({ description: "Completed task count" })
-  completed: number;
+  completed!: number;
 
   @ApiProperty({ description: "In-progress task count" })
-  inProgress: number;
+  inProgress!: number;
 }
 
 export class TaskMemberDto {
   @ApiProperty({ description: "TaskParticipant ID (uuid)" })
-  id: string;
+  id!: string;
 
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;
@@ -293,25 +293,25 @@ export class TaskMemberDto {
   avatarUrl?: string | null;
 
   @ApiProperty({ type: TaskMemberStatsDto })
-  taskStats: TaskMemberStatsDto;
+  taskStats!: TaskMemberStatsDto;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 }
 
 // ── Envelope responses ({success, data?[, message]}) ──
 
 export class ListTaskParticipantsResponseDto {
   @ApiProperty()
-  success: boolean;
+  success!: boolean;
 
   @ApiProperty({ type: [TaskParticipantListItemDto] })
-  data: TaskParticipantListItemDto[];
+  data!: TaskParticipantListItemDto[];
 }
 
 export class TaskParticipantDataResponseDto {
   @ApiProperty()
-  success: boolean;
+  success!: boolean;
 
   @ApiPropertyOptional({ type: TaskParticipantDto, description: "Participant, null when not found" })
   data?: TaskParticipantDto | null;
@@ -319,56 +319,56 @@ export class TaskParticipantDataResponseDto {
 
 export class MembersResponseDto {
   @ApiProperty()
-  success: boolean;
+  success!: boolean;
 
   @ApiProperty({ type: [TaskMemberDto] })
-  data: TaskMemberDto[];
+  data!: TaskMemberDto[];
 }
 
 export class PaginatedTasksDto {
   @ApiProperty({ type: [TaskWithRelationsDto] })
-  records: TaskWithRelationsDto[];
+  records!: TaskWithRelationsDto[];
 
   @ApiProperty({ description: "Total record count" })
-  total: number;
+  total!: number;
 
   @ApiProperty({ description: "Current page, 0-based" })
-  page: number;
+  page!: number;
 
   @ApiProperty({ description: "Page size" })
-  pageSize: number;
+  pageSize!: number;
 }
 
 export class TasksResponseDto {
   @ApiProperty()
-  success: boolean;
+  success!: boolean;
 
   @ApiProperty({ type: PaginatedTasksDto })
-  data: PaginatedTasksDto;
+  data!: PaginatedTasksDto;
 }
 
 export class TaskSpaceResponseDto {
   @ApiProperty()
-  success: boolean;
+  success!: boolean;
 
   @ApiProperty({ type: TaskSpaceDto })
-  data: TaskSpaceDto;
+  data!: TaskSpaceDto;
 }
 
 export class CreateTaskResponseDto {
   @ApiProperty()
-  success: boolean;
+  success!: boolean;
 
   @ApiProperty({ type: TaskDto })
-  data: TaskDto;
+  data!: TaskDto;
 }
 
 export class BatchCreateTasksResponseDto {
   @ApiProperty()
-  success: boolean;
+  success!: boolean;
 
   @ApiProperty({ type: Object, description: "Batch creation result" })
-  data: {
+  data!: {
     count: number;
   };
 }

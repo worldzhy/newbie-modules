@@ -10,7 +10,7 @@ export class CreateMonitorInstallationDto {
   @ApiProperty({ description: 'Human-readable label, e.g. "nightwatch-prod"' })
   @IsString()
   @MaxLength(255)
-  label: string;
+  label!: string;
 
   @ApiPropertyOptional({
     description: 'Opaque host tag; convention "projectId/applicationId"',

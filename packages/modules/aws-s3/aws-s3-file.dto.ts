@@ -6,39 +6,39 @@ import { FileEntity } from "./aws-s3-file.entity";
 
 export class GetSignedUploadUrlResponseDto {
   @ApiProperty({ type: String })
-  fileId: string;
+  fileId!: string;
 
   @ApiProperty({ type: String })
-  signedUploadUrl: string;
+  signedUploadUrl!: string;
 }
 
 export class CreateFileResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String, required: false })
-  type: string;
+  type!: string;
 
   @ApiProperty({ type: Number, required: false })
-  size: number;
+  size!: number;
 
   @ApiProperty({ type: String })
-  s3Bucket: string;
+  s3Bucket!: string;
 
   @ApiProperty({ type: String })
-  s3Key: string;
+  s3Key!: string;
 
   @ApiProperty({ type: String, required: false })
-  parentId: string;
+  parentId!: string;
 
   @ApiProperty({ type: String, required: false })
-  uploadId: string;
+  uploadId!: string;
 
   @ApiProperty({ type: Number })
-  uploadProgress: number;
+  uploadProgress!: number;
 }
 
 export class ListFilesRequestDto extends CommonListRequestDto {
@@ -69,7 +69,7 @@ export class CreateFolderRequestDto {
   })
   @IsString()
   @MinLength(1)
-  name: string;
+  name!: string;
 
   @ApiProperty({
     type: String,
@@ -84,16 +84,16 @@ export class CreateFolderRequestDto {
 export class CreateFileRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String, required: true })
   @IsString()
-  type: string;
+  type!: string;
 
   @ApiProperty({ type: Number, required: true })
   @Type(() => Number)
   @IsNumber()
-  size: number;
+  size!: number;
 
   @ApiProperty({ type: String, required: false })
   @IsOptional()
@@ -122,7 +122,7 @@ export class CreateFileRequestDto {
 export class RenameFileRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  name: string;
+  name!: string;
 }
 
 export class RenameFileResponseDto extends CreateFileResponseDto {}
@@ -143,24 +143,24 @@ export class ListFilePathsResponseDto {
     type: String,
   })
   @IsString()
-  id: string;
+  id!: string;
 
   @ApiProperty({
     type: String,
   })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({
     type: String,
   })
   @IsString()
-  type: string;
+  type!: string;
   @ApiProperty({
     type: String,
   })
   @IsString()
-  parentId: string;
+  parentId!: string;
 }
 
 //***************/
@@ -222,7 +222,7 @@ export class UploadBase64RequestDto {
     description: "Base64 encoded file data.",
   })
   @IsString()
-  base64: string;
+  base64!: string;
 
   @ApiProperty({
     type: String,
@@ -250,12 +250,12 @@ export class UploadBase64RequestDto {
 class UploadPartInfo {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  ETag: string;
+  ETag!: string;
 
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
-  PartNumber: number;
+  PartNumber!: number;
 }
 
 export class CreateMultipartUploadRequestDto extends CreateFileRequestDto {}
@@ -265,42 +265,42 @@ export class CreateMultipartUploadResponseDto extends CreateFileResponseDto {}
 export class UploadPartRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  uploadId: string;
+  uploadId!: string;
 
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
-  uploadProgress: number;
+  uploadProgress!: number;
 
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
-  partNumber: number;
+  partNumber!: number;
 }
 
 export class UploadPartResponseDto {
   @ApiProperty({ type: String })
-  ETag: string;
+  ETag!: string;
 
   @ApiProperty({ type: Number })
-  PartNumber: number;
+  PartNumber!: number;
 }
 
 export class CompleteMultipartUploadRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  uploadId: string;
+  uploadId!: string;
 
   @ApiProperty({
     type: [UploadPartInfo],
     required: true,
   })
   @IsArray()
-  parts: UploadPartInfo[];
+  parts!: UploadPartInfo[];
 }
 
 export class AbortMultipartUploadRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  uploadId: string;
+  uploadId!: string;
 }

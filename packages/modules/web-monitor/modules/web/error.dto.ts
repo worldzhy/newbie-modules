@@ -113,13 +113,13 @@ export class WebMonitorErrorItemResponseDto {
  */
 export class ListWebMonitorErrorsResponseDto {
   @ApiProperty({ type: WebMonitorErrorItemResponseDto, isArray: true, description: "Error rows" })
-  dataList: WebMonitorErrorItemResponseDto[];
+  dataList!: WebMonitorErrorItemResponseDto[];
 
   @ApiProperty({ type: Number, description: "Total record count" })
-  totalNum: number;
+  totalNum!: number;
 
   @ApiProperty({ type: Number, description: "Current page number" })
-  pageNo: number;
+  pageNo!: number;
 }
 
 /**
@@ -128,22 +128,22 @@ export class ListWebMonitorErrorsResponseDto {
  */
 export class ListWebMonitorErrorOnesResponseDto {
   @ApiProperty({ type: WebMonitorErrorItemResponseDto, isArray: true, description: "Error rows" })
-  dataList: WebMonitorErrorItemResponseDto[];
+  dataList!: WebMonitorErrorItemResponseDto[];
 
   @ApiProperty({ type: Number, description: "Total record count" })
-  totalNum: number;
+  totalNum!: number;
 
   @ApiProperty({ type: Number, description: "Current page number" })
-  pageNo: number;
+  pageNo!: number;
 
   @ApiProperty({ type: String, description: "Earliest occurrence time of the error" })
-  first: string;
+  first!: string;
 
   @ApiProperty({ type: String, description: "Latest occurrence time of the error" })
-  last: string;
+  last!: string;
 
   @ApiProperty({ type: Number, description: "Distinct affected users" })
-  userNum: number;
+  userNum!: number;
 }
 
 /**
@@ -152,5 +152,5 @@ export class ListWebMonitorErrorOnesResponseDto {
  */
 export class ListWebMonitorErrorMarkUsersResponseDto {
   @ApiProperty({ type: WebMonitorErrorItemResponseDto, isArray: true, description: "Error rows" })
-  list: WebMonitorErrorItemResponseDto[];
+  list!: WebMonitorErrorItemResponseDto[];
 }

@@ -8,13 +8,13 @@ export class ListSessionsRequestDto extends CommonListRequestDto {}
  */
 export class SessionResponseDto {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ type: String })
-  accessToken: string;
+  accessToken!: string;
 
   @ApiProperty({ type: String })
-  ipAddress: string;
+  ipAddress!: string;
 
   @ApiPropertyOptional({ type: String })
   userAgent?: string | null;
@@ -38,13 +38,13 @@ export class SessionResponseDto {
   operatingSystem?: string | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @ApiProperty({ type: String })
-  userId: string;
+  userId!: string;
 
   @ApiPropertyOptional({ type: Boolean })
   isCurrentSession?: boolean;

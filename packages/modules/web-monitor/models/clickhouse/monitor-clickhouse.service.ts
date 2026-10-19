@@ -8,9 +8,9 @@ import WebSdkErrorFactory from "./web/sdk-error";
 
 @Injectable()
 export class MonitorClickhouseService implements OnModuleInit {
-  private webAjaxFactory: (appId: string) => Promise<ClickhouseModel>;
-  private webErrorFactory: (appId: string) => Promise<ClickhouseModel>;
-  private webSdkErrorFactory: () => Promise<ClickhouseModel>;
+  private webAjaxFactory!: (appId: string) => Promise<ClickhouseModel>;
+  private webErrorFactory!: (appId: string) => Promise<ClickhouseModel>;
+  private webSdkErrorFactory!: () => Promise<ClickhouseModel>;
 
   constructor(
     private readonly configService: ConfigService,

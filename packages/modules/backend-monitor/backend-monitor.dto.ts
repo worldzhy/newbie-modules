@@ -34,7 +34,7 @@ export class BackendMonitorRequestEventDto {
   @IsNotEmpty()
   @IsString()
   @MaxLength(128)
-  requestId: string;
+  requestId!: string;
 
   @ApiPropertyOptional({
     description: "Route template, e.g. /users/:id; empty when no route matched",
@@ -52,19 +52,19 @@ export class BackendMonitorRequestEventDto {
   @IsNotEmpty()
   @IsString()
   @MaxLength(2048)
-  path: string;
+  path!: string;
 
   @ApiProperty({ description: "HTTP method in upper-case", example: "GET" })
   @IsNotEmpty()
   @IsString()
   @MaxLength(10)
-  method: string;
+  method!: string;
 
   @ApiProperty({ description: "HTTP response status code", example: 200 })
   @IsInt()
   @Min(100)
   @Max(599)
-  statusCode: number;
+  statusCode!: number;
 
   @ApiProperty({
     description: "ISO 8601 timestamp of request arrival",
@@ -72,7 +72,7 @@ export class BackendMonitorRequestEventDto {
   })
   @IsNotEmpty()
   @IsDateString()
-  requestAt: string;
+  requestAt!: string;
 
   @ApiProperty({
     description: "ISO 8601 timestamp of response completion",
@@ -80,7 +80,7 @@ export class BackendMonitorRequestEventDto {
   })
   @IsNotEmpty()
   @IsDateString()
-  responseAt: string;
+  responseAt!: string;
 
   @ApiPropertyOptional({ description: "Client IP address" })
   @IsOptional()
@@ -114,13 +114,13 @@ export class BackendMonitorErrorEventDto {
   @IsNotEmpty()
   @IsString()
   @MaxLength(200)
-  type: string;
+  type!: string;
 
   @ApiProperty({ description: "Error message" })
   @IsNotEmpty()
   @IsString()
   @MaxLength(4096)
-  message: string;
+  message!: string;
 
   @ApiPropertyOptional({ description: "Full stack trace" })
   @IsOptional()
@@ -173,7 +173,7 @@ export class BackendMonitorErrorEventDto {
   @ApiProperty({ description: "ISO 8601 timestamp of when the error occurred" })
   @IsNotEmpty()
   @IsDateString()
-  occurredAt: string;
+  occurredAt!: string;
 }
 
 /**
@@ -232,7 +232,7 @@ export class ListBackendMonitorRequestLogsRequestDto {
   @ApiProperty({ type: String, description: "Application ID (UUID)" })
   @IsNotEmpty()
   @IsUUID()
-  applicationId: string;
+  applicationId!: string;
 
   @ApiProperty({ type: Number, description: "Page number, starts from 0" })
   @IsOptional()
@@ -274,7 +274,7 @@ export class ListBackendMonitorErrorLogsRequestDto {
   @ApiProperty({ type: String, description: "Application ID (UUID)" })
   @IsNotEmpty()
   @IsUUID()
-  applicationId: string;
+  applicationId!: string;
 
   @ApiProperty({ type: Number, description: "Page number, starts from 0" })
   @IsOptional()
@@ -317,87 +317,87 @@ export class ListBackendMonitorErrorLogsRequestDto {
 /** One row of application_request_logs (ClickHouse snake_case shape). */
 export class BackendMonitorRequestLogResponseDto {
   @ApiProperty()
-  application_id: string;
+  application_id!: string;
   @ApiProperty()
-  request_id: string;
+  request_id!: string;
   @ApiProperty()
-  route: string;
+  route!: string;
   @ApiProperty()
-  path: string;
+  path!: string;
   @ApiProperty({ description: "HTTP method in upper-case" })
-  method: string;
+  method!: string;
   @ApiProperty()
-  status_code: number;
+  status_code!: number;
   @ApiProperty()
-  request_at: string;
+  request_at!: string;
   @ApiProperty()
-  response_at: string;
+  response_at!: string;
   @ApiProperty()
-  duration_ms: number;
+  duration_ms!: number;
   @ApiProperty()
-  env: string;
+  env!: string;
   @ApiProperty()
-  instance_id: string;
+  instance_id!: string;
   @ApiProperty()
-  app_version: string;
+  app_version!: string;
   @ApiPropertyOptional()
-  ip: string;
+  ip!: string;
   @ApiPropertyOptional()
-  user_agent: string;
+  user_agent!: string;
   @ApiProperty()
-  ingested_at: string;
+  ingested_at!: string;
 }
 
 /** One row of application_error_logs (ClickHouse snake_case shape). */
 export class BackendMonitorErrorLogResponseDto {
   @ApiProperty()
-  application_id: string;
+  application_id!: string;
   @ApiPropertyOptional()
-  request_id: string;
+  request_id!: string;
   @ApiProperty()
-  fingerprint: string;
+  fingerprint!: string;
   @ApiProperty({ description: "Error type / class name" })
-  type: string;
+  type!: string;
   @ApiProperty({ description: "Error message" })
-  message: string;
+  message!: string;
   @ApiPropertyOptional({ description: "Full stack trace" })
-  stack: string;
+  stack!: string;
   @ApiPropertyOptional()
-  route: string;
+  route!: string;
   @ApiPropertyOptional({ description: "Pathname without query string" })
-  path: string;
+  path!: string;
   @ApiPropertyOptional({ description: "HTTP method in upper-case" })
-  method: string;
+  method!: string;
   @ApiPropertyOptional({ description: "HTTP response status code; 0 for non-HTTP errors" })
-  status_code: number;
+  status_code!: number;
   @ApiProperty()
-  env: string;
+  env!: string;
   @ApiProperty()
-  instance_id: string;
+  instance_id!: string;
   @ApiProperty()
-  app_version: string;
+  app_version!: string;
   @ApiPropertyOptional()
-  ip: string;
+  ip!: string;
   @ApiPropertyOptional()
-  user_agent: string;
+  user_agent!: string;
   @ApiProperty({ description: "ISO 8601 timestamp of when the error occurred" })
-  occurred_at: string;
+  occurred_at!: string;
   @ApiProperty()
-  ingested_at: string;
+  ingested_at!: string;
 }
 
 export class ListBackendMonitorRequestLogsResponseDto {
   @ApiProperty({ type: [BackendMonitorRequestLogResponseDto] })
-  records: BackendMonitorRequestLogResponseDto[];
+  records!: BackendMonitorRequestLogResponseDto[];
 
   @ApiProperty({ type: Number })
-  total: number;
+  total!: number;
 }
 
 export class ListBackendMonitorErrorLogsResponseDto {
   @ApiProperty({ type: [BackendMonitorErrorLogResponseDto] })
-  records: BackendMonitorErrorLogResponseDto[];
+  records!: BackendMonitorErrorLogResponseDto[];
 
   @ApiProperty({ type: Number })
-  total: number;
+  total!: number;
 }

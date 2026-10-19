@@ -2,10 +2,10 @@ import { ApiProperty } from "@nestjs/swagger";
 
 export class GoogleDriveFileEntity {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String })
   type?: string | null;
@@ -26,34 +26,34 @@ export class GoogleDriveFileEntity {
   parentId?: string | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 export class GoogleDrivePermissionEntity {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ type: String })
-  permissionId: string;
+  permissionId!: string;
 
   @ApiProperty({ type: String })
-  type: string;
+  type!: string;
 
   @ApiProperty({ type: String })
-  role: string;
+  role!: string;
 
   @ApiProperty({ type: String })
-  email: string;
+  email!: string;
 
   @ApiProperty({ type: String })
-  createdAt: string;
+  createdAt!: string;
 
   @ApiProperty({ type: String })
-  updatedAt: string;
+  updatedAt!: string;
 
   @ApiProperty({ type: String })
-  fileId: string;
+  fileId!: string;
 }

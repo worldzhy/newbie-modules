@@ -17,7 +17,7 @@ import { LarkService } from "./lark.service";
 @Injectable()
 export class LarkWebSocketService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(LarkWebSocketService.name);
-  private client: Lark.WSClient;
+  private client!: Lark.WSClient;
 
   constructor(
     private readonly configService: ConfigService,

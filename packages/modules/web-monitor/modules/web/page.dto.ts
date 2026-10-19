@@ -34,7 +34,7 @@ export class WebMonitorPageDetailResponseDto {
   createTime?: string;
 
   @ApiProperty({ type: String, description: "URL domain" })
-  url: string;
+  url!: string;
 
   @ApiPropertyOptional({ type: String, description: "Full URL" })
   fullUrl?: string;
@@ -106,7 +106,7 @@ export class WebMonitorPageDetailResponseDto {
  */
 export class WebMonitorPageAverageKeyResponseDto {
   @ApiProperty({ type: String, description: "URL domain" })
-  url: string;
+  url!: string;
 }
 
 /**
@@ -115,10 +115,10 @@ export class WebMonitorPageAverageKeyResponseDto {
  */
 export class WebMonitorPageAverageItemResponseDto {
   @ApiProperty({ type: WebMonitorPageAverageKeyResponseDto, description: "Group-by key {url}" })
-  _id: WebMonitorPageAverageKeyResponseDto;
+  _id!: WebMonitorPageAverageKeyResponseDto;
 
   @ApiProperty({ type: Number, description: "Visit count" })
-  count: number;
+  count!: number;
 
   @ApiPropertyOptional({ type: Number, description: "Average full load time (ms)" })
   loadTime?: number;
@@ -150,13 +150,13 @@ export class WebMonitorPageAverageItemResponseDto {
  */
 export class ListWebMonitorPageAveragesResponseDto {
   @ApiProperty({ type: WebMonitorPageAverageItemResponseDto, isArray: true, description: "Page average rows" })
-  dataList: WebMonitorPageAverageItemResponseDto[];
+  dataList!: WebMonitorPageAverageItemResponseDto[];
 
   @ApiProperty({ type: Number, description: "Total record count" })
-  totalNum: number;
+  totalNum!: number;
 
   @ApiProperty({ type: Number, description: "Current page number" })
-  pageNo: number;
+  pageNo!: number;
 }
 
 /**
@@ -165,28 +165,28 @@ export class ListWebMonitorPageAveragesResponseDto {
  */
 export class WebMonitorRealTimePageItemResponseDto {
   @ApiProperty({ type: String, description: "Interval start (yyyy/MM/dd hh:mm)" })
-  beginTime: string;
+  beginTime!: string;
 
   @ApiProperty({ type: String, description: "Interval end (yyyy/MM/dd hh:mm)" })
-  endTime: string;
+  endTime!: string;
 
   @ApiProperty({ type: Number, description: "Visit count in the interval" })
-  count: number;
+  count!: number;
 
   @ApiProperty({ type: Number, description: "Average DNS time (ms)" })
-  dnsTime: number;
+  dnsTime!: number;
 
   @ApiProperty({ type: Number, description: "Average full load time (ms)" })
-  loadTime: number;
+  loadTime!: number;
 
   @ApiProperty({ type: Number, description: "Average request time (ms)" })
-  requestTime: number;
+  requestTime!: number;
 
   @ApiProperty({ type: Number, description: "Average TCP connect time (ms)" })
-  tcpTime: number;
+  tcpTime!: number;
 
   @ApiProperty({ type: Number, description: "Average first paint time (ms)" })
-  whiteTime: number;
+  whiteTime!: number;
 }
 
 /**
@@ -194,11 +194,11 @@ export class WebMonitorRealTimePageItemResponseDto {
  */
 export class ListWebMonitorPageVisitsResponseDto {
   @ApiProperty({ type: WebMonitorPageDetailResponseDto, isArray: true, description: "Page visit rows" })
-  dataList: WebMonitorPageDetailResponseDto[];
+  dataList!: WebMonitorPageDetailResponseDto[];
 
   @ApiProperty({ type: Number, description: "Total record count" })
-  totalNum: number;
+  totalNum!: number;
 
   @ApiProperty({ type: Number, description: "Current page number" })
-  pageNo: number;
+  pageNo!: number;
 }

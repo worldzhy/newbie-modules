@@ -5,7 +5,7 @@ import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/comm
 import { ShortcutGroupEntity } from "./shortcut.entity";
 
 export class ShortcutReqBaseDto {
-  channelName: string;
+  channelName!: string;
 }
 
 export class ListShortcutGroupsRequestDto extends CommonListRequestDto {
@@ -23,7 +23,7 @@ export class ListShortcutGroupsResponseDto extends CommonListResponseDto {
 export class CreateShortcutGroupRequestDto {
   @ApiProperty({ type: String })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String, required: false })
   @IsString()

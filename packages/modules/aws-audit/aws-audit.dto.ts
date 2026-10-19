@@ -10,34 +10,34 @@ export type AwsAuditSeverity = "high" | "medium" | "low";
 /** Aggregated scan summary counts. */
 export class AwsAuditScanSummaryDto {
   @ApiProperty({ type: [String], description: "AWS regions scanned" })
-  regionsScanned: string[];
+  regionsScanned!: string[];
 
   @ApiProperty({ description: "Total number of security findings" })
-  totalFindings: number;
+  totalFindings!: number;
 
   @ApiProperty({ description: "High-severity findings count" })
-  high: number;
+  high!: number;
 
   @ApiProperty({ description: "Medium-severity findings count" })
-  medium: number;
+  medium!: number;
 
   @ApiProperty({ description: "Low-severity findings count" })
-  low: number;
+  low!: number;
 
   @ApiProperty({ description: "Number of services that partially failed during the scan" })
-  partialFailures: number;
+  partialFailures!: number;
 }
 
 /** A single persisted audit scan record (serialized for the client). */
 export class AwsAuditScanRecordDto {
   @ApiProperty({ description: "Scan record ID" })
-  id: string;
+  id!: string;
 
   @ApiProperty({ description: "Project ID" })
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({ description: "Scan lifecycle status", example: "SUCCESS" })
-  status: AwsAuditScanStatus;
+  status!: AwsAuditScanStatus;
 
   @ApiPropertyOptional({ description: "Error message when status is FAILED", type: String })
   errorMessage?: string | null;
@@ -49,13 +49,13 @@ export class AwsAuditScanRecordDto {
   summary?: AwsAuditScanSummaryDto | null;
 
   @ApiProperty({ description: "Whether a full report is available for this scan" })
-  hasReport: boolean;
+  hasReport!: boolean;
 
   @ApiProperty({ description: "Creation timestamp (ISO)" })
-  createdAt: string;
+  createdAt!: string;
 
   @ApiProperty({ description: "Last update timestamp (ISO)" })
-  updatedAt: string;
+  updatedAt!: string;
 
   @ApiPropertyOptional({ description: "Timestamp when the scan started (ISO)", type: String })
   startedAt?: string | null;
@@ -67,10 +67,10 @@ export class AwsAuditScanRecordDto {
 /** AWS account identity info resolved during the scan. */
 export class AwsAuditAccountDto {
   @ApiProperty({ description: "Project name" })
-  projectName: string;
+  projectName!: string;
 
   @ApiProperty({ description: "AWS account ID from the configured credential" })
-  configuredAwsAccountId: string;
+  configuredAwsAccountId!: string;
 
   @ApiPropertyOptional({ description: "AWS account ID discovered via STS", type: String })
   discoveredAwsAccountId?: string | null;
@@ -82,16 +82,16 @@ export class AwsAuditAccountDto {
   callerArn?: string | null;
 
   @ApiProperty({ description: "Cross-account IAM role ARN assumed for the scan" })
-  roleArn: string;
+  roleArn!: string;
 
   @ApiProperty({ type: [String], description: "AWS regions scanned" })
-  regions: string[];
+  regions!: string[];
 }
 
 /** A single security finding from the audit. */
 export class AwsAuditFindingDto {
   @ApiProperty({ description: "Stable rule identifier used for cross-scan deduplication" })
-  ruleId: string;
+  ruleId!: string;
 
   @ApiProperty({
     description: "CIS AWS Foundations Benchmark control ID (null if no direct mapping)",
@@ -101,22 +101,22 @@ export class AwsAuditFindingDto {
   cisControlId?: string | null;
 
   @ApiProperty({ description: "AWS service that produced the finding" })
-  service: "iam" | "s3" | "ec2" | "rds" | "sts";
+  service!: "iam" | "s3" | "ec2" | "rds" | "sts";
 
   @ApiProperty({ description: "Severity level" })
-  severity: AwsAuditSeverity;
+  severity!: AwsAuditSeverity;
 
   @ApiProperty({ description: "Type of resource (e.g. IAMUser, S3Bucket)" })
-  resourceType: string;
+  resourceType!: string;
 
   @ApiProperty({ description: "Resource identifier" })
-  resourceId: string;
+  resourceId!: string;
 
   @ApiProperty({ description: "Short finding title" })
-  title: string;
+  title!: string;
 
   @ApiProperty({ description: "Detailed finding description" })
-  detail: string;
+  detail!: string;
 
   @ApiPropertyOptional({ description: "Recommended remediation" })
   recommendation?: string;
@@ -128,19 +128,19 @@ export class AwsAuditFindingDto {
 /** A partial-failure error recorded during the scan. */
 export class AwsAuditErrorDto {
   @ApiProperty({ description: "AWS service that failed" })
-  service: "iam" | "s3" | "ec2" | "rds" | "sts";
+  service!: "iam" | "s3" | "ec2" | "rds" | "sts";
 
   @ApiProperty({ description: "Error message" })
-  message: string;
+  message!: string;
 }
 
 /** IAM user access key metadata from the credential report. */
 export class AwsAuditIamAccessKeyDto {
   @ApiProperty({ description: "Access key slot (1 or 2)" })
-  slot: number;
+  slot!: number;
 
   @ApiProperty({ description: "Whether the access key is active" })
-  active: boolean;
+  active!: boolean;
 
   @ApiPropertyOptional({ description: "Last rotation timestamp (ISO)", type: String })
   lastRotatedAt?: string | null;
@@ -158,31 +158,31 @@ export class AwsAuditIamAccessKeyDto {
 /** A managed or inline policy risk item. */
 export class AwsAuditPolicyRiskDto {
   @ApiProperty({ description: "Severity level" })
-  severity: AwsAuditSeverity;
+  severity!: AwsAuditSeverity;
 
   @ApiProperty({ description: "Short risk summary" })
-  summary: string;
+  summary!: string;
 
   @ApiProperty({ description: "Detailed risk description" })
-  detail: string;
+  detail!: string;
 }
 
 /** An attached or inline policy with associated risks. */
 export class AwsAuditPolicyAnalysisDto {
   @ApiProperty({ description: "Policy name" })
-  policyName: string;
+  policyName!: string;
 
   @ApiProperty({ description: "Policy ARN (or inline identifier)" })
-  policyArn: string;
+  policyArn!: string;
 
   @ApiProperty({ type: [AwsAuditPolicyRiskDto], description: "Risk findings for this policy" })
-  risks: AwsAuditPolicyRiskDto[];
+  risks!: AwsAuditPolicyRiskDto[];
 }
 
 /** An IAM user with MFA status, attached policies, and access keys. */
 export class AwsAuditIamUserDto {
   @ApiProperty({ description: "IAM user name" })
-  userName: string;
+  userName!: string;
 
   @ApiPropertyOptional({ description: "IAM user ARN", type: String })
   arn?: string | null;
@@ -191,7 +191,7 @@ export class AwsAuditIamUserDto {
   createdAt?: string | null;
 
   @ApiProperty({ description: "Whether console password is enabled" })
-  passwordEnabled: boolean;
+  passwordEnabled!: boolean;
 
   @ApiPropertyOptional({ description: "Last password change timestamp (ISO)", type: String })
   passwordLastChanged?: string | null;
@@ -200,25 +200,25 @@ export class AwsAuditIamUserDto {
   passwordNextRotation?: string | null;
 
   @ApiProperty({ description: "Whether MFA is enabled" })
-  mfaActive: boolean;
+  mfaActive!: boolean;
 
   @ApiProperty({ type: [String], description: "Groups the user belongs to" })
-  groups: string[];
+  groups!: string[];
 
   @ApiProperty({ type: [AwsAuditPolicyAnalysisDto], description: "Attached managed policies with risks" })
-  attachedPolicies: AwsAuditPolicyAnalysisDto[];
+  attachedPolicies!: AwsAuditPolicyAnalysisDto[];
 
   @ApiProperty({ type: [AwsAuditPolicyAnalysisDto], description: "Inline policies with risks" })
-  inlinePolicies: AwsAuditPolicyAnalysisDto[];
+  inlinePolicies!: AwsAuditPolicyAnalysisDto[];
 
   @ApiProperty({ type: [AwsAuditIamAccessKeyDto], description: "Access key metadata from credential report" })
-  accessKeys: AwsAuditIamAccessKeyDto[];
+  accessKeys!: AwsAuditIamAccessKeyDto[];
 }
 
 /** An IAM group with attached and inline policies. */
 export class AwsAuditIamGroupDto {
   @ApiProperty({ description: "IAM group name" })
-  groupName: string;
+  groupName!: string;
 
   @ApiPropertyOptional({ description: "IAM group ARN", type: String })
   arn?: string | null;
@@ -227,16 +227,16 @@ export class AwsAuditIamGroupDto {
   createdAt?: string | null;
 
   @ApiProperty({ type: [AwsAuditPolicyAnalysisDto], description: "Attached managed policies with risks" })
-  attachedPolicies: AwsAuditPolicyAnalysisDto[];
+  attachedPolicies!: AwsAuditPolicyAnalysisDto[];
 
   @ApiProperty({ type: [AwsAuditPolicyAnalysisDto], description: "Inline policies with risks" })
-  inlinePolicies: AwsAuditPolicyAnalysisDto[];
+  inlinePolicies!: AwsAuditPolicyAnalysisDto[];
 }
 
 /** An IAM role with attached and inline policies. */
 export class AwsAuditIamRoleDto {
   @ApiProperty({ description: "IAM role name" })
-  roleName: string;
+  roleName!: string;
 
   @ApiPropertyOptional({ description: "IAM role ARN", type: String })
   arn?: string | null;
@@ -248,34 +248,34 @@ export class AwsAuditIamRoleDto {
   lastUsedAt?: string | null;
 
   @ApiProperty({ type: [AwsAuditPolicyAnalysisDto], description: "Attached managed policies with risks" })
-  attachedPolicies: AwsAuditPolicyAnalysisDto[];
+  attachedPolicies!: AwsAuditPolicyAnalysisDto[];
 
   @ApiProperty({ type: [AwsAuditPolicyAnalysisDto], description: "Inline policies with risks" })
-  inlinePolicies: AwsAuditPolicyAnalysisDto[];
+  inlinePolicies!: AwsAuditPolicyAnalysisDto[];
 }
 
 /** IAM account password policy. */
 export class AwsAuditPasswordPolicyDto {
   @ApiProperty({ description: "Minimum password length" })
-  minimumPasswordLength: number;
+  minimumPasswordLength!: number;
 
   @ApiProperty({ description: "Whether symbols are required" })
-  requireSymbols: boolean;
+  requireSymbols!: boolean;
 
   @ApiProperty({ description: "Whether numbers are required" })
-  requireNumbers: boolean;
+  requireNumbers!: boolean;
 
   @ApiProperty({ description: "Whether uppercase characters are required" })
-  requireUppercaseCharacters: boolean;
+  requireUppercaseCharacters!: boolean;
 
   @ApiProperty({ description: "Whether lowercase characters are required" })
-  requireLowercaseCharacters: boolean;
+  requireLowercaseCharacters!: boolean;
 
   @ApiProperty({ description: "Whether users can change their own password" })
-  allowUsersToChangePassword: boolean;
+  allowUsersToChangePassword!: boolean;
 
   @ApiProperty({ description: "Whether password expiration is enforced" })
-  expirePasswords: boolean;
+  expirePasswords!: boolean;
 
   @ApiPropertyOptional({ description: "Maximum password age in days", type: Number })
   maxPasswordAge?: number | null;
@@ -284,7 +284,7 @@ export class AwsAuditPasswordPolicyDto {
   passwordReusePrevention?: number | null;
 
   @ApiProperty({ description: "Whether hard expiry is enabled" })
-  hardExpiry: boolean;
+  hardExpiry!: boolean;
 }
 
 /** IAM resources captured during the scan. */
@@ -296,25 +296,25 @@ export class AwsAuditIamResourcesDto {
   passwordPolicy?: AwsAuditPasswordPolicyDto | null;
 
   @ApiProperty({ type: [AwsAuditIamUserDto] })
-  users: AwsAuditIamUserDto[];
+  users!: AwsAuditIamUserDto[];
 
   @ApiProperty({ type: [AwsAuditIamGroupDto] })
-  groups: AwsAuditIamGroupDto[];
+  groups!: AwsAuditIamGroupDto[];
 
   @ApiProperty({ type: [AwsAuditIamRoleDto] })
-  roles: AwsAuditIamRoleDto[];
+  roles!: AwsAuditIamRoleDto[];
 }
 
 /** An S3 bucket with security-relevant settings. */
 export class AwsAuditS3BucketDto {
   @ApiProperty({ description: "Bucket name" })
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({ description: "Bucket ARN", type: String })
   arn?: string | null;
 
   @ApiProperty({ description: "Bucket region" })
-  region: string;
+  region!: string;
 
   @ApiPropertyOptional({ description: "Bucket creation timestamp (ISO)", type: String })
   createdAt?: string | null;
@@ -323,16 +323,16 @@ export class AwsAuditS3BucketDto {
   publicAccessBlock?: Record<string, unknown> | null;
 
   @ApiProperty({ description: "Whether the bucket policy is evaluated as public" })
-  policyIsPublic: boolean;
+  policyIsPublic!: boolean;
 
   @ApiProperty({ description: "Whether the bucket has public ACL grants" })
-  hasPublicAcl: boolean;
+  hasPublicAcl!: boolean;
 
   @ApiProperty({ description: "Whether default encryption is enabled" })
-  encryptionEnabled: boolean;
+  encryptionEnabled!: boolean;
 
   @ApiProperty({ description: "Versioning status (Enabled/Suspended/Disabled)" })
-  versioningStatus: string;
+  versioningStatus!: string;
 }
 
 /** An EC2 instance. */
@@ -341,7 +341,7 @@ export class AwsAuditEc2InstanceDto {
   instanceId?: string | null;
 
   @ApiProperty({ description: "Instance name tag" })
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({ description: "Instance state", type: String })
   state?: string | null;
@@ -356,13 +356,13 @@ export class AwsAuditEc2InstanceDto {
   privateIpAddress?: string | null;
 
   @ApiProperty({ type: [String], description: "Security group IDs attached to the instance" })
-  securityGroupIds: string[];
+  securityGroupIds!: string[];
 }
 
 /** An EC2 security group ingress rule. */
 export class AwsAuditIngressRuleDto {
   @ApiProperty({ description: "IP protocol" })
-  protocol: string;
+  protocol!: string;
 
   @ApiPropertyOptional({ description: "From port", type: Number })
   fromPort?: number | null;
@@ -371,10 +371,10 @@ export class AwsAuditIngressRuleDto {
   toPort?: number | null;
 
   @ApiProperty({ type: [String], description: "IPv4 CIDR ranges" })
-  ipv4Ranges: string[];
+  ipv4Ranges!: string[];
 
   @ApiProperty({ type: [String], description: "IPv6 CIDR ranges" })
-  ipv6Ranges: string[];
+  ipv6Ranges!: string[];
 }
 
 /** An EC2 security group. */
@@ -389,16 +389,16 @@ export class AwsAuditSecurityGroupDto {
   description?: string | null;
 
   @ApiProperty({ type: [AwsAuditIngressRuleDto], description: "Ingress rules" })
-  ingressRules: AwsAuditIngressRuleDto[];
+  ingressRules!: AwsAuditIngressRuleDto[];
 }
 
 /** EC2 resources for a single region. */
 export class AwsAuditEc2RegionResourcesDto {
   @ApiProperty({ type: [AwsAuditEc2InstanceDto] })
-  instances: AwsAuditEc2InstanceDto[];
+  instances!: AwsAuditEc2InstanceDto[];
 
   @ApiProperty({ type: [AwsAuditSecurityGroupDto] })
-  securityGroups: AwsAuditSecurityGroupDto[];
+  securityGroups!: AwsAuditSecurityGroupDto[];
 }
 
 /** An RDS instance. */
@@ -419,73 +419,73 @@ export class AwsAuditRdsInstanceDto {
   status?: string | null;
 
   @ApiProperty({ description: "Whether the instance is publicly accessible" })
-  publiclyAccessible: boolean;
+  publiclyAccessible!: boolean;
 
   @ApiProperty({ description: "Whether storage is encrypted" })
-  storageEncrypted: boolean;
+  storageEncrypted!: boolean;
 
   @ApiProperty({ description: "Whether deletion protection is enabled" })
-  deletionProtection: boolean;
+  deletionProtection!: boolean;
 
   @ApiPropertyOptional({ description: "Master username", type: String })
   masterUsername?: string | null;
 
   @ApiProperty({ description: "Whether master password is managed by AWS Secrets Manager" })
-  manageMasterUserPassword: boolean;
+  manageMasterUserPassword!: boolean;
 
   @ApiPropertyOptional({ description: "Master user secret ARN", type: String })
   masterUserSecretArn?: string | null;
 
   @ApiProperty({ description: "Whether Multi-AZ is enabled" })
-  multiAz: boolean;
+  multiAz!: boolean;
 }
 
 /** Per-region resources (EC2 + RDS). */
 export class AwsAuditRegionalResourceDto {
   @ApiProperty({ description: "AWS region" })
-  region: string;
+  region!: string;
 
   @ApiProperty({ type: AwsAuditEc2RegionResourcesDto })
-  ec2: AwsAuditEc2RegionResourcesDto;
+  ec2!: AwsAuditEc2RegionResourcesDto;
 
   @ApiProperty({ type: [AwsAuditRdsInstanceDto] })
-  rds: AwsAuditRdsInstanceDto[];
+  rds!: AwsAuditRdsInstanceDto[];
 }
 
 /** Full resource inventory captured during the scan. */
 export class AwsAuditResourcesDto {
   @ApiProperty({ type: AwsAuditIamResourcesDto })
-  iam: AwsAuditIamResourcesDto;
+  iam!: AwsAuditIamResourcesDto;
 
   @ApiProperty({ type: [AwsAuditS3BucketDto] })
-  s3: AwsAuditS3BucketDto[];
+  s3!: AwsAuditS3BucketDto[];
 
   @ApiProperty({ type: [AwsAuditRegionalResourceDto] })
-  regional: AwsAuditRegionalResourceDto[];
+  regional!: AwsAuditRegionalResourceDto[];
 }
 
 /** The full audit report. */
 export class AwsAuditReportDto {
   @ApiProperty({ description: "Project ID" })
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({ description: "Scan completion timestamp (ISO)" })
-  scannedAt: string;
+  scannedAt!: string;
 
   @ApiProperty({ type: AwsAuditAccountDto })
-  account: AwsAuditAccountDto;
+  account!: AwsAuditAccountDto;
 
   @ApiProperty({ type: AwsAuditScanSummaryDto })
-  summary: AwsAuditScanSummaryDto;
+  summary!: AwsAuditScanSummaryDto;
 
   @ApiProperty({ type: [String], description: "Known limitations of this audit" })
-  limitations: string[];
+  limitations!: string[];
 
   @ApiProperty({ type: [AwsAuditErrorDto] })
-  errors: AwsAuditErrorDto[];
+  errors!: AwsAuditErrorDto[];
 
   @ApiProperty({ type: [AwsAuditFindingDto] })
-  findings: AwsAuditFindingDto[];
+  findings!: AwsAuditFindingDto[];
 
   @ApiPropertyOptional({ type: AwsAuditResourcesDto })
   resources?: AwsAuditResourcesDto;
@@ -494,10 +494,10 @@ export class AwsAuditReportDto {
 /** Response for GET /aws-audit/projects/:projectId/report. */
 export class AwsAuditReportResponseDto {
   @ApiProperty({ description: "Project ID" })
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({ description: "Whether an AWS credential is configured for this project" })
-  hasSettings: boolean;
+  hasSettings!: boolean;
 
   @ApiPropertyOptional({ description: "Currently running scan, or null", type: AwsAuditScanRecordDto })
   currentScan?: AwsAuditScanRecordDto | null;
@@ -521,13 +521,13 @@ export class AwsAuditReportResponseDto {
 /** Response for POST /aws-audit/projects/:projectId/scan. */
 export class AwsAuditScanStartResponseDto {
   @ApiProperty({ description: "Whether the scan request was accepted" })
-  accepted: boolean;
+  accepted!: boolean;
 
   @ApiProperty({
     description: "The scan record that was started (or the already-running one)",
     type: AwsAuditScanRecordDto,
   })
-  scan: AwsAuditScanRecordDto;
+  scan!: AwsAuditScanRecordDto;
 }
 
 export class GetAwsAuditReportRequestDto {

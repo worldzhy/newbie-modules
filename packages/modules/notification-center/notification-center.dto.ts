@@ -9,19 +9,19 @@ import { NOTIFICATION_SCOPES, SEVERITIES } from "./notification-center.constants
 
 export class NotificationRecordDto {
   @ApiProperty()
-  id: string;
+  id!: string;
 
   @ApiProperty({ description: "Key of the notification this record was produced from" })
-  notificationKey: string;
+  notificationKey!: string;
 
   @ApiProperty({ enum: SEVERITIES })
-  severity: string;
+  severity!: string;
 
   @ApiProperty()
-  title: string;
+  title!: string;
 
   @ApiProperty({ type: String, required: false, nullable: true })
-  detail: string | null;
+  detail!: string | null;
 
   @ApiProperty({
     type: Object,
@@ -29,28 +29,28 @@ export class NotificationRecordDto {
     nullable: true,
     description: "Context values passed to notify(), preserved for detail panels",
   })
-  payload: Record<string, unknown> | null;
+  payload!: Record<string, unknown> | null;
 
   @ApiProperty({ type: String, required: false, nullable: true })
-  deduplicationKey: string | null;
+  deduplicationKey!: string | null;
 
   @ApiProperty({ type: String, required: false, nullable: true })
-  projectId: string | null;
+  projectId!: string | null;
 
   @ApiProperty({ type: String, required: false, nullable: true })
-  link: string | null;
+  link!: string | null;
 
   @ApiProperty({ description: "Read state for the requesting user" })
-  read: boolean;
+  read!: boolean;
 
   @ApiProperty()
-  createdAt: Date;
+  createdAt!: Date;
 }
 
 export class NotifyDto {
   @ApiProperty({ description: "Key of a registered notification" })
   @IsString()
-  notificationKey: string;
+  notificationKey!: string;
 
   @ApiProperty({ type: Object, required: false, description: "Values interpolated into the notification templates" })
   @IsOptional()
@@ -81,13 +81,13 @@ export class NotifyDto {
 
 export class NotifyResultDto {
   @ApiProperty()
-  id: string;
+  id!: string;
 
   @ApiProperty({ description: "True when the deduplication key already existed" })
-  deduplicated: boolean;
+  deduplicated!: boolean;
 
   @ApiProperty({ description: "True when the delivery was dropped (below minimum severity)" })
-  dropped: boolean;
+  dropped!: boolean;
 }
 
 export class ListNotificationsRequestDto extends CommonListRequestDto {
@@ -125,17 +125,17 @@ export class ListNotificationsResponseDto extends CommonListResponseDto {
 
 export class UnreadCountResponseDto {
   @ApiProperty()
-  count: number;
+  count!: number;
 }
 
 export class MarkNotificationReadResponseDto {
   @ApiProperty()
-  read: boolean;
+  read!: boolean;
 }
 
 export class MarkAllNotificationsReadResponseDto {
   @ApiProperty({ description: "Number of notifications marked as read" })
-  marked: number;
+  marked!: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -144,29 +144,29 @@ export class MarkAllNotificationsReadResponseDto {
 
 export class NotificationSettingDto {
   @ApiProperty()
-  key: string;
+  key!: string;
 
   @ApiProperty()
-  name: string;
+  name!: string;
 
   @ApiProperty()
-  titleTemplate: string;
+  titleTemplate!: string;
 
   @ApiProperty({ type: String, required: false, nullable: true })
-  detailTemplate: string | null;
+  detailTemplate!: string | null;
 
   @ApiProperty({ enum: SEVERITIES })
-  defaultSeverity: string;
+  defaultSeverity!: string;
 
   @ApiProperty()
-  pushEnabled: boolean;
+  pushEnabled!: boolean;
 
   @ApiProperty({
     enum: NOTIFICATION_SCOPES,
     description:
       "Delivery scope: system notifications push through the host-configured system chats; project notifications are routed to the owning project's bound chats by the host.",
   })
-  scope: string;
+  scope!: string;
 }
 
 export class UpdateNotificationSettingDto {
@@ -188,10 +188,10 @@ export class UpdateNotificationSettingDto {
 
 export class NotificationCenterSettingDto {
   @ApiProperty({ description: "Master switch for chat push through the host-provided push adapter" })
-  pushEnabled: boolean;
+  pushEnabled!: boolean;
 
   @ApiProperty({ enum: SEVERITIES })
-  minimumSeverity: string;
+  minimumSeverity!: string;
 }
 
 export class UpdateNotificationCenterSettingDto {
@@ -209,8 +209,8 @@ export class UpdateNotificationCenterSettingDto {
 
 export class TestPushResultDto {
   @ApiProperty({ description: "Number of system chats that accepted the test message" })
-  succeeded: number;
+  succeeded!: number;
 
   @ApiProperty({ description: "Number of system chats that rejected the test message" })
-  failed: number;
+  failed!: number;
 }

@@ -71,7 +71,7 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.ref
     // audit: not required — routine expiry noise
     try {
       this.tokenService.verifyUserRefreshToken(refreshToken);
-    } catch (error: unknown) {
+    } catch {
       await this.sessionService.destroy(refreshToken);
       throw new UnauthorizedException("Token is expired.");
     }

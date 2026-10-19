@@ -7,10 +7,10 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
  */
 export class ApprovedSubnetResponseDto {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ type: String })
-  subnet: string;
+  subnet!: string;
 
   @ApiPropertyOptional({ type: String })
   city?: string | null;
@@ -25,11 +25,11 @@ export class ApprovedSubnetResponseDto {
   countryCode?: string | null;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @ApiProperty({ type: String })
-  userId: string;
+  userId!: string;
 }

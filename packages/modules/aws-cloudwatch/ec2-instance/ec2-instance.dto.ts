@@ -8,34 +8,34 @@ import { BooleanTransformer } from "@devbie/newbie/transformers/boolean.transfor
  */
 export class Ec2InstanceResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: String })
-  instanceId: string;
+  instanceId!: string;
 
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({ type: String })
   status?: string | null;
 
   @ApiProperty({ type: String })
-  region: string;
+  region!: string;
 
   @ApiProperty({ type: Boolean })
-  isWatching: boolean;
+  isWatching!: boolean;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 export class ListEC2InstancesRequestDto {
   @ApiProperty()
   @IsUUID()
-  projectId: string;
+  projectId!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -52,25 +52,25 @@ export class ListEC2InstancesRequestDto {
 export class FetchEC2InstancesDto {
   @ApiProperty()
   @IsUUID()
-  projectId: string;
+  projectId!: string;
 }
 
 export class SyncEC2InstancesWatchDto {
   @ApiProperty({ type: String })
   @IsUUID()
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({ type: [String], minLength: 0 })
   @IsNotEmpty()
   @IsArray()
   @ArrayMinSize(0)
   @IsUUID("4", { each: true })
-  watchEC2InstanceIds: string[];
+  watchEC2InstanceIds!: string[];
 
   @ApiProperty({ type: [String], minLength: 0 })
   @IsNotEmpty()
   @IsArray()
   @ArrayMinSize(0)
   @IsUUID("4", { each: true })
-  unwatchEC2InstanceIds: string[];
+  unwatchEC2InstanceIds!: string[];
 }

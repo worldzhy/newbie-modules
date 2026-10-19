@@ -5,29 +5,29 @@ import { EmailTemplate } from "./aws-ses.interface";
 export class SendEmailRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  toAddress: string;
+  toAddress!: string;
 
   @ApiProperty({ type: String, required: true })
   @IsString()
-  subject: string;
+  subject!: string;
 
   @ApiProperty({ type: String, required: true })
   @IsString()
-  html: string;
+  html!: string;
 
   @ApiProperty({ type: String, required: true })
   @IsString()
-  text: string;
+  text!: string;
 }
 
 export class SendEmailWithTemplateRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  toAddress: string;
+  toAddress!: string;
 
   @ApiProperty({ type: String, required: true, enum: EmailTemplate })
   @IsEnum(EmailTemplate)
-  templateName: EmailTemplate;
+  templateName!: EmailTemplate;
 
   @ApiProperty({ type: Object, required: false })
   @IsOptional()

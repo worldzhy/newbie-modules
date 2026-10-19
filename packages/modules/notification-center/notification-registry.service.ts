@@ -28,7 +28,7 @@ export interface NotificationDeclaration {
   scope?: NotificationScope;
 }
 
-export interface RegisteredNotification extends NotificationDeclaration {}
+export type RegisteredNotification = NotificationDeclaration;
 
 /**
  * In-process registry of notifications declared by business code. This is the

@@ -15,10 +15,10 @@ export class WebMonitorCustomFilterResponseDto {
   createTime?: string;
 
   @ApiProperty({ type: String, description: "Filter key used in customFilter queries" })
-  filterKey: string;
+  filterKey!: string;
 
   @ApiProperty({ type: String, description: "Filter description shown in the UI" })
-  filterDesc: string;
+  filterDesc!: string;
 }
 
 /**
@@ -26,7 +26,7 @@ export class WebMonitorCustomFilterResponseDto {
  */
 export class ListWebMonitorCustomFiltersResponseDto {
   @ApiProperty({ type: WebMonitorCustomFilterResponseDto, isArray: true, description: "Filter definition rows" })
-  list: WebMonitorCustomFilterResponseDto[];
+  list!: WebMonitorCustomFilterResponseDto[];
 }
 
 /**
@@ -53,7 +53,7 @@ export class WebMonitorCustomItemResponseDto {
   path?: string;
 
   @ApiProperty({ type: String, description: "Custom metric name" })
-  customName: string;
+  customName!: string;
 
   @ApiPropertyOptional({ type: String, description: "Custom metric payload (stringified object)" })
   customContent?: string;
@@ -73,11 +73,11 @@ export class WebMonitorCustomItemResponseDto {
  */
 export class ListWebMonitorCustomAveragesResponseDto {
   @ApiProperty({ type: Number, description: "Total record count" })
-  totalNum: number;
+  totalNum!: number;
 
   @ApiProperty({ type: WebMonitorCustomItemResponseDto, isArray: true, description: "Custom metric rows" })
-  dataList: WebMonitorCustomItemResponseDto[];
+  dataList!: WebMonitorCustomItemResponseDto[];
 
   @ApiProperty({ type: Number, description: "Current page number" })
-  pageNo: number;
+  pageNo!: number;
 }

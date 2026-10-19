@@ -271,7 +271,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       const cronJob = this.schedulerRegistry.getCronJob(cronJobName);
       cronJob.stop();
       this.schedulerRegistry.deleteCronJob(cronJobName);
-    } catch (error) {
+    } catch {
       // The job was never registered (e.g. invalid cron on a previous reconcile).
     }
   }

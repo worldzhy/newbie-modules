@@ -2,35 +2,35 @@ import { ApiProperty } from "@nestjs/swagger";
 
 export class FileEntity {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String })
-  type: string;
+  type!: string;
 
   @ApiProperty({
     type: Number,
     description: "The size of the file in bytes, null for folders.",
   })
-  size: number | null;
+  size!: number | null;
 
   @ApiProperty({ type: String })
-  s3Bucket: string;
+  s3Bucket!: string;
 
   @ApiProperty({ type: String })
-  s3Key: string;
+  s3Key!: string;
 
   @ApiProperty({ type: Object })
-  s3Response: object;
+  s3Response!: object;
 
   @ApiProperty({ type: String })
-  parentId: string | null;
+  parentId!: string | null;
 
   @ApiProperty({ type: String })
-  createdAt: string;
+  createdAt!: string;
 
   @ApiProperty({ type: String })
-  updatedAt: string;
+  updatedAt!: string;
 }

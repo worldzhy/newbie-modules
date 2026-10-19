@@ -7,7 +7,7 @@ import { GoogleDrivePermissionEntity } from "@modules/googleapis/google-drive/go
 export class ListGoogleDrivePermissionsRequestDto extends CommonListRequestDto {
   @ApiProperty({ type: String, required: true, description: "The file ID to list permissions for." })
   @IsString()
-  fileId: string;
+  fileId!: string;
 }
 
 export class ListGoogleDrivePermissionsResponseDto extends CommonListResponseDto {
@@ -18,15 +18,15 @@ export class ListGoogleDrivePermissionsResponseDto extends CommonListResponseDto
 export class CreateGoogleDrivePermissionRequestDto {
   @ApiProperty({ type: String, required: true, description: "The ID of the file to share." })
   @IsString()
-  fileId: string;
+  fileId!: string;
 
   @ApiProperty({ type: String, required: true, description: "The email address to share the file with." })
   @IsEmail()
-  email: string;
+  email!: string;
 
   @ApiProperty({ type: String, required: true, description: "The role to assign to the user." })
   @IsEnum(GoogleAccountRole)
-  role: GoogleAccountRole;
+  role!: GoogleAccountRole;
 }
 
 export class CreateGoogleDrivePermissionResponseDto extends GoogleDrivePermissionEntity {}
@@ -34,5 +34,5 @@ export class CreateGoogleDrivePermissionResponseDto extends GoogleDrivePermissio
 export class GetGoogleDrivePermissionRequestDto {
   @ApiProperty({ type: Number, required: true, description: "The ID of the permission to get." })
   @IsNumber()
-  permissionId: number;
+  permissionId!: number;
 }

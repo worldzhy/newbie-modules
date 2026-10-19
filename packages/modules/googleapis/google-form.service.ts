@@ -28,20 +28,7 @@ export class GoogleFormService {
   async getFormResponses(formId: string) {
     try {
       const result = await this.client.forms.responses.list({ formId });
-
-      const responses = result.data.responses;
-      if (responses) {
-        for (let i = 0; i < responses.length; i++) {
-          const response = responses[i];
-          const answers = response.answers;
-          for (const key in answers) {
-            const answer = answers[key];
-            answer.questionId;
-          }
-        }
-      }
-
-      return responses || [];
+      return result.data.responses || [];
     } catch (error) {
       throw error;
     }

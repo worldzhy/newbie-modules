@@ -6,7 +6,7 @@ import { ShortcutGroupEntity, ShortcutItemEntity } from "./shortcut.entity";
 import { ShortcutItemType } from "@generated/prisma/client";
 
 export class ShortcutReqBaseDto {
-  channelName: string;
+  channelName!: string;
 }
 
 export class ShortcutTreeRequestDto {
@@ -18,10 +18,10 @@ export class ShortcutTreeRequestDto {
 
 export class ShortcutTreeResDto extends ShortcutGroupEntity {
   @ApiProperty({ type: ShortcutTreeResDto, isArray: true })
-  child: ShortcutTreeResDto[];
+  child!: ShortcutTreeResDto[];
 
   @ApiProperty({ type: ShortcutItemEntity, isArray: true })
-  items: ShortcutItemEntity[];
+  items!: ShortcutItemEntity[];
 }
 
 export class ListShortcutItemsRequestDto extends CommonListRequestDto {
@@ -47,29 +47,29 @@ export class CreateShortcutItemRequestDto {
   @ApiProperty({ type: Number, required: false })
   @IsNumber()
   @IsOptional()
-  groupId: number;
+  groupId!: number;
 
   @ApiProperty({ type: Number, required: false })
   @IsNumber()
   @IsOptional()
-  sort: number;
+  sort!: number;
 
   @ApiProperty({ type: String })
   @IsString()
-  label: string;
+  label!: string;
 
   @ApiProperty({ type: String })
   @IsString()
-  content: string;
+  content!: string;
 
   @ApiProperty({ type: String, enum: ShortcutItemType })
   @IsEnum(ShortcutItemType)
-  type: ShortcutItemType;
+  type!: ShortcutItemType;
 
   @ApiProperty({ type: String, required: false })
   @IsString()
   @IsOptional()
-  description: string;
+  description!: string;
 }
 
 export class UpdateShortcutItemRequestDto {

@@ -17,7 +17,7 @@ export class SignUpDto {
   @ApiProperty({ type: String, required: true })
   @IsEmail()
   @IsNotEmpty()
-  email: string;
+  email!: string;
 
   @ApiProperty({ type: String, required: false })
   @IsPhoneNumber()
@@ -75,12 +75,12 @@ export class LoginByPasswordRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
   @IsNotEmpty()
-  account: string;
+  account!: string;
 
   @ApiProperty({ type: String, required: true })
   @IsString()
   @MinLength(8)
-  password: string;
+  password!: string;
 }
 
 export class LoginByPasswordResponseDto {
@@ -115,7 +115,7 @@ export class GoogleOAuthRedirectResponseDto extends LoginByPasswordResponseDto {
  */
 export class SendVerificationCodeResponseDto {
   @ApiProperty({ type: Number })
-  secondsOfCountdown: number;
+  secondsOfCountdown!: number;
 }
 
 /**
@@ -140,7 +140,7 @@ export class SendVerificationCodeRequestDto {
   })
   @IsString()
   @IsNotEmpty()
-  use: VerificationCodeUse;
+  use!: VerificationCodeUse;
 }
 
 /**
@@ -150,12 +150,12 @@ export class LoginByVerificationCodeRequestDto {
   @ApiProperty({ type: String, required: true, description: "The account (email or phone)." })
   @IsString()
   @IsNotEmpty()
-  account: string;
+  account!: string;
 
   @ApiProperty({ type: String, required: true, description: "The 6-digit verification code." })
   @IsString()
   @IsNotEmpty()
-  verificationCode: string;
+  verificationCode!: string;
 }
 
 /**
@@ -163,7 +163,7 @@ export class LoginByVerificationCodeRequestDto {
  */
 export class LogoutResponseDto {
   @ApiProperty({ type: Object })
-  data: { message: string };
+  data!: { message: string };
 }
 
 export class TotpLoginDto {

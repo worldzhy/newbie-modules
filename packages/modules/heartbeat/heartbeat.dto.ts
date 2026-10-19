@@ -11,7 +11,7 @@ export class CreateHeartbeatInstallationDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(255)
-  label: string;
+  label!: string;
 
   @ApiPropertyOptional({ description: "Opaque host-owned tag (e.g. projectId/applicationId); never parsed here" })
   @IsOptional()
@@ -56,10 +56,10 @@ export class HeartbeatPingDto {
 
 export class HeartbeatPingResponseDto {
   @ApiProperty()
-  serverTime: Date;
+  serverTime!: Date;
 
   // Requested ping interval (seconds). v1 fixed 30; reserved for server-side
   // throttling without a client upgrade.
   @ApiProperty()
-  reportIntervalSeconds: number;
+  reportIntervalSeconds!: number;
 }

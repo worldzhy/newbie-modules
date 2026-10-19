@@ -2,55 +2,55 @@ import { ApiProperty } from "@nestjs/swagger";
 
 export class ShortcutGroupEntity {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String })
-  description: string;
+  description!: string;
 
   @ApiProperty({ type: Number })
-  sort: number;
+  sort!: number;
 
   @ApiProperty({ type: Number })
-  parentId: number;
+  parentId!: number;
 
   @ApiProperty({ type: String })
-  status: string;
+  status!: string;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 export class ShortcutItemEntity {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ type: String })
-  label: string;
+  label!: string;
 
   @ApiProperty({ type: String })
-  content: string;
+  content!: string;
 
   @ApiProperty({ type: String })
-  description: string;
+  description!: string;
 
   @ApiProperty({ type: String })
-  type: string;
+  type!: string;
 
   @ApiProperty({ type: Number })
-  sort: number;
+  sort!: number;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @ApiProperty({ type: Number })
-  groupId: number;
+  groupId!: number;
 }

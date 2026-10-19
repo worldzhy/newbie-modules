@@ -5,11 +5,11 @@ import { SuppressionListReason } from "@aws-sdk/client-sesv2";
 export class AddSuppressedDestinationRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  emailAddress: string;
+  emailAddress!: string;
 
   @ApiProperty({ enum: SuppressionListReason, required: true })
   @IsIn(Object.values(SuppressionListReason))
-  reason: SuppressionListReason;
+  reason!: SuppressionListReason;
 }
 
 export class ListSuppressionDestinationsRequestDto {
@@ -25,5 +25,5 @@ export class ListSuppressionDestinationsRequestDto {
   nextToken?: string;
 
   @ApiProperty({ type: Number, required: true })
-  pageSize: number;
+  pageSize!: number;
 }

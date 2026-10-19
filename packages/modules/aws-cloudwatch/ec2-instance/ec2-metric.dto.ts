@@ -6,32 +6,32 @@ export class GetWatchedEC2InstancesMetricRequestDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsUUID("4")
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({
     enum: CloudwatchEC2MetricName,
   })
   @IsNotEmpty()
   @IsEnum(CloudwatchEC2MetricName)
-  metricName: CloudwatchEC2MetricName;
+  metricName!: CloudwatchEC2MetricName;
 
   @ApiProperty()
   @IsNotEmpty()
-  startTime: string;
+  startTime!: string;
 
   @ApiProperty()
   @IsNotEmpty()
-  endTime: string;
+  endTime!: string;
 
   @ApiProperty({
     type: Number,
     description: "The period must be a multiple of 60",
   })
   @IsNumberString()
-  period: string;
+  period!: string;
 
   @ApiProperty({ enum: CloudwatchMetricStatistics })
   @IsNotEmpty()
   @IsEnum(CloudwatchMetricStatistics)
-  statistics: CloudwatchMetricStatistics;
+  statistics!: CloudwatchMetricStatistics;
 }

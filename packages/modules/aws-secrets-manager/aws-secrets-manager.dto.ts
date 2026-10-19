@@ -53,10 +53,10 @@ export function IsSecretValue(validationOptions?: ValidationOptions): PropertyDe
  */
 export class SecretResponseDto {
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String })
-  arn: string;
+  arn!: string;
 
   @ApiPropertyOptional({ type: String })
   description?: string | null;
@@ -65,10 +65,10 @@ export class SecretResponseDto {
   type?: SecretType | null;
 
   @ApiProperty({ type: String })
-  region: string;
+  region!: string;
 
   @ApiProperty({ type: Boolean })
-  rotationEnabled: boolean;
+  rotationEnabled!: boolean;
 
   @ApiPropertyOptional({ type: String })
   rotationLambdaArn?: string | null;
@@ -88,20 +88,20 @@ export class SecretResponseDto {
 
 export class ListSecretsResponseDto {
   @ApiProperty({ type: SecretResponseDto, isArray: true })
-  records: SecretResponseDto[];
+  records!: SecretResponseDto[];
 
   @ApiPropertyOptional({
     type: String,
     nullable: true,
     description: "Opaque cursor for the next page; pass it back as nextToken. Null when no more pages",
   })
-  nextToken: string | null;
+  nextToken!: string | null;
 }
 
 export class ListSecretsRequestDto {
   @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
   @IsString()
-  projectId: string;
+  projectId!: string;
 
   @ApiPropertyOptional({ description: "AWS region override (defaults to the credential default region)" })
   @IsOptional()
@@ -130,7 +130,7 @@ export class ListSecretsRequestDto {
 export class GetSecretRequestDto {
   @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
   @IsString()
-  projectId: string;
+  projectId!: string;
 
   @ApiPropertyOptional({ description: "AWS region override (defaults to the credential default region)" })
   @IsOptional()
@@ -141,7 +141,7 @@ export class GetSecretRequestDto {
 export class CreateSecretDto {
   @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
   @IsString()
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({
     description: "Secret name; letters, digits and /_+=.@- excluding slash (used as URL path parameter)",
@@ -149,11 +149,11 @@ export class CreateSecretDto {
   })
   @IsString()
   @Matches(/^[a-zA-Z0-9_+=.@-]{1,512}$/)
-  name: string;
+  name!: string;
 
   @ApiProperty({ enum: SECRET_TYPES, description: "Secret type", required: true })
   @IsIn(SECRET_TYPES)
-  type: SecretType;
+  type!: SecretType;
 
   @ApiProperty({
     description: "Secret value: a JSON object (stored as JSON) or a non-empty string (stored verbatim)",
@@ -164,7 +164,7 @@ export class CreateSecretDto {
     ],
   })
   @IsSecretValue()
-  secretValue: SecretValuePayload;
+  secretValue!: SecretValuePayload;
 
   @ApiPropertyOptional({ description: "Secret description" })
   @IsOptional()
@@ -180,7 +180,7 @@ export class CreateSecretDto {
 export class UpdateSecretDto {
   @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
   @IsString()
-  projectId: string;
+  projectId!: string;
 
   @ApiPropertyOptional({
     description: "New secret value: a JSON object (stored as JSON) or a non-empty string (stored verbatim)",
@@ -212,11 +212,11 @@ export class UpdateSecretDto {
 export class SetRotationRequestDto {
   @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
   @IsString()
-  projectId: string;
+  projectId!: string;
 
   @ApiProperty({ description: "Enable or disable automatic rotation", required: true })
   @IsBoolean()
-  enabled: boolean;
+  enabled!: boolean;
 
   @ApiPropertyOptional({ description: "Rotation interval in days (defaults to 30)", default: 30 })
   @IsOptional()
@@ -232,19 +232,19 @@ export class SetRotationRequestDto {
 
 export class GetSecretValueResponseDto {
   @ApiProperty({ description: "Secret name" })
-  name: string;
+  name!: string;
 
   @ApiProperty({
     description: "Decrypted value: an object when valueType=json, raw text for text, base64 for binary",
     oneOf: [{ type: "object", additionalProperties: true }, { type: "string" }],
   })
-  secretValue: SecretValuePayload;
+  secretValue!: SecretValuePayload;
 
   @ApiProperty({ enum: SECRET_VALUE_TYPES, description: "Payload encoding of the secretValue field" })
-  valueType: SecretValueType;
+  valueType!: SecretValueType;
 }
 
 export class DeleteSecretResponseDto {
   @ApiProperty({ description: "Name of the deleted secret" })
-  name: string;
+  name!: string;
 }
