@@ -16,13 +16,13 @@ export class SearchPeopleLinkedinReqDto {
     type: String,
   })
   @IsString()
-  firstName: string;
+  firstName!: string;
 
   @ApiProperty({
     type: String,
   })
   @IsString()
-  companyDomain: string;
+  companyDomain!: string;
 
   @ApiProperty({
     type: String,
@@ -42,20 +42,20 @@ export class SearchPeopleLinkedinReqDto {
 }
 
 export class SearchPeopleLinkedinRes {
-  url: string;
-  company_similarity_score: number;
-  location_similarity_score: number;
-  name_similarity_score: number;
-  title_similarity_score: number;
+  url!: string;
+  company_similarity_score!: number;
+  location_similarity_score!: number;
+  name_similarity_score!: number;
+  title_similarity_score!: number;
 }
 export class SearchPeopleLinkedinResDto implements CommonResDto {
   error?: CommonErrorResDto;
   res?: SearchPeopleLinkedinRes;
-  spent: number;
+  spent!: number;
 }
 
 export class SearchPeopleByLinkedinReqDto {
-  linkedinUrl: string;
+  linkedinUrl!: string;
   /**
    * default value: exclude
    * Costs an extra `1` credit per email returned on top of the cost of the base endpoint (if data is available).
@@ -69,8 +69,8 @@ export class SearchPeopleByLinkedinReqDto {
 }
 
 export class SearchPeopleByLinkedinRes {
-  personal_emails: string[];
-  personal_numbers: string[];
+  personal_emails!: string[];
+  personal_numbers!: string[];
 
   public_identifier?: string;
   profile_pic_url?: string;
@@ -116,5 +116,5 @@ export class SearchPeopleByLinkedinRes {
 export class SearchPeopleByLinkedinResDto implements CommonResDto {
   error?: CommonErrorResDto;
   res?: SearchPeopleByLinkedinRes;
-  spent: number;
+  spent!: number;
 }

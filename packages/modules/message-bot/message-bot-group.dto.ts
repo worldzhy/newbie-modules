@@ -18,7 +18,7 @@ export class ListMessageBotChannelGroupsResponseDto extends CommonListResponseDt
 export class CreateMessageBotChannelGroupRequestDto {
   @ApiProperty({ type: String })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String, required: false })
   @IsString()

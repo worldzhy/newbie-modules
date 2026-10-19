@@ -19,7 +19,7 @@ export class SearchEmailByDomainReqDto {
     type: String,
   })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({
     type: String,
@@ -33,13 +33,13 @@ export class SearchEmailByDomainReqDto {
     type: String,
   })
   @IsString()
-  companyDomain: string;
+  companyDomain!: string;
 
   @ApiProperty({
     type: String,
   })
   @IsString()
-  webhook: string;
+  webhook!: string;
 
   @ApiProperty({
     type: Number,
@@ -51,13 +51,13 @@ export class SearchEmailByDomainReqDto {
 }
 
 export class EmailDto {
-  email: string;
+  email!: string;
   /**
    * 100 : We found the email and checked it against the mail server and it appears to be valid
      80 : We found the email but we were unable to validate it against the mail server.
      5 : We found the email using outside services but we can’t verify its validity.
    */
-  score: number;
+  score!: number;
 }
 
 export class SearchEmailContentResDto {
@@ -66,35 +66,35 @@ export class SearchEmailContentResDto {
     description:
       "When searching, this data is set to null. Once the search is done, if we found the corresponding email, the email becomes an object containing information including the email value and the score related to this email.",
   })
-  email: EmailDto | null;
+  email!: EmailDto | null;
 
   @ApiProperty({
     type: String,
   })
-  name: string;
+  name!: string;
 
   @ApiProperty({
     type: Boolean,
     description:
       "The searching boolean returned by the server will let you know if the server is searching for that contact of it has already been found",
   })
-  searching: boolean;
+  searching!: boolean;
 
-  company: {
+  company!: {
     name: string;
     title: string;
     url: string;
   };
-  created: number;
-  id: number;
-  is_new: boolean;
-  lists: unknown[]; // Adjust the type accordingly
-  status: string;
+  created!: number;
+  id!: number;
+  is_new!: boolean;
+  lists!: unknown[]; // Adjust the type accordingly
+  status!: string;
 }
 
 export class SearchEmailThirdResDto {
-  status: VoliaNorbertStatus;
-  data: SearchEmailContentResDto;
+  status!: VoliaNorbertStatus;
+  data!: SearchEmailContentResDto;
   // [request, header, config]
   [x: string]: unknown;
 }

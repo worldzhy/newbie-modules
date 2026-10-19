@@ -6,23 +6,23 @@ import { SlackMessageBotSendMessageReqBody } from "./slack.interface";
 export class SendSlackMessageRequestDto {
   @ApiProperty({ type: String })
   @IsString()
-  channelId: string;
+  channelId!: string;
 
   @ApiProperty({ type: SlackMessageBotSendMessageReqBody })
   @Type(() => SlackMessageBotSendMessageReqBody)
   @ValidateNested()
   @IsDefined()
-  body: SlackMessageBotSendMessageReqBody;
+  body!: SlackMessageBotSendMessageReqBody;
 }
 
 export class SendSlackTextMessageRequestDto {
   @ApiProperty({ type: String })
   @IsString()
-  channelId: string;
+  channelId!: string;
 
   @ApiProperty({ type: String })
   @IsString()
-  text: string;
+  text!: string;
 }
 
 export class SendSlackMessageResponseDto {

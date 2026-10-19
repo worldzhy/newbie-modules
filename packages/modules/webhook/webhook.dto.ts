@@ -3,11 +3,11 @@ import { IsBoolean, IsNotEmpty, IsOptional, IsString } from "class-validator";
 export class CreateWebhookDto {
   @IsString()
   @IsNotEmpty()
-  url: string;
+  url!: string;
 
   @IsString()
   @IsNotEmpty()
-  event: string;
+  event!: string;
 
   @IsString()
   @IsOptional()

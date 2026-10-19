@@ -4,16 +4,16 @@ import { IsNumber, IsOptional, IsString } from "class-validator";
 
 class ProductEntity {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String, required: false })
   imageFileId?: string;
 
   @ApiProperty({ type: Number })
-  priceInCents: number;
+  priceInCents!: number;
 
   @ApiProperty({ type: Number, required: false })
   priceInCentsDiscounted?: number;
@@ -22,11 +22,11 @@ class ProductEntity {
 export class CreateProductRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
-  priceInCents: number;
+  priceInCents!: number;
 
   @ApiProperty({ type: Number, required: false })
   @IsOptional()
@@ -36,16 +36,16 @@ export class CreateProductRequestDto {
 
 export class CreateProductResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: Number })
-  priceInCents: number;
+  priceInCents!: number;
 
   @ApiProperty({ type: Number })
-  priceInCentsDiscounted: number;
+  priceInCentsDiscounted!: number;
 }
 
 export class ListProductsRequestDto extends CommonListRequestDto {

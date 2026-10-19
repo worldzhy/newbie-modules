@@ -6,13 +6,13 @@ export class ContactSearchPeopleBase {
     type: String,
   })
   @IsString()
-  userId: string;
+  userId!: string;
 
   @ApiProperty({
     type: String,
   })
   @IsString()
-  userSource: string;
+  userSource!: string;
 
   @ApiProperty({
     type: String,
@@ -87,7 +87,7 @@ export class CreateContactSearchTaskBatchReqDto {
     isArray: true,
   })
   @IsArray()
-  peoples: ContactSearchPeopleTaskDto[];
+  peoples!: ContactSearchPeopleTaskDto[];
 
   @ApiProperty({
     type: Boolean,
@@ -109,7 +109,7 @@ export class CreateContactSearchTaskBatchReqDto {
     type: String,
   })
   @IsString()
-  batchId: string;
+  batchId!: string;
 
   @ApiProperty({
     type: String,

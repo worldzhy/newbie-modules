@@ -13,7 +13,7 @@ export class UsersListResDto {
     type: expose<User>,
     isArray: true,
   })
-  records: Expose<User>[];
+  records!: Expose<User>[];
 
   @ApiProperty({
     type: CommonPaginationResDto,

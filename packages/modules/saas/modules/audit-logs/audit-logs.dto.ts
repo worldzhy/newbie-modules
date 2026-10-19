@@ -11,7 +11,7 @@ export class AuditLogsListResDto {
     type: expose<AuditLog>,
     isArray: true,
   })
-  records: Expose<AuditLog>[];
+  records!: Expose<AuditLog>[];
 
   @ApiProperty({
     type: CommonPaginationResDto,

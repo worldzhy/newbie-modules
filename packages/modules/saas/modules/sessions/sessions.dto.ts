@@ -11,7 +11,7 @@ export class SessionsListResDto {
     type: expose<Session>,
     isArray: true,
   })
-  records: Expose<Session>[];
+  records!: Expose<Session>[];
 
   @ApiProperty({
     type: CommonPaginationResDto,

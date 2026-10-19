@@ -12,7 +12,7 @@ export class CreateOrderRequestDto {
 
   @ApiProperty({ type: OrderItemRequestEntity, isArray: true, required: true })
   @IsArray()
-  items: OrderItemRequestEntity[];
+  items!: OrderItemRequestEntity[];
 
   @ApiProperty({ type: String, required: false })
   @IsString()
@@ -22,13 +22,13 @@ export class CreateOrderRequestDto {
 
 export class CreateOrderResponseDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ enum: OrderStatus })
   status: OrderStatus;
 
   @ApiProperty({ type: Number })
-  totalInCents: number;
+  totalInCents!: number;
 
   @ApiProperty({ enum: PaymentMethod })
   paymentMethod: PaymentMethod;
@@ -37,7 +37,7 @@ export class CreateOrderResponseDto {
   note?: string;
 
   @ApiProperty({ type: String })
-  userId: string;
+  userId!: string;
 }
 
 export class ListOrdersRequestDto extends CommonListRequestDto {

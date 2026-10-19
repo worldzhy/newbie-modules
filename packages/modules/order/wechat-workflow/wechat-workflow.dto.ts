@@ -5,11 +5,11 @@ import { OrderItemRequestEntity } from "../order.entity";
 export class WechatWorkflowCreateOrderRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  wechatOpenId: string;
+  wechatOpenId!: string;
 
   @ApiProperty({ type: OrderItemRequestEntity, isArray: true, required: true })
   @IsArray()
-  items: OrderItemRequestEntity[];
+  items!: OrderItemRequestEntity[];
 
   @ApiProperty({ type: String, required: false })
   @IsString()
@@ -20,5 +20,5 @@ export class WechatWorkflowCreateOrderRequestDto {
 export class WechatWorkflowUpdateOrderPaidRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  wechatTransactionId: string;
+  wechatTransactionId!: string;
 }

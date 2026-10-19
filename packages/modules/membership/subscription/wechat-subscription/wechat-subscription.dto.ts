@@ -6,18 +6,18 @@ import { SubscriptionStatus } from "@generated/prisma/client";
 export class CreateWechatSubscriptionRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  wechatOpenId: string;
+  wechatOpenId!: string;
 
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
-  planId: number;
+  planId!: number;
 }
 
 export class GetWechatSubscriptionRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  id: string;
+  id!: string;
 }
 
 export class UpdateWechatSubscriptionRequestDto {

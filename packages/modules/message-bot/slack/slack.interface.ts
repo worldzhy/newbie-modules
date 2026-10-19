@@ -7,7 +7,7 @@ export type SlackMessageBotSendMessageRes = string;
 export class SlackMessageBotSendMessageReqBody {
   @ApiProperty({ type: String })
   @IsString()
-  [SlackWebhookMessageType.Text]: string;
+  [SlackWebhookMessageType.Text]!: string;
 
   @ApiProperty({ type: Object, isArray: true, required: false })
   @IsObject()

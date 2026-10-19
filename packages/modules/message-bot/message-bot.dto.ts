@@ -6,25 +6,25 @@ import { MessageBotProvider, MessageBotRecordStatus } from "./message-bot.consta
 // Response DTO for a message channel record, mirrors the MessageBotChannel Prisma model.
 export class MessageBotChannelDetailResDto {
   @ApiProperty({ type: String })
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: String })
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({ type: String })
   description?: string | null;
 
   @ApiProperty({ type: String })
-  webhook: string;
+  webhook!: string;
 
   @ApiProperty({ type: String, enum: MessageBotProvider, description: "Message provider (Lark / Slack)" })
-  provider: string;
+  provider!: string;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 
   @ApiPropertyOptional({ type: String })
   groupId?: string | null;
@@ -33,28 +33,28 @@ export class MessageBotChannelDetailResDto {
 // Response DTO for a message delivery record, mirrors the MessageBotRecord Prisma model.
 export class MessageBotRecordDetailResDto {
   @ApiProperty({ type: Number })
-  id: number;
+  id!: number;
 
   @ApiProperty({ type: String })
-  channelId: string;
+  channelId!: string;
 
   @ApiProperty({ type: String })
-  webhook: string;
+  webhook!: string;
 
   @ApiProperty({ type: Object, description: "Raw request payload sent to the webhook" })
-  request: Record<string, unknown>;
+  request!: Record<string, unknown>;
 
   @ApiPropertyOptional({ type: Object, description: "Raw response payload received from the webhook" })
   response?: Record<string, unknown> | null;
 
   @ApiProperty({ type: String, enum: MessageBotRecordStatus })
-  status: string;
+  status!: string;
 
   @ApiProperty({ type: Date })
-  createdAt: Date;
+  createdAt!: Date;
 
   @ApiProperty({ type: Date })
-  updatedAt: Date;
+  updatedAt!: Date;
 }
 
 export class ListMessageBotChannelsRequestDto extends CommonListRequestDto {
@@ -72,11 +72,11 @@ export class ListMessageBotChannelsResponseDto extends CommonListResponseDto {
 export class CreateMessageBotChannelRequestDto {
   @ApiProperty({ type: String })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String })
   @IsString()
-  webhook: string;
+  webhook!: string;
 
   @ApiProperty({ type: String, required: false })
   @IsString()
@@ -92,7 +92,7 @@ export class CreateMessageBotChannelRequestDto {
 export class UpdateMessageBotChannelRequestDto {
   @ApiProperty({ type: String })
   @IsString()
-  id: string;
+  id!: string;
 
   @ApiProperty({ type: String, required: false })
   @IsString()
@@ -114,7 +114,7 @@ export class ListMessageBotMessagesRequestDto extends CommonListRequestDto {
   @ApiProperty({ type: String })
   @IsNotEmpty()
   @IsString()
-  channelId: string;
+  channelId!: string;
 }
 
 export class ListMessageBotMessagesResponseDto extends CommonListResponseDto {

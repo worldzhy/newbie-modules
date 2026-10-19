@@ -4,9 +4,9 @@ import { LarkWebhookMessageType } from "./lark.constants";
 
 // Internal type for the raw Lark webhook response, not exposed through any controller.
 export class LarkMessageBotSendMessageRes {
-  code: number;
+  code!: number;
 
-  msg: string;
+  msg!: string;
 
   data?: unknown;
 }
@@ -14,7 +14,7 @@ export class LarkMessageBotSendMessageRes {
 export class LarkMessageBotSendMessageReqBody {
   @ApiProperty({ type: String, enum: LarkWebhookMessageType })
   @IsString()
-  msg_type: string;
+  msg_type!: string;
 
   @ApiProperty({ type: Object, required: false })
   @IsObject()

@@ -10,7 +10,7 @@ export class ListSubscriptionPlansRequestDto extends CommonListRequestDto {}
 export class CreateSubscriptionPlanRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: String, enum: BillingCycle, required: true })
   @IsEnum(BillingCycle)
@@ -19,7 +19,7 @@ export class CreateSubscriptionPlanRequestDto {
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
-  priceInCents: number;
+  priceInCents!: number;
 }
 
 export class UpdateSubscriptionPlanRequestDto {
@@ -43,7 +43,7 @@ export class GetSubscriptionPlanRequestDto {
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
-  id: number;
+  id!: number;
 }
 
 // Subscription Dtos
@@ -52,12 +52,12 @@ export class ListSubscriptionsRequestDto extends CommonListRequestDto {}
 export class CreateSubscriptionRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  userId: string;
+  userId!: string;
 
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
   @Type(() => Number)
-  planId: number;
+  planId!: number;
 }
 
 export class UpdateSubscriptionRequestDto {
@@ -69,5 +69,5 @@ export class UpdateSubscriptionRequestDto {
 export class GetSubscriptionRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  id: string;
+  id!: string;
 }

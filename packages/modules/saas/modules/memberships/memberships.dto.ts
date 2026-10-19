@@ -12,7 +12,7 @@ export class MembershipsListResDto {
     type: expose<Membership>,
     isArray: true,
   })
-  records: Expose<Membership>[];
+  records!: Expose<Membership>[];
 
   @ApiProperty({
     type: CommonPaginationResDto,

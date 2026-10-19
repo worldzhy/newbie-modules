@@ -5,5 +5,5 @@ export class ListStacksRequestDto {
   @ApiProperty({ type: String, description: "Filter stacks by environment id." })
   @IsNotEmpty()
   @IsString()
-  environmentId: string;
+  environmentId!: string;
 }

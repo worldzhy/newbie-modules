@@ -8,38 +8,38 @@ export class ListMembershipLevelsRequestDto extends CommonListRequestDto {}
 export class CreateMembershipLevelRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
-  requiredPoints: number;
+  requiredPoints!: number;
 
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
-  discountRate: number;
+  discountRate!: number;
 }
 
 export class UpdateMembershipLevelRequestDto {
   @ApiProperty({ type: String, required: false })
   @IsString()
   @IsOptional()
-  name: string;
+  name!: string;
 
   @ApiProperty({ type: Number, required: false })
   @IsNumber()
   @IsOptional()
-  requiredPoints: number;
+  requiredPoints!: number;
 
   @ApiProperty({ type: Number, required: false })
   @IsNumber()
   @IsOptional()
-  discountRate: number;
+  discountRate!: number;
 }
 
 export class GetMembershipLevelRequestDto {
   @ApiProperty({ type: Number, required: true })
   @IsNumber()
-  id: number;
+  id!: number;
 }
 
 // Membership Dtos
@@ -49,7 +49,7 @@ export class CreateMembershipRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsUUID()
   @IsNotEmpty()
-  userId: string;
+  userId!: string;
 }
 
 export class UpdateMembershipRequestDto {
@@ -67,5 +67,5 @@ export class UpdateMembershipRequestDto {
 export class GetMembershipRequestDto {
   @ApiProperty({ type: String, required: true })
   @IsString()
-  id: string;
+  id!: string;
 }
