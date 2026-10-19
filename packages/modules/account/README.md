@@ -63,15 +63,15 @@ back as empty string or null.
 
 #### 4.1 Default-returned fields (no permission needed)
 
-| Field | Used by |
-|---|---|
-| `name` | `User.name` |
-| `en_name` | (not consumed) |
-| `avatar_url` | `User.uiAvatarsUrl` (falls back to `buildUiAvatarsUrl`) |
-| `avatar_thumb` / `avatar_middle` / `avatar_big` | (not consumed) |
-| `open_id` | `User.larkOpenId` (S1 primary key) |
-| `union_id` | `User.larkUnionId` |
-| `tenant_key` | (not consumed) |
+| Field                                           | Used by                                                 |
+| ----------------------------------------------- | ------------------------------------------------------- |
+| `name`                                          | `User.name`                                             |
+| `en_name`                                       | (not consumed)                                          |
+| `avatar_url`                                    | `User.uiAvatarsUrl` (falls back to `buildUiAvatarsUrl`) |
+| `avatar_thumb` / `avatar_middle` / `avatar_big` | (not consumed)                                          |
+| `open_id`                                       | `User.larkOpenId` (S1 primary key)                      |
+| `union_id`                                      | `User.larkUnionId`                                      |
+| `tenant_key`                                    | (not consumed)                                          |
 
 > `avatar_url` is **not** a sensitive field. It is returned by default
 > alongside `name` / `open_id` / `union_id`. No extra permission is
@@ -83,12 +83,12 @@ back as empty string or null.
 The "Permission name" column below is the exact Chinese label shown in
 the Feishu console; search by that string when enabling.
 
-| Permission name (console) | Constraint | Returned fields | Consumed at |
-|---|---|---|---|
-| `获取用户邮箱信息` | self-built app only | `email`, `enterprise_email` | `lark-auth.service.ts` L134 -> `User.email` |
-| `获取用户手机号` | self-built app only | `mobile` | `lark-auth.service.ts` L135 -> `User.phone` |
-| `获取用户 user ID` | self-built app only | `user_id` | (not consumed) |
-| `获取用户受雇信息` | — | `employee_no` and other employment fields | (not consumed) |
+| Permission name (console) | Constraint          | Returned fields                           | Consumed at                                 |
+| ------------------------- | ------------------- | ----------------------------------------- | ------------------------------------------- |
+| `获取用户邮箱信息`        | self-built app only | `email`, `enterprise_email`               | `lark-auth.service.ts` L134 -> `User.email` |
+| `获取用户手机号`          | self-built app only | `mobile`                                  | `lark-auth.service.ts` L135 -> `User.phone` |
+| `获取用户 user ID`        | self-built app only | `user_id`                                 | (not consumed)                              |
+| `获取用户受雇信息`        | —                   | `employee_no` and other employment fields | (not consumed)                              |
 
 #### 4.3 Required permissions for this module
 
@@ -118,10 +118,10 @@ not affect the live login chain.
 
 ## Troubleshooting
 
-| Symptom | Direction |
-|---|---|
-| `Lark token exchange failed` | Wrong App ID/Secret, app not released, user not in availability range |
-| `avatar_url` empty | User has not uploaded an avatar in Feishu (the field is empty when the user has no avatar — unrelated to permissions) |
-| `email` empty | `获取用户邮箱信息` not enabled, or user has no email |
-| `mobile` empty | `获取用户手机号` not enabled, or user has no mobile |
-| Status 20005 / 20021 / 20022 | User invalid / resigned / frozen (see Feishu error code table) |
+| Symptom                      | Direction                                                                                                             |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `Lark token exchange failed` | Wrong App ID/Secret, app not released, user not in availability range                                                 |
+| `avatar_url` empty           | User has not uploaded an avatar in Feishu (the field is empty when the user has no avatar — unrelated to permissions) |
+| `email` empty                | `获取用户邮箱信息` not enabled, or user has no email                                                                  |
+| `mobile` empty               | `获取用户手机号` not enabled, or user has no mobile                                                                   |
+| Status 20005 / 20021 / 20022 | User invalid / resigned / frozen (see Feishu error code table)                                                        |

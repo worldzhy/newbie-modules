@@ -4,10 +4,10 @@ Newbie health module. One health token = one running deployment endpoint.
 
 ## API Groups
 
-| Group            | Auth                | Base path               |
-| ---------------- | ------------------- | ----------------------- |
-| Host integration | Host JWT/Guard      | `/health/installations` |
-| Instance snapshot| `X-Health-Token`    | `POST /health/snapshot` |
+| Group             | Auth             | Base path               |
+| ----------------- | ---------------- | ----------------------- |
+| Host integration  | Host JWT/Guard   | `/health/installations` |
+| Instance snapshot | `X-Health-Token` | `POST /health/snapshot` |
 
 A snapshot carries the aggregated dependency health status (`ok` | `error`)
 and per-indicator results (e.g. `prisma`, `mongo`, `clickhouse`, `redis`,
@@ -18,12 +18,12 @@ and per-indicator results (e.g. `prisma`, `mongo`, `clickhouse`, `redis`,
 
 Derived at read time from `lastSnapshotAt` + `lastSnapshotStatus`:
 
-| State     | Condition                                                           |
-| --------- | ------------------------------------------------------------------- |
-| `unknown` | Never reported (`lastSnapshotAt` is null)                           |
-| `healthy` | Last snapshot `ok` and within the online threshold (≤ 90s)          |
-| `degraded`| Last snapshot `error` and within the online threshold               |
-| `offline` | No snapshot within the online threshold (> 90s)                     |
+| State      | Condition                                                  |
+| ---------- | ---------------------------------------------------------- |
+| `unknown`  | Never reported (`lastSnapshotAt` is null)                  |
+| `healthy`  | Last snapshot `ok` and within the online threshold (≤ 90s) |
+| `degraded` | Last snapshot `error` and within the online threshold      |
+| `offline`  | No snapshot within the online threshold (> 90s)            |
 
 ## Design Reference
 

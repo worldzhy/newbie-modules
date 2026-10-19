@@ -35,11 +35,11 @@ D7 保留 URL 的唯一理由是"前端业务代码（非 `_gen`）不消费这�
 
 新契约：
 
-| 操作 | 旧 | 新 |
-|---|---|---|
-| 读状态 | `GET .../agents` → `AgentSummaryDto[]` | 删除独立列表端点；`ApplicationDto.webMonitor: WebMonitorSummaryDto \| null` 直接承载（null = BACKEND 应用或遗留未 enroll 的 FRONTEND 应用） |
-| 签发/轮转 | `POST .../agents/:type/credential/regenerate` | `POST .../web-monitor/credential/rotate` → `WebMonitorCredentialDto` |
-| 吊销 | `DELETE .../agents/:type/credential` | `DELETE .../web-monitor/credential` → `WebMonitorSummaryDto` |
+| 操作      | 旧                                            | 新                                                                                                                                          |
+| --------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 读状态    | `GET .../agents` → `AgentSummaryDto[]`        | 删除独立列表端点；`ApplicationDto.webMonitor: WebMonitorSummaryDto \| null` 直接承载（null = BACKEND 应用或遗留未 enroll 的 FRONTEND 应用） |
+| 签发/轮转 | `POST .../agents/:type/credential/regenerate` | `POST .../web-monitor/credential/rotate` → `WebMonitorCredentialDto`                                                                        |
+| 吊销      | `DELETE .../agents/:type/credential`          | `DELETE .../web-monitor/credential` → `WebMonitorSummaryDto`                                                                                |
 
 新 DTO（去掉恒为 `WEB_MONITOR` 的 `type` 字段）：
 
