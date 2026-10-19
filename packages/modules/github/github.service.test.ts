@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { GitHubService, RepoNameConflictError } from "./github.service";
+import { GitHubService, GitHubNotConfiguredError, RepoNameConflictError } from "./github.service";
 
 /**
  * M8 verification: GithubAdapter with an injected mock Octokit - verifies ensureRepoExists idempotency,
@@ -51,6 +51,14 @@ function makeService(octokit: any): GitHubService {
   return service;
 }
 
+/** Service constructed with neither the App triplet nor a PAT — no octokit. */
+function makeUnconfiguredService(): GitHubService {
+  const emptyConfig = {
+    getOrThrow: () => ({}),
+  } as any;
+  return new GitHubService(emptyConfig);
+}
+
 function httpError(status: number, message?: string) {
   const e: any = new Error(message ?? `HTTP ${status}`);
   e.status = status;
@@ -78,6 +86,35 @@ describe("GitHubService.isConfigured", () => {
   it("returns true in PAT mode", () => {
     const service = makeService(makeOctokitMock({}));
     assert.equal(service.isConfigured(), true);
+  });
+
+  it("returns false when no credentials are configured", () => {
+    const service = makeUnconfiguredService();
+    assert.equal(service.isConfigured(), false);
+  });
+});
+
+describe("GitHubService without credentials", () => {
+  it("rejects API calls with GitHubNotConfiguredError instead of a bare TypeError", async () => {
+    const service = makeUnconfiguredService();
+    await assert.rejects(service.deleteRepo("o", "r"), (e: any) => e instanceof GitHubNotConfiguredError);
+    await assert.rejects(
+      service.ensureRepoExists("o", "n", "to", "tr"),
+      (e: any) => e instanceof GitHubNotConfiguredError,
+    );
+    await assert.rejects(
+      service.getFileContent("o", "r", "package-lock.json"),
+      (e: any) => e instanceof GitHubNotConfiguredError,
+    );
+  });
+
+  it("keeps credential-free helpers usable (buildCloneUrl, parseGitHubUrl)", () => {
+    const service = makeUnconfiguredService();
+    assert.equal(service.buildCloneUrl("acme", "atlas-api"), "https://github.com/acme/atlas-api.git");
+    assert.deepEqual(service.parseGitHubUrl("https://github.com/acme/atlas-api"), {
+      owner: "acme",
+      repo: "atlas-api",
+    });
   });
 });
 
