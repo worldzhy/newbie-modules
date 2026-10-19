@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { Express } from "express";
+import type { Express } from "express";
 import * as XLSX from "xlsx";
 
 /** Raw content of a single worksheet: its name plus a matrix of string cell values. */
@@ -10,10 +10,11 @@ export interface XlsxSheetMatrix {
 
 @Injectable()
 export class XLSXService {
-  private workbook!: XLSX.WorkBook;
-
-  createWorkbook() {
-    this.workbook = XLSX.utils.book_new();
+  // All methods are stateless: the workbook is held by the caller, never by
+  // this singleton. Keeping per-request workbook state on the service instance
+  // would let concurrent requests corrupt each other.
+  createWorkbook(): XLSX.WorkBook {
+    return XLSX.utils.book_new();
   }
 
   //****************************************/
@@ -69,49 +70,49 @@ export class XLSXService {
     });
   }
 
-  getSheets(): string[] {
-    return this.workbook.SheetNames;
+  getSheets(workbook: XLSX.WorkBook): string[] {
+    return workbook.SheetNames;
   }
 
   //**********************/
   //* Load file          */
   //**********************/
 
-  loadLocalFile(filePath: string) {
-    this.workbook = XLSX.readFile(filePath);
+  loadLocalFile(filePath: string): XLSX.WorkBook {
+    return XLSX.readFile(filePath);
   }
 
-  loadFile(file: Express.Multer.File) {
-    this.workbook = XLSX.read(file.buffer);
+  loadFile(file: Express.Multer.File): XLSX.WorkBook {
+    return XLSX.read(file.buffer);
   }
 
-  loadBuffer(buffer: Buffer) {
-    this.workbook = XLSX.read(buffer);
+  loadBuffer(buffer: Buffer): XLSX.WorkBook {
+    return XLSX.read(buffer);
   }
 
   //************************/
   //* Get columns and rows */
   //************************/
 
-  getColumnsBySheetIndex(index: number): string[] {
-    const sheet = this.workbook.Sheets[this.workbook.SheetNames[index]];
+  getColumnsBySheetIndex(workbook: XLSX.WorkBook, index: number): string[] {
+    const sheet = workbook.Sheets[workbook.SheetNames[index]];
 
     return this.getColumns(sheet);
   }
 
-  getColumnsBySheetName(name: string): string[] {
-    const sheet = this.workbook.Sheets[name];
+  getColumnsBySheetName(workbook: XLSX.WorkBook, name: string): string[] {
+    const sheet = workbook.Sheets[name];
 
     return this.getColumns(sheet);
   }
 
-  getRowsBySheetIndex(index: number): object[] {
-    const sheet = this.workbook.Sheets[this.workbook.SheetNames[index]];
+  getRowsBySheetIndex(workbook: XLSX.WorkBook, index: number): object[] {
+    const sheet = workbook.Sheets[workbook.SheetNames[index]];
     return this.getRows(sheet);
   }
 
-  getRowsBySheetName(name: string): object[] {
-    const sheet = this.workbook.Sheets[name];
+  getRowsBySheetName(workbook: XLSX.WorkBook, name: string): object[] {
+    const sheet = workbook.Sheets[name];
     return this.getRows(sheet);
   }
 
@@ -119,8 +120,8 @@ export class XLSXService {
   //* Save file          */
   //**********************/
 
-  writeFile(fileName: string) {
-    XLSX.writeFile(this.workbook, fileName);
+  writeFile(workbook: XLSX.WorkBook, fileName: string) {
+    XLSX.writeFile(workbook, fileName);
   }
 
   //**********************/
