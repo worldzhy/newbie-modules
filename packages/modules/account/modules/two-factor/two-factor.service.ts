@@ -1,13 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { generateSecret, generateURI, verify } from "otplib";
 import QRCode from "qrcode";
-import { RateLimiterMemory } from "rate-limiter-flexible";
 import { MfaMethod } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { INVALID_TOKEN } from "@devbie/newbie/exceptions/errors.constants";
 import { compareHash } from "@devbie/newbie/utilities/common.util";
 import { TokenService } from "@modules/security/token/token.service";
 import { TokenSubject } from "@modules/security/token/token.constants";
+import { LimitTotpLoginByUserService } from "@modules/security/rate-limiter/rate-limiter.service";
 import { MfaTokenPayload, TotpTokenResponse } from "../../account.interface";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "../../auth/login-audit";
@@ -16,23 +16,18 @@ const MULTI_FACTOR_TOKEN_TTL_SECONDS = 5 * 60;
 // Accept one adjacent 30-second step (epochTolerance is in seconds) so minor
 // clock skew never locks users out.
 const TOTP_EPOCH_TOLERANCE_SECONDS = 30;
-const TOTP_LOGIN_MAX_ATTEMPTS = 5;
-const TOTP_LOGIN_ATTEMPT_WINDOW_SECONDS = 300;
 const TOTP_ISSUER = "NightWatch";
 
 @Injectable()
 export class TwoFactorService {
-  // Bound online guessing of TOTP codes during the login challenge.
-  private readonly totpAttemptLimiter = new RateLimiterMemory({
-    keyPrefix: "totp-login-attempt-",
-    points: TOTP_LOGIN_MAX_ATTEMPTS,
-    duration: TOTP_LOGIN_ATTEMPT_WINDOW_SECONDS,
-  });
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly tokenService: TokenService,
     private readonly auditLogService: AuditLogService,
+    // Bounds online guessing of TOTP codes during the login challenge; shares
+    // the Redis-backed limiter base with the other login limiters so the cap
+    // holds across instances (modules.security.ratelimiter.totpLoginLimiter).
+    private readonly limitTotpLoginByUserService: LimitTotpLoginByUserService,
   ) {}
 
   /**
@@ -182,8 +177,7 @@ export class TwoFactorService {
     }
 
     const attemptKey = payload.userId;
-    const attempts = await this.totpAttemptLimiter.get(attemptKey);
-    if (attempts !== null && attempts.remainingPoints <= 0) {
+    if (!(await this.limitTotpLoginByUserService.isAllowed(attemptKey))) {
       await recordLoginFailure(this.auditLogService, {
         actorId: payload.userId,
         ipAddress: params.ipAddress,
@@ -222,7 +216,7 @@ export class TwoFactorService {
       epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
     });
     if (!result.valid) {
-      await this.totpAttemptLimiter.penalty(attemptKey);
+      await this.limitTotpLoginByUserService.increment(attemptKey);
       await recordLoginFailure(this.auditLogService, {
         actorId: user.id,
         ipAddress: params.ipAddress,
@@ -232,7 +226,7 @@ export class TwoFactorService {
       throw new BadRequestException("The authenticator code is invalid.");
     }
 
-    await this.totpAttemptLimiter.delete(attemptKey);
+    await this.limitTotpLoginByUserService.delete(attemptKey);
     return user.id;
   }
 }
