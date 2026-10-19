@@ -1,5 +1,5 @@
 import { Global, Module } from "@nestjs/common";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, DiscoveryModule } from "@nestjs/core";
 
 import { CookieModule } from "./cookie/cookie.module";
 import { TokenModule } from "./token/token.module";
@@ -9,8 +9,10 @@ import { AuthenticationGuard } from "./authentication/authentication.guard";
 import { AuthorizationGuard } from "./authorization/authorization.guard";
 import { RouteAuthorizationService } from "./authorization/route-authorization.service";
 import { NoAuthGuard } from "./authentication/public/public.guard";
+import { PublicCorsService } from "./authentication/public/public-cors.service";
 import { ApiKeyAuthGuard } from "./authentication/api-key/api-key.guard";
 import { GoogleAuthGuard } from "./authentication/google-oauth/google.guard";
+import { InstallationAuthGuard } from "./authentication/installation/installation.guard";
 import { JwtAuthGuard } from "./authentication/jwt/jwt.guard";
 import { PasswordAuthGuard } from "./authentication/password/password.guard";
 import { RefreshTokenAuthGuard } from "./authentication/refresh-token/refresh-token.guard";
@@ -42,7 +44,7 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
  */
 @Global()
 @Module({
-  imports: [CookieModule, TokenModule],
+  imports: [CookieModule, TokenModule, DiscoveryModule],
   providers: [
     RouteAuthenticationService,
     RouteAuthorizationService,
@@ -54,11 +56,13 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
     NoAuthGuard,
     ApiKeyAuthGuard,
     GoogleAuthGuard,
+    InstallationAuthGuard,
     JwtAuthGuard,
     PasswordAuthGuard,
     RefreshTokenAuthGuard,
     VerificationCodeAuthGuard,
     SelfOnlyGuard,
+    PublicCorsService,
 
     NoStrategy,
     ApiKeyStrategy,

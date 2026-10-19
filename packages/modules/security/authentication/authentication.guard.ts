@@ -9,12 +9,14 @@ import { PasswordAuthGuard } from "./password/password.guard";
 import { RefreshTokenAuthGuard } from "./refresh-token/refresh-token.guard";
 import { VerificationCodeAuthGuard } from "./verification-code/verification-code.guard";
 import { GoogleAuthGuard } from "./google-oauth/google.guard";
+import { InstallationAuthGuard } from "./installation/installation.guard";
 import { IS_PUBLIC_KEY } from "./public/public.decorator";
 import { IS_LOGGING_IN_PASSWORD_KEY } from "./password/password.decorator";
 import { IS_LOGGING_IN_VERIFICATION_CODE_KEY } from "./verification-code/verification-code.decorator";
 import { IS_REFRESHING_ACCESS_TOKEN_KEY } from "./refresh-token/refresh-token.decorator";
 import { IS_LOGGING_IN_APIKEY_KEY } from "./api-key/api-key.decorator";
 import { IS_LOGGING_IN_GOOGLE_KEY } from "./google-oauth/google.decorator";
+import { INSTALLATION_AUTH_KEY } from "./installation/installation.decorator";
 import { RouteAuthenticationService } from "./route-authentication.service";
 import { GuardType } from "./guard.types";
 
@@ -31,6 +33,7 @@ export class AuthenticationGuard extends AuthGuard("authentication") {
     private refreshTokenAuthGuard: RefreshTokenAuthGuard,
     private googleAuthGuard: GoogleAuthGuard,
     private jwtAuthGuard: JwtAuthGuard,
+    private installationAuthGuard: InstallationAuthGuard,
   ) {
     super();
   }
@@ -67,6 +70,15 @@ export class AuthenticationGuard extends AuthGuard("authentication") {
     ]);
     if (isLoggingInByApiKey) {
       return this.apiKeyAuthGuard.canActivate(context);
+    }
+
+    // Use @InstallationAuth(kind) for installation-token report endpoints
+    const installationKind = this.reflector.getAllAndOverride<string>(INSTALLATION_AUTH_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (installationKind) {
+      return this.installationAuthGuard.canActivate(context);
     }
 
     // Use @GuardByVerificationCode() for local.verification-code strategy authentication
