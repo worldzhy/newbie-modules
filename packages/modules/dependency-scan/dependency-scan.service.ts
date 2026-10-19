@@ -113,7 +113,13 @@ export class DependencyScanService {
     });
 
     this.activeScans.add(applicationId);
-    this.runScanInBackground(applicationId, scan.id).catch(() => {});
+    this.runScanInBackground(applicationId, scan.id).catch((error: unknown) => {
+      this.logger.error(
+        `Background dependency scan failed for application ${applicationId} (scan ${scan.id}): ${
+          error instanceof Error ? (error.stack ?? error.message) : String(error)
+        }`,
+      );
+    });
 
     return { accepted: true, scan: this.serializeScan(scan) };
   }
