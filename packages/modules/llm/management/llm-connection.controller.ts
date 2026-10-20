@@ -30,6 +30,7 @@ export class LlmConnectionController {
   ) {}
 
   @Get()
+  @RequirePermission("List", "LlmConnection")
   @ApiOperation({ summary: "List all LLM connections with their bound scopes (keys masked)" })
   @ApiResponse({ status: 200, type: [LlmConnectionResponseDto] })
   async list(): Promise<LlmConnectionResponseDto[]> {

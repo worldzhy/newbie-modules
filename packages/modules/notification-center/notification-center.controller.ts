@@ -1,6 +1,9 @@
 import { Body, Controller, Get, Param, Post, Put, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { NotificationCenterService, NotifyInput, NotifyResult } from "./notification-center.service";
 import { NotificationSettingService } from "./notification-setting.service";
 import {
@@ -34,6 +37,7 @@ export class NotificationCenterController {
   // --- Notification delivery ----------------------------------------------
 
   @Post("notifications")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.NotificationRecord)
   @ApiOperation({ summary: "Deliver a notification from a registered notification" })
   @ApiResponse({ status: 201, type: NotifyResultDto })
   notify(@Body() body: NotifyDto): Promise<NotifyResult> {
@@ -43,6 +47,7 @@ export class NotificationCenterController {
   // --- Notification reads -------------------------------------------------
 
   @Get("notifications")
+  @RequireOwner()
   @ApiOperation({ summary: "List notifications for the current user (newest first)" })
   @ApiResponse({ status: 200, type: ListNotificationsResponseDto })
   list(
@@ -53,6 +58,7 @@ export class NotificationCenterController {
   }
 
   @Get("notifications/unread-count")
+  @RequireOwner()
   @ApiOperation({ summary: "Count unread notifications for the current user" })
   @ApiResponse({ status: 200, type: UnreadCountResponseDto })
   unreadCount(@Req() req: AuthenticatedRequest): Promise<UnreadCountResponseDto> {
@@ -60,6 +66,7 @@ export class NotificationCenterController {
   }
 
   @Post("notifications/:id/read")
+  @RequireOwner()
   @ApiOperation({ summary: "Mark one notification as read for the current user" })
   @ApiResponse({ status: 200, type: MarkNotificationReadResponseDto })
   markRead(
@@ -70,6 +77,7 @@ export class NotificationCenterController {
   }
 
   @Post("notifications/read-all")
+  @RequireOwner()
   @ApiOperation({ summary: "Mark every visible notification as read for the current user" })
   @ApiResponse({ status: 200, type: MarkAllNotificationsReadResponseDto })
   markAllRead(@Req() req: AuthenticatedRequest): Promise<MarkAllNotificationsReadResponseDto> {
@@ -79,6 +87,7 @@ export class NotificationCenterController {
   // --- Per-notification settings -------------------------------------------
 
   @Get("notification-settings")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.NotificationSetting)
   @ApiOperation({ summary: "List registered notifications with their runtime settings" })
   @ApiResponse({ status: 200, type: [NotificationSettingDto] })
   listSettings(): Promise<NotificationSettingDto[]> {
@@ -86,6 +95,7 @@ export class NotificationCenterController {
   }
 
   @Put("notification-settings/:key")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.NotificationSetting)
   @ApiOperation({ summary: "Update runtime settings for a notification" })
   @ApiResponse({ status: 200, type: NotificationSettingDto })
   updateSetting(
@@ -98,6 +108,7 @@ export class NotificationCenterController {
   // --- Center settings -----------------------------------------------------
 
   @Get("notification-center-setting")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.NotificationCenterSetting)
   @ApiOperation({ summary: "Get notification-center settings" })
   @ApiResponse({ status: 200, type: NotificationCenterSettingDto })
   getCenterSettings(): Promise<NotificationCenterSettingDto> {
@@ -105,6 +116,7 @@ export class NotificationCenterController {
   }
 
   @Put("notification-center-setting")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.NotificationCenterSetting)
   @ApiOperation({ summary: "Update notification-center settings" })
   @ApiResponse({ status: 200, type: NotificationCenterSettingDto })
   updateCenterSettings(@Body() body: UpdateNotificationCenterSettingDto): Promise<NotificationCenterSettingDto> {
@@ -112,6 +124,7 @@ export class NotificationCenterController {
   }
 
   @Post("notification-center-setting/test-push")
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.NotificationCenterSetting)
   @ApiOperation({ summary: "Send a test message to the host-configured system chats" })
   @ApiResponse({ status: 200, type: TestPushResultDto })
   testPush(): Promise<TestPushResultDto> {

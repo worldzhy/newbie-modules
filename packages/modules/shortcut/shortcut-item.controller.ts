@@ -12,9 +12,11 @@ import {
   ShortcutTreeRequestDto,
 } from "./shortcut-item.dto";
 import { ShortcutItemEntity } from "./shortcut.entity";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Shortcut")
 @ApiBearerAuth()
+@RequireOwner()
 @Controller("shortcut-items")
 export class ShortcutItemController {
   constructor(private readonly prisma: PrismaService) {}

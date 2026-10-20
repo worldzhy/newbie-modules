@@ -3,8 +3,10 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { EnvironmentService } from "./services/environment.service";
 import { WebMonitorEnvironmentGroupByItemResponseDto, WebMonitorEnvironmentResponseDto } from "./environment.dto";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / Web / Environment")
+@RequireOwner()
 @Controller("/web-monitor/environment")
 export class EnvironmentController {
   constructor(private readonly envSrv: EnvironmentService) {}

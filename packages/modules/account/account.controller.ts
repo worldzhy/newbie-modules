@@ -11,6 +11,7 @@ import { VerificationCodeService } from "@modules/account/modules/verification-c
 import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
 import { LimitLoginByIp } from "@modules/security/rate-limiter/rate-limiter.decorator";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 import {
   ChangePasswordDto,
   GetCurrentUserResponseDto,
@@ -30,6 +31,7 @@ export class AccountController {
   ) {}
 
   @Get("me")
+  @RequireOwner()
   @ApiBearerAuth()
   @ApiOperation({ summary: "Get current user information" })
   @ApiResponse({ type: GetCurrentUserResponseDto })
@@ -38,6 +40,7 @@ export class AccountController {
   }
 
   @Patch("me")
+  @RequireOwner()
   @ApiBearerAuth()
   @ApiOperation({ summary: "Update current user information" })
   @ApiResponse({ type: GetCurrentUserResponseDto })
@@ -46,6 +49,7 @@ export class AccountController {
   }
 
   @ApiBearerAuth()
+  @RequireOwner()
   @Post("change-password")
   @ApiOperation({ summary: "Change the password of the current user" })
   @ApiResponse({ type: PasswordChangeResponseDto })

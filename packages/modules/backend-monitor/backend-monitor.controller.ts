@@ -1,6 +1,8 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req } from "@nestjs/common";
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
+import { PermissionAction } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 import { PublicCors } from "@modules/security/authentication/public/public-cors.decorator";
 import { BackendMonitorService } from "./backend-monitor.service";
@@ -55,6 +57,7 @@ export class BackendMonitorController {
   @ApiOperation({ summary: "List backend request logs for an application" })
   @ApiResponse({ status: 200, type: ListBackendMonitorRequestLogsResponseDto })
   @Get("request-logs")
+  @RequirePermission(PermissionAction.List, "BackendMonitorLog")
   async listRequestLogs(@Query() query: ListBackendMonitorRequestLogsRequestDto) {
     return await this.backendMonitorService.listRequestLogs(query);
   }
@@ -63,6 +66,7 @@ export class BackendMonitorController {
   @ApiOperation({ summary: "List backend error logs for an application" })
   @ApiResponse({ status: 200, type: ListBackendMonitorErrorLogsResponseDto })
   @Get("error-logs")
+  @RequirePermission(PermissionAction.List, "BackendMonitorLog")
   async listErrorLogs(@Query() query: ListBackendMonitorErrorLogsRequestDto) {
     return await this.backendMonitorService.listErrorLogs(query);
   }

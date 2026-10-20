@@ -5,6 +5,7 @@ import { GuardByRefreshToken } from "@modules/security/authentication/refresh-to
 import { TokenService } from "@modules/security/token/token.service";
 import { LimitLoginByUserService } from "@modules/security/rate-limiter/rate-limiter.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 import { WechatAuthService } from "@modules/account/auth/wechat/auth.service";
 import {
   WechatLoginDto,
@@ -37,6 +38,7 @@ export class WechatAuthController {
   }
 
   @Post("logout")
+  @RequireOwner()
   @ApiOperation({ summary: "WeChat logout" })
   @ApiResponse({ type: LogoutResponseDto })
   async logout(@Req() req): Promise<{ data: { message: string } }> {

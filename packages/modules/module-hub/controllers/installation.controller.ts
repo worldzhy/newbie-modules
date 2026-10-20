@@ -1,6 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Post, Put, Query } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 import { CreateHubInstallationDto, ListHubInstallationsQueryDto, SetHubTargetSpecDto } from "../module-hub.dto";
 import { ModuleHubInstallationService } from "../services/installation.service";
@@ -28,26 +30,31 @@ export class InstallationController {
   // -- Installations ---------------------------------------------------------
 
   @Post("installations")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.ModuleHubInstallation)
   async create(@Body() body: CreateHubInstallationDto) {
     return this.installations.create(body);
   }
 
   @Get("installations")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.ModuleHubInstallation)
   async list(@Query() query: ListHubInstallationsQueryDto) {
     return this.installations.list(query);
   }
 
   @Get("installations/:id")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.ModuleHubInstallation)
   async get(@Param() params: CommonGetByStringIdRequestDto) {
     return this.installations.get(params.id);
   }
 
   @Get("installations/:id/modules")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.ModuleHubInstallation)
   async modules(@Param() params: CommonGetByStringIdRequestDto) {
     return this.installations.getModules(params.id);
   }
 
   @Put("installations/:id/target-spec")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.ModuleHubInstallation)
   async setTargetSpec(
     @Param() params: CommonGetByStringIdRequestDto,
     @Body() body: SetHubTargetSpecDto,
@@ -57,11 +64,13 @@ export class InstallationController {
   }
 
   @Post("installations/:id/token/regenerate")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.ModuleHubInstallation)
   async regenerateToken(@Param() params: CommonGetByStringIdRequestDto, @Query("actor") actor?: string) {
     return this.installations.regenerateToken(params.id, actor);
   }
 
   @Delete("installations/:id")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.ModuleHubInstallation)
   async revoke(@Param() params: CommonGetByStringIdRequestDto, @Query("actor") actor?: string) {
     return this.installations.revoke(params.id, actor);
   }
@@ -69,11 +78,13 @@ export class InstallationController {
   // -- Catalog ---------------------------------------------------------------
 
   @Get("catalog")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.HubModuleRelease)
   async catalog() {
     return this.releases.getCatalog();
   }
 
   @Get("catalog/:moduleKey/releases")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.HubModuleRelease)
   async moduleReleases(@Param("moduleKey") moduleKey: string) {
     return this.releases.getReleasesForModule(moduleKey);
   }

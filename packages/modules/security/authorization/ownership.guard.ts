@@ -55,6 +55,13 @@ export class OwnershipGuard implements CanActivate {
       return true;
     }
 
+    // Self-by-token routes (e.g. /account/me, /account/logout): no :userId
+    // param means the operation inherently targets the authenticated user,
+    // so ownership holds by construction.
+    if (!ownerId) {
+      return true;
+    }
+
     // Superuser override: resolved through the RBAC authorizer rather than a
     // hardcoded admin role, so superuser status is auditable and revocable.
     if (this.permissionAuthorizer) {

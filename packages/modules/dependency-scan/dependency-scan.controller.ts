@@ -1,5 +1,7 @@
 import { Controller, Get, Param, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { DependencyScanService } from "./dependency-scan.service";
 import { DependencyScanProjectReportResponseDto, DependencyScanScanStartResponseDto } from "./dependency-scan.dto";
 
@@ -19,6 +21,7 @@ export class DependencyScanController {
   }
 
   @Post("applications/:applicationId/scan")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.DependencyScan)
   @ApiOperation({ summary: "Start a new dependency vulnerability scan for an application" })
   @ApiResponse({ status: 200, type: DependencyScanScanStartResponseDto })
   async startApplicationScan(

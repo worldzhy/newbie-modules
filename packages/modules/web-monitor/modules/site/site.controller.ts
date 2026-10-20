@@ -3,8 +3,10 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { SiteService } from "./site.service";
 import { func } from "../../shared/utils";
 import { WebMonitorSiteResponseDto } from "./site.dto";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / System")
+@RequireOwner()
 @Controller("/web-monitor/system")
 export class SiteController {
   constructor(private readonly site: SiteService) {}

@@ -7,8 +7,10 @@ import {
   ListWebMonitorAjaxMarkUsersResponseDto,
   ListWebMonitorAjaxOnesResponseDto,
 } from "./ajax.dto";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / Web / Ajax")
+@RequireOwner()
 @Controller("/web-monitor/ajax")
 export class AjaxController {
   constructor(private readonly ajax: AjaxService) {}
