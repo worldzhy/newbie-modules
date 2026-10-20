@@ -29,8 +29,8 @@
   },
   "assets": [
     {
-      "include": "microservices/aws-ses/templates/",
-      "outDir": "dist/src"
+      "include": "modules/aws-ses/templates/**/*",
+      "outDir": "dist"
     }
   ]
 }
