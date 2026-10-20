@@ -2,15 +2,8 @@ import { Inject, Injectable, Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PermissionAction } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import {
-  PermissionAuthorizer,
-  PermissionRequirement,
-  Scope,
-} from "@modules/security/ports/permission.authorizer";
-import {
-  SCOPE_PERMISSION_CHECKER,
-  ScopePermissionChecker,
-} from "@modules/security/ports/scope-permission.authorizer";
+import { PermissionAuthorizer, PermissionRequirement, Scope } from "@modules/security/ports/permission.authorizer";
+import { SCOPE_PERMISSION_CHECKER, ScopePermissionChecker } from "@modules/security/ports/scope-permission.authorizer";
 
 /**
  * Account-side binding of security's PermissionAuthorizer port.
@@ -33,11 +26,7 @@ export class AccountPermissionAuthorizer implements PermissionAuthorizer {
     private readonly scopeChecker?: ScopePermissionChecker,
   ) {}
 
-  async authorize(
-    userId: string,
-    { resource, action }: PermissionRequirement,
-    scope?: Scope,
-  ): Promise<boolean> {
+  async authorize(userId: string, { resource, action }: PermissionRequirement, scope?: Scope): Promise<boolean> {
     // Host-wide kill switch: when disabled, every permission check passes.
     if (this.config.get<boolean>("modules.account.rbacEnabled", true) === false) {
       return true;

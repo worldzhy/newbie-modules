@@ -39,9 +39,10 @@ export class UserController {
     const { roles, ...scalarFields } = body;
 
     // Resolve role names to Role rows for the UserRole join table.
-    const roleConnect = roles && roles.length > 0
-      ? await this.prisma.role.findMany({ where: { name: { in: roles } }, select: { id: true } })
-      : [];
+    const roleConnect =
+      roles && roles.length > 0
+        ? await this.prisma.role.findMany({ where: { name: { in: roles } }, select: { id: true } })
+        : [];
 
     const user = await this.prisma.user.create({
       data: {
@@ -107,7 +108,11 @@ export class UserController {
 
     // [step 3] Return users without password; map roles to name strings.
     result.records = result.records.map((user) => {
-      const { password: _password, roles, ...rest } = user as User & {
+      const {
+        password: _password,
+        roles,
+        ...rest
+      } = user as User & {
         roles: { role: { name: string } }[];
       };
       return { ...rest, roles: roles.map((r) => r.role.name) };

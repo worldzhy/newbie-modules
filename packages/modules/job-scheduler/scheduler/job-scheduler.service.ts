@@ -191,7 +191,8 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       throw new NotFoundException(`Job schedule not found: ${key}`);
     }
 
-    const hasUpdate = updates.isEnabled !== undefined || updates.cronExpr !== undefined || updates.timezone !== undefined;
+    const hasUpdate =
+      updates.isEnabled !== undefined || updates.cronExpr !== undefined || updates.timezone !== undefined;
     if (!hasUpdate) {
       throw new BadRequestException("No updatable fields provided. Supported fields: isEnabled, cronExpr, timezone.");
     }
