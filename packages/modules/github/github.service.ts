@@ -244,7 +244,7 @@ export class GitHubService {
    * Rewrite the generated repo's npm package identity so the application
    * repository no longer carries the starter template's package name. This
    * is the platform (GitHub generate) counterpart of what the framework
-   * CLIs do locally (`newbie create` / `fewbie init` both overwrite
+   * CLIs do locally (`newbie create` / `fewbie create` both overwrite
    * package.json `name` with the project name): generate copies the starter
    * wholesale and the provisioning layer never runs the CLI.
    *
