@@ -14,7 +14,7 @@ export function hashWebToken(token: string): string {
 
 /**
  * Registry of web-monitor browser-SDK installations. One token = one FRONTEND
- * application reporting to /api/v1/report/web with the token in the body.
+ * application reporting to /web-monitor/report with the token in the body.
  *
  * Mirrors the hub/heartbeat/backend-monitor installation pattern (random UUID
  * token, SHA-256 hash, one-time plaintext return, soft revocation) by copying

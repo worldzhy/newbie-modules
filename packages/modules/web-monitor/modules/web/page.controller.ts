@@ -10,7 +10,7 @@ import {
 } from "./page.dto";
 
 @ApiTags("Frontend Monitor / Web / Pages")
-@Controller("/api/v1/pages")
+@Controller("/web-monitor/pages")
 export class PageController {
   constructor(private readonly pageSrv: PageService) {}
 

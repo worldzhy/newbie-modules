@@ -4,7 +4,7 @@ import { RemoveService, type CustomDeleteFilter } from "./remove.service";
 import { func } from "../../shared/utils";
 
 @ApiTags("Frontend Monitor / Remove")
-@Controller("/api/v1/remove")
+@Controller("/web-monitor/remove")
 export class RemoveController {
   constructor(private readonly removeService: RemoveService) {}
 

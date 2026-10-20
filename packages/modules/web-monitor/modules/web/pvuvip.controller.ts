@@ -8,7 +8,7 @@ import { WebMonitorPvUvIpResponseDto } from "./pvuvip.dto";
 import parser from "cron-parser";
 
 @ApiTags("Frontend Monitor / Web / PvUvIp")
-@Controller("/api/v1/pvuvip")
+@Controller("/web-monitor/pvuvip")
 export class PvuvipController {
   private cfg: Record<string, unknown>;
   constructor(

@@ -4,7 +4,7 @@ import { func } from "../../shared/utils";
 import { ResourceService } from "./services/resource.service";
 
 @ApiTags("Frontend Monitor / Web / Resource")
-@Controller("/api/v1/resource")
+@Controller("/web-monitor/resource")
 export class ResourceController {
   constructor(private readonly resourceSrv: ResourceService) {}
 

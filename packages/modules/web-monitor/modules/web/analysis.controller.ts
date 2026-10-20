@@ -10,7 +10,7 @@ import {
 import { WebMonitorEnvironmentResponseDto } from "./environment.dto";
 
 @ApiTags("Frontend Monitor / Web / Analysis")
-@Controller("/api/v1/analysis")
+@Controller("/web-monitor/analysis")
 export class WebMonitorAnalysisController {
   constructor(private readonly analysisService: WebMonitorAnalysisService) {}
 

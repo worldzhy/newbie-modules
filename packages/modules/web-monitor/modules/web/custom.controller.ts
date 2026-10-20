@@ -5,7 +5,7 @@ import { WebCustomService } from "./services/custom.service";
 import { ListWebMonitorCustomAveragesResponseDto, ListWebMonitorCustomFiltersResponseDto } from "./custom.dto";
 
 @ApiTags("Frontend Monitor / Web / Custom")
-@Controller("/api/v1/custom")
+@Controller("/web-monitor/custom")
 export class CustomController {
   constructor(private readonly webCustom: WebCustomService) {}
 

@@ -9,7 +9,7 @@ import {
 } from "./error.dto";
 
 @ApiTags("Frontend Monitor / Web / Error")
-@Controller("/api/v1/error")
+@Controller("/web-monitor/error")
 export class ErrorController {
   constructor(private readonly errorSrv: ErrorService) {}
 
