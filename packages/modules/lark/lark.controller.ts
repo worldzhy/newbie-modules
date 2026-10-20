@@ -1,6 +1,8 @@
 import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
+import { PermissionAction } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { LarkService } from "./lark.service";
 import { GetChatHistoryRequestDto, LarkWebhookDto, SendTextDto } from "./lark.dto";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
@@ -11,6 +13,7 @@ export class LarkController {
   constructor(private readonly larkService: LarkService) {}
 
   @Post("history")
+  @RequirePermission(PermissionAction.List, "LarkMessage")
   @ApiOperation({ summary: "Get chat history from Lark group" })
   @ApiBearerAuth()
   @ApiResponse({ type: Object })
@@ -20,6 +23,7 @@ export class LarkController {
   }
 
   @Post("send-text")
+  @RequirePermission(PermissionAction.Create, "LarkMessage")
   @ApiOperation({ summary: "Send a text message to a user or group" })
   @ApiBearerAuth()
   @ApiResponse({ type: Object })

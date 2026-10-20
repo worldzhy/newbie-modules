@@ -32,7 +32,8 @@ import {
   GetSignedUploadUrlResponseDto,
 } from "./aws-s3-file.dto";
 import { FileEntity } from "./aws-s3-file.entity";
-import { Prisma } from "@generated/prisma/client";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { AwsS3FileService } from "./aws-s3-file.service";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -51,6 +52,7 @@ export class AwsS3FileController {
   //*******************/
 
   @Get("sync")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @ApiOperation({ summary: "Sync files from S3 to database" })
   @ApiResponse({ type: String })
   async syncFiles() {
@@ -95,6 +97,7 @@ export class AwsS3FileController {
   }
 
   @Patch(":fileId/rename")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.S3File)
   @ApiResponse({ type: RenameFileResponseDto })
   async renameFile(@Param("fileId") fileId: string, @Body() body: RenameFileRequestDto) {
     return await this.prisma.s3File.update({
@@ -104,6 +107,7 @@ export class AwsS3FileController {
   }
 
   @Patch(":fileId/move")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.S3File)
   @ApiOperation({ summary: "Move a file or folder to another folder" })
   @ApiResponse({ type: FileEntity })
   async moveFile(@Param("fileId") fileId: string, @Body() body: MoveFileRequestDto) {
@@ -114,6 +118,7 @@ export class AwsS3FileController {
   }
 
   @Delete(":id")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.S3File)
   @ApiOperation({ summary: "Delete a file or folder" })
   @ApiResponse({ type: FileEntity })
   async deleteFile(@Param("id") id: string) {
@@ -126,6 +131,7 @@ export class AwsS3FileController {
 
   /** It would be better if the business layer reimplements this interface */
   @Post("signedUploadUrl")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @ApiResponse({ type: GetSignedUploadUrlResponseDto })
   async getSignedUploadUrl(@Body() body: CreateFileRequestDto) {
     // Specify a folder for the specific scenario
@@ -137,6 +143,7 @@ export class AwsS3FileController {
   }
 
   @Get("signedDownloadUrl")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.S3File)
   @ApiOperation({ summary: "Get a signed download URL for a file" })
   @ApiResponse({ type: GetSignedUploadUrlResponseDto })
   async getSignedDownloadUrl(@Query("fileId") fileId: string) {
@@ -175,6 +182,7 @@ export class AwsS3FileController {
   }
 
   @Post("upload-base64")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   async uploadBase64String(@Body() body: UploadBase64RequestDto) {
     return await this.s3File.uploadBase64String(body);
   }
@@ -184,6 +192,7 @@ export class AwsS3FileController {
   //*******************************/
 
   @Post("create-multipart")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @ApiResponse({ type: CreateMultipartUploadResponseDto })
   async createMultipartUpload(@Body() body: CreateMultipartUploadRequestDto) {
     return await this.s3File.createMultipartUpload(body);
@@ -211,6 +220,7 @@ export class AwsS3FileController {
   }
 
   @Post("complete-multipart")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @ApiOperation({ summary: "Complete a multipart upload" })
   @ApiResponse({ type: FileEntity })
   async completeMultipartUpload(@Body() body: CompleteMultipartUploadRequestDto) {
@@ -218,6 +228,7 @@ export class AwsS3FileController {
   }
 
   @Post("abort-multipart")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.S3File)
   @ApiOperation({ summary: "Abort a multipart upload" })
   @ApiResponse({ type: Object })
   async abortMultipartUpload(@Body() body: AbortMultipartUploadRequestDto) {

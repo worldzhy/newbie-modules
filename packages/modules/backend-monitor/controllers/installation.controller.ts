@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 import { CreateMonitorInstallationDto, ListMonitorInstallationsQueryDto } from "../monitor-installation.dto";
 import { MonitorInstallationService } from "../services/monitor-installation.service";
@@ -17,30 +19,35 @@ export class InstallationController {
   constructor(private readonly installations: MonitorInstallationService) {}
 
   @Post()
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Enroll a backend-monitor deployment installation" })
   create(@Body() body: CreateMonitorInstallationDto) {
     return this.installations.create(body);
   }
 
   @Get()
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "List backend-monitor installations" })
   list(@Query() query: ListMonitorInstallationsQueryDto) {
     return this.installations.list(query);
   }
 
   @Get(":id")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Get one backend-monitor installation" })
   get(@Param("id") id: string) {
     return this.installations.get(id);
   }
 
   @Post(":id/token/regenerate")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Rotate the report token (plaintext returned once)" })
   regenerate(@Param("id") id: string) {
     return this.installations.regenerateToken(id);
   }
 
   @Delete(":id")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Revoke an installation; subsequent ingest gets 401" })
   revoke(@Param("id") id: string) {
     return this.installations.revoke(id);

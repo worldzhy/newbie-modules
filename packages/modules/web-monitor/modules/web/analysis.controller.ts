@@ -8,8 +8,10 @@ import {
   WebMonitorWebTopDatasResponseDto,
 } from "./analysis.dto";
 import { WebMonitorEnvironmentResponseDto } from "./environment.dto";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / Web / Analysis")
+@RequireOwner()
 @Controller("/web-monitor/analysis")
 export class WebMonitorAnalysisController {
   constructor(private readonly analysisService: WebMonitorAnalysisService) {}

@@ -6,8 +6,10 @@ import { func } from "../../shared/utils";
 import { PvuvipService } from "./services/pvuvip.service";
 import { WebMonitorPvUvIpResponseDto } from "./pvuvip.dto";
 import parser from "cron-parser";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / Web / PvUvIp")
+@RequireOwner()
 @Controller("/web-monitor/pvuvip")
 export class PvuvipController {
   private cfg: Record<string, unknown>;

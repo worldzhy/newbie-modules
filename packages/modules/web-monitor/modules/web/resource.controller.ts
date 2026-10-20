@@ -2,8 +2,10 @@ import { Controller, Get, Query } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { ResourceService } from "./services/resource.service";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / Web / Resource")
+@RequireOwner()
 @Controller("/web-monitor/resource")
 export class ResourceController {
   constructor(private readonly resourceSrv: ResourceService) {}

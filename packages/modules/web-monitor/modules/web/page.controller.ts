@@ -8,8 +8,10 @@ import {
   ListWebMonitorPageVisitsResponseDto,
   WebMonitorRealTimePageItemResponseDto,
 } from "./page.dto";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / Web / Pages")
+@RequireOwner()
 @Controller("/web-monitor/pages")
 export class PageController {
   constructor(private readonly pageSrv: PageService) {}

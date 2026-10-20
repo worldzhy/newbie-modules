@@ -7,8 +7,10 @@ import {
   ListWebMonitorErrorMarkUsersResponseDto,
   ListWebMonitorErrorOnesResponseDto,
 } from "./error.dto";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / Web / Error")
+@RequireOwner()
 @Controller("/web-monitor/error")
 export class ErrorController {
   constructor(private readonly errorSrv: ErrorService) {}

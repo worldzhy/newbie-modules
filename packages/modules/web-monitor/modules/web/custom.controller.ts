@@ -3,8 +3,10 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { WebCustomService } from "./services/custom.service";
 import { ListWebMonitorCustomAveragesResponseDto, ListWebMonitorCustomFiltersResponseDto } from "./custom.dto";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / Web / Custom")
+@RequireOwner()
 @Controller("/web-monitor/custom")
 export class CustomController {
   constructor(private readonly webCustom: WebCustomService) {}

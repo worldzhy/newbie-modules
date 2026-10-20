@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Res, UploadedFile, UseInterceptors } from "@nestjs/common";
-import { Prisma } from "@generated/prisma/client";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { GoogleDriveFileService } from "@modules/googleapis/google-drive/google-drive-file.service";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiConsumes, ApiBody } from "@nestjs/swagger";
 import {
@@ -27,6 +28,7 @@ export class GoogleDriveFileController {
   ) {}
 
   @Post()
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.GoogleDriveFile)
   @ApiResponse({ type: ListGoogleDriveFilesResponseDto })
   async listFiles(@Body() body: ListGoogleDriveFilesRequestDto) {
     return await this.prisma.findManyInManyPages({
@@ -55,12 +57,14 @@ export class GoogleDriveFileController {
   }
 
   @Post("folder")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.GoogleDriveFile)
   @ApiResponse({ type: CreateGoogleDriveFileResponseDto })
   async createFolder(@Body() body: CreateGoogleDriveFileRequestDto) {
     return await this.googleDriveFile.createFolder(body);
   }
 
   @Post("document")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.GoogleDriveFile)
   @ApiResponse({ type: CreateGoogleDriveFileResponseDto })
   async createDocument(@Body() body: CreateGoogleDriveFileRequestDto) {
     return await this.googleDriveFile.createDocument({
@@ -70,6 +74,7 @@ export class GoogleDriveFileController {
   }
 
   @Post("spreadsheet")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.GoogleDriveFile)
   @ApiResponse({ type: CreateGoogleDriveFileResponseDto })
   async createSpreadsheet(@Body() body: CreateGoogleDriveFileRequestDto) {
     return await this.googleDriveFile.createSheet({
@@ -79,12 +84,14 @@ export class GoogleDriveFileController {
   }
 
   @Patch(":fileId/rename")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.GoogleDriveFile)
   @ApiResponse({ type: RenameGoogleDriveFileResponseDto })
   async renameFile(@Param() params: GetGoogleDriveFileRequestDto, @Body() body: RenameGoogleDriveFileRequestDto) {
     return await this.googleDriveFile.renameFile({ fileId: params.fileId, name: body.name });
   }
 
   @Delete(":fileId")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.GoogleDriveFile)
   @ApiOperation({ summary: "Delete a Google Drive file" })
   @ApiResponse({ type: CreateGoogleDriveFileResponseDto })
   async deleteFile(@Param() params: GetGoogleDriveFileRequestDto) {
@@ -92,6 +99,7 @@ export class GoogleDriveFileController {
   }
 
   @Get(":fileId/download")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.GoogleDriveFile)
   @ApiOperation({ summary: "Download a file from Google Drive via service account" })
   @ApiResponse({ status: 200, description: "File stream" })
   async downloadFile(@Param() params: GetGoogleDriveFileRequestDto, @Res() res: Response) {
@@ -99,6 +107,7 @@ export class GoogleDriveFileController {
   }
 
   @Get(":fileId/path")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.GoogleDriveFile)
   @ApiResponse({ type: GetFilePathResponseDto, isArray: true })
   async getFilePath(@Param() params: GetGoogleDriveFileRequestDto) {
     return await this.googleDriveFile.getFilePath(params.fileId);

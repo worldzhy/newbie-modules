@@ -10,9 +10,11 @@ import {
   ListShortcutGroupsResponseDto,
 } from "./shortcut-group.dto";
 import { ShortcutGroupEntity } from "./shortcut.entity";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Shortcut")
 @ApiBearerAuth()
+@RequireOwner()
 @Controller("shortcut-groups")
 export class ShortcutGroupController {
   constructor(private readonly prisma: PrismaService) {}

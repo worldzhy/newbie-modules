@@ -1,7 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { Prisma } from "@generated/prisma/client";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { GoogleDrivePermissionService } from "@modules/googleapis/google-drive/google-drive-permission.service";
 import {
   CreateGoogleDrivePermissionRequestDto,
@@ -21,6 +22,7 @@ export class GoogleDrivePermissionController {
   ) {}
 
   @Get()
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.GoogleDrivePermission)
   @ApiResponse({ type: ListGoogleDrivePermissionsResponseDto })
   async listPermissions(@Query() query: ListGoogleDrivePermissionsRequestDto) {
     return await this.prisma.findManyInOnePage({
@@ -30,12 +32,14 @@ export class GoogleDrivePermissionController {
   }
 
   @Post()
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.GoogleDrivePermission)
   @ApiResponse({ type: CreateGoogleDrivePermissionResponseDto })
   async createPermission(@Body() body: CreateGoogleDrivePermissionRequestDto) {
     return await this.googleDrivePermission.createPermission(body);
   }
 
   @Delete(":permissionId")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.GoogleDrivePermission)
   @ApiOperation({ summary: "Delete a Google Drive permission" })
   @ApiResponse({ type: CreateGoogleDrivePermissionResponseDto })
   async deletePermission(@Param() params: GetGoogleDrivePermissionRequestDto) {

@@ -5,6 +5,7 @@ import { CookieName, CookieService } from "@modules/security/cookie/cookie.servi
 import { TokenService } from "@modules/security/token/token.service";
 import { LimitLoginByUserService } from "@modules/security/rate-limiter/rate-limiter.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 import { LogoutResponseDto } from "@modules/account/auth/auth.dto";
 
 @ApiTags("Account / Auth")
@@ -18,6 +19,7 @@ export class LogoutController {
   ) {}
 
   @Post("logout")
+  @RequireOwner()
   @ApiBearerAuth()
   @ApiOperation({ summary: "Logout the current user" })
   @ApiResponse({ type: LogoutResponseDto })

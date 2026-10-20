@@ -1,6 +1,8 @@
 import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { JwtAuthGuard } from "@modules/security/authentication/jwt/jwt.guard";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { TaskParticipantService } from "./task-participant.service";
 import { LookupParticipantQueryDto, TaskParticipantDataResponseDto, ListTaskParticipantsResponseDto } from "./task.dto";
 
@@ -12,6 +14,7 @@ export class TaskParticipantController {
   constructor(private readonly taskParticipantService: TaskParticipantService) {}
 
   @Get()
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.TaskParticipant)
   @ApiOperation({ summary: "List all task participants" })
   @ApiResponse({ status: 200, type: ListTaskParticipantsResponseDto })
   async listParticipants(): Promise<ListTaskParticipantsResponseDto> {
@@ -20,6 +23,7 @@ export class TaskParticipantController {
   }
 
   @Get("by-identity")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.TaskParticipant)
   @ApiOperation({ summary: "Look up a participant by identity source and external ID" })
   @ApiResponse({ status: 200, type: TaskParticipantDataResponseDto })
   async getParticipantByIdentity(@Query() query: LookupParticipantQueryDto): Promise<TaskParticipantDataResponseDto> {

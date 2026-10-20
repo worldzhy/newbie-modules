@@ -2,8 +2,10 @@ import { Controller, Post, Body } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { RemoveService, type CustomDeleteFilter } from "./remove.service";
 import { func } from "../../shared/utils";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 
 @ApiTags("Frontend Monitor / Remove")
+@RequireOwner()
 @Controller("/web-monitor/remove")
 export class RemoveController {
   constructor(private readonly removeService: RemoveService) {}

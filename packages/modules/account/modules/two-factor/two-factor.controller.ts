@@ -1,6 +1,7 @@
 import { Body, Controller, Post, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { UserRequest } from "@modules/security/security.interface";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
 import { DisableTwoFactorDto, EnableTwoFactorDto } from "./two-factor.dto";
 import { TwoFactorService } from "./two-factor.service";
@@ -15,6 +16,7 @@ export class TwoFactorController {
   ) {}
 
   @Post("setup")
+  @RequireOwner()
   @ApiOperation({ summary: "Begin TOTP enrollment; returns QR code and secret" })
   @ApiResponse({ status: 200, description: "Pending enrollment with QR code data URL." })
   async setup(@Req() request: UserRequest) {
@@ -22,6 +24,7 @@ export class TwoFactorController {
   }
 
   @Post("enable")
+  @RequireOwner()
   @ApiOperation({ summary: "Confirm TOTP code and enable two-factor authentication" })
   async enable(@Req() request: UserRequest, @Body() body: EnableTwoFactorDto) {
     const result = await this.twoFactorService.enable(request.user.userId, body.code);
@@ -34,6 +37,7 @@ export class TwoFactorController {
   }
 
   @Post("disable")
+  @RequireOwner()
   @ApiOperation({ summary: "Disable two-factor authentication" })
   async disable(@Req() request: UserRequest, @Body() body: DisableTwoFactorDto) {
     await this.twoFactorService.disable(request.user.userId, body);

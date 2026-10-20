@@ -17,6 +17,7 @@ export class LlmScopeController {
   constructor(private readonly scopes: LlmScopeService) {}
 
   @Get()
+  @RequirePermission("List", "LlmScopeAssignment")
   @ApiOperation({ summary: "List all scope-to-connection bindings" })
   @ApiResponse({ status: 200, type: [LlmScopeBindingResponseDto] })
   async list(): Promise<LlmScopeBindingResponseDto[]> {
