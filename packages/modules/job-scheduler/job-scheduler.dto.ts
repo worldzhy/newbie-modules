@@ -21,7 +21,7 @@ export class JobScheduleDto {
   timezone!: string;
 
   @ApiProperty()
-  enabled!: boolean;
+  isEnabled!: boolean;
 
   @ApiProperty({ type: Object, required: false, nullable: true })
   payload?: unknown;
@@ -66,7 +66,7 @@ export class UpdateJobScheduleDto {
   @ApiProperty({ required: false, description: "Enable or pause the schedule" })
   @IsOptional()
   @IsBoolean()
-  enabled?: boolean;
+  isEnabled?: boolean;
 
   @ApiProperty({ required: false, description: "Cron expression, e.g. 0 3 * * *" })
   @IsOptional()

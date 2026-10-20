@@ -11,7 +11,7 @@
 // at startup (a Notification subclass registering itself through
 // NotificationRegistryService) and NotificationSettingService persists one
 // row per key. The database row wins for runtime-editable fields
-// (defaultSeverity, pushEnabled): declarations only create
+// (defaultSeverity, isPushEnabled): declarations only create
 // missing rows, never override operator edits.
 model NotificationSetting {
   key            String    @id @db.VarChar(100)
@@ -23,7 +23,7 @@ model NotificationSetting {
   defaultSeverity String   @db.VarChar(10)
   // Per-notification push master switch; the center master switch must also
   // be on for a push to fire.
-  pushEnabled    Boolean   @default(true)
+  isPushEnabled  Boolean   @default(true)
   // Delivery scope: "system" notifications are platform-wide and pushed
   // through the host-provided push port; "project" notifications are routed
   // to the owning project's bound chats by the host.
@@ -92,8 +92,8 @@ model NotificationCenterSetting {
 
   // Master switch for chat push through the host-provided push port. A
   // notification push only fires when both this switch and the notification's
-  // own pushEnabled are on.
-  pushEnabled Boolean @default(false)
+  // own isPushEnabled are on.
+  isPushEnabled Boolean @default(false)
   // Notifications below this severity are dropped before delivery.
   minimumSeverity String @default("high") @db.VarChar(10)
 

@@ -127,7 +127,7 @@ export class AwsSecretsManagerController {
       {
         projectId: body.projectId,
         region: body.region,
-        enabled: body.enabled,
+        isEnabled: body.isEnabled,
         ...(body.days !== undefined ? { days: body.days } : {}),
       },
       () => this.secretsService.setRotation(body.projectId, name, body),

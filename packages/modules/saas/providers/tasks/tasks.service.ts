@@ -44,7 +44,7 @@ export class TasksService {
     const deleted = await this.prisma.user.findMany({
       select: { id: true },
       where: {
-        active: false,
+        isActive: false,
         sessions: { every: { updatedAt: { lte: now } } },
       },
     });

@@ -24,7 +24,7 @@ export class JobSchedulerController {
   }
 
   @Patch("schedules/:key")
-  @ApiOperation({ summary: "Update runtime-editable fields (enabled, cronExpr, timezone) of a job schedule" })
+  @ApiOperation({ summary: "Update runtime-editable fields (isEnabled, cronExpr, timezone) of a job schedule" })
   @ApiResponse({ status: 200, type: JobScheduleDto })
   updateSchedule(@Param("key") key: string, @Body() body: UpdateJobScheduleDto): Promise<JobScheduleDto> {
     return this.jobScheduler.updateSchedule(key, body ?? {}) as Promise<JobScheduleDto>;

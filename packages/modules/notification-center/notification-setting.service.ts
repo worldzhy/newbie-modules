@@ -14,7 +14,7 @@ export interface NotificationSettingListItem {
   titleTemplate: string;
   detailTemplate: string | null;
   defaultSeverity: string;
-  pushEnabled: boolean;
+  isPushEnabled: boolean;
   scope: string;
 }
 
@@ -43,7 +43,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
   /**
    * Persist default settings for every notification registered in memory. Only
    * rows that do not exist yet are created; existing rows (including their
-   * runtime-edited defaultSeverity / pushEnabled) are left untouched so
+   * runtime-edited defaultSeverity / isPushEnabled) are left untouched so
    * operator edits survive restarts.
    */
   async reconcileDeclarations(): Promise<void> {
@@ -60,7 +60,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
             titleTemplate: declared.titleTemplate,
             detailTemplate: declared.detailTemplate ?? null,
             defaultSeverity: declared.defaultSeverity,
-            pushEnabled: declared.defaultPushEnabled ?? DEFAULT_NOTIFICATION_PUSH_ENABLED,
+            isPushEnabled: declared.defaultPushEnabled ?? DEFAULT_NOTIFICATION_PUSH_ENABLED,
             scope: declared.scope ?? DEFAULT_NOTIFICATION_SCOPE,
           },
         });
@@ -80,7 +80,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       titleTemplate: row.titleTemplate,
       detailTemplate: row.detailTemplate,
       defaultSeverity: row.defaultSeverity,
-      pushEnabled: row.pushEnabled,
+      isPushEnabled: row.isPushEnabled,
       scope: row.scope,
     }));
   }
@@ -89,7 +89,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
     key: string,
     updates: {
       defaultSeverity?: string;
-      pushEnabled?: boolean;
+      isPushEnabled?: boolean;
     },
   ): Promise<NotificationSettingListItem> {
     const row = await this.prisma.notificationSetting.findUnique({ where: { key } });
@@ -107,7 +107,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       where: { key },
       data: {
         ...(updates.defaultSeverity !== undefined ? { defaultSeverity: updates.defaultSeverity } : {}),
-        ...(updates.pushEnabled !== undefined ? { pushEnabled: updates.pushEnabled } : {}),
+        ...(updates.isPushEnabled !== undefined ? { isPushEnabled: updates.isPushEnabled } : {}),
       },
     });
 
@@ -117,7 +117,7 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       titleTemplate: updated.titleTemplate,
       detailTemplate: updated.detailTemplate,
       defaultSeverity: updated.defaultSeverity,
-      pushEnabled: updated.pushEnabled,
+      isPushEnabled: updated.isPushEnabled,
       scope: updated.scope,
     };
   }

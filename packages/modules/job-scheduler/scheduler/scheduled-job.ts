@@ -16,7 +16,7 @@ export abstract class ScheduledJob implements OnModuleInit {
   /// Optional override; defaults to the platform timezone when not declared.
   protected readonly timezone: string = DEFAULT_TIMEZONE;
   protected abstract readonly cronExpr: string;
-  protected abstract readonly enabled: boolean;
+  protected abstract readonly isEnabled: boolean;
   protected abstract readonly logger: Logger;
 
   @Inject(JobSchedulerService)
@@ -33,7 +33,7 @@ export abstract class ScheduledJob implements OnModuleInit {
       handlerKey: this.key,
       cronExpr: this.cronExpr,
       timezone: this.timezone,
-      enabled: this.enabled,
+      isEnabled: this.isEnabled,
     });
   }
 

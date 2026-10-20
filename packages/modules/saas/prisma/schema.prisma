@@ -38,7 +38,7 @@ model User {
     twoFactorSecret      String?
     attributes           Json?
     updatedAt            DateTime             @updatedAt
-    active               Boolean              @default(true)
+    isActive             Boolean              @default(true)
     prefersEmail         Email?               @relation("userPrefersEmail", fields: [prefersEmailId], references: [id])
     apiKeys              ApiKey[]             @relation("userApiKey")
     approvedSubnets      ApprovedSubnet[]     @relation("userApprovedSubnet")

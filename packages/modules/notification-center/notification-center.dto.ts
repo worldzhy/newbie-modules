@@ -159,7 +159,7 @@ export class NotificationSettingDto {
   defaultSeverity!: string;
 
   @ApiProperty()
-  pushEnabled!: boolean;
+  isPushEnabled!: boolean;
 
   @ApiProperty({
     enum: NOTIFICATION_SCOPES,
@@ -179,7 +179,7 @@ export class UpdateNotificationSettingDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  pushEnabled?: boolean;
+  isPushEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -188,7 +188,7 @@ export class UpdateNotificationSettingDto {
 
 export class NotificationCenterSettingDto {
   @ApiProperty({ description: "Master switch for chat push through the host-provided push adapter" })
-  pushEnabled!: boolean;
+  isPushEnabled!: boolean;
 
   @ApiProperty({ enum: SEVERITIES })
   minimumSeverity!: string;
@@ -198,7 +198,7 @@ export class UpdateNotificationCenterSettingDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsBoolean()
-  pushEnabled?: boolean;
+  isPushEnabled?: boolean;
 
   @ApiProperty({ required: false, enum: SEVERITIES })
   @IsOptional()

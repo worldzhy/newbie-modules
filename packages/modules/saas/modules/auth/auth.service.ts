@@ -122,10 +122,10 @@ export class AuthService {
       },
     });
 
-    if (!user.active)
+    if (!user.isActive)
       await this.prisma.user.update({
         where: { id: user.id },
-        data: { active: true },
+        data: { isActive: true },
       });
     if (!user.emails.find((i) => i.emailSafe === emailSafe)?.isVerified)
       throw new UnauthorizedException(UNVERIFIED_EMAIL);
@@ -796,7 +796,7 @@ export class AuthService {
       "gender",
       "name",
       "notificationEmails",
-      "active",
+      "isActive",
       "prefersLanguage",
       "prefersColorScheme",
       "prefersReducedMotion",

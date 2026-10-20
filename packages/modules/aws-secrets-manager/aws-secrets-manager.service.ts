@@ -206,10 +206,10 @@ export class AwsSecretsManagerService {
     return this.getSecret(projectId, name, region);
   }
 
-  async setRotation(projectId: string, name: string, data: { enabled: boolean; days?: number; region?: string }) {
+  async setRotation(projectId: string, name: string, data: { isEnabled: boolean; days?: number; region?: string }) {
     const { client, region } = await this.getProjectContext(projectId, data.region);
 
-    if (data.enabled) {
+    if (data.isEnabled) {
       const lambdaArn = await this.getRotationLambdaArn(projectId);
       if (!lambdaArn) {
         throw new BadRequestException(
@@ -309,7 +309,7 @@ export class AwsSecretsManagerService {
       description: entry.Description ?? null,
       type: type && (SECRET_TYPES as readonly string[]).includes(type) ? (type as SecretType) : null,
       region,
-      rotationEnabled: entry.RotationEnabled ?? false,
+      isRotationEnabled: entry.RotationEnabled ?? false,
       rotationLambdaArn: entry.RotationLambdaARN ?? null,
       rotationRules: entry.RotationRules ?? null,
       lastRotatedAt: entry.LastRotatedDate ?? null,

@@ -7,11 +7,11 @@ General-purpose in-process scheduling platform. Business code registers job hand
 1. **Register job handlers**: business modules inject `JobHandlerRegistryService` and call `registerHandler(key, fn)` at startup; `fn` has signature `(payload?: unknown) => Promise<void>`.
 2. **Declare default schedules**: inject `JobSchedulerService` and call `upsertScheduleDeclaration({ key, handlerKey, cronExpr, timezone })`. Declarations only create missing rows. At runtime schedules can be paused or their cron changed in the database; restarts do not overwrite them.
 
-As a convenience, a concrete scheduled job can instead extend the abstract `ScheduledJob` base class (from `scheduler/scheduled-job.ts`): declare `key`/`cronExpr`/`timezone`/`enabled` and implement `handle()`; the base class registers the job handler and declares the schedule on module init.
+As a convenience, a concrete scheduled job can instead extend the abstract `ScheduledJob` base class (from `scheduler/scheduled-job.ts`): declare `key`/`cronExpr`/`timezone`/`isEnabled` and implement `handle()`; the base class registers the job handler and declares the schedule on module init.
 
 3. **Reconcile**: every 30 seconds the scheduler syncs enabled schedules into dynamic cron jobs (`@nestjs/schedule` + `cron`); disabled or deleted schedules are removed.
 4. **Execution and reentrancy guard**: when due, the corresponding job handler fires; if the previous run of the same schedule has not finished, the current run is recorded as `skipped` (in-process reentrancy guard, no distributed lock). Manual triggers go through `POST /job-scheduler/schedules/:key/trigger`.
-5. **Runtime editing**: `PATCH /job-scheduler/schedules/:key` can change `enabled` / `cronExpr` / `timezone` (invalid cron/timezone returns 400). Changes trigger an immediate reconcile without waiting for the next 30s tick; `key`/`handlerKey`/`payload` remain owned by the declaration side.
+5. **Runtime editing**: `PATCH /job-scheduler/schedules/:key` can change `isEnabled` / `cronExpr` / `timezone` (invalid cron/timezone returns 400). Changes trigger an immediate reconcile without waiting for the next 30s tick; `key`/`handlerKey`/`payload` remain owned by the declaration side.
 6. **Execution history**: `JobRun` records trigger (schedule/manual), status (running/success/failed/skipped), duration, and error message.
 
 ## Assembly conventions
