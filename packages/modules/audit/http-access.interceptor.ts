@@ -34,11 +34,19 @@ export class HttpAccessInterceptor implements NestInterceptor {
   private static readonly MUTATING_METHODS = ["POST", "PUT", "PATCH", "DELETE"];
 
   /**
-   * Excluded path prefixes:
-   * - /api/v1: web monitoring SDK telemetry ingestion
-   * - /heartbeat/ping: agent liveness pings
+   * Excluded path prefixes — collector ingestion and liveness endpoints only.
+   * These are high-volume machine-to-machine routes authenticated by
+   * installation token (never user JWT), with their own data stores; they
+   * produce neither access-log lines nor audit-table rows. All dashboard
+   * queries and installation-management endpoints remain audited.
    */
-  private static readonly EXCLUDED_PATH_PREFIXES = ["/api/v1", "/heartbeat/ping"];
+  private static readonly EXCLUDED_PATH_PREFIXES = [
+    "/web-monitor/report",
+    "/module-hub/report",
+    "/backend-monitor/ingest",
+    "/health/snapshot",
+    "/heartbeat/ping",
+  ];
 
   private readonly logger = new Logger("HttpAccess");
 
