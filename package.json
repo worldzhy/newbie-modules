@@ -4,9 +4,9 @@
   "private": true,
   "description": "Monorepo registry of newbie backend modules consumed by @devbie/newbie-cli",
   "scripts": {
-    "import": "node scripts/import-modules.mjs",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "import": "node scripts/import-modules.mjs"
   },
   "devDependencies": {
     "prettier": "^3.9.9"
