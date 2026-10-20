@@ -9,7 +9,7 @@ import {
 } from "./ajax.dto";
 
 @ApiTags("Frontend Monitor / Web / Ajax")
-@Controller("/api/v1/ajax")
+@Controller("/web-monitor/ajax")
 export class AjaxController {
   constructor(private readonly ajax: AjaxService) {}
 

@@ -22,7 +22,7 @@ import { ResolvedWebToken, WebTokenResolver } from "../../services/web-token.res
  * throttled.
  */
 @ApiTags("Frontend Monitor / Web / Report")
-@Controller("/api/v1")
+@Controller("/web-monitor")
 export class WebReportController {
   private config: Record<string, unknown>;
 
@@ -36,7 +36,7 @@ export class WebReportController {
     this.config = this.configService.get("modules.web-monitor") || {};
   }
 
-  @Post("/report/web")
+  @Post("/report")
   @InstallationAuth("web-monitor")
   @PublicCors()
   @ApiOperation({ summary: "Web SDK data report endpoint" })

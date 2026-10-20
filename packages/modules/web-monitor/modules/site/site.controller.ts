@@ -5,7 +5,7 @@ import { func } from "../../shared/utils";
 import { WebMonitorSiteResponseDto } from "./site.dto";
 
 @ApiTags("Frontend Monitor / System")
-@Controller("/api/v1/system")
+@Controller("/web-monitor/system")
 export class SiteController {
   constructor(private readonly site: SiteService) {}
 
@@ -41,7 +41,7 @@ export class SiteController {
     return func.result({ data: result });
   }
 
-  @Get("/web/list")
+  @Get("/list")
   @ApiOperation({ summary: "Get web system list" })
   @ApiResponse({ type: WebMonitorSiteResponseDto, isArray: true })
   async getWebSiteList() {

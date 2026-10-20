@@ -5,7 +5,7 @@ import { EnvironmentService } from "./services/environment.service";
 import { WebMonitorEnvironmentGroupByItemResponseDto, WebMonitorEnvironmentResponseDto } from "./environment.dto";
 
 @ApiTags("Frontend Monitor / Web / Environment")
-@Controller("/api/v1/environment")
+@Controller("/web-monitor/environment")
 export class EnvironmentController {
   constructor(private readonly envSrv: EnvironmentService) {}
 
