@@ -108,6 +108,8 @@ export interface LarkWebhookBody {
   event?: LarkMessageEvent;
   challenge?: string;
   type?: string;
+  /** Root verification token on legacy (v1) url_verification requests. */
+  token?: string;
   encrypt?: string;
   /** Present on card-action callbacks (no header.event_type). */
   action?: LarkCardAction;

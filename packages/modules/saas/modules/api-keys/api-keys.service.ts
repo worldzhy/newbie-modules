@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@prisma/client";
 import { ApiKey } from "@prisma/client";
@@ -13,6 +13,8 @@ import { LRUCache } from "lru-cache";
 
 @Injectable()
 export class ApiKeysService {
+  private readonly logger = new Logger(ApiKeysService.name);
+
   private lru;
 
   constructor(
@@ -313,7 +315,9 @@ export class ApiKeysService {
             id: item._id,
           }),
         );
-      } catch (error) {}
+      } catch (error) {
+        this.logger.warn(`Failed to parse API key usage records from Elasticsearch: ${error}`);
+      }
     }
 
     return [];

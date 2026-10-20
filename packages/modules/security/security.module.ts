@@ -28,15 +28,12 @@ import {
   LimitLoginByUserService,
   LimitTotpLoginByUserService,
 } from "./rate-limiter/rate-limiter.service";
-import { RouteAuthenticationService } from "./authentication/route-authentication.service";
-
-import { RouteAuthenticationGuard } from "./authentication/route-authentication.guard";
 import { SelfOnlyGuard } from "./self-only/self-only.guard";
 
 /**
  * Foundation security machinery: the global guard pipeline, authentication
  * mechanisms (none/JWT/API-key strategies under ./authentication),
- * token/cookie services, rate limiting and route-level auth configuration.
+ * token/cookie services and rate limiting.
  *
  * Identity-specific strategies (password, verification-code, refresh-token,
  * Google) and all data access live in the identity provider module (account),
@@ -46,11 +43,9 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
 @Module({
   imports: [CookieModule, TokenModule, DiscoveryModule],
   providers: [
-    RouteAuthenticationService,
     { provide: APP_GUARD, useClass: RateLimiterGuard }, // 1st priority guard.
     { provide: APP_GUARD, useClass: AuthenticationGuard }, // 2nd priority guard.
-    { provide: APP_GUARD, useClass: RouteAuthenticationGuard }, // 3rd priority guard (specific route auth)
-    { provide: APP_GUARD, useClass: AuthorizationGuard }, // 4th priority guard.
+    { provide: APP_GUARD, useClass: AuthorizationGuard }, // 3rd priority guard.
     NoAuthGuard,
     ApiKeyAuthGuard,
     GoogleAuthGuard,
@@ -78,7 +73,6 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
     LimitLoginByUserService,
     LimitInstallationByTokenService,
     LimitTotpLoginByUserService,
-    RouteAuthenticationService,
     TokenModule,
     CookieModule,
     JwtAuthGuard,

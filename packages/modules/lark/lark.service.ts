@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { GetChatHistoryRequestDto, SendTextDto, SendCardDto, UpdateCardDto } from "./lark.dto";
@@ -141,16 +141,17 @@ export class LarkService {
   /**
    * Main webhook entry point. Dispatches to specialized handlers based on
    * payload shape. Deduplicates by event_id so Lark redeliveries are no-ops.
+   *
+   * Source verification: encrypted callbacks authenticate via the encrypt key
+   * (only key holders can produce valid ciphertext). Plain callbacks must
+   * carry the app's Verification Token — in the v2 event header or the root
+   * `token` field of legacy url_verification requests. Missing configuration
+   * fails closed; a mismatching token is rejected.
    */
   async handleWebhook(body: LarkWebhookBody): Promise<unknown> {
-    // 1. URL verification challenge (no event_id, never dedup).
-    if (body.type === "url_verification" || body.header?.event_type === "url_verification") {
-      this.logger.log("Received URL verification challenge");
-      return { challenge: body.challenge };
-    }
-
-    // 2. Encrypted event — decrypt and re-dispatch (the decrypted body has no
-    //    `encrypt` field, so this cannot loop).
+    // 1. Encrypted event — decrypt and re-dispatch (the decrypted body has no
+    //    `encrypt` field, so this cannot loop). The decrypted body re-enters
+    //    handleWebhook and passes the plain-callback token check below.
     if (body.encrypt) {
       const encryptKey = this.configService.get<string>("modules.lark.encryptKey");
       if (!encryptKey) {
@@ -168,7 +169,27 @@ export class LarkService {
       return this.handleWebhook(decrypted as LarkWebhookBody);
     }
 
-    // 3. Card action (button click on an interactive card). Card actions do
+    // 2. Verification-token check for plain callbacks, aligned with the
+    //    module-hub webhook standard: missing configuration fails closed.
+    const expectedToken = this.configService.get<string>("modules.lark.verificationToken");
+    if (!expectedToken) {
+      throw new ServiceUnavailableException(
+        "Lark webhook is not configured (LARK_VERIFICATION_TOKEN missing); plain events are rejected.",
+      );
+    }
+    const providedToken = body.header?.token ?? body.token;
+    if (providedToken !== expectedToken) {
+      this.logger.warn("Rejected a Lark webhook callback with an invalid verification token");
+      throw new UnauthorizedException("Lark webhook verification token mismatch.");
+    }
+
+    // 3. URL verification challenge (no event_id, never dedup).
+    if (body.type === "url_verification" || body.header?.event_type === "url_verification") {
+      this.logger.log("Received URL verification challenge");
+      return { challenge: body.challenge };
+    }
+
+    // 4. Card action (button click on an interactive card). Card actions do
     //    not carry header.event_type; they have `action` at the root.
     //    No dedup here: card callbacks carry only the card's open_message_id
     //    (identical across repeat clicks), so dedup would swallow legitimate

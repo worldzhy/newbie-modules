@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { isEmpty } from "lodash";
 import { GooglePlacesService } from "./google-places.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -15,6 +15,8 @@ enum ELocationType {
 
 @Injectable()
 export class LocationsService {
+  private readonly logger = new Logger(LocationsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private googlePlacesService: GooglePlacesService,
@@ -113,7 +115,9 @@ export class LocationsService {
               tValue = tValue?.toLowerCase();
               try {
                 tValue = normalize(tValue)?.toLowerCase();
-              } catch (error) {}
+              } catch (error) {
+                this.logger.warn(`Failed to normalize state text "${tValue}"; using the raw value instead`);
+              }
               const sValue = state?.toLowerCase();
               let $state = state;
               try {

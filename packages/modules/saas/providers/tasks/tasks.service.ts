@@ -68,7 +68,9 @@ export class TasksService {
     for await (const domain of domains) {
       try {
         await this.domainsService.verifyDomain(domain.teamId, domain.id);
-      } catch (error) {}
+      } catch (error) {
+        this.logger.warn(`Failed to verify domain ${domain.id} (team ${domain.teamId}): ${error}`);
+      }
     }
   }
 

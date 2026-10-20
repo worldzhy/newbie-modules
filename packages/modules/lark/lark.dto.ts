@@ -94,6 +94,11 @@ export class LarkWebhookDto {
   @IsOptional()
   type?: string;
 
+  /** Root verification token on legacy (v1) url_verification requests. */
+  @ApiProperty()
+  @IsOptional()
+  token?: string;
+
   @ApiProperty()
   @IsOptional()
   encrypt?: string;

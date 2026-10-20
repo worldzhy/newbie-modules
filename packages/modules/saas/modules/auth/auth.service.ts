@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   NotFoundException,
   UnauthorizedException,
   UnprocessableEntityException,
@@ -69,6 +70,8 @@ import { AwsSesService } from "@modules/aws-ses/aws-ses.service";
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   authenticator: typeof authenticator;
 
   constructor(
@@ -179,7 +182,9 @@ export class AuthService {
         }>(`https://api.genderize.io/?name=${data.name.split(" ")[0]}`);
         if (prediction.data.probability > 0.5 && prediction.data.gender === "male") data.gender = "MALE";
         if (prediction.data.probability > 0.5 && prediction.data.gender === "female") data.gender = "FEMALE";
-      } catch (error) {}
+      } catch (error) {
+        this.logger.warn(`Gender prediction lookup failed: ${error}`);
+      }
     }
 
     if (this.configService.get<boolean>("modules.saas.gravatar.enabled")) {
@@ -191,7 +196,9 @@ export class AuthService {
           });
 
           if (img.data.byteLength > 1) data.profilePictureUrl = `https://www.gravatar.com/avatar/${md5Email}?d=mp`;
-        } catch (error) {}
+        } catch (error) {
+          this.logger.warn(`Gravatar availability check failed: ${error}`);
+        }
       }
     }
 
@@ -766,7 +773,9 @@ export class AuthService {
       }>(MERGE_ACCOUNTS_TOKEN, token);
       baseUserId = result.baseUserId;
       mergeUserId = result.mergeUserId;
-    } catch (error) {}
+    } catch (error) {
+      this.logger.warn(`Failed to verify merge-accounts token: ${error}`);
+    }
     if (!baseUserId || !mergeUserId) throw new BadRequestException(USER_NOT_FOUND);
     return this.merge(baseUserId, mergeUserId);
   }
