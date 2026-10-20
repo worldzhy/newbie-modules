@@ -11,6 +11,7 @@ import { AuthModule } from "./auth/auth.module";
 import { ApiKeyModule } from "./modules/api-key/api-key.module";
 import { ApprovedSubnetModule } from "./modules/approved-subnet/approved-subnet.module";
 import { PermissionModule } from "./modules/permission/permission.module";
+import { RoleModule } from "./modules/role/role.module";
 import { SessionModule } from "./modules/session/session.module";
 import { TwoFactorModule } from "./modules/two-factor/two-factor.module";
 import { UserModule } from "./modules/user/user.module";
@@ -29,6 +30,7 @@ import { AccountLoginAccountResolver } from "./security-ports/login-account.reso
     ApiKeyModule,
     ApprovedSubnetModule,
     PermissionModule,
+    RoleModule,
     SessionModule,
     TwoFactorModule,
     UserModule,
