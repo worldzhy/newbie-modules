@@ -52,7 +52,8 @@ import { OwnershipGuard } from "./authorization/ownership.guard";
     { provide: APP_GUARD, useClass: RateLimiterGuard }, // 1st priority guard.
     { provide: APP_GUARD, useClass: AuthenticationGuard }, // 2nd priority guard.
     { provide: APP_GUARD, useClass: AuthorizationGuard }, // 3rd priority guard.
-    { provide: APP_GUARD, useClass: OwnershipGuard }, // 4th priority guard.
+    OwnershipGuard,
+    { provide: APP_GUARD, useExisting: OwnershipGuard }, // 4th priority guard.
     NoAuthGuard,
     ApiKeyAuthGuard,
     GoogleAuthGuard,
