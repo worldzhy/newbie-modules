@@ -54,8 +54,8 @@ export class GoogleDriveFileService {
   async getFile(name: string) {
     const file = await this.prisma.googleDriveFile.findFirst({ where: { name } });
     if (file) {
-      const response = await this.client.files.get({ fileId: file.id, supportsAllDrives: true });
-      this.logger.log("getFile response", JSON.stringify(response?.data ?? {}));
+      await this.client.files.get({ fileId: file.id, supportsAllDrives: true });
+      this.logger.log(`getFile: fetched Drive metadata for "${name}" (id: ${file.id})`);
     }
 
     return file;

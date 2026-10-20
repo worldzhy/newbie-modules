@@ -9,7 +9,7 @@ The authentication method is selected at construction time by config priority:
 1. **GitHub App mode**: when `appId` + `privateKey` + `installationId` are all present, uses `createAppAuth` from `@octokit/auth-app` and mints an installation token per request. Recommended for production (scoped, revocable, not tied to a personal account).
 2. **PAT mode**: when only `auth` (PAT / personal token) is present, uses `auth: token`. For migration / single-user scenarios.
 
-When neither is present, `octokit` is still constructed but logs a warning; method calls will fail due to missing credentials. Use `isConfigured()` for an upfront check.
+When neither is present, no Octokit client is constructed and a warning is logged; any API method call then throws `GitHubNotConfiguredError` (rather than a bare `TypeError`). Use `isConfigured()` for an upfront check.
 
 ## env
 
@@ -31,6 +31,8 @@ When neither is present, `octokit` is still constructed but logs a warning; meth
 | `deleteRepo(org, repo)`                                        | best-effort repo deletion; 404 is ignored. Used for teardown cleanup                                                                                                                                                                                      |
 
 `RepoNameConflictError` is thrown when the generate call in `ensureRepoExists` returns 422, meaning the repository name is occupied by a repository not owned by the caller.
+
+`GitHubNotConfiguredError` is thrown by every API method when the service was constructed without credentials (neither the App triplet nor a PAT), so an unconfigured deployment fails fast with a meaningful error.
 
 ## Out of scope
 

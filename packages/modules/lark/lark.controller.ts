@@ -30,9 +30,11 @@ export class LarkController {
 
   /**
    * Lark pushes message events to this callback. There is no human user
-   * session to attach a JWT to; Lark is the caller and identifies itself via
-   * the app_id / tenant_key in the payload. @NoGuard() opens the endpoint so
-   * the global default JWT guard does not reject these callbacks with 401.
+   * session to attach a JWT to; Lark is the caller and authenticates itself
+   * via the Verification Token carried in every plain callback (and via the
+   * encrypt key for encrypted callbacks) — see LarkService.handleWebhook.
+   * @NoGuard() opens the endpoint so the global default JWT guard does not
+   * reject these callbacks with 401.
    */
   @Post("webhook")
   @ApiOperation({ summary: "Lark Webhook Callback" })

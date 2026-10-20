@@ -19,13 +19,19 @@ export class WechatAuthService {
   async login(params: { ipAddress: string; userAgent: string; phone: string; openId: string }) {
     const { ipAddress, userAgent, phone, openId } = params;
 
-    // [step 1] Get user
+    // [step 1] Get user — phone is the identity anchor for WeChat login.
     let user = await this.prisma.user.findUnique({ where: { phone } });
 
     if (user) {
+      // The matched row is authoritative; refresh lastLoginAt (and wechatOpenId
+      // if it changed) on that exact row, never on an unrelated row found by
+      // wechatOpenId.
       await this.prisma.user.update({
-        where: { wechatOpenId: params.openId },
-        data: { lastLoginAt: new Date() },
+        where: { id: user.id },
+        data: {
+          lastLoginAt: new Date(),
+          wechatOpenId: openId,
+        },
       });
     } else {
       // Create new user if not exists

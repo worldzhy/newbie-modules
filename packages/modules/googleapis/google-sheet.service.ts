@@ -40,13 +40,15 @@ export class GoogleSheetService {
    **************************************/
 
   async addSheet(params: { fileId: string; properties: sheets_v4.Schema$SheetProperties; headings?: string[] }) {
-    const response = await this.client.spreadsheets.batchUpdate({
+    await this.client.spreadsheets.batchUpdate({
       spreadsheetId: params.fileId,
       requestBody: {
         requests: [{ addSheet: { properties: params.properties } }],
       },
     });
-    this.logger.log("addSheet response", JSON.stringify(response?.data ?? {}));
+    this.logger.log(
+      `addSheet: added sheet "${params.properties.title ?? "(untitled)"}" to spreadsheet ${params.fileId}`,
+    );
     // if (params.headings && params.headings.length > 0) {
     //   await this.updateRow({
     //     fileId: file.id,

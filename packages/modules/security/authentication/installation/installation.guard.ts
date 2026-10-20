@@ -6,8 +6,11 @@ import {
   UnauthorizedException,
 } from "@nestjs/common";
 import { ModuleRef, Reflector } from "@nestjs/core";
+import { createHash } from "node:crypto";
 import { Request } from "express";
+import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { InstallationResolver, installationResolverToken } from "../../ports/installation.resolver";
+import { LimitInstallationByTokenService } from "../../rate-limiter/rate-limiter.service";
 import { INSTALLATION_AUTH_KEY } from "./installation.decorator";
 
 const BEARER_PATTERN = /^bearer\s+(.+)$/i;
@@ -26,12 +29,20 @@ const BEARER_PATTERN = /^bearer\s+(.+)$/i;
  *
  * On success the resolver's installation context is attached as
  * `req.installation`.
+ *
+ * Every installation-authed request is rate-limited per token (ADR-011): the
+ * bucket key is the SHA-256 of the presented token (one token per
+ * installation, and no usable credential reaches the limiter backend), and
+ * over-quota requests are rejected with 429 before the resolver hits the
+ * database. The cap is built into the strategy rather than opted into per
+ * controller, so new collectors are covered automatically.
  */
 @Injectable()
 export class InstallationAuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly moduleRef: ModuleRef,
+    private readonly limitInstallationByTokenService: LimitInstallationByTokenService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -62,6 +73,12 @@ export class InstallationAuthGuard implements CanActivate {
     if (!token) {
       throw new UnauthorizedException("Missing installation token: present it as Authorization: Bearer <token>.");
     }
+
+    const bucketKey = createHash("sha256").update(token).digest("hex");
+    if (!(await this.limitInstallationByTokenService.isAllowed(bucketKey))) {
+      throw new NewbieException(NewbieExceptionType.Access_HighFrequency);
+    }
+    await this.limitInstallationByTokenService.increment(bucketKey);
 
     req.installation = await resolver.resolve(token, kind);
     return true;

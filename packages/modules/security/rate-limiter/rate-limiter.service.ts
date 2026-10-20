@@ -7,6 +7,8 @@ enum LimiterType {
   IP_ACCESS = "ip-access",
   IP_LOGIN = "ip-login",
   USER_LOGIN = "user-login",
+  INSTALLATION = "installation",
+  TOTP_LOGIN = "totp-login",
 }
 
 abstract class RateLimiterService {
@@ -31,6 +33,16 @@ abstract class RateLimiterService {
       case LimiterType.USER_LOGIN:
         this.points = this.config.getOrThrow<number>("modules.security.ratelimiter.userLoginLimiter.points");
         this.duration = this.config.getOrThrow<number>("modules.security.ratelimiter.userLoginLimiter.durationSeconds");
+        break;
+      case LimiterType.INSTALLATION:
+        this.points = this.config.getOrThrow<number>("modules.security.ratelimiter.installationLimiter.points");
+        this.duration = this.config.getOrThrow<number>(
+          "modules.security.ratelimiter.installationLimiter.durationSeconds",
+        );
+        break;
+      case LimiterType.TOTP_LOGIN:
+        this.points = this.config.getOrThrow<number>("modules.security.ratelimiter.totpLoginLimiter.points");
+        this.duration = this.config.getOrThrow<number>("modules.security.ratelimiter.totpLoginLimiter.durationSeconds");
         break;
     }
 
@@ -79,5 +91,32 @@ export class LimitLoginByIpService extends RateLimiterService {
 export class LimitLoginByUserService extends RateLimiterService {
   constructor(configService: ConfigService, redisService: RedisService) {
     super(configService, redisService, LimiterType.USER_LOGIN);
+  }
+}
+
+/**
+ * Per-installation quota for machine-to-machine report endpoints (ADR-011).
+ * The bucket key is the SHA-256 of the presented installation token, which is
+ * equivalent to keying by installation (one token per installation) without
+ * storing usable credentials in the limiter backend. Enforced inside the
+ * InstallationAuthGuard, not by decorator.
+ */
+@Injectable()
+export class LimitInstallationByTokenService extends RateLimiterService {
+  constructor(configService: ConfigService, redisService: RedisService) {
+    super(configService, redisService, LimiterType.INSTALLATION);
+  }
+}
+
+/**
+ * Bounds online guessing of TOTP codes during the login MFA challenge, keyed
+ * by user id. Shares the Redis-backed base with the other login limiters so
+ * the cap holds across multiple instances (previously a per-process
+ * RateLimiterMemory inside TwoFactorService).
+ */
+@Injectable()
+export class LimitTotpLoginByUserService extends RateLimiterService {
+  constructor(configService: ConfigService, redisService: RedisService) {
+    super(configService, redisService, LimiterType.TOTP_LOGIN);
   }
 }

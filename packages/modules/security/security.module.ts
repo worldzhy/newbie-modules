@@ -7,7 +7,6 @@ import { TokenModule } from "./token/token.module";
 import { RateLimiterGuard } from "./rate-limiter/rate-limiter.guard";
 import { AuthenticationGuard } from "./authentication/authentication.guard";
 import { AuthorizationGuard } from "./authorization/authorization.guard";
-import { RouteAuthorizationService } from "./authorization/route-authorization.service";
 import { NoAuthGuard } from "./authentication/public/public.guard";
 import { PublicCorsService } from "./authentication/public/public-cors.service";
 import { ApiKeyAuthGuard } from "./authentication/api-key/api-key.guard";
@@ -24,19 +23,17 @@ import { JwtStrategy } from "./authentication/jwt/jwt.strategy";
 
 import {
   LimitAccessByIpService,
+  LimitInstallationByTokenService,
   LimitLoginByIpService,
   LimitLoginByUserService,
+  LimitTotpLoginByUserService,
 } from "./rate-limiter/rate-limiter.service";
-import { RouteAuthenticationService } from "./authentication/route-authentication.service";
-
-import { RouteAuthenticationGuard } from "./authentication/route-authentication.guard";
-import { RouteAuthorizationGuard } from "./authorization/route-authorization.guard";
 import { SelfOnlyGuard } from "./self-only/self-only.guard";
 
 /**
  * Foundation security machinery: the global guard pipeline, authentication
  * mechanisms (none/JWT/API-key strategies under ./authentication),
- * token/cookie services, rate limiting and route-level auth configuration.
+ * token/cookie services and rate limiting.
  *
  * Identity-specific strategies (password, verification-code, refresh-token,
  * Google) and all data access live in the identity provider module (account),
@@ -46,13 +43,9 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
 @Module({
   imports: [CookieModule, TokenModule, DiscoveryModule],
   providers: [
-    RouteAuthenticationService,
-    RouteAuthorizationService,
     { provide: APP_GUARD, useClass: RateLimiterGuard }, // 1st priority guard.
     { provide: APP_GUARD, useClass: AuthenticationGuard }, // 2nd priority guard.
-    { provide: APP_GUARD, useClass: RouteAuthenticationGuard }, // 3rd priority guard (specific route auth)
-    { provide: APP_GUARD, useClass: AuthorizationGuard }, // 4th priority guard.
-    { provide: APP_GUARD, useClass: RouteAuthorizationGuard }, // 5th priority guard (specific route authorization)
+    { provide: APP_GUARD, useClass: AuthorizationGuard }, // 3rd priority guard.
     NoAuthGuard,
     ApiKeyAuthGuard,
     GoogleAuthGuard,
@@ -71,13 +64,15 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
     LimitAccessByIpService,
     LimitLoginByIpService,
     LimitLoginByUserService,
+    LimitInstallationByTokenService,
+    LimitTotpLoginByUserService,
   ],
   exports: [
     LimitAccessByIpService,
     LimitLoginByIpService,
     LimitLoginByUserService,
-    RouteAuthenticationService,
-    RouteAuthorizationService,
+    LimitInstallationByTokenService,
+    LimitTotpLoginByUserService,
     TokenModule,
     CookieModule,
     JwtAuthGuard,

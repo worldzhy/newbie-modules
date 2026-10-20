@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "@prisma/client";
 import { Domain } from "@prisma/client";
@@ -20,6 +20,8 @@ import { generateRandomString } from "@devbie/newbie/utilities/random.util";
 
 @Injectable()
 export class DomainsService {
+  private readonly logger = new Logger(DomainsService.name);
+
   constructor(
     private prisma: PrismaService,
     private dnsService: DnsService,
@@ -33,7 +35,9 @@ export class DomainsService {
     try {
       const fullUrl = new URL(data.domain);
       data.domain = fullUrl.hostname;
-    } catch (error) {}
+    } catch (error) {
+      this.logger.debug(`Domain value "${data.domain}" is not a full URL; validating it as a bare hostname`);
+    }
     if (!/(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/.test(data.domain))
       throw new BadRequestException(INVALID_DOMAIN);
     const verificationCode = await generateRandomString();
@@ -54,7 +58,9 @@ export class DomainsService {
               profilePictureUrl: `https://logo.clearbit.com/${data.domain}`,
             },
           });
-      } catch (error) {}
+      } catch (error) {
+        this.logger.warn(`Failed to fetch team logo from clearbit for domain ${data.domain}: ${error}`);
+      }
 
     return this.prisma.domain.create({
       data: {
@@ -125,7 +131,9 @@ export class DomainsService {
           )}`,
         );
         verified = data.includes(domain.verificationCode);
-      } catch (error) {}
+      } catch (error) {
+        this.logger.warn(`HTML domain verification request failed for ${domain.domain}: ${error}`);
+      }
       if (verified) {
         await this.prisma.domain.update({
           where: { id },

@@ -18,7 +18,8 @@
   "env": {
     "AWS_S3_REGION": "",
     "AWS_S3_BUCKET": "",
-    "AWS_S3_SIGNED_URL_EXPIRESIN": "1800"
+    "AWS_S3_SIGNED_URL_EXPIRESIN": "1800",
+    "AWS_S3_CDN_HOSTNAME": ""
   },
   "dependencies": {
     "@aws-sdk/client-s3": "latest",

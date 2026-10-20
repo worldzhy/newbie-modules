@@ -20,6 +20,14 @@
         "ipAccessLimiter": {
           "points": 20,
           "durationSeconds": 60
+        },
+        "installationLimiter": {
+          "points": 120,
+          "durationSeconds": 60
+        },
+        "totpLoginLimiter": {
+          "points": 5,
+          "durationSeconds": 300
         }
       },
       "token": {

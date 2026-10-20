@@ -17,14 +17,12 @@ import { IS_REFRESHING_ACCESS_TOKEN_KEY } from "./refresh-token/refresh-token.de
 import { IS_LOGGING_IN_APIKEY_KEY } from "./api-key/api-key.decorator";
 import { IS_LOGGING_IN_GOOGLE_KEY } from "./google-oauth/google.decorator";
 import { INSTALLATION_AUTH_KEY } from "./installation/installation.decorator";
-import { RouteAuthenticationService } from "./route-authentication.service";
 import { GuardType } from "./guard.types";
 
 @Injectable()
 export class AuthenticationGuard extends AuthGuard("authentication") {
   constructor(
     private readonly config: ConfigService,
-    private readonly routeAuthenticationService: RouteAuthenticationService,
     private reflector: Reflector,
     private noAuthGuard: NoAuthGuard,
     private passwordAuthGuard: PasswordAuthGuard,
@@ -39,12 +37,6 @@ export class AuthenticationGuard extends AuthGuard("authentication") {
   }
 
   canActivate(context: ExecutionContext) {
-    const req = context.switchToHttp().getRequest();
-    // ! Skip authentication for configured public routes
-    if (this.routeAuthenticationService.isPublic(req.url, req.method)) {
-      return true;
-    }
-
     // Use @NoGuard() for non-authentication
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),

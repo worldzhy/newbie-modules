@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { AwsAuditScan, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -143,6 +143,7 @@ interface IamPolicyDocument {
 
 @Injectable()
 export class AwsAuditService {
+  private readonly logger = new Logger(AwsAuditService.name);
   private readonly severityRank: Record<Severity, number> = { high: 3, medium: 2, low: 1 };
   private readonly policyCache = new Map<string, Promise<ManagedPolicyAnalysis>>();
   private readonly activeScans = new Set<string>();
@@ -283,7 +284,13 @@ export class AwsAuditService {
     });
 
     this.activeScans.add(projectId);
-    this.runAuditScanInBackground(projectId, scan.id).catch(() => {});
+    this.runAuditScanInBackground(projectId, scan.id).catch((error: unknown) => {
+      this.logger.error(
+        `Background audit scan failed for project ${projectId} (scan ${scan.id}): ${
+          error instanceof Error ? (error.stack ?? error.message) : String(error)
+        }`,
+      );
+    });
 
     return {
       accepted: true,

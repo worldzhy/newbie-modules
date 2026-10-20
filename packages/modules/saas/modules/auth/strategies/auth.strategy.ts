@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Request } from "express";
 import ipRangeCheck from "ip-range-check";
@@ -16,6 +16,8 @@ class SaaSStarterStrategyName extends Strategy {
 
 @Injectable()
 export class SaaSStarterStrategy extends PassportStrategy(SaaSStarterStrategyName) {
+  private readonly logger = new Logger(SaaSStarterStrategy.name);
+
   constructor(
     private apiKeyService: ApiKeysService,
     private tokensService: TokensService,
@@ -62,7 +64,9 @@ export class SaaSStarterStrategy extends PassportStrategy(SaaSStarterStrategyNam
             teamId: apiKeyDetails.teamId as number,
             scopes: apiKeyDetails.scopes as string[],
           });
-        } catch (error) {}
+        } catch (error) {
+          this.logger.warn(`API key authentication failed; falling back to bearer token validation: ${error}`);
+        }
     }
 
     /** Bearer JWT authorization */
@@ -80,7 +84,9 @@ export class SaaSStarterStrategy extends PassportStrategy(SaaSStarterStrategyNam
         sessionId,
         role,
       });
-    } catch (error) {}
+    } catch (error) {
+      this.logger.warn(`Bearer token validation failed: ${error}`);
+    }
 
     return this.fail("Invalid token", 401);
   }
