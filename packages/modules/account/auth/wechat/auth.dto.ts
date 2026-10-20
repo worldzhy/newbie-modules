@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { UserRole, UserStatus, UserGender, MfaMethod } from "@generated/prisma/client";
+import { UserStatus, UserGender, MfaMethod } from "@generated/prisma/client";
 import { IsString } from "class-validator";
 
 export class WechatLoginDto {
@@ -39,8 +39,8 @@ export class WechatUserResponseDto {
   @ApiPropertyOptional({ type: String })
   phone?: string | null;
 
-  @ApiProperty({ enum: UserRole, isArray: true })
-  roles!: UserRole[];
+  @ApiProperty({ type: String, isArray: true })
+  roles!: string[];
 
   @ApiPropertyOptional({ type: String })
   name?: string | null;

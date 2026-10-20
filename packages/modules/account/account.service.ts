@@ -14,21 +14,26 @@ export class AccountService {
   async me(request: UserRequest) {
     // The JWT strategy already verified the session and loaded the user's
     // roles into request.user, so only the profile lookup is needed here.
-    return await this.prisma.user.findUniqueOrThrow({
+    const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: request.user.userId },
       select: {
         id: true,
         email: true,
         phone: true,
-        roles: true,
         twoFactorMethod: true,
         name: true,
         firstName: true,
         middleName: true,
         lastName: true,
         avatarFileId: true,
+        roles: { select: { role: { select: { name: true } } } },
       },
     });
+
+    return {
+      ...user,
+      roles: user.roles.map((ur) => ur.role.name),
+    };
   }
 
   async updateMe(request: UserRequest, body: UpdateMeDto) {

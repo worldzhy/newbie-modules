@@ -18,10 +18,20 @@ export interface PermissionRequirement {
   action: string;
 }
 
+/**
+ * Authorization scope context. `none` means a global (system-level) check.
+ * `project` means the check is scoped to a specific project whose id is
+ * resolved by the host's ScopeResolver.
+ *
+ * Ownership checks (`@RequireOwner`) do not use this type — they are a
+ * separate access-control model and handled by OwnershipGuard.
+ */
+export type Scope = { type: "none" } | { type: "project"; id: string };
+
 export interface PermissionAuthorizer {
   /**
    * Returns true when the user (or one of their roles) holds the required
-   * permission for the resource/action pair.
+   * permission for the resource/action pair, optionally within a scope.
    */
-  authorize(userId: string, requirement: PermissionRequirement): Promise<boolean>;
+  authorize(userId: string, requirement: PermissionRequirement, scope?: Scope): Promise<boolean>;
 }

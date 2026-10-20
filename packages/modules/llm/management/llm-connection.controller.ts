@@ -37,7 +37,7 @@ export class LlmConnectionController {
   }
 
   @Post()
-  @RequirePermission("create", "LlmConnection")
+  @RequirePermission("Create", "LlmConnection")
   @ApiOperation({ summary: "Create an LLM connection (not yet bound to any scope)" })
   @ApiBody({ type: CreateLlmConnectionDto })
   @ApiResponse({ status: 201, type: LlmConnectionResponseDto })
@@ -46,7 +46,7 @@ export class LlmConnectionController {
   }
 
   @Patch(":id")
-  @RequirePermission("update", "LlmConnection")
+  @RequirePermission("Update", "LlmConnection")
   @ApiOperation({ summary: "Update an LLM connection; echoing the masked key keeps it unchanged" })
   @ApiBody({ type: UpdateLlmConnectionDto })
   @ApiResponse({ status: 200, type: LlmConnectionResponseDto })
@@ -55,7 +55,7 @@ export class LlmConnectionController {
   }
 
   @Delete(":id")
-  @RequirePermission("delete", "LlmConnection")
+  @RequirePermission("Delete", "LlmConnection")
   @ApiOperation({ summary: "Delete an LLM connection; all scope bindings are removed (cascade)" })
   @ApiResponse({ status: 200, type: LlmConnectionResponseDto })
   async remove(@Param("id") id: string): Promise<LlmConnectionResponseDto> {
@@ -63,7 +63,7 @@ export class LlmConnectionController {
   }
 
   @Post(":id/test")
-  @RequirePermission("manage", "LlmConnection")
+  @RequirePermission("Manage", "LlmConnection")
   @ApiOperation({ summary: "Test connection with a minimal chat completion request (shared adapter path)" })
   @ApiResponse({ status: 200, type: TestLlmConnectionResponseDto })
   async test(@Param("id") id: string): Promise<TestLlmConnectionResponseDto> {

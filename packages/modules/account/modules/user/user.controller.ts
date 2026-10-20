@@ -36,10 +36,18 @@ export class UserController {
   @ApiOperation({ summary: "Create a new user" })
   @ApiResponse({ type: CreateUserResponseDto })
   async createUser(@Body() body: CreateUserDto) {
-    // [step 1] Create the user. Cast: the validated DTO matches the Prisma create input
-    // for scalar columns (roles as a plain enum array is valid on create).
+    const { roles, ...scalarFields } = body;
+
+    // Resolve role names to Role rows for the UserRole join table.
+    const roleConnect = roles && roles.length > 0
+      ? await this.prisma.role.findMany({ where: { name: { in: roles } }, select: { id: true } })
+      : [];
+
     const user = await this.prisma.user.create({
-      data: body as Prisma.UserCreateInput,
+      data: {
+        ...scalarFields,
+        roles: { create: roleConnect.map((r) => ({ role: { connect: { id: r.id } } })) },
+      },
       select: {
         id: true,
         email: true,
@@ -51,11 +59,6 @@ export class UserController {
         lastName: true,
       },
     });
-
-    // [step 2] No Permission records are created here. A permission row has no
-    // owner scope, so a Manage/User record granted the new user global control
-    // over every user. Self-service profile access goes through /account/me;
-    // the /users management endpoints are an ADMIN capability.
 
     return user;
   }
@@ -81,7 +84,7 @@ export class UserController {
     }
 
     if (roles && roles.length > 0) {
-      whereConditions.push({ roles: { hasSome: roles } });
+      whereConditions.push({ roles: { some: { role: { name: { in: roles } } } } });
     }
 
     if (whereConditions.length > 1) {
@@ -96,12 +99,18 @@ export class UserController {
     const result = await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.User,
       pagination: { page, pageSize },
-      findManyArgs: { where: where },
+      findManyArgs: {
+        where: where,
+        include: { roles: { include: { role: { select: { name: true } } } } },
+      },
     });
 
-    // [step 3] Return users without password.
+    // [step 3] Return users without password; map roles to name strings.
     result.records = result.records.map((user) => {
-      return this.userService.withoutPassword(user);
+      const { password: _password, roles, ...rest } = user as User & {
+        roles: { role: { name: string } }[];
+      };
+      return { ...rest, roles: roles.map((r) => r.role.name) };
     });
 
     return result;
@@ -114,9 +123,11 @@ export class UserController {
   async getUser(@Param("userId") userId: string) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
+      include: { roles: { include: { role: { select: { name: true } } } } },
     });
 
-    return this.userService.withoutPassword(user);
+    const { password: _password, roles, ...rest } = user;
+    return { ...rest, roles: roles.map((r) => r.role.name) };
   }
 
   @Patch(":userId")
@@ -140,23 +151,30 @@ export class UserController {
     },
   })
   async updateUser(@Param("userId") userId: string, @Body() body: UpdateUserDto, @Req() request: UserRequest) {
-    // Prisma requires scalar list updates to use {set: [...]}, while the DTO
-    // accepts a plain enum array. Empty array clears all roles.
+    // Roles are now a UserRole join relation; resolve names to Role rows and
+    // replace the whole set via deleteMany + create.
     const { roles, ...scalarFields } = body;
     const data: Prisma.UserUpdateInput = scalarFields as Prisma.UserUpdateInput;
+
     if (roles !== undefined) {
-      data.roles = { set: roles };
+      const roleRows = await this.prisma.role.findMany({
+        where: { name: { in: roles } },
+        select: { id: true },
+      });
+      data.roles = {
+        deleteMany: {},
+        create: roleRows.map((r) => ({ role: { connect: { id: r.id } } })),
+      };
     }
 
     const user = await this.prisma.user.update({
       where: { id: userId },
       data,
+      include: { roles: { include: { role: { select: { name: true } } } } },
     });
 
     if (roles !== undefined) {
       await this.auditLogService.record(AuditEvent.ROLES_CHANGED, {
-        // The actor is the admin performing the change; the target user is
-        // the resource. An admin editing their own roles has both equal.
         actorId: request.user.userId,
         resourceType: "user",
         resourceId: userId,
@@ -166,8 +184,8 @@ export class UserController {
       });
     }
 
-    // Strip the password hash from the response to prevent sensitive data leakage.
-    return this.userService.withoutPassword(user);
+    const { password: _password, roles: userRoles, ...rest } = user;
+    return { ...rest, roles: userRoles.map((r) => r.role.name) };
   }
 
   @Delete(":userId")
