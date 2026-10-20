@@ -25,11 +25,7 @@ export interface RequirePermissionOptions {
  * Argument order is verb-object (action, resource) for readability at call
  * sites; metadata is stored in the canonical PermissionRequirement shape.
  */
-export const RequirePermission = (
-  action: string,
-  resource: string,
-  options: RequirePermissionOptions = {},
-) =>
+export const RequirePermission = (action: string, resource: string, options: RequirePermissionOptions = {}) =>
   SetMetadata(PERMISSION_KEY, {
     resource,
     action,

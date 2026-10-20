@@ -67,9 +67,7 @@ export class AuthorizationGuard implements CanActivate {
         this.scopeResolvers?.[metadata.scope] ??
         (metadata.scope === "project" ? defaultProjectScopeResolver : undefined);
       if (!resolver) {
-        throw new InternalServerErrorException(
-          `Scope resolver "${metadata.scope}" is not registered.`,
-        );
+        throw new InternalServerErrorException(`Scope resolver "${metadata.scope}" is not registered.`);
       }
       scope = await resolver.resolve(context);
     }

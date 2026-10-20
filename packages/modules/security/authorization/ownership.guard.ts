@@ -9,10 +9,7 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { OWNER_KEY } from "./require-owner.decorator";
-import {
-  PERMISSION_AUTHORIZER,
-  PermissionAuthorizer,
-} from "../ports/permission.authorizer";
+import { PERMISSION_AUTHORIZER, PermissionAuthorizer } from "../ports/permission.authorizer";
 import { AccessTokenParsed } from "../security.interface";
 
 /**
