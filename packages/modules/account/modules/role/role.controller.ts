@@ -73,7 +73,7 @@ export class RoleController {
 
     return {
       ...result,
-      records: (result.records as (Prisma.RoleGetPayload<{ include: { _count: { select: { users: true } } } }>)[]).map(
+      records: (result.records as Prisma.RoleGetPayload<{ include: { _count: { select: { users: true } } } }>[]).map(
         (role) => this.toResponseDto(role, role._count.users),
       ),
     };
@@ -161,7 +161,14 @@ export class RoleController {
   }
 
   private toResponseDto(
-    role: { id: number; name: string; isBuiltin: boolean; description: string | null; createdAt: Date; updatedAt: Date },
+    role: {
+      id: number;
+      name: string;
+      isBuiltin: boolean;
+      description: string | null;
+      createdAt: Date;
+      updatedAt: Date;
+    },
     userCount: number,
   ): RoleResponseDto {
     return {
