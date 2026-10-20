@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, NotFoundException, Param, ParseIntPipe, Query, Req, UseGuards } from "@nestjs/common";
+import { Controller, Delete, Get, NotFoundException, Param, ParseIntPipe, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Prisma, Session } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -6,12 +6,12 @@ import { Expose, expose } from "../../helpers/expose";
 import { ListSessionsRequestDto, ListSessionsResponseDto, SessionResponseDto } from "./session.dto";
 import { SESSION_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { UserRequest } from "@modules/security/security.interface";
-import { SelfOnlyGuard } from "@modules/security/self-only/self-only.guard";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 
 @ApiTags("Account / Session")
 @ApiBearerAuth()
-@UseGuards(SelfOnlyGuard)
+@RequireOwner()
 @Controller("users/:userId/sessions")
 export class SessionController {
   constructor(

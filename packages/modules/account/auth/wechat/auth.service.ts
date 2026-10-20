@@ -36,7 +36,16 @@ export class WechatAuthService {
     } else {
       // Create new user if not exists
       user = await this.prisma.user.create({
-        data: { phone, wechatOpenId: openId, lastLoginAt: new Date() },
+        data: {
+          phone,
+          wechatOpenId: openId,
+          lastLoginAt: new Date(),
+          roles: {
+            create: {
+              role: { connectOrCreate: { where: { name: "USER" }, create: { name: "USER", isBuiltin: true } } },
+            },
+          },
+        },
       });
     }
 

@@ -18,7 +18,16 @@ export class AccountAccessTokenSessionResolver implements AccessTokenSessionReso
   async resolve(accessToken: string): Promise<ResolvedAccessTokenSession> {
     const session = await this.prisma.session.findFirst({
       where: { accessToken },
-      select: { id: true, user: { select: { id: true, roles: true, status: true } } },
+      select: {
+        id: true,
+        user: {
+          select: {
+            id: true,
+            status: true,
+            roles: { select: { role: { select: { name: true } } } },
+          },
+        },
+      },
     });
 
     if (!session) {
@@ -31,6 +40,7 @@ export class AccountAccessTokenSessionResolver implements AccessTokenSessionReso
       throw new ForbiddenException("The account is not active.");
     }
 
-    return { userId: session.user.id, sessionId: session.id, roles: session.user.roles };
+    const roles = session.user.roles.map((ur) => ur.role.name);
+    return { userId: session.user.id, sessionId: session.id, roles };
   }
 }

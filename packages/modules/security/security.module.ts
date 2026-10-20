@@ -28,7 +28,7 @@ import {
   LimitLoginByUserService,
   LimitTotpLoginByUserService,
 } from "./rate-limiter/rate-limiter.service";
-import { SelfOnlyGuard } from "./self-only/self-only.guard";
+import { OwnershipGuard } from "./authorization/ownership.guard";
 
 /**
  * Foundation security machinery: the global guard pipeline, authentication
@@ -38,6 +38,12 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
  * Identity-specific strategies (password, verification-code, refresh-token,
  * Google) and all data access live in the identity provider module (account),
  * which binds the SPI ports under ./ports.
+ *
+ * SCOPE_RESOLVERS is intentionally NOT provided here — it is a host-owned
+ * SPI token. Hosts register their scope resolvers (the default "project"
+ * resolver plus any sub-resource resolvers) via their own module. The
+ * AuthorizationGuard falls back to defaultProjectScopeResolver for the
+ * "project" key when no host resolver is registered.
  */
 @Global()
 @Module({
@@ -46,6 +52,7 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
     { provide: APP_GUARD, useClass: RateLimiterGuard }, // 1st priority guard.
     { provide: APP_GUARD, useClass: AuthenticationGuard }, // 2nd priority guard.
     { provide: APP_GUARD, useClass: AuthorizationGuard }, // 3rd priority guard.
+    { provide: APP_GUARD, useClass: OwnershipGuard }, // 4th priority guard.
     NoAuthGuard,
     ApiKeyAuthGuard,
     GoogleAuthGuard,
@@ -54,7 +61,6 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
     PasswordAuthGuard,
     RefreshTokenAuthGuard,
     VerificationCodeAuthGuard,
-    SelfOnlyGuard,
     PublicCorsService,
 
     NoStrategy,
@@ -77,7 +83,7 @@ import { SelfOnlyGuard } from "./self-only/self-only.guard";
     CookieModule,
     JwtAuthGuard,
     ApiKeyAuthGuard,
-    SelfOnlyGuard,
+    OwnershipGuard,
   ],
 })
 export class SecurityModule {}

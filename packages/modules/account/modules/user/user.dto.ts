@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { MfaMethod, UserGender, UserRole, UserStatus } from "@generated/prisma/client";
+import { MfaMethod, UserGender, UserStatus } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { Transform, Type } from "class-transformer";
 import {
@@ -39,14 +39,14 @@ export class CreateUserDto {
   password?: string | null;
 
   @ApiPropertyOptional({
-    enum: UserRole,
+    type: String,
     isArray: true,
-    description: "Scalar enum array; accepted directly on create.",
+    description: "Role names; resolved against the Role table.",
   })
   @IsArray()
-  @IsEnum(UserRole, { each: true })
+  @IsString({ each: true })
   @IsOptional()
-  roles?: UserRole[];
+  roles?: string[];
 
   @ApiPropertyOptional({ type: String })
   @IsString()
@@ -127,8 +127,8 @@ export class CreateUserDto {
 
 /**
  * Request DTO for updating a user. All fields are optional.
- * Note: 'roles' is accepted as a plain enum array and wrapped into
- * {set: roles} in the controller, as required by Prisma for scalar lists.
+ * Note: 'roles' is accepted as role name strings; the controller resolves
+ * them to Role rows and writes the UserRole join table.
  */
 export class UpdateUserDto {
   @ApiPropertyOptional({ type: String })
@@ -148,14 +148,14 @@ export class UpdateUserDto {
   password?: string | null;
 
   @ApiPropertyOptional({
-    enum: UserRole,
+    type: String,
     isArray: true,
-    description: "Replaces the whole role list (Prisma set semantics).",
+    description: "Replaces the whole role list by name.",
   })
   @IsArray()
-  @IsEnum(UserRole, { each: true })
+  @IsString({ each: true })
   @IsOptional()
-  roles?: UserRole[];
+  roles?: string[];
 
   @ApiPropertyOptional({ type: String })
   @IsString()
@@ -272,8 +272,8 @@ export class UserResponseDto {
   @ApiPropertyOptional({ type: String })
   phone?: string | null;
 
-  @ApiProperty({ enum: UserRole, isArray: true })
-  roles!: UserRole[];
+  @ApiProperty({ type: String, isArray: true })
+  roles!: string[];
 
   @ApiPropertyOptional({ type: String })
   name?: string | null;
@@ -393,9 +393,9 @@ export class ListUsersRequestDto extends CommonListRequestDto {
   name?: string;
 
   @ApiPropertyOptional({
-    enum: UserRole,
+    type: String,
     isArray: true,
-    description: "Filter by role overlap (hasSome); omit for no role filtering",
+    description: "Filter by role name overlap; omit for no role filtering",
   })
   @IsOptional()
   @Transform(({ value }: { value: unknown }): string[] | undefined => {
@@ -404,6 +404,6 @@ export class ListUsersRequestDto extends CommonListRequestDto {
     return undefined;
   })
   @IsArray()
-  @IsEnum(UserRole, { each: true })
-  roles?: UserRole[];
+  @IsString({ each: true })
+  roles?: string[];
 }

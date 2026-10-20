@@ -18,6 +18,7 @@ export class PermissionController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get("resources")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Permission)
   @ApiOperation({ summary: "List all permission resource names" })
   @ApiResponse({ type: String, isArray: true })
   listPermissionResources() {
@@ -25,6 +26,7 @@ export class PermissionController {
   }
 
   @Get("actions")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Permission)
   @ApiOperation({ summary: "List all permission action names" })
   @ApiResponse({ type: String, isArray: true })
   listPermissionActions() {
@@ -44,7 +46,6 @@ export class PermissionController {
         value: {
           resource: Prisma.ModelName.User,
           action: PermissionAction.Get,
-          where: { state: { in: ["StateA", "StateB"] } },
           trustedUserId: "fd5c948e-d15d-48d6-a458-7798e4d9921c",
         },
       },
@@ -58,6 +59,7 @@ export class PermissionController {
   }
 
   @Get("")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Permission)
   @ApiOperation({ summary: "Get permissions with pagination and optional resource filter" })
   @ApiResponse({ type: ListPermissionsResponseDto })
   async list(@Query() query: ListPermissionsRequestDto) {
@@ -86,6 +88,7 @@ export class PermissionController {
   }
 
   @Get(":permissionId")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.Permission)
   @ApiOperation({ summary: "Get a permission by id" })
   @ApiResponse({ type: PermissionResponseDto })
   async getPermission(@Param("permissionId") permissionId: number): Promise<Permission> {

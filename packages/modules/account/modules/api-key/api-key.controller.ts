@@ -1,17 +1,17 @@
-import { Body, Controller, Delete, Get, Headers, Ip, Param, Patch, Post, Put, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Headers, Ip, Param, Patch, Post, Put, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { ApiKey, Prisma } from "@generated/prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OrderByPipe } from "@devbie/newbie/pipes/order-by.pipe";
 import { WherePipe } from "@devbie/newbie/pipes/where.pipe";
 import { Expose } from "../../helpers/expose";
-import { SelfOnlyGuard } from "@modules/security/self-only/self-only.guard";
+import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 import { ApiKeyResponseDto, CreateApiKeyDto, ReplaceApiKeyDto, UpdateApiKeyDto } from "./api-key.dto";
 import { ApiKeyService } from "./api-key.service";
 
 @ApiTags("Account / Api Key")
 @ApiBearerAuth()
-@UseGuards(SelfOnlyGuard)
+@RequireOwner()
 @Controller("users/:userId/api-keys")
 export class ApiKeyController {
   constructor(private apiKeyService: ApiKeyService) {}
