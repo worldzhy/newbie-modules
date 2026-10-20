@@ -35,7 +35,7 @@ export type RegisteredNotification = NotificationDeclaration;
  * code-side counterpart to the database NotificationSetting rows: it holds the
  * templates and defaults that cannot be safely edited at runtime. The database
  * row (see NotificationSettingService) owns the runtime-editable delivery
- * settings (defaultSeverity, pushEnabled).
+ * settings (defaultSeverity, isPushEnabled).
  *
  * Business code typically declares a notification by subclassing the abstract
  * Notification base class, which registers itself here on module init.

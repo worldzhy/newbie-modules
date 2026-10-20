@@ -45,7 +45,7 @@ export interface JobScheduleDeclaration {
   handlerKey: string;
   cronExpr: string;
   timezone?: string;
-  enabled?: boolean;
+  isEnabled?: boolean;
   payload?: unknown;
 }
 
@@ -56,7 +56,7 @@ interface JobScheduleRecord {
   handlerKey: string;
   cronExpr: string;
   timezone: string;
-  enabled: boolean;
+  isEnabled: boolean;
   payload: unknown;
 }
 
@@ -93,7 +93,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   /// Sync database schedule definitions into dynamic cron jobs: create/update
-  /// for enabled schedules, remove cron jobs for disabled or deleted schedules.
+  /// for isEnabled schedules, remove cron jobs for disabled or deleted schedules.
   async reconcile() {
     const schedules = (await this.prisma.jobSchedule.findMany({
       orderBy: { key: "asc" },
@@ -102,7 +102,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     const desiredCronJobNames = new Set<string>();
 
     for (const schedule of schedules) {
-      if (!schedule.enabled) {
+      if (!schedule.isEnabled) {
         continue;
       }
 
@@ -127,7 +127,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /// Manually trigger a schedule regardless of its `enabled` flag. Still
+  /// Manually trigger a schedule regardless of its `isEnabled` flag. Still
   /// subject to the same reentry guard: while a run is in progress the run is
   /// recorded as `skipped`.
   async triggerSchedule(key: string) {
@@ -140,7 +140,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
 
   /// Declare a default schedule from business code. The database row wins for
   /// runtime settings: declarations only create missing rows, never override
-  /// cron/timezone/enabled edits. The display name stays declaration-owned and
+  /// cron/timezone/isEnabled edits. The display name stays declaration-owned and
   /// is re-synced on every startup.
   async upsertScheduleDeclaration(declaration: JobScheduleDeclaration): Promise<void> {
     const existing = await this.prisma.jobSchedule.findUnique({ where: { key: declaration.key } });
@@ -161,7 +161,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
           handlerKey: declaration.handlerKey,
           cronExpr: declaration.cronExpr,
           timezone: declaration.timezone ?? DEFAULT_TIMEZONE,
-          enabled: declaration.enabled ?? true,
+          isEnabled: declaration.isEnabled ?? true,
           // Nullable Json column: DbNull stores NULL; an object must satisfy
           // InputJsonValue. Plain null is rejected by Prisma's input types.
           payload: declaration.payload == null ? Prisma.DbNull : (declaration.payload as Prisma.InputJsonValue),
@@ -183,17 +183,17 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
 
   /// Update the runtime-editable fields of a schedule, then reconcile
   /// immediately so the change takes effect without waiting for the next 30s
-  /// reconcile tick. Only enabled/cronExpr/timezone are editable here; key,
+  /// reconcile tick. Only isEnabled/cronExpr/timezone are editable here; key,
   /// handlerKey and payload stay declaration-owned.
-  async updateSchedule(key: string, updates: { enabled?: boolean; cronExpr?: string; timezone?: string }) {
+  async updateSchedule(key: string, updates: { isEnabled?: boolean; cronExpr?: string; timezone?: string }) {
     const schedule = await this.prisma.jobSchedule.findUnique({ where: { key } });
     if (!schedule) {
       throw new NotFoundException(`Job schedule not found: ${key}`);
     }
 
-    const hasUpdate = updates.enabled !== undefined || updates.cronExpr !== undefined || updates.timezone !== undefined;
+    const hasUpdate = updates.isEnabled !== undefined || updates.cronExpr !== undefined || updates.timezone !== undefined;
     if (!hasUpdate) {
-      throw new BadRequestException("No updatable fields provided. Supported fields: enabled, cronExpr, timezone.");
+      throw new BadRequestException("No updatable fields provided. Supported fields: isEnabled, cronExpr, timezone.");
     }
 
     const nextCronExpr = updates.cronExpr ?? schedule.cronExpr;
@@ -205,7 +205,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     const updated = await this.prisma.jobSchedule.update({
       where: { key },
       data: {
-        ...(updates.enabled !== undefined ? { enabled: updates.enabled } : {}),
+        ...(updates.isEnabled !== undefined ? { isEnabled: updates.isEnabled } : {}),
         ...(updates.cronExpr !== undefined ? { cronExpr: updates.cronExpr } : {}),
         ...(updates.timezone !== undefined ? { timezone: updates.timezone } : {}),
       },

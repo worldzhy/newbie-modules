@@ -159,7 +159,7 @@ export class NotificationCenterService {
     }
 
     if (!deduplicated) {
-      await this.dispatchPush(setting.scope, setting.pushEnabled, center, title, detail);
+      await this.dispatchPush(setting.scope, setting.isPushEnabled, center, title, detail);
     }
 
     return { id: recordId, deduplicated, dropped: false };
@@ -168,11 +168,11 @@ export class NotificationCenterService {
   private async dispatchPush(
     scope: string,
     notificationPushEnabled: boolean,
-    center: { pushEnabled: boolean },
+    center: { isPushEnabled: boolean },
     title: string,
     detail: string | null,
   ): Promise<void> {
-    if (!notificationPushEnabled || !center.pushEnabled || !this.pushPort) {
+    if (!notificationPushEnabled || !center.isPushEnabled || !this.pushPort) {
       return;
     }
     // Only system-scope notifications push through the center; project-scope
@@ -189,7 +189,7 @@ export class NotificationCenterService {
   async getCenterSettings(): Promise<NotificationCenterSettingDto> {
     const setting = await this.ensureCenterSetting();
     return {
-      pushEnabled: setting.pushEnabled,
+      isPushEnabled: setting.isPushEnabled,
       minimumSeverity: setting.minimumSeverity,
     };
   }
@@ -200,20 +200,20 @@ export class NotificationCenterService {
     const updated = await this.prisma.notificationCenterSetting.update({
       where: { id: setting.id },
       data: {
-        ...(body.pushEnabled !== undefined ? { pushEnabled: body.pushEnabled } : {}),
+        ...(body.isPushEnabled !== undefined ? { isPushEnabled: body.isPushEnabled } : {}),
         ...(body.minimumSeverity !== undefined ? { minimumSeverity: body.minimumSeverity } : {}),
       },
     });
 
     return {
-      pushEnabled: updated.pushEnabled,
+      isPushEnabled: updated.isPushEnabled,
       minimumSeverity: updated.minimumSeverity,
     };
   }
 
   async testPush(): Promise<TestPushResultDto> {
     const setting = await this.ensureCenterSetting();
-    if (!setting.pushEnabled) {
+    if (!setting.isPushEnabled) {
       throw new BadRequestException("Push is disabled.");
     }
     if (!this.pushPort) {
@@ -232,7 +232,7 @@ export class NotificationCenterService {
     return this.prisma.notificationCenterSetting.create({
       data: {
         id: CENTER_SETTING_SINGLETON_ID,
-        pushEnabled: DEFAULT_PUSH_ENABLED,
+        isPushEnabled: DEFAULT_PUSH_ENABLED,
         minimumSeverity: DEFAULT_MINIMUM_SEVERITY,
       },
     });

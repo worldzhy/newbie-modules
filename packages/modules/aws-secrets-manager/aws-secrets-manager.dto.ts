@@ -68,7 +68,7 @@ export class SecretResponseDto {
   region!: string;
 
   @ApiProperty({ type: Boolean })
-  rotationEnabled!: boolean;
+  isRotationEnabled!: boolean;
 
   @ApiPropertyOptional({ type: String })
   rotationLambdaArn?: string | null;
@@ -216,7 +216,7 @@ export class SetRotationRequestDto {
 
   @ApiProperty({ description: "Enable or disable automatic rotation", required: true })
   @IsBoolean()
-  enabled!: boolean;
+  isEnabled!: boolean;
 
   @ApiPropertyOptional({ description: "Rotation interval in days (defaults to 30)", default: 30 })
   @IsOptional()

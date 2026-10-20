@@ -112,7 +112,7 @@ export class UsersService {
   async deactivateUser(id: number, deactivatedBy?: number): Promise<Expose<User>> {
     const user = await this.prisma.user.update({
       where: { id },
-      data: { active: false },
+      data: { isActive: false },
       include: { prefersEmail: true },
     });
     await this.prisma.session.deleteMany({ where: { user: { id } } });

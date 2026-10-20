@@ -231,11 +231,11 @@ model ElasticsearchDataboardColumn {
   id                     Int                                   @id @default(autoincrement())
   name                   String
   ordinalPosition        Int? // The sort number of the column on the board. The first position is 1.
-  visible                Boolean                               @default(true)
+  isVisible              Boolean                               @default(true)
   width                  Int?
-  copyable               Boolean?
-  searchable             Boolean?
-  sortable               Boolean?
+  isCopyable             Boolean?
+  isSearchable           Boolean?
+  isSortable             Boolean?
   tooltip                String?
   formatter              ElasticsearchDataboardColumnFormatter @default(NONE)
   createdAt              DateTime                              @default(now())
