@@ -1,6 +1,6 @@
 {
   "key": "googlemaps",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "googlemaps.module",
     "className": "GoogleMapsModule"

@@ -1,6 +1,6 @@
 {
   "key": "redis",
-  "layer": "foundation",
+  "layer": "datastore",
   "module": {
     "file": "redis.module",
     "className": "RedisModule"

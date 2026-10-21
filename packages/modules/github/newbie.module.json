@@ -1,6 +1,6 @@
 {
   "key": "github",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "github.module",
     "className": "GitHubModule"

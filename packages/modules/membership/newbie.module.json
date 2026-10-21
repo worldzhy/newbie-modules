@@ -1,6 +1,6 @@
 {
   "key": "membership",
-  "layer": "domain",
+  "layer": "feature",
   "module": {
     "file": "membership.module",
     "className": "MembershipModule"

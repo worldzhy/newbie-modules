@@ -1,6 +1,6 @@
 {
   "key": "engined",
-  "layer": "domain",
+  "layer": "feature",
   "deprecated": "No longer maintained; do not adopt in new projects.",
   "module": {
     "file": "engined.module",

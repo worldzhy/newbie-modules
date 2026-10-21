@@ -1,6 +1,6 @@
 {
   "key": "queue",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "queue.module",
     "className": "NewbieQueueModule"

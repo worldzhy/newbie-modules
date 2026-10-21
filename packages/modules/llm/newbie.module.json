@@ -1,6 +1,6 @@
 {
   "key": "llm",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "llm.module",
     "className": "LlmModule"

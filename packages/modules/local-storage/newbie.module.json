@@ -1,6 +1,6 @@
 {
   "key": "local-storage",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "local-storage.module",
     "className": "LocalStorageModule"

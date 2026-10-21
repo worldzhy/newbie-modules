@@ -1,6 +1,6 @@
 {
   "key": "aws-identity",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "aws-identity.module",
     "className": "AwsIdentityModule"

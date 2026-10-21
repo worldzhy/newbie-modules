@@ -1,6 +1,6 @@
 {
   "key": "lark",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "lark.module",
     "className": "LarkModule"

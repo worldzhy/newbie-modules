@@ -1,6 +1,6 @@
 {
   "key": "snowflake",
-  "layer": "foundation",
+  "layer": "datastore",
   "module": {
     "file": "snowflake.module",
     "className": "SnowflakeModule"

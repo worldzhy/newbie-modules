@@ -1,6 +1,6 @@
 {
   "key": "clickhouse",
-  "layer": "foundation",
+  "layer": "datastore",
   "cli": "clickhouse",
   "module": {
     "file": "clickhouse.module",

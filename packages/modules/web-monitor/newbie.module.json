@@ -1,6 +1,7 @@
 {
   "key": "web-monitor",
-  "layer": "domain",
+  "layer": "feature",
+  "publicNamespace": true,
   "role": "collector",
   "module": {
     "file": "web-monitor.module",

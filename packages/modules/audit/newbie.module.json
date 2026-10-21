@@ -1,6 +1,6 @@
 {
   "key": "audit",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "audit.module",
     "className": "AuditModule"

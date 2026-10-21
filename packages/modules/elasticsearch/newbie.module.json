@@ -1,6 +1,6 @@
 {
   "key": "elasticsearch",
-  "layer": "foundation",
+  "layer": "datastore",
   "module": {
     "file": "elasticsearch.module",
     "className": "ElasticsearchModule"

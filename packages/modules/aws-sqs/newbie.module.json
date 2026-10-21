@@ -1,6 +1,6 @@
 {
   "key": "aws-sqs",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "aws-sqs.module",
     "className": "AwsSqsModule"

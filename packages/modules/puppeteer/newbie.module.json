@@ -1,6 +1,6 @@
 {
   "key": "puppeteer",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "puppeteer.module",
     "className": "PuppeteerModule"

@@ -1,6 +1,6 @@
 {
   "key": "event-scheduling",
-  "layer": "domain",
+  "layer": "feature",
   "module": {
     "file": "event-scheduling.module",
     "className": "EventSchedulingModule"

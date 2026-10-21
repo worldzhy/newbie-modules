@@ -1,6 +1,6 @@
 {
   "key": "map",
-  "layer": "domain",
+  "layer": "feature",
   "module": {
     "file": "map.module",
     "className": "MapModule"
