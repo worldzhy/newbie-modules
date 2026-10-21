@@ -9,7 +9,7 @@ on:
     branches: [dev]
 
 jobs:
-  format-check:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
