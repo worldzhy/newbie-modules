@@ -6,6 +6,7 @@
     "className": "GoogleAPIsModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security"],
   "config-service": {
     "googleapis": {
       "credentials": {

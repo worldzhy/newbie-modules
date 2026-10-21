@@ -6,6 +6,7 @@
     "className": "JobSchedulerModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security"],
   "dependencies": {
     "@nestjs/event-emitter": "latest",
     "@nestjs/schedule": "latest"

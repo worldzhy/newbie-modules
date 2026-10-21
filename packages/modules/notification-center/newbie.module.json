@@ -6,6 +6,7 @@
     "className": "NotificationCenterModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security"],
   "config-service": {},
   "env": {},
   "dependencies": {}

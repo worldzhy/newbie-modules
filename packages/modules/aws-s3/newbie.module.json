@@ -6,7 +6,7 @@
     "className": "AwsS3Module"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["aws-identity"],
+  "moduleDependencies": ["aws-identity", "security"],
   "config-service": {
     "aws-s3": {
       "region": "process.env.AWS_S3_REGION || 'us-east-1'",
