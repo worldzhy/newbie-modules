@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Query } from "@nestjs/common";
-import { ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { MessageTrackerService } from "./message-tracker.service";
 import { SendEmailMessageParams, SendTextMessageParams } from "./message-tracker.interface";
 
@@ -9,6 +9,7 @@ export class MessageTrackerController {
   constructor(private readonly messageTrackerService: MessageTrackerService) {}
 
   @Post("messages/email")
+  @ApiCreatedResponse()
   @ApiBody({
     description: "",
     examples: {
@@ -27,6 +28,7 @@ export class MessageTrackerController {
   }
 
   @Post("messages/text")
+  @ApiCreatedResponse()
   @ApiBody({
     description: "",
     examples: {
@@ -38,11 +40,13 @@ export class MessageTrackerController {
   }
 
   @Get("status/email")
+  @ApiOkResponse({ type: String })
   async getEventsOfEmailMessage(@Query("sesMessageId") sesMessageId: string) {
     return await this.messageTrackerService.getStatusOfEmailMessage(sesMessageId);
   }
 
   @Post("status/emails")
+  @ApiOkResponse({ type: Object })
   @ApiBody({
     description: "",
     examples: {
@@ -54,11 +58,13 @@ export class MessageTrackerController {
   }
 
   @Get("status/text")
+  @ApiOkResponse({ type: String })
   async getEventsOfTextMessage(@Query("smsMessageId") smsMessageId: string) {
     return await this.messageTrackerService.getStatusOfTextMessage(smsMessageId);
   }
 
   @Post("status/texts")
+  @ApiOkResponse({ type: Object })
   @ApiBody({
     description: "",
     examples: {

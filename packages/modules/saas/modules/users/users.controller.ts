@@ -13,8 +13,10 @@ import {
   Req,
   UploadedFiles,
   UseInterceptors,
+  MaxFileSizeValidator,
+  ParseFilePipe,
 } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { FilesInterceptor } from "@nestjs/platform-express";
 import { Prisma, User } from "@prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -28,6 +30,9 @@ import { UsersService } from "./users.service";
 import { AccessTokenType } from "../auth/auth.interface";
 import { INVALID_TOKEN } from "../../errors/errors.constants";
 
+// Profile pictures are buffered in memory, so the HTTP boundary enforces an explicit ceiling.
+const MAX_PROFILE_PICTURE_SIZE_BYTES = 25000000;
+
 @ApiTags("Users")
 @Controller("users")
 export class UserController {
@@ -38,6 +43,7 @@ export class UserController {
 
   /** Get users */
   @Get()
+  @ApiOkResponse({ type: UsersListResDto })
   @Scopes("user-*:read-info")
   async getAll(@Query() query: UsersListReqDto): Promise<UsersListResDto> {
     const { page, pageSize } = query;
@@ -56,6 +62,7 @@ export class UserController {
 
   /** Get a user */
   @Get(":userId")
+  @ApiOkResponse()
   @Scopes("user-{userId}:read-info")
   async get(@Param("userId", ParseIntPipe) id: number): Promise<Expose<User>> {
     return this.usersService.getUser(id);
@@ -63,6 +70,7 @@ export class UserController {
 
   /** Get login user */
   @Get("/info/me")
+  @ApiOkResponse()
   async getMe(@Req() req: UserRequest): Promise<Expose<User>> {
     const { userId } = req.user;
     try {
@@ -75,6 +83,7 @@ export class UserController {
 
   /** Update a user */
   @Patch(":userId")
+  @ApiOkResponse()
   @Scopes("user-{userId}:write-info")
   async update(
     @Req() request: UserRequest,
@@ -86,6 +95,7 @@ export class UserController {
 
   /** Delete a user */
   @Delete(":userId")
+  @ApiOkResponse()
   @Scopes("user-{userId}:deactivate")
   async remove(@Param("userId", ParseIntPipe) id: number, @Req() request: UserRequest): Promise<Expose<User>> {
     return this.usersService.deactivateUser(
@@ -96,15 +106,39 @@ export class UserController {
 
   /** Upload profile picture */
   @Post(":userId/profile-picture")
+  @ApiCreatedResponse()
   @Scopes("user-{userId}:write-info")
   @UseInterceptors(FilesInterceptor("files"))
-  async profilePicture(@Param("userId", ParseIntPipe) id: number, @UploadedFiles() files: Express.Multer.File[]) {
+  @ApiConsumes("multipart/form-data")
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        files: {
+          type: "array",
+          items: { type: "string", format: "binary" },
+          description: "The profile picture to upload",
+        },
+      },
+      required: ["files"],
+    },
+  })
+  async profilePicture(
+    @Param("userId", ParseIntPipe) id: number,
+    @UploadedFiles(
+      new ParseFilePipe({
+        validators: [new MaxFileSizeValidator({ maxSize: MAX_PROFILE_PICTURE_SIZE_BYTES })],
+      }),
+    )
+    files: Express.Multer.File[],
+  ) {
     if (files.length && files[0]) return this.usersService.uploadProfilePicture(id, files[0]);
     else throw new BadRequestException();
   }
 
   /** Send a link to merge two users */
   @Post(":userId/merge-request")
+  @ApiOkResponse()
   @Scopes("user-{userId}:merge")
   @RateLimit(10)
   async mergeRequest(

@@ -1,5 +1,5 @@
 import { Controller, Delete, Get, Patch, Post, Body, Param, Query } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { Prisma, Place } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ListPlacesRequestDto } from "./place.dto";
@@ -11,6 +11,7 @@ export class PlaceController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Post("")
+  @ApiCreatedResponse()
   @ApiBody({
     description: "Optional fields are address2 and geoJSON.",
     examples: {
@@ -41,6 +42,7 @@ export class PlaceController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async list(@Query() query: ListPlacesRequestDto) {
     const { page, pageSize } = query;
     return await this.prisma.findManyInManyPages({
@@ -50,11 +52,13 @@ export class PlaceController {
   }
 
   @Get(":placeId")
+  @ApiOkResponse()
   async getPlace(@Param("placeId") placeId: number): Promise<Place> {
     return await this.prisma.place.findUniqueOrThrow({ where: { id: placeId } });
   }
 
   @Patch(":placeId")
+  @ApiOkResponse()
   @ApiBody({
     description: "Update a specific user location.",
     examples: {
@@ -88,6 +92,7 @@ export class PlaceController {
   }
 
   @Delete(":placeId")
+  @ApiOkResponse()
   async deletePlace(@Param("placeId") placeId: number): Promise<Place> {
     return await this.prisma.place.delete({
       where: { id: placeId },

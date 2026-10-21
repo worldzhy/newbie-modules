@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from "@nestjs/common";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Domain, Prisma } from "@prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OptionalIntPipe } from "@devbie/newbie/pipes/optional-int.pipe";
@@ -11,12 +12,14 @@ import { DOMAIN_VERIFICATION_HTML, DOMAIN_VERIFICATION_TXT } from "./domains.con
 import { CreateDomainDto } from "./domains.dto";
 import { DomainsService } from "./domains.service";
 
+@ApiTags("Teams Domains")
 @Controller("teams/:teamId/domains")
 export class DomainController {
   constructor(private domainsService: DomainsService) {}
 
   /** Create a new domain for a team */
   @Post()
+  @ApiCreatedResponse()
   @AuditLog("create-domain")
   @Scopes("team-{teamId}:write-domain-*")
   async create(@Param("teamId", ParseIntPipe) teamId: number, @Body() data: CreateDomainDto): Promise<Expose<Domain>> {
@@ -25,6 +28,7 @@ export class DomainController {
 
   /** Get domains for a team */
   @Get()
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-domain-*")
   async getAll(
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -45,6 +49,7 @@ export class DomainController {
 
   /** Read a domain for a team */
   @Get(":id")
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-domain-{id}")
   async get(
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -55,6 +60,7 @@ export class DomainController {
 
   /** Delete a domain for a team */
   @Delete(":id")
+  @ApiOkResponse()
   @AuditLog("delete-domain")
   @Scopes("team-{teamId}:delete-domain-{id}")
   async remove(
@@ -66,6 +72,7 @@ export class DomainController {
 
   /** Verify a domain using TXT record */
   @Post(":id/verify/txt")
+  @ApiOkResponse()
   @AuditLog("verify-domain-txt")
   @Scopes("team-{teamId}:write-domain-{id}")
   async verifyTxt(
@@ -77,6 +84,7 @@ export class DomainController {
 
   /** Verify a domain using HTML file upload */
   @Post(":id/verify/html")
+  @ApiOkResponse()
   @AuditLog("verify-domain-html")
   @Scopes("team-{teamId}:write-domain-{id}")
   async verifyHtml(

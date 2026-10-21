@@ -9,7 +9,7 @@ import {
   Patch,
   Post,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import {
   PostgresqlDatasource,
   PostgresqlDatasourceConstraint,
@@ -55,6 +55,7 @@ export class PostgresqlDatasourceController {
       },
     },
   })
+  @ApiCreatedResponse()
   async createPostgresqlDatasource(
     @Body()
     body: {
@@ -68,6 +69,7 @@ export class PostgresqlDatasourceController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async getPostgresqlDatasources(): Promise<PostgresqlDatasource[]> {
     return await this.prisma.postgresqlDatasource.findMany({
       orderBy: {
@@ -81,6 +83,7 @@ export class PostgresqlDatasourceController {
   }
 
   @Get(":datasourceId")
+  @ApiOkResponse()
   async getPostgresqlDatasource(@Param("datasourceId") datasourceId: string): Promise<PostgresqlDatasource | null> {
     return await this.prisma.postgresqlDatasource.findUnique({
       where: { id: datasourceId },
@@ -102,6 +105,7 @@ export class PostgresqlDatasourceController {
       },
     },
   })
+  @ApiOkResponse()
   async updatePostgresqlDatasource(
     @Param("datasourceId") datasourceId: string,
     @Body() body: { host: string; port: number; database: string },
@@ -113,6 +117,7 @@ export class PostgresqlDatasourceController {
   }
 
   @Delete(":datasourceId")
+  @ApiOkResponse()
   async deletePostgresqlDatasourceTable(@Param("datasourceId") datasourceId: string): Promise<PostgresqlDatasource> {
     return await this.prisma.postgresqlDatasource.delete({
       where: { id: datasourceId },
@@ -120,6 +125,7 @@ export class PostgresqlDatasourceController {
   }
 
   @Patch(":datasourceId/load")
+  @ApiOkResponse()
   async loadPostgresqlDatasource(@Param("datasourceId") datasourceId: string): Promise<PostgresqlDatasource> {
     // * [step 1] Get the postgresql.
     const datasource = await this.prisma.postgresqlDatasource.findUnique({
@@ -227,6 +233,7 @@ export class PostgresqlDatasourceController {
    * Unload a postgresql datasource.
    */
   @Patch(":datasourceId/unload")
+  @ApiOkResponse()
   async unloadPostgresqlDatasource(@Param("datasourceId") datasourceId: string): Promise<PostgresqlDatasource> {
     // [step 1] Get the postgresql.
     const datasource = await this.prisma.postgresqlDatasource.findUnique({
@@ -254,6 +261,7 @@ export class PostgresqlDatasourceController {
   }
 
   @Get(":datasourceId/tables")
+  @ApiOkResponse()
   async getPostgresqlDatasourceTables(@Param("datasourceId") datasourceId: string): Promise<PostgresqlDatasource> {
     return await this.prisma.postgresqlDatasource.findUniqueOrThrow({
       where: { id: datasourceId },
@@ -262,6 +270,7 @@ export class PostgresqlDatasourceController {
   }
 
   @Get(":datasourceId/constraints")
+  @ApiOkResponse()
   async getPostgresqlDatasourceConstraints(
     @Param("datasourceId")
     datasourceId: string,
@@ -273,6 +282,7 @@ export class PostgresqlDatasourceController {
   }
 
   @Get(":datasourceId/constraints/:tableName")
+  @ApiOkResponse()
   async getPostgresqlDatasourceConstraintsByTable(
     @Param("datasourceId") datasourceId: string,
     @Param("tableName") tableName: string,
@@ -300,6 +310,7 @@ export class PostgresqlDatasourceController {
    * Overview a postgresql datasource.
    */
   @Get(":datasourceId/overview")
+  @ApiOkResponse()
   async overviewPostgresqlDatasource(@Param("datasourceId") datasourceId: string): Promise<{
     host: string;
     port: number;

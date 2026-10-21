@@ -1,6 +1,6 @@
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiOkResponse } from "@nestjs/swagger";
 import {
   CreateOrderRequestDto,
   CreateOrderResponseDto,
@@ -8,6 +8,7 @@ import {
   ListOrdersResponseDto,
   UpdateOrderResponseDto,
 } from "./order.dto";
+import { OrderEntity } from "./order.entity";
 import { OrderService } from "./order.service";
 import { TokenService } from "@modules/security/token/token.service";
 import { Request } from "express";
@@ -24,7 +25,7 @@ export class OrderController {
   ) {}
 
   @Post("")
-  @ApiResponse({ type: CreateOrderResponseDto })
+  @ApiCreatedResponse({ type: CreateOrderResponseDto })
   async createOrder(@Req() request: Request, @Body() body: CreateOrderRequestDto) {
     const accessToken = this.tokenService.getTokenFromHttpRequest(request);
     if (!accessToken) {
@@ -41,6 +42,7 @@ export class OrderController {
   }
 
   @Get(":id")
+  @ApiOkResponse({ type: OrderEntity })
   async getOrder(@Param("id") id: string) {
     const order = await this.prisma.order.findUnique({
       where: { id },
@@ -63,7 +65,7 @@ export class OrderController {
   }
 
   @Get("")
-  @ApiResponse({ type: ListOrdersResponseDto })
+  @ApiOkResponse({ type: ListOrdersResponseDto })
   async list(@Query() query: ListOrdersRequestDto) {
     const result = await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.Order,
@@ -96,6 +98,7 @@ export class OrderController {
   }
 
   @Delete(":id")
+  @ApiOkResponse({ type: OrderEntity })
   async deleteOrder(@Param("id") id: string) {
     return await this.prisma.order.delete({
       where: { id },
@@ -107,7 +110,7 @@ export class OrderController {
   //***********************************/
 
   @Patch(":id/paid")
-  @ApiResponse({ type: UpdateOrderResponseDto })
+  @ApiOkResponse({ type: UpdateOrderResponseDto })
   async paid(@Param("id") id: string) {
     return await this.prisma.order.update({
       where: { id },
@@ -116,7 +119,7 @@ export class OrderController {
   }
 
   @Patch(":id/refund-request")
-  @ApiResponse({ type: UpdateOrderResponseDto })
+  @ApiOkResponse({ type: UpdateOrderResponseDto })
   async refundRequest(@Param("id") id: string) {
     return await this.prisma.order.update({
       where: { id },
@@ -125,7 +128,7 @@ export class OrderController {
   }
 
   @Patch(":id/refund-approve")
-  @ApiResponse({ type: UpdateOrderResponseDto })
+  @ApiOkResponse({ type: UpdateOrderResponseDto })
   async refundApproval(@Param("id") id: string) {
     return await this.prisma.order.update({
       where: { id },
@@ -134,7 +137,7 @@ export class OrderController {
   }
 
   @Patch(":id/refund-reject")
-  @ApiResponse({ type: UpdateOrderResponseDto })
+  @ApiOkResponse({ type: UpdateOrderResponseDto })
   async refundReject(@Param("id") id: string) {
     return await this.prisma.order.update({
       where: { id },
@@ -143,7 +146,7 @@ export class OrderController {
   }
 
   @Patch(":id/refunded")
-  @ApiResponse({ type: UpdateOrderResponseDto })
+  @ApiOkResponse({ type: UpdateOrderResponseDto })
   async refunded(@Param("id") id: string) {
     return await this.prisma.order.update({
       where: { id },

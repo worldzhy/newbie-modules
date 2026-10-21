@@ -1,16 +1,19 @@
 import { Controller, Get, Param, ParseIntPipe, Query } from "@nestjs/common";
+import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import Stripe from "stripe";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OptionalIntPipe } from "@devbie/newbie/pipes/optional-int.pipe";
 import { Scopes } from "../auth/scope.decorator";
 import { StripeService } from "./stripe.service";
 
+@ApiTags("Teams Invoices")
 @Controller("teams/:teamId/invoices")
 export class StripeInvoicesController {
   constructor(private stripeService: StripeService) {}
 
   /** Read invoices for a team */
   @Get()
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-invoice-*")
   async getAll(
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -22,6 +25,7 @@ export class StripeInvoicesController {
 
   /** Read an invoice for a team */
   @Get(":id")
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-invoice-{id}")
   async get(@Param("teamId", ParseIntPipe) teamId: number, @Param("id") id: string): Promise<Stripe.Invoice> {
     return this.stripeService.getInvoice(teamId, id);

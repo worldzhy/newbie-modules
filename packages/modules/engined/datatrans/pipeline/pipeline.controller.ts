@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { DatatransPipelineService } from "./pipeline.service";
 import { PostgresqlDatasourceTableService } from "../../datasource/postgresql/table/table.service";
 import { ElasticsearchDatasourceIndexService } from "../../datasource/elasticsearch/index/index.service";
@@ -33,6 +33,7 @@ export class DatatransPipelineController {
       },
     },
   })
+  @ApiCreatedResponse()
   async createPipeline(
     @Body()
     body: Prisma.DatatransPipelineUncheckedCreateInput,
@@ -58,11 +59,13 @@ export class DatatransPipelineController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async getPipelines(): Promise<DatatransPipeline[]> {
     return await this.prisma.datatransPipeline.findMany({});
   }
 
   @Get(":pipelineId")
+  @ApiOkResponse()
   async getPipeline(@Param("pipelineId") pipelineId: string): Promise<DatatransPipeline | null> {
     return await this.prisma.datatransPipeline.findUnique({
       where: { id: pipelineId },
@@ -83,6 +86,7 @@ export class DatatransPipelineController {
       },
     },
   })
+  @ApiOkResponse()
   async updatePipeline(
     @Param("pipelineId") pipelineId: string,
     @Body()
@@ -95,6 +99,7 @@ export class DatatransPipelineController {
   }
 
   @Delete(":pipelineId")
+  @ApiOkResponse()
   async deletePipeline(@Param("pipelineId") pipelineId: string): Promise<DatatransPipeline> {
     return await this.prisma.datatransPipeline.delete({
       where: { id: pipelineId },
@@ -102,6 +107,7 @@ export class DatatransPipelineController {
   }
 
   @Get(":pipelineId/overview")
+  @ApiOkResponse()
   async overviewPipeline(@Param("pipelineId") pipelineId: string): Promise<{
     table: string;
     numberOfRecords: number;

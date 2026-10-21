@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query } from "@nestjs/common";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Prisma, Webhook } from "@generated/prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OrderByPipe } from "@devbie/newbie/pipes/order-by.pipe";
@@ -6,18 +7,21 @@ import { WherePipe } from "@devbie/newbie/pipes/where.pipe";
 import { CreateWebhookDto, ReplaceWebhookDto, UpdateWebhookDto } from "./webhook.dto";
 import { WebhookService } from "./webhook.service";
 
-@Controller("webhooks")
+@ApiTags("Webhook")
+@Controller("teams/:teamId/webhooks")
 export class WebhookController {
   constructor(private webhookService: WebhookService) {}
 
   /** Create a webhook for a group */
   @Post()
+  @ApiCreatedResponse()
   async create(@Param("teamId", ParseIntPipe) teamId: number, @Body() data: CreateWebhookDto): Promise<Webhook> {
     return this.webhookService.createWebhook({ ...data, teamId });
   }
 
   /** Get webhooks for a group */
   @Get()
+  @ApiOkResponse()
   async getAll(
     @Query("skip") skip?: number,
     @Query("take") take?: number,
@@ -36,18 +40,21 @@ export class WebhookController {
 
   /** Get webhook scopes for a group */
   @Get("scopes")
+  @ApiOkResponse({ type: Object })
   async scopes(): Promise<Record<string, string>> {
     return this.webhookService.getWebhookScopes();
   }
 
   /** Get a webhook for a group */
   @Get(":id")
+  @ApiOkResponse()
   async get(@Param("teamId", ParseIntPipe) teamId: number, @Param("id", ParseIntPipe) id: number): Promise<Webhook> {
     return this.webhookService.getWebhook(teamId, id);
   }
 
   /** Update a webhook for a group */
   @Patch(":id")
+  @ApiOkResponse()
   async update(
     @Body() data: UpdateWebhookDto,
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -58,6 +65,7 @@ export class WebhookController {
 
   /** Replace a webhook for a group */
   @Put(":id")
+  @ApiOkResponse()
   async replace(
     @Body() data: ReplaceWebhookDto,
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -68,6 +76,7 @@ export class WebhookController {
 
   /** Delete a webhook for a group */
   @Delete(":id")
+  @ApiOkResponse()
   async remove(@Param("teamId", ParseIntPipe) teamId: number, @Param("id", ParseIntPipe) id: number): Promise<Webhook> {
     return this.webhookService.deleteWebhook(teamId, id);
   }

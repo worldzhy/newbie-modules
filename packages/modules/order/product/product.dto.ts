@@ -1,34 +1,34 @@
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsNumber, IsOptional, IsString } from "class-validator";
 
-class ProductEntity {
+export class ProductEntity {
   @ApiProperty({ type: Number })
   id!: number;
 
   @ApiProperty({ type: String })
   name!: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   imageFileId?: string;
 
   @ApiProperty({ type: Number })
   priceInCents!: number;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   priceInCentsDiscounted?: number;
 }
 
 export class CreateProductRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   name!: string;
 
-  @ApiProperty({ type: Number, required: true })
+  @ApiProperty({ type: Number })
   @IsNumber()
   priceInCents!: number;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsNumber()
   priceInCentsDiscounted?: number;
@@ -49,7 +49,7 @@ export class CreateProductResponseDto {
 }
 
 export class ListProductsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   name?: string;
@@ -61,22 +61,22 @@ export class ListProductsResponseDto extends CommonListResponseDto {
 }
 
 export class UpdateProductRequestDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   imageFileId?: string;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsNumber()
   priceInCents?: number;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsNumber()
   priceInCentsDiscounted?: number;

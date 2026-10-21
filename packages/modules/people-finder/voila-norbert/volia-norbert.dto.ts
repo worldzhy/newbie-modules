@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsString, IsOptional } from "class-validator";
 
 export enum VoliaNorbertStatus {
@@ -21,9 +21,8 @@ export class SearchEmailByDomainReqDto {
   @IsString()
   name!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
   })
   @IsString()
   @IsOptional()
@@ -41,9 +40,8 @@ export class SearchEmailByDomainReqDto {
   @IsString()
   webhook!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: Number,
-    required: false,
   })
   @IsString()
   @IsOptional()

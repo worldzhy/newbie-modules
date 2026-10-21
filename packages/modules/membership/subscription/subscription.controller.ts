@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { MembershipService } from "../membership.service";
@@ -8,6 +8,8 @@ import {
   CreateSubscriptionRequestDto,
   GetSubscriptionRequestDto,
   ListSubscriptionsRequestDto,
+  ListSubscriptionsResponseDto,
+  SubscriptionResponseDto,
   UpdateSubscriptionRequestDto,
 } from "./subscription.dto";
 
@@ -23,6 +25,7 @@ export class SubscriptionController {
 
   @Get()
   @ApiOperation({ summary: "List all subscriptions" })
+  @ApiOkResponse({ type: ListSubscriptionsResponseDto })
   async listSubscriptions(@Query() query: ListSubscriptionsRequestDto) {
     const result = await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.Subscription,
@@ -78,6 +81,7 @@ export class SubscriptionController {
 
   @Post()
   @ApiOperation({ summary: "Create a new subscription" })
+  @ApiCreatedResponse({ type: SubscriptionResponseDto })
   async createSubscription(@Body() body: CreateSubscriptionRequestDto) {
     // [step 1] Find or create the membership for the user
     let membership = await this.prisma.membership.findUnique({
@@ -99,6 +103,7 @@ export class SubscriptionController {
 
   @Patch(":id")
   @ApiOperation({ summary: "Update an existing subscription" })
+  @ApiOkResponse({ type: SubscriptionResponseDto })
   async updateSubscription(@Param() params: GetSubscriptionRequestDto, @Body() body: UpdateSubscriptionRequestDto) {
     return await this.prisma.subscription.update({
       where: { id: params.id },
@@ -108,6 +113,7 @@ export class SubscriptionController {
 
   @Delete(":id")
   @ApiOperation({ summary: "Delete a subscription plan" })
+  @ApiOkResponse({ type: SubscriptionResponseDto })
   async deleteSubscriptionPlan(@Param() params: GetSubscriptionRequestDto) {
     return await this.prisma.subscription.delete({ where: { id: params.id } });
   }

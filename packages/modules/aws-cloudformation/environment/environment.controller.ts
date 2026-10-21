@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { AwsEnvironment, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsEnvironmentService } from "@modules/aws-cloudformation/environment/environment.service";
@@ -14,6 +14,7 @@ export class AwsEnvironmentController {
   ) {}
 
   @Post("")
+  @ApiCreatedResponse()
   @ApiBody({
     description: "The 'name' is required in request body.",
     examples: {
@@ -42,6 +43,7 @@ export class AwsEnvironmentController {
   }
 
   @Get(":environmentId")
+  @ApiOkResponse()
   async getEnvironment(@Param("environmentId") environmentId: string): Promise<AwsEnvironment> {
     return await this.prisma.awsEnvironment.findUniqueOrThrow({
       where: { id: environmentId },
@@ -49,6 +51,7 @@ export class AwsEnvironmentController {
   }
 
   @Patch(":environmentId")
+  @ApiOkResponse()
   @ApiBody({
     description: "Update environment variables.",
     examples: {
@@ -74,6 +77,7 @@ export class AwsEnvironmentController {
   }
 
   @Delete(":environmentId")
+  @ApiOkResponse()
   async deleteEnvironment(@Param("environmentId") environmentId: string): Promise<AwsEnvironment> {
     return await this.prisma.awsEnvironment.delete({
       where: { id: environmentId },

@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsString } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsOptional, IsString } from "class-validator";
 
 class CommonResDto {
   error?: unknown;
@@ -24,19 +24,19 @@ export class SearchPeopleLinkedinReqDto {
   @IsString()
   companyDomain!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
   })
   @IsString()
+  @IsOptional()
   lastName?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
     description: "Name of country, city or state",
   })
   @IsString()
+  @IsOptional()
   /** Name of country, city or state */
   location?: string;
 }

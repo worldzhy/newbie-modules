@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsString, IsObject, IsDefined } from "class-validator";
 import { LarkMessageBotSendMessageReqBody } from "./lark.interface";
 
@@ -24,9 +24,9 @@ export class LarkMessageBotSendTextMessageReqDto {
 }
 
 export class LarkMessageBotSendMessageResDto {
-  @ApiProperty({ type: Object, required: false })
+  @ApiPropertyOptional({ type: Object })
   res?: object;
 
-  @ApiProperty({ type: Object, required: false })
+  @ApiPropertyOptional({ type: Object })
   error?: object;
 }

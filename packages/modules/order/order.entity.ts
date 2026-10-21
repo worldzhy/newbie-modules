@@ -1,20 +1,24 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { OrderStatus, PaymentMethod } from "@generated/prisma/client";
-import { IsOptional } from "class-validator";
+import { IsNumber, IsOptional, IsString } from "class-validator";
 
 export class OrderItemRequestEntity {
   @ApiProperty({ type: String })
+  @IsString()
   skuId!: string;
 
   @ApiProperty({ type: String })
+  @IsString()
   name!: string;
 
   @ApiProperty({ type: Number })
+  @IsNumber()
   priceInCents!: number;
 
-  @ApiProperty({ type: Number })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
-  quantity!: number;
+  @IsNumber()
+  quantity?: number;
 }
 
 export class OrderItemResponseEntity {
@@ -53,7 +57,7 @@ export class OrderEntity {
   @ApiProperty({ type: OrderItemResponseEntity, isArray: true })
   items!: OrderItemResponseEntity[];
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   note?: string;
 
   @ApiProperty({ type: String })

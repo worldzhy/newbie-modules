@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { PostgresqlDatasourceTable, Prisma } from "@generated/prisma/client";
 import { PostgresqlDatasourceTableService } from "./table.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -26,6 +26,7 @@ export class PostgresqlDatasourceTableController {
       },
     },
   })
+  @ApiCreatedResponse()
   async createPostgresqlDatasourceTable(
     @Body() body: Prisma.PostgresqlDatasourceTableUncheckedCreateInput,
   ): Promise<PostgresqlDatasourceTable> {
@@ -39,11 +40,13 @@ export class PostgresqlDatasourceTableController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async getPostgresqlDatasourceTables(): Promise<PostgresqlDatasourceTable[]> {
     return await this.prisma.postgresqlDatasourceTable.findMany({});
   }
 
   @Get(":tableId")
+  @ApiOkResponse()
   async getPostgresqlDatasourceTable(@Param("tableId") tableId: number): Promise<PostgresqlDatasourceTable | null> {
     return await this.prisma.postgresqlDatasourceTable.findUnique({
       where: { id: tableId },
@@ -51,6 +54,7 @@ export class PostgresqlDatasourceTableController {
   }
 
   @Patch(":tableId")
+  @ApiOkResponse()
   async updateElasticsearchDatasourceIndex(
     @Param("tableId") tableId: number,
     @Body() body: Prisma.PostgresqlDatasourceTableUpdateInput,
@@ -62,6 +66,7 @@ export class PostgresqlDatasourceTableController {
   }
 
   @Delete(":tableId")
+  @ApiOkResponse()
   async deletePostgresqlDatasourceTable(@Param("tableId") tableId: number): Promise<PostgresqlDatasourceTable> {
     // [step 1] Get the table.
     const table = await this.prisma.postgresqlDatasourceTable.findUniqueOrThrow({ where: { id: tableId } });
@@ -76,6 +81,7 @@ export class PostgresqlDatasourceTableController {
   }
 
   @Get(":tableId/columns")
+  @ApiOkResponse()
   async getPostgresqlDatasourceColumns(@Param("tableId") tableId: number): Promise<PostgresqlDatasourceTable> {
     return await this.postgresqlDatasourceTableService.findUniqueOrThrow({
       where: { id: tableId },

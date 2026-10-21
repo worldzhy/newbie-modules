@@ -1,5 +1,6 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsString, IsOptional, IsArray, IsBoolean } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsString, IsOptional, IsArray, IsBoolean, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
 
 export class ContactSearchPeopleBase {
   @ApiProperty({
@@ -14,49 +15,43 @@ export class ContactSearchPeopleBase {
   @IsString()
   userSource!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
   })
   @IsString()
   @IsOptional()
   name?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
   })
   @IsString()
   @IsOptional()
   firstName?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
   })
   @IsString()
   @IsOptional()
   middleName?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
   })
   @IsString()
   @IsOptional()
   lastName?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
   })
   @IsString()
   @IsOptional()
   companyDomain?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
   })
   @IsString()
   @IsOptional()
@@ -87,19 +82,19 @@ export class CreateContactSearchTaskBatchReqDto {
     isArray: true,
   })
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ContactSearchPeopleTaskDto)
   peoples!: ContactSearchPeopleTaskDto[];
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: Boolean,
-    required: false,
   })
   @IsBoolean()
   @IsOptional()
   findPhone?: boolean;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: Boolean,
-    required: false,
   })
   @IsBoolean()
   @IsOptional()
@@ -111,9 +106,8 @@ export class CreateContactSearchTaskBatchReqDto {
   @IsString()
   batchId!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
   })
   @IsString()
   @IsOptional()

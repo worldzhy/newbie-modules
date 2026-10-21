@@ -1,20 +1,22 @@
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { OrderStatus, PaymentMethod } from "@generated/prisma/client";
-import { IsArray, IsIn, IsOptional, IsString } from "class-validator";
+import { IsArray, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
 import { OrderEntity, OrderItemRequestEntity } from "./order.entity";
 
 export class CreateOrderRequestDto {
-  @ApiProperty({ type: String, required: true })
-  @IsString()
-  @IsIn(Object.values(PaymentMethod))
+  @ApiProperty({ type: String, enum: PaymentMethod })
+  @IsEnum(PaymentMethod)
   paymentMethod: PaymentMethod;
 
-  @ApiProperty({ type: OrderItemRequestEntity, isArray: true, required: true })
+  @ApiProperty({ type: OrderItemRequestEntity, isArray: true })
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderItemRequestEntity)
   items!: OrderItemRequestEntity[];
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   note?: string;
@@ -33,7 +35,7 @@ export class CreateOrderResponseDto {
   @ApiProperty({ enum: PaymentMethod })
   paymentMethod: PaymentMethod;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   note?: string;
 
   @ApiProperty({ type: String })
@@ -41,7 +43,7 @@ export class CreateOrderResponseDto {
 }
 
 export class ListOrdersRequestDto extends CommonListRequestDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   userId?: string;
@@ -53,13 +55,12 @@ export class ListOrdersResponseDto extends CommonListResponseDto {
 }
 
 export class UpdateOrderRequestDto {
-  @ApiProperty({ type: String, required: false })
-  @IsString()
+  @ApiPropertyOptional({ type: String, enum: OrderStatus })
   @IsOptional()
-  @IsIn(Object.values(OrderStatus))
+  @IsEnum(OrderStatus)
   status?: OrderStatus;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   note?: string;

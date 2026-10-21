@@ -1,5 +1,5 @@
 import { Controller, Delete, Get, Patch, Post, Body, Param, Query } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse } from "@nestjs/swagger";
 import { Organization, PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -13,6 +13,7 @@ export class OrganizationController {
 
   @Post("")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Organization)
+  @ApiCreatedResponse()
   @ApiBody({
     description: "The 'name' is required in request body.",
     examples: {
@@ -32,6 +33,7 @@ export class OrganizationController {
 
   @Get("")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.Organization)
+  @ApiOkResponse()
   async list(@Query() query: ListOrganizationsRequestDto) {
     const { page, pageSize } = query;
 
@@ -63,6 +65,7 @@ export class OrganizationController {
 
   @Get(":organizationId")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.Organization)
+  @ApiOkResponse()
   async getOrganization(@Param("organizationId") organizationId: string): Promise<Organization> {
     return await this.prisma.organization.findUniqueOrThrow({
       where: { id: organizationId },
@@ -71,6 +74,7 @@ export class OrganizationController {
 
   @Patch(":organizationId")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.Organization)
+  @ApiOkResponse()
   @ApiBody({
     description: "",
     examples: {
@@ -95,6 +99,7 @@ export class OrganizationController {
 
   @Delete(":organizationId")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Organization)
+  @ApiOkResponse()
   async deleteOrganization(@Param("organizationId") organizationId: string): Promise<Organization> {
     return await this.prisma.organization.delete({
       where: { id: organizationId },

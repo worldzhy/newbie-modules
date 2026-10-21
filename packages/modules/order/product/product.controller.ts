@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiOkResponse } from "@nestjs/swagger";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Prisma } from "@generated/prisma/client";
 import {
@@ -7,6 +7,7 @@ import {
   CreateProductResponseDto,
   ListProductsRequestDto,
   ListProductsResponseDto,
+  ProductEntity,
   UpdateProductRequestDto,
   UpdateProductResponseDto,
 } from "./product.dto";
@@ -18,13 +19,13 @@ export class ProductController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Post("")
-  @ApiResponse({ type: CreateProductResponseDto })
+  @ApiCreatedResponse({ type: CreateProductResponseDto })
   async createProduct(@Body() body: CreateProductRequestDto) {
     return await this.prisma.product.create({ data: body });
   }
 
   @Get("")
-  @ApiResponse({ type: ListProductsResponseDto })
+  @ApiOkResponse({ type: ListProductsResponseDto })
   async list(@Query() query: ListProductsRequestDto) {
     const { name, ...pagination } = query;
 
@@ -39,12 +40,13 @@ export class ProductController {
   }
 
   @Get(":id")
+  @ApiOkResponse({ type: ProductEntity })
   async getProductById(@Param("id") id: number) {
     return await this.prisma.product.findUnique({ where: { id } });
   }
 
   @Patch(":id")
-  @ApiResponse({ type: UpdateProductResponseDto })
+  @ApiOkResponse({ type: UpdateProductResponseDto })
   async updateProduct(@Param("id") id: number, @Body() body: UpdateProductRequestDto) {
     return await this.prisma.product.update({
       where: { id },
@@ -53,6 +55,7 @@ export class ProductController {
   }
 
   @Delete(":id")
+  @ApiOkResponse({ type: ProductEntity })
   async deleteFile(@Param("id") id: number) {
     return await this.prisma.product.delete({
       where: { id },

@@ -12,7 +12,7 @@ import {
 import { TencentCosService } from "./tencent-cos.service";
 import { Express } from "express";
 import { FileInterceptor } from "@nestjs/platform-express";
-import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 
 @ApiTags("Tencent COS")
 @ApiBearerAuth()
@@ -21,6 +21,8 @@ export class TencentCosController {
   constructor(private readonly cos: TencentCosService) {}
 
   @Post("")
+  @ApiConsumes("multipart/form-data")
+  @ApiCreatedResponse({ type: Object })
   @ApiBody({
     description: "The 'file' is required in request body.",
   })
@@ -52,21 +54,25 @@ export class TencentCosController {
   }
 
   @Get("")
+  @ApiOkResponse({ type: Object })
   async getFile(@Query("key") key: string) {
     return await this.cos.getObject(key);
   }
 
   @Post("getSignedDownloadUrl")
+  @ApiOkResponse({ type: Object })
   async getFilePreview(@Body() body: { key: string }) {
     return await this.cos.getSignedDownloadUrl({ key: body.key });
   }
 
   @Post("delete")
+  @ApiOkResponse({ type: Object })
   async deleteFile(@Body() { key }: { key: string }): Promise<any> {
     return await this.cos.deleteFile(key);
   }
 
   @Post("initMultipartUpload")
+  @ApiCreatedResponse({ type: Object })
   async initMultipartUpload(@Body() body: { fileName: string }) {
     const path = process.env.STORE_PATH as string;
     const key = `${path}/large/${Date.now()}-${body.fileName}`;
@@ -79,6 +85,20 @@ export class TencentCosController {
   }
 
   @Post("uploadPart")
+  @ApiConsumes("multipart/form-data")
+  @ApiCreatedResponse({ type: Object })
+  @ApiBody({
+    schema: {
+      type: "object",
+      properties: {
+        chunk: { type: "string", format: "binary", description: "A single chunk of the uploaded file." },
+        key: { type: "string", description: "The object key of the multipart upload." },
+        uploadId: { type: "string", description: "The multipart upload ID." },
+        partNumber: { type: "string", description: "The 1-based part number." },
+      },
+      required: ["chunk", "key", "uploadId", "partNumber"],
+    },
+  })
   @UseInterceptors(
     FileInterceptor("chunk", {
       limits: { fileSize: 1024 * 1024 * 10 },
@@ -98,6 +118,7 @@ export class TencentCosController {
   }
 
   @Post("completeMultipartUpload")
+  @ApiCreatedResponse({ type: Object })
   async completeMultipartUpload(
     @Body()
     body: {

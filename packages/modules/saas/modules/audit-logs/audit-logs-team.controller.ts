@@ -1,5 +1,5 @@
 import { Controller, Get, Param, ParseIntPipe, Query } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { AuditLog, Prisma } from "@prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { expose } from "../../helpers/expose";
@@ -13,6 +13,7 @@ export class AuditLogTeamController {
 
   /** Get audit logs for a team */
   @Get()
+  @ApiOkResponse({ type: AuditLogsListResDto })
   @Scopes("team-{teamId}:read-audit-log-*")
   async getAll(
     @Param("teamId", ParseIntPipe) teamId: number,

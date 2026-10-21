@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from "@nestjs/common";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Email, Prisma } from "@prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OptionalIntPipe } from "@devbie/newbie/pipes/optional-int.pipe";
@@ -9,12 +10,14 @@ import { Scopes } from "../auth/scope.decorator";
 import { CreateEmailDto } from "./emails.dto";
 import { EmailsService } from "./emails.service";
 
+@ApiTags("Users Emails")
 @Controller("users/:userId/emails")
 export class EmailController {
   constructor(private emailsService: EmailsService) {}
 
   /** Create a new email for a user */
   @Post()
+  @ApiCreatedResponse()
   @Scopes("user-{userId}:write-email-*")
   async create(@Param("userId", ParseIntPipe) userId: number, @Body() data: CreateEmailDto): Promise<Expose<Email>> {
     return this.emailsService.createEmail(userId, data);
@@ -22,6 +25,7 @@ export class EmailController {
 
   /** Get emails for a user */
   @Get()
+  @ApiOkResponse()
   @Scopes("user-{userId}:read-email-*")
   async getAll(
     @Param("userId", ParseIntPipe) userId: number,
@@ -42,6 +46,7 @@ export class EmailController {
 
   /** Get an email for a user */
   @Get(":id")
+  @ApiOkResponse()
   @Scopes("user-{userId}:read-email-{id}")
   async get(
     @Param("userId", ParseIntPipe) userId: number,
@@ -52,6 +57,7 @@ export class EmailController {
 
   /** Delete an email for a user */
   @Delete(":id")
+  @ApiOkResponse()
   @Scopes("user-{userId}:delete-email-{id}")
   async remove(
     @Param("userId", ParseIntPipe) userId: number,

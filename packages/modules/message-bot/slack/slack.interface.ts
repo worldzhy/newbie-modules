@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsObject, IsString, IsOptional, IsBoolean } from "class-validator";
 import { SlackWebhookMessageType } from "./slack.constants";
 
@@ -9,22 +9,22 @@ export class SlackMessageBotSendMessageReqBody {
   @IsString()
   [SlackWebhookMessageType.Text]!: string;
 
-  @ApiProperty({ type: Object, isArray: true, required: false })
+  @ApiPropertyOptional({ type: Object, isArray: true })
   @IsObject()
   @IsOptional()
   [SlackWebhookMessageType.Blocks]?: object[];
 
-  @ApiProperty({ type: Object, isArray: true, required: false })
+  @ApiPropertyOptional({ type: Object, isArray: true })
   @IsObject()
   @IsOptional()
   [SlackWebhookMessageType.Attachments]?: object[];
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   [SlackWebhookMessageType.Thread_ts]?: string;
 
-  @ApiProperty({ type: Boolean, required: false })
+  @ApiPropertyOptional({ type: Boolean })
   @IsBoolean()
   @IsOptional()
   [SlackWebhookMessageType.Mrkdwn]?: boolean;

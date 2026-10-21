@@ -1,5 +1,5 @@
 import { Controller, Delete, Get, Patch, Post, Body, Param, Query } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { Tag, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ListTagsRequestDto } from "./tag.dto";
@@ -11,6 +11,7 @@ export class TagController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get("grouped")
+  @ApiOkResponse({ type: Object, isArray: true })
   async getGroupedTags() {
     const tagGroups = await this.prisma.tagGroup.findMany({
       select: {
@@ -35,6 +36,7 @@ export class TagController {
   }
 
   @Post("")
+  @ApiCreatedResponse()
   @ApiBody({
     description: "The 'name' is required in request body.",
     examples: {
@@ -54,6 +56,7 @@ export class TagController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async list(@Query() query: ListTagsRequestDto) {
     const { page, pageSize } = query;
 
@@ -83,6 +86,7 @@ export class TagController {
   }
 
   @Get(":tagId")
+  @ApiOkResponse()
   async getTag(@Param("tagId") tagId: number): Promise<Tag> {
     return await this.prisma.tag.findUniqueOrThrow({
       where: { id: tagId },
@@ -90,6 +94,7 @@ export class TagController {
   }
 
   @Patch(":tagId")
+  @ApiOkResponse()
   @ApiBody({
     description: "",
     examples: {
@@ -114,6 +119,7 @@ export class TagController {
   }
 
   @Delete(":tagId")
+  @ApiOkResponse()
   async deleteTag(@Param("tagId") tagId: number): Promise<Tag> {
     return await this.prisma.tag.delete({
       where: { id: tagId },

@@ -1,7 +1,9 @@
 import { Body, Controller, Headers, Post } from "@nestjs/common";
+import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Public } from "../auth/public.decorator";
 import { StripeService } from "./stripe.service";
 
+@ApiTags("Stripe Webhooks")
 @Controller("webhooks/stripe")
 @Public()
 export class StripeWebhookController {
@@ -9,6 +11,7 @@ export class StripeWebhookController {
 
   /** Handle a Stripe webhook */
   @Post()
+  @ApiOkResponse()
   async handleWebhook(
     @Headers("stripe-signature") signature: string,
     @Body() raw: Buffer,

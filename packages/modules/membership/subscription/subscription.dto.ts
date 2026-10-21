@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { CommonListRequestDto } from "@devbie/newbie/common.dto";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { BillingCycle, SubscriptionStatus } from "@generated/prisma/client";
 import { IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
 import { Type } from "class-transformer";
@@ -8,66 +8,145 @@ import { Type } from "class-transformer";
 export class ListSubscriptionPlansRequestDto extends CommonListRequestDto {}
 
 export class CreateSubscriptionPlanRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   name!: string;
 
-  @ApiProperty({ type: String, enum: BillingCycle, required: true })
+  @ApiProperty({ type: String, enum: BillingCycle })
   @IsEnum(BillingCycle)
   billingCycle: BillingCycle;
 
-  @ApiProperty({ type: Number, required: true })
+  @ApiProperty({ type: Number })
   @IsNumber()
   @Type(() => Number)
   priceInCents!: number;
 }
 
 export class UpdateSubscriptionPlanRequestDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsNumber()
   priceInCents?: number;
 
-  @ApiProperty({ type: String, enum: BillingCycle, required: false })
+  @ApiPropertyOptional({ type: String, enum: BillingCycle })
   @IsOptional()
   @IsEnum(BillingCycle)
   billingCycle?: BillingCycle;
 }
 
 export class GetSubscriptionPlanRequestDto {
-  @ApiProperty({ type: Number, required: true })
+  @ApiProperty({ type: Number })
   @IsNumber()
   @Type(() => Number)
   id!: number;
+}
+
+export class SubscriptionPlanResponseDto {
+  @ApiProperty({ type: Number })
+  id!: number;
+
+  @ApiProperty({ type: String })
+  name!: string;
+
+  @ApiProperty({ type: Number })
+  priceInCents!: number;
+
+  @ApiProperty({ type: String, enum: BillingCycle })
+  billingCycle!: BillingCycle;
+
+  @ApiPropertyOptional({ type: Object })
+  features?: object | null;
+
+  @ApiProperty({ type: Date })
+  createdAt!: Date;
+
+  @ApiProperty({ type: Date })
+  updatedAt!: Date;
+}
+
+export class ListSubscriptionPlansResponseDto extends CommonListResponseDto {
+  @ApiProperty({ type: SubscriptionPlanResponseDto, isArray: true })
+  declare records: SubscriptionPlanResponseDto[];
 }
 
 // Subscription Dtos
 export class ListSubscriptionsRequestDto extends CommonListRequestDto {}
 
 export class CreateSubscriptionRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   userId!: string;
 
-  @ApiProperty({ type: Number, required: true })
+  @ApiProperty({ type: Number })
   @IsNumber()
   @Type(() => Number)
   planId!: number;
 }
 
 export class UpdateSubscriptionRequestDto {
-  @ApiProperty({ type: String, enum: SubscriptionStatus, required: true })
+  @ApiProperty({ type: String, enum: SubscriptionStatus })
   @IsEnum(SubscriptionStatus)
   status: SubscriptionStatus;
 }
 
 export class GetSubscriptionRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   id!: string;
+}
+
+export class SubscriptionResponseDto {
+  @ApiProperty({ type: String })
+  id!: string;
+
+  @ApiProperty({ type: String, enum: SubscriptionStatus })
+  status!: SubscriptionStatus;
+
+  @ApiProperty({ type: Date })
+  dateOfStart!: Date;
+
+  @ApiProperty({ type: Date })
+  dateOfEnd!: Date;
+
+  @ApiProperty({ type: Boolean })
+  autoRenew!: boolean;
+
+  @ApiProperty({ type: Number })
+  paymentAmountInCents!: number;
+
+  @ApiPropertyOptional({ type: String })
+  wechatTransactionId?: string | null;
+
+  @ApiProperty({ type: String })
+  membershipId!: string;
+
+  @ApiProperty({ type: Number })
+  planId!: number;
+
+  @ApiProperty({ type: Date })
+  createdAt!: Date;
+
+  @ApiProperty({ type: Date })
+  updatedAt!: Date;
+}
+
+export class SubscriptionListItemResponseDto extends SubscriptionResponseDto {
+  @ApiPropertyOptional({ type: String })
+  cardNumber?: string | null;
+
+  @ApiProperty({ type: String })
+  userName!: string;
+
+  @ApiProperty({ type: String })
+  userPhone!: string;
+}
+
+export class ListSubscriptionsResponseDto extends CommonListResponseDto {
+  @ApiProperty({ type: SubscriptionListItemResponseDto, isArray: true })
+  declare records: SubscriptionListItemResponseDto[];
 }

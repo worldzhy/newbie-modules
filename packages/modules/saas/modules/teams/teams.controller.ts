@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Put, Query } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Team, Prisma } from "@prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OptionalIntPipe } from "@devbie/newbie/pipes/optional-int.pipe";
@@ -19,6 +19,7 @@ export class TeamController {
 
   /** Get teams */
   @Get()
+  @ApiOkResponse()
   @Scopes("team-*:read-info")
   async getAll(
     @Query("skip", OptionalIntPipe) skip?: number,
@@ -38,6 +39,7 @@ export class TeamController {
 
   /** Get team details */
   @Get(":teamId")
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-info")
   async get(
     @Param("teamId", ParseIntPipe) id: number,
@@ -49,6 +51,7 @@ export class TeamController {
 
   /** Update a team */
   @Patch(":teamId")
+  @ApiOkResponse()
   @AuditLog("update-info")
   @Scopes("team-{teamId}:write-info")
   async update(@Body() data: UpdateTeamDto, @Param("teamId", ParseIntPipe) id: number): Promise<Expose<Team>> {
@@ -57,6 +60,7 @@ export class TeamController {
 
   /** Replace a team */
   @Put(":teamId")
+  @ApiOkResponse()
   @AuditLog("update-info")
   @Scopes("team-{teamId}:write-info")
   async replace(@Body() data: ReplaceTeamDto, @Param("teamId", ParseIntPipe) id: number): Promise<Expose<Team>> {
@@ -65,6 +69,7 @@ export class TeamController {
 
   /** Delete a team */
   @Delete(":teamId")
+  @ApiOkResponse()
   @AuditLog("delete")
   @Scopes("team-{teamId}:delete")
   async remove(@Param("teamId", ParseIntPipe) id: number): Promise<Expose<Team>> {

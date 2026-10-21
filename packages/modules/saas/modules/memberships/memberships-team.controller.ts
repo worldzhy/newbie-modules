@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Ip, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
 import { Membership, Prisma } from "@prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { ApiTags, ApiResponse } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiOkResponse, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { expose } from "../../helpers/expose";
 import { Expose } from "../../helpers/interfaces";
 import { AuditLog } from "../audit-logs/audit-log.decorator";
@@ -20,6 +20,7 @@ export class TeamMembershipController {
 
   /** Add a member to a team */
   @Post()
+  @ApiCreatedResponse()
   @AuditLog("add-membership")
   @Scopes("team-{teamId}:write-membership-*")
   async create(
@@ -56,6 +57,7 @@ export class TeamMembershipController {
 
   /** Get a membership for a team */
   @Get(":id")
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-membership-{id}")
   async get(
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -66,6 +68,7 @@ export class TeamMembershipController {
 
   /** Update a membership for a team */
   @Patch(":id")
+  @ApiOkResponse()
   @AuditLog("update-membership")
   @Scopes("team-{teamId}:write-membership-{id}")
   async update(
@@ -78,6 +81,7 @@ export class TeamMembershipController {
 
   /** Remove a member from a team */
   @Delete(":id")
+  @ApiOkResponse()
   @AuditLog("delete-membership")
   @Scopes("team-{teamId}:delete-membership-{id}")
   async remove(

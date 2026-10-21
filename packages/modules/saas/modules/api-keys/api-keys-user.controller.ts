@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { AuditLog } from "../audit-logs/audit-log.decorator";
 import { ApiKey, Prisma } from "@prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
@@ -18,6 +18,7 @@ export class ApiKeyUserController {
 
   /** Create an API key for a user */
   @Post()
+  @ApiCreatedResponse()
   @AuditLog("create-api-key")
   @Scopes("user-{userId}:write-api-key-*")
   async create(@Param("userId", ParseIntPipe) userId: number, @Body() data: CreateApiKeyDto): Promise<Expose<ApiKey>> {
@@ -26,6 +27,7 @@ export class ApiKeyUserController {
 
   /** Get API keys for a user */
   @Get()
+  @ApiOkResponse()
   @Scopes("user-{userId}:read-api-key-*")
   async getAll(
     @Param("userId", ParseIntPipe) userId: number,
@@ -46,6 +48,7 @@ export class ApiKeyUserController {
 
   /** Get API key scopes for a user */
   @Get("scopes")
+  @ApiOkResponse({ type: Object })
   @Scopes("user-{userId}:write-api-key-*")
   async scopes(@Param("userId", ParseIntPipe) userId: number): Promise<Record<string, string>> {
     return this.apiKeysService.getApiKeyScopesForUserCustomized(userId);
@@ -53,6 +56,7 @@ export class ApiKeyUserController {
 
   /** Get an API key */
   @Get(":id")
+  @ApiOkResponse()
   @Scopes("user-{userId}:read-api-key-{id}")
   async get(
     @Param("userId", ParseIntPipe) userId: number,
@@ -63,6 +67,7 @@ export class ApiKeyUserController {
 
   /** Update an API key */
   @Patch(":id")
+  @ApiOkResponse()
   @AuditLog("update-api-key")
   @Scopes("user-{userId}:write-api-key-{id}")
   async update(
@@ -75,6 +80,7 @@ export class ApiKeyUserController {
 
   /** Replace an API key */
   @Put(":id")
+  @ApiOkResponse()
   @AuditLog("update-api-key")
   @Scopes("user-{userId}:write-api-key-{id}")
   async replace(
@@ -87,6 +93,7 @@ export class ApiKeyUserController {
 
   /** Delete an API key */
   @Delete(":id")
+  @ApiOkResponse()
   @AuditLog("delete-api-key")
   @Scopes("user-{userId}:delete-api-key-{id}")
   async remove(
@@ -98,6 +105,7 @@ export class ApiKeyUserController {
 
   /** Get logs for an API key */
   @Get(":id/logs")
+  @ApiOkResponse({ type: Object, isArray: true })
   @Scopes("user-{userId}:read-api-key-logs-*")
   async getLogs(
     @Param("userId", ParseIntPipe) userId: number,

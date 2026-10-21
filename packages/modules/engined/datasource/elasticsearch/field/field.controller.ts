@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { ElasticsearchDatasourceIndexField, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
@@ -22,6 +22,7 @@ export class ElasticsearchDatasourceIndexFieldController {
       },
     },
   })
+  @ApiCreatedResponse()
   async createElasticsearchDatasourceIndexField(
     @Body() body: Prisma.ElasticsearchDatasourceIndexFieldUncheckedCreateInput,
   ): Promise<ElasticsearchDatasourceIndexField> {
@@ -31,9 +32,11 @@ export class ElasticsearchDatasourceIndexFieldController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async getElasticsearchDatasourceIndexFields(@Query("page") _page: number, @Query("pageSize") _pageSize: number) {}
 
   @Get(":indexId")
+  @ApiOkResponse()
   async getElasticsearchDatasourceIndexField(
     @Param("indexId") indexId: number,
   ): Promise<ElasticsearchDatasourceIndexField | null> {
@@ -43,6 +46,7 @@ export class ElasticsearchDatasourceIndexFieldController {
   }
 
   @Patch(":indexId")
+  @ApiOkResponse()
   async updateElasticsearchDatasourceIndexField(
     @Param("indexId") indexId: number,
     @Body() body: Prisma.ElasticsearchDatasourceIndexFieldUpdateInput,
@@ -54,6 +58,7 @@ export class ElasticsearchDatasourceIndexFieldController {
   }
 
   @Delete(":indexId")
+  @ApiOkResponse()
   async deleteElasticsearchDatasourceIndexField(
     @Param("indexId") indexId: number,
   ): Promise<ElasticsearchDatasourceIndexField> {
