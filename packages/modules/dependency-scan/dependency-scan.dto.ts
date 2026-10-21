@@ -98,7 +98,7 @@ export class DependencyScanFindingDto {
   @ApiProperty({ description: "OSV vulnerability ID (e.g. GHSA-...)" })
   vulnId!: string;
 
-  @ApiProperty({ type: [String], isArray: true, description: "Vulnerability aliases (e.g. CVE IDs)" })
+  @ApiProperty({ type: String, isArray: true, description: "Vulnerability aliases (e.g. CVE IDs)" })
   aliases!: string[];
 
   @ApiProperty({ description: "Severity level" })
@@ -155,7 +155,7 @@ export class DependencyScanApplicationOverviewDto {
   @ApiProperty({ description: "Open findings counts by severity", type: DependencyScanOpenSummaryDto })
   openSummary!: DependencyScanOpenSummaryDto;
 
-  @ApiProperty({ type: [DependencyScanFindingDto], isArray: true, description: "Open findings sorted by severity" })
+  @ApiProperty({ type: DependencyScanFindingDto, isArray: true, description: "Open findings sorted by severity" })
   findings!: DependencyScanFindingDto[];
 }
 
@@ -177,7 +177,7 @@ export class DependencyScanProjectReportResponseDto {
   summary!: DependencyScanProjectSummaryDto;
 
   @ApiProperty({
-    type: [DependencyScanApplicationOverviewDto],
+    type: DependencyScanApplicationOverviewDto,
     isArray: true,
     description: "Per-application scan state and open findings",
   })

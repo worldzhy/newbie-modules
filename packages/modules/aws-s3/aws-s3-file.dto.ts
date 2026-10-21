@@ -278,7 +278,7 @@ export class CompleteMultipartUploadRequestDto {
   uploadId!: string;
 
   @ApiProperty({
-    type: [UploadPartInfo],
+    type: UploadPartInfo,
     isArray: true,
   })
   @Type(() => UploadPartInfo)

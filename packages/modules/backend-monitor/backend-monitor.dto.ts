@@ -207,7 +207,7 @@ export class CreateBackendMonitorIngestDto {
   appVersion?: string;
 
   @ApiPropertyOptional({
-    type: [BackendMonitorRequestEventDto],
+    type: BackendMonitorRequestEventDto,
     description: "Request metric events (max 500)",
     isArray: true,
   })
@@ -218,7 +218,7 @@ export class CreateBackendMonitorIngestDto {
   requests?: BackendMonitorRequestEventDto[];
 
   @ApiPropertyOptional({
-    type: [BackendMonitorErrorEventDto],
+    type: BackendMonitorErrorEventDto,
     description: "Error events (max 500)",
     isArray: true,
   })
@@ -389,7 +389,7 @@ export class BackendMonitorErrorLogResponseDto {
 }
 
 export class ListBackendMonitorRequestLogsResponseDto {
-  @ApiProperty({ type: [BackendMonitorRequestLogResponseDto], isArray: true })
+  @ApiProperty({ type: BackendMonitorRequestLogResponseDto, isArray: true })
   records!: BackendMonitorRequestLogResponseDto[];
 
   @ApiProperty({ type: Number })
@@ -397,7 +397,7 @@ export class ListBackendMonitorRequestLogsResponseDto {
 }
 
 export class ListBackendMonitorErrorLogsResponseDto {
-  @ApiProperty({ type: [BackendMonitorErrorLogResponseDto], isArray: true })
+  @ApiProperty({ type: BackendMonitorErrorLogResponseDto, isArray: true })
   records!: BackendMonitorErrorLogResponseDto[];
 
   @ApiProperty({ type: Number })

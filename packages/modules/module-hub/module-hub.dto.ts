@@ -98,7 +98,7 @@ export class HubReportDto {
   // Module snapshot in the shape of `newbie status --json` modules[] entries
   // (see design doc section 3). Source: the framework's own assembled-module
   // inventory, NOT a CLI invocation (design doc section 5).
-  @ApiPropertyOptional({ description: "newbie status --json modules[] shape", isArray: true })
+  @ApiPropertyOptional({ type: Object, description: "newbie status --json modules[] shape", isArray: true })
   @IsOptional()
   @IsArray()
   @IsObject({ each: true })

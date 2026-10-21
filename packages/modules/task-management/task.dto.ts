@@ -133,7 +133,7 @@ export class CreateTasksBatchRequestDto {
   @IsOptional()
   creatorId?: string;
 
-  @ApiProperty({ type: [CreateTaskItemDto], isArray: true })
+  @ApiProperty({ type: CreateTaskItemDto, isArray: true })
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -307,7 +307,7 @@ export class ListTaskParticipantsResponseDto {
   @ApiProperty()
   success!: boolean;
 
-  @ApiProperty({ type: [TaskParticipantListItemDto], isArray: true })
+  @ApiProperty({ type: TaskParticipantListItemDto, isArray: true })
   data!: TaskParticipantListItemDto[];
 }
 
@@ -323,12 +323,12 @@ export class MembersResponseDto {
   @ApiProperty()
   success!: boolean;
 
-  @ApiProperty({ type: [TaskMemberDto], isArray: true })
+  @ApiProperty({ type: TaskMemberDto, isArray: true })
   data!: TaskMemberDto[];
 }
 
 export class PaginatedTasksDto {
-  @ApiProperty({ type: [TaskWithRelationsDto], isArray: true })
+  @ApiProperty({ type: TaskWithRelationsDto, isArray: true })
   records!: TaskWithRelationsDto[];
 
   @ApiProperty({ description: "Total record count" })

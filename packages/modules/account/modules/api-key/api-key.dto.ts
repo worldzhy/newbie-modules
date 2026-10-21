@@ -7,13 +7,13 @@ export class CreateApiKeyDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ type: [String], isArray: true })
+  @ApiPropertyOptional({ type: String, isArray: true })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   ipRestrictions?: string[];
 
-  @ApiPropertyOptional({ type: [String], isArray: true })
+  @ApiPropertyOptional({ type: String, isArray: true })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
@@ -26,13 +26,13 @@ export class UpdateApiKeyDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ type: [String], isArray: true })
+  @ApiPropertyOptional({ type: String, isArray: true })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   ipRestrictions?: string[];
 
-  @ApiPropertyOptional({ type: [String], isArray: true })
+  @ApiPropertyOptional({ type: String, isArray: true })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
@@ -45,13 +45,13 @@ export class ReplaceApiKeyDto {
   @IsNotEmpty()
   description!: string;
 
-  @ApiProperty({ type: [String], isArray: true })
+  @ApiProperty({ type: String, isArray: true })
   @IsArray()
   @IsString({ each: true })
   @IsNotEmpty()
   ipRestrictions!: string[];
 
-  @ApiProperty({ type: [String], isArray: true })
+  @ApiProperty({ type: String, isArray: true })
   @IsArray()
   @IsString({ each: true })
   @IsNotEmpty()

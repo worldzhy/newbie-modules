@@ -109,6 +109,7 @@ export class LlmConnectionResponseDto {
   apiKey!: string;
 
   @ApiProperty({
+    type: String,
     isArray: true,
     description: "Consumer scopes bound to this connection (ADR-006). One scope binds to exactly one connection.",
   })

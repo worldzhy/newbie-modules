@@ -9,7 +9,7 @@ export type AwsAuditSeverity = "high" | "medium" | "low";
 
 /** Aggregated scan summary counts. */
 export class AwsAuditScanSummaryDto {
-  @ApiProperty({ type: [String], isArray: true, description: "AWS regions scanned" })
+  @ApiProperty({ type: String, isArray: true, description: "AWS regions scanned" })
   regionsScanned!: string[];
 
   @ApiProperty({ description: "Total number of security findings" })
@@ -84,7 +84,7 @@ export class AwsAuditAccountDto {
   @ApiProperty({ description: "Cross-account IAM role ARN assumed for the scan" })
   roleArn!: string;
 
-  @ApiProperty({ type: [String], isArray: true, description: "AWS regions scanned" })
+  @ApiProperty({ type: String, isArray: true, description: "AWS regions scanned" })
   regions!: string[];
 }
 
@@ -174,7 +174,7 @@ export class AwsAuditPolicyAnalysisDto {
   @ApiProperty({ description: "Policy ARN (or inline identifier)" })
   policyArn!: string;
 
-  @ApiProperty({ type: [AwsAuditPolicyRiskDto], isArray: true, description: "Risk findings for this policy" })
+  @ApiProperty({ type: AwsAuditPolicyRiskDto, isArray: true, description: "Risk findings for this policy" })
   risks!: AwsAuditPolicyRiskDto[];
 }
 
@@ -201,21 +201,21 @@ export class AwsAuditIamUserDto {
   @ApiProperty({ description: "Whether MFA is enabled" })
   mfaActive!: boolean;
 
-  @ApiProperty({ type: [String], isArray: true, description: "Groups the user belongs to" })
+  @ApiProperty({ type: String, isArray: true, description: "Groups the user belongs to" })
   groups!: string[];
 
   @ApiProperty({
-    type: [AwsAuditPolicyAnalysisDto],
+    type: AwsAuditPolicyAnalysisDto,
     isArray: true,
     description: "Attached managed policies with risks",
   })
   attachedPolicies!: AwsAuditPolicyAnalysisDto[];
 
-  @ApiProperty({ type: [AwsAuditPolicyAnalysisDto], isArray: true, description: "Inline policies with risks" })
+  @ApiProperty({ type: AwsAuditPolicyAnalysisDto, isArray: true, description: "Inline policies with risks" })
   inlinePolicies!: AwsAuditPolicyAnalysisDto[];
 
   @ApiProperty({
-    type: [AwsAuditIamAccessKeyDto],
+    type: AwsAuditIamAccessKeyDto,
     isArray: true,
     description: "Access key metadata from credential report",
   })
@@ -234,13 +234,13 @@ export class AwsAuditIamGroupDto {
   createdAt?: string | null;
 
   @ApiProperty({
-    type: [AwsAuditPolicyAnalysisDto],
+    type: AwsAuditPolicyAnalysisDto,
     isArray: true,
     description: "Attached managed policies with risks",
   })
   attachedPolicies!: AwsAuditPolicyAnalysisDto[];
 
-  @ApiProperty({ type: [AwsAuditPolicyAnalysisDto], isArray: true, description: "Inline policies with risks" })
+  @ApiProperty({ type: AwsAuditPolicyAnalysisDto, isArray: true, description: "Inline policies with risks" })
   inlinePolicies!: AwsAuditPolicyAnalysisDto[];
 }
 
@@ -259,13 +259,13 @@ export class AwsAuditIamRoleDto {
   lastUsedAt?: string | null;
 
   @ApiProperty({
-    type: [AwsAuditPolicyAnalysisDto],
+    type: AwsAuditPolicyAnalysisDto,
     isArray: true,
     description: "Attached managed policies with risks",
   })
   attachedPolicies!: AwsAuditPolicyAnalysisDto[];
 
-  @ApiProperty({ type: [AwsAuditPolicyAnalysisDto], isArray: true, description: "Inline policies with risks" })
+  @ApiProperty({ type: AwsAuditPolicyAnalysisDto, isArray: true, description: "Inline policies with risks" })
   inlinePolicies!: AwsAuditPolicyAnalysisDto[];
 }
 
@@ -310,13 +310,13 @@ export class AwsAuditIamResourcesDto {
   })
   passwordPolicy?: AwsAuditPasswordPolicyDto | null;
 
-  @ApiProperty({ type: [AwsAuditIamUserDto], isArray: true })
+  @ApiProperty({ type: AwsAuditIamUserDto, isArray: true })
   users!: AwsAuditIamUserDto[];
 
-  @ApiProperty({ type: [AwsAuditIamGroupDto], isArray: true })
+  @ApiProperty({ type: AwsAuditIamGroupDto, isArray: true })
   groups!: AwsAuditIamGroupDto[];
 
-  @ApiProperty({ type: [AwsAuditIamRoleDto], isArray: true })
+  @ApiProperty({ type: AwsAuditIamRoleDto, isArray: true })
   roles!: AwsAuditIamRoleDto[];
 }
 
@@ -370,7 +370,7 @@ export class AwsAuditEc2InstanceDto {
   @ApiPropertyOptional({ description: "Private IP address", type: String })
   privateIpAddress?: string | null;
 
-  @ApiProperty({ type: [String], isArray: true, description: "Security group IDs attached to the instance" })
+  @ApiProperty({ type: String, isArray: true, description: "Security group IDs attached to the instance" })
   securityGroupIds!: string[];
 }
 
@@ -385,10 +385,10 @@ export class AwsAuditIngressRuleDto {
   @ApiPropertyOptional({ description: "To port", type: Number })
   toPort?: number | null;
 
-  @ApiProperty({ type: [String], isArray: true, description: "IPv4 CIDR ranges" })
+  @ApiProperty({ type: String, isArray: true, description: "IPv4 CIDR ranges" })
   ipv4Ranges!: string[];
 
-  @ApiProperty({ type: [String], isArray: true, description: "IPv6 CIDR ranges" })
+  @ApiProperty({ type: String, isArray: true, description: "IPv6 CIDR ranges" })
   ipv6Ranges!: string[];
 }
 
@@ -403,16 +403,16 @@ export class AwsAuditSecurityGroupDto {
   @ApiPropertyOptional({ description: "Description", type: String })
   description?: string | null;
 
-  @ApiProperty({ type: [AwsAuditIngressRuleDto], isArray: true, description: "Ingress rules" })
+  @ApiProperty({ type: AwsAuditIngressRuleDto, isArray: true, description: "Ingress rules" })
   ingressRules!: AwsAuditIngressRuleDto[];
 }
 
 /** EC2 resources for a single region. */
 export class AwsAuditEc2RegionResourcesDto {
-  @ApiProperty({ type: [AwsAuditEc2InstanceDto], isArray: true })
+  @ApiProperty({ type: AwsAuditEc2InstanceDto, isArray: true })
   instances!: AwsAuditEc2InstanceDto[];
 
-  @ApiProperty({ type: [AwsAuditSecurityGroupDto], isArray: true })
+  @ApiProperty({ type: AwsAuditSecurityGroupDto, isArray: true })
   securityGroups!: AwsAuditSecurityGroupDto[];
 }
 
@@ -463,7 +463,7 @@ export class AwsAuditRegionalResourceDto {
   @ApiProperty({ type: AwsAuditEc2RegionResourcesDto })
   ec2!: AwsAuditEc2RegionResourcesDto;
 
-  @ApiProperty({ type: [AwsAuditRdsInstanceDto], isArray: true })
+  @ApiProperty({ type: AwsAuditRdsInstanceDto, isArray: true })
   rds!: AwsAuditRdsInstanceDto[];
 }
 
@@ -472,10 +472,10 @@ export class AwsAuditResourcesDto {
   @ApiProperty({ type: AwsAuditIamResourcesDto })
   iam!: AwsAuditIamResourcesDto;
 
-  @ApiProperty({ type: [AwsAuditS3BucketDto], isArray: true })
+  @ApiProperty({ type: AwsAuditS3BucketDto, isArray: true })
   s3!: AwsAuditS3BucketDto[];
 
-  @ApiProperty({ type: [AwsAuditRegionalResourceDto], isArray: true })
+  @ApiProperty({ type: AwsAuditRegionalResourceDto, isArray: true })
   regional!: AwsAuditRegionalResourceDto[];
 }
 
@@ -493,13 +493,13 @@ export class AwsAuditReportDto {
   @ApiProperty({ type: AwsAuditScanSummaryDto })
   summary!: AwsAuditScanSummaryDto;
 
-  @ApiProperty({ type: [String], isArray: true, description: "Known limitations of this audit" })
+  @ApiProperty({ type: String, isArray: true, description: "Known limitations of this audit" })
   limitations!: string[];
 
-  @ApiProperty({ type: [AwsAuditErrorDto], isArray: true })
+  @ApiProperty({ type: AwsAuditErrorDto, isArray: true })
   errors!: AwsAuditErrorDto[];
 
-  @ApiProperty({ type: [AwsAuditFindingDto], isArray: true })
+  @ApiProperty({ type: AwsAuditFindingDto, isArray: true })
   findings!: AwsAuditFindingDto[];
 
   @ApiPropertyOptional({ type: AwsAuditResourcesDto })

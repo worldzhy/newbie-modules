@@ -71,13 +71,13 @@ export class SyncRDSInstancesWatchDto {
   @IsUUID()
   projectId!: string;
 
-  @ApiProperty({ type: [String], minLength: 0, isArray: true })
+  @ApiProperty({ type: String, minLength: 0, isArray: true })
   @IsArray()
   @ArrayMinSize(0)
   @IsUUID("4", { each: true })
   watchRDSInstanceIds!: string[];
 
-  @ApiProperty({ type: [String], minLength: 0, isArray: true })
+  @ApiProperty({ type: String, minLength: 0, isArray: true })
   @IsArray()
   @ArrayMinSize(0)
   @IsUUID("4", { each: true })
