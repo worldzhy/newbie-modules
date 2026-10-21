@@ -1,5 +1,5 @@
 import { Global, Module } from "@nestjs/common";
-import { APP_GUARD, DiscoveryModule } from "@nestjs/core";
+import { APP_GUARD } from "@nestjs/core";
 
 import { CookieModule } from "./cookie/cookie.module";
 import { TokenModule } from "./token/token.module";
@@ -8,7 +8,6 @@ import { RateLimiterGuard } from "./rate-limiter/rate-limiter.guard";
 import { AuthenticationGuard } from "./authentication/authentication.guard";
 import { AuthorizationGuard } from "./authorization/authorization.guard";
 import { NoAuthGuard } from "./authentication/public/public.guard";
-import { PublicCorsService } from "./authentication/public/public-cors.service";
 import { ApiKeyAuthGuard } from "./authentication/api-key/api-key.guard";
 import { GoogleAuthGuard } from "./authentication/google-oauth/google.guard";
 import { InstallationAuthGuard } from "./authentication/installation/installation.guard";
@@ -47,7 +46,7 @@ import { OwnershipGuard } from "./authorization/ownership.guard";
  */
 @Global()
 @Module({
-  imports: [CookieModule, TokenModule, DiscoveryModule],
+  imports: [CookieModule, TokenModule],
   providers: [
     { provide: APP_GUARD, useClass: RateLimiterGuard }, // 1st priority guard.
     { provide: APP_GUARD, useClass: AuthenticationGuard }, // 2nd priority guard.
@@ -62,7 +61,6 @@ import { OwnershipGuard } from "./authorization/ownership.guard";
     PasswordAuthGuard,
     RefreshTokenAuthGuard,
     VerificationCodeAuthGuard,
-    PublicCorsService,
 
     NoStrategy,
     ApiKeyStrategy,

@@ -1,9 +1,9 @@
 import { Body, Controller, Post, Req } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
+import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { HeartbeatInstallation } from "@generated/prisma/client";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
-import { PublicCors } from "@modules/security/authentication/public/public-cors.decorator";
 
 import { HeartbeatPingDto, HeartbeatPingResponseDto } from "../heartbeat.dto";
 import { HeartbeatInstallationService, PING_INTERVAL_SECONDS } from "../services/installation.service";
@@ -27,7 +27,7 @@ export class PingController {
 
   @Post("ping")
   @InstallationAuth("heartbeat")
-  @PublicCors()
+  @AllowAnyOrigin()
   async ping(
     @Req() req: Request & { installation: HeartbeatInstallation },
     @Body() body: HeartbeatPingDto,

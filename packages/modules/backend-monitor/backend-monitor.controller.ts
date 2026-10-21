@@ -1,10 +1,10 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req } from "@nestjs/common";
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
+import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
-import { PublicCors } from "@modules/security/authentication/public/public-cors.decorator";
 import { BackendMonitorService } from "./backend-monitor.service";
 import { ResolvedMonitorToken } from "./monitor-token.resolver";
 import {
@@ -40,7 +40,7 @@ export class BackendMonitorController {
   @ApiResponse({ status: 413, description: "An event array exceeds the batch limit." })
   @HttpCode(HttpStatus.NO_CONTENT)
   @InstallationAuth("backend-monitor")
-  @PublicCors()
+  @AllowAnyOrigin()
   @Post("ingest")
   async ingest(
     @Req() req: Request & { installation: ResolvedMonitorToken },

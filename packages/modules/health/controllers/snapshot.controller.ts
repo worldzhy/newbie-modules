@@ -1,9 +1,9 @@
 import { Body, Controller, Post, Req } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
+import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { HealthInstallation } from "@generated/prisma/client";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
-import { PublicCors } from "@modules/security/authentication/public/public-cors.decorator";
 
 import { HealthSnapshotDto, HealthSnapshotResponseDto } from "../health.dto";
 import { HealthInstallationService, SNAPSHOT_INTERVAL_SECONDS } from "../services/installation.service";
@@ -27,7 +27,7 @@ export class SnapshotController {
 
   @Post("snapshot")
   @InstallationAuth("health")
-  @PublicCors()
+  @AllowAnyOrigin()
   async snapshot(
     @Req() req: Request & { installation: HealthInstallation },
     @Body() body: HealthSnapshotDto,
