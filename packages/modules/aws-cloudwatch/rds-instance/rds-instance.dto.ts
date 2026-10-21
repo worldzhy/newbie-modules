@@ -71,13 +71,13 @@ export class SyncRDSInstancesWatchDto {
   @IsUUID()
   projectId!: string;
 
-  @ApiProperty({ type: [String], minLength: 0 })
+  @ApiProperty({ type: String, minLength: 0, isArray: true })
   @IsArray()
   @ArrayMinSize(0)
   @IsUUID("4", { each: true })
   watchRDSInstanceIds!: string[];
 
-  @ApiProperty({ type: [String], minLength: 0 })
+  @ApiProperty({ type: String, minLength: 0, isArray: true })
   @IsArray()
   @ArrayMinSize(0)
   @IsUUID("4", { each: true })
@@ -90,7 +90,7 @@ export class GetWatchedRDSInstancesMetricRequestDto {
   @IsUUID("4")
   projectId!: string;
 
-  @ApiProperty({ enum: CloudwatchMetricRDSMetricName })
+  @ApiProperty({ enum: CloudwatchMetricRDSMetricName, enumName: "CloudwatchMetricRDSMetricName" })
   @IsNotEmpty()
   @IsEnum(CloudwatchMetricRDSMetricName)
   metricName!: CloudwatchMetricRDSMetricName;
@@ -107,7 +107,7 @@ export class GetWatchedRDSInstancesMetricRequestDto {
   @IsNumberString()
   period!: string;
 
-  @ApiProperty({ enum: CloudwatchMetricStatistics })
+  @ApiProperty({ enum: CloudwatchMetricStatistics, enumName: "CloudwatchMetricStatistics" })
   @IsNotEmpty()
   @IsEnum(CloudwatchMetricStatistics)
   statistics!: CloudwatchMetricStatistics;

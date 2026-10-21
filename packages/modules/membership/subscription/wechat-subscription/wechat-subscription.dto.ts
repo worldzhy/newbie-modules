@@ -1,31 +1,31 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsEnum, IsNumber, IsOptional, IsString } from "class-validator";
 import { Type } from "class-transformer";
 import { SubscriptionStatus } from "@generated/prisma/client";
 
 export class CreateWechatSubscriptionRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   wechatOpenId!: string;
 
-  @ApiProperty({ type: Number, required: true })
+  @ApiProperty({ type: Number })
   @IsNumber()
   @Type(() => Number)
   planId!: number;
 }
 
 export class GetWechatSubscriptionRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   id!: string;
 }
 
 export class UpdateWechatSubscriptionRequestDto {
-  @ApiProperty({ type: String, enum: SubscriptionStatus, required: true })
+  @ApiProperty({ type: String, enum: SubscriptionStatus })
   @IsEnum(SubscriptionStatus)
-  status: SubscriptionStatus;
+  status!: SubscriptionStatus;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   wechatTransactionId?: string;

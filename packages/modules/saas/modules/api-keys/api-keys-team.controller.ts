@@ -12,7 +12,7 @@ import {
   UseGuards,
   Req,
 } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { ApiKey, Prisma } from "@prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OptionalIntPipe } from "@devbie/newbie/pipes/optional-int.pipe";
@@ -32,6 +32,7 @@ export class ApiKeyTeamController {
 
   /** Create an API key for a team */
   @Post()
+  @ApiCreatedResponse()
   @AuditLog("create-api-key")
   @UseGuards(SaasAuthGuard)
   @Scopes("team-{teamId}:write-api-key-*")
@@ -46,6 +47,7 @@ export class ApiKeyTeamController {
 
   /** Get API keys for a team */
   @Get()
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-api-key-*")
   async getAll(
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -66,6 +68,7 @@ export class ApiKeyTeamController {
 
   /** Get API key scopes for a team */
   @Get("scopes")
+  @ApiOkResponse({ type: Object })
   @Scopes("team-{teamId}:write-api-key-*")
   async scopes(@Param("teamId", ParseIntPipe) teamId: number): Promise<Record<string, string>> {
     return this.apiKeysService.getApiKeyScopesForTeamCustomized(teamId);
@@ -73,6 +76,7 @@ export class ApiKeyTeamController {
 
   /** Get an API key */
   @Get(":id")
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-api-key-{id}")
   async get(
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -83,6 +87,7 @@ export class ApiKeyTeamController {
 
   /** Update an API key */
   @Patch(":id")
+  @ApiOkResponse()
   @AuditLog("update-api-key")
   @Scopes("team-{teamId}:write-api-key-{id}")
   async update(
@@ -95,6 +100,7 @@ export class ApiKeyTeamController {
 
   /** Replace an API key */
   @Put(":id")
+  @ApiOkResponse()
   @AuditLog("update-api-key")
   @Scopes("team-{teamId}:write-api-key-{id}")
   async replace(
@@ -107,6 +113,7 @@ export class ApiKeyTeamController {
 
   /** Delete an API key */
   @Delete(":id")
+  @ApiOkResponse()
   @AuditLog("delete-api-key")
   @Scopes("team-{teamId}:delete-api-key-{id}")
   async remove(
@@ -118,6 +125,7 @@ export class ApiKeyTeamController {
 
   /** Get logs for an API key */
   @Get(":id/logs")
+  @ApiOkResponse({ type: Object, isArray: true })
   @Scopes("team-{teamId}:read-api-key-logs-*")
   async getLogs(
     @Param("teamId", ParseIntPipe) teamId: number,

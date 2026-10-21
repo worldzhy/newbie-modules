@@ -1,4 +1,5 @@
 import { Controller, Delete, Get, Param, ParseIntPipe, Query } from "@nestjs/common";
+import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { ApprovedSubnet, Prisma } from "@prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OptionalIntPipe } from "@devbie/newbie/pipes/optional-int.pipe";
@@ -8,12 +9,14 @@ import { Expose } from "../../helpers/interfaces";
 import { Scopes } from "../auth/scope.decorator";
 import { ApprovedSubnetsService } from "./approved-subnets.service";
 
+@ApiTags("Users Approved Subnets")
 @Controller("users/:userId/approved-subnets")
 export class ApprovedSubnetController {
   constructor(private approvedSubnetsService: ApprovedSubnetsService) {}
 
   /** Get approved subnets for a user */
   @Get()
+  @ApiOkResponse()
   @Scopes("user-{userId}:read-approved-subnet-*")
   async getAll(
     @Param("userId", ParseIntPipe) userId: number,
@@ -34,6 +37,7 @@ export class ApprovedSubnetController {
 
   /** Get an approved subnet for a user */
   @Get(":id")
+  @ApiOkResponse()
   @Scopes("user-{userId}:read-approved-subnet-{id}")
   async get(
     @Param("userId", ParseIntPipe) userId: number,
@@ -44,6 +48,7 @@ export class ApprovedSubnetController {
 
   /** Delete an approved subnet for a user */
   @Delete(":id")
+  @ApiOkResponse()
   @Scopes("user-{userId}:delete-approved-subnet-{id}")
   async remove(
     @Param("userId", ParseIntPipe) userId: number,

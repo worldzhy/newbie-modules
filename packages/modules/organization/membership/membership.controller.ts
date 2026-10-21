@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Ip, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
 import { OrgMembership, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { ApiBearerAuth, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiResponse, ApiTags } from "@nestjs/swagger";
 import {
   CreateMembershipDto,
   ListMembershipsRequestDto,
@@ -21,6 +21,7 @@ export class MembershipController {
 
   /** Add a member to a team */
   @Post()
+  @ApiCreatedResponse()
   async create(
     @Ip() ipAddress: string,
     @Param("organizationId") organizationId: string,
@@ -50,6 +51,7 @@ export class MembershipController {
 
   /** Get a membership for a team */
   @Get(":id")
+  @ApiOkResponse()
   async get(
     @Param("organizationId") organizationId: string,
     @Param("id", ParseIntPipe) id: number,
@@ -59,6 +61,7 @@ export class MembershipController {
 
   /** Update a membership for a team */
   @Patch(":id")
+  @ApiOkResponse()
   async update(
     @Body() data: UpdateMembershipDto,
     @Param("organizationId") organizationId: string,
@@ -69,6 +72,7 @@ export class MembershipController {
 
   /** Remove a member from a team */
   @Delete(":id")
+  @ApiOkResponse()
   async remove(
     @Param("organizationId") organizationId: string,
     @Param("id", ParseIntPipe) id: number,

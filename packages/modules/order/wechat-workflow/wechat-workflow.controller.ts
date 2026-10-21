@@ -1,6 +1,6 @@
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
-import { ApiTags, ApiBearerAuth, ApiResponse, ApiOperation } from "@nestjs/swagger";
+import { ApiTags, ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation } from "@nestjs/swagger";
 import { GuardByApiKey } from "@modules/security/authentication/api-key/api-key.decorator";
 import { OrderService } from "../order.service";
 import { CreateOrderResponseDto, UpdateOrderResponseDto } from "../order.dto";
@@ -19,6 +19,7 @@ export class WechatWorkflowOrderController {
 
   @Get(":id")
   @ApiOperation({ summary: "[Auth by API key] Get order details" })
+  @ApiOkResponse({ type: CreateOrderResponseDto })
   async getOrder(@Param("id") id: string) {
     return await this.prisma.order.findUnique({ where: { id } });
   }
@@ -27,7 +28,7 @@ export class WechatWorkflowOrderController {
   @ApiOperation({
     summary: "[Auth by API key] Call from Tencent cloudbase workflow",
   })
-  @ApiResponse({ type: CreateOrderResponseDto })
+  @ApiCreatedResponse({ type: CreateOrderResponseDto })
   async createOrder(@Body() body: WechatWorkflowCreateOrderRequestDto) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { wechatOpenId: body.wechatOpenId },
@@ -65,7 +66,7 @@ export class WechatWorkflowOrderController {
   }
 
   @Patch(":id/paid")
-  @ApiResponse({ type: UpdateOrderResponseDto })
+  @ApiOkResponse({ type: UpdateOrderResponseDto })
   async paid(@Param("id") id: string, @Body() body: WechatWorkflowUpdateOrderPaidRequestDto) {
     return await this.prisma.order.update({
       where: { id },
@@ -78,7 +79,7 @@ export class WechatWorkflowOrderController {
   }
 
   @Patch(":id/refunded")
-  @ApiResponse({ type: UpdateOrderResponseDto })
+  @ApiOkResponse({ type: UpdateOrderResponseDto })
   async refunded(@Param("id") id: string) {
     return await this.prisma.order.update({
       where: { id },

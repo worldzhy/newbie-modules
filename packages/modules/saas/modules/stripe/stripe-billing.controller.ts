@@ -1,16 +1,19 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put } from "@nestjs/common";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import Stripe from "stripe";
 import { AuditLog } from "../audit-logs/audit-log.decorator";
 import { Scopes } from "../auth/scope.decorator";
 import { CreateBillingDto, ReplaceBillingDto, UpdateBillingDto } from "./stripe.dto";
 import { StripeService } from "./stripe.service";
 
+@ApiTags("Teams Billing")
 @Controller("teams/:teamId/billing")
 export class StripeBillingController {
   constructor(private stripeService: StripeService) {}
 
   /** Create a billing account for a team */
   @Post()
+  @ApiCreatedResponse()
   @AuditLog("create-billing")
   @Scopes("team-{teamId}:write-billing")
   async createBillingAccount(
@@ -22,6 +25,7 @@ export class StripeBillingController {
 
   /** Read billing for a team */
   @Get()
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-billing")
   async getBillingAccount(@Param("teamId", ParseIntPipe) teamId: number): Promise<Stripe.Customer> {
     return this.stripeService.getCustomer(teamId);
@@ -29,6 +33,7 @@ export class StripeBillingController {
 
   /** Update billing for a team */
   @Patch()
+  @ApiOkResponse()
   @AuditLog("update-billing")
   @Scopes("team-{teamId}:write-billing")
   async updateBillingAccount(
@@ -40,6 +45,7 @@ export class StripeBillingController {
 
   /** Replace billing for a team */
   @Put()
+  @ApiOkResponse()
   @AuditLog("update-billing")
   @Scopes("team-{teamId}:write-billing")
   async replaceBillingAccount(
@@ -51,6 +57,7 @@ export class StripeBillingController {
 
   /** Delete billing for a team */
   @Delete()
+  @ApiOkResponse()
   @AuditLog("delete-billing")
   @Scopes("team-{teamId}:delete-billing")
   async deleteBillingAccount(@Param("teamId", ParseIntPipe) teamId: number): Promise<Stripe.DeletedCustomer> {
@@ -59,6 +66,7 @@ export class StripeBillingController {
 
   /** Get the billing portal link for a team */
   @Get("link")
+  @ApiOkResponse()
   @AuditLog("billing-portal")
   @Scopes("team-{teamId}:write-billing")
   async getSession(

@@ -39,6 +39,7 @@ export class AuditLogQueryDto {
   resourceId?: string;
 
   @ApiPropertyOptional({ type: String, enum: RESULT_VALUES, description: "Filter by result: success / failure" })
+  @Type(() => String)
   @IsOptional()
   @IsIn(RESULT_VALUES)
   result?: (typeof RESULT_VALUES)[number];

@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
@@ -21,6 +21,7 @@ export class InstallationController {
   @Post()
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Enroll a backend-monitor deployment installation" })
+  @ApiCreatedResponse()
   create(@Body() body: CreateMonitorInstallationDto) {
     return this.installations.create(body);
   }
@@ -28,6 +29,7 @@ export class InstallationController {
   @Get()
   @RequirePermission(PermissionAction.List, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "List backend-monitor installations" })
+  @ApiOkResponse()
   list(@Query() query: ListMonitorInstallationsQueryDto) {
     return this.installations.list(query);
   }
@@ -35,6 +37,7 @@ export class InstallationController {
   @Get(":id")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Get one backend-monitor installation" })
+  @ApiOkResponse()
   get(@Param("id") id: string) {
     return this.installations.get(id);
   }
@@ -42,6 +45,7 @@ export class InstallationController {
   @Post(":id/token/regenerate")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Rotate the report token (plaintext returned once)" })
+  @ApiOkResponse()
   regenerate(@Param("id") id: string) {
     return this.installations.regenerateToken(id);
   }
@@ -49,6 +53,7 @@ export class InstallationController {
   @Delete(":id")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Revoke an installation; subsequent ingest gets 401" })
+  @ApiOkResponse()
   revoke(@Param("id") id: string) {
     return this.installations.revoke(id);
   }

@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { ElasticsearchDataboardColumn, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
@@ -21,6 +21,7 @@ export class ElasticsearchDataboardColumnController {
       },
     },
   })
+  @ApiCreatedResponse()
   async createElasticsearchDataboardColumn(
     @Body()
     body: Prisma.ElasticsearchDataboardColumnCreateInput,
@@ -29,6 +30,7 @@ export class ElasticsearchDataboardColumnController {
   }
 
   @Get(":columnId")
+  @ApiOkResponse()
   async getElasticsearchDataboardColumn(@Param("columnId") columnId: number): Promise<ElasticsearchDataboardColumn> {
     return await this.prisma.elasticsearchDataboardColumn.findUniqueOrThrow({
       where: { id: columnId },
@@ -47,6 +49,7 @@ export class ElasticsearchDataboardColumnController {
       },
     },
   })
+  @ApiOkResponse()
   async updateElasticsearchDataboardColumn(
     @Param("columnId") columnId: number,
     @Body() body: Prisma.ElasticsearchDataboardColumnUpdateInput,
@@ -58,6 +61,7 @@ export class ElasticsearchDataboardColumnController {
   }
 
   @Delete(":columnId")
+  @ApiOkResponse()
   async deleteElasticsearchDataboardColumn(@Param("columnId") columnId: number): Promise<ElasticsearchDataboardColumn> {
     return await this.prisma.elasticsearchDataboardColumn.delete({
       where: { id: columnId },

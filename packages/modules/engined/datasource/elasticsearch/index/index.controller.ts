@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Put } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import {
   ElasticsearchDatasourceIndex,
   ElasticsearchDatasourceIndexField,
@@ -31,6 +31,7 @@ export class ElasticsearchDatasourceIndexController {
       },
     },
   })
+  @ApiCreatedResponse()
   async createElasticsearchDatasourceIndex(
     @Body() body: Prisma.ElasticsearchDatasourceIndexUncheckedCreateInput,
   ): Promise<ElasticsearchDatasourceIndex> {
@@ -44,11 +45,13 @@ export class ElasticsearchDatasourceIndexController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async getElasticsearchDatasourceIndices(): Promise<ElasticsearchDatasourceIndex[]> {
     return await this.prisma.elasticsearchDatasourceIndex.findMany({});
   }
 
   @Get(":indexId")
+  @ApiOkResponse()
   async getElasticsearchDatasourceIndex(
     @Param("indexId") indexId: number,
   ): Promise<ElasticsearchDatasourceIndex | null> {
@@ -58,6 +61,7 @@ export class ElasticsearchDatasourceIndexController {
   }
 
   @Patch(":indexId")
+  @ApiOkResponse()
   async updateElasticsearchDatasourceIndex(
     @Param("indexId") indexId: number,
     @Body() body: Prisma.ElasticsearchDatasourceIndexUpdateInput,
@@ -69,6 +73,7 @@ export class ElasticsearchDatasourceIndexController {
   }
 
   @Delete(":indexId")
+  @ApiOkResponse()
   async deleteElasticsearchDatasourceIndex(@Param("indexId") indexId: number): Promise<ElasticsearchDatasourceIndex> {
     // [step 1] Get the index.
     const index = await this.prisma.elasticsearchDatasourceIndex.findUniqueOrThrow({
@@ -85,6 +90,7 @@ export class ElasticsearchDatasourceIndexController {
   }
 
   @Put(":indexId/mapping")
+  @ApiOkResponse()
   async putElasticsearchDatasourceIndexMapping(
     @Param("indexId") indexId: number,
   ): Promise<ElasticsearchDatasourceIndex> {
@@ -115,6 +121,7 @@ export class ElasticsearchDatasourceIndexController {
   }
 
   @Get(":indexId/mapping")
+  @ApiOkResponse()
   async getElasticsearchDatasourceIndexMapping(@Param("indexId") indexId: number) {
     const index = await this.prisma.elasticsearchDatasourceIndex.findUniqueOrThrow({
       where: { id: indexId },

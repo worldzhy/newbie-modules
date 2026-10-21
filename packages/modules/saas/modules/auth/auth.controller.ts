@@ -1,7 +1,7 @@
 import { Body, Controller, Headers, HttpCode, HttpStatus, Ip, Post, Get, Req, Res, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as queryString from "query-string";
-import { ApiTags, ApiOperation } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { User } from "@prisma/client";
 import { Expose } from "../../helpers/interfaces";
 import {
@@ -30,6 +30,7 @@ export class AuthController {
 
   /** Login to an account */
   @Post("login")
+  @ApiOkResponse()
   @RateLimit(10)
   async login(
     @Body() data: LoginDto,
@@ -49,6 +50,7 @@ export class AuthController {
 
   /** Create a new account */
   @Post("register")
+  @ApiCreatedResponse()
   @HttpCode(HttpStatus.CREATED)
   @RateLimit(10)
   async register(@Ip() ip: string, @Body() data: RegisterDto): Promise<Expose<User>> {
@@ -56,15 +58,17 @@ export class AuthController {
   }
 
   @ApiOperation({
-    summary: "google auth page, will redirect to google login",
+    summary: "Google auth page, will redirect to google login",
   })
+  @ApiOkResponse()
   @UseGuards(GoogleAuthGuard)
   @Get("google")
   async handleGoogleAuth() {}
 
   @ApiOperation({
-    summary: "google auth callback url, will redirect to front-end login page",
+    summary: "Google auth callback url, will redirect to front-end login page",
   })
+  @ApiOkResponse()
   @UseGuards(GoogleAuthGuard)
   @Get("google/callback")
   async handleGoogleAuthCallback(@Req() req, @Res() res, @Ip() ip: string, @Headers("User-Agent") userAgent: string) {
@@ -83,6 +87,7 @@ export class AuthController {
 
   /** Get a new access token using a refresh token */
   @Post("refresh")
+  @ApiOkResponse()
   @RateLimit(5)
   async refresh(
     @Ip() ip: string,
@@ -94,6 +99,7 @@ export class AuthController {
 
   /** Logout from a session */
   @Post("logout")
+  @ApiOkResponse()
   @RateLimit(5)
   async logout(@Body("token") refreshToken: string): Promise<{ success: true }> {
     await this.authService.logout(refreshToken);
@@ -102,6 +108,7 @@ export class AuthController {
 
   /** Approve a new subnet */
   @Post("approve-subnet")
+  @ApiOkResponse()
   @RateLimit(5)
   async approveSubnet(
     @Ip() ip: string,
@@ -113,6 +120,7 @@ export class AuthController {
 
   /** Resend email verification link */
   @Post("resend-email-verification")
+  @ApiOkResponse()
   @RateLimit(10)
   async resendVerify(@Body() data: ResendEmailVerificationDto, @Body("origin") origin?: string) {
     return this.authService.sendEmailVerification(data.email, true, origin);
@@ -120,6 +128,7 @@ export class AuthController {
 
   /** Verify a new email */
   @Post("verify-email")
+  @ApiOkResponse()
   async verifyEmail(
     @Ip() ip: string,
     @Headers("User-Agent") userAgent: string,
@@ -131,6 +140,7 @@ export class AuthController {
 
   /** Send a password reset link */
   @Post("forgot-password")
+  @ApiOkResponse()
   @RateLimit(10)
   async forgotPassword(@Body() data: ForgotPasswordDto, @Body("origin") origin?: string) {
     return this.authService.requestPasswordReset(data.email, origin);
@@ -138,6 +148,7 @@ export class AuthController {
 
   /** Reset password */
   @Post("reset-password")
+  @ApiOkResponse()
   @RateLimit(10)
   async resetPassword(
     @Ip() ip: string,
@@ -149,6 +160,7 @@ export class AuthController {
 
   /** Login using TOTP */
   @Post("login/totp")
+  @ApiOkResponse()
   @RateLimit(10)
   async totpLogin(
     @Body() data: TotpLoginDto,
@@ -161,6 +173,7 @@ export class AuthController {
 
   /** Login using a token */
   @Post("login/token")
+  @ApiOkResponse()
   @RateLimit(10)
   async emailTokenLoginPost(
     @Body("token") token: string,
@@ -172,6 +185,7 @@ export class AuthController {
 
   /** Merge two user accounts */
   @Post("merge-accounts")
+  @ApiOkResponse()
   @RateLimit(10)
   async merge(@Body("token") token: string): Promise<{ success: true }> {
     return this.authService.mergeUsers(token);

@@ -1,24 +1,27 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsArray, IsOptional, IsString } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsArray, IsOptional, IsString, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
 import { OrderItemRequestEntity } from "../order.entity";
 
 export class WechatWorkflowCreateOrderRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   wechatOpenId!: string;
 
-  @ApiProperty({ type: OrderItemRequestEntity, isArray: true, required: true })
+  @ApiProperty({ type: OrderItemRequestEntity, isArray: true })
   @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderItemRequestEntity)
   items!: OrderItemRequestEntity[];
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   note?: string;
 }
 
 export class WechatWorkflowUpdateOrderPaidRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   wechatTransactionId!: string;
 }

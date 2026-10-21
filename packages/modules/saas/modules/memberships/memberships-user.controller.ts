@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Query } from "@nestjs/common";
-import { ApiTags, ApiResponse } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiOkResponse, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Membership, Prisma } from "@prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Expose } from "../../helpers/interfaces";
@@ -18,6 +18,7 @@ export class UserMembershipController {
   ) {}
 
   @Post()
+  @ApiCreatedResponse()
   @Scopes("user-{userId}:write-membership-*")
   async create(
     @Param("userId", ParseIntPipe) userId: number,
@@ -51,6 +52,7 @@ export class UserMembershipController {
 
   /** Get a membership for a user */
   @Get(":id")
+  @ApiOkResponse()
   @Scopes("user-{userId}:read-membership-{id}")
   async get(
     @Param("userId", ParseIntPipe) userId: number,
@@ -61,6 +63,7 @@ export class UserMembershipController {
 
   /** Delete a membership for a user */
   @Delete(":id")
+  @ApiOkResponse()
   @Scopes("user-{userId}:delete-membership-{id}")
   async remove(
     @Param("userId", ParseIntPipe) userId: number,

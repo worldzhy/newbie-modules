@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Req } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { HealthInstallation } from "@generated/prisma/client";
@@ -28,6 +28,7 @@ export class SnapshotController {
   @Post("snapshot")
   @InstallationAuth("health")
   @AllowAnyOrigin()
+  @ApiCreatedResponse({ type: HealthSnapshotResponseDto })
   async snapshot(
     @Req() req: Request & { installation: HealthInstallation },
     @Body() body: HealthSnapshotDto,

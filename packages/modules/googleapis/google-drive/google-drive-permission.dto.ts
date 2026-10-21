@@ -5,7 +5,7 @@ import { GoogleAccountRole } from "@modules/googleapis/google-drive/google-drive
 import { GoogleDrivePermissionEntity } from "@modules/googleapis/google-drive/google-drive.entity";
 
 export class ListGoogleDrivePermissionsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ type: String, required: true, description: "The file ID to list permissions for." })
+  @ApiProperty({ type: String, description: "The file ID to list permissions for." })
   @IsString()
   fileId!: string;
 }
@@ -16,15 +16,19 @@ export class ListGoogleDrivePermissionsResponseDto extends CommonListResponseDto
 }
 
 export class CreateGoogleDrivePermissionRequestDto {
-  @ApiProperty({ type: String, required: true, description: "The ID of the file to share." })
+  @ApiProperty({ type: String, description: "The ID of the file to share." })
   @IsString()
   fileId!: string;
 
-  @ApiProperty({ type: String, required: true, description: "The email address to share the file with." })
+  @ApiProperty({ type: String, description: "The email address to share the file with." })
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ type: String, required: true, description: "The role to assign to the user." })
+  @ApiProperty({
+    enum: GoogleAccountRole,
+    enumName: "GoogleAccountRole",
+    description: "The role to assign to the user.",
+  })
   @IsEnum(GoogleAccountRole)
   role!: GoogleAccountRole;
 }
@@ -32,7 +36,7 @@ export class CreateGoogleDrivePermissionRequestDto {
 export class CreateGoogleDrivePermissionResponseDto extends GoogleDrivePermissionEntity {}
 
 export class GetGoogleDrivePermissionRequestDto {
-  @ApiProperty({ type: Number, required: true, description: "The ID of the permission to get." })
+  @ApiProperty({ type: Number, description: "The ID of the permission to get." })
   @IsNumber()
   permissionId!: number;
 }

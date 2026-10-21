@@ -1,4 +1,4 @@
-import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsEmail, IsEnum, IsIn, IsNotEmpty, IsOptional, IsString } from "class-validator";
 import { OrgMembership, MembershipRole } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { ApiProperty } from "@nestjs/swagger";
@@ -25,8 +25,7 @@ export class CreateMembershipDto {
   @IsNotEmpty()
   email!: string;
 
-  @IsString()
-  @IsIn(Object.keys(MembershipRole))
+  @IsEnum(MembershipRole)
   @IsOptional()
   role?: MembershipRole;
 }

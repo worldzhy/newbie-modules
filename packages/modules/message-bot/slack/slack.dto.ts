@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsString, ValidateNested, IsDefined } from "class-validator";
 import { Type } from "class-transformer";
 import { SlackMessageBotSendMessageReqBody } from "./slack.interface";
@@ -26,9 +26,9 @@ export class SendSlackTextMessageRequestDto {
 }
 
 export class SendSlackMessageResponseDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   res?: string;
 
-  @ApiProperty({ type: Object, required: false })
+  @ApiPropertyOptional({ type: Object })
   error?: object;
 }

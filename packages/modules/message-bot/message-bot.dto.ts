@@ -58,7 +58,7 @@ export class MessageBotRecordDetailResDto {
 }
 
 export class ListMessageBotChannelsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   groupId?: string;
@@ -78,12 +78,12 @@ export class CreateMessageBotChannelRequestDto {
   @IsString()
   webhook!: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   groupId?: string;
@@ -94,17 +94,17 @@ export class UpdateMessageBotChannelRequestDto {
   @IsString()
   id!: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   webhook?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   groupId?: string;

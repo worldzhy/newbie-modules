@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import {
   ElasticsearchDataboard,
   ElasticsearchDataboardState,
@@ -27,6 +27,7 @@ export class ElasticsearchDataboardController {
       },
     },
   })
+  @ApiCreatedResponse()
   async createElasticsearchDataboard(
     @Body()
     body: Prisma.ElasticsearchDataboardUncheckedCreateInput,
@@ -35,9 +36,11 @@ export class ElasticsearchDataboardController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async getElasticsearchDataboards(@Query("page") _page: number, @Query("pageSize") _pageSize: number) {}
 
   @Get(":databoardId")
+  @ApiOkResponse()
   async getElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     return await this.prisma.elasticsearchDataboard.findUniqueOrThrow({
       where: { id: databoardId },
@@ -56,6 +59,7 @@ export class ElasticsearchDataboardController {
       },
     },
   })
+  @ApiOkResponse()
   async updateElasticsearchDataboard(
     @Param("databoardId") databoardId: string,
     @Body() body: Prisma.ElasticsearchDataboardUpdateInput,
@@ -67,6 +71,7 @@ export class ElasticsearchDataboardController {
   }
 
   @Delete(":databoardId")
+  @ApiOkResponse()
   async deleteElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     return await this.prisma.elasticsearchDataboard.delete({
       where: { id: databoardId },
@@ -74,6 +79,7 @@ export class ElasticsearchDataboardController {
   }
 
   @Patch(":databoardId/load")
+  @ApiOkResponse()
   async loadElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     // [step 1] Get databoard
     const databoard = await this.prisma.elasticsearchDataboard.findUniqueOrThrow({
@@ -102,6 +108,7 @@ export class ElasticsearchDataboardController {
   }
 
   @Patch(":databoardId/unload")
+  @ApiOkResponse()
   async unloadElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     // [step 1] Get databoard
     const _databoard = await this.prisma.elasticsearchDataboard.findUniqueOrThrow({
@@ -121,6 +128,7 @@ export class ElasticsearchDataboardController {
   }
 
   @Get(":databoardId/columns")
+  @ApiOkResponse()
   async getElasticsearchDataboardColumns(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     // [step 1] Get databoard
     return await this.prisma.elasticsearchDataboard.findUniqueOrThrow({

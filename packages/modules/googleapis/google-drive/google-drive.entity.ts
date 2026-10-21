@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class GoogleDriveFileEntity {
   @ApiProperty({ type: String })
@@ -7,22 +7,22 @@ export class GoogleDriveFileEntity {
   @ApiProperty({ type: String })
   name!: string;
 
-  @ApiProperty({ type: String })
+  @ApiPropertyOptional({ type: String })
   type?: string | null;
 
-  @ApiProperty({ type: Number })
+  @ApiPropertyOptional({ type: Number })
   size?: number | null;
 
-  @ApiProperty({ type: String })
+  @ApiPropertyOptional({ type: String })
   iconLink?: string | null;
 
-  @ApiProperty({ type: String })
+  @ApiPropertyOptional({ type: String })
   webViewLink?: string | null;
 
-  @ApiProperty({ type: String })
+  @ApiPropertyOptional({ type: String })
   webContentLink?: string | null;
 
-  @ApiProperty({ type: String })
+  @ApiPropertyOptional({ type: String })
   parentId?: string | null;
 
   @ApiProperty({ type: Date })

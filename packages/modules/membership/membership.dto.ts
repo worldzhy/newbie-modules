@@ -1,71 +1,128 @@
 import { IsNotEmpty, IsNumber, IsOptional, IsString, IsUUID } from "class-validator";
-import { ApiProperty } from "@nestjs/swagger";
-import { CommonListRequestDto } from "@devbie/newbie/common.dto";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
+import { SubscriptionResponseDto } from "./subscription/subscription.dto";
 
 // Membership Level Dtos
 export class ListMembershipLevelsRequestDto extends CommonListRequestDto {}
 
 export class CreateMembershipLevelRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   name!: string;
 
-  @ApiProperty({ type: Number, required: true })
+  @ApiProperty({ type: Number })
   @IsNumber()
   requiredPoints!: number;
 
-  @ApiProperty({ type: Number, required: true })
+  @ApiProperty({ type: Number })
   @IsNumber()
   discountRate!: number;
 }
 
 export class UpdateMembershipLevelRequestDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
-  name!: string;
+  name?: string;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsNumber()
   @IsOptional()
-  requiredPoints!: number;
+  requiredPoints?: number;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsNumber()
   @IsOptional()
-  discountRate!: number;
+  discountRate?: number;
 }
 
 export class GetMembershipLevelRequestDto {
-  @ApiProperty({ type: Number, required: true })
+  @ApiProperty({ type: Number })
   @IsNumber()
   id!: number;
+}
+
+export class MembershipLevelResponseDto {
+  @ApiProperty({ type: Number })
+  id!: number;
+
+  @ApiProperty({ type: String })
+  name!: string;
+
+  @ApiProperty({ type: Number })
+  requiredPoints!: number;
+
+  @ApiProperty({ type: Number })
+  discountRate!: number;
+
+  @ApiProperty({ type: Date })
+  createdAt!: Date;
+
+  @ApiProperty({ type: Date })
+  updatedAt!: Date;
+}
+
+export class ListMembershipLevelsResponseDto extends CommonListResponseDto {
+  @ApiProperty({ type: MembershipLevelResponseDto, isArray: true })
+  declare records: MembershipLevelResponseDto[];
 }
 
 // Membership Dtos
 export class ListMembershipsRequestDto extends CommonListRequestDto {}
 
 export class CreateMembershipRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsUUID()
   @IsNotEmpty()
   userId!: string;
 }
 
 export class UpdateMembershipRequestDto {
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsNumber()
   @IsOptional()
   points?: number;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsNumber()
   @IsOptional()
   levelId?: number;
 }
 
 export class GetMembershipRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   id!: string;
+}
+
+export class MembershipResponseDto {
+  @ApiProperty({ type: String })
+  id!: string;
+
+  @ApiPropertyOptional({ type: String })
+  cardNumber?: string | null;
+
+  @ApiProperty({ type: Number })
+  points!: number;
+
+  @ApiProperty({ type: String })
+  userId!: string;
+
+  @ApiPropertyOptional({ type: Number })
+  levelId?: number | null;
+
+  @ApiProperty({ type: Date })
+  createdAt!: Date;
+
+  @ApiProperty({ type: Date })
+  updatedAt!: Date;
+
+  @ApiPropertyOptional({ type: SubscriptionResponseDto, isArray: true })
+  subscriptions?: SubscriptionResponseDto[];
+}
+
+export class ListMembershipsResponseDto extends CommonListResponseDto {
+  @ApiProperty({ type: MembershipResponseDto, isArray: true })
+  declare records: MembershipResponseDto[];
 }

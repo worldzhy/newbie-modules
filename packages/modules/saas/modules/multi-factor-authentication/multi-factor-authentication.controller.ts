@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Param, ParseIntPipe, Post } from "@nestjs/common";
+import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { User } from "@prisma/client";
 import { MFA_PHONE_OR_TOKEN_REQUIRED } from "../../errors/errors.constants";
 import { Expose } from "../../helpers/interfaces";
@@ -6,12 +7,14 @@ import { Scopes } from "../auth/scope.decorator";
 import { EnableSmsMfaDto, EnableTotpMfaDto } from "./multi-factor-authentication.dto";
 import { MultiFactorAuthenticationService } from "./multi-factor-authentication.service";
 
+@ApiTags("Users Multi-factor Authentication")
 @Controller("users/:userId/multi-factor-authentication")
 export class MultiFactorAuthenticationController {
   constructor(private multiFactorAuthenticationService: MultiFactorAuthenticationService) {}
 
   /** Disable MFA for a user */
   @Delete()
+  @ApiOkResponse()
   @Scopes("user-{userId}:delete-mfa-*")
   async disable2FA(@Param("userId", ParseIntPipe) userId: number): Promise<Expose<User>> {
     return this.multiFactorAuthenticationService.disableMfa(userId);
@@ -19,6 +22,7 @@ export class MultiFactorAuthenticationController {
 
   /** Regenerate backup codes for a user */
   @Post("regenerate")
+  @ApiOkResponse({ type: String, isArray: true })
   @Scopes("user-{userId}:write-mfa-regenerate")
   async regenerateBackupCodes(@Param("userId", ParseIntPipe) userId: number): Promise<string[]> {
     return this.multiFactorAuthenticationService.regenerateBackupCodes(userId);
@@ -26,6 +30,7 @@ export class MultiFactorAuthenticationController {
 
   /** Enable TOTP-based MFA for a user */
   @Post("totp")
+  @ApiOkResponse()
   @Scopes("user-{userId}:write-mfa-totp")
   async enableTotp(
     @Param("userId", ParseIntPipe) userId: number,
@@ -39,6 +44,7 @@ export class MultiFactorAuthenticationController {
 
   /** Enable SMS-based MFA for a user */
   @Post("sms")
+  @ApiOkResponse()
   @Scopes("user-{userId}:write-mfa-sms")
   async enableSms(
     @Param("userId", ParseIntPipe) userId: number,
@@ -54,6 +60,7 @@ export class MultiFactorAuthenticationController {
 
   /** Enable email-based MFA for a user */
   @Post("email")
+  @ApiOkResponse()
   @Scopes("user-{userId}:write-mfa-email")
   async enableEmail(
     @Param("userId", ParseIntPipe) userId: number,

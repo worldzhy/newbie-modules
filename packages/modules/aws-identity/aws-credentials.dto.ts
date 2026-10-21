@@ -34,7 +34,7 @@ export class AwsCrossAccountBindingDto {
   @ApiPropertyOptional({ description: "Default AWS region for API calls", type: String })
   defaultRegion?: string | null;
 
-  @ApiProperty({ type: [String], description: "Configured AWS regions" })
+  @ApiProperty({ type: String, isArray: true, description: "Configured AWS regions" })
   regions!: string[];
 
   @ApiPropertyOptional({ description: "Last verification timestamp (ISO)", type: String })
@@ -112,7 +112,7 @@ export class UpsertAwsCrossAccountBindingDto {
   @Matches(AWS_REGION_PATTERN)
   defaultRegion?: string;
 
-  @ApiPropertyOptional({ type: [String], example: ["us-east-1", "ap-southeast-1"] })
+  @ApiPropertyOptional({ type: String, isArray: true, example: ["us-east-1", "ap-southeast-1"] })
   @IsOptional()
   @IsArray()
   @ArrayMinSize(1)

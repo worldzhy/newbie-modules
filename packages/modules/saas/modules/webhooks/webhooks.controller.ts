@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query } from "@nestjs/common";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Prisma, Webhook } from "@prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OptionalIntPipe } from "@devbie/newbie/pipes/optional-int.pipe";
@@ -10,12 +11,14 @@ import { Scopes } from "../auth/scope.decorator";
 import { CreateWebhookDto, ReplaceWebhookDto, UpdateWebhookDto } from "./webhooks.dto";
 import { WebhooksService } from "./webhooks.service";
 
+@ApiTags("Teams Webhooks")
 @Controller("teams/:teamId/webhooks")
 export class WebhookController {
   constructor(private webhooksService: WebhooksService) {}
 
   /** Create a webhook for a team */
   @Post()
+  @ApiCreatedResponse()
   @AuditLog("create-webhook")
   @Scopes("team-{teamId}:write-webhook-*")
   async create(
@@ -27,6 +30,7 @@ export class WebhookController {
 
   /** Get webhooks for a team */
   @Get()
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-webhook-*")
   async getAll(
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -47,6 +51,7 @@ export class WebhookController {
 
   /** Get webhook scopes for a team */
   @Get("scopes")
+  @ApiOkResponse({ type: Object })
   @Scopes("team-{teamId}:write-webhook-*")
   async scopes(): Promise<Record<string, string>> {
     return this.webhooksService.getWebhookScopes();
@@ -54,6 +59,7 @@ export class WebhookController {
 
   /** Get a webhook for a team */
   @Get(":id")
+  @ApiOkResponse()
   @Scopes("team-{teamId}:read-webhook-{id}")
   async get(
     @Param("teamId", ParseIntPipe) teamId: number,
@@ -64,6 +70,7 @@ export class WebhookController {
 
   /** Update a webhook for a team */
   @Patch(":id")
+  @ApiOkResponse()
   @AuditLog("update-webhook")
   @Scopes("team-{teamId}:write-webhook-{id}")
   async update(
@@ -76,6 +83,7 @@ export class WebhookController {
 
   /** Replace a webhook for a team */
   @Put(":id")
+  @ApiOkResponse()
   @AuditLog("update-webhook")
   @Scopes("team-{teamId}:write-webhook-{id}")
   async replace(
@@ -88,6 +96,7 @@ export class WebhookController {
 
   /** Delete a webhook for a team */
   @Delete(":id")
+  @ApiOkResponse()
   @AuditLog("delete-webhook")
   @Scopes("team-{teamId}:delete-webhook-{id}")
   async remove(

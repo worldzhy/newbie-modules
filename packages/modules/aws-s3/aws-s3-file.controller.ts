@@ -7,6 +7,8 @@ import {
   Query,
   Delete,
   Controller,
+  MaxFileSizeValidator,
+  ParseFilePipe,
   UploadedFile,
   UseInterceptors,
 } from "@nestjs/common";
@@ -37,6 +39,9 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { AwsS3FileService } from "./aws-s3-file.service";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+
+// Upload requests are buffered in memory, so the HTTP boundary enforces an explicit ceiling.
+const MAX_UPLOAD_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 
 @ApiTags("AWS / S3")
 @ApiBearerAuth()
@@ -171,7 +176,13 @@ export class AwsS3FileController {
   })
   @ApiOperation({ summary: "Upload a file to S3" })
   @ApiResponse({ type: CreateFileResponseDto })
-  async uploadFile(@Body() body: UploadFileRequestDto, @UploadedFile() file: Express.Multer.File) {
+  async uploadFile(
+    @Body() body: UploadFileRequestDto,
+    @UploadedFile(
+      new ParseFilePipe({ validators: [new MaxFileSizeValidator({ maxSize: MAX_UPLOAD_FILE_SIZE_BYTES })] }),
+    )
+    file: Express.Multer.File,
+  ) {
     return await this.s3File.uploadFile({
       buffer: file.buffer,
       name: file.originalname,
@@ -183,6 +194,7 @@ export class AwsS3FileController {
 
   @Post("upload-base64")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
+  @ApiResponse({ type: CreateFileResponseDto })
   async uploadBase64String(@Body() body: UploadBase64RequestDto) {
     return await this.s3File.uploadBase64String(body);
   }

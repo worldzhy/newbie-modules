@@ -25,7 +25,7 @@ export class CreateLlmConnectionDto {
   @MaxLength(255)
   model!: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     description:
       "Required for openai-compatible (without the /chat/completions suffix). " +
       "Optional for anthropic; leave empty to use https://api.anthropic.com.",
@@ -109,6 +109,8 @@ export class LlmConnectionResponseDto {
   apiKey!: string;
 
   @ApiProperty({
+    type: String,
+    isArray: true,
     description: "Consumer scopes bound to this connection (ADR-006). One scope binds to exactly one connection.",
   })
   scopes!: string[];

@@ -81,6 +81,7 @@ export class CreateTaskItemDto {
   assigneeId?: string;
 
   @ApiPropertyOptional({ type: String, format: "date-time", description: "ISO 8601 due date" })
+  @Type(() => String)
   @IsDateString()
   @IsOptional()
   dueDate?: Date;
@@ -110,6 +111,7 @@ export class UpdateTaskRequestDto {
   assigneeId?: string;
 
   @ApiPropertyOptional({ type: String, format: "date-time", description: "ISO 8601 due date" })
+  @Type(() => String)
   @IsDateString()
   @IsOptional()
   dueDate?: Date;
@@ -131,7 +133,7 @@ export class CreateTasksBatchRequestDto {
   @IsOptional()
   creatorId?: string;
 
-  @ApiProperty({ type: [CreateTaskItemDto] })
+  @ApiProperty({ type: CreateTaskItemDto, isArray: true })
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
@@ -305,7 +307,7 @@ export class ListTaskParticipantsResponseDto {
   @ApiProperty()
   success!: boolean;
 
-  @ApiProperty({ type: [TaskParticipantListItemDto] })
+  @ApiProperty({ type: TaskParticipantListItemDto, isArray: true })
   data!: TaskParticipantListItemDto[];
 }
 
@@ -321,12 +323,12 @@ export class MembersResponseDto {
   @ApiProperty()
   success!: boolean;
 
-  @ApiProperty({ type: [TaskMemberDto] })
+  @ApiProperty({ type: TaskMemberDto, isArray: true })
   data!: TaskMemberDto[];
 }
 
 export class PaginatedTasksDto {
-  @ApiProperty({ type: [TaskWithRelationsDto] })
+  @ApiProperty({ type: TaskWithRelationsDto, isArray: true })
   records!: TaskWithRelationsDto[];
 
   @ApiProperty({ description: "Total record count" })

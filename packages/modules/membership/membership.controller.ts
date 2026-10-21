@@ -1,8 +1,14 @@
 import { Body, Controller, Delete, Get, Param, Patch, Query, Req } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Prisma, SubscriptionStatus } from "@generated/prisma/client";
-import { GetMembershipRequestDto, ListMembershipLevelsRequestDto, UpdateMembershipRequestDto } from "./membership.dto";
+import {
+  GetMembershipRequestDto,
+  ListMembershipLevelsRequestDto,
+  ListMembershipsResponseDto,
+  MembershipResponseDto,
+  UpdateMembershipRequestDto,
+} from "./membership.dto";
 
 @ApiTags("Membership")
 @ApiBearerAuth()
@@ -12,6 +18,7 @@ export class MembershipController {
 
   @Get("me")
   @ApiOperation({ summary: "Get membership information for the current user" })
+  @ApiOkResponse({ type: MembershipResponseDto })
   async getMembership(@Req() req) {
     // [step 1] Find membership by userId
     const membership = await this.prisma.membership.findUnique({
@@ -41,6 +48,7 @@ export class MembershipController {
 
   @Get()
   @ApiOperation({ summary: "List all memberships" })
+  @ApiOkResponse({ type: ListMembershipsResponseDto })
   async listMemberships(@Query() query: ListMembershipLevelsRequestDto) {
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.Membership,
@@ -50,6 +58,7 @@ export class MembershipController {
 
   @Patch(":id")
   @ApiOperation({ summary: "Update an existing membership" })
+  @ApiOkResponse({ type: MembershipResponseDto })
   async updateMembership(@Param() params: GetMembershipRequestDto, @Body() body: UpdateMembershipRequestDto) {
     return await this.prisma.membership.update({
       where: { id: params.id },
@@ -59,6 +68,7 @@ export class MembershipController {
 
   @Delete(":id")
   @ApiOperation({ summary: "Delete a membership" })
+  @ApiOkResponse({ type: MembershipResponseDto })
   async deleteMembership(@Param() params: GetMembershipRequestDto) {
     return await this.prisma.membership.delete({ where: { id: params.id } });
   }

@@ -1,6 +1,6 @@
 import { Controller, Get, Ip, Req, Res } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request, Response } from "express";
 import { GuardByGoogle } from "@modules/security/authentication/google-oauth/google.decorator";
 import { GoogleUserResDto } from "@modules/security/authentication/google-oauth/dto/google-user.dto";
@@ -25,6 +25,7 @@ export class LoginByGoogleController {
     private readonly config: ConfigService,
   ) {}
 
+  @ApiOkResponse()
   @GuardByGoogle()
   @Get("login-by-google")
   @ApiOperation({ summary: "Initiate Google OAuth login (redirects to Google)" })

@@ -12,6 +12,7 @@ import {
  * owning user is still active.
  */
 @Injectable()
+// eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- bound via the ACCESS_TOKEN_SESSION_RESOLVER useClass provider
 export class AccountAccessTokenSessionResolver implements AccessTokenSessionResolver {
   constructor(private readonly prisma: PrismaService) {}
 

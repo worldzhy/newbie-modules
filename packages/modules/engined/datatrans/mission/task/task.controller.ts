@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import {
   DatatransPipeline,
   DatatransTask,
@@ -37,16 +37,19 @@ export class DatatransTaskController {
       },
     },
   })
+  @ApiCreatedResponse()
   async createDatatransTask(@Body() body: Prisma.DatatransTaskUncheckedCreateInput): Promise<DatatransTask> {
     return await this.prisma.datatransTask.create({ data: body });
   }
 
   @Get("")
+  @ApiOkResponse()
   async getDatatransTasks(): Promise<DatatransTask[]> {
     return await this.prisma.datatransTask.findMany({});
   }
 
   @Get(":taskId")
+  @ApiOkResponse()
   async getDatatransTask(@Param("taskId") taskId: number): Promise<DatatransTask | null> {
     return await this.prisma.datatransTask.findUnique({
       where: { id: taskId },
@@ -54,6 +57,7 @@ export class DatatransTaskController {
   }
 
   @Patch(":taskId")
+  @ApiOkResponse()
   async updateDatatransTask(
     @Param("taskId") taskId: number,
     @Body() body: Prisma.DatatransTaskUpdateInput,
@@ -65,6 +69,7 @@ export class DatatransTaskController {
   }
 
   @Delete(":taskId")
+  @ApiOkResponse()
   async deleteDatatransTask(@Param("taskId") taskId: number): Promise<DatatransTask> {
     return await this.prisma.datatransTask.delete({
       where: { id: taskId },
@@ -73,6 +78,7 @@ export class DatatransTaskController {
 
   //* Process the task.
   @Patch(":taskId/process")
+  @ApiOkResponse()
   async stopDatatransTask(@Param("taskId") taskId: number): Promise<DatatransTask> {
     // [step 1] Get task.
     const task = await this.prisma.datatransTask.findUniqueOrThrow({
@@ -142,6 +148,7 @@ export class DatatransTaskController {
 
   //* Send to queue, then AWS Lambda will process the task.
   @Patch(":taskId/task2sqs")
+  @ApiOkResponse()
   async startDatatransTask(@Param("taskId") taskId: number): Promise<DatatransTask> {
     // [step 1] Get task.
     const task = await this.prisma.datatransTask.findUniqueOrThrow({

@@ -1,4 +1,5 @@
 import { Controller, Get, Query } from "@nestjs/common";
+import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { AuditLog, Prisma } from "@prisma/client";
 import { CursorPipe } from "@devbie/newbie/pipes/cursor.pipe";
 import { OptionalIntPipe } from "@devbie/newbie/pipes/optional-int.pipe";
@@ -8,12 +9,14 @@ import { Expose } from "../../helpers/interfaces";
 import { Scopes } from "../auth/scope.decorator";
 import { AuditLogsService } from "./audit-logs.service";
 
+@ApiTags("Audit Logs")
 @Controller("audit-logs")
 export class AuditLogController {
   constructor(private auditLogsService: AuditLogsService) {}
 
   /** Get audit logs for a team */
   @Get()
+  @ApiOkResponse()
   @Scopes("audit-log-*:read-info")
   async getAll(
     @Query("skip", OptionalIntPipe) skip?: number,

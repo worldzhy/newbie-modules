@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { AwsResourceStack, AwsResourceStackState, Prisma } from "@generated/prisma/client";
 import { CloudFormationStackType } from "@modules/aws-cloudformation/stack/stack.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -16,16 +16,19 @@ export class AwsCloudformationStackController {
   ) {}
 
   @Get("types")
+  @ApiOkResponse({ type: String, isArray: true })
   listStackTypes() {
     return this.cloudformationService.listStackTypes();
   }
 
   @Get("params")
+  @ApiOkResponse({ type: Object })
   async getStackParams(@Query("type") type: string, @Query("manager") manager: string) {
     return this.cloudformationService.getStackParams({ manager, type });
   }
 
   @Post("")
+  @ApiCreatedResponse()
   @ApiBody({
     description: "Create infrastructure stack.",
     examples: {
@@ -55,6 +58,7 @@ export class AwsCloudformationStackController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async list(@Query() query: ListStacksRequestDto) {
     const { environmentId } = query;
     return await this.prisma.findManyInOnePage({
@@ -64,6 +68,7 @@ export class AwsCloudformationStackController {
   }
 
   @Get(":stackId")
+  @ApiOkResponse()
   async getStack(@Param("stackId") stackId: string): Promise<AwsResourceStack> {
     return await this.prisma.awsResourceStack.findUniqueOrThrow({
       where: { id: stackId },
@@ -71,6 +76,7 @@ export class AwsCloudformationStackController {
   }
 
   @Patch(":stackId")
+  @ApiOkResponse()
   @ApiBody({
     description: "Update infrastructure stack.",
     examples: {
@@ -106,6 +112,7 @@ export class AwsCloudformationStackController {
   }
 
   @Delete(":stackId")
+  @ApiOkResponse()
   async deleteStack(
     @Param("stackId")
     stackId: string,
@@ -127,6 +134,7 @@ export class AwsCloudformationStackController {
 
   //* Create resources
   @Post(":stackId/create-resources")
+  @ApiCreatedResponse()
   async createResources(
     @Param("stackId")
     stackId: string,
@@ -136,6 +144,7 @@ export class AwsCloudformationStackController {
 
   //* Destroy resources
   @Post(":stackId/destroy-resources")
+  @ApiOkResponse()
   async destroyResources(
     @Param("stackId")
     stackId: string,

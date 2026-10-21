@@ -1,10 +1,12 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   CreateMembershipLevelRequestDto,
   GetMembershipLevelRequestDto,
+  ListMembershipLevelsResponseDto,
+  MembershipLevelResponseDto,
   UpdateMembershipLevelRequestDto,
 } from "./membership.dto";
 
@@ -16,6 +18,7 @@ export class MembershipLevelController {
 
   @Get()
   @ApiOperation({ summary: "List all membership levels" })
+  @ApiOkResponse({ type: ListMembershipLevelsResponseDto })
   async listMembershipLevels() {
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.MembershipLevel,
@@ -25,12 +28,14 @@ export class MembershipLevelController {
 
   @Post()
   @ApiOperation({ summary: "Create a new membership level" })
+  @ApiCreatedResponse({ type: MembershipLevelResponseDto })
   async createMembershipLevel(@Body() body: CreateMembershipLevelRequestDto) {
     return await this.prisma.membershipLevel.create({ data: body });
   }
 
   @Patch(":id")
   @ApiOperation({ summary: "Update an existing membership level" })
+  @ApiOkResponse({ type: MembershipLevelResponseDto })
   async updateMembershipLevel(
     @Param() params: GetMembershipLevelRequestDto,
     @Body() body: UpdateMembershipLevelRequestDto,
@@ -43,6 +48,7 @@ export class MembershipLevelController {
 
   @Delete(":id")
   @ApiOperation({ summary: "Delete a membership level" })
+  @ApiOkResponse({ type: MembershipLevelResponseDto })
   async deleteMembershipLevel(@Param() params: GetMembershipLevelRequestDto) {
     return await this.prisma.membershipLevel.delete({ where: { id: params.id } });
   }

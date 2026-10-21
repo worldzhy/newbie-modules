@@ -8,6 +8,7 @@ import { LoginAccountResolver } from "@modules/security/ports/login-account.reso
  * rate limiter shares one bucket across a user's aliases.
  */
 @Injectable()
+// eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- bound via the LOGIN_ACCOUNT_RESOLVER useClass provider
 export class AccountLoginAccountResolver implements LoginAccountResolver {
   constructor(private readonly userService: UserService) {}
 

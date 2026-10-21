@@ -97,7 +97,6 @@ export class ResetPasswordDto {
 export class ChangePasswordDto {
   @ApiProperty({
     type: String,
-    required: true,
     description: "The current password of the account.",
   })
   @IsString()
@@ -106,7 +105,6 @@ export class ChangePasswordDto {
 
   @ApiProperty({
     type: String,
-    required: true,
     description: "The new password for the account.",
   })
   @IsString()

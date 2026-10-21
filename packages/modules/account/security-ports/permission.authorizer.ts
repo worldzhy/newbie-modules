@@ -17,6 +17,7 @@ import { SCOPE_PERMISSION_CHECKER, ScopePermissionChecker } from "@modules/secur
  * SCOPE_PERMISSION_CHECKER, since membership data is host-owned.
  */
 @Injectable()
+// eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- bound via the PERMISSION_AUTHORIZER useClass provider
 export class AccountPermissionAuthorizer implements PermissionAuthorizer {
   constructor(
     private readonly prisma: PrismaService,

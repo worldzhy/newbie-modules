@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from "@nestjs/common";
-import { ApiBearerAuth, ApiBody, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { ElasticsearchDatasource, ElasticsearchDatasourceState, Prisma } from "@generated/prisma/client";
 import { ElasticsearchDatasourceService } from "./elasticsearch-datasource.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -23,6 +23,7 @@ export class ElasticsearchDatasourceController {
       },
     },
   })
+  @ApiCreatedResponse()
   async createElasticsearchDatasource(
     @Body()
     body: Prisma.ElasticsearchDatasourceCreateInput,
@@ -31,6 +32,7 @@ export class ElasticsearchDatasourceController {
   }
 
   @Get("")
+  @ApiOkResponse()
   async getElasticsearchDatasources(@Query("page") page: number, @Query("pageSize") pageSize: number) {
     return await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.ElasticsearchDatasource,
@@ -39,6 +41,7 @@ export class ElasticsearchDatasourceController {
   }
 
   @Get(":datasourceId")
+  @ApiOkResponse()
   async getElasticsearchDatasource(
     @Param("datasourceId") datasourceId: string,
   ): Promise<ElasticsearchDatasource | null> {
@@ -59,6 +62,7 @@ export class ElasticsearchDatasourceController {
       },
     },
   })
+  @ApiOkResponse()
   async updateElasticsearchDatasource(
     @Param("datasourceId") datasourceId: string,
     @Body() body: Prisma.ElasticsearchDatasourceUpdateInput,
@@ -70,6 +74,7 @@ export class ElasticsearchDatasourceController {
   }
 
   @Delete(":datasourceId")
+  @ApiOkResponse()
   async deleteElasticsearchDatasource(@Param("datasourceId") datasourceId: string): Promise<ElasticsearchDatasource> {
     return await this.prisma.elasticsearchDatasource.delete({
       where: { id: datasourceId },
@@ -80,6 +85,7 @@ export class ElasticsearchDatasourceController {
    * Load an elasticsearch datasource.
    */
   @Patch(":datasourceId/load")
+  @ApiOkResponse()
   async loadElasticsearchDatasource(@Param("datasourceId") datasourceId: string): Promise<ElasticsearchDatasource> {
     // [step 1] Get datasource.
     const datasource = await this.prisma.elasticsearchDatasource.findUnique({
@@ -136,6 +142,7 @@ export class ElasticsearchDatasourceController {
    * Unload an elasticsearch datasource.
    */
   @Patch(":datasourceId/unload")
+  @ApiOkResponse()
   async unloadPostgresqlDatasource(@Param("datasourceId") datasourceId: string): Promise<ElasticsearchDatasource> {
     // [step 1] Get datasource.
     const datasource = await this.prisma.elasticsearchDatasource.findUnique({
@@ -158,6 +165,7 @@ export class ElasticsearchDatasourceController {
   }
 
   @Get(":datasourceId/indices")
+  @ApiOkResponse()
   async getElasticsearchDatasourceIndices(
     @Param("datasourceId") datasourceId: string,
   ): Promise<ElasticsearchDatasource> {
@@ -183,6 +191,7 @@ export class ElasticsearchDatasourceController {
       },
     },
   })
+  @ApiOkResponse()
   async searchElasticsearchDatasource(
     @Param("datasourceId") datasourceId: string,
     @Body()
@@ -221,6 +230,7 @@ export class ElasticsearchDatasourceController {
       },
     },
   })
+  @ApiOkResponse()
   async searchAggregationsElasticsearchDatasource(
     @Param("datasourceId") datasourceId: string,
     @Body()

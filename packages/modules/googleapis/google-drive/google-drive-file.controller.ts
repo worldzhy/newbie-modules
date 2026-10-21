@@ -1,9 +1,30 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Res, UploadedFile, UseInterceptors } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  MaxFileSizeValidator,
+  Param,
+  ParseFilePipe,
+  Patch,
+  Post,
+  Res,
+  UploadedFile,
+  UseInterceptors,
+} from "@nestjs/common";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { GoogleDriveFileService } from "@modules/googleapis/google-drive/google-drive-file.service";
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags, ApiConsumes, ApiBody } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+  ApiConsumes,
+  ApiBody,
+} from "@nestjs/swagger";
 import {
   CreateGoogleDriveFileRequestDto,
   CreateGoogleDriveFileResponseDto,
@@ -17,6 +38,9 @@ import {
 } from "./google-drive-file.dto";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { Express, Response } from "express";
+
+// Upload requests are buffered in memory, so the HTTP boundary enforces an explicit ceiling.
+const MAX_UPLOAD_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 
 @ApiTags("Google Drive / File")
 @ApiBearerAuth()
@@ -52,7 +76,14 @@ export class GoogleDriveFileController {
     },
   })
   @ApiOperation({ summary: "Upload a file to Google Drive" })
-  async uploadFile(@UploadedFile() file: Express.Multer.File, @Body() body: UploadGoogleDriveFileBodyDto) {
+  @ApiCreatedResponse()
+  async uploadFile(
+    @UploadedFile(
+      new ParseFilePipe({ validators: [new MaxFileSizeValidator({ maxSize: MAX_UPLOAD_FILE_SIZE_BYTES })] }),
+    )
+    file: Express.Multer.File,
+    @Body() body: UploadGoogleDriveFileBodyDto,
+  ) {
     await this.googleDriveFile.uploadFile({ file, parentId: body.parentId });
   }
 

@@ -1,10 +1,11 @@
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Body, Controller, Param, Patch, Post } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { GuardByApiKey } from "@modules/security/authentication/api-key/api-key.decorator";
 import { MembershipService } from "@modules/membership/membership.service";
 import { SubscriptionService } from "@modules/membership/subscription/subscription.service";
 import { SubscriptionStatus } from "@generated/prisma/client";
+import { SubscriptionResponseDto } from "../subscription.dto";
 import {
   CreateWechatSubscriptionRequestDto,
   GetWechatSubscriptionRequestDto,
@@ -24,6 +25,7 @@ export class WechatSubscriptionController {
   @GuardByApiKey()
   @Post()
   @ApiOperation({ summary: "Create a new subscription" })
+  @ApiCreatedResponse({ type: SubscriptionResponseDto })
   async createSubscription(@Body() body: CreateWechatSubscriptionRequestDto) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { wechatOpenId: body.wechatOpenId },
@@ -62,6 +64,7 @@ export class WechatSubscriptionController {
   @GuardByApiKey()
   @Patch(":id")
   @ApiOperation({ summary: "Update an existing subscription" })
+  @ApiOkResponse({ type: SubscriptionResponseDto })
   async updateSubscription(
     @Param() params: GetWechatSubscriptionRequestDto,
     @Body() body: UpdateWechatSubscriptionRequestDto,
