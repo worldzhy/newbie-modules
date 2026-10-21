@@ -9,6 +9,7 @@ import { ApiKeyVerifier } from "@modules/security/ports/api-key.verifier";
  * API key and compares the presented secret against its hash.
  */
 @Injectable()
+// eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- bound via the API_KEY_VERIFIER useClass provider
 export class AccountApiKeyVerifier implements ApiKeyVerifier {
   constructor(private readonly prisma: PrismaService) {}
 

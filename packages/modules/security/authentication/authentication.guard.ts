@@ -20,6 +20,7 @@ import { INSTALLATION_AUTH_KEY } from "./installation/installation.decorator";
 import { GuardType } from "./guard.types";
 
 @Injectable()
+// eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- registered as an APP_GUARD provider
 export class AuthenticationGuard extends AuthGuard("authentication") {
   constructor(
     private readonly config: ConfigService,

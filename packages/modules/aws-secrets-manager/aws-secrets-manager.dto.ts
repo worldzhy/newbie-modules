@@ -3,6 +3,7 @@ import { Type } from "class-transformer";
 import {
   buildMessage,
   IsBoolean,
+  IsDefined,
   IsIn,
   IsInt,
   IsOptional,
@@ -90,7 +91,7 @@ export class ListSecretsResponseDto {
   @ApiProperty({ type: SecretResponseDto, isArray: true })
   records!: SecretResponseDto[];
 
-  @ApiPropertyOptional({
+  @ApiProperty({
     type: String,
     nullable: true,
     description: "Opaque cursor for the next page; pass it back as nextToken. Null when no more pages",
@@ -99,7 +100,7 @@ export class ListSecretsResponseDto {
 }
 
 export class ListSecretsRequestDto {
-  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)" })
   @IsString()
   projectId!: string;
 
@@ -128,7 +129,7 @@ export class ListSecretsRequestDto {
 }
 
 export class GetSecretRequestDto {
-  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)" })
   @IsString()
   projectId!: string;
 
@@ -139,30 +140,31 @@ export class GetSecretRequestDto {
 }
 
 export class CreateSecretDto {
-  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)" })
   @IsString()
   projectId!: string;
 
   @ApiProperty({
     description: "Secret name; letters, digits and /_+=.@- excluding slash (used as URL path parameter)",
-    required: true,
   })
   @IsString()
   @Matches(/^[a-zA-Z0-9_+=.@-]{1,512}$/)
   name!: string;
 
-  @ApiProperty({ enum: SECRET_TYPES, description: "Secret type", required: true })
+  @ApiProperty({ enum: SECRET_TYPES, description: "Secret type" })
+  @Type(() => String)
   @IsIn(SECRET_TYPES)
   type!: SecretType;
 
+  // eslint-disable-next-line @darraghor/nestjs-typed/validated-non-primitive-property-needs-type-decorator -- union payload (object | string) enforced by IsSecretValue()
   @ApiProperty({
     description: "Secret value: a JSON object (stored as JSON) or a non-empty string (stored verbatim)",
-    required: true,
     oneOf: [
       { type: "object", additionalProperties: true },
       { type: "string", minLength: 1 },
     ],
   })
+  @IsDefined()
   @IsSecretValue()
   secretValue!: SecretValuePayload;
 
@@ -178,10 +180,11 @@ export class CreateSecretDto {
 }
 
 export class UpdateSecretDto {
-  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)" })
   @IsString()
   projectId!: string;
 
+  // eslint-disable-next-line @darraghor/nestjs-typed/validated-non-primitive-property-needs-type-decorator -- union payload (object | string) enforced by IsSecretValue()
   @ApiPropertyOptional({
     description: "New secret value: a JSON object (stored as JSON) or a non-empty string (stored verbatim)",
     oneOf: [
@@ -199,6 +202,7 @@ export class UpdateSecretDto {
   description?: string;
 
   @ApiPropertyOptional({ enum: SECRET_TYPES, description: "New secret type" })
+  @Type(() => String)
   @IsOptional()
   @IsIn(SECRET_TYPES)
   type?: SecretType;
@@ -210,11 +214,11 @@ export class UpdateSecretDto {
 }
 
 export class SetRotationRequestDto {
-  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)", required: true })
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)" })
   @IsString()
   projectId!: string;
 
-  @ApiProperty({ description: "Enable or disable automatic rotation", required: true })
+  @ApiProperty({ description: "Enable or disable automatic rotation" })
   @IsBoolean()
   isEnabled!: boolean;
 

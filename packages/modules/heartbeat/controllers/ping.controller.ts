@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Req } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { HeartbeatInstallation } from "@generated/prisma/client";
@@ -28,6 +28,7 @@ export class PingController {
   @Post("ping")
   @InstallationAuth("heartbeat")
   @AllowAnyOrigin()
+  @ApiCreatedResponse({ type: HeartbeatPingResponseDto })
   async ping(
     @Req() req: Request & { installation: HeartbeatInstallation },
     @Body() body: HeartbeatPingDto,

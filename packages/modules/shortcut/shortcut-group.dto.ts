@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { IsString, IsNumber, IsOptional } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
@@ -9,7 +9,7 @@ export class ShortcutReqBaseDto {
 }
 
 export class ListShortcutGroupsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
@@ -25,39 +25,39 @@ export class CreateShortcutGroupRequestDto {
   @IsString()
   name!: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsNumber()
   @IsOptional()
   sort?: number;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsNumber()
   @IsOptional()
   parentId?: number;
 }
 
 export class UpdateShortcutGroupRequestDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsNumber()
   @IsOptional()
   sort?: number;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsNumber()
   @IsOptional()
   parentId?: number;

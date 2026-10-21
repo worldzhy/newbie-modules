@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Req } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { ModuleHubInstallation } from "@generated/prisma/client";
@@ -35,6 +35,7 @@ export class ReportController {
   @Post("report")
   @InstallationAuth("module-hub")
   @AllowAnyOrigin()
+  @ApiCreatedResponse({ type: HubReportResponseDto })
   async report(
     @Req() req: Request & { installation: ModuleHubInstallation },
     @Body() body: HubReportDto,

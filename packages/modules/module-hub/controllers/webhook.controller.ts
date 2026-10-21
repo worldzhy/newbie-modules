@@ -11,7 +11,7 @@ import {
   ServiceUnavailableException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 import { Request } from "express";
 
@@ -35,6 +35,7 @@ export class WebhookController {
   @Post("registry")
   @HttpCode(HttpStatus.OK)
   @NoGuard()
+  @ApiOkResponse()
   async registryPush(
     @Req() req: Request & { rawBody?: Buffer },
     @Headers("x-hub-signature-256") signature: string,

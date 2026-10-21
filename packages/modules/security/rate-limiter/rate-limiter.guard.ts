@@ -7,6 +7,7 @@ import { LIMIT_ACCESS_BY_IP, LIMIT_LOGIN_BY_IP, LIMIT_LOGIN_BY_USER } from "./ra
 import { LOGIN_ACCOUNT_RESOLVER, LoginAccountResolver } from "../ports/login-account.resolver";
 
 @Injectable()
+// eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- registered as an APP_GUARD provider
 export class RateLimiterGuard {
   constructor(
     private readonly limitAccessByIpService: LimitAccessByIpService,

@@ -1,5 +1,5 @@
 import { Body, Controller, Post, Req } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { UserRequest } from "@modules/security/security.interface";
 import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
@@ -26,6 +26,7 @@ export class TwoFactorController {
   @Post("enable")
   @RequireOwner()
   @ApiOperation({ summary: "Confirm TOTP code and enable two-factor authentication" })
+  @ApiOkResponse()
   async enable(@Req() request: UserRequest, @Body() body: EnableTwoFactorDto) {
     const result = await this.twoFactorService.enable(request.user.userId, body.code);
     await this.auditLogService.record(AuditEvent.MFA_ENABLED, {
@@ -39,6 +40,7 @@ export class TwoFactorController {
   @Post("disable")
   @RequireOwner()
   @ApiOperation({ summary: "Disable two-factor authentication" })
+  @ApiOkResponse()
   async disable(@Req() request: UserRequest, @Body() body: DisableTwoFactorDto) {
     await this.twoFactorService.disable(request.user.userId, body);
     await this.auditLogService.record(AuditEvent.MFA_DISABLED, {

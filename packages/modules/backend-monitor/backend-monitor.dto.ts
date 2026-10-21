@@ -209,6 +209,7 @@ export class CreateBackendMonitorIngestDto {
   @ApiPropertyOptional({
     type: [BackendMonitorRequestEventDto],
     description: "Request metric events (max 500)",
+    isArray: true,
   })
   @IsOptional()
   @IsArray()
@@ -219,6 +220,7 @@ export class CreateBackendMonitorIngestDto {
   @ApiPropertyOptional({
     type: [BackendMonitorErrorEventDto],
     description: "Error events (max 500)",
+    isArray: true,
   })
   @IsOptional()
   @IsArray()
@@ -234,14 +236,14 @@ export class ListBackendMonitorRequestLogsRequestDto {
   @IsUUID()
   applicationId!: string;
 
-  @ApiProperty({ type: Number, description: "Page number, starts from 0" })
+  @ApiPropertyOptional({ type: Number, description: "Page number, starts from 0" })
   @IsOptional()
   @IsInt()
   @Min(0)
   @Type(() => Number)
   page?: number;
 
-  @ApiProperty({ type: Number, description: "Items per page, capped at 100" })
+  @ApiPropertyOptional({ type: Number, description: "Items per page, capped at 100" })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -276,14 +278,14 @@ export class ListBackendMonitorErrorLogsRequestDto {
   @IsUUID()
   applicationId!: string;
 
-  @ApiProperty({ type: Number, description: "Page number, starts from 0" })
+  @ApiPropertyOptional({ type: Number, description: "Page number, starts from 0" })
   @IsOptional()
   @IsInt()
   @Min(0)
   @Type(() => Number)
   page?: number;
 
-  @ApiProperty({ type: Number, description: "Items per page, capped at 100" })
+  @ApiPropertyOptional({ type: Number, description: "Items per page, capped at 100" })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -340,9 +342,9 @@ export class BackendMonitorRequestLogResponseDto {
   instance_id!: string;
   @ApiProperty()
   app_version!: string;
-  @ApiPropertyOptional()
+  @ApiProperty()
   ip!: string;
-  @ApiPropertyOptional()
+  @ApiProperty()
   user_agent!: string;
   @ApiProperty()
   ingested_at!: string;
@@ -352,7 +354,7 @@ export class BackendMonitorRequestLogResponseDto {
 export class BackendMonitorErrorLogResponseDto {
   @ApiProperty()
   application_id!: string;
-  @ApiPropertyOptional()
+  @ApiProperty()
   request_id!: string;
   @ApiProperty()
   fingerprint!: string;
@@ -360,15 +362,15 @@ export class BackendMonitorErrorLogResponseDto {
   type!: string;
   @ApiProperty({ description: "Error message" })
   message!: string;
-  @ApiPropertyOptional({ description: "Full stack trace" })
+  @ApiProperty({ description: "Full stack trace" })
   stack!: string;
-  @ApiPropertyOptional()
+  @ApiProperty()
   route!: string;
-  @ApiPropertyOptional({ description: "Pathname without query string" })
+  @ApiProperty({ description: "Pathname without query string" })
   path!: string;
-  @ApiPropertyOptional({ description: "HTTP method in upper-case" })
+  @ApiProperty({ description: "HTTP method in upper-case" })
   method!: string;
-  @ApiPropertyOptional({ description: "HTTP response status code; 0 for non-HTTP errors" })
+  @ApiProperty({ description: "HTTP response status code; 0 for non-HTTP errors" })
   status_code!: number;
   @ApiProperty()
   env!: string;
@@ -376,9 +378,9 @@ export class BackendMonitorErrorLogResponseDto {
   instance_id!: string;
   @ApiProperty()
   app_version!: string;
-  @ApiPropertyOptional()
+  @ApiProperty()
   ip!: string;
-  @ApiPropertyOptional()
+  @ApiProperty()
   user_agent!: string;
   @ApiProperty({ description: "ISO 8601 timestamp of when the error occurred" })
   occurred_at!: string;
@@ -387,7 +389,7 @@ export class BackendMonitorErrorLogResponseDto {
 }
 
 export class ListBackendMonitorRequestLogsResponseDto {
-  @ApiProperty({ type: [BackendMonitorRequestLogResponseDto] })
+  @ApiProperty({ type: [BackendMonitorRequestLogResponseDto], isArray: true })
   records!: BackendMonitorRequestLogResponseDto[];
 
   @ApiProperty({ type: Number })
@@ -395,7 +397,7 @@ export class ListBackendMonitorRequestLogsResponseDto {
 }
 
 export class ListBackendMonitorErrorLogsResponseDto {
-  @ApiProperty({ type: [BackendMonitorErrorLogResponseDto] })
+  @ApiProperty({ type: [BackendMonitorErrorLogResponseDto], isArray: true })
   records!: BackendMonitorErrorLogResponseDto[];
 
   @ApiProperty({ type: Number })

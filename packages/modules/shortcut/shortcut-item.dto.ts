@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { IsString, IsNumber, IsOptional, IsEnum } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
@@ -10,7 +10,7 @@ export class ShortcutReqBaseDto {
 }
 
 export class ShortcutTreeRequestDto {
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @Type(() => Number)
   @IsOptional()
   groupId?: number;
@@ -25,13 +25,13 @@ export class ShortcutTreeResDto extends ShortcutGroupEntity {
 }
 
 export class ListShortcutItemsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
   id?: number;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsNumber()
   @Type(() => Number)
@@ -73,32 +73,32 @@ export class CreateShortcutItemRequestDto {
 }
 
 export class UpdateShortcutItemRequestDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   label?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   content?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   description?: string;
 
-  @ApiProperty({ type: String, enum: ShortcutItemType, required: false })
+  @ApiPropertyOptional({ type: String, enum: ShortcutItemType })
   @IsOptional()
   @IsEnum(ShortcutItemType)
   type?: ShortcutItemType;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsNumber()
   sort?: number;
 
-  @ApiProperty({ type: Number, required: false })
+  @ApiPropertyOptional({ type: Number })
   @IsOptional()
   @IsNumber()
   groupId?: number;

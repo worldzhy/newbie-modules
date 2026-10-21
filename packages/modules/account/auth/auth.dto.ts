@@ -1,9 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 import { MfaMethod, VerificationCodeUse } from "@generated/prisma/client";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 import {
   IsDate,
   IsEmail,
+  IsEnum,
   IsIn,
   IsNotEmpty,
   IsOptional,
@@ -14,17 +16,17 @@ import {
 } from "class-validator";
 
 export class SignUpDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsEmail()
   @IsNotEmpty()
   email!: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsPhoneNumber()
   @IsOptional()
   phone?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsStrongPassword()
   @IsOptional()
@@ -34,50 +36,51 @@ export class SignUpDto {
   // default USER role. Letting clients choose roles would allow instant
   // privilege escalation to ADMIN.
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   name?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   firstName?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   middleName?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   lastName?: string;
 
-  @ApiProperty({ type: Date, required: false })
+  @ApiPropertyOptional({ type: Date })
+  @Type(() => Date)
   @IsDate()
   @IsOptional()
   dateOfBirth?: Date;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   @IsIn(["MALE", "FEMALE", "NONBINARY", "UNKNOWN"])
   gender?: "MALE" | "FEMALE" | "NONBINARY" | "UNKNOWN";
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   avatarFileId?: string;
 }
 
 export class LoginByPasswordRequestDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
   account!: string;
 
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   @MinLength(8)
   password!: string;
@@ -122,23 +125,23 @@ export class SendVerificationCodeResponseDto {
  * Request DTO for sending verification code to email or phone.
  */
 export class SendVerificationCodeRequestDto {
-  @ApiProperty({ type: String, required: false, description: "The email address to send the code to." })
+  @ApiPropertyOptional({ type: String, description: "The email address to send the code to." })
   @IsEmail()
   @IsOptional()
   email?: string;
 
-  @ApiProperty({ type: String, required: false, description: "The phone number to send the code to." })
+  @ApiPropertyOptional({ type: String, description: "The phone number to send the code to." })
   @IsString()
   @IsOptional()
   phone?: string;
 
   @ApiProperty({
     type: String,
-    required: true,
     description: "The purpose of the verification code (e.g. LOGIN_BY_EMAIL, RESET_PASSWORD).",
     enum: VerificationCodeUse,
   })
   @IsString()
+  @IsEnum(VerificationCodeUse)
   @IsNotEmpty()
   use!: VerificationCodeUse;
 }
@@ -147,12 +150,12 @@ export class SendVerificationCodeRequestDto {
  * Request DTO for logging in with a verification code.
  */
 export class LoginByVerificationCodeRequestDto {
-  @ApiProperty({ type: String, required: true, description: "The account (email or phone)." })
+  @ApiProperty({ type: String, description: "The account (email or phone)." })
   @IsString()
   @IsNotEmpty()
   account!: string;
 
-  @ApiProperty({ type: String, required: true, description: "The 6-digit verification code." })
+  @ApiProperty({ type: String, description: "The 6-digit verification code." })
   @IsString()
   @IsNotEmpty()
   verificationCode!: string;

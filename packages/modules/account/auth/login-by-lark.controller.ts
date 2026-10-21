@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, Get, Ip, Query, Req, Res } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
@@ -28,6 +28,7 @@ export class LoginByLarkController {
     private readonly cookieService: CookieService,
   ) {}
 
+  @ApiOkResponse()
   @NoGuard()
   @Get("login-by-lark")
   @ApiOperation({ summary: "Initiate Feishu OAuth login (redirects to Feishu)" })
@@ -38,6 +39,7 @@ export class LoginByLarkController {
     response.redirect(this.larkAuthService.buildAuthorizeUrl(state));
   }
 
+  @ApiOkResponse()
   @NoGuard()
   @Get("login-by-lark/redirect")
   @ApiOperation({ summary: "Feishu OAuth redirect callback" })

@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { NOTIFICATION_SCOPES, SEVERITIES } from "./notification-center.constants";
@@ -52,28 +52,28 @@ export class NotifyDto {
   @IsString()
   notificationKey!: string;
 
-  @ApiProperty({ type: Object, required: false, description: "Values interpolated into the notification templates" })
+  @ApiPropertyOptional({ type: Object, description: "Values interpolated into the notification templates" })
   @IsOptional()
   @IsObject()
   context?: Record<string, unknown>;
 
-  @ApiProperty({ enum: SEVERITIES, required: false, description: "Override the notification default severity" })
+  @ApiPropertyOptional({ enum: SEVERITIES, description: "Override the notification default severity" })
   @IsOptional()
   @IsString()
   @IsIn(SEVERITIES as unknown as string[])
   severity?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   projectId?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   link?: string;
 
-  @ApiProperty({ type: String, required: false, description: "Optional idempotency key" })
+  @ApiPropertyOptional({ type: String, description: "Optional idempotency key" })
   @IsOptional()
   @IsString()
   deduplicationKey?: string;
@@ -91,27 +91,26 @@ export class NotifyResultDto {
 }
 
 export class ListNotificationsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ type: String, required: false, description: "Pass 'true' to return only unread notifications" })
+  @ApiPropertyOptional({ type: String, description: "Pass 'true' to return only unread notifications" })
   @IsOptional()
   @IsString()
   unreadOnly?: string;
 
-  @ApiProperty({ required: false, enum: SEVERITIES, description: "Filter by resolved severity" })
+  @ApiPropertyOptional({ enum: SEVERITIES, description: "Filter by resolved severity" })
   @IsOptional()
   @IsString()
   @IsIn(SEVERITIES as unknown as string[])
   severity?: string;
 
-  @ApiProperty({
+  @ApiPropertyOptional({
     type: String,
-    required: false,
     description: "Comma-separated notification keys to filter by, e.g. 'heartbeat.offline,job.run-failed'",
   })
   @IsOptional()
   @IsString()
   notificationKeys?: string;
 
-  @ApiProperty({ type: String, required: false, description: "Filter by scoped project id (UUID)" })
+  @ApiPropertyOptional({ type: String, description: "Filter by scoped project id (UUID)" })
   @IsOptional()
   @IsString()
   @IsUUID()
@@ -119,7 +118,7 @@ export class ListNotificationsRequestDto extends CommonListRequestDto {
 }
 
 export class ListNotificationsResponseDto extends CommonListResponseDto {
-  @ApiProperty({ type: [NotificationRecordDto] })
+  @ApiProperty({ type: NotificationRecordDto, isArray: true })
   declare records: NotificationRecordDto[];
 }
 
@@ -170,13 +169,13 @@ export class NotificationSettingDto {
 }
 
 export class UpdateNotificationSettingDto {
-  @ApiProperty({ required: false, enum: SEVERITIES })
+  @ApiPropertyOptional({ enum: SEVERITIES })
   @IsOptional()
   @IsString()
   @IsIn(SEVERITIES as unknown as string[])
   defaultSeverity?: string;
 
-  @ApiProperty({ required: false })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
   isPushEnabled?: boolean;
@@ -195,12 +194,12 @@ export class NotificationCenterSettingDto {
 }
 
 export class UpdateNotificationCenterSettingDto {
-  @ApiProperty({ required: false })
+  @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
   isPushEnabled?: boolean;
 
-  @ApiProperty({ required: false, enum: SEVERITIES })
+  @ApiPropertyOptional({ enum: SEVERITIES })
   @IsOptional()
   @IsString()
   @IsIn(SEVERITIES as unknown as string[])

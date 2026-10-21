@@ -3,11 +3,11 @@ import { UserStatus, UserGender, MfaMethod } from "@generated/prisma/client";
 import { IsString } from "class-validator";
 
 export class WechatLoginDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   openId!: string;
 
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   phone!: string;
 }

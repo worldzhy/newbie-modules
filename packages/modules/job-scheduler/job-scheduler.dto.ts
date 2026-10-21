@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsBoolean, IsOptional, IsString } from "class-validator";
 
 export class JobScheduleDto {
@@ -23,7 +23,7 @@ export class JobScheduleDto {
   @ApiProperty()
   isEnabled!: boolean;
 
-  @ApiProperty({ type: Object, required: false, nullable: true })
+  @ApiPropertyOptional({ type: Object, nullable: true })
   payload?: unknown;
 
   @ApiProperty({ description: "How the schedule was created", example: "declaration" })
@@ -63,23 +63,23 @@ export class JobRunDto {
 }
 
 export class UpdateJobScheduleDto {
-  @ApiProperty({ required: false, description: "Enable or pause the schedule" })
+  @ApiPropertyOptional({ description: "Enable or pause the schedule" })
   @IsOptional()
   @IsBoolean()
   isEnabled?: boolean;
 
-  @ApiProperty({ required: false, description: "Cron expression, e.g. 0 3 * * *" })
+  @ApiPropertyOptional({ description: "Cron expression, e.g. 0 3 * * *" })
   @IsOptional()
   @IsString()
   cronExpr?: string;
 
-  @ApiProperty({ required: false, description: "IANA timezone, e.g. Asia/Shanghai" })
+  @ApiPropertyOptional({ description: "IANA timezone, e.g. Asia/Shanghai" })
   @IsOptional()
   @IsString()
   timezone?: string;
 }
 
 export class ListJobRunsRequestDto {
-  @ApiProperty({ required: false, default: 50, description: "Maximum runs to return (1-200)" })
+  @ApiPropertyOptional({ default: 50, description: "Maximum runs to return (1-200)" })
   limit?: string;
 }

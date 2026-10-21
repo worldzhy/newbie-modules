@@ -238,12 +238,12 @@ export class UpdateUserDto {
  * Request DTO for changing a user's password.
  */
 export class ChangeUserPasswordDto {
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
   currentPassword!: string;
 
-  @ApiProperty({ type: String, required: true })
+  @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
   @MinLength(8)

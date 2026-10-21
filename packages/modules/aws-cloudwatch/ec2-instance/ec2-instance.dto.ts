@@ -60,14 +60,14 @@ export class SyncEC2InstancesWatchDto {
   @IsUUID()
   projectId!: string;
 
-  @ApiProperty({ type: [String], minLength: 0 })
+  @ApiProperty({ type: [String], minLength: 0, isArray: true })
   @IsNotEmpty()
   @IsArray()
   @ArrayMinSize(0)
   @IsUUID("4", { each: true })
   watchEC2InstanceIds!: string[];
 
-  @ApiProperty({ type: [String], minLength: 0 })
+  @ApiProperty({ type: [String], minLength: 0, isArray: true })
   @IsNotEmpty()
   @IsArray()
   @ArrayMinSize(0)

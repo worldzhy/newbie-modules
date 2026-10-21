@@ -10,6 +10,7 @@ export class GetWatchedEC2InstancesMetricRequestDto {
 
   @ApiProperty({
     enum: CloudwatchEC2MetricName,
+    enumName: "CloudwatchEC2MetricName",
   })
   @IsNotEmpty()
   @IsEnum(CloudwatchEC2MetricName)
@@ -30,7 +31,7 @@ export class GetWatchedEC2InstancesMetricRequestDto {
   @IsNumberString()
   period!: string;
 
-  @ApiProperty({ enum: CloudwatchMetricStatistics })
+  @ApiProperty({ enum: CloudwatchMetricStatistics, enumName: "CloudwatchMetricStatistics" })
   @IsNotEmpty()
   @IsEnum(CloudwatchMetricStatistics)
   statistics!: CloudwatchMetricStatistics;

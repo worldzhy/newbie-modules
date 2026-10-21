@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
@@ -19,30 +19,35 @@ export class InstallationController {
 
   @Post("installations")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.HeartbeatInstallation)
+  @ApiCreatedResponse()
   async create(@Body() body: CreateHeartbeatInstallationDto) {
     return this.installations.create(body);
   }
 
   @Get("installations")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.HeartbeatInstallation)
+  @ApiOkResponse()
   async list(@Query() query: ListHeartbeatInstallationsQueryDto) {
     return this.installations.list(query);
   }
 
   @Get("installations/:id")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.HeartbeatInstallation)
+  @ApiOkResponse()
   async get(@Param() params: CommonGetByStringIdRequestDto) {
     return this.installations.get(params.id);
   }
 
   @Post("installations/:id/token/regenerate")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.HeartbeatInstallation)
+  @ApiOkResponse()
   async regenerateToken(@Param() params: CommonGetByStringIdRequestDto) {
     return this.installations.regenerateToken(params.id);
   }
 
   @Delete("installations/:id")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.HeartbeatInstallation)
+  @ApiOkResponse()
   async revoke(@Param() params: CommonGetByStringIdRequestDto) {
     return this.installations.revoke(params.id);
   }

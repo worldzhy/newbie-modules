@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsOptional, IsString, Length, Matches } from "class-validator";
 
 /** Request body for confirming TOTP enrollment. */
@@ -15,12 +15,12 @@ export class EnableTwoFactorDto {
  * authenticator code must prove the caller's identity.
  */
 export class DisableTwoFactorDto {
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   password?: string;
 
-  @ApiProperty({ type: String, required: false })
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   code?: string;
