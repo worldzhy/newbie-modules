@@ -1,11 +1,12 @@
 {
   "key": "googleapis",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "googleapis.module",
     "className": "GoogleAPIsModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security"],
   "config-service": {
     "googleapis": {
       "credentials": {

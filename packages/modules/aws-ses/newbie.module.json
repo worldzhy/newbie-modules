@@ -1,11 +1,11 @@
 {
   "key": "aws-ses",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "aws-ses.module",
     "className": "AwsSesModule"
   },
-  "moduleDependencies": ["aws-identity"],
+  "moduleDependencies": ["aws-identity", "security"],
   "config-service": {
     "aws-ses": {
       "region": "process.env.AWS_SES_REGION || 'us-east-1'",
@@ -26,11 +26,5 @@
   },
   "devDependencies": {
     "@types/mustache": "latest"
-  },
-  "assets": [
-    {
-      "include": "modules/aws-ses/templates/**/*",
-      "outDir": "dist"
-    }
-  ]
+  }
 }

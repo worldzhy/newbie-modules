@@ -1,20 +1,7 @@
-import {
-  Body,
-  Controller,
-  Headers,
-  HttpCode,
-  HttpStatus,
-  Ip,
-  Post,
-  Get,
-  Req,
-  Res,
-  Query,
-  UseGuards,
-} from "@nestjs/common";
+import { Body, Controller, Headers, HttpCode, HttpStatus, Ip, Post, Get, Req, Res, UseGuards } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as queryString from "query-string";
-import { ApiTags, ApiBearerAuth, ApiResponse, ApiOperation } from "@nestjs/swagger";
+import { ApiTags, ApiOperation } from "@nestjs/swagger";
 import { User } from "@prisma/client";
 import { Expose } from "../../helpers/interfaces";
 import {

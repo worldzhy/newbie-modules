@@ -1,10 +1,10 @@
 import { BadRequestException, Controller, HttpException, HttpStatus, Post, Req, Headers, Body } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
+import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { ConfigService } from "@nestjs/config";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
-import { PublicCors } from "@modules/security/authentication/public/public-cors.decorator";
 import { func, getRandomIp } from "../../shared/utils";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { RedisService } from "@modules/redis/redis.service";
@@ -38,7 +38,7 @@ export class WebReportController {
 
   @Post("/report")
   @InstallationAuth("web-monitor")
-  @PublicCors()
+  @AllowAnyOrigin()
   @ApiOperation({ summary: "Web SDK data report endpoint" })
   @ApiResponse({ type: String })
   async webReport(

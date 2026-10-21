@@ -52,7 +52,7 @@ export class TeamsService {
         orderBy,
       });
       return teams.map((user) => expose<Team>(user));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

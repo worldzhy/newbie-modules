@@ -36,7 +36,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy) {
     accessToken: string,
     refreshToken: string,
     profile: Profile,
-    done: VerifyCallback,
+    _done: VerifyCallback,
   ): Promise<User> {
     if (!profile) {
       throw new BadRequestException();

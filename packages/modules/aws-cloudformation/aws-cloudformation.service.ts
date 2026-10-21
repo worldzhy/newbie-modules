@@ -36,8 +36,6 @@ export class AwsCloudformationService {
     // }
 
     // [step 2] Build the infrastructure stack.
-    let output: CreateStackCommandOutput;
-    let state: AwsResourceStackState;
     if (
       false ===
       this.cloudformationStackService.checkStackParams({
@@ -48,8 +46,8 @@ export class AwsCloudformationService {
       throw new BadRequestException("This infrastructure stack parameters are not ready.");
     }
 
-    output = await this.cloudformationStackService.createResources(stack);
-    state = AwsResourceStackState.BUILD_PROCESSING;
+    const output: CreateStackCommandOutput = await this.cloudformationStackService.createResources(stack);
+    const state = AwsResourceStackState.BUILD_PROCESSING;
 
     return await this.prisma.awsResourceStack.update({
       where: { id: stack.id },
@@ -79,10 +77,8 @@ export class AwsCloudformationService {
     // }
 
     // [step 2] Delete the stack on AWS CloudFormation.
-    let output: DeleteStackCommandOutput;
-    let state: AwsResourceStackState;
-    output = await this.cloudformationStackService.destroyResources(stack);
-    state = AwsResourceStackState.DESTROY_PROCESSING;
+    const output: DeleteStackCommandOutput = await this.cloudformationStackService.destroyResources(stack);
+    const state = AwsResourceStackState.DESTROY_PROCESSING;
 
     return await this.prisma.awsResourceStack.update({
       where: { id: stack.id },

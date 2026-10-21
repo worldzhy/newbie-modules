@@ -1,6 +1,6 @@
 {
   "key": "task-management",
-  "layer": "domain",
+  "layer": "feature",
   "module": {
     "file": "task-management.module",
     "className": "TaskManagementModule"

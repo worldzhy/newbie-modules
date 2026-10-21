@@ -1,4 +1,4 @@
-const normalizeEmail = require("normalize-email");
+import normalizeEmail from "normalize-email";
 
 /**
  * Converts an email address to a unqiue, safe email

@@ -1,6 +1,6 @@
 {
   "key": "xlsx",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "xlsx.module",
     "className": "XLSXModule"

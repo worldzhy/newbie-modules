@@ -9,7 +9,7 @@ import {
   floorByMinutes,
   splitDateTime,
 } from "@devbie/newbie/utilities/datetime.util";
-const CronParser = require("cron-parser");
+import * as CronParser from "cron-parser";
 
 @Injectable()
 export class AvailabilityService {
@@ -134,7 +134,6 @@ export class AvailabilityService {
     minutesOfTimeslot: number;
     timeZone?: string;
   }) {
-    const parser = require("cron-parser");
     const timeslots: {
       datetimeOfStart: Date;
       datetimeOfEnd: Date;
@@ -155,7 +154,7 @@ export class AvailabilityService {
       iterator: true,
     };
 
-    const interval = parser.parseExpression(
+    const interval = CronParser.parseExpression(
       `0/${params.minutesOfTimeslot} ${params.hourOfOpening}-${params.hourOfClosure - 1} * * *`,
       cronParserOptions,
     );

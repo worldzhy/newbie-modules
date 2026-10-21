@@ -35,7 +35,7 @@ export class DomainsService {
     try {
       const fullUrl = new URL(data.domain);
       data.domain = fullUrl.hostname;
-    } catch (error) {
+    } catch {
       this.logger.debug(`Domain value "${data.domain}" is not a full URL; validating it as a bare hostname`);
     }
     if (!/(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/.test(data.domain))
@@ -91,7 +91,7 @@ export class DomainsService {
         orderBy,
       });
       return domains.map((team) => expose<Domain>(team));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

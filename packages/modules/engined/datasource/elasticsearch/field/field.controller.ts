@@ -31,7 +31,7 @@ export class ElasticsearchDatasourceIndexFieldController {
   }
 
   @Get("")
-  async getElasticsearchDatasourceIndexFields(@Query("page") page: number, @Query("pageSize") pageSize: number) {}
+  async getElasticsearchDatasourceIndexFields(@Query("page") _page: number, @Query("pageSize") _pageSize: number) {}
 
   @Get(":indexId")
   async getElasticsearchDatasourceIndexField(

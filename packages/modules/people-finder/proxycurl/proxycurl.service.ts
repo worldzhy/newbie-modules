@@ -68,7 +68,7 @@ export class ProxycurlService {
             if (response.header["x-proxycurl-credit-cost"]) {
               try {
                 spent = Number(response.header["x-proxycurl-credit-cost"]);
-              } catch (e) {
+              } catch {
                 spent = 0;
               }
             }
@@ -126,7 +126,7 @@ export class ProxycurlService {
             if (response && response.header && response.header["x-proxycurl-credit-cost"]) {
               try {
                 spent = Number(response.header["x-proxycurl-credit-cost"]);
-              } catch (e) {
+              } catch {
                 spent = 0;
               }
             }

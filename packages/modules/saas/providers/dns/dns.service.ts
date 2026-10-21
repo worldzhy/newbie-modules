@@ -7,7 +7,7 @@ export class DnsService {
   async lookup(hostname: string, recordType: RecordType): Promise<RecordResult> {
     try {
       return await this.unsafeLookup(hostname, recordType);
-    } catch (error) {
+    } catch {
       return [];
     }
   }

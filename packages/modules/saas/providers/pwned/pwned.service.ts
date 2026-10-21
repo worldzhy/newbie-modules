@@ -7,7 +7,7 @@ export class PwnedService {
     try {
       const numberOfPwned = await this.unsafeCheckPwnedPassword(password);
       return !numberOfPwned;
-    } catch (error) {
+    } catch {
       return true;
     }
   }

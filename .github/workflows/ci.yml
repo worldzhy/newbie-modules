@@ -17,6 +17,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run format:check
+      # The shared backend eslint standard is syntactic only (no type-aware
+      # rules), so it runs here without any module dependency installed.
+      - run: npm run lint
       # Module business-logic tests (e.g. account/auth/login-audit-coverage.test.ts)
       # cannot run standalone here: this registry has no NestJS/zod/etc.
       # dependencies installed, by design (modules are copied into a consumer

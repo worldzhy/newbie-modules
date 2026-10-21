@@ -8,19 +8,19 @@ export interface EmailMessageEvent {
     messageId: string;
     destination: string[];
     headersTruncated: boolean;
-    headers: Object[];
-    commonHeaders: Object;
-    tags: Object;
+    headers: object[];
+    commonHeaders: object;
+    tags: object;
   };
-  open: {};
-  click: {};
+  open: object;
+  click: object;
 }
 
 export interface EmailMessageEventCreateInput {
   eventType: string;
   eventTime: Date;
-  event: {};
-  mail: {};
+  event: object;
+  mail: object;
   sesMessageId: string;
   messageId?: number;
 }
@@ -51,7 +51,7 @@ export interface TextMessageEvent {
 export interface TextMessageEventCreateInput {
   eventType: string;
   eventTime: Date;
-  event: {};
+  event: object;
   isFinalEvent: boolean;
   messageStatus: string;
   messageStatusDescription: string;

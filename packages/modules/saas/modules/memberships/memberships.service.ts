@@ -63,7 +63,7 @@ export class MembershipsService {
         include: { team: true, user: true },
       });
       return memberships.map((user) => expose<Membership>(user));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

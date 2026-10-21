@@ -38,7 +38,7 @@ export class ApprovedSubnetsService {
         orderBy,
       });
       return ApprovedSubnet.map((user) => expose<ApprovedSubnet>(user));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

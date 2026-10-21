@@ -1,11 +1,12 @@
 {
   "key": "aws-identity",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "aws-identity.module",
     "className": "AwsIdentityModule"
   },
   "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security"],
   "config-service": {},
   "env": {},
   "dependencies": {

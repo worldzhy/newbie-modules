@@ -30,7 +30,7 @@ export class EventService {
     const calendarOfTargetContainer = daysOfMonth(params.to.year, params.to.month);
     const daysOfSourceWeek = calendarOfSourceContainer[params.from.week - 1];
     const daysOfTargetWeek = calendarOfTargetContainer[params.to.week - 1];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const targetEvents: any[] = [];
 
     for (let j = 0; j < daysOfTargetWeek.length; j++) {

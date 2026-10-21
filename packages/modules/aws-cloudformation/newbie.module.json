@@ -1,6 +1,6 @@
 {
   "key": "aws-cloudformation",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "aws-cloudformation.module",
     "className": "AwsCloudformationModule"

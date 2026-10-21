@@ -1,6 +1,6 @@
 {
   "key": "order",
-  "layer": "domain",
+  "layer": "feature",
   "module": {
     "file": "order.module",
     "className": "OrderModule"

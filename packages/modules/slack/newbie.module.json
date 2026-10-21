@@ -1,6 +1,6 @@
 {
   "key": "slack",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "slack.module",
     "className": "SlackModule"

@@ -18,7 +18,7 @@ export class AvailabilityJobProcessor {
   // @Process({concurrency: 10}) // todo: Check if the concurrency is valid.
   @Process()
   async parseAvailability(job: Job) {
-    let availabilityExpressionId = (job.data as any).availabilityExpressionId as number;
+    const availabilityExpressionId = (job.data as any).availabilityExpressionId as number;
 
     // [step 1] Parse expression to timeslots.
     const availabilityTimeslots = await this.availabilityService.parseAvailabilityExpression(availabilityExpressionId);
@@ -47,7 +47,7 @@ export class AvailabilityJobProcessor {
   }
 
   @OnQueueCompleted()
-  onCompleted(job: Job, result: any) {
+  onCompleted(job: Job, _result: any) {
     this.logger.log(`Availability job ${job.id} is completed.`);
   }
 }

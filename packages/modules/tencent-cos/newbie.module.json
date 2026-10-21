@@ -1,6 +1,6 @@
 {
   "key": "tencent-cos",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "tencent-cos.module",
     "className": "TencentCosModule"

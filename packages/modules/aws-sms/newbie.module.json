@@ -1,6 +1,6 @@
 {
   "key": "aws-sms",
-  "layer": "foundation",
+  "layer": "infrastructure",
   "module": {
     "file": "aws-sms.module",
     "className": "AwsSmsModule"

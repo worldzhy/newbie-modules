@@ -52,7 +52,7 @@ export class OrganizationService {
         orderBy,
       });
       return organizations.map((user) => expose<Organization>(user));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

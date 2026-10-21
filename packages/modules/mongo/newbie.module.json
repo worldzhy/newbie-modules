@@ -1,6 +1,6 @@
 {
   "key": "mongo",
-  "layer": "foundation",
+  "layer": "datastore",
   "module": {
     "file": "mongo.module",
     "className": "MongoModule"

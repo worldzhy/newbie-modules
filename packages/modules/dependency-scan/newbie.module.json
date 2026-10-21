@@ -1,12 +1,12 @@
 {
   "key": "dependency-scan",
-  "layer": "domain",
+  "layer": "feature",
   "module": {
     "file": "dependency-scan.module",
     "className": "DependencyScanModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["github"],
+  "moduleDependencies": ["github", "security"],
   "config-service": {},
   "env": {},
   "dependencies": {

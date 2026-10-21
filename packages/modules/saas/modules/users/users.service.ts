@@ -58,7 +58,7 @@ export class UsersService {
         orderBy,
       });
       return users.map((user) => expose<User>(user));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

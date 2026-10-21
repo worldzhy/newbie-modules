@@ -8,7 +8,7 @@ export default {
     };
   },
   stacks(app) {
-    app.stack(function Stack({ stack }) {
+    app.stack(({ stack }) => {
       // Environment variable configuration
       const environment = {
         DB_HOST: process.env.DB_HOST || "localhost",

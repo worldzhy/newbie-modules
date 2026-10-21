@@ -4,6 +4,6 @@ export interface TextMessageCreateInput {
   sqsMessageId: string;
   smsMessageId?: string;
   smsMessageStatus?: number;
-  smsMessageResponse: {};
+  smsMessageResponse: object;
   updatedAt: Date;
 }
