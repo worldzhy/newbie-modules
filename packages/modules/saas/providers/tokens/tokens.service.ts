@@ -35,7 +35,7 @@ export class TokensService {
         ...options,
         subject,
       }) as any as T;
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException(INVALID_TOKEN);
     }
   }

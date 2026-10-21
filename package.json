@@ -7,10 +7,13 @@
   "scripts": {
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "import": "node scripts/import-modules.mjs"
+    "import": "node scripts/import-modules.mjs",
+    "lint": "eslint",
+    "lint:fix": "eslint --fix"
   },
   "devDependencies": {
-    "@devbie/style-guide": "^1.0.0",
+    "@devbie/style-guide": "^1.1.3",
+    "eslint": "^9.39.4",
     "prettier": "^3.9.9"
   }
 }

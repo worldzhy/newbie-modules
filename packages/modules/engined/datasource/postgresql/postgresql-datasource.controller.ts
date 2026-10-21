@@ -310,16 +310,16 @@ export class PostgresqlDatasourceController {
       id: number;
       name: string;
       numberOfRecords: number;
-      hasMany: {}[];
-      belongsTo: {}[];
+      hasMany: object[];
+      belongsTo: object[];
     }[];
   }> {
     const tableSummaries: {
       id: number;
       name: string;
       numberOfRecords: number;
-      hasMany: {}[];
-      belongsTo: {}[];
+      hasMany: object[];
+      belongsTo: object[];
     }[] = [];
 
     // * [step 1] Get the postgresql.

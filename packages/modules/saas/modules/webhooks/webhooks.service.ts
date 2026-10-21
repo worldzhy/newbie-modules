@@ -49,7 +49,7 @@ export class WebhooksService {
         orderBy,
       });
       return webhooks.map((team) => expose<Webhook>(team));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

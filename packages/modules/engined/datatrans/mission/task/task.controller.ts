@@ -91,7 +91,7 @@ export class DatatransTaskController {
     const fromTable = pipeline["fromTable"] as PostgresqlDatasourceTable;
     const hasManyTables = pipeline.hasManyTables;
     const belongsToTables = pipeline.belongsToTables;
-    const toIndex = pipeline["toIndex"] as ElasticsearchDatasourceIndex;
+    const _toIndex = pipeline["toIndex"] as ElasticsearchDatasourceIndex;
 
     // [step 3] Process task.
     if (!(fromTable.name in Prisma.ModelName)) {
@@ -116,7 +116,7 @@ export class DatatransTaskController {
     // [step 3-2] Attach child tables' records to fromTable.
     for (let index = 0; index < hasManyTables.length; index++) {
       const childTableName = hasManyTables[index];
-      const constraint = await this.prisma.postgresqlDatasourceConstraint.findFirstOrThrow({
+      const _constraint = await this.prisma.postgresqlDatasourceConstraint.findFirstOrThrow({
         where: {
           AND: [
             { table: childTableName },
@@ -126,11 +126,8 @@ export class DatatransTaskController {
         },
       });
 
-      constraint.keyColumn;
-
       for (let index = 0; index < fromTableRecords.length; index++) {
-        const fromTableRecord = fromTableRecords[index];
-        const childTableRecords: any[] = await this.prisma.$queryRawUnsafe(
+        const _childTableRecords: any[] = await this.prisma.$queryRawUnsafe(
           `SELECT * FROM "${fromTable.schema}"."${fromTable.name}" LIMIT ${task.take} OFFSET ${task.skip}`,
         );
       }

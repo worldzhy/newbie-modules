@@ -115,14 +115,14 @@ export class LocationsService {
               tValue = tValue?.toLowerCase();
               try {
                 tValue = normalize(tValue)?.toLowerCase();
-              } catch (error) {
+              } catch {
                 this.logger.warn(`Failed to normalize state text "${tValue}"; using the raw value instead`);
               }
               const sValue = state?.toLowerCase();
               let $state = state;
               try {
                 $state = normalize(state) || state;
-              } catch (error) {
+              } catch {
                 $state = state;
               }
               const nsValue = $state?.toLowerCase();

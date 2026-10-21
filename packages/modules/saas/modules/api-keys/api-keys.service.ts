@@ -75,7 +75,7 @@ export class ApiKeysService {
         orderBy,
       });
       return apiKey.map((team) => expose<ApiKey>(team));
-    } catch (error) {
+    } catch {
       return [];
     }
   }
@@ -100,7 +100,7 @@ export class ApiKeysService {
         orderBy,
       });
       return apiKey.map((user) => expose<ApiKey>(user));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

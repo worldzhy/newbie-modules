@@ -2,8 +2,7 @@ import { states } from "./jsons/states";
 import { territories } from "./jsons/territories";
 import { associations } from "./jsons/associations";
 import { canada } from "./jsons/canada";
-
-const _ = require("lodash");
+import * as _ from "lodash";
 
 const allRegions = { ...states, ...territories, ...associations, ...canada };
 const uspsFullNameMap = _.mapValues(allRegions, (value) => {
@@ -82,7 +81,6 @@ export function normalize(state, options?) {
     return opts.returnType(uspsFullNameMap)[uspsKey] || null;
   }
 
-  // eslint-disable-next-line default-case
   switch (opts.returnType) {
     case "USPS":
       return uspsKey || null;

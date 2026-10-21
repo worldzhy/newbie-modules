@@ -8,7 +8,7 @@ import { ApiKeysService } from "../../api-keys/api-keys.service";
 import { LOGIN_ACCESS_TOKEN } from "../../../providers/tokens/tokens.constants";
 import { TokensService } from "../../../providers/tokens/tokens.service";
 import { AccessTokenClaims, AccessTokenParsed, AccessTokenType } from "../auth.interface";
-const Strategy = require("passport-strategy");
+import Strategy from "passport-strategy";
 
 class SaaSStarterStrategyName extends Strategy {
   name = "saas";

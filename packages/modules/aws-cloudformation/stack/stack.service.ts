@@ -99,7 +99,7 @@ export class AwsCloudformationStackService {
   }
 
   //* Get example parameters of stack.
-  getStackParams(stackType: string): {} {
+  getStackParams(stackType: string): object {
     return this.getStackServiceByType(stackType)?.getStackParams();
   }
 

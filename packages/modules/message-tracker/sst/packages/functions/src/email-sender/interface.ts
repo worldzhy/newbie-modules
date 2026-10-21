@@ -6,6 +6,6 @@ export interface EmailMessageCreateInput {
   sqsMessageId: string;
   sesMessageId?: string;
   sesMessageStatus?: number;
-  sesMessageResponse: {};
+  sesMessageResponse: object;
   updatedAt: Date;
 }

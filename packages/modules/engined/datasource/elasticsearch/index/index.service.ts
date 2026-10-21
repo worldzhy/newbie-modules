@@ -53,7 +53,7 @@ export class ElasticsearchDatasourceIndexService {
     }
   }
 
-  async getSettings(indexName: string) {
+  async getSettings(_indexName: string) {
     const result = await this.elastic.indices.getSettings();
     if (result.statusCode !== 200) {
       throw new BadRequestException("Bad Request to get elasticsearch index settings.");
@@ -62,7 +62,7 @@ export class ElasticsearchDatasourceIndexService {
     return result;
   }
 
-  async putSettings(indexName: string) {
+  async putSettings(_indexName: string) {
     const result = await this.elastic.indices.putSettings();
     if (result.statusCode !== 200) {
       throw new BadRequestException("Bad Request to put elasticsearch index settings.");

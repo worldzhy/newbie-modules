@@ -47,7 +47,7 @@ export class EmailService {
 
     // [step 1] Get template
     const templatePath = Object.keys(params.template)[0];
-    let templateMarkdown = await this.readTemplate(templatePath);
+    const templateMarkdown = await this.readTemplate(templatePath);
 
     // [step 2] Replace information in template
     let contentMarkdown = mustache.render(templateMarkdown, params.template[templatePath] || {});

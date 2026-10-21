@@ -238,8 +238,6 @@ export class AuthService {
 
   async findOrCreateAccountByGoogleAuth({
     googleId,
-    firstName,
-    lastName,
     email,
     avatar,
   }: {

@@ -49,7 +49,7 @@ export class EmailsService {
         orderBy,
       });
       return emails.map((user) => expose<Email>(user));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

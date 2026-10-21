@@ -37,7 +37,6 @@ export class AwsSqsService {
     MessageGroupId?: string;
     MessageDeduplicationId?: string;
   }) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sendMessageRequest: any = {
       QueueUrl: params.queueUrl ?? this.queueUrl,
       MessageBody: JSON.stringify(params.body),

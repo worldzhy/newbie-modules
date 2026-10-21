@@ -5,7 +5,7 @@ export const cloudformationPrismaExtension = Prisma.defineExtension((prisma) =>
   prisma.$extends({
     query: {
       awsResourceStack: {
-        async create({ model, operation, args, query }) {
+        async create({ args, query }) {
           const { data } = args;
           if (data && !data.name && data.type) {
             args.data = {

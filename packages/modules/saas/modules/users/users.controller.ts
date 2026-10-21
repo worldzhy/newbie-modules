@@ -68,7 +68,7 @@ export class UserController {
     try {
       const res = await this.usersService.getUser(userId as number);
       return res;
-    } catch (e) {
+    } catch {
       throw new UnauthorizedException(INVALID_TOKEN);
     }
   }

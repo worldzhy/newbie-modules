@@ -27,7 +27,7 @@ export class AuditLogsService {
         include: { team: true, user: true },
       });
       return AuditLog.map((team) => expose<AuditLog>(team));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

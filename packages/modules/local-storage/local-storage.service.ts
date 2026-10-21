@@ -98,7 +98,7 @@ export class LocalStorageService {
     let path = "";
 
     // [step 1] Get current file.
-    let file = await this.prisma.localFile.findFirstOrThrow({
+    const file = await this.prisma.localFile.findFirstOrThrow({
       where: { id: fileId },
       select: { id: true, name: true, type: true, parentId: true },
     });

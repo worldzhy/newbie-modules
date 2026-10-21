@@ -12,7 +12,7 @@ export class ElasticsearchDatasourceService {
   //   ! Elasticsearch index operations    //
   // ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄  ⌄ //
 
-  async getMapping(datasource: ElasticsearchDatasource) {
+  async getMapping(_datasource: ElasticsearchDatasource) {
     // [step 1] Get mappings of all indices.
     const result = await this.elastic.indices.getMapping();
     if (result.statusCode !== 200) {

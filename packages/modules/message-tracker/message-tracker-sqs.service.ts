@@ -30,7 +30,6 @@ export class MessageTrackerSqsService {
     MessageGroupId?: string;
     MessageDeduplicationId?: string;
   }) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const sendMessageRequest: any = {
       QueueUrl: params.queueUrl,
       MessageBody: JSON.stringify(params.body),

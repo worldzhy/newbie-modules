@@ -38,7 +38,7 @@ export class WebhookService {
         orderBy,
       });
       return webhooks;
-    } catch (error) {
+    } catch {
       return [];
     }
   }

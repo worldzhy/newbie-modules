@@ -30,7 +30,7 @@ export class GeolocationService implements OnModuleDestroy {
   private async getSafeLocation(ipAddress: string): Promise<Partial<CityResponse>> {
     try {
       return this.getUnsafeLocation(ipAddress);
-    } catch (error) {
+    } catch {
       return {};
     }
   }

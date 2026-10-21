@@ -29,6 +29,7 @@ export class PeopledatalabsService {
     private readonly logger: Logger,
   ) {
     this.apiKey = this.configService.getOrThrow<string>("modules.peopleFinder.peopledatalabs.apiKey");
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment -- PDLJS ships without matching type declarations
     // @ts-ignore
     this.api = PDLJS({ apiKey: this.apiKey });
 

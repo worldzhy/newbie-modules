@@ -26,7 +26,7 @@ function eventGeneratedFields(data: any) {
   }
 }
 
-const eventContainerCreateOrUpdate = ({ model, operation, args, query }) => {
+const eventContainerCreateOrUpdate = ({ args, query }) => {
   if (args.data) {
     const { dateOfOpening, dateOfClosure } = args.data;
     if (isString(dateOfOpening)) {
@@ -39,12 +39,7 @@ const eventContainerCreateOrUpdate = ({ model, operation, args, query }) => {
   return query(args);
 };
 
-const eventContainerFindUniqueOrFindUniqueThrowOrFindFirstOrFindFirstThrow = async ({
-  model,
-  operation,
-  args,
-  query,
-}) => {
+const eventContainerFindUniqueOrFindUniqueThrowOrFindFirstOrFindFirstThrow = async ({ args, query }) => {
   const result = await query(args);
   if (result) {
     if (result.dateOfOpening) {
@@ -57,7 +52,7 @@ const eventContainerFindUniqueOrFindUniqueThrowOrFindFirstOrFindFirstThrow = asy
   return result;
 };
 
-const eventContainerFindMany = async ({ model, operation, args, query }) => {
+const eventContainerFindMany = async ({ args, query }) => {
   const result = await query(args);
   if (result.length) {
     for (let i = 0; i < result.length; i++) {
@@ -72,14 +67,14 @@ const eventContainerFindMany = async ({ model, operation, args, query }) => {
   return result;
 };
 
-const eventCreateOrUpdate = ({ model, operation, args, query }) => {
+const eventCreateOrUpdate = ({ args, query }) => {
   if (args.data) {
     eventGeneratedFields(args.data);
   }
   return query(args);
 };
 
-const eventCreateMany = ({ model, operation, args, query }) => {
+const eventCreateMany = ({ args, query }) => {
   if (args.data && args.data.length) {
     for (let i = 0; i < args.data.length; i++) {
       eventGeneratedFields(args.data[i]);
@@ -88,7 +83,7 @@ const eventCreateMany = ({ model, operation, args, query }) => {
   return query(args);
 };
 
-const eventDelete = ({ model, operation, args, query }) => {
+const eventDelete = ({ args, query }) => {
   return query({
     ...args,
     operation: "update",
@@ -101,7 +96,7 @@ const eventDelete = ({ model, operation, args, query }) => {
   });
 };
 
-const eventDeleteMany = ({ model, operation, args, query }) => {
+const eventDeleteMany = ({ args, query }) => {
   return query({
     ...args,
     operation: "updateMany",

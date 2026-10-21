@@ -31,7 +31,7 @@ export class SessionsService {
         orderBy,
       });
       return sessions.map((user) => expose<Session>(user)).map((i) => ({ ...i, isCurrentSession: sessionId === i.id }));
-    } catch (error) {
+    } catch {
       return [];
     }
   }

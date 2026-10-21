@@ -35,7 +35,7 @@ export class ElasticsearchDataboardController {
   }
 
   @Get("")
-  async getElasticsearchDataboards(@Query("page") page: number, @Query("pageSize") pageSize: number) {}
+  async getElasticsearchDataboards(@Query("page") _page: number, @Query("pageSize") _pageSize: number) {}
 
   @Get(":databoardId")
   async getElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
@@ -104,7 +104,7 @@ export class ElasticsearchDataboardController {
   @Patch(":databoardId/unload")
   async unloadElasticsearchDataboard(@Param("databoardId") databoardId: string): Promise<ElasticsearchDataboard> {
     // [step 1] Get databoard
-    const databoard = await this.prisma.elasticsearchDataboard.findUniqueOrThrow({
+    const _databoard = await this.prisma.elasticsearchDataboard.findUniqueOrThrow({
       where: { id: databoardId },
     });
 
