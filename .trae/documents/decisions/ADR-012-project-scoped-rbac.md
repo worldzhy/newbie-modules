@@ -1,8 +1,9 @@
 # ADR-012: 统一授权契约（系统级 RBAC + 作用域级 RBAC + 所有权分离）
 
-状态：提议中
+状态：superseded（契约仍生效，注册仓已合入 devbie monorepo）
+Superseded by: devbie monorepo ADR-018（newbie-modules 合入 devbie）+ nightwatch-backend ADR-019（宿主 RBAC 实施）+ nightwatch-backend ADR-020（RBAC gap closure）
 日期：2026-10-20
-归属注记：本决策治理 newbie-modules 模块代码（security / account），单一源存放于本仓。宿主侧实施见 nightwatch-backend ADR-019。
+归属注记：本决策治理原 newbie-modules 模块代码（security / account），模块源码现已合入 devbie monorepo。框架 SPI 契约（PermissionAuthorizer / ScopeResolver / @RequirePermission / @RequireOwner）仍由本文件描述，宿主侧实施见 nightwatch-backend ADR-019。
 
 ## 背景
 
