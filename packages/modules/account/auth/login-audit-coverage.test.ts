@@ -14,7 +14,7 @@ import { join } from "node:path";
  *
  * Adding a new login channel must add its file to LOGIN_ENTRY_FILES below;
  * that is the intended, reviewable way to extend this contract (see
- * trae-knowledge memory/user_profile.md, "工程治理").
+ * worldzhy-knowledge memory/user_profile.md, "工程治理").
  *
  * Three checks run per file:
  * 1. Rejection coverage — every rejection of an *already identified* account
