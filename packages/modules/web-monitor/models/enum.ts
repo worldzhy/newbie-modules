@@ -1,7 +1,7 @@
 export enum ClickHouseTablePrefix {
-  WEB_AJAX = "WebAjax_",
-  WEB_ERROR = "WebErrors_",
-  WEB_SDK_ERROR = "WebSdkErrors",
+  WEB_AJAX = "web_monitor_requests_",
+  WEB_ERROR = "web_monitor_errors_",
+  WEB_SDK_ERROR = "web_monitor_sdk_errors",
 }
 
 export enum MongoCollectionPrefix {
