@@ -4,9 +4,12 @@ import { describe, it } from "node:test";
 import {
   discoverMigrations,
   planMigrations,
+  runPlan,
   splitStatements,
   type AppliedMigration,
   type DiscoveredMigration,
+  type MigrationExecutor,
+  type MigrationPlan,
 } from "./migration-runner";
 
 function migration(overrides: Partial<DiscoveredMigration> = {}): DiscoveredMigration {
@@ -162,5 +165,95 @@ describe("discoverMigrations", () => {
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }
+  });
+});
+
+/**
+ * Execution-loop orchestration only: statement order, history-row timing and
+ * abort behaviour. The DDL itself is not exercised here — a fake executor
+ * cannot prove ClickHouse accepts a statement, so dialect/layout correctness
+ * stays with the e2e smoke test against a real server.
+ */
+function recorder(options: { failOn?: string } = {}): { executor: MigrationExecutor; calls: string[] } {
+  const calls: string[] = [];
+  const executor = {
+    async command({ query }: { query: string }): Promise<void> {
+      calls.push(`command:${query}`);
+      if (options.failOn !== undefined && query.includes(options.failOn)) {
+        throw new Error(`statement rejected: ${query}`);
+      }
+    },
+    async insert(input: { values: Array<{ version: string }> }): Promise<void> {
+      calls.push(`insert:${input.values[0]?.version ?? "?"}`);
+    },
+  };
+  return { executor: executor as unknown as MigrationExecutor, calls };
+}
+
+function plan(...pending: DiscoveredMigration[]): MigrationPlan {
+  return { applied: [], pending };
+}
+
+describe("runPlan", () => {
+  it("issues every statement in file order, then records history", async () => {
+    const { executor, calls } = recorder();
+    const file = migration({ sql: "CREATE TABLE a (x Int8);\nCREATE TABLE b (x Int8);" });
+
+    const executed = await runPlan(executor, plan(file));
+
+    assert.deepEqual(calls, [
+      "command:CREATE TABLE a (x Int8)",
+      "command:CREATE TABLE b (x Int8)",
+      "insert:20261016000000",
+    ]);
+    assert.deepEqual(
+      executed.map((m) => m.filename),
+      ["V20261016000000__init.sql"],
+    );
+  });
+
+  it("leaves no history row when a statement inside the file fails", async () => {
+    const { executor, calls } = recorder({ failOn: "CREATE TABLE b" });
+    const file = migration({ sql: "CREATE TABLE a (x Int8);\nCREATE TABLE b (x Int8);" });
+
+    await assert.rejects(runPlan(executor, plan(file)), /statement rejected/);
+
+    // Statement 1 already ran; the file is re-runnable because nothing was
+    // recorded (ClickHouse DDL is not transactional).
+    assert.deepEqual(calls, ["command:CREATE TABLE a (x Int8)", "command:CREATE TABLE b (x Int8)"]);
+  });
+
+  it("aborts at the failing file but keeps earlier files' history rows", async () => {
+    const { executor, calls } = recorder({ failOn: "BROKEN" });
+    const first = migration({ version: "20261016000000", sql: "CREATE TABLE ok (x Int8);" });
+    const second = migration({
+      version: "20261017000000",
+      name: "broken",
+      filename: "V20261017000000__broken.sql",
+      sql: "BROKEN",
+    });
+
+    await assert.rejects(runPlan(executor, plan(first, second)), /statement rejected/);
+
+    assert.deepEqual(calls, ["command:CREATE TABLE ok (x Int8)", "insert:20261016000000", "command:BROKEN"]);
+  });
+
+  it("rejects a file with no executable statements", async () => {
+    const { executor, calls } = recorder();
+    const file = migration({ sql: "  \n\n  " });
+
+    await assert.rejects(runPlan(executor, plan(file)), /no executable statements/);
+    assert.deepEqual(calls, []);
+  });
+
+  it("does nothing for an empty pending set", async () => {
+    const { executor, calls } = recorder();
+    const logs: string[] = [];
+
+    const executed = await runPlan(executor, plan(), (message) => logs.push(message));
+
+    assert.deepEqual(executed, []);
+    assert.deepEqual(calls, []);
+    assert.deepEqual(logs, []);
   });
 });

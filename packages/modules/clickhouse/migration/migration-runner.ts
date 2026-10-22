@@ -315,6 +315,66 @@ async function ensureHistoryTable(client: ClickHouseClient): Promise<void> {
 }
 
 /**
+ * The slice of the ClickHouse client the execution loop needs. Deliberately
+ * narrow: the loop only issues statements and records history rows. This is
+ * not a product-level driver abstraction — there is one driver, and the DDL
+ * itself still needs a real server to verify (see the e2e smoke test).
+ */
+export type MigrationExecutor = Pick<ClickHouseClient, "command" | "insert">;
+
+/** Run fn against a connected client scoped to the target database. */
+async function withClient<T>(
+  config: ClickhouseMigrationConfig,
+  fn: (client: ClickHouseClient) => Promise<T>,
+): Promise<T> {
+  await ensureDatabase(config);
+  const client = createClient({
+    url: config.url,
+    username: config.username,
+    password: config.password,
+    database: config.database,
+  });
+  try {
+    await ensureHistoryTable(client);
+    return await fn(client);
+  } finally {
+    await client.close();
+  }
+}
+
+/**
+ * Execute a plan against an already-connected executor and return the files
+ * applied in this run. Statements run in file order; the history row is
+ * written only after the whole file succeeds, so a partial failure re-runs
+ * the idempotent file on the next attempt.
+ */
+export async function runPlan(
+  executor: MigrationExecutor,
+  plan: MigrationPlan,
+  log: MigrationLog = () => undefined,
+): Promise<DiscoveredMigration[]> {
+  const executed: DiscoveredMigration[] = [];
+  for (const migration of plan.pending) {
+    log(`Applying ${migration.filename}`);
+    const statements = splitStatements(migration.sql);
+    if (statements.length === 0) {
+      throw new Error(`Migration ${migration.filename} contains no executable statements.`);
+    }
+    for (const statement of statements) {
+      await executor.command({ query: statement });
+    }
+    await executor.insert({
+      table: HISTORY_TABLE,
+      columns: ["version", "name", "checksum"],
+      values: [{ version: migration.version, name: migration.name, checksum: migration.checksum }],
+      format: "JSONEachRow",
+    });
+    executed.push(migration);
+  }
+  return executed;
+}
+
+/**
  * Validate and apply every pending migration. Returns the full plan plus the
  * list of files executed in this run.
  */
@@ -326,41 +386,11 @@ export async function runMigrations(
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
   }
-  await ensureDatabase(config);
-
-  const client = createClient({
-    url: config.url,
-    username: config.username,
-    password: config.password,
-    database: config.database,
-  });
-
-  try {
-    await ensureHistoryTable(client);
+  return withClient(config, async (client) => {
     const discovered = await discoverMigrations(modulesRoot);
     const applied = await readAppliedMigrations(client);
     const plan = planMigrations(discovered, applied);
-
-    const executed: DiscoveredMigration[] = [];
-    for (const migration of plan.pending) {
-      log(`Applying ${migration.filename}`);
-      const statements = splitStatements(migration.sql);
-      if (statements.length === 0) {
-        throw new Error(`Migration ${migration.filename} contains no executable statements.`);
-      }
-      for (const statement of statements) {
-        await client.command({ query: statement });
-      }
-      // Recorded only after the whole file succeeds; a partial failure
-      // re-runs the idempotent file on the next attempt.
-      await client.insert({
-        table: HISTORY_TABLE,
-        columns: ["version", "name", "checksum"],
-        values: [{ version: migration.version, name: migration.name, checksum: migration.checksum }],
-        format: "JSONEachRow",
-      });
-      executed.push(migration);
-    }
+    const executed = await runPlan(client, plan, log);
 
     if (executed.length === 0) {
       log(`Already up to date (${applied.length} applied)`);
@@ -368,9 +398,7 @@ export async function runMigrations(
       log(`Applied ${executed.length} migration(s); ${applied.length + executed.length} total`);
     }
     return { applied, pending: plan.pending, executed };
-  } finally {
-    await client.close();
-  }
+  });
 }
 
 /** Read-only view used by the `status` command. */
@@ -381,19 +409,9 @@ export async function getMigrationStatus(
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
   }
-  await ensureDatabase(config);
-  const client = createClient({
-    url: config.url,
-    username: config.username,
-    password: config.password,
-    database: config.database,
-  });
-  try {
-    await ensureHistoryTable(client);
+  return withClient(config, async (client) => {
     const discovered = await discoverMigrations(modulesRoot);
     const applied = await readAppliedMigrations(client);
     return { ...planMigrations(discovered, applied), database: config.database };
-  } finally {
-    await client.close();
-  }
+  });
 }
