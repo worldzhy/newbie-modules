@@ -19,11 +19,10 @@ export class MonitorClickhouseService implements OnModuleInit {
 
   async onModuleInit() {
     // The shared ClickhouseService owns the @clickhouse/client connection and
-    // exposes the ORM-like helpers (createDatabase / model). The business layer
-    // only needs to select which database to use.
-    const dbName =
-      this.configService.get<string>("modules.web-monitor.clickhouseDB") ||
-      this.configService.getOrThrow<string>("modules.clickhouse.database");
+    // exposes the ORM-like helpers (createDatabase / model). The database is
+    // always the host-level shared one (ADR-015); collector modules do not
+    // carry their own deployment topology.
+    const dbName = this.configService.getOrThrow<string>("modules.clickhouse.database");
 
     // Ensure the database exists before creating tables.
     await this.clickhouse.createDatabase(dbName);
