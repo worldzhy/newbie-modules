@@ -12,6 +12,7 @@ export class DependencyScanController {
   constructor(private readonly dependencyScanService: DependencyScanService) {}
 
   @Get("projects/:projectId/report")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.DependencyScan, { scope: "project" })
   @ApiOperation({
     summary: "Get dependency vulnerability scan status and open findings for every application of a project",
   })
@@ -21,7 +22,7 @@ export class DependencyScanController {
   }
 
   @Post("applications/:applicationId/scan")
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.DependencyScan)
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.DependencyScan, { scope: "application" })
   @ApiOperation({ summary: "Start a new dependency vulnerability scan for an application" })
   @ApiResponse({ status: 200, type: DependencyScanScanStartResponseDto })
   async startApplicationScan(
