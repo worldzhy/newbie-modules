@@ -106,7 +106,7 @@ export class BackendMonitorService {
 
     if (requests.length > 0) {
       await this.clickhouse.insert({
-        table: "application_request_logs",
+        table: "backend_monitor_request_logs",
         values: requests.map((event) =>
           this.toRequestRow(applicationId, installationId, event, env, instanceId, appVersion),
         ),
@@ -116,7 +116,7 @@ export class BackendMonitorService {
 
     if (errors.length > 0) {
       await this.clickhouse.insert({
-        table: "application_error_logs",
+        table: "backend_monitor_error_logs",
         values: errors.map((event) =>
           this.toErrorRow(applicationId, installationId, event, env, instanceId, appVersion),
         ),
@@ -222,7 +222,7 @@ export class BackendMonitorService {
     const countResult = await this.clickhouse.query({
       query: `
         SELECT count() AS total
-        FROM application_request_logs
+        FROM backend_monitor_request_logs
         WHERE application_id = {applicationId:UUID}
           AND ({hasKeyword:UInt8} = 0 OR path ILIKE {keyword:String})
       `,
@@ -242,7 +242,7 @@ export class BackendMonitorService {
           application_id, request_id, route, path, method, status_code,
           request_at, response_at, duration_ms, env, instance_id, app_version,
           ip, user_agent, ingested_at
-        FROM application_request_logs
+        FROM backend_monitor_request_logs
         WHERE application_id = {applicationId:UUID}
           AND ({hasKeyword:UInt8} = 0 OR path ILIKE {keyword:String})
         ORDER BY ${safeField} ${safeOrder}
@@ -275,7 +275,7 @@ export class BackendMonitorService {
     const countResult = await this.clickhouse.query({
       query: `
         SELECT count() AS total
-        FROM application_error_logs
+        FROM backend_monitor_error_logs
         WHERE application_id = {applicationId:UUID}
           AND ({hasKeyword:UInt8} = 0
                OR message ILIKE {keyword:String}
@@ -297,7 +297,7 @@ export class BackendMonitorService {
           application_id, request_id, fingerprint, type, message, stack,
           route, path, method, status_code, env, instance_id, app_version,
           ip, user_agent, occurred_at, ingested_at
-        FROM application_error_logs
+        FROM backend_monitor_error_logs
         WHERE application_id = {applicationId:UUID}
           AND ({hasKeyword:UInt8} = 0
                OR message ILIKE {keyword:String}
