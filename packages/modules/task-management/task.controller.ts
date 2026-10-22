@@ -6,6 +6,7 @@ import { RequireOwner } from "@modules/security/authorization/require-owner.deco
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { TaskService } from "./task.service";
+import { TaskParticipantService } from "./task-participant.service";
 import { BatchCreateTasksResponseDto, CreateTasksBatchRequestDto, TaskDto, UpdateTaskRequestDto } from "./task.dto";
 
 @ApiTags("Task Management")
@@ -13,7 +14,10 @@ import { BatchCreateTasksResponseDto, CreateTasksBatchRequestDto, TaskDto, Updat
 @UseGuards(JwtAuthGuard)
 @Controller("tasks")
 export class TaskController {
-  constructor(private readonly taskService: TaskService) {}
+  constructor(
+    private readonly taskService: TaskService,
+    private readonly taskParticipantService: TaskParticipantService,
+  ) {}
 
   @Post("batch")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task, { scope: "project" })
@@ -33,13 +37,11 @@ export class TaskController {
     @Body() dto: UpdateTaskRequestDto,
     @Req() req: UserRequest,
   ): Promise<TaskDto> {
-    const operator = {
-      id: req.user.userId,
-      name: req.user.userId,
-      source: "SYSTEM",
-    };
-
-    return await this.taskService.updateTask(taskId, dto, operator);
+    const participant = await this.taskParticipantService.ensureHostParticipant({ userId: req.user.userId });
+    return await this.taskService.updateTask(taskId, dto, {
+      participantId: participant.id,
+      name: participant.name ?? undefined,
+    });
   }
 
   @Delete(":taskId")
@@ -47,11 +49,10 @@ export class TaskController {
   @ApiOperation({ summary: "Soft delete a task" })
   @ApiResponse({ status: 200, type: TaskDto })
   async deleteTask(@Param("taskId") taskId: string, @Req() req: UserRequest): Promise<TaskDto> {
-    const operator = {
-      id: req.user.userId,
-      name: req.user.userId,
-      source: "SYSTEM",
-    };
-    return await this.taskService.deleteTask(taskId, operator);
+    const participant = await this.taskParticipantService.ensureHostParticipant({ userId: req.user.userId });
+    return await this.taskService.deleteTask(taskId, {
+      participantId: participant.id,
+      name: participant.name ?? undefined,
+    });
   }
 }

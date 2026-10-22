@@ -56,11 +56,10 @@ export class TaskSpaceController {
     const page = query.page ?? 0;
     const pageSize = query.pageSize ?? 10;
 
-    // Every project implicitly owns its companion TaskSpace.
-    await this.taskSpaceService.ensureSpaceForProject(projectId);
+    const space = await this.taskSpaceService.ensureSpaceForProject(projectId);
 
     const result = await this.taskService.listTasks({
-      projectId,
+      spaceId: space.id,
       status: query.status,
       keyword: query.keyword,
       assigneeName: query.assigneeName,
@@ -97,7 +96,6 @@ export class TaskSpaceController {
     const result = await this.taskService.createTask({
       ...dto,
       spaceId: space.id,
-      projectId,
       creatorId: creator.id,
     });
     return { success: true, data: result };

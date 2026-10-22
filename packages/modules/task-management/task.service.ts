@@ -4,20 +4,17 @@ import { Prisma } from "@generated/prisma/client";
 import { TaskStatus } from "@generated/prisma/enums";
 import { CreateTaskItemDto, UpdateTaskRequestDto } from "./task.dto";
 
-// Re-export the Prisma-generated enum so callers can keep importing it from the service module.
 export { TaskStatus };
 
 export interface Operator {
-  id: string;
+  participantId?: string;
   name?: string;
-  source: string;
 }
 
 export interface CreateTaskInput {
   title: string;
   description?: string;
   spaceId: string;
-  projectId: string;
   status?: TaskStatus;
   assigneeId?: string;
   dueDate?: Date;
@@ -26,13 +23,12 @@ export interface CreateTaskInput {
 
 export interface CreateTasksBatchInput {
   spaceId: string;
-  projectId: string;
   creatorId?: string;
   tasks: CreateTaskItemDto[];
 }
 
 export interface ListTasksFilter {
-  projectId: string;
+  spaceId: string;
   status?: TaskStatus;
   keyword?: string;
   assigneeName?: string;
@@ -62,7 +58,6 @@ export class TaskService {
         title: data.title,
         description: data.description,
         spaceId: data.spaceId,
-        projectId: data.projectId,
         status: data.status || TaskStatus.PENDING,
         assigneeId: data.assigneeId,
         dueDate: data.dueDate,
@@ -78,7 +73,6 @@ export class TaskService {
         description: task.description,
         status: task.status || TaskStatus.PENDING,
         spaceId: input.spaceId,
-        projectId: input.projectId,
         creatorId: input.creatorId,
         assigneeId: task.assigneeId,
         dueDate: task.dueDate,
@@ -91,14 +85,13 @@ export class TaskService {
 
   async listTasks(filter: ListTasksFilter) {
     const whereClause: Prisma.TaskWhereInput = {
-      projectId: filter.projectId,
+      spaceId: filter.spaceId,
       deletedAt: null,
     };
 
     if (filter.status) {
       whereClause.status = filter.status;
     } else if (!filter.includeCompleted) {
-      // If status is not specified and we shouldn't include completed, filter out COMPLETED and CANCELLED
       whereClause.status = {
         notIn: [TaskStatus.COMPLETED, TaskStatus.CANCELLED],
       };
@@ -107,7 +100,7 @@ export class TaskService {
     if (filter.keyword) {
       whereClause.title = {
         contains: filter.keyword,
-        mode: "insensitive", // PostgreSQL only, ignore if using SQLite/MySQL without support
+        mode: "insensitive",
       };
     }
 
@@ -158,7 +151,6 @@ export class TaskService {
       }
 
       if (current.status === dto.status) {
-        // Idempotent: keep the current status but still allow updating other fields.
         nextStatus = current.status;
       } else if (!TASK_STATUS_TRANSITIONS[current.status].has(dto.status)) {
         throw new ConflictException(`Invalid task status transition: ${current.status} -> ${dto.status}`);
@@ -175,9 +167,8 @@ export class TaskService {
         assigneeId: dto.assigneeId,
         dueDate: dto.dueDate,
         ...(nextStatus !== undefined ? { status: nextStatus } : {}),
-        lastOperatorId: operator.id,
+        lastOperatorParticipantId: operator.participantId,
         lastOperatorName: operator.name,
-        lastOperatorSource: operator.source,
       },
     });
   }
@@ -187,9 +178,8 @@ export class TaskService {
       where: { id: taskId },
       data: {
         deletedAt: new Date(),
-        lastOperatorId: operator.id,
+        lastOperatorParticipantId: operator.participantId,
         lastOperatorName: operator.name,
-        lastOperatorSource: operator.source,
       },
     });
   }
