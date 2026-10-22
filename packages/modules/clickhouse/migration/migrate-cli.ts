@@ -25,7 +25,7 @@ const DEFAULT_MODULES_ROOT = path.resolve(__dirname, "..", "..");
 
 export interface CliOptions {
   cwd: string;
-  modulesRoot?: string;
+  modulesRoot?: string | string[];
 }
 
 /** Minimal .env parser (KEY=VALUE lines, `export ` prefix, quotes, comments). */
@@ -67,10 +67,12 @@ export function resolveConfig(cwd: string): ClickhouseMigrationConfig {
 
 export async function runMigrateCli(argv: string[], options: CliOptions): Promise<number> {
   const command = argv[0];
-  const rootFlag = argv.find((arg) => arg.startsWith("--modules-root="));
-  const modulesRoot = rootFlag
-    ? rootFlag.slice("--modules-root=".length)
-    : (options.modulesRoot ?? DEFAULT_MODULES_ROOT);
+  // Repeatable flag: hosts with application-layer migration directories pass
+  // one --modules-root per tree; all roots share one history table.
+  const rootFlags = argv
+    .filter((arg) => arg.startsWith("--modules-root="))
+    .map((arg) => arg.slice("--modules-root=".length));
+  const modulesRoot = rootFlags.length > 0 ? rootFlags : (options.modulesRoot ?? DEFAULT_MODULES_ROOT);
   const cwd = options.cwd;
   const config = resolveConfig(cwd);
   const log = (message: string): void => console.log(`[clickhouse-migrate] ${message}`);

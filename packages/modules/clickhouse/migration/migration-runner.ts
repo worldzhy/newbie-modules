@@ -7,9 +7,11 @@ import path from "node:path";
  * Forward-only ClickHouse migration engine (minimal Flyway semantics).
  *
  * - Migration files live in every assembled module under
- *   `clickhouse-migrations/V<version>__<description>.sql`; the modules root
- *   is self-located by callers (src/modules under tsx, dist/src/modules when
- *   compiled), so the engine is host-agnostic.
+ *   `clickhouse-migrations/V<version>__<description>.sql`; the modules roots
+ *   are self-located by callers (src/modules under tsx, dist/src/modules when
+ *   compiled), so the engine is host-agnostic. Hosts with application-layer
+ *   tables (e.g. url-monitor, nightwatch ADR-022) pass additional roots; all
+ *   roots share one history table and one global version sequence.
  * - Each migrated database owns a history table recording version, name and
  *   SHA-256 checksum of every applied file. Applied files are immutable:
  *   checksum drift aborts the run.
@@ -170,43 +172,49 @@ function isLineCommentStart(sql: string, index: number): boolean {
 }
 
 /**
- * Discover migration files across every assembled module:
- * `<modulesRoot>/<moduleKey>/clickhouse-migrations/V*.sql`.
- * Versions must be globally unique; results are ordered by version.
+ * Discover migration files across every scanned root:
+ * `<modulesRoot>/<moduleKey>/clickhouse-migrations/V*.sql`. Multiple roots
+ * (e.g. the assembled module tree plus a host application tree) are scanned
+ * in order and merged. Versions must be globally unique across all roots;
+ * results are ordered by version.
  */
-export async function discoverMigrations(modulesRoot: string): Promise<DiscoveredMigration[]> {
-  const moduleDirs = await fs.readdir(modulesRoot, { withFileTypes: true });
+export async function discoverMigrations(modulesRoot: string | string[]): Promise<DiscoveredMigration[]> {
+  const roots = Array.isArray(modulesRoot) ? modulesRoot : [modulesRoot];
   const discovered: DiscoveredMigration[] = [];
 
-  for (const moduleDir of moduleDirs) {
-    if (!moduleDir.isDirectory()) continue;
-    const migrationDir = path.join(modulesRoot, moduleDir.name, MIGRATION_DIR_NAME);
-    let entries: string[];
-    try {
-      entries = await fs.readdir(migrationDir);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
-      throw error;
-    }
+  for (const root of roots) {
+    const moduleDirs = await fs.readdir(root, { withFileTypes: true });
 
-    for (const filename of entries) {
-      const match = MIGRATION_FILE_PATTERN.exec(filename);
-      if (!match) {
-        throw new Error(
-          `Invalid migration filename '${filename}' in ${moduleDir.name}/${MIGRATION_DIR_NAME}: ` +
-            "expected V<YYYYMMDDHHMMSS>__<snake_case_description>.sql",
-        );
+    for (const moduleDir of moduleDirs) {
+      if (!moduleDir.isDirectory()) continue;
+      const migrationDir = path.join(root, moduleDir.name, MIGRATION_DIR_NAME);
+      let entries: string[];
+      try {
+        entries = await fs.readdir(migrationDir);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw error;
       }
-      const filePath = path.join(migrationDir, filename);
-      const sql = await fs.readFile(filePath, "utf8");
-      discovered.push({
-        version: match[1],
-        name: match[2],
-        filename,
-        filePath,
-        sql,
-        checksum: crypto.createHash("sha256").update(sql).digest("hex"),
-      });
+
+      for (const filename of entries) {
+        const match = MIGRATION_FILE_PATTERN.exec(filename);
+        if (!match) {
+          throw new Error(
+            `Invalid migration filename '${filename}' in ${moduleDir.name}/${MIGRATION_DIR_NAME}: ` +
+              "expected V<YYYYMMDDHHMMSS>__<snake_case_description>.sql",
+          );
+        }
+        const filePath = path.join(migrationDir, filename);
+        const sql = await fs.readFile(filePath, "utf8");
+        discovered.push({
+          version: match[1],
+          name: match[2],
+          filename,
+          filePath,
+          sql,
+          checksum: crypto.createHash("sha256").update(sql).digest("hex"),
+        });
+      }
     }
   }
 
@@ -312,7 +320,7 @@ async function ensureHistoryTable(client: ClickHouseClient): Promise<void> {
  */
 export async function runMigrations(
   config: ClickhouseMigrationConfig,
-  modulesRoot: string,
+  modulesRoot: string | string[],
   log: MigrationLog = () => undefined,
 ): Promise<MigrationResult> {
   if (!config.database) {
@@ -368,7 +376,7 @@ export async function runMigrations(
 /** Read-only view used by the `status` command. */
 export async function getMigrationStatus(
   config: ClickhouseMigrationConfig,
-  modulesRoot: string,
+  modulesRoot: string | string[],
 ): Promise<MigrationPlan & { database: string }> {
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
