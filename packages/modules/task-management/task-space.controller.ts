@@ -30,10 +30,10 @@ export class TaskSpaceController {
 
   @Get()
   @RequirePermission(PermissionAction.List, Prisma.ModelName.TaskSpace)
-  @ApiOperation({ summary: "List all task spaces with task counts" })
+  @ApiOperation({ summary: "List the task spaces whose owning Project the caller is a member of" })
   @ApiResponse({ status: 200, type: [TaskSpaceWithCountDto] })
-  async listSpaces(): Promise<TaskSpaceWithCountDto[]> {
-    return await this.taskSpaceService.listSpaces();
+  async listSpaces(@Req() req: UserRequest): Promise<TaskSpaceWithCountDto[]> {
+    return await this.taskSpaceService.listSpacesForUser(req.user.userId);
   }
 
   @Get("by-project/:projectId")

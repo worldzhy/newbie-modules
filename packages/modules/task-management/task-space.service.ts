@@ -46,4 +46,26 @@ export class TaskSpaceService {
       orderBy: { updatedAt: "desc" },
     });
   }
+
+  /**
+   * List only the task spaces whose owning Project the user is a member of.
+   * Filters via the Prisma relation chain TaskSpace → Project → ProjectMember.
+   */
+  async listSpacesForUser(userId: string) {
+    return await this.prisma.taskSpace.findMany({
+      where: {
+        project: {
+          members: {
+            some: { userId },
+          },
+        },
+      },
+      include: {
+        _count: {
+          select: { tasks: { where: { deletedAt: null } } },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+  }
 }
