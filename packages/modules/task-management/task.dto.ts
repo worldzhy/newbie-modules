@@ -19,10 +19,10 @@ import { TaskStatus } from "./task.service";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class LookupParticipantQueryDto {
-  @ApiProperty({ type: String, description: "Participant external ID" })
+  @ApiProperty({ type: String, description: "Host user ID the participant stands for" })
   @IsString()
   @IsNotEmpty()
-  externalId!: string;
+  userId!: string;
 }
 
 export class ListTasksQueryDto {
@@ -139,8 +139,8 @@ export class TaskParticipantDto {
   @ApiProperty({ description: "TaskParticipant ID (uuid)" })
   id!: string;
 
-  @ApiProperty({ description: "Participant external ID (host user UUID)" })
-  externalId!: string;
+  @ApiPropertyOptional({ description: "Host user this participant stands for", type: String, nullable: true })
+  userId?: string | null;
 
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;
@@ -159,8 +159,8 @@ export class TaskParticipantListItemDto {
   @ApiProperty({ description: "TaskParticipant ID (uuid)" })
   id!: string;
 
-  @ApiProperty({ description: "Participant external ID (host user UUID)" })
-  externalId!: string;
+  @ApiPropertyOptional({ description: "Host user this participant stands for", type: String, nullable: true })
+  userId?: string | null;
 
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;

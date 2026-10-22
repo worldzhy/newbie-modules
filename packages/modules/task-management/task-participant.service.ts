@@ -3,11 +3,10 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TaskStatus } from "@generated/prisma/enums";
 
 export interface EnsureParticipantInput {
-  externalId: string;
+  /** Host user this participant stands for; also the participant's identity. */
+  userId: string;
   name?: string;
   avatarUrl?: string;
-  /** Host user this participant stands for; enables the User FK and self-lookup. */
-  userId?: string;
 }
 
 @Injectable()
@@ -15,21 +14,31 @@ export class TaskParticipantService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * List participants visible to one user: herself plus anyone who created or
-   * was assigned a task inside a project she belongs to.
+   * Visibility rule: a participant is visible when it is the requester herself,
+   * or when the user behind it shares a project with the requester.
    */
+  private visibleTo(requesterUserId: string) {
+    return {
+      OR: [
+        { userId: requesterUserId },
+        {
+          user: {
+            projectMemberships: {
+              some: { project: { members: { some: { userId: requesterUserId } } } },
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  /** List the participants the caller may see (see `visibleTo`). */
   async listParticipants(userId: string) {
     return await this.prisma.taskParticipant.findMany({
-      where: {
-        OR: [
-          { userId },
-          { createdTasks: { some: { space: { project: { members: { some: { userId } } } } } } },
-          { assignedTasks: { some: { space: { project: { members: { some: { userId } } } } } } },
-        ],
-      },
+      where: this.visibleTo(userId),
       select: {
         id: true,
-        externalId: true,
+        userId: true,
         name: true,
         avatarUrl: true,
       },
@@ -37,55 +46,23 @@ export class TaskParticipantService {
     });
   }
 
-  /** Look up a participant by external ID, restricted to the requester's reach. */
-  async getParticipantByExternalId(externalId: string, requesterUserId?: string) {
-    if (!requesterUserId) {
-      return await this.prisma.taskParticipant.findUnique({ where: { externalId } });
-    }
+  /** Look up a participant by the host user it stands for, within the caller's reach. */
+  async getParticipantByUserId(targetUserId: string, requesterUserId: string) {
     return await this.prisma.taskParticipant.findFirst({
-      where: {
-        externalId,
-        OR: [
-          { userId: requesterUserId },
-          { createdTasks: { some: { space: { project: { members: { some: { userId: requesterUserId } } } } } } },
-          { assignedTasks: { some: { space: { project: { members: { some: { userId: requesterUserId } } } } } } },
-        ],
-      },
+      where: { userId: targetUserId, ...this.visibleTo(requesterUserId) },
     });
   }
 
-  /** Internal lookup used for participant provisioning; no access filtering. */
-  private async findByExternalId(externalId: string) {
-    return await this.prisma.taskParticipant.findUnique({ where: { externalId } });
-  }
-
   async ensureParticipant(input: EnsureParticipantInput) {
-    const existing = await this.findByExternalId(input.externalId);
-    if (existing) {
-      // Backfill the host user link for participants created before the FK existed.
-      if (input.userId && !existing.userId) {
-        return await this.prisma.taskParticipant.update({
-          where: { id: existing.id },
-          data: { userId: input.userId },
-        });
-      }
-      return existing;
-    }
-
-    try {
-      return await this.prisma.taskParticipant.create({
-        data: {
-          externalId: input.externalId,
-          name: input.name || null,
-          avatarUrl: input.avatarUrl || null,
-          ...(input.userId ? { userId: input.userId } : {}),
-        },
-      });
-    } catch (error) {
-      const created = await this.findByExternalId(input.externalId);
-      if (created) return created;
-      throw error;
-    }
+    return await this.prisma.taskParticipant.upsert({
+      where: { userId: input.userId },
+      create: {
+        userId: input.userId,
+        name: input.name || null,
+        avatarUrl: input.avatarUrl || null,
+      },
+      update: {},
+    });
   }
 
   async ensureHostParticipant(input: { userId: string }) {
@@ -95,7 +72,6 @@ export class TaskParticipantService {
     });
 
     return await this.ensureParticipant({
-      externalId: input.userId,
       userId: input.userId,
       ...(user?.name ? { name: user.name } : {}),
       ...(user?.uiAvatarsUrl ? { avatarUrl: user.uiAvatarsUrl } : {}),

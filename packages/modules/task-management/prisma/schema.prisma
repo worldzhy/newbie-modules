@@ -3,7 +3,7 @@
 // !! ------------------------------------------------------------ //
 // * TaskSpace (1:1 companion space for a Nightwatch Project)       //
 // * Task (Work Item)                                              //
-// * TaskParticipant (Actor, identified by an external host ID)    //
+// * TaskParticipant (Actor, identified by the host user it stands for) //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 model TaskSpace {
@@ -21,7 +21,6 @@ model TaskSpace {
 
 model TaskParticipant {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  externalId     String   @unique
   name           String?
   avatarUrl      String?
   createdAt      DateTime @default(now())

@@ -23,15 +23,15 @@ export class TaskParticipantController {
     return { success: true, data: participants };
   }
 
-  @Get("by-external-id")
+  @Get("by-user-id")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.TaskParticipant)
-  @ApiOperation({ summary: "Look up a participant by external ID" })
+  @ApiOperation({ summary: "Look up a participant by host user ID" })
   @ApiResponse({ status: 200, type: TaskParticipantDataResponseDto })
-  async getParticipantByExternalId(
+  async getParticipantByUserId(
     @Query() query: LookupParticipantQueryDto,
     @Req() req: UserRequest,
   ): Promise<TaskParticipantDataResponseDto> {
-    const participant = await this.taskParticipantService.getParticipantByExternalId(query.externalId, req.user.userId);
+    const participant = await this.taskParticipantService.getParticipantByUserId(query.userId, req.user.userId);
     return { success: true, data: participant };
   }
 }
