@@ -39,7 +39,7 @@ export interface HealthLivenessSnapshot {
 
 /**
  * Presence of the installations sharing one externalRef, normalized for the
- * host-side per-facility dashboards. Several rows can share a ref (rotation
+ * platform-side per-facility dashboards. Several rows can share a ref (rotation
  * history, multiple instances):
  * - `enrolled` — at least one non-revoked installation exists.
  * - `online` — a non-revoked installation's latest snapshot is healthy or
@@ -146,7 +146,7 @@ export class HealthInstallationService implements InstallationResolver {
   // -------------------------------------------------------------------------
 
   /**
-   * Batch liveness lookup for host-side list views: externalRef -> snapshot.
+   * Batch liveness lookup for platform-side list views: externalRef -> snapshot.
    * One query for the whole set; an externalRef with no installation (or none
    * at all) is simply absent from the map. When multiple installations share
    * an externalRef, the worst state wins; ties keep the newest snapshot.
@@ -195,7 +195,7 @@ export class HealthInstallationService implements InstallationResolver {
   }
 
   /**
-   * Batch presence lookup for host-side per-facility views:
+   * Batch presence lookup for platform-side per-facility views:
    * externalRef -> InstallationPresence. One query for the whole set; an
    * externalRef with no installation row at all is absent from the map.
    * Revoked rows are included so the caller can distinguish NOT_ENABLED

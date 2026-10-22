@@ -33,7 +33,7 @@ model WebMonitorInstallation {
   // Immutable public partition key (embedded in Mongo/ClickHouse names).
   appKey String @unique @db.VarChar(64)
 
-  // Opaque host-owned tag (convention: "projectId/applicationId").
+  // Opaque platform-owned tag (convention: "projectId/applicationId").
   externalRef String? @db.VarChar(255)
 
   firstSeenAt DateTime?

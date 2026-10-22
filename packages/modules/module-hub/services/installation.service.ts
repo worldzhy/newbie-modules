@@ -11,7 +11,7 @@ export const ONLINE_THRESHOLD_SECONDS = 180;
 
 /**
  * Presence of the installations sharing one externalRef, normalized for the
- * host-side per-facility dashboards. Several rows can share a ref (rotation
+ * platform-side per-facility dashboards. Several rows can share a ref (rotation
  * history, multiple instances):
  * - `enrolled` — at least one non-revoked installation exists.
  * - `online` — a non-revoked installation reported within the online window.
@@ -207,7 +207,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
   }
 
   /**
-   * Batch presence lookup for host-side per-facility views:
+   * Batch presence lookup for platform-side per-facility views:
    * externalRef -> InstallationPresence. One query for the whole set; an
    * externalRef with no installation row at all is absent from the map.
    * Revoked rows are included so the caller can distinguish NOT_ENABLED

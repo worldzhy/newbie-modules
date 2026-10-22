@@ -26,7 +26,7 @@ model BackendMonitorInstallation {
   // creation/rotation and never stored.
   tokenHash String @unique @db.VarChar(64)
 
-  // Opaque host-owned tag (convention: "projectId/applicationId"); the ingest
+  // Opaque platform-owned tag (convention: "projectId/applicationId"); the ingest
   // resolver parses the applicationId segment to stamp CH rows.
   externalRef String? @db.VarChar(255)
 
