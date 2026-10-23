@@ -178,6 +178,7 @@ model PeopleEvaluationEvidence {
   @@index([collectionPeriodId])
   @@index([sourceType])
   @@index([evaluateeUserId, collectionPeriodId])
+  @@unique([collectionPeriodId, sourceRef])
   @@schema("module/people-evaluation")
 }
 
