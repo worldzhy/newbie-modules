@@ -3,7 +3,7 @@
 状态：已采纳（2026-10-13 用户批准方案 B：两表分离）
 日期：2026-10-13
 归属注记：本决策治理 newbie-modules 模块代码，单一源存放于本仓（nightwatch-backend 侧编号 ADR-006，该处现为同编号重定向存根）。2026-10-19 起按单一源规则执行。
-Supersedes：ADR-005 的决策 2（scope 作为记录固有属性、per-scope 唯一 active 记录）与决策 7 中的 activate 语义
+Supersedes：ADR-004 的决策 2（scope 作为记录固有属性、per-scope 唯一 active 记录）与决策 7 中的 activate 语义（编号订正说明见文末 Errata）
 
 ## 触发问题
 
@@ -171,3 +171,7 @@ health decorator 不变——port 构建后仍用 withHealthTracking 包装，ou
 - **不引入 default fallback**：隐式语义。需要共享时直接把多个 scope 绑定到同一条 LlmConnection 即可。
 - **不做连接级别的环境变量桥接**：同 ADR-005 决策 6，env 来源已清理。
 - **不引入 provider/connection 二级分离**（经验库 1323838 的建议）：当前 provider/model/baseUrl/apiKey 四元组即连接定义；同 baseUrl 多 model 是 LlmConnection 多条不同记录（baseUrl 相同但 model 不同），不需要 Provider 抽象。
+
+## Errata
+
+- 2026-10-23 编号订正：本文原为 nightwatch-backend ADR-006，2026-10-19 迁入本仓时重编号为 ADR-005。正文（第 10、172 行）中的 "ADR-005" 指迁移前的 nightwatch-backend ADR-005，即本仓 ADR-004；契约结论不变。

@@ -1,9 +1,9 @@
 # ADR-012: 统一授权契约（系统级 RBAC + 作用域级 RBAC + 所有权分离）
 
-状态：superseded（契约仍生效，注册仓已合入 devbie monorepo）
-Superseded by: devbie monorepo ADR-018（newbie-modules 合入 devbie）+ nightwatch-backend ADR-019（宿主 RBAC 实施）+ nightwatch-backend ADR-020（RBAC gap closure）+ newbie-modules ADR-017（scope 名称从装饰器移到宿主配置）
+状态：已采纳（框架契约现仍生效；"scope 名称由模块装饰器声明"章节由 ADR-017 取代）
+更新：2026-10-23 — 订正 2026-10-22（0a36535）的误标：registry 仓未并入 devbie monorepo（devbie ADR-018 第 4 条明确其保持独立，security/account 源码仍在 newbie-modules/packages/modules）。原 "Superseded by: devbie monorepo ADR-018" 作废；宿主侧实施由 nightwatch-backend ADR-019 与 ADR-027 记录，实施不等于取代。
 日期：2026-10-20
-归属注记：本决策治理原 newbie-modules 模块代码（security / account），模块源码现已合入 devbie monorepo。框架 SPI 契约（PermissionAuthorizer / ScopeResolver / @RequirePermission / @RequireOwner）仍由本文件描述，宿主侧实施见 nightwatch-backend ADR-019。
+归属注记：本决策治理 newbie-modules 模块代码（security / account），源码位于本仓 `packages/modules/`。框架 SPI 契约（PermissionAuthorizer / ScopeResolver / @RequirePermission / @RequireOwner）由本文件描述，宿主侧实施见 nightwatch-backend ADR-019。
 
 ## 背景
 

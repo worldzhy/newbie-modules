@@ -3,7 +3,7 @@
 状态：已采纳（2026-10-13 用户批准三项核心决策 + 三项细化决策：在途前端改动先独立提交、页面挪至 /settings/models、health 发射点上移 resolver decorator）
 日期：2026-10-13
 归属注记：本决策治理 newbie-modules 模块代码，单一源存放于本仓（nightwatch-backend 侧编号 ADR-005，该处现为同编号重定向存根）。2026-10-19 起按单一源规则执行。
-Supersedes：ADR-004 的"health 发射点位于 copilot kernel（AgentRunner 内经 ModelHealthSink seam）"一节（见决策 3）
+Supersedes：ADR-003 的"health 发射点位于 copilot kernel（AgentRunner 内经 ModelHealthSink seam）"一节（见决策 3；编号订正说明见文末 Errata）
 
 ## 背景
 
@@ -59,3 +59,7 @@ copilot 的 model port 已是"唯一提供者"雏形，但存在三个结构性�
 - **nightwatch-backend**：手写 migration（建 `module/llm` schema、表迁移改名、加 `scope` 列回填、索引替换）；host 层 copilot transports/skills/tests import 更新；jdy 收敛；`modules.config.ts` 与 `.env` 清理。
 - **nightwatch-frontend**：models 页泛化（+可能的位置迁移）、dock、model-status 组件类型更新、apits 重生成；并行会话在途的"Test Connection 挪入弹窗"未提交改动需先收口。
 - **验证**：migration 后创建三条 scope 记录；E2E 覆盖 copilot web 对话、ai-analysis SSE（含无 active 记录的友好错误）、jdy JSON mode、models 页 per-scope 激活与三态 health 展示。
+
+## Errata
+
+- 2026-10-23 编号订正：本文原为 nightwatch-backend ADR-005，2026-10-19 迁入本仓时重编号为 ADR-004。正文（第 16、22、24、46 行）中的 "ADR-004" 指迁移前的 nightwatch-backend ADR-004，即本仓 ADR-003；契约结论不变。

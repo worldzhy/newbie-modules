@@ -54,3 +54,7 @@
 
 - 生产 ClickHouse（库名仍为 worldzhy、表名仍为旧名）需在发版窗口执行同样的 RENAME + 库名归一，属运维操作，按 runbook 另案执行。
 - 引用面为字符串字面量（SQL in code / prompt 文本），编译期无法兜底；以 grep 取证清单 + 行为级验证（ingest 写入 + analysis 查询 + 错误尖峰任务）作为交付证据。
+
+## Errata
+
+- 2026-10-23 生产迁移修订：上节"生产 ClickHouse 需执行 RENAME + 库名归一保数据"作废——platform 未上线，生产数据可丢弃。随 main 同步部署时改为设置 `CLICKHOUSE_DB=nightwatch`、由新代码自建全表后 `DROP DATABASE worldzhy`；本地实例的 RENAME 步骤仍有效。
