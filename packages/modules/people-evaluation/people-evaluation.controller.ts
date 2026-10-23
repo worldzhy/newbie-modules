@@ -1,15 +1,24 @@
 import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import {
   CreatePeopleEvaluationPeriodRequestDto,
-  CreatePeopleEvaluationRubricVersionRequestDto,
   CreatePeopleEvaluationPeriodResponseDto,
+  CreatePeopleEvaluationPipPlanRequestDto,
+  CreatePeopleEvaluationRubricVersionRequestDto,
+  CreatePeopleEvaluationRubricVersionResponseDto,
+  DeclarePeopleEvaluationHomeGroundRequestDto,
   ListPeopleEvaluationPeriodsRequestDto,
   ListPeopleEvaluationPeriodsResponseDto,
+  PeopleEvaluationAgentSessionResponseDto,
+  PeopleEvaluationAssessmentResponseDto,
+  PeopleEvaluationDeclaredDocumentResponseDto,
+  PeopleEvaluationHomeGroundResponseDto,
+  PeopleEvaluationMemberWorkspaceResponseDto,
+  PeopleEvaluationPipPlanResponseDto,
+  ReviewPeopleEvaluationAssessmentRequestDto,
   UpdatePeopleEvaluationPeriodStatusRequestDto,
-  CreatePeopleEvaluationRubricVersionResponseDto,
 } from "./people-evaluation.dto";
 import { PeopleEvaluationService } from "./people-evaluation.service";
 
@@ -18,9 +27,10 @@ import { PeopleEvaluationService } from "./people-evaluation.service";
  *
  * All routes are system-level (the evaluation is cross-project and keyed by
  * user, not by project): the identity provider grants them to the supervisor
- * role via `*:Manage`. Evidence is intentionally NOT exposed over HTTP —
- * collection runners write it directly, so there is no route through which a
- * caller could forge evidence for another evaluatee.
+ * role via `*:Manage`. Evidence and assessments are intentionally NOT writable
+ * over HTTP — the deterministic packet builder and the assessment runner write
+ * through the service directly, so no caller can forge evidence or judgments
+ * for another evaluatee.
  */
 @ApiTags("People Evaluation")
 @ApiBearerAuth()
@@ -78,5 +88,108 @@ export class PeopleEvaluationController {
   @ApiResponse({ status: 200, type: CreatePeopleEvaluationPeriodResponseDto })
   transitionPeriodStatus(@Param("id") id: string, @Body() body: UpdatePeopleEvaluationPeriodStatusRequestDto) {
     return this.peopleEvaluation.transitionPeriodStatus(id, body.status);
+  }
+
+  // --- Home ground -------------------------------------------------------
+
+  @Post("home-ground")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.PeopleEvaluationHomeGround)
+  @ApiOperation({ summary: "Declare (or re-declare) a member's specialty circle for a collection period" })
+  @ApiResponse({ status: 201, type: PeopleEvaluationHomeGroundResponseDto })
+  declareHomeGround(@Body() body: DeclarePeopleEvaluationHomeGroundRequestDto) {
+    return this.peopleEvaluation.declareHomeGround(body);
+  }
+
+  // --- Collector-reported context ---------------------------------------
+
+  @Get("workspaces")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.PeopleEvaluationMemberWorkspace)
+  @ApiOperation({ summary: "List the workspaces a member's collector has reported" })
+  @ApiResponse({ type: PeopleEvaluationMemberWorkspaceResponseDto, isArray: true })
+  @ApiQuery({ name: "evaluateeUserId", required: true, type: String })
+  listWorkspaces(@Query("evaluateeUserId") evaluateeUserId: string) {
+    return this.peopleEvaluation.listWorkspaces(evaluateeUserId);
+  }
+
+  @Get("sessions")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.PeopleEvaluationAgentSession)
+  @ApiOperation({ summary: "List collected agent-session index rows for a member" })
+  @ApiResponse({ type: PeopleEvaluationAgentSessionResponseDto, isArray: true })
+  @ApiQuery({ name: "evaluateeUserId", required: true, type: String })
+  @ApiQuery({ name: "collectionPeriodId", required: false, type: String })
+  listSessions(
+    @Query("evaluateeUserId") evaluateeUserId: string,
+    @Query("collectionPeriodId") collectionPeriodId?: string,
+  ) {
+    return this.peopleEvaluation.listSessions(evaluateeUserId, collectionPeriodId);
+  }
+
+  // --- Declared documents ------------------------------------------------
+
+  @Get("documents")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.PeopleEvaluationDeclaredDocument)
+  @ApiOperation({ summary: "List declared work artifacts for a member" })
+  @ApiResponse({ type: PeopleEvaluationDeclaredDocumentResponseDto, isArray: true })
+  @ApiQuery({ name: "evaluateeUserId", required: true, type: String })
+  listDocuments(@Query("evaluateeUserId") evaluateeUserId: string) {
+    return this.peopleEvaluation.listDocuments(evaluateeUserId);
+  }
+
+  @Get("documents/:id")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.PeopleEvaluationDeclaredDocument)
+  @ApiOperation({ summary: "Get one declared work artifact, including its content" })
+  @ApiResponse({ status: 200, type: PeopleEvaluationDeclaredDocumentResponseDto })
+  getDocument(@Param("id") id: string) {
+    return this.peopleEvaluation.getDocument(id);
+  }
+
+  // --- Assessments -------------------------------------------------------
+
+  @Get("assessments")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.PeopleEvaluationAssessment)
+  @ApiOperation({ summary: "List assessments for a member (newest first)" })
+  @ApiResponse({ type: PeopleEvaluationAssessmentResponseDto, isArray: true })
+  @ApiQuery({ name: "evaluateeUserId", required: true, type: String })
+  @ApiQuery({ name: "collectionPeriodId", required: false, type: String })
+  listAssessments(
+    @Query("evaluateeUserId") evaluateeUserId: string,
+    @Query("collectionPeriodId") collectionPeriodId?: string,
+  ) {
+    return this.peopleEvaluation.listAssessments(evaluateeUserId, collectionPeriodId);
+  }
+
+  @Get("assessments/:id")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.PeopleEvaluationAssessment)
+  @ApiOperation({ summary: "Get one assessment, including its coverage declaration" })
+  @ApiResponse({ status: 200, type: PeopleEvaluationAssessmentResponseDto })
+  getAssessment(@Param("id") id: string) {
+    return this.peopleEvaluation.getAssessment(id);
+  }
+
+  @Patch("assessments/:id/review")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.PeopleEvaluationAssessment)
+  @ApiOperation({ summary: "Record the supervisor's final call on an assessment" })
+  @ApiResponse({ status: 200, type: PeopleEvaluationAssessmentResponseDto })
+  reviewAssessment(@Param("id") id: string, @Body() body: ReviewPeopleEvaluationAssessmentRequestDto) {
+    return this.peopleEvaluation.reviewAssessment(id, body);
+  }
+
+  // --- PIP plans ---------------------------------------------------------
+
+  @Get("pip-plans")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.PeopleEvaluationPipPlan)
+  @ApiOperation({ summary: "List PIP plans for a member" })
+  @ApiResponse({ type: PeopleEvaluationPipPlanResponseDto, isArray: true })
+  @ApiQuery({ name: "evaluateeUserId", required: true, type: String })
+  listPipPlans(@Query("evaluateeUserId") evaluateeUserId: string) {
+    return this.peopleEvaluation.listPipPlans(evaluateeUserId);
+  }
+
+  @Post("pip-plans")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.PeopleEvaluationPipPlan)
+  @ApiOperation({ summary: "Open a PIP plan from one or more assessments" })
+  @ApiResponse({ status: 201, type: PeopleEvaluationPipPlanResponseDto })
+  createPipPlan(@Body() body: CreatePeopleEvaluationPipPlanRequestDto) {
+    return this.peopleEvaluation.createPipPlan(body);
   }
 }

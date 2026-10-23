@@ -12,6 +12,8 @@ import {
   ChangeUserPasswordDto,
   CreateUserResponseDto,
   CreateUserDto,
+  ExternalIdentityResponseDto,
+  LinkExternalIdentityDto,
   ListUsersRequestDto,
   ListUsersResponseDto,
   UpdateUserDto,
@@ -253,6 +255,54 @@ export class UserController {
       data: { password: body.newPassword },
       select: { id: true, email: true, phone: true },
     });
+  }
+
+  /* External platform identities (evidence attribution, ADR-029) */
+
+  @Get(":userId/external-identities")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.AccountExternalIdentity)
+  @ApiOperation({ summary: "List a user's external platform identities" })
+  @ApiResponse({ type: ExternalIdentityResponseDto, isArray: true })
+  async listExternalIdentities(@Param("userId") userId: string) {
+    return this.prisma.accountExternalIdentity.findMany({
+      where: { userId },
+      orderBy: { linkedAt: "asc" },
+    });
+  }
+
+  @Post(":userId/external-identities")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.AccountExternalIdentity)
+  @ApiOperation({ summary: "Link an external platform identity to a user" })
+  @ApiResponse({ type: ExternalIdentityResponseDto })
+  async linkExternalIdentity(@Param("userId") userId: string, @Body() body: LinkExternalIdentityDto) {
+    const platform = body.platform.trim().toUpperCase();
+    return this.prisma.accountExternalIdentity.upsert({
+      where: {
+        platform_externalAccountId: {
+          platform,
+          externalAccountId: body.externalAccountId,
+        },
+      },
+      create: {
+        userId,
+        platform,
+        externalAccountId: body.externalAccountId,
+        displayName: body.displayName,
+      },
+      update: {
+        userId,
+        displayName: body.displayName,
+      },
+    });
+  }
+
+  @Delete(":userId/external-identities/:identityId")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.AccountExternalIdentity)
+  @ApiOperation({ summary: "Unlink an external platform identity" })
+  @ApiResponse({ type: ExternalIdentityResponseDto })
+  async unlinkExternalIdentity(@Param("userId") userId: string, @Param("identityId") identityId: string) {
+    await this.prisma.accountExternalIdentity.deleteMany({ where: { id: identityId, userId } });
+    return { id: identityId, deleted: true };
   }
 
   /* End */

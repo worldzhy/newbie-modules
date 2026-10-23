@@ -40,6 +40,7 @@ model User {
   emails               Email[]
   sessions             Session[]
   roles                UserRole[]
+  externalIdentities   AccountExternalIdentity[]
 
   // WeChat mini-program fields
   wechatOpenId     String? @unique // Unique WeChat user identifier
@@ -181,6 +182,25 @@ model ApiKey {
   userId               String     @db.Uuid
   organizationId       String?    @db.Uuid
 
+  @@index([userId])
+  @@schema("module/account")
+}
+
+/// External platform identity used for evidence attribution (ADR-029 in
+/// nightwatch-backend). The platform account id is the primary attribution
+/// key — never the display name or email. `platform` is an uppercase tag
+/// such as "GITHUB" or "BITBUCKET".
+model AccountExternalIdentity {
+  id                String   @id @default(uuid()) @db.Uuid
+  userId            String   @db.Uuid
+  platform          String   @db.VarChar(32)
+  externalAccountId String   @db.VarChar(128)
+  displayName       String?  @db.VarChar(255)
+  linkedAt          DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([platform, externalAccountId])
   @@index([userId])
   @@schema("module/account")
 }
