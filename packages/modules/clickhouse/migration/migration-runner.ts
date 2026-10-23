@@ -178,10 +178,10 @@ function isLineCommentStart(sql: string, index: number): boolean {
  * in order and merged. Versions must be globally unique across all roots;
  * results are ordered by version.
  */
-export async function discoverMigrations(roots: string[]): Promise<DiscoveredMigration[]> {
+export async function discoverMigrations(moduleRoots: string[]): Promise<DiscoveredMigration[]> {
   const discovered: DiscoveredMigration[] = [];
 
-  for (const root of roots) {
+  for (const root of moduleRoots) {
     const moduleDirs = await fs.readdir(root, { withFileTypes: true });
 
     for (const moduleDir of moduleDirs) {
@@ -379,14 +379,14 @@ export async function runPlan(
  */
 export async function runMigrations(
   config: ClickhouseMigrationConfig,
-  roots: string[],
+  moduleRoots: string[],
   log: MigrationLogger = () => undefined,
 ): Promise<MigrationResult> {
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
   }
   return withClient(config, async (client) => {
-    const discovered = await discoverMigrations(roots);
+    const discovered = await discoverMigrations(moduleRoots);
     const applied = await readAppliedMigrations(client);
     const plan = planMigrations(discovered, applied);
     const executed = await runPlan(client, plan, log);
@@ -403,13 +403,13 @@ export async function runMigrations(
 /** Read-only view used by the `status` command. */
 export async function getMigrationStatus(
   config: ClickhouseMigrationConfig,
-  roots: string[],
+  moduleRoots: string[],
 ): Promise<MigrationPlan & { database: string }> {
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
   }
   return withClient(config, async (client) => {
-    const discovered = await discoverMigrations(roots);
+    const discovered = await discoverMigrations(moduleRoots);
     const applied = await readAppliedMigrations(client);
     return { ...planMigrations(discovered, applied), database: config.database };
   });
