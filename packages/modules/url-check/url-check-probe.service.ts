@@ -15,7 +15,7 @@ const ALERT_FAILURE_THRESHOLD = 3;
 const RECOVERY_SUCCESS_THRESHOLD = 3;
 const PROBE_CONCURRENCY = 10;
 const MAX_REDIRECTS = 5;
-const CHECK_RESULTS_TABLE = "url_monitor_check_results";
+const CHECK_RESULTS_TABLE = "url_check_results";
 const PROBE_USER_AGENT = "nightwatch-url-check/1.0";
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 

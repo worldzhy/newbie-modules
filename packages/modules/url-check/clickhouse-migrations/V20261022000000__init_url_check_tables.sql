@@ -1,17 +1,17 @@
--- ClickHouse schema for the host url-monitor feature (ADR-022).
+-- ClickHouse schema for the url-check module (ADR-022).
 --
--- One row per probe execution against a UrlMonitorTarget. Static table managed
+-- One row per probe execution against a UrlCheckTarget. Static table managed
 -- by the clickhouse module's forward-only migration runner (ADR-014); the file
--- lives under src/application because url-monitor is a host feature, and the
--- migrate CLI is invoked a second time with --modules-root pointing at the
--- application tree. Idempotent: safe to re-run on an existing identical schema.
+-- ships inside the url-check module and is picked up via the standard
+-- --modules-root scan. Idempotent: safe to re-run on an existing identical
+-- schema.
 
 -- Raw check results power the availability timeline, uptime ratios and MTTR
 -- statistics; the current up/down state machine itself lives in Postgres on
--- UrlMonitorTarget (consecutiveFailures / isAlertOpen).
-CREATE TABLE IF NOT EXISTS url_monitor_check_results
+-- UrlCheckTarget (consecutiveFailures / isAlertOpen).
+CREATE TABLE IF NOT EXISTS url_check_results
 (
-    -- UrlMonitorTarget.id this probe ran against.
+    -- UrlCheckTarget.id this probe ran against.
     target_id      UUID,
     -- Denormalized owning project for project-level availability queries.
     project_id     UUID,

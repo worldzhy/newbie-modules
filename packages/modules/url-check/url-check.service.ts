@@ -13,7 +13,7 @@ import {
   UrlCheckTargetStatsDto,
 } from "./url-check.dto";
 
-const CHECK_RESULTS_TABLE = "url_monitor_check_results";
+const CHECK_RESULTS_TABLE = "url_check_results";
 const DEFAULT_RESULT_LIMIT = 50;
 const MAX_RESULT_LIMIT = 200;
 
