@@ -7,9 +7,14 @@ export { Scope };
  * SPI port for resolving an authorization scope from the request context.
  *
  * Hosts register resolvers by key (e.g. "project", "application") via the
- * SCOPE_RESOLVERS token. The `@RequirePermission` decorator references a
- * resolver key; the AuthorizationGuard looks up the resolver and calls it
- * to obtain the Scope passed to PermissionAuthorizer.
+ * SCOPE_RESOLVERS token. Two ways a resolver gets selected:
+ *
+ * 1. Preferred (ADR-017): the resource is listed in the host's
+ *    HOST_SCOPED_RESOURCES; the Guard iterates resolvers in registration order
+ *    and takes the first non-{type:"none"} result.
+ * 2. Legacy: a `@RequirePermission` decorator still carries
+ *    `{ scope: "<key>" }`; the Guard looks that key up directly. Deprecated for
+ *    modules — decorators must not name host vocabulary.
  *
  * The default "project" resolver extracts `projectId` from route params, then
  * query, then body — in that order. Hosts may override it or register

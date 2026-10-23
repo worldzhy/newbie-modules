@@ -166,3 +166,52 @@ export const HOST_SCOPED_RESOURCES = Symbol("HOST_SCOPED_RESOURCES");
 ### 受影响的实施步骤
 
 实施章节保持原迁移顺序不变（Phase 1 双轨 → Phase 2 移除 scope 参数 → 验证 → back-port）。只是 Phase 1 的具体代码按本勘误的新机制写。
+
+---
+
+## 勘误修订 2（2026-10-23，实施后严肃复查）
+
+实施完成后的逐项复查发现三类缺口，均已在同一批改动中修复。决策与机制不变，本节记录**机制落地时必须配套的三件事**。
+
+### 1. 护栏盲区（回归，已修）
+
+首版实施只改了 Guard 与 controller，没同步两个校验器——它们都只认旧机制的 `{ scope: ... }` 键：
+
+| 护栏 | 首版问题 | 修复 |
+|---|---|---|
+| 启动期矩阵校验（host `MatrixCompletenessValidator`） | 只收集带 `scope` 元数据的资源 → 迁移后 8 个模块资源不再被校验 | 改为 `legacy scope ∪ HOST_SCOPED_RESOURCES` 取并集 |
+| CI 契约测试（host `rbac-contract.test.ts`） | 同上 → 测试仍绿，但对已迁移资源完全失效；且单行正则漏掉 prettier 换行后的多行 decorator | 改为并集校验 + 全文多行正则 + 行号按匹配偏移计算 |
+
+**教训**：把某个判据从 A 位置搬到 B 位置时，所有"读 A 位置"的校验器都要同步搬；否则护栏静默失效，且测试仍绿。
+
+### 2. 资源粒度语义（设计澄清）
+
+`HOST_SCOPED_RESOURCES` 是 **resource 级**白名单，不是 `(resource, action)` 级。因此该资源的**所有** action 都会尝试解析 scope，而旧机制允许逐 action 显式声明或不声明。
+
+已核实的等价性与差异：
+
+| 路由 | 旧机制 | 新机制 | 结论 |
+|---|---|---|---|
+| `PATCH /tasks/:taskId` | `{scope:"task"}` | task resolver 命中 | 等价 |
+| `POST /tasks/batch`（body.spaceId） | `{scope:"task-space"}` | task-space resolver 命中 | 等价 |
+| `POST /dependency-scan/applications/:applicationId/scan` | `{scope:"application"}` | application resolver 命中 | 等价 |
+| `GET /ec2-metric?projectId=` | `{scope:"project"}` | project resolver 命中 | 等价 |
+| `GET /task-spaces/by-project/:projectId` | **无 scope**（系统级） | project resolver 命中 → 项目级 | **行为变更**：成员从 403 → 允许 |
+
+最后一行是唯一的实际变更，方向为放宽且符合 ADR-019 语义（项目成员应能访问自己项目），但**必须知道它是白名单的副作用**，不是显式决策。若未来需要 action 级精度，应升级 token 类型为 `Record<resource, actions[]>`，而不是回到装饰器携带 key。
+
+### 3. 迁移面遗漏（已修）
+
+首版按当时的模块清单做一次性迁移，漏掉复查前才装配进宿主的 url-check 模块（8 处 legacy 键：2×`project` + 6×`url-monitor-target`）。
+
+**根因**：registry 是装配真源，迁移必须**先改 registry、再同步消费者**；只改消费者会被下一次 `newbie assemble` 还原。本次已改 registry 的 `url-check.controller.ts` 并把 `UrlMonitorTarget` 加入 `HOST_SCOPED_RESOURCES_LIST`（对应 `url-monitor-target` resolver 早已注册，此前只能通过 legacy 键到达）。
+
+### 4. 下一里程碑：清退 legacy 轨道
+
+legacy 键并非死代码——宿主 app 层仍有 43 处 `{ scope: ... }`（Project / Application / SecurityOverview / ProjectDashboardMetric / AiAnalysisReport 等）。清退计划：
+
+1. 把 app 层控制器的 scope 键全部移除，资源逐个登记进 `HOST_SCOPED_RESOURCES`
+2. 删除 Guard 的 legacy 分支与 `RequirePermissionOptions.scope`（当前已标 `@deprecated`）
+3. 删除对 `defaultProjectScopeResolver` 的直连兜底引用
+
+清退前，`@deprecated` 标注与本节即为唯一约束。模块侧从现在起**禁止**新增 `{ scope: ... }`（registry 已无任何模块使用）。

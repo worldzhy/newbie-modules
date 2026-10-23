@@ -18,11 +18,13 @@ import {
 } from "./url-check.dto";
 
 /**
- * Administration of url-check targets. Collection routes carry the owning
- * project in query/body and authorize through the default project scope
- * resolver; single-target routes authorize through the "url-monitor-target"
- * scope resolver, which looks the target up and checks against its owning
- * project.
+ * Administration of url-check targets.
+ *
+ * Scope resolution is host-owned (see newbie-modules ADR-017): this module
+ * declares no scope keys. The host lists `UrlMonitorTarget` in
+ * HOST_SCOPED_RESOURCES and registers resolvers in priority order — the
+ * target-id resolver maps single-target routes to their owning project, and
+ * the project resolver covers collection routes that carry projectId.
  */
 @ApiTags("url-check")
 @ApiBearerAuth()
@@ -31,7 +33,7 @@ export class UrlCheckController {
   constructor(private readonly urlCheck: UrlCheckService) {}
 
   @Get()
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.UrlMonitorTarget, { scope: "project" })
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.UrlMonitorTarget)
   @ApiOperation({ summary: "List URL check targets of a project" })
   @ApiOkResponse({ type: UrlMonitorTargetDto, isArray: true })
   async list(@Query() query: ListUrlMonitorTargetsRequestDto): Promise<UrlMonitorTargetDto[]> {
@@ -39,7 +41,7 @@ export class UrlCheckController {
   }
 
   @Post()
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.UrlMonitorTarget, { scope: "project" })
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.UrlMonitorTarget)
   @ApiOperation({ summary: "Add an external URL to the availability check" })
   @ApiCreatedResponse({ type: UrlMonitorTargetDto })
   async create(@Body() body: CreateUrlMonitorTargetDto, @Req() request: UserRequest): Promise<UrlMonitorTargetDto> {
@@ -47,7 +49,7 @@ export class UrlCheckController {
   }
 
   @Get(":targetId")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.UrlMonitorTarget, { scope: "url-monitor-target" })
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.UrlMonitorTarget)
   @ApiOperation({ summary: "Get one URL check target" })
   @ApiOkResponse({ type: UrlMonitorTargetDto })
   async getById(@Param("targetId") targetId: string): Promise<UrlMonitorTargetDto> {
@@ -55,7 +57,7 @@ export class UrlCheckController {
   }
 
   @Patch(":targetId")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.UrlMonitorTarget, { scope: "url-monitor-target" })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.UrlMonitorTarget)
   @ApiOperation({ summary: "Rename, re-point, pause or resume a URL check target" })
   @ApiOkResponse({ type: UrlMonitorTargetDto })
   async update(
@@ -66,7 +68,7 @@ export class UrlCheckController {
   }
 
   @Delete(":targetId")
-  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.UrlMonitorTarget, { scope: "url-monitor-target" })
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.UrlMonitorTarget)
   @ApiOperation({ summary: "Remove a URL check target" })
   @ApiOkResponse({ type: DeleteUrlMonitorTargetResponseDto })
   async delete(@Param("targetId") targetId: string): Promise<DeleteUrlMonitorTargetResponseDto> {
@@ -74,7 +76,7 @@ export class UrlCheckController {
   }
 
   @Get(":targetId/check-results")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.UrlMonitorTarget, { scope: "url-monitor-target" })
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.UrlMonitorTarget)
   @ApiOperation({ summary: "Recent raw check results of one target (newest first)" })
   @ApiOkResponse({ type: UrlMonitorCheckResultDto, isArray: true })
   async listCheckResults(
@@ -85,7 +87,7 @@ export class UrlCheckController {
   }
 
   @Get(":targetId/incidents")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.UrlMonitorTarget, { scope: "url-monitor-target" })
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.UrlMonitorTarget)
   @ApiOperation({ summary: "Outage incidents of one target, newest first" })
   @ApiOkResponse({ type: UrlMonitorIncidentDto, isArray: true })
   async listIncidents(
@@ -96,7 +98,7 @@ export class UrlCheckController {
   }
 
   @Get(":targetId/stats")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.UrlMonitorTarget, { scope: "url-monitor-target" })
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.UrlMonitorTarget)
   @ApiOperation({ summary: "Availability, MTTR and latency stats over a trailing window" })
   @ApiOkResponse({ type: UrlMonitorTargetStatsDto })
   async getStats(
