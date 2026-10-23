@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional, getSchemaPath } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, Allow } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
@@ -234,7 +234,14 @@ export class TestPushResultDto {
   @ApiProperty({
     description: "Per-recipient delivery results so the caller can surface specific failures",
     type: "array",
-    items: { $ref: getSchemaPath(PushDeliveryResultDto) },
+    items: {
+      type: "object",
+      properties: {
+        recipientKey: { type: "string", description: "Opaque recipient key, e.g. lark:group:oc_xxx" },
+        success: { type: "boolean", description: "True when the push succeeded" },
+        error: { type: "string", nullable: true, description: "Provider error message when the push failed" },
+      },
+    },
     isArray: true,
   })
   @Type(() => PushDeliveryResultDto)
