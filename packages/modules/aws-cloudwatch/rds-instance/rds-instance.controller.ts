@@ -17,7 +17,7 @@ export class RdsInstanceController {
   constructor(private readonly rdsInstanceService: RdsInstanceService) {}
 
   @Get()
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.RdsInstance, { scope: "project" })
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.RdsInstance)
   @ApiOperation({ summary: "List RDS instances with optional filters" })
   @ApiResponse({ type: RdsInstanceResponseDto, isArray: true })
   async listRDSInstances(@Query() query: ListRDSInstancesRequestDto) {
@@ -26,7 +26,7 @@ export class RdsInstanceController {
   }
 
   @Get("fetch")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.RdsInstance, { scope: "project" })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.RdsInstance)
   @ApiOperation({ summary: "Fetch RDS instances from AWS and sync to DB" })
   @ApiResponse({ type: Boolean })
   async fetchRDSInstances(@Query() query: FetchRDSInstancesDto) {
@@ -34,7 +34,7 @@ export class RdsInstanceController {
   }
 
   @Patch("syncWatch")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.RdsInstance, { scope: "project" })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.RdsInstance)
   @ApiOperation({ summary: "Sync watch/unwatch status for multiple RDS instances" })
   @ApiResponse({ type: Boolean })
   async syncRDSInstancesWatch(@Body() body: SyncRDSInstancesWatchDto) {

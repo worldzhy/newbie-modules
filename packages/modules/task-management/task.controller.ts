@@ -19,7 +19,7 @@ export class TaskController {
   ) {}
 
   @Post("batch")
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task, { scope: "task-space" })
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Batch create tasks in an existing task space" })
   @ApiResponse({ status: 200, type: BatchCreateTasksResponseDto })
   async createTasksBatch(@Body() dto: CreateTasksBatchRequestDto): Promise<BatchCreateTasksResponseDto> {
@@ -28,7 +28,7 @@ export class TaskController {
   }
 
   @Patch(":taskId")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Task, { scope: "task" })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Update a task (validated status transitions)" })
   @ApiResponse({ status: 200, type: TaskDto })
   async updateTask(
@@ -44,7 +44,7 @@ export class TaskController {
   }
 
   @Delete(":taskId")
-  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Task, { scope: "task" })
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Soft delete a task" })
   @ApiResponse({ status: 200, type: TaskDto })
   async deleteTask(@Param("taskId") taskId: string, @Req() req: UserRequest): Promise<TaskDto> {

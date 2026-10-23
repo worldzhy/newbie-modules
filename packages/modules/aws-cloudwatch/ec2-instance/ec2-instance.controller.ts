@@ -17,7 +17,7 @@ export class Ec2InstanceController {
   constructor(private readonly ec2InstanceService: Ec2InstanceService) {}
 
   @Get()
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.Ec2Instance, { scope: "project" })
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Ec2Instance)
   @ApiOperation({ summary: "List EC2 instances with optional filters" })
   @ApiResponse({ type: Ec2InstanceResponseDto, isArray: true })
   async listEC2Instances(@Query() query: ListEC2InstancesRequestDto) {
@@ -26,7 +26,7 @@ export class Ec2InstanceController {
   }
 
   @Get("fetch")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Ec2Instance, { scope: "project" })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Ec2Instance)
   @ApiOperation({ summary: "Fetch EC2 instances from AWS and sync to DB" })
   @ApiResponse({ type: Boolean })
   async fetchEC2Instances(@Query() query: FetchEC2InstancesDto) {
@@ -34,7 +34,7 @@ export class Ec2InstanceController {
   }
 
   @Patch("syncWatch")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Ec2Instance, { scope: "project" })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Ec2Instance)
   @ApiOperation({ summary: "Sync watch/unwatch status for multiple EC2 instances" })
   @ApiResponse({ type: Boolean })
   async syncEC2InstancesWatch(@Body() body: SyncEC2InstancesWatchDto) {

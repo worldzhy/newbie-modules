@@ -18,6 +18,20 @@ export { Scope };
  */
 export const SCOPE_RESOLVERS = Symbol("SCOPE_RESOLVERS");
 
+/**
+ * SPI port that hosts bind to declare which resources need scope resolution.
+ *
+ * When the AuthorizationGuard sees a resource in this list and the route
+ * metadata carries no legacy `scope` key, it iterates all registered
+ * ScopeResolvers in SCOPE_RESOLVERS priority order — the first one that
+ * returns a non-{type:"none"} Scope wins.
+ *
+ * Type is flat string[] (resource names). The host controls resolver
+ * priority via the key insertion order in SCOPE_RESOLVERS (specific
+ * resolvers first, defaultProjectScopeResolver last).
+ */
+export const HOST_SCOPED_RESOURCES = Symbol("HOST_SCOPED_RESOURCES");
+
 export interface ScopeResolver {
   resolve(context: ExecutionContext): Promise<Scope>;
 }

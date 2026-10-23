@@ -12,7 +12,7 @@ export class AwsAuditController {
   constructor(private readonly awsAuditService: AwsAuditService) {}
 
   @Get(":projectId/report")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsAuditScan, { scope: "project" })
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsAuditScan)
   @ApiOperation({ summary: "Get the latest AWS security audit report and scan history for a project" })
   @ApiResponse({ status: 200, type: AwsAuditReportResponseDto })
   async getProjectReport(
@@ -25,7 +25,7 @@ export class AwsAuditController {
   }
 
   @Post(":projectId/scan")
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.AwsAuditScan, { scope: "project" })
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.AwsAuditScan)
   @ApiOperation({ summary: "Start a new AWS security audit scan for a project" })
   @ApiResponse({ status: 200, type: AwsAuditScanStartResponseDto })
   async startProjectScan(@Param("projectId") projectId: string): Promise<AwsAuditScanStartResponseDto> {

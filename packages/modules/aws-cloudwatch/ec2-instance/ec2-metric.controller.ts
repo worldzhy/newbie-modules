@@ -12,7 +12,7 @@ export class Ec2MetricController {
   constructor(private readonly ec2MetricService: Ec2MetricService) {}
 
   @Get()
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.Ec2Instance, { scope: "project" })
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Ec2Instance)
   @ApiOperation({ summary: "Get CloudWatch metrics for watched EC2 instances" })
   @ApiResponse({ type: Object, isArray: true })
   async getWatchedEC2InstancesMetric(@Query() query: GetWatchedEC2InstancesMetricRequestDto) {
