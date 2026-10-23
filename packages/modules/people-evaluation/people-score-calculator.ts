@@ -1,3 +1,5 @@
+import type { EvidenceSourceType } from "./people-evidence-source-type";
+
 /**
  * v0.x machine scoring for PeopleEvaluationEvidence → PeopleEvaluationScore.
  *
@@ -5,12 +7,7 @@
  * Every score is a deterministic function of the evidence rows and the
  * rubric's dimension anchors. All inputs are frozen snapshots at scoring
  * time so the decision trail is replayable.
- *
- * EvidenceSourceType values must match the alias exported from
- * people-evidence-collector.ts — see that file for the list.
  */
-
-export type EvidenceSourceType = "GIT" | "INCIDENT" | "TEST_TREND" | "WORK_DELIVERABLE";
 
 export interface ScoringInputEvidence {
   id: string;
@@ -71,56 +68,56 @@ export function computeDimensionScores(
   // 1. Bucket evidences by dimensionKey (null = uncategorized)
   const categorized = new Map<string, ScoringInputEvidence[]>();
   const uncategorized: ScoringInputEvidence[] = [];
-  for (const ev of evidences) {
-    if (ev.dimensionKey) {
-      const arr = categorized.get(ev.dimensionKey) ?? [];
-      arr.push(ev);
-      categorized.set(ev.dimensionKey, arr);
+  for (const evidence of evidences) {
+    if (evidence.dimensionKey) {
+      const bucket = categorized.get(evidence.dimensionKey) ?? [];
+      bucket.push(evidence);
+      categorized.set(evidence.dimensionKey, bucket);
     } else {
-      uncategorized.push(ev);
+      uncategorized.push(evidence);
     }
   }
 
   // 2. Evenly distribute uncategorized evidence across rubric dimensions.
   //    Each dimension gets at least floor share; remainder assigned in round-robin.
-  const dimKeys = dimensions.map((d) => d.dimensionKey);
-  const baseShare = Math.floor(uncategorized.length / dimKeys.length);
-  const remainder = uncategorized.length % dimKeys.length;
+  const dimensionKeys = dimensions.map((dimension) => dimension.dimensionKey);
+  const baseShare = Math.floor(uncategorized.length / dimensionKeys.length);
+  const remainder = uncategorized.length % dimensionKeys.length;
 
-  const dimEvidence = new Map<string, ScoringInputEvidence[]>();
-  for (const key of dimKeys) {
+  const evidenceByDimension = new Map<string, ScoringInputEvidence[]>();
+  for (const key of dimensionKeys) {
     const bucket: ScoringInputEvidence[] = [...(categorized.get(key) ?? [])];
-    dimEvidence.set(key, bucket);
+    evidenceByDimension.set(key, bucket);
   }
-  for (let i = 0; i < dimKeys.length; i++) {
+  for (let i = 0; i < dimensionKeys.length; i++) {
     const share = baseShare + (i < remainder ? 1 : 0);
     const slice = uncategorized.splice(0, share);
-    const bucket = dimEvidence.get(dimKeys[i])!;
+    const bucket = evidenceByDimension.get(dimensionKeys[i])!;
     bucket.push(...slice);
   }
 
   // 3. Compute per-dimension weighted count + score
   const results: DimensionScoreResult[] = [];
-  for (const dim of dimensions) {
-    const bucket = dimEvidence.get(dim.dimensionKey) ?? [];
+  for (const dimension of dimensions) {
+    const bucket = evidenceByDimension.get(dimension.dimensionKey) ?? [];
     if (bucket.length === 0) continue; // no evidence at all → skip (dimension not applicable yet)
 
     let weightedCount = 0;
     const evidenceRefs: string[] = [];
-    for (const ev of bucket) {
-      weightedCount += QUALITY_BY_SOURCE_TYPE[ev.sourceType] ?? 1.0;
-      evidenceRefs.push(ev.id);
+    for (const evidence of bucket) {
+      weightedCount += QUALITY_BY_SOURCE_TYPE[evidence.sourceType] ?? 1.0;
+      evidenceRefs.push(evidence.id);
     }
 
     const normalized = clamp(Math.log1p(weightedCount) / maxLog, 0, 1);
     let score = 50 + normalized * 50;
 
-    if (clampToAnchors && dim.anchorLow != null && dim.anchorHigh != null) {
-      score = clamp(score, dim.anchorLow, dim.anchorHigh);
+    if (clampToAnchors && dimension.anchorLow != null && dimension.anchorHigh != null) {
+      score = clamp(score, dimension.anchorLow, dimension.anchorHigh);
     }
 
     results.push({
-      dimensionKey: dim.dimensionKey,
+      dimensionKey: dimension.dimensionKey,
       score: Math.round(score * 100) / 100,
       evidenceRefs,
     });

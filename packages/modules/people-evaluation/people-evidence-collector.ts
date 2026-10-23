@@ -1,12 +1,5 @@
 import { spawn } from "node:child_process";
-
-/**
- * Source type tag for evidence rows. Aligns with the Prisma
- * EvidenceSourceType enum declared in prisma/schema.prisma — same values,
- * separate declaration because the registry package does not build the
- * Prisma client (that happens only in the consumer app).
- */
-export type EvidenceSourceType = "GIT" | "INCIDENT" | "TEST_TREND" | "WORK_DELIVERABLE";
+import type { EvidenceSourceType } from "./people-evidence-source-type";
 
 /**
  * Generic evidence collector contract (ADR-021).
@@ -24,7 +17,7 @@ export type EvidenceSourceType = "GIT" | "INCIDENT" | "TEST_TREND" | "WORK_DELIV
  * changes converges.
  */
 export interface EvidenceCollector {
-  /** Human-readable source tag. Must match EvidenceSourceType enum. */
+  /** Source type tag. Must match EvidenceSourceType enum. */
   readonly sourceType: EvidenceSourceType;
 
   /** Collect evidence for the given window and return batch-ready rows. */
@@ -63,11 +56,10 @@ export interface EvidenceRow {
  * the same window produces identical rows.
  */
 export class GitEvidenceCollector implements EvidenceCollector {
-  readonly sourceType = "GIT" as const;
+  readonly sourceType: EvidenceSourceType = "GIT";
 
-  /** Map of local repo path → logical repo name (used in sourceRef). */
   constructor(
-    private readonly repoConfigs: { path: string; label: string }[],
+    private readonly repoConfigs: { path: string; repoName: string }[],
     /** Lowercased email → evaluateeUserId. Host supplies the mapping. */
     private readonly emailToUserId: Record<string, string>,
   ) {}
@@ -75,16 +67,14 @@ export class GitEvidenceCollector implements EvidenceCollector {
   async collect(window: EvidenceWindow): Promise<EvidenceRow[]> {
     const rows: EvidenceRow[] = [];
     for (const repo of this.repoConfigs) {
-      const commits = await this.runGitLog(repo.path, repo.label, window);
+      const commits = await this.runGitLog(repo.path, repo.repoName, window);
       rows.push(...commits);
     }
     return rows;
   }
 
-  private runGitLog(repoPath: string, label: string, window: EvidenceWindow): Promise<EvidenceRow[]> {
+  private runGitLog(repoPath: string, repoName: string, window: EvidenceWindow): Promise<EvidenceRow[]> {
     return new Promise((resolve) => {
-      // %H = hash, %ae = author email, %s = subject, %ad = author date (ISO)
-      // --after / --before are INCLUSIVE; we want [start, end) so --before = end ISO
       const startIso = window.windowStart.toISOString();
       const endIso = window.windowEnd.toISOString();
       const proc = spawn(
@@ -114,9 +104,9 @@ export class GitEvidenceCollector implements EvidenceCollector {
           if (!userId) continue; // skip commits from unknown authors
           rows.push({
             evaluateeUserId: userId,
-            sourceRef: `git:${label}:${hash.slice(0, 8)}`,
+            sourceRef: `git:${repoName}:${hash.slice(0, 8)}`,
             dimensionKey: this.guessDimension(subject),
-            payload: { hash, subject, repoLabel: label, authorEmail: email },
+            payload: { hash, subject, repoName, authorEmail: email },
             eventAt: new Date(dateStr),
           });
         }
