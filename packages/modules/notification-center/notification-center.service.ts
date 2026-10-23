@@ -250,9 +250,27 @@ export class NotificationCenterService {
     if (!this.pushPort) {
       throw new BadRequestException("No push adapter is configured by the host application.");
     }
-    const results = await this.pushPort.pushSystemText(
-      "Notification center test message: the push channel is working.",
-    );
+    let results: PushDeliveryResult[];
+    try {
+      results = await this.pushPort.pushSystemText("Notification center test message: the push channel is working.");
+    } catch (error) {
+      // Adapter-level failure (DB down enumerating bindings, Lark client crash, etc.).
+      // Surface it as a single synthetic failure so the diagnostic toast shows
+      // something actionable instead of a generic 500. Do NOT persist this row —
+      // testPush is a diagnostic tool and its results must not mix with real delivery records.
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        succeeded: 0,
+        failed: 1,
+        results: [
+          {
+            recipientKey: "__adapter__",
+            success: false,
+            error: `Push adapter failed: ${message}`,
+          },
+        ],
+      };
+    }
     return {
       succeeded: results.filter((result) => result.success).length,
       failed: results.filter((result) => !result.success).length,
