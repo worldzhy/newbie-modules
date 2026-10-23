@@ -1,10 +1,10 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { IsString, IsEmail, IsEnum, IsNumber } from "class-validator";
-import { CommonListResponseDto } from "@devbie/newbie/common.dto";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { GoogleAccountRole } from "@modules/googleapis/google-drive/google-drive.enum";
 import { GoogleDrivePermissionEntity } from "@modules/googleapis/google-drive/google-drive.entity";
 
-export class ListGoogleDrivePermissionsRequestDto {
+export class ListGoogleDrivePermissionsRequestDto extends CommonListRequestDto {
   @ApiProperty({ type: String, description: "The file ID to list permissions for." })
   @IsString()
   fileId!: string;

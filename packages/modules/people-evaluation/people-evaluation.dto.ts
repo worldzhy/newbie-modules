@@ -12,7 +12,7 @@ import {
   ValidateIf,
 } from "class-validator";
 import { EvidenceSourceType, PeriodType } from "@generated/prisma/client";
-import { CommonListResponseDto } from "@devbie/newbie/common.dto";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
 // --- Rubric versions ---------------------------------------------------
 
@@ -92,7 +92,7 @@ export class CreatePeopleEvaluationPeriodRequestDto {
   status?: string;
 }
 
-export class ListPeopleEvaluationPeriodsRequestDto {
+export class ListPeopleEvaluationPeriodsRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({ enum: PeriodType, description: "Filter by period type" })
   @IsOptional()
   @IsEnum(PeriodType)
