@@ -18,14 +18,14 @@ import { getMigrationStatus, runMigrations, type ClickhouseMigrationConfig } fro
  * always win.
  */
 
-// Default modules root: this file lives at
+// Default module root: this file lives at
 // <moduleRoot>/clickhouse/migration/migrate-cli.(ts|js) in both the source
 // tree (src/modules) and the compiled tree (dist/src/modules).
-const DEFAULT_MODULES_ROOT = path.resolve(__dirname, "..", "..");
+const DEFAULT_MODULE_ROOT = path.resolve(__dirname, "..", "..");
 
-export interface CliOptions {
+export interface MigrateCliOptions {
   cwd: string;
-  modulesRoots?: string | string[];
+  moduleRoots?: string[];
 }
 
 /** Minimal .env parser (KEY=VALUE lines, `export ` prefix, quotes, comments). */
@@ -65,20 +65,20 @@ export function resolveConfig(cwd: string): ClickhouseMigrationConfig {
   };
 }
 
-export async function runMigrateCli(argv: string[], options: CliOptions): Promise<number> {
+export async function runMigrateCli(argv: string[], options: MigrateCliOptions): Promise<number> {
   const command = argv[0];
   // Repeatable flag: hosts with application-layer migration directories pass
   // one --modules-root per tree; all roots share one history table.
-  const moduleRoots = argv
+  const rootArguments = argv
     .filter((arg) => arg.startsWith("--modules-root="))
     .map((arg) => arg.slice("--modules-root=".length));
-  const modulesRoots = moduleRoots.length > 0 ? moduleRoots : (options.modulesRoots ?? DEFAULT_MODULES_ROOT);
+  const moduleRoots = rootArguments.length > 0 ? rootArguments : (options.moduleRoots ?? [DEFAULT_MODULE_ROOT]);
   const cwd = options.cwd;
   const config = resolveConfig(cwd);
   const log = (message: string): void => console.log(`[clickhouse-migrate] ${message}`);
 
   if (command === "deploy") {
-    const result = await runMigrations(config, modulesRoots, log);
+    const result = await runMigrations(config, moduleRoots, log);
     for (const migration of result.executed) {
       console.log(`  applied ${migration.version} ${migration.name}`);
     }
@@ -86,7 +86,7 @@ export async function runMigrateCli(argv: string[], options: CliOptions): Promis
   }
 
   if (command === "status") {
-    const status = await getMigrationStatus(config, modulesRoots);
+    const status = await getMigrationStatus(config, moduleRoots);
     console.log(`Database:  ${status.database}`);
     console.log(`Applied:   ${status.applied.length}`);
     for (const row of status.applied) {

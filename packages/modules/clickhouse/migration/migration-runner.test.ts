@@ -138,7 +138,7 @@ describe("discoverMigrations", () => {
         "SELECT 1",
       );
 
-      const found = await discoverMigrations(root);
+      const found = await discoverMigrations([root]);
       assert.deepEqual(
         found.map((migration) => [migration.version, migration.name]),
         [
@@ -161,7 +161,7 @@ describe("discoverMigrations", () => {
       const dir = path.join(root, "module-x", "clickhouse-migrations");
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(path.join(dir, "bad-name.sql"), "SELECT 1");
-      await assert.rejects(discoverMigrations(root), /Invalid migration filename/);
+      await assert.rejects(discoverMigrations([root]), /Invalid migration filename/);
     } finally {
       await fs.rm(root, { recursive: true, force: true });
     }

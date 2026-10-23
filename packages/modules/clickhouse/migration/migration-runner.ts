@@ -7,8 +7,8 @@ import path from "node:path";
  * Forward-only ClickHouse migration engine (minimal Flyway semantics).
  *
  * - Migration files live in every assembled module under
- *   `clickhouse-migrations/V<version>__<description>.sql`; the modules roots
- *   are self-located by callers (src/modules under tsx, dist/src/modules when
+ *   `clickhouse-migrations/V<version>__<description>.sql`; the roots are
+ *   self-located by callers (src/modules under tsx, dist/src/modules when
  *   compiled), so the engine is host-agnostic. Hosts with application-layer
  *   tables (e.g. url-monitor, nightwatch ADR-022) pass additional roots; all
  *   roots share one history table and one global version sequence.
@@ -178,8 +178,7 @@ function isLineCommentStart(sql: string, index: number): boolean {
  * in order and merged. Versions must be globally unique across all roots;
  * results are ordered by version.
  */
-export async function discoverMigrations(modulesRoots: string | string[]): Promise<DiscoveredMigration[]> {
-  const roots = Array.isArray(modulesRoots) ? modulesRoots : [modulesRoots];
+export async function discoverMigrations(roots: string[]): Promise<DiscoveredMigration[]> {
   const discovered: DiscoveredMigration[] = [];
 
   for (const root of roots) {
@@ -380,14 +379,14 @@ export async function runPlan(
  */
 export async function runMigrations(
   config: ClickhouseMigrationConfig,
-  modulesRoots: string | string[],
+  roots: string[],
   log: MigrationLogger = () => undefined,
 ): Promise<MigrationResult> {
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
   }
   return withClient(config, async (client) => {
-    const discovered = await discoverMigrations(modulesRoots);
+    const discovered = await discoverMigrations(roots);
     const applied = await readAppliedMigrations(client);
     const plan = planMigrations(discovered, applied);
     const executed = await runPlan(client, plan, log);
@@ -404,13 +403,13 @@ export async function runMigrations(
 /** Read-only view used by the `status` command. */
 export async function getMigrationStatus(
   config: ClickhouseMigrationConfig,
-  modulesRoots: string | string[],
+  roots: string[],
 ): Promise<MigrationPlan & { database: string }> {
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
   }
   return withClient(config, async (client) => {
-    const discovered = await discoverMigrations(modulesRoots);
+    const discovered = await discoverMigrations(roots);
     const applied = await readAppliedMigrations(client);
     return { ...planMigrations(discovered, applied), database: config.database };
   });
