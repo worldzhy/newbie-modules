@@ -1,0 +1,13 @@
+{
+  "key": "url-check",
+  "layer": "capability",
+  "role": "collector",
+  "module": {
+    "file": "url-check.module",
+    "className": "UrlCheckModule"
+  },
+  "moduleDependencies": ["clickhouse", "security"],
+  "config-service": {},
+  "env": {},
+  "dependencies": {}
+}
