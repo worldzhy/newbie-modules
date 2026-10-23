@@ -2,9 +2,9 @@
 // This file is managed by @devbie/newbie-cli — assembled into the
 // consumer prisma tree on `newbie install`.
 
-// !! ------------------------------------------------------------ //
-// !!            [Module] People Evaluation models             //
-// !! ------------------------------------------------------------ //
+// !! ----------------------------------------------------------- //
+// !!            [Module] People Evaluation models                //
+// !! ----------------------------------------------------------- //
 // * PeopleRubricVersion                                          //
 // * PeopleEvaluationDimension                                    //
 // * PeopleEvaluationPeriod                                       //
@@ -20,7 +20,7 @@
 // * PeriodType (enum)                                            //
 // * FloorTriggerStatus (enum)                                    //
 // * ImprovementItemStatus (enum)                                 //
-// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 enum EvidenceSourceType {
   GIT

@@ -40,8 +40,8 @@ export interface EvidenceRow {
   dimensionKey?: string;
   /** Free-form JSON payload specific to the source type. */
   payload: Record<string, unknown>;
-  /** Timestamp of the source event. */
-  collectedAt: Date;
+  /** Timestamp of the source event (e.g. git commit date), NOT the collection-run time. */
+  eventAt: Date;
 }
 
 /**
@@ -109,7 +109,7 @@ export class GitEvidenceCollector implements EvidenceCollector {
             sourceRef: `git:${label}:${hash.slice(0, 8)}`,
             dimensionKey: this.guessDimension(subject),
             payload: { hash, subject, repoLabel: label, authorEmail: email },
-            collectedAt: new Date(dateStr),
+            eventAt: new Date(dateStr),
           });
         }
         resolve(rows);

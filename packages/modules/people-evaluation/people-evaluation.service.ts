@@ -1,19 +1,20 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PeopleEvaluationPeriod, EvidenceSourceType, PeopleRubricVersion } from "@generated/prisma/client";
+import { PeopleEvaluationPeriod, PeopleRubricVersion, PeriodType } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { CreateEvaluationPeriodDto, CreateRubricVersionDto, RecordEvidenceDto } from "./people-evaluation.dto";
 
 /**
- * PeopleEvaluationService — core CRUD for people-evaluation module.
+ * PeopleEvaluationService — persistence layer for rubric versions,
+ * evaluation periods, collected evidence and computed scores.
  *
- * This service owns the minimal persistence layer for rubric versions,
- * evaluation periods, collected evidence and computed scores. It does NOT
- * run the evaluation pipeline — evidence collection, machine scoring and
- * AI qualitative judgment are separate pipeline services that orchestrate
- * through this repository surface.
+ * This service does NOT run the evaluation pipeline — evidence
+ * collection, machine scoring and AI qualitative judgment are
+ * orchestrated through this repository surface by host-side runners.
  *
- * Lifecycle anchor (ADR-021): rubric versions are published ex ante before
- * any period of that version starts. periods pin to exactly one rubric
- * version so all evaluatees inside a period score against identical rules.
+ * Lifecycle anchor (ADR-021): rubric versions are published ex ante
+ * before any period of that version starts; periods pin to exactly one
+ * rubric version so all evaluatees inside a period score against
+ * identical rules.
  */
 @Injectable()
 export class PeopleEvaluationService {
@@ -21,15 +22,11 @@ export class PeopleEvaluationService {
 
   // --- Rubric versions ---------------------------------------------------
 
-  /**
-   * Find the currently active rubric, or null if none exists.
-   * v0.x pre-release: there may be no active rubric — seed one on host bootstrap.
-   */
   async findActiveRubric(): Promise<PeopleRubricVersion | null> {
     return this.prisma.peopleRubricVersion.findFirst({ where: { isActive: true } });
   }
 
-  async createRubricVersion(input: CreateRubricVersionInput): Promise<PeopleRubricVersion> {
+  async createRubricVersion(input: CreateRubricVersionDto): Promise<PeopleRubricVersion> {
     return this.prisma.peopleRubricVersion.create({
       data: {
         version: input.version,
@@ -59,9 +56,7 @@ export class PeopleEvaluationService {
     return period;
   }
 
-  async createPeriod(input: CreateEvaluationPeriodInput): Promise<PeopleEvaluationPeriod> {
-    // Pin to an existing rubric version — the rubric must exist and the caller
-    // is responsible for ensuring it's published ex ante before periodStart.
+  async createPeriod(input: CreateEvaluationPeriodDto): Promise<PeopleEvaluationPeriod> {
     const rubric = await this.prisma.peopleRubricVersion.findUnique({
       where: { id: input.rubricVersionId },
     });
@@ -87,7 +82,7 @@ export class PeopleEvaluationService {
    * (git / incident / test-trend) or submitted by evaluatees themselves
    * as a work-deliverable payload.
    */
-  async recordEvidence(input: RecordEvidenceInput): Promise<void> {
+  async recordEvidence(input: RecordEvidenceDto): Promise<void> {
     await this.prisma.peopleEvaluationEvidence.create({
       data: {
         evaluateeUserId: input.evaluateeUserId,
@@ -100,39 +95,4 @@ export class PeopleEvaluationService {
       },
     });
   }
-}
-
-// --- Input types ---------------------------------------------------------
-// Declared here instead of a separate DTO file so we don't force
-// DTO-first scaffolding before controller lands. Moved to .dto.ts
-// when controller is wired.
-
-export interface CreateRubricVersionInput {
-  version: string;
-  dimensionConfig: object;
-  fullLoadBaselines: object;
-  floorRules: object;
-  companyDirectionStatement: string;
-  publishedAt?: Date;
-  isActive?: boolean;
-}
-
-export type PeriodType = PeopleEvaluationPeriod["type"];
-
-export interface CreateEvaluationPeriodInput {
-  rubricVersionId: string;
-  type: PeriodType;
-  periodStart: Date;
-  periodEnd: Date;
-  status?: string;
-}
-
-export interface RecordEvidenceInput {
-  evaluateeUserId: string;
-  collectionPeriodId: string;
-  sourceType: EvidenceSourceType;
-  sourceRef?: string;
-  dimensionKey?: string;
-  payload: object;
-  collectedAt?: Date;
 }
