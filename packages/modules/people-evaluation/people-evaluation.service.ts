@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { PeopleEvaluationPeriod, PeopleRubricVersion, PeriodType } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { CreateEvaluationPeriodDto, CreateRubricVersionDto, RecordEvidenceDto } from "./people-evaluation.dto";
@@ -67,6 +67,9 @@ export class PeopleEvaluationService {
     if (!rubric) {
       throw new NotFoundException(`PeopleRubricVersion ${input.rubricVersionId} not found`);
     }
+    if (!rubric.isActive) {
+      throw new ConflictException(`PeopleRubricVersion ${input.rubricVersionId} is not active`);
+    }
 
     return this.prisma.peopleEvaluationPeriod.create({
       data: {
@@ -85,17 +88,39 @@ export class PeopleEvaluationService {
    * Append an evidence row. Called by collection pipeline workers
    * (git / incident / test-trend) or submitted by evaluatees themselves
    * as a work-deliverable payload.
+   *
+   * Idempotent on (collectionPeriodId, sourceRef): a duplicate sourceRef
+   * converges onto the existing row instead of violating the unique
+   * index. Rows are immutable once written — only dimensionKey follows
+   * the latest write (attribution is the writer's responsibility), the
+   * same contract as the collect-evidence runner upsert.
    */
   async recordEvidence(input: RecordEvidenceDto): Promise<void> {
-    await this.prisma.peopleEvaluationEvidence.create({
-      data: {
-        evaluateeUserId: input.evaluateeUserId,
-        collectionPeriodId: input.collectionPeriodId,
-        sourceType: input.sourceType,
-        sourceRef: input.sourceRef,
+    const data = {
+      evaluateeUserId: input.evaluateeUserId,
+      collectionPeriodId: input.collectionPeriodId,
+      sourceType: input.sourceType,
+      sourceRef: input.sourceRef,
+      dimensionKey: input.dimensionKey,
+      payload: input.payload,
+      collectedAt: input.collectedAt ?? new Date(),
+    };
+
+    if (!input.sourceRef) {
+      await this.prisma.peopleEvaluationEvidence.create({ data });
+      return;
+    }
+
+    await this.prisma.peopleEvaluationEvidence.upsert({
+      where: {
+        collectionPeriodId_sourceRef: {
+          collectionPeriodId: input.collectionPeriodId,
+          sourceRef: input.sourceRef,
+        },
+      },
+      create: data,
+      update: {
         dimensionKey: input.dimensionKey,
-        payload: input.payload,
-        collectedAt: input.collectedAt ?? new Date(),
       },
     });
   }
