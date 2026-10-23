@@ -25,7 +25,7 @@ model ModuleHubInstallation {
 
   // Optional source-repository URL, supplied by the host at enrollment.
   repoUrl String? @db.VarChar(255)
-  // Opaque host-owned tag (e.g. "projectId/applicationId"); hub never parses it.
+  // Opaque platform-owned tag (e.g. "projectId/applicationId"); hub never parses it.
   externalRef String? @db.VarChar(255)
 
   // Runtime facts self-registered at process start and refreshed on reports.

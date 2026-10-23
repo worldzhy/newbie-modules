@@ -7,7 +7,7 @@
 // Health installation identity. PostgreSQL schema: "module/health".
 // One Installation = one running deployment endpoint holding a health token
 // (a newbie backend, fewbie SSR process, or any other node service). The
-// module is project-agnostic: host-side grouping lives in opaque
+// module is project-agnostic: platform-side grouping lives in opaque
 // `externalRef` and is never parsed here.
 //
 // Unlike heartbeat (pure liveness), health stores the latest dependency
@@ -27,7 +27,7 @@ model HealthInstallation {
   // at creation/rotation and never stored.
   tokenHash String @unique @db.VarChar(64)
 
-  // Opaque host-owned tag (e.g. "projectId/applicationId"); never parsed here.
+  // Opaque platform-owned tag (e.g. "projectId/applicationId"); never parsed here.
   externalRef String? @db.VarChar(255)
 
   // Runtime facts self-reported by the client on snapshot. All informational.

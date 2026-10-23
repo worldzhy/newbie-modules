@@ -1,0 +1,13 @@
+{
+  "key": "people-evaluation",
+  "layer": "capability",
+  "module": {
+    "file": "people-evaluation.module",
+    "className": "PeopleEvaluationModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["account"],
+  "config-service": {},
+  "env": {},
+  "dependencies": {}
+}

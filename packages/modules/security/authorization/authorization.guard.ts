@@ -15,7 +15,12 @@ import {
   PermissionRequirement,
   Scope,
 } from "../ports/permission.authorizer";
-import { SCOPE_RESOLVERS, ScopeResolver, defaultProjectScopeResolver } from "../ports/scope.resolver";
+import {
+  SCOPE_RESOLVERS,
+  HOST_SCOPED_RESOURCES,
+  ScopeResolver,
+  defaultProjectScopeResolver,
+} from "../ports/scope.resolver";
 
 interface PermissionMetadata extends PermissionRequirement {
   scope?: string;
@@ -32,6 +37,9 @@ export class AuthorizationGuard implements CanActivate {
     @Optional()
     @Inject(SCOPE_RESOLVERS)
     private readonly scopeResolvers?: Record<string, ScopeResolver>,
+    @Optional()
+    @Inject(HOST_SCOPED_RESOURCES)
+    private readonly hostScopedResources?: string[],
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -60,9 +68,12 @@ export class AuthorizationGuard implements CanActivate {
       );
     }
 
-    // [step 4] Resolve scope if declared.
+    // [step 4] Resolve scope — dual-track during migration.
     let scope: Scope | undefined;
+    const { resource, action } = metadata;
+
     if (metadata.scope) {
+      // Legacy track: decorator carries resolver key directly.
       const resolver =
         this.scopeResolvers?.[metadata.scope] ??
         (metadata.scope === "project" ? defaultProjectScopeResolver : undefined);
@@ -70,9 +81,22 @@ export class AuthorizationGuard implements CanActivate {
         throw new InternalServerErrorException(`Scope resolver "${metadata.scope}" is not registered.`);
       }
       scope = await resolver.resolve(context);
+    } else if (this.hostScopedResources?.includes(resource)) {
+      // New track: host declares the resource is scope-sensitive via HOST_SCOPED_RESOURCES.
+      // Iterate resolvers in host-controlled priority order — first non-none wins.
+      const resolverEntries = Object.entries(this.scopeResolvers ?? {});
+      // SCOPE_RESOLVERS is a plain object; insertion order determines priority.
+      // The host is responsible for putting specific resolvers (task, task-space, application,
+      // url-check-target) before the final defaultProjectScopeResolver fallback.
+      for (const [, resolver] of resolverEntries) {
+        const resolved = await resolver.resolve(context);
+        if (resolved.type !== "none") {
+          scope = resolved;
+          break;
+        }
+      }
     }
 
-    const { resource, action } = metadata;
     return this.permissionAuthorizer.authorize(payload.userId, { resource, action }, scope);
   }
 }

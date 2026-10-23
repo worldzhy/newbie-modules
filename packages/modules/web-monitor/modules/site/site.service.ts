@@ -1,13 +1,13 @@
 import { Injectable } from "@nestjs/common";
 import { DeleteResult } from "mongodb";
-import { MonitorModelsService } from "../../models/mongo/monitor-models.service";
+import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
 import { func } from "../../shared/utils";
 
 @Injectable()
 export class SiteService {
   constructor(
-    private readonly models: MonitorModelsService,
+    private readonly models: WebMonitorModelsService,
     private readonly nodeCache: NodeCacheService,
   ) {}
 

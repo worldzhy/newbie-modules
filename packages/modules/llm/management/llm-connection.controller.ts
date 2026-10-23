@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { ChatModelResolver } from "../chat-model.resolver";
 import { ModelCallError } from "../chat-model.port";
@@ -30,7 +31,7 @@ export class LlmConnectionController {
   ) {}
 
   @Get()
-  @RequirePermission("List", "LlmConnection")
+  @RequirePermission(PermissionAction.List, "LlmConnection")
   @ApiOperation({ summary: "List all LLM connections with their bound scopes (keys masked)" })
   @ApiResponse({ status: 200, type: [LlmConnectionResponseDto] })
   async list(): Promise<LlmConnectionResponseDto[]> {
@@ -38,7 +39,7 @@ export class LlmConnectionController {
   }
 
   @Post()
-  @RequirePermission("Create", "LlmConnection")
+  @RequirePermission(PermissionAction.Create, "LlmConnection")
   @ApiOperation({ summary: "Create an LLM connection (not yet bound to any scope)" })
   @ApiBody({ type: CreateLlmConnectionDto })
   @ApiResponse({ status: 201, type: LlmConnectionResponseDto })
@@ -47,7 +48,7 @@ export class LlmConnectionController {
   }
 
   @Patch(":id")
-  @RequirePermission("Update", "LlmConnection")
+  @RequirePermission(PermissionAction.Update, "LlmConnection")
   @ApiOperation({ summary: "Update an LLM connection; echoing the masked key keeps it unchanged" })
   @ApiBody({ type: UpdateLlmConnectionDto })
   @ApiResponse({ status: 200, type: LlmConnectionResponseDto })
@@ -56,7 +57,7 @@ export class LlmConnectionController {
   }
 
   @Delete(":id")
-  @RequirePermission("Delete", "LlmConnection")
+  @RequirePermission(PermissionAction.Delete, "LlmConnection")
   @ApiOperation({ summary: "Delete an LLM connection; all scope bindings are removed (cascade)" })
   @ApiResponse({ status: 200, type: LlmConnectionResponseDto })
   async remove(@Param("id") id: string): Promise<LlmConnectionResponseDto> {
@@ -64,7 +65,7 @@ export class LlmConnectionController {
   }
 
   @Post(":id/test")
-  @RequirePermission("Manage", "LlmConnection")
+  @RequirePermission(PermissionAction.Manage, "LlmConnection")
   @ApiOperation({ summary: "Test connection with a minimal chat completion request (shared adapter path)" })
   @ApiResponse({ status: 200, type: TestLlmConnectionResponseDto })
   async test(@Param("id") id: string): Promise<TestLlmConnectionResponseDto> {

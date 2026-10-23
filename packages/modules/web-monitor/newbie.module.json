@@ -13,7 +13,6 @@
   "config-service": {
     "web-monitor": {
       "isLocalDev": false,
-      "clickhouseDB": "process.env.WEB_MONITOR_CLICKHOUSE_DB",
       "redis_consumption": {
         "task_time": "*/10 * * * * *",
         "thread_web": 1000,
@@ -42,7 +41,6 @@
     }
   },
   "env": {
-    "WEB_MONITOR_CLICKHOUSE_DB": "",
     "WEB_MONITOR_TENCENT_MAP_KEY": ""
   },
   "dependencies": {

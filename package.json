@@ -9,7 +9,8 @@
     "format:check": "prettier --check .",
     "import": "node scripts/import-modules.mjs",
     "lint": "eslint \"packages/**/*.ts\"",
-    "lint:fix": "eslint \"packages/**/*.ts\" --fix"
+    "lint:fix": "eslint \"packages/**/*.ts\" --fix",
+    "prepare": "command -v git >/dev/null 2>&1 && git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
     "@devbie/style-guide": "^1.4.1",

@@ -28,7 +28,7 @@ export class AwsSecretsManagerController {
   ) {}
 
   @Post("")
-  @RequirePermission(PermissionAction.Create, "AwsSecretsManagerSecret", { scope: "project" })
+  @RequirePermission(PermissionAction.Create, "AwsSecretsManagerSecret")
   @ApiOperation({ summary: "Create Secret" })
   @ApiResponse({ status: 201, description: "Secret created successfully", type: SecretResponseDto })
   async createSecret(@Req() request: UserRequest, @Body() body: CreateSecretDto) {
@@ -42,7 +42,7 @@ export class AwsSecretsManagerController {
   }
 
   @Get("")
-  @RequirePermission(PermissionAction.List, "AwsSecretsManagerSecret", { scope: "project" })
+  @RequirePermission(PermissionAction.List, "AwsSecretsManagerSecret")
   @ApiOperation({ summary: "List all managed Secrets (metadata only, no secret values)" })
   @ApiResponse({ type: ListSecretsResponseDto })
   async listSecrets(@Query() query: ListSecretsRequestDto) {
@@ -50,7 +50,7 @@ export class AwsSecretsManagerController {
   }
 
   @Get(":name")
-  @RequirePermission(PermissionAction.Get, "AwsSecretsManagerSecret", { scope: "project" })
+  @RequirePermission(PermissionAction.Get, "AwsSecretsManagerSecret")
   @ApiOperation({ summary: "Get Secret metadata (no secret value)" })
   @ApiResponse({ type: SecretResponseDto })
   async getSecret(@Param("name") name: string, @Query() query: GetSecretRequestDto) {
@@ -58,7 +58,7 @@ export class AwsSecretsManagerController {
   }
 
   @Get(":name/value")
-  @RequirePermission(PermissionAction.Get, "AwsSecretsManagerSecret", { scope: "project" })
+  @RequirePermission(PermissionAction.Get, "AwsSecretsManagerSecret")
   @ApiOperation({ summary: "Get Secret value" })
   @ApiResponse({ type: GetSecretValueResponseDto, description: "Secret name and decrypted value" })
   async getSecretValue(
@@ -77,7 +77,7 @@ export class AwsSecretsManagerController {
   }
 
   @Patch(":name")
-  @RequirePermission(PermissionAction.Update, "AwsSecretsManagerSecret", { scope: "project" })
+  @RequirePermission(PermissionAction.Update, "AwsSecretsManagerSecret")
   @ApiOperation({ summary: "Update Secret" })
   @ApiResponse({ type: SecretResponseDto })
   async updateSecret(@Req() request: UserRequest, @Param("name") name: string, @Body() body: UpdateSecretDto) {
@@ -98,7 +98,7 @@ export class AwsSecretsManagerController {
   }
 
   @Delete(":name")
-  @RequirePermission(PermissionAction.Delete, "AwsSecretsManagerSecret", { scope: "project" })
+  @RequirePermission(PermissionAction.Delete, "AwsSecretsManagerSecret")
   @ApiOperation({ summary: "Delete Secret (30-day recovery window)" })
   @ApiResponse({ type: DeleteSecretResponseDto })
   async deleteSecret(@Req() request: UserRequest, @Param("name") name: string, @Query() query: GetSecretRequestDto) {
@@ -112,7 +112,7 @@ export class AwsSecretsManagerController {
   }
 
   @Post(":name/rotate")
-  @RequirePermission(PermissionAction.Update, "AwsSecretsManagerSecret", { scope: "project" })
+  @RequirePermission(PermissionAction.Update, "AwsSecretsManagerSecret")
   @ApiOperation({ summary: "Trigger an immediate rotation with the existing rotation configuration" })
   @ApiResponse({ type: SecretResponseDto })
   async rotateSecret(@Req() request: UserRequest, @Param("name") name: string, @Query() query: GetSecretRequestDto) {
@@ -126,7 +126,7 @@ export class AwsSecretsManagerController {
   }
 
   @Post(":name/rotation")
-  @RequirePermission(PermissionAction.Update, "AwsSecretsManagerSecret", { scope: "project" })
+  @RequirePermission(PermissionAction.Update, "AwsSecretsManagerSecret")
   @ApiOperation({ summary: "Enable or disable automatic rotation" })
   @ApiResponse({ type: SecretResponseDto })
   async setRotation(@Req() request: UserRequest, @Param("name") name: string, @Body() body: SetRotationRequestDto) {

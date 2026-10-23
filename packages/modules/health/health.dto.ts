@@ -13,7 +13,7 @@ export class CreateHealthInstallationDto {
   @MaxLength(255)
   label!: string;
 
-  @ApiPropertyOptional({ description: "Opaque host-owned tag (e.g. projectId/applicationId); never parsed here" })
+  @ApiPropertyOptional({ description: "Opaque platform-owned tag (e.g. projectId/applicationId); never parsed here" })
   @IsOptional()
   @IsString()
   @MaxLength(255)
@@ -21,7 +21,7 @@ export class CreateHealthInstallationDto {
 }
 
 export class ListHealthInstallationsQueryDto {
-  @ApiPropertyOptional({ description: "Filter by host-owned externalRef" })
+  @ApiPropertyOptional({ description: "Filter by platform-owned externalRef" })
   @IsOptional()
   @IsString()
   externalRef?: string;

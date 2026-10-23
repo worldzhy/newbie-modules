@@ -5,12 +5,16 @@ export const PERMISSION_KEY = "permission";
 
 export interface RequirePermissionOptions {
   /**
-   * Scope resolver key. When set, the AuthorizationGuard looks up the
-   * registered ScopeResolver (via SCOPE_RESOLVERS) and passes the resolved
-   * Scope to PermissionAuthorizer. Omit for a global (system-level) check.
+   * @deprecated Legacy scope-resolver key (ADR-017). Modules must not name host
+   * vocabulary ("project", "task", "application", ...) in decorators.
    *
-   * The default "project" resolver reads `request.params.projectId`. Hosts
-   * may register custom resolvers for sub-resources.
+   * Preferred: list the resource in the host's `HOST_SCOPED_RESOURCES` config;
+   * the AuthorizationGuard then iterates the registered ScopeResolvers in
+   * host-controlled priority order and takes the first non-{type:"none"} scope.
+   *
+   * Still honoured for host app-layer controllers and not-yet-migrated modules:
+   * when set, the Guard looks up this exact key in SCOPE_RESOLVERS and does not
+   * iterate. Omit for a global (system-level) check.
    */
   scope?: string;
 }

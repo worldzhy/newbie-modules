@@ -98,7 +98,7 @@ model Role {
 }
 
 model UserRole {
-  userId String
+  userId String @db.Uuid
   roleId Int
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)

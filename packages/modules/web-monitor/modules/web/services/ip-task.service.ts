@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
+import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { func } from "../../../shared/utils";
@@ -19,7 +19,7 @@ export class WebIpTaskService {
   private readonly logger = new Logger(WebIpTaskService.name);
   constructor(
     private readonly config: ConfigService,
-    private readonly models: MonitorModelsService,
+    private readonly models: WebMonitorModelsService,
     private readonly redis: RedisService,
     private readonly site: SiteService,
   ) {

@@ -10,11 +10,11 @@
  */
 import type { Command } from "commander";
 
-import { runMigrateCli, type CliOptions } from "../migration/migrate-cli";
+import { runMigrateCli } from "../migration/migrate-cli";
 
 export function register(parent: Command, options: { cwd: string }): void {
   const run = (command: string) => (): Promise<void> =>
-    runMigrateCli([command], options as CliOptions)
+    runMigrateCli([command], options)
       .then((exitCode) => {
         if (exitCode !== 0) process.exitCode = exitCode;
       })

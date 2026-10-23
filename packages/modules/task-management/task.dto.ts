@@ -19,15 +19,10 @@ import { TaskStatus } from "./task.service";
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class LookupParticipantQueryDto {
-  @ApiProperty({ type: String, description: "Opaque identity source (host-defined)" })
+  @ApiProperty({ type: String, description: "Host user ID the participant stands for" })
   @IsString()
   @IsNotEmpty()
-  identitySource!: string;
-
-  @ApiProperty({ type: String, description: "Participant ID within that source" })
-  @IsString()
-  @IsNotEmpty()
-  externalId!: string;
+  userId!: string;
 }
 
 export class ListTasksQueryDto {
@@ -123,11 +118,6 @@ export class CreateTasksBatchRequestDto {
   @IsNotEmpty()
   spaceId!: string;
 
-  @ApiProperty({ type: String, description: "Nightwatch Project ID (uuid)" })
-  @IsUUID("4")
-  @IsNotEmpty()
-  projectId!: string;
-
   @ApiPropertyOptional({ type: String, description: "Creator TaskParticipant ID (uuid)" })
   @IsUUID("4")
   @IsOptional()
@@ -142,18 +132,15 @@ export class CreateTasksBatchRequestDto {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Response DTOs (no class-validator decorators: validation applies to inbound payloads only)
+// Response DTOs
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class TaskParticipantDto {
   @ApiProperty({ description: "TaskParticipant ID (uuid)" })
   id!: string;
 
-  @ApiProperty({ description: "Opaque identity source (host-defined)" })
-  identitySource!: string;
-
-  @ApiProperty({ description: "Participant ID within that source" })
-  externalId!: string;
+  @ApiPropertyOptional({ description: "Host user this participant stands for", type: String, nullable: true })
+  userId?: string | null;
 
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;
@@ -172,11 +159,8 @@ export class TaskParticipantListItemDto {
   @ApiProperty({ description: "TaskParticipant ID (uuid)" })
   id!: string;
 
-  @ApiProperty({ description: "Opaque identity source (host-defined)" })
-  identitySource!: string;
-
-  @ApiProperty({ description: "Participant ID within that source" })
-  externalId!: string;
+  @ApiPropertyOptional({ description: "Host user this participant stands for", type: String, nullable: true })
+  userId?: string | null;
 
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
   name?: string | null;
@@ -243,23 +227,17 @@ export class TaskDto {
   @ApiProperty({ description: "Owning TaskSpace ID (uuid)" })
   spaceId!: string;
 
-  @ApiProperty({ description: "Nightwatch Project ID (uuid)" })
-  projectId!: string;
-
   @ApiPropertyOptional({ description: "Creator TaskParticipant ID (uuid)", type: String })
   creatorId?: string | null;
 
   @ApiPropertyOptional({ description: "Assignee TaskParticipant ID (uuid)", type: String })
   assigneeId?: string | null;
 
-  @ApiPropertyOptional({ description: "ID of the last operator", type: String })
-  lastOperatorId?: string | null;
+  @ApiPropertyOptional({ description: "Last operator TaskParticipant ID (uuid)", type: String })
+  lastOperatorParticipantId?: string | null;
 
   @ApiPropertyOptional({ description: "Display name of the last operator", type: String })
   lastOperatorName?: string | null;
-
-  @ApiPropertyOptional({ description: "Source of the last operator, e.g. LARK | SYSTEM | WEB", type: String })
-  lastOperatorSource?: string | null;
 }
 
 export class TaskWithRelationsDto extends TaskDto {
@@ -268,6 +246,9 @@ export class TaskWithRelationsDto extends TaskDto {
 
   @ApiPropertyOptional({ type: TaskParticipantDto, description: "Task assignee" })
   assignee?: TaskParticipantDto | null;
+
+  @ApiPropertyOptional({ type: TaskParticipantDto, description: "Last operator" })
+  lastOperatorParticipant?: TaskParticipantDto | null;
 
   @ApiPropertyOptional({ type: TaskSpaceDto, description: "Owning task space" })
   space?: TaskSpaceDto | null;

@@ -3,14 +3,14 @@
 // !! ------------------------------------------------------------ //
 // * TaskSpace (1:1 companion space for a Nightwatch Project)       //
 // * Task (Work Item)                                              //
-// * TaskParticipant (Actor referenced by an external identity)    //
+// * TaskParticipant (Actor, identified by the host user it stands for) //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 model TaskSpace {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId   String   @unique @db.Uuid // 1:1 link to the Nightwatch Project
-  name        String? // Space name; the caller passes the project name at creation
-  description String? // Space description
+  projectId   String   @unique @db.Uuid
+  name        String?
+  description String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -21,47 +21,38 @@ model TaskSpace {
 
 model TaskParticipant {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  // Opaque, host-defined identity source (e.g. the host account system or an IM platform).
-  identitySource String
-  // Participant ID within that source. Opaque string: host IDs are not assumed to be UUIDs.
-  externalId     String
-  name           String? // Participant display name snapshot
-  avatarUrl      String? // Participant avatar URL snapshot
+  name           String?
+  avatarUrl      String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  createdTasks   Task[]   @relation("CreatedTasks") // Tasks created by this participant
-  assignedTasks  Task[]   @relation("AssignedTasks") // Tasks assigned to this participant
+  createdTasks   Task[]   @relation("CreatedTasks")
+  assignedTasks  Task[]   @relation("AssignedTasks")
 
-  @@unique([identitySource, externalId])
   @@schema("module/task-management")
 }
 
 model Task {
   id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  title       String // Task title
-  description String? // Task details
-  status      TaskStatus        @default(PENDING) // Current workflow status
-  dueDate     DateTime? // Expected completion time
+  title       String
+  description String?
+  status      TaskStatus        @default(PENDING)
+  dueDate     DateTime?
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
-  deletedAt   DateTime? // Soft delete timestamp
+  deletedAt   DateTime?
 
   spaceId   String    @db.Uuid
-  space     TaskSpace @relation(fields: [spaceId], references: [id])
-
-  // Direct link to the Nightwatch Project (flattened; no TaskProject indirection).
-  projectId String @db.Uuid
+  space     TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
   creatorId  String?         @db.Uuid
-  creator    TaskParticipant? @relation("CreatedTasks", fields: [creatorId], references: [id])
+  creator    TaskParticipant? @relation("CreatedTasks", fields: [creatorId], references: [id], onDelete: SetNull)
 
   assigneeId String?         @db.Uuid
-  assignee   TaskParticipant? @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  assignee   TaskParticipant? @relation("AssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
 
-  // Last Operation Tracking
-  lastOperatorId     String? // User ID or External ID of the last modifier
-  lastOperatorName   String? // Display Name of the last modifier
-  lastOperatorSource String? // "LARK" | "SYSTEM" | "WEB"
+  lastOperatorParticipantId String? @db.Uuid
+  lastOperatorParticipant   TaskParticipant? @relation("LastOperatorTasks", fields: [lastOperatorParticipantId], references: [id], onDelete: SetNull)
+  lastOperatorName          String?
 
   @@schema("module/task-management")
 }

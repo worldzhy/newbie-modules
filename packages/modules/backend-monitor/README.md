@@ -6,8 +6,8 @@ Backend application monitoring ingestion for nightwatch.
 
 - `POST /backend-monitor/ingest` (`@NoGuard`) — batched request metrics + error
   reports authenticated by a **BackendMonitorInstallation** report token sent as
-  `X-Backend-Monitor-Token`, stored in ClickHouse `application_request_logs` /
-  `application_error_logs`.
+  `X-Backend-Monitor-Token`, stored in ClickHouse `backend_monitor_request_logs` /
+  `backend_monitor_error_logs`.
 - `GET /backend-monitor/request-logs` / `error-logs` — paginated, application-scoped
   log queries for the monitoring UI (query contract unchanged by the
   installation cutover).

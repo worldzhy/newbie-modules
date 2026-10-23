@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { MonitorModelsService } from "../../models/mongo/monitor-models.service";
+import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
 import { RedisService } from "@modules/redis/redis.service";
 import { ConfigService } from "@nestjs/config";
 import dayjs from "dayjs";
@@ -10,7 +10,7 @@ import { RedisKeyPrefix } from "../../models/enum";
 export class DayReportNumService {
   private cfg: Record<string, unknown>;
   constructor(
-    private readonly models: MonitorModelsService,
+    private readonly models: WebMonitorModelsService,
     private readonly redis: RedisService,
     private readonly configService: ConfigService,
   ) {

@@ -12,6 +12,7 @@ export class DependencyScanController {
   constructor(private readonly dependencyScanService: DependencyScanService) {}
 
   @Get("projects/:projectId/report")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.DependencyScan)
   @ApiOperation({
     summary: "Get dependency vulnerability scan status and open findings for every application of a project",
   })

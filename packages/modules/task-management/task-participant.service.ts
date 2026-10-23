@@ -2,16 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TaskStatus } from "@generated/prisma/enums";
 
-/**
- * Identity source used for actors authenticated through the host's own
- * security module (JWT). Other sources (e.g. an IM platform) are supplied by
- * the host orchestration layer; this module never enumerates them.
- */
-export const HOST_IDENTITY_SOURCE = "host";
-
 export interface EnsureParticipantInput {
-  identitySource: string;
-  externalId: string;
+  /** Host user this participant stands for; also the participant's identity. */
+  userId: string;
   name?: string;
   avatarUrl?: string;
 }
@@ -20,12 +13,32 @@ export interface EnsureParticipantInput {
 export class TaskParticipantService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listParticipants() {
+  /**
+   * Visibility rule: a participant is visible when it is the requester herself,
+   * or when the user behind it shares a project with the requester.
+   */
+  private visibleTo(requesterUserId: string) {
+    return {
+      OR: [
+        { userId: requesterUserId },
+        {
+          user: {
+            projectMemberships: {
+              some: { project: { members: { some: { userId: requesterUserId } } } },
+            },
+          },
+        },
+      ],
+    };
+  }
+
+  /** List the participants the caller may see (see `visibleTo`). */
+  async listParticipants(userId: string) {
     return await this.prisma.taskParticipant.findMany({
+      where: this.visibleTo(userId),
       select: {
         id: true,
-        identitySource: true,
-        externalId: true,
+        userId: true,
         name: true,
         avatarUrl: true,
       },
@@ -33,47 +46,25 @@ export class TaskParticipantService {
     });
   }
 
-  async getParticipantByIdentity(identitySource: string, externalId: string) {
-    return await this.prisma.taskParticipant.findUnique({
-      where: { identitySource_externalId: { identitySource, externalId } },
+  /** Look up a participant by the host user it stands for, within the caller's reach. */
+  async getParticipantByUserId(targetUserId: string, requesterUserId: string) {
+    return await this.prisma.taskParticipant.findFirst({
+      where: { userId: targetUserId, ...this.visibleTo(requesterUserId) },
     });
   }
 
-  /**
-   * Idempotently resolve a participant for an external identity. A
-   * participant is one identity: cross-source account merging is a host
-   * orchestration concern and intentionally not modelled here.
-   */
   async ensureParticipant(input: EnsureParticipantInput) {
-    const existing = await this.getParticipantByIdentity(input.identitySource, input.externalId);
-    if (existing) return existing;
-
-    try {
-      return await this.prisma.taskParticipant.create({
-        data: {
-          identitySource: input.identitySource,
-          externalId: input.externalId,
-          name: input.name || null,
-          avatarUrl: input.avatarUrl || null,
-        },
-      });
-    } catch (error) {
-      // Lost a concurrent-create race on the composite unique: re-read.
-      const created = await this.getParticipantByIdentity(input.identitySource, input.externalId);
-      if (created) return created;
-      throw error;
-    }
+    return await this.prisma.taskParticipant.upsert({
+      where: { userId: input.userId },
+      create: {
+        userId: input.userId,
+        name: input.name || null,
+        avatarUrl: input.avatarUrl || null,
+      },
+      update: {},
+    });
   }
 
-  /**
-   * Resolve the participant for a host-authenticated actor (JWT), snapshotting
-   * the display name and avatar from the account User on first creation so
-   * task rows stay readable even if the account later changes. A missing User
-   * row degrades to a nameless participant instead of blocking the write.
-   *
-   * The account module is a declared moduleDependency; the cross-schema read
-   * follows the same pattern as organization membership.
-   */
   async ensureHostParticipant(input: { userId: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id: input.userId },
@@ -81,8 +72,7 @@ export class TaskParticipantService {
     });
 
     return await this.ensureParticipant({
-      identitySource: HOST_IDENTITY_SOURCE,
-      externalId: input.userId,
+      userId: input.userId,
       ...(user?.name ? { name: user.name } : {}),
       ...(user?.uiAvatarsUrl ? { avatarUrl: user.uiAvatarsUrl } : {}),
     });
@@ -104,17 +94,17 @@ export class TaskParticipantService {
     const participants = await this.prisma.taskParticipant.findMany({
       where: {
         OR: [
-          { createdTasks: { some: { projectId, deletedAt: null } } },
-          { assignedTasks: { some: { projectId, deletedAt: null } } },
+          { createdTasks: { some: { space: { projectId }, deletedAt: null } } },
+          { assignedTasks: { some: { space: { projectId }, deletedAt: null } } },
         ],
       },
       include: {
         assignedTasks: {
-          where: { projectId, deletedAt: null },
+          where: { space: { projectId }, deletedAt: null },
           select: { status: true },
         },
         createdTasks: {
-          where: { projectId, deletedAt: null },
+          where: { space: { projectId }, deletedAt: null },
           select: { id: true },
         },
       },

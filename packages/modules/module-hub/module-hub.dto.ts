@@ -16,7 +16,7 @@ export class CreateHubInstallationDto {
   @IsString()
   repoUrl?: string;
 
-  @ApiPropertyOptional({ description: "Opaque host-owned tag (e.g. projectId/applicationId); hub never parses it" })
+  @ApiPropertyOptional({ description: "Opaque platform-owned tag (e.g. projectId/applicationId); hub never parses it" })
   @IsOptional()
   @IsString()
   externalRef?: string;
@@ -28,7 +28,7 @@ export class CreateHubInstallationDto {
 }
 
 export class ListHubInstallationsQueryDto {
-  @ApiPropertyOptional({ description: "Filter by host-owned externalRef" })
+  @ApiPropertyOptional({ description: "Filter by platform-owned externalRef" })
   @IsOptional()
   @IsString()
   externalRef?: string;

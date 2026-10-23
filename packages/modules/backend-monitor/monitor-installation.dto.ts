@@ -34,7 +34,7 @@ export class CreateMonitorInstallationDto {
 }
 
 export class ListMonitorInstallationsQueryDto {
-  @ApiPropertyOptional({ description: "Filter by host-owned externalRef" })
+  @ApiPropertyOptional({ description: "Filter by platform-owned externalRef" })
   @IsOptional()
   @IsString()
   externalRef?: string;

@@ -3,14 +3,14 @@ import { JobsService } from "./jobs.service";
 import { SiteModule } from "@modules/web-monitor/modules/site/site.module";
 
 import { DayReportModule } from "@modules/web-monitor/modules/day-report/day-report.module";
-import { MonitorClickhouseModule } from "../../models/clickhouse/monitor-clickhouse.module";
+import { WebMonitorClickhouseModule } from "../../models/clickhouse/web-monitor-clickhouse.module";
 
 import { WebModule } from "@modules/web-monitor/modules/web/web.module";
 
-// WebPvuvip is created lazily by MonitorModelsService on the shared connection,
+// WebPvuvip is created lazily by WebMonitorModelsService on the shared connection,
 // so no MongooseModule.forFeature registration is needed here.
 @Module({
-  imports: [SiteModule, DayReportModule, MonitorClickhouseModule, WebModule],
+  imports: [SiteModule, DayReportModule, WebMonitorClickhouseModule, WebModule],
   providers: [JobsService],
   exports: [JobsService],
 })

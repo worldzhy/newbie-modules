@@ -316,7 +316,7 @@ export class ListBackendMonitorErrorLogsRequestDto {
   sortOrder?: "asc" | "desc";
 }
 
-/** One row of application_request_logs (ClickHouse snake_case shape). */
+/** One row of backend_monitor_request_logs (ClickHouse snake_case shape). */
 export class BackendMonitorRequestLogResponseDto {
   @ApiProperty()
   application_id!: string;
@@ -350,7 +350,7 @@ export class BackendMonitorRequestLogResponseDto {
   ingested_at!: string;
 }
 
-/** One row of application_error_logs (ClickHouse snake_case shape). */
+/** One row of backend_monitor_error_logs (ClickHouse snake_case shape). */
 export class BackendMonitorErrorLogResponseDto {
   @ApiProperty()
   application_id!: string;

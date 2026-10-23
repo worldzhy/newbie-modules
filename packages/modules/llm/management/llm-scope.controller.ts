@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { LlmScopeBindingResponseDto } from "./llm-scope.dto";
 import { LlmScopeService } from "./llm-scope.service";
@@ -17,7 +18,7 @@ export class LlmScopeController {
   constructor(private readonly scopes: LlmScopeService) {}
 
   @Get()
-  @RequirePermission("List", "LlmScopeAssignment")
+  @RequirePermission(PermissionAction.List, "LlmScopeAssignment")
   @ApiOperation({ summary: "List all scope-to-connection bindings" })
   @ApiResponse({ status: 200, type: [LlmScopeBindingResponseDto] })
   async list(): Promise<LlmScopeBindingResponseDto[]> {
@@ -25,7 +26,7 @@ export class LlmScopeController {
   }
 
   @Patch(":scope")
-  @RequirePermission("Manage", "LlmScopeAssignment")
+  @RequirePermission(PermissionAction.Manage, "LlmScopeAssignment")
   @ApiOperation({ summary: "Bind a consumer scope to an LLM connection (upsert)" })
   @ApiBody({
     schema: {
@@ -48,7 +49,7 @@ export class LlmScopeController {
   }
 
   @Delete(":scope")
-  @RequirePermission("Manage", "LlmScopeAssignment")
+  @RequirePermission(PermissionAction.Manage, "LlmScopeAssignment")
   @ApiOperation({ summary: "Remove the binding for a consumer scope (the scope's consumer will stop working)" })
   @ApiResponse({ status: 200, type: LlmScopeBindingResponseDto })
   async unbind(@Param("scope") scope: string): Promise<LlmScopeBindingResponseDto> {

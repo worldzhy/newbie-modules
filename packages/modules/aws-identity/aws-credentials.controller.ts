@@ -16,7 +16,7 @@ export class AwsCredentialsController {
   constructor(private readonly service: AwsCredentialsService) {}
 
   @Get(":projectId")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsCrossAccountBinding, { scope: "project" })
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsCrossAccountBinding)
   @ApiOperation({ summary: "Get the cross-account AWS role configured for a host scope" })
   @ApiResponse({ status: 200, type: AwsCrossAccountBindingResponseDto })
   async getProjectCredential(@Param("projectId") projectId: string) {
@@ -33,7 +33,7 @@ export class AwsCredentialsController {
   }
 
   @Put(":projectId")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding, { scope: "project" })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding)
   @ApiOperation({ summary: "Save or update the cross-account role ARN for a host scope" })
   @ApiResponse({ status: 200, type: AwsCrossAccountBindingResponseDto })
   async upsertProjectCredential(@Param("projectId") projectId: string, @Body() body: UpsertAwsCrossAccountBindingDto) {
@@ -41,7 +41,7 @@ export class AwsCredentialsController {
   }
 
   @Post(":projectId/verify")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding, { scope: "project" })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding)
   @ApiOperation({ summary: "Verify the cross-account role via STS AssumeRole + GetCallerIdentity" })
   @ApiResponse({ status: 200, type: VerifyAwsCrossAccountBindingResponseDto })
   async verifyProjectCredential(@Param("projectId") projectId: string) {
@@ -49,7 +49,7 @@ export class AwsCredentialsController {
   }
 
   @Post(":projectId/rotate-external-id")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding, { scope: "project" })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding)
   @ApiOperation({ summary: "Rotate the external ID of the binding for this host scope" })
   @ApiResponse({ status: 200, type: AwsCrossAccountBindingResponseDto })
   async rotateExternalId(@Param("projectId") projectId: string) {
@@ -57,7 +57,7 @@ export class AwsCredentialsController {
   }
 
   @Delete(":projectId")
-  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.AwsCrossAccountBinding, { scope: "project" })
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.AwsCrossAccountBinding)
   @ApiOperation({ summary: "Delete the cross-account AWS role configuration for a host scope" })
   @ApiResponse({ status: 200, type: AwsCrossAccountBindingResponseDto })
   async deleteProjectCredential(@Param("projectId") projectId: string) {

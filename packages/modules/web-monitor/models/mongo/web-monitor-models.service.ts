@@ -18,7 +18,7 @@ import { WebPvuvipSchema, WebPvuvipDocument } from "./web/web-pvuvip.schema";
 import { MongoCollectionPrefix, MongoStaticCollection } from "../enum";
 
 @Injectable()
-export class MonitorModelsService {
+export class WebMonitorModelsService {
   constructor(private readonly modelRegistry: MongoModelRegistry) {}
 
   // Model registration mechanics (register-once / OverwriteModelError guard)

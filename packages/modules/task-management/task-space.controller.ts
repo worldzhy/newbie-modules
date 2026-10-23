@@ -30,14 +30,14 @@ export class TaskSpaceController {
 
   @Get()
   @RequirePermission(PermissionAction.List, Prisma.ModelName.TaskSpace)
-  @ApiOperation({ summary: "List all task spaces with task counts" })
+  @ApiOperation({ summary: "List the task spaces whose owning Project the caller is a member of" })
   @ApiResponse({ status: 200, type: [TaskSpaceWithCountDto] })
-  async listSpaces(): Promise<TaskSpaceWithCountDto[]> {
-    return await this.taskSpaceService.listSpaces();
+  async listSpaces(@Req() req: UserRequest): Promise<TaskSpaceWithCountDto[]> {
+    return await this.taskSpaceService.listSpacesForUser(req.user.userId);
   }
 
   @Get("by-project/:projectId")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.TaskSpace, { scope: "project" })
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.TaskSpace)
   @ApiOperation({ summary: "Get (auto-provisioning on first access) the task space of a Nightwatch project" })
   @ApiResponse({ status: 200, type: TaskSpaceResponseDto })
   async getSpaceByProjectId(@Param("projectId") projectId: string): Promise<TaskSpaceResponseDto> {
@@ -46,7 +46,7 @@ export class TaskSpaceController {
   }
 
   @Get("by-project/:projectId/tasks")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.Task, { scope: "project" })
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Task)
   @ApiOperation({ summary: "List tasks of a Nightwatch project (companion task space is ensured)" })
   @ApiResponse({ status: 200, type: TasksResponseDto })
   async listTasksByProjectId(
@@ -56,11 +56,10 @@ export class TaskSpaceController {
     const page = query.page ?? 0;
     const pageSize = query.pageSize ?? 10;
 
-    // Every project implicitly owns its companion TaskSpace.
-    await this.taskSpaceService.ensureSpaceForProject(projectId);
+    const space = await this.taskSpaceService.ensureSpaceForProject(projectId);
 
     const result = await this.taskService.listTasks({
-      projectId,
+      spaceId: space.id,
       status: query.status,
       keyword: query.keyword,
       assigneeName: query.assigneeName,
@@ -81,7 +80,7 @@ export class TaskSpaceController {
   }
 
   @Post("by-project/:projectId/tasks")
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task, { scope: "project" })
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Create a task under the Nightwatch project (companion task space is ensured)" })
   @ApiResponse({ status: 200, type: CreateTaskResponseDto })
   async createTask(
@@ -97,14 +96,13 @@ export class TaskSpaceController {
     const result = await this.taskService.createTask({
       ...dto,
       spaceId: space.id,
-      projectId,
       creatorId: creator.id,
     });
     return { success: true, data: result };
   }
 
   @Get("by-project/:projectId/members")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.TaskSpace, { scope: "project" })
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.TaskSpace)
   @ApiOperation({ summary: "List project participants with task stats by Nightwatch projectId" })
   @ApiResponse({ status: 200, type: MembersResponseDto })
   async listProjectMembers(@Param("projectId") projectId: string): Promise<MembersResponseDto> {

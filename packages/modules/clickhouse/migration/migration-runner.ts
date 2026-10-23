@@ -7,9 +7,11 @@ import path from "node:path";
  * Forward-only ClickHouse migration engine (minimal Flyway semantics).
  *
  * - Migration files live in every assembled module under
- *   `clickhouse-migrations/V<version>__<description>.sql`; the modules root
- *   is self-located by callers (src/modules under tsx, dist/src/modules when
- *   compiled), so the engine is host-agnostic.
+ *   `clickhouse-migrations/V<version>__<description>.sql`; the roots are
+ *   self-located by callers (src/modules under tsx, dist/src/modules when
+ *   compiled), so the engine is host-agnostic. Hosts with application-layer
+ *   tables (e.g. url-monitor, nightwatch ADR-022) pass additional roots; all
+ *   roots share one history table and one global version sequence.
  * - Each migrated database owns a history table recording version, name and
  *   SHA-256 checksum of every applied file. Applied files are immutable:
  *   checksum drift aborts the run.
@@ -52,14 +54,14 @@ export interface MigrationResult extends MigrationPlan {
   executed: DiscoveredMigration[];
 }
 
-interface MigrationLog {
+interface MigrationLogger {
   (message: string): void;
 }
 
 const HISTORY_TABLE = "_clickhouse_schema_migrations";
 const MIGRATION_DIR_NAME = "clickhouse-migrations";
-// V20261016000000__init_backend_monitor_tables.sql (8 or 14 digit timestamp)
-const MIGRATION_FILE_PATTERN = /^V(\d{8}(?:\d{6})?)__([a-z0-9_]+)\.sql$/;
+// V20261016000000__init_backend_monitor_tables.sql (14 digit timestamp)
+const MIGRATION_FILE_PATTERN = /^V(\d{14})__([a-z0-9_]+)\.sql$/;
 // Database/table identifiers we generate ourselves must stay injection-safe;
 // they only ever come from CLICKHOUSE_DB env and the constant above.
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_]+$/;
@@ -170,43 +172,48 @@ function isLineCommentStart(sql: string, index: number): boolean {
 }
 
 /**
- * Discover migration files across every assembled module:
- * `<modulesRoot>/<moduleKey>/clickhouse-migrations/V*.sql`.
- * Versions must be globally unique; results are ordered by version.
+ * Discover migration files across every scanned root:
+ * `<root>/<moduleKey>/clickhouse-migrations/V*.sql`. Multiple roots
+ * (e.g. the assembled module tree plus a host application tree) are scanned
+ * in order and merged. Versions must be globally unique across all roots;
+ * results are ordered by version.
  */
-export async function discoverMigrations(modulesRoot: string): Promise<DiscoveredMigration[]> {
-  const moduleDirs = await fs.readdir(modulesRoot, { withFileTypes: true });
+export async function discoverMigrations(moduleRoots: string[]): Promise<DiscoveredMigration[]> {
   const discovered: DiscoveredMigration[] = [];
 
-  for (const moduleDir of moduleDirs) {
-    if (!moduleDir.isDirectory()) continue;
-    const migrationDir = path.join(modulesRoot, moduleDir.name, MIGRATION_DIR_NAME);
-    let entries: string[];
-    try {
-      entries = await fs.readdir(migrationDir);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
-      throw error;
-    }
+  for (const root of moduleRoots) {
+    const moduleDirs = await fs.readdir(root, { withFileTypes: true });
 
-    for (const filename of entries) {
-      const match = MIGRATION_FILE_PATTERN.exec(filename);
-      if (!match) {
-        throw new Error(
-          `Invalid migration filename '${filename}' in ${moduleDir.name}/${MIGRATION_DIR_NAME}: ` +
-            "expected V<YYYYMMDDHHMMSS>__<snake_case_description>.sql",
-        );
+    for (const moduleDir of moduleDirs) {
+      if (!moduleDir.isDirectory()) continue;
+      const migrationDir = path.join(root, moduleDir.name, MIGRATION_DIR_NAME);
+      let entries: string[];
+      try {
+        entries = await fs.readdir(migrationDir);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw error;
       }
-      const filePath = path.join(migrationDir, filename);
-      const sql = await fs.readFile(filePath, "utf8");
-      discovered.push({
-        version: match[1],
-        name: match[2],
-        filename,
-        filePath,
-        sql,
-        checksum: crypto.createHash("sha256").update(sql).digest("hex"),
-      });
+
+      for (const filename of entries) {
+        const match = MIGRATION_FILE_PATTERN.exec(filename);
+        if (!match) {
+          throw new Error(
+            `Invalid migration filename '${filename}' in ${moduleDir.name}/${MIGRATION_DIR_NAME}: ` +
+              "expected V<YYYYMMDDHHMMSS>__<snake_case_description>.sql",
+          );
+        }
+        const filePath = path.join(migrationDir, filename);
+        const sql = await fs.readFile(filePath, "utf8");
+        discovered.push({
+          version: match[1],
+          name: match[2],
+          filename,
+          filePath,
+          sql,
+          checksum: crypto.createHash("sha256").update(sql).digest("hex"),
+        });
+      }
     }
   }
 
@@ -307,52 +314,82 @@ async function ensureHistoryTable(client: ClickHouseClient): Promise<void> {
 }
 
 /**
- * Validate and apply every pending migration. Returns the full plan plus the
- * list of files executed in this run.
+ * The slice of the ClickHouse client the execution loop needs. Deliberately
+ * narrow: the loop only issues statements and records history rows. This is
+ * not a product-level driver abstraction — there is one driver, and the DDL
+ * itself still needs a real server to verify (see the e2e smoke test).
  */
-export async function runMigrations(
-  config: ClickhouseMigrationConfig,
-  modulesRoot: string,
-  log: MigrationLog = () => undefined,
-): Promise<MigrationResult> {
-  if (!config.database) {
-    throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
-  }
-  await ensureDatabase(config);
+export type MigrationExecutor = Pick<ClickHouseClient, "command" | "insert">;
 
+/** Run fn against a connected client scoped to the target database. */
+async function withClient<T>(
+  config: ClickhouseMigrationConfig,
+  fn: (client: ClickHouseClient) => Promise<T>,
+): Promise<T> {
+  await ensureDatabase(config);
   const client = createClient({
     url: config.url,
     username: config.username,
     password: config.password,
     database: config.database,
   });
-
   try {
     await ensureHistoryTable(client);
-    const discovered = await discoverMigrations(modulesRoot);
+    return await fn(client);
+  } finally {
+    await client.close();
+  }
+}
+
+/**
+ * Execute a plan against an already-connected executor and return the files
+ * applied in this run. Statements run in file order; the history row is
+ * written only after the whole file succeeds, so a partial failure re-runs
+ * the idempotent file on the next attempt.
+ */
+export async function runPlan(
+  executor: MigrationExecutor,
+  plan: MigrationPlan,
+  log: MigrationLogger = () => undefined,
+): Promise<DiscoveredMigration[]> {
+  const executed: DiscoveredMigration[] = [];
+  for (const migration of plan.pending) {
+    log(`Applying ${migration.filename}`);
+    const statements = splitStatements(migration.sql);
+    if (statements.length === 0) {
+      throw new Error(`Migration ${migration.filename} contains no executable statements.`);
+    }
+    for (const statement of statements) {
+      await executor.command({ query: statement });
+    }
+    await executor.insert({
+      table: HISTORY_TABLE,
+      columns: ["version", "name", "checksum"],
+      values: [{ version: migration.version, name: migration.name, checksum: migration.checksum }],
+      format: "JSONEachRow",
+    });
+    executed.push(migration);
+  }
+  return executed;
+}
+
+/**
+ * Validate and apply every pending migration. Returns the full plan plus the
+ * list of files executed in this run.
+ */
+export async function runMigrations(
+  config: ClickhouseMigrationConfig,
+  moduleRoots: string[],
+  log: MigrationLogger = () => undefined,
+): Promise<MigrationResult> {
+  if (!config.database) {
+    throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
+  }
+  return withClient(config, async (client) => {
+    const discovered = await discoverMigrations(moduleRoots);
     const applied = await readAppliedMigrations(client);
     const plan = planMigrations(discovered, applied);
-
-    const executed: DiscoveredMigration[] = [];
-    for (const migration of plan.pending) {
-      log(`Applying ${migration.filename}`);
-      const statements = splitStatements(migration.sql);
-      if (statements.length === 0) {
-        throw new Error(`Migration ${migration.filename} contains no executable statements.`);
-      }
-      for (const statement of statements) {
-        await client.command({ query: statement });
-      }
-      // Recorded only after the whole file succeeds; a partial failure
-      // re-runs the idempotent file on the next attempt.
-      await client.insert({
-        table: HISTORY_TABLE,
-        columns: ["version", "name", "checksum"],
-        values: [{ version: migration.version, name: migration.name, checksum: migration.checksum }],
-        format: "JSONEachRow",
-      });
-      executed.push(migration);
-    }
+    const executed = await runPlan(client, plan, log);
 
     if (executed.length === 0) {
       log(`Already up to date (${applied.length} applied)`);
@@ -360,32 +397,20 @@ export async function runMigrations(
       log(`Applied ${executed.length} migration(s); ${applied.length + executed.length} total`);
     }
     return { applied, pending: plan.pending, executed };
-  } finally {
-    await client.close();
-  }
+  });
 }
 
 /** Read-only view used by the `status` command. */
 export async function getMigrationStatus(
   config: ClickhouseMigrationConfig,
-  modulesRoot: string,
+  moduleRoots: string[],
 ): Promise<MigrationPlan & { database: string }> {
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
   }
-  await ensureDatabase(config);
-  const client = createClient({
-    url: config.url,
-    username: config.username,
-    password: config.password,
-    database: config.database,
-  });
-  try {
-    await ensureHistoryTable(client);
-    const discovered = await discoverMigrations(modulesRoot);
+  return withClient(config, async (client) => {
+    const discovered = await discoverMigrations(moduleRoots);
     const applied = await readAppliedMigrations(client);
     return { ...planMigrations(discovered, applied), database: config.database };
-  } finally {
-    await client.close();
-  }
+  });
 }

@@ -1,11 +1,26 @@
 import base from "@devbie/style-guide/eslint/base";
 import nest from "@devbie/style-guide/eslint/nest";
 
+// The Nest layer carries type-aware rules, so it may only cover TypeScript sources.
+// Flat config has no cascading, so the scope has to live here; root tooling files
+// (eslint.config.mjs, scripts/*.mjs) are plain Node modules linted by `base` alone.
+const nestForModules = nest.map((config) => ({
+  ...config,
+  files: ["packages/**/*.ts"],
+}));
+
 export default [
   ...base,
-  ...nest,
+  ...nestForModules,
   {
     ignores: ["**/node_modules/**", "**/.trae/**"],
+  },
+  {
+    linterOptions: {
+      // A suppression that no longer matches a violation is dead documentation: fail lint
+      // instead of emitting a warning so it cannot rot unnoticed.
+      reportUnusedDisableDirectives: "error",
+    },
   },
   {
     rules: {

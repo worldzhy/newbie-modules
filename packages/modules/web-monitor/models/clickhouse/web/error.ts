@@ -1,5 +1,6 @@
 import { ClickhouseDataType } from "@modules/clickhouse/clickhouse.types";
-import { ClickhouseModel, ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickhouseModel } from "@modules/clickhouse/clickhouse.model";
+import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
 import { ClickHouseTablePrefix } from "../../enum";
 
 export default function WebError(clickhouse: ClickhouseService, dbName: string) {
