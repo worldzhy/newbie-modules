@@ -1,12 +1,12 @@
 import { Injectable } from "@nestjs/common";
-import { WebMonitorClickhouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
+import { WebMonitorClickHouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
 import { ConfigService } from "@nestjs/config";
 
 @Injectable()
 export class ErrorService {
   private cfg: Record<string, unknown>;
   constructor(
-    private readonly ch: WebMonitorClickhouseService,
+    private readonly ch: WebMonitorClickHouseService,
     private readonly config: ConfigService,
   ) {
     this.cfg = this.config.get("modules.web-monitor") || {};

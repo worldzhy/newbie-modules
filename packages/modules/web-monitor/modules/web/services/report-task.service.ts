@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
-import { WebMonitorClickhouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
+import { WebMonitorClickHouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
 import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 import { SystemDocument } from "../../../models/mongo/system.schema";
 import { func } from "../../../shared/utils";
@@ -68,7 +68,7 @@ export class WebReportTaskService {
     private readonly redis: RedisService,
     private readonly site: SiteService,
     private readonly models: WebMonitorModelsService,
-    private readonly ch: WebMonitorClickhouseService,
+    private readonly ch: WebMonitorClickHouseService,
   ) {
     this.cfg = this.config.get("modules.web-monitor") || {};
   }

@@ -1,7 +1,7 @@
 import { Global, Module } from "@nestjs/common";
 // ScheduleModule.forRoot() is owned by the job-scheduler module when both
 // modules are assembled: a second forRoot would register every @Cron twice.
-import { WebMonitorClickhouseModule } from "./models/clickhouse/web-monitor-clickhouse.module";
+import { WebMonitorClickHouseModule } from "./models/clickhouse/web-monitor-clickhouse.module";
 import { SharedModule } from "./shared/shared.module";
 import { SiteModule } from "./modules/site/site.module";
 import { JobsModule } from "./modules/jobs/jobs.module";
@@ -13,7 +13,7 @@ import { RemoveModule } from "./modules/remove/remove.module";
 @Global()
 @Module({
   imports: [
-    WebMonitorClickhouseModule,
+    WebMonitorClickHouseModule,
     WebMonitorModelsModule,
     SharedModule,
     SiteModule,

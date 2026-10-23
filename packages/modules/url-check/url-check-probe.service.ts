@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
-import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { assertPublicHttpUrl, assertPubliclyResolvable } from "./public-url";
@@ -91,7 +91,7 @@ export class UrlCheckProbeService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly clickhouse: ClickhouseService,
+    private readonly clickhouse: ClickHouseService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
 

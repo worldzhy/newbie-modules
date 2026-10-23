@@ -1,22 +1,22 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickhouseModel } from "./clickhouse.model";
-import { ClickhouseTableConfig, ClickhouseColumnMeta, ClickhouseSchemaDiff } from "./clickhouse.types";
+import { ClickHouseModel } from "./clickhouse.model";
+import { ClickHouseTableConfig, ClickHouseColumnMeta, ClickHouseSchemaDiff } from "./clickhouse.types";
 
 /**
  * Shared ClickHouse service.
  *
  * Two layers of responsibility:
  * 1. Connection management (query/insert/ping/close) — thin pass-through to @clickhouse/client.
- * 2. Schema-driven helpers (createDatabase/createModel + ClickhouseModel):
+ * 2. Schema-driven helpers (createDatabase/createModel + ClickHouseModel):
  *    - schema-based CREATE TABLE IF NOT EXISTS (autoCreate)
  *    - schema-diff ALTER TABLE ADD/DROP/MODIFY COLUMN (autoSync)
  *    - model.find() query builder (with subquery chaining)
  *    - model.delete() (ALTER TABLE ... DELETE WHERE ...)
  */
 @Injectable()
-export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
+export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
   private readonly client: ClickHouseClient;
   // Cached default database from microservices.clickhouse.database — used as a
   // fallback when createModel callers don't explicitly pass a database name.
@@ -73,9 +73,9 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
   // (microservices.clickhouse.database). If both are unset, the bare table name is
   // used and ClickHouse resolves it against the user's default database.
   async createModel<T = Record<string, unknown>>(
-    config: ClickhouseTableConfig,
+    config: ClickHouseTableConfig,
     dbName?: string,
-  ): Promise<ClickhouseModel<T>> {
+  ): Promise<ClickHouseModel<T>> {
     const resolvedDbName = dbName ?? this.defaultDbName;
     const table = resolvedDbName ? `${resolvedDbName}.${config.tableName}` : config.tableName;
     if (config.autoCreate !== false) {
@@ -91,15 +91,15 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
         await this.createTable(table, config);
       }
     }
-    return new ClickhouseModel<T>(this.client, table, config);
+    return new ClickHouseModel<T>(this.client, table, config);
   }
 
   // Fetch the column metadata of an existing table via DESCRIBE TABLE.
   // Returns null when the table does not exist.
-  private async getTableMeta(table: string): Promise<ClickhouseColumnMeta[] | null> {
+  private async getTableMeta(table: string): Promise<ClickHouseColumnMeta[] | null> {
     try {
       const result = await this.query({ query: `DESCRIBE TABLE ${table}`, format: "JSONEachRow" });
-      return (await result.json()) as ClickhouseColumnMeta[];
+      return (await result.json()) as ClickHouseColumnMeta[];
     } catch (err: unknown) {
       const e = err as { message?: string; code?: number };
       const msg = String(e?.message || err);
@@ -114,12 +114,12 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
   // Compare the code schema against the actual table columns.
   // Returns columns to add (in code only), delete (in table only), and modify (type changed).
   private diffTableMeta(
-    codeSchema: ClickhouseTableConfig["schema"],
-    tableMeta: ClickhouseColumnMeta[],
-  ): ClickhouseSchemaDiff {
+    codeSchema: ClickHouseTableConfig["schema"],
+    tableMeta: ClickHouseColumnMeta[],
+  ): ClickHouseSchemaDiff {
     const tableMetaMap = new Map(tableMeta.map((c) => [c.name, c.type]));
-    const addColumns: ClickhouseSchemaDiff["addColumns"] = [];
-    const modifyColumns: ClickhouseSchemaDiff["modifyColumns"] = [];
+    const addColumns: ClickHouseSchemaDiff["addColumns"] = [];
+    const modifyColumns: ClickHouseSchemaDiff["modifyColumns"] = [];
     for (const [name, def] of Object.entries(codeSchema)) {
       const actualType = tableMetaMap.get(name);
       if (actualType !== undefined) {
@@ -136,7 +136,7 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Apply the schema diff to the table via ALTER TABLE ADD/DROP/MODIFY COLUMN.
-  private async syncTable(table: string, diff: ClickhouseSchemaDiff): Promise<void> {
+  private async syncTable(table: string, diff: ClickHouseSchemaDiff): Promise<void> {
     const statements: string[] = [];
     for (const name of diff.deleteColumns) {
       statements.push(`ALTER TABLE ${table} DROP COLUMN ${name}`);
@@ -154,7 +154,7 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
 
   // Generate and execute CREATE TABLE IF NOT EXISTS from schema config.
   // Function defaults (e.g. Date.now) are for data insertion, not DDL — skipped here.
-  private async createTable(table: string, config: ClickhouseTableConfig): Promise<void> {
+  private async createTable(table: string, config: ClickHouseTableConfig): Promise<void> {
     const columns = Object.entries(config.schema)
       .map(([name, def]) => {
         const parts = [name, def.type];

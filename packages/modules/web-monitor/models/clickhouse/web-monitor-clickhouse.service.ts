@@ -1,25 +1,25 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ClickhouseModel } from "@modules/clickhouse/clickhouse.model";
-import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickHouseModel } from "@modules/clickhouse/clickhouse.model";
+import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 
 import WebAjaxFactory from "./web/ajax";
 import WebErrorFactory from "./web/error";
 import WebSdkErrorFactory from "./web/sdk-error";
 
 @Injectable()
-export class WebMonitorClickhouseService implements OnModuleInit {
-  private webAjaxFactory!: (appId: string) => Promise<ClickhouseModel>;
-  private webErrorFactory!: (appId: string) => Promise<ClickhouseModel>;
-  private webSdkErrorFactory!: () => Promise<ClickhouseModel>;
+export class WebMonitorClickHouseService implements OnModuleInit {
+  private webAjaxFactory!: (appId: string) => Promise<ClickHouseModel>;
+  private webErrorFactory!: (appId: string) => Promise<ClickHouseModel>;
+  private webSdkErrorFactory!: () => Promise<ClickHouseModel>;
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly clickhouse: ClickhouseService,
+    private readonly clickhouse: ClickHouseService,
   ) {}
 
   async onModuleInit() {
-    // The shared ClickhouseService owns the @clickhouse/client connection and
+    // The shared ClickHouseService owns the @clickhouse/client connection and
     // exposes the ORM-like helpers (createDatabase / model). The database is
     // always the host-level shared one (ADR-015); collector modules do not
     // carry their own deployment topology.

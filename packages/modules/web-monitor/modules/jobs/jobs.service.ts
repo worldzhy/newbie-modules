@@ -13,7 +13,7 @@ import { WebReportTaskService } from "@modules/web-monitor/modules/web/services/
 import { WebPvuvipTaskService } from "@modules/web-monitor/modules/web/services/pvuvip-task.service";
 import { WebIpTaskService } from "@modules/web-monitor/modules/web/services/ip-task.service";
 import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
-import { WebMonitorClickhouseService } from "../../models/clickhouse/web-monitor-clickhouse.service";
+import { WebMonitorClickHouseService } from "../../models/clickhouse/web-monitor-clickhouse.service";
 import { SystemDocument } from "../../models/mongo/system.schema";
 import { WEB_THRESHOLD_ALERT_EVENT, WebThresholdAlertCategory, WebThresholdAlertEvent } from "./threshold-alert.event";
 import ip from "ip";
@@ -34,7 +34,7 @@ export class JobsService implements OnModuleInit {
     private readonly webPvuvipTask: WebPvuvipTaskService,
     private readonly webIpTask: WebIpTaskService,
     private readonly models: WebMonitorModelsService,
-    private readonly clickhouse: WebMonitorClickhouseService,
+    private readonly clickhouse: WebMonitorClickHouseService,
     private readonly eventEmitter: EventEmitter2,
   ) {
     this.cfg = this.configService.get("modules.web-monitor") || {};
@@ -221,7 +221,7 @@ export class JobsService implements OnModuleInit {
     await this.runSignal("slow ajax", async () => {
       const ajaxModel = await this.clickhouse.WebAjax(system.appId);
       const thresholdMs = (system.slowAjaxTime ?? 2) * 1000;
-      const timeFilter = this.buildClickhouseTimeFilter(windowStart, windowEnd);
+      const timeFilter = this.buildClickHouseTimeFilter(windowStart, windowEnd);
       const filter = `${timeFilter.where} AND duration >= {thresholdMs:UInt32}`;
       const queryParams = { ...timeFilter.queryParams, thresholdMs };
       const countRows = await ajaxModel.find({ where: filter, select: "count() AS total", queryParams });
@@ -251,7 +251,7 @@ export class JobsService implements OnModuleInit {
 
     await this.runSignal("js error spike", async () => {
       const errorModel = await this.clickhouse.WebError(system.appId);
-      const timeFilter = this.buildClickhouseTimeFilter(windowStart, windowEnd);
+      const timeFilter = this.buildClickHouseTimeFilter(windowStart, windowEnd);
       // Count both errors and distinct identified visitors. Anonymous
       // traffic (empty markUser) cannot be attributed, so the user gate only
       // applies when at least one visitor in the window is identifiable.
@@ -292,7 +292,7 @@ export class JobsService implements OnModuleInit {
     // later, so it never re-alerts.
     await this.runSignal("js-error-first-seen", async () => {
       const errorModel = await this.clickhouse.WebError(system.appId);
-      const timeFilter = this.buildClickhouseTimeFilter(windowStart, windowEnd);
+      const timeFilter = this.buildClickHouseTimeFilter(windowStart, windowEnd);
       const groups = await errorModel.find({
         where: timeFilter.where,
         select: "name, resourceUrl, line, type, COUNT() AS count, uniqExactIf(markUser, markUser != '') AS users",
@@ -306,7 +306,7 @@ export class JobsService implements OnModuleInit {
         const resourceUrl = String(row.resourceUrl ?? "");
         const line = String(row.line ?? "");
         const fingerprint = this.errorFingerprint(name, resourceUrl, line);
-        const beforeFilter = this.buildClickhouseBeforeFilter(windowStart);
+        const beforeFilter = this.buildClickHouseBeforeFilter(windowStart);
         const existedRows = await errorModel.find({
           where: `${beforeFilter.where} AND name = {name:String} AND resourceUrl = {resourceUrl:String} AND line = {line:String}`,
           select: "1",
@@ -352,7 +352,7 @@ export class JobsService implements OnModuleInit {
     }
   }
 
-  private buildClickhouseTimeFilter(
+  private buildClickHouseTimeFilter(
     windowStart: Date,
     windowEnd: Date,
   ): { where: string; queryParams: Record<string, unknown> } {
@@ -368,7 +368,7 @@ export class JobsService implements OnModuleInit {
   }
 
   /** Upper-bound filter for checking whether an error fingerprint existed earlier. */
-  private buildClickhouseBeforeFilter(windowStart: Date): { where: string; queryParams: Record<string, unknown> } {
+  private buildClickHouseBeforeFilter(windowStart: Date): { where: string; queryParams: Record<string, unknown> } {
     return {
       where: `createTime < toDateTime({windowStart:String}, 'Asia/Shanghai')`,
       queryParams: { windowStart: this.toShanghaiDateTime(windowStart) },

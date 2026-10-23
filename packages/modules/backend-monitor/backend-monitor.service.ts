@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, PayloadTooLargeException } from "@nestjs/common";
-import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { computeErrorFingerprint } from "./error-fingerprint.util";
 import { MonitorTokenResolver, ResolvedMonitorToken } from "./monitor-token.resolver";
 import {
@@ -70,7 +70,7 @@ function toClickHouseDate(date: Date): string {
 @Injectable()
 export class BackendMonitorService {
   constructor(
-    private readonly clickhouse: ClickhouseService,
+    private readonly clickhouse: ClickHouseService,
     private readonly monitorTokenResolver: MonitorTokenResolver,
   ) {}
 

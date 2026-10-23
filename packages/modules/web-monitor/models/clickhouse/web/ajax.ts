@@ -1,26 +1,26 @@
-import { ClickhouseDataType } from "@modules/clickhouse/clickhouse.types";
-import { ClickhouseModel } from "@modules/clickhouse/clickhouse.model";
-import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickHouseDataType } from "@modules/clickhouse/clickhouse.types";
+import { ClickHouseModel } from "@modules/clickhouse/clickhouse.model";
+import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { ClickHouseTablePrefix } from "../../enum";
 
-export default function WebAjax(clickhouse: ClickhouseService, dbName: string) {
+export default function WebAjax(clickhouse: ClickHouseService, dbName: string) {
   const schema = {
     tableName: ClickHouseTablePrefix.WEB_AJAX,
     schema: {
-      createTime: { type: ClickhouseDataType.DateTime, default: Date.now }, // Created time
-      url: { type: ClickhouseDataType.String }, // AJAX URL
-      method: { type: ClickhouseDataType.LowCardinality(ClickhouseDataType.String) }, // Request method
-      duration: { type: ClickhouseDataType.UInt32 }, // AJAX response time (ms)
-      bodySize: { type: ClickhouseDataType.Int32 }, // Response size (bytes)
-      options: { type: ClickhouseDataType.String }, // Request body options
-      query: { type: ClickhouseDataType.String }, // Query params
-      fullUrl: { type: ClickhouseDataType.String }, // Full URL
-      callUrl: { type: ClickhouseDataType.String }, // Calling page URL
-      markPage: { type: ClickhouseDataType.String }, // Page mark
-      markUser: { type: ClickhouseDataType.String }, // User mark
-      phone: { type: ClickhouseDataType.String }, // User phone
-      uid: { type: ClickhouseDataType.String }, // User ID
-      traceId: { type: ClickhouseDataType.String }, // Server trace ID
+      createTime: { type: ClickHouseDataType.DateTime, default: Date.now }, // Created time
+      url: { type: ClickHouseDataType.String }, // AJAX URL
+      method: { type: ClickHouseDataType.LowCardinality(ClickHouseDataType.String) }, // Request method
+      duration: { type: ClickHouseDataType.UInt32 }, // AJAX response time (ms)
+      bodySize: { type: ClickHouseDataType.Int32 }, // Response size (bytes)
+      options: { type: ClickHouseDataType.String }, // Request body options
+      query: { type: ClickHouseDataType.String }, // Query params
+      fullUrl: { type: ClickHouseDataType.String }, // Full URL
+      callUrl: { type: ClickHouseDataType.String }, // Calling page URL
+      markPage: { type: ClickHouseDataType.String }, // Page mark
+      markUser: { type: ClickHouseDataType.String }, // User mark
+      phone: { type: ClickHouseDataType.String }, // User phone
+      uid: { type: ClickHouseDataType.String }, // User ID
+      traceId: { type: ClickHouseDataType.String }, // Server trace ID
     },
     options: `ENGINE = MergeTree
     PARTITION BY toYYYYMM(createTime)
@@ -29,8 +29,8 @@ export default function WebAjax(clickhouse: ClickhouseService, dbName: string) {
     autoSync: true,
   };
 
-  const models: Record<string, ClickhouseModel> = {};
-  const modelCreates: Record<string, Promise<ClickhouseModel>> = {};
+  const models: Record<string, ClickHouseModel> = {};
+  const modelCreates: Record<string, Promise<ClickHouseModel>> = {};
   return async (appId: string) => {
     if (!models[appId]) {
       if (!modelCreates[appId]) {

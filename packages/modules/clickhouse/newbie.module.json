@@ -4,7 +4,7 @@
   "cli": "clickhouse",
   "module": {
     "file": "clickhouse.module",
-    "className": "ClickhouseModule"
+    "className": "ClickHouseModule"
   },
   "config-service": {
     "clickhouse": {

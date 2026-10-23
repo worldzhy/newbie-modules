@@ -1,24 +1,24 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 
-import type { ClickhouseDeleteObject, ClickhouseQueryObject, ClickhouseTableConfig } from "./clickhouse.types";
+import type { ClickHouseDeleteObject, ClickHouseQueryObject, ClickHouseTableConfig } from "./clickhouse.types";
 
 /**
  * Model bound to a single ClickHouse table. Provides a query builder for find()
  * and an ALTER TABLE DELETE helper for delete().
  *
  * Executes through the ClickHouse client directly, so the dependency direction
- * is service → model → client. The model never references ClickhouseService,
+ * is service → model → client. The model never references ClickHouseService,
  * which keeps the import graph acyclic.
  */
-export class ClickhouseModel<T = Record<string, unknown>> {
+export class ClickHouseModel<T = Record<string, unknown>> {
   constructor(
     private readonly client: ClickHouseClient,
     private readonly table: string,
-    private readonly config: ClickhouseTableConfig,
+    private readonly config: ClickHouseTableConfig,
   ) {}
 
   // Query builder: single object or chained array (subquery wrapping).
-  async find(qObjArray: ClickhouseQueryObject | ClickhouseQueryObject[]): Promise<T[]> {
+  async find(qObjArray: ClickHouseQueryObject | ClickHouseQueryObject[]): Promise<T[]> {
     if (!Array.isArray(qObjArray)) qObjArray = [qObjArray];
     let sql = "";
     const queryParams: Record<string, unknown> = {};
@@ -37,7 +37,7 @@ export class ClickhouseModel<T = Record<string, unknown>> {
   }
 
   // ALTER TABLE ... DELETE WHERE ...
-  async delete(delObj: ClickhouseDeleteObject): Promise<void> {
+  async delete(delObj: ClickHouseDeleteObject): Promise<void> {
     const sql = `ALTER TABLE ${this.table} DELETE WHERE ${delObj.where}`;
     await this.client.query({
       query: sql,
@@ -59,7 +59,7 @@ export class ClickhouseModel<T = Record<string, unknown>> {
   }
 
   // Build SELECT SQL from a query object.
-  private objectToSql(table: string, q: ClickhouseQueryObject): string {
+  private objectToSql(table: string, q: ClickHouseQueryObject): string {
     const where = q.where ? ` WHERE ${q.where}` : "";
     const groupBy = q.groupBy ? ` GROUP BY ${q.groupBy}` : "";
     const orderBy = q.orderBy ? ` ORDER BY ${q.orderBy}` : "";

@@ -1,5 +1,5 @@
 // ClickHouse column data types used by table schemas.
-export const ClickhouseDataType = {
+export const ClickHouseDataType = {
   String: "String",
   DateTime: "DateTime",
   UInt16: "UInt16",
@@ -9,15 +9,15 @@ export const ClickhouseDataType = {
 } as const;
 
 // Column definition: type + optional default value
-export interface ClickhouseColumnDef {
+export interface ClickHouseColumnDef {
   type: string;
   default?: unknown;
 }
 
 // Schema config: table name, columns, engine options
-export interface ClickhouseTableConfig {
+export interface ClickHouseTableConfig {
   tableName: string;
-  schema: Record<string, ClickhouseColumnDef>;
+  schema: Record<string, ClickHouseColumnDef>;
   // e.g. "ENGINE = MergeTree PARTITION BY toYYYYMM(createTime) ORDER BY createTime"
   options: string;
   // When true (default), CREATE TABLE IF NOT EXISTS is issued on first createModel() call.
@@ -29,20 +29,20 @@ export interface ClickhouseTableConfig {
 }
 
 // Column metadata as returned by DESCRIBE TABLE — {name, type} pairs.
-export interface ClickhouseColumnMeta {
+export interface ClickHouseColumnMeta {
   name: string;
   type: string;
 }
 
 // Schema diff produced by comparing code schema against table metadata.
-export interface ClickhouseSchemaDiff {
+export interface ClickHouseSchemaDiff {
   addColumns: Array<{ name: string; type: string }>;
   deleteColumns: string[];
   modifyColumns: Array<{ name: string; type: string }>;
 }
 
 // Query builder object for SELECT statements.
-export interface ClickhouseQueryObject {
+export interface ClickHouseQueryObject {
   select?: string;
   // WHERE clause as raw SQL. User-supplied values MUST use {name:Type}
   // placeholders and be supplied via queryParams — never interpolate directly.
@@ -56,8 +56,8 @@ export interface ClickhouseQueryObject {
 }
 
 // Delete object — ALTER TABLE ... DELETE WHERE ...
-export interface ClickhouseDeleteObject {
-  // WHERE clause. Same parameterization rule as ClickhouseQueryObject.where.
+export interface ClickHouseDeleteObject {
+  // WHERE clause. Same parameterization rule as ClickHouseQueryObject.where.
   where: string;
   queryParams?: Record<string, unknown>;
 }
