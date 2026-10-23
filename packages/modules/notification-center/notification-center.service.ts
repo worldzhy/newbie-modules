@@ -16,6 +16,7 @@ import {
   MarkAllNotificationsReadResponseDto,
   MarkNotificationReadResponseDto,
   NotificationCenterSettingDto,
+  NotificationPushFailureDto,
   TestPushResultDto,
   UnreadCountResponseDto,
   UpdateNotificationCenterSettingDto,
@@ -28,12 +29,19 @@ import { NotificationRegistryService } from "./notification-registry.service";
  * settings; the actual chat push is supplied by the host application, which
  * knows its chat platform and its system-chat bindings.
  */
+export interface PushDeliveryResult {
+  recipientKey: string;
+  success: boolean;
+  error?: string;
+}
+
 export interface NotificationPushPort {
   /**
    * Push a system-scope text message to the host-configured system chats.
-   * Returns per-chat delivery counts.
+   * Returns per-recipient delivery results so the center can record failures
+   * and auto-resolve them on later successes.
    */
-  pushSystemText(text: string): Promise<{ succeeded: number; failed: number }>;
+  pushSystemText(text: string): Promise<PushDeliveryResult[]>;
 }
 
 export interface NotifyInput {
@@ -159,7 +167,7 @@ export class NotificationCenterService {
     }
 
     if (!deduplicated) {
-      await this.dispatchPush(setting.scope, setting.isPushEnabled, center, title, detail);
+      await this.dispatchPush(setting.scope, setting.isPushEnabled, center, title, detail, recordId);
     }
 
     return { id: recordId, deduplicated, dropped: false };
@@ -171,6 +179,7 @@ export class NotificationCenterService {
     center: { isPushEnabled: boolean },
     title: string,
     detail: string | null,
+    recordId: string,
   ): Promise<void> {
     if (!notificationPushEnabled || !center.isPushEnabled || !this.pushPort) {
       return;
@@ -181,7 +190,14 @@ export class NotificationCenterService {
       return;
     }
     const text = detail ? `${title}\n${detail}` : title;
-    await this.pushPort.pushSystemText(text);
+    const results = await this.pushPort.pushSystemText(text);
+    for (const result of results) {
+      if (!result.success) {
+        await this.recordFailure(recordId, result.recipientKey, result.error ?? "unknown error");
+      } else {
+        await this.resolveFailures(result.recipientKey);
+      }
+    }
   }
 
   // --- Center settings -----------------------------------------------------
@@ -219,7 +235,13 @@ export class NotificationCenterService {
     if (!this.pushPort) {
       throw new BadRequestException("No push adapter is configured by the host application.");
     }
-    return this.pushPort.pushSystemText("Notification center test message: the push channel is working.");
+    const results = await this.pushPort.pushSystemText(
+      "Notification center test message: the push channel is working.",
+    );
+    return {
+      succeeded: results.filter((result) => result.success).length,
+      failed: results.filter((result) => !result.success).length,
+    };
   }
 
   private async ensureCenterSetting() {
@@ -308,6 +330,53 @@ export class NotificationCenterService {
       });
     }
     return { marked: unread.length };
+  }
+
+  // --- Push failure tracking -------------------------------------------------
+
+  /**
+   * Record a push failure for a recipient. Called by the center itself after
+   * system-scope pushes, and exposed for hosts to report project-scope push
+   * failures.
+   */
+  async recordFailure(notificationRecordId: string | null, recipientKey: string, error: string): Promise<void> {
+    await this.prisma.notificationPushFailure.create({
+      data: {
+        notificationRecordId,
+        recipientKey,
+        error: error.slice(0, 1000),
+      },
+    });
+  }
+
+  /**
+   * Auto-resolve all historical failures for a recipient when it later succeeds.
+   */
+  async resolveFailures(recipientKey: string): Promise<void> {
+    await this.prisma.notificationPushFailure.updateMany({
+      where: { recipientKey, resolvedAt: null },
+      data: { resolvedAt: new Date() },
+    });
+  }
+
+  /**
+   * List unresolved push failures with linked notification title when available.
+   */
+  async listUnresolved(): Promise<NotificationPushFailureDto[]> {
+    const failures = await this.prisma.notificationPushFailure.findMany({
+      where: { resolvedAt: null },
+      orderBy: { createdAt: "desc" },
+      include: { notificationRecord: { select: { title: true } } },
+    });
+    return failures.map((failure) => ({
+      id: failure.id,
+      notificationRecordId: failure.notificationRecordId,
+      notificationTitle: failure.notificationRecord?.title ?? null,
+      recipientKey: failure.recipientKey,
+      error: failure.error,
+      createdAt: failure.createdAt,
+      resolvedAt: failure.resolvedAt,
+    }));
   }
 
   // --- Internal helpers ----------------------------------------------------

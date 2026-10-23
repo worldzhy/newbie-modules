@@ -61,6 +61,7 @@ model NotificationRecord {
   createdAt DateTime @default(now())
 
   receipts NotificationReceipt[]
+  pushFailures NotificationPushFailure[]
 
   @@unique([deduplicationKey])
   @@index([createdAt])
@@ -82,6 +83,25 @@ model NotificationReceipt {
 
   @@unique([userId, notificationId])
   @@index([userId])
+  @@schema("module/notification-center")
+}
+
+// Per-recipient push failure record. Written by NotificationCenterService when
+// the host push port reports a failed delivery; resolved automatically when the
+// same recipient succeeds on a later push. The recipientKey is an opaque string
+// defined by the host (recommended: `${platform}:${recipientType}:${recipientId}`).
+model NotificationPushFailure {
+  id                   String   @id @default(uuid()) @db.Uuid
+  notificationRecordId String?  @db.Uuid
+  recipientKey         String   @db.VarChar(255)
+  error                String   @db.VarChar(1000)
+  createdAt            DateTime @default(now())
+  resolvedAt           DateTime?
+
+  notificationRecord NotificationRecord? @relation(fields: [notificationRecordId], references: [id], onDelete: Cascade)
+
+  @@index([notificationRecordId])
+  @@index([recipientKey, resolvedAt])
   @@schema("module/notification-center")
 }
 

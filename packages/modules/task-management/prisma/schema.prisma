@@ -51,7 +51,7 @@ model Task {
   assignee   TaskParticipant? @relation("AssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
 
   lastOperatorParticipantId String? @db.Uuid
-  lastOperatorParticipant   TaskParticipant? @relation(fields: [lastOperatorParticipantId], references: [id], onDelete: SetNull)
+  lastOperatorParticipant   TaskParticipant? @relation("LastOperatorTasks", fields: [lastOperatorParticipantId], references: [id], onDelete: SetNull)
   lastOperatorName          String?
 
   @@schema("module/task-management")

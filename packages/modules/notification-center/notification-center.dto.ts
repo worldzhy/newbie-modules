@@ -213,3 +213,30 @@ export class TestPushResultDto {
   @ApiProperty({ description: "Number of system chats that rejected the test message" })
   failed!: number;
 }
+
+// ---------------------------------------------------------------------------
+// Push failure DTOs
+// ---------------------------------------------------------------------------
+
+export class NotificationPushFailureDto {
+  @ApiProperty({ description: "Failure row ID" })
+  id!: string;
+
+  @ApiProperty({ type: String, nullable: true, description: "Linked notification record; null on system push track" })
+  notificationRecordId!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: "Title of the linked notification record" })
+  notificationTitle!: string | null;
+
+  @ApiProperty({ description: "Opaque recipient key defined by the host (e.g. lark:group:oc_xxx)" })
+  recipientKey!: string;
+
+  @ApiProperty({ description: "Error message from the push adapter" })
+  error!: string;
+
+  @ApiProperty()
+  createdAt!: Date;
+
+  @ApiProperty({ type: Date, nullable: true, description: "Null when still unresolved" })
+  resolvedAt!: Date | null;
+}

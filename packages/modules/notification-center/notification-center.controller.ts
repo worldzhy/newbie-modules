@@ -12,6 +12,7 @@ import {
   MarkAllNotificationsReadResponseDto,
   MarkNotificationReadResponseDto,
   NotificationCenterSettingDto,
+  NotificationPushFailureDto,
   NotificationSettingDto,
   NotifyDto,
   NotifyResultDto,
@@ -129,5 +130,15 @@ export class NotificationCenterController {
   @ApiResponse({ status: 200, type: TestPushResultDto })
   testPush(): Promise<TestPushResultDto> {
     return this.notificationCenter.testPush();
+  }
+
+  // --- Push failures --------------------------------------------------------
+
+  @Get("notification-center/push-failures")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.NotificationPushFailure)
+  @ApiOperation({ summary: "List unresolved push failures across all recipients" })
+  @ApiResponse({ status: 200, type: [NotificationPushFailureDto] })
+  listPushFailures(): Promise<NotificationPushFailureDto[]> {
+    return this.notificationCenter.listUnresolved();
   }
 }
