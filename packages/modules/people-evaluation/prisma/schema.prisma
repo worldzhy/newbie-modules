@@ -125,7 +125,7 @@ model PeopleEvaluationPeriod {
 
   rubricVersion PeopleEvaluationRubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
 
-  homeGrounds   PeopleEvaluationMemberHomeGround[]
+  homeGrounds   PeopleEvaluationHomeGround[]
   evidences     PeopleEvaluationEvidence[]
   deliverables  PeopleEvaluationWorkDeliverable[]
   scores        PeopleEvaluationScore[]
@@ -136,17 +136,17 @@ model PeopleEvaluationPeriod {
   @@schema("module/people-evaluation")
 }
 
-/// One member's home-ground declaration for a period. Dual-circle model:
+/// One evaluatee's home-ground declaration for a period. Dual-circle model:
 /// dimensions in `homeDimensions` get treated as the specialty circle
 /// (higher weight + higher expectation), everything else is the growth
 /// circle (lower weight but must show period-over-period growth).
-model PeopleEvaluationMemberHomeGround {
+model PeopleEvaluationHomeGround {
   id        String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
   collectionPeriodId String @db.Uuid
 
   homeDimensions Json @db.JsonB // dimensionKey[]
-  // Weights keyed by dimensionKey — member-visible contribution weight per dimension
+  // Weights keyed by dimensionKey — evaluatee-visible contribution weight per dimension
   weights    Json   @db.JsonB
   declaredAt DateTime @default(now())
 

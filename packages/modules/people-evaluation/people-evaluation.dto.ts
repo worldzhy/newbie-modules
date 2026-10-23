@@ -15,7 +15,7 @@ import { EvidenceSourceType, PeriodType } from "@generated/prisma/client";
 
 // --- Rubric versions ---------------------------------------------------
 
-export class CreateRubricVersionDto {
+export class CreatePeopleEvaluationRubricVersionDto {
   @ApiProperty({ description: 'Semantic version string, e.g. "v0.1"' })
   @IsString()
   @IsNotEmpty()
@@ -53,7 +53,7 @@ export class CreateRubricVersionDto {
   isActive?: boolean;
 }
 
-export class RubricVersionDto {
+export class PeopleEvaluationRubricVersionDto {
   @ApiProperty() id!: string;
   @ApiProperty() version!: string;
   @ApiProperty() publishedAt!: Date;
@@ -64,7 +64,7 @@ export class RubricVersionDto {
 
 // --- Evaluation periods ------------------------------------------------
 
-export class CreateEvaluationPeriodDto {
+export class CreatePeopleEvaluationPeriodDto {
   @ApiProperty({ description: "Rubric version this period scores against" })
   @IsUUID()
   @IsNotEmpty()
@@ -91,14 +91,14 @@ export class CreateEvaluationPeriodDto {
   status?: string;
 }
 
-export class ListPeriodsQueryDto {
+export class ListPeopleEvaluationPeriodsQueryDto {
   @ApiPropertyOptional({ enum: PeriodType, description: "Filter by period type" })
   @IsOptional()
   @IsEnum(PeriodType)
   type?: PeriodType;
 }
 
-export class EvaluationPeriodDto {
+export class PeopleEvaluationPeriodDto {
   @ApiProperty() id!: string;
   @ApiProperty() rubricVersionId!: string;
   @ApiProperty() type!: PeriodType;
@@ -109,7 +109,7 @@ export class EvaluationPeriodDto {
 
 // --- Evidence ----------------------------------------------------------
 
-export class RecordEvidenceDto {
+export class RecordPeopleEvaluationEvidenceDto {
   @ApiProperty({ description: "Who this evidence belongs to (evaluatee userId)" })
   @IsUUID()
   @IsNotEmpty()
