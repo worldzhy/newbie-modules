@@ -75,13 +75,13 @@ function createHarness(targetOverrides: Partial<FakeTargetRow> = {}, seedInciden
   const emitted: FakeEmittedEvent[] = [];
 
   const tx = {
-    urlMonitorTarget: {
+    urlCheckTarget: {
       update: async ({ data }: { data: Partial<FakeTargetRow> }) => {
         Object.assign(dbTarget, data);
         return { ...dbTarget };
       },
     },
-    urlMonitorIncident: {
+    urlCheckIncident: {
       create: async ({ data }: { data: { targetId: string; openedAt: Date; peakConsecutiveFailures: number } }) => {
         incidents.push({ ...data, recoveredAt: null, durationMs: null });
       },
@@ -103,12 +103,12 @@ function createHarness(targetOverrides: Partial<FakeTargetRow> = {}, seedInciden
   };
 
   const prisma = {
-    urlMonitorTarget: {
-      ...tx.urlMonitorTarget,
+    urlCheckTarget: {
+      ...tx.urlCheckTarget,
       // Each cycle reads a fresh snapshot, like a real database read.
       findMany: async () => [{ ...dbTarget }],
     },
-    urlMonitorIncident: tx.urlMonitorIncident,
+    urlCheckIncident: tx.urlCheckIncident,
     $transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => callback(tx),
   };
   const clickhouse = { insert: async () => undefined };

@@ -15,8 +15,8 @@ import { UrlCheckService } from "./url-check.service";
  *
  * Down/recovered transitions emit url-check.down and url-check.recovered
  * events via EventEmitter2; alarm routing is the host application's job.
- * The module does NOT own the Prisma schema for urlMonitorTarget /
- * urlMonitorIncident — those are host-domain tables, and this module reads
+ * The module does NOT own the Prisma schema for urlCheckTarget /
+ * urlCheckIncident — those are host-domain tables, and this module reads
  * and writes them through the host's PrismaService.
  */
 @Module({

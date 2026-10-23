@@ -4,13 +4,13 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { assertPublicHttpUrl } from "./public-url";
 import {
-  CreateUrlMonitorTargetDto,
-  DeleteUrlMonitorTargetResponseDto,
-  UpdateUrlMonitorTargetDto,
-  UrlMonitorCheckResultDto,
-  UrlMonitorIncidentDto,
-  UrlMonitorLatencyBucketDto,
-  UrlMonitorTargetStatsDto,
+  CreateUrlCheckTargetDto,
+  DeleteUrlCheckTargetResponseDto,
+  UpdateUrlCheckTargetDto,
+  UrlCheckResultDto,
+  UrlCheckIncidentDto,
+  UrlCheckLatencyBucketDto,
+  UrlCheckTargetStatsDto,
 } from "./url-check.dto";
 
 const CHECK_RESULTS_TABLE = "url_monitor_check_results";
@@ -43,16 +43,16 @@ export class UrlCheckService {
   ) {}
 
   list(projectId: string) {
-    return this.prisma.urlMonitorTarget.findMany({
+    return this.prisma.urlCheckTarget.findMany({
       where: { projectId },
       orderBy: { createdAt: "desc" },
     });
   }
 
-  async create(body: CreateUrlMonitorTargetDto, createdByUserId: string) {
+  async create(body: CreateUrlCheckTargetDto, createdByUserId: string) {
     assertPublicHttpUrl(body.url);
     await this.assertProject(body.projectId);
-    return this.prisma.urlMonitorTarget.create({
+    return this.prisma.urlCheckTarget.create({
       data: {
         projectId: body.projectId,
         name: body.name,
@@ -63,14 +63,14 @@ export class UrlCheckService {
   }
 
   async getById(targetId: string) {
-    const target = await this.prisma.urlMonitorTarget.findUnique({ where: { id: targetId } });
+    const target = await this.prisma.urlCheckTarget.findUnique({ where: { id: targetId } });
     if (!target) {
       throw new NotFoundException(`URL check target not found: ${targetId}`);
     }
     return target;
   }
 
-  async update(targetId: string, body: UpdateUrlMonitorTargetDto) {
+  async update(targetId: string, body: UpdateUrlCheckTargetDto) {
     const target = await this.getById(targetId);
     if (body.url !== undefined) {
       assertPublicHttpUrl(body.url);
@@ -81,7 +81,7 @@ export class UrlCheckService {
     // recovery notification is emitted because nothing actually recovered.
     const closesOnPause = body.isActive === false && target.isAlertOpen;
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.urlMonitorTarget.update({
+      const updated = await tx.urlCheckTarget.update({
         where: { id: targetId },
         data: {
           ...(body.name !== undefined ? { name: body.name } : {}),
@@ -92,7 +92,7 @@ export class UrlCheckService {
       });
       if (closesOnPause) {
         const closedAt = new Date();
-        await tx.urlMonitorIncident.updateMany({
+        await tx.urlCheckIncident.updateMany({
           where: { targetId, recoveredAt: null },
           data: {
             recoveredAt: closedAt,
@@ -106,12 +106,12 @@ export class UrlCheckService {
 
   async delete(targetId: string) {
     await this.getById(targetId);
-    await this.prisma.urlMonitorTarget.delete({ where: { id: targetId } });
-    return { success: true } as DeleteUrlMonitorTargetResponseDto;
+    await this.prisma.urlCheckTarget.delete({ where: { id: targetId } });
+    return { success: true } as DeleteUrlCheckTargetResponseDto;
   }
 
   /** Recent raw check results for one target, newest first. */
-  async listCheckResults(targetId: string, limitQuery?: string): Promise<UrlMonitorCheckResultDto[]> {
+  async listCheckResults(targetId: string, limitQuery?: string): Promise<UrlCheckResultDto[]> {
     await this.getById(targetId);
     const parsedLimit = Number.parseInt(limitQuery ?? "", 10);
     const limit =
@@ -126,17 +126,17 @@ export class UrlCheckService {
       query_params: { targetId, limit },
       format: "JSONEachRow",
     });
-    return (await result.json()) as UrlMonitorCheckResultDto[];
+    return (await result.json()) as UrlCheckResultDto[];
   }
 
   /** Outage incidents of one target, newest first. */
-  async listIncidents(targetId: string, limitQuery?: string): Promise<UrlMonitorIncidentDto[]> {
+  async listIncidents(targetId: string, limitQuery?: string): Promise<UrlCheckIncidentDto[]> {
     await this.getById(targetId);
     const parsedLimit = Number.parseInt(limitQuery ?? "", 10);
     const limit =
       Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, MAX_RESULT_LIMIT) : DEFAULT_RESULT_LIMIT;
 
-    return this.prisma.urlMonitorIncident.findMany({
+    return this.prisma.urlCheckIncident.findMany({
       where: { targetId },
       orderBy: { openedAt: "desc" },
       take: limit,
@@ -150,7 +150,7 @@ export class UrlCheckService {
    * Availability is count-based, which equals the time-weighted ratio under
    * the fixed 60s probe cadence.
    */
-  async getStats(targetId: string, windowQuery?: string): Promise<UrlMonitorTargetStatsDto> {
+  async getStats(targetId: string, windowQuery?: string): Promise<UrlCheckTargetStatsDto> {
     await this.getById(targetId);
     const window: StatsWindow = windowQuery === "7d" || windowQuery === "30d" ? windowQuery : "24h";
     const hours = STATS_WINDOW_HOURS[window];
@@ -187,7 +187,7 @@ export class UrlCheckService {
       }),
       // MTTR is incident-scoped by definition; only incidents closed in the
       // window carry a complete duration.
-      this.prisma.urlMonitorIncident.aggregate({
+      this.prisma.urlCheckIncident.aggregate({
         where: { targetId, recoveredAt: { not: null, gte: since } },
         _count: true,
         _avg: { durationMs: true },
@@ -198,7 +198,7 @@ export class UrlCheckService {
       totalChecks: 0,
       upChecks: 0,
     };
-    const latency = (await bucketsResult.json()) as UrlMonitorLatencyBucketDto[];
+    const latency = (await bucketsResult.json()) as UrlCheckLatencyBucketDto[];
 
     return {
       window,

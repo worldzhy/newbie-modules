@@ -3,13 +3,13 @@ import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } 
 
 // --- Request DTOs ---
 
-export class ListUrlMonitorTargetsRequestDto {
+export class ListUrlCheckTargetsRequestDto {
   @ApiProperty({ description: "Owning project ID" })
   @IsUUID()
   projectId!: string;
 }
 
-export class CreateUrlMonitorTargetDto {
+export class CreateUrlCheckTargetDto {
   @ApiProperty({ description: "Owning project ID" })
   @IsUUID()
   projectId!: string;
@@ -27,7 +27,7 @@ export class CreateUrlMonitorTargetDto {
   url!: string;
 }
 
-export class UrlMonitorTargetStatsRequestDto {
+export class UrlCheckTargetStatsRequestDto {
   @ApiPropertyOptional({
     enum: ["24h", "7d", "30d"],
     description: "Stats window ending now; defaults to 24h",
@@ -37,7 +37,7 @@ export class UrlMonitorTargetStatsRequestDto {
   window?: "24h" | "7d" | "30d";
 }
 
-export class UpdateUrlMonitorTargetDto {
+export class UpdateUrlCheckTargetDto {
   @ApiPropertyOptional({ description: "Display name of the monitored target" })
   @IsOptional()
   @IsNotEmpty()
@@ -60,7 +60,7 @@ export class UpdateUrlMonitorTargetDto {
 
 // --- Response DTOs (validation decorators apply to inbound payloads only) ---
 
-export class UrlMonitorTargetDto {
+export class UrlCheckTargetDto {
   @ApiProperty({ description: "Target ID (uuid)" })
   id!: string;
 
@@ -105,7 +105,7 @@ export class UrlMonitorTargetDto {
   updatedAt!: Date;
 }
 
-export class UrlMonitorIncidentDto {
+export class UrlCheckIncidentDto {
   @ApiProperty({ description: "Incident ID (uuid)" })
   id!: string;
 
@@ -135,7 +135,7 @@ export class UrlMonitorIncidentDto {
   updatedAt!: Date;
 }
 
-export class UrlMonitorCheckResultDto {
+export class UrlCheckResultDto {
   @ApiProperty({ description: "Whether the probe considered the URL up" })
   isUp!: boolean;
 
@@ -152,12 +152,12 @@ export class UrlMonitorCheckResultDto {
   checkedAt!: Date;
 }
 
-export class DeleteUrlMonitorTargetResponseDto {
+export class DeleteUrlCheckTargetResponseDto {
   @ApiProperty({ description: "Always true when deletion succeeds" })
   success!: boolean;
 }
 
-export class UrlMonitorLatencyBucketDto {
+export class UrlCheckLatencyBucketDto {
   @ApiProperty({ description: "Bucket start as unix seconds (UTC)" })
   bucketStart!: number;
 
@@ -196,7 +196,7 @@ export class UrlMonitorLatencyBucketDto {
   p99DurationMs!: number | null;
 }
 
-export class UrlMonitorTargetStatsDto {
+export class UrlCheckTargetStatsDto {
   @ApiProperty({ enum: ["24h", "7d", "30d"], description: "Window the stats cover, ending now" })
   window!: "24h" | "7d" | "30d";
 
@@ -225,8 +225,8 @@ export class UrlMonitorTargetStatsDto {
 
   @ApiProperty({
     description: "Per-bucket probe counts and latency percentiles, oldest first",
-    type: UrlMonitorLatencyBucketDto,
+    type: UrlCheckLatencyBucketDto,
     isArray: true,
   })
-  latency!: UrlMonitorLatencyBucketDto[];
+  latency!: UrlCheckLatencyBucketDto[];
 }

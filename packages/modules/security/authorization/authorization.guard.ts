@@ -87,7 +87,7 @@ export class AuthorizationGuard implements CanActivate {
       const resolverEntries = Object.entries(this.scopeResolvers ?? {});
       // SCOPE_RESOLVERS is a plain object; insertion order determines priority.
       // The host is responsible for putting specific resolvers (task, task-space, application,
-      // url-monitor-target) before the final defaultProjectScopeResolver fallback.
+      // url-check-target) before the final defaultProjectScopeResolver fallback.
       for (const [, resolver] of resolverEntries) {
         const resolved = await resolver.resolve(context);
         if (resolved.type !== "none") {

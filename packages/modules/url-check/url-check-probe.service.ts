@@ -97,7 +97,7 @@ export class UrlCheckProbeService {
 
   /** One full check cycle over every active target, with bounded concurrency. */
   async runChecks(): Promise<void> {
-    const targets = (await this.prisma.urlMonitorTarget.findMany({
+    const targets = (await this.prisma.urlCheckTarget.findMany({
       where: { isActive: true },
       select: {
         id: true,
@@ -222,7 +222,7 @@ export class UrlCheckProbeService {
     // transaction: an open alert always has a matching open incident, and a
     // closed alert always has a closed incident.
     await this.prisma.$transaction(async (tx) => {
-      await tx.urlMonitorTarget.update({
+      await tx.urlCheckTarget.update({
         where: { id: target.id },
         data: {
           consecutiveFailures,
@@ -236,11 +236,11 @@ export class UrlCheckProbeService {
       });
 
       if (opensAlert) {
-        await tx.urlMonitorIncident.create({
+        await tx.urlCheckIncident.create({
           data: { targetId: target.id, openedAt: checkedAt, peakConsecutiveFailures: consecutiveFailures },
         });
       } else if (closesAlert) {
-        await tx.urlMonitorIncident.updateMany({
+        await tx.urlCheckIncident.updateMany({
           where: { targetId: target.id, recoveredAt: null },
           data: {
             recoveredAt: checkedAt,
@@ -249,7 +249,7 @@ export class UrlCheckProbeService {
         });
       } else if (outageContinues) {
         // Keep the incident's peak failure count current while the outage lasts.
-        await tx.urlMonitorIncident.updateMany({
+        await tx.urlCheckIncident.updateMany({
           where: { targetId: target.id, recoveredAt: null, peakConsecutiveFailures: { lt: consecutiveFailures } },
           data: { peakConsecutiveFailures: consecutiveFailures },
         });
