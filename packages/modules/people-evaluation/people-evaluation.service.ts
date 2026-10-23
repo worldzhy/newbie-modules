@@ -473,6 +473,12 @@ export class PeopleEvaluationService {
     return assessment;
   }
 
+  /** Coverage declaration for an assessment: the packet it was judged from. */
+  async getAssessmentPacket(id: string) {
+    const assessment = await this.getAssessment(id);
+    return this.getPacket(assessment.packetId);
+  }
+
   /** Record the supervisor's final call on an assessment. */
   async reviewAssessment(id: string, input: ReviewPeopleEvaluationAssessmentRequestDto) {
     await this.getAssessment(id);

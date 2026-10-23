@@ -14,6 +14,7 @@ import {
   PeopleEvaluationAgentSessionResponseDto,
   PeopleEvaluationAssessmentResponseDto,
   PeopleEvaluationDeclaredDocumentResponseDto,
+  PeopleEvaluationEvidencePacketResponseDto,
   PeopleEvaluationHomeGroundResponseDto,
   PeopleEvaluationMemberWorkspaceResponseDto,
   PeopleEvaluationPipPlanResponseDto,
@@ -164,6 +165,14 @@ export class PeopleEvaluationController {
   @ApiResponse({ status: 200, type: PeopleEvaluationAssessmentResponseDto })
   getAssessment(@Param("id") id: string) {
     return this.peopleEvaluation.getAssessment(id);
+  }
+
+  @Get("assessments/:id/packet")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.PeopleEvaluationEvidencePacket)
+  @ApiOperation({ summary: "Get the evidence packet an assessment was judged from (coverage declaration)" })
+  @ApiResponse({ status: 200, type: PeopleEvaluationEvidencePacketResponseDto })
+  getAssessmentPacket(@Param("id") id: string) {
+    return this.peopleEvaluation.getAssessmentPacket(id);
   }
 
   @Patch("assessments/:id/review")
