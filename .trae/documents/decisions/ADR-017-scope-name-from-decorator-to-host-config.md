@@ -110,3 +110,59 @@ const SCOPE_RESOLVERS = {
 - `HOST_SCOPED_RESOURCES` 可演进：scope 可以是数组（一个资源多层级 scope），框架层做笛卡尔乘积检查
 - 宿主配置表可以被其他宿主消费方直接参考（配置是纯数据，不泄漏模块源码）
 - ADR-012 后续里程碑追加 Superseded by: ADR-017（scope 名称声明位置变更）
+
+---
+
+## 勘误修订（2026-10-23，实施前）
+
+### 触发原因
+
+实施前发现正文中的机制设计（`HOST_SCOPED_RESOURCES: Record<scopeName, resourceNames[]>`）有根本问题：
+
+1. **不存在 scope 名称这个东西**。SPI 里 Scope 类型只有两种：`{ type: "none" }` 和 `{ type: "project"; id: string }`。正文中 `"project"`、`"application"`、`"task"`、`"task-space"` 这些字符串不是 scope 名称，是 **resolver key**（"怎么从请求参数里找到 projectId"的查找策略标识符）
+2. **同一个 resource 出现在多个 resolver key 下**。Task 资源在三个 resolver key 下出现：
+   - `task`（路由 `PATCH tasks/:taskId`，从 taskId 追 projectId）
+   - `task-space`（路由 `POST tasks/batch`，从 body.spaceId 追 projectId）
+   - `project`（路由 `POST task-spaces/:projectId/tasks`，projectId 直给）
+3. **Record 模型反查不唯一**。从 resource 名反查 resolver key 会匹配多个，Guard 拿不到唯一答案
+
+### 修订内容（方向不变，机制简化）
+
+| 正文位置 | 旧值 | 修订为 |
+|---------|------|--------|
+| §候选方案 B | `HOST_SCOPED_RESOURCES: Record<scopeName, resourceNames[]>` | `HOST_SCOPED_RESOURCES: string[]`（扁平资源名列表，标记"这个资源需要 scope 解析"） |
+| §跨宿主接口签名 | `Guard 注入 HOST_SCOPED_RESOURCES: Record<string, string[]>` | `Guard 注入 HOST_SCOPED_RESOURCES: string[]` + 遍历 SCOPE_RESOLVERS（宿主控制优先级） |
+| §跨宿主换宿主例子 | `HOST_SCOPED_RESOURCES = { organization: [...] }` | `HOST_SCOPED_RESOURCES = ["Ec2Instance", "RdsInstance", ...]`；resolver 注册顺序决定优先级 |
+| §影响 1 SPI 新增 token | `HOST_SCOPED_RESOURCES: Record<string, string[]>` | `HOST_SCOPED_RESOURCES: string[]` |
+| §影响 1 Guard 改动 | "从宿主配置表自动查 scope 名称" | "resource 在 HOST_SCOPED_RESOURCES 里 → 按宿主注册顺序遍历 SCOPE_RESOLVERS → 第一个返回非 `{type:"none"}` 的即为 scope" |
+| §影响 3 宿主配置 | "新增 `HOST_SCOPED_RESOURCES` 配置表" | "新增 `HOST_SCOPED_RESOURCES` 配置（string[]），resolver 注册顺序即优先级" |
+
+### 新机制说明
+
+**HOST_SCOPED_RESOURCES token**（SPI 新增）：
+
+```typescript
+// packages/modules/security/ports/scope.resolver.ts
+export const HOST_SCOPED_RESOURCES = Symbol("HOST_SCOPED_RESOURCES");
+// 类型：Record<string, string[]> → 勘误为 → string[]
+```
+
+**Guard 逻辑**（勘误后）：
+
+```
+旧 metadata.scope 存在？
+  ├─ 是 → 走旧路：resolver = scopeResolvers[metadata.scope] ?? defaultProjectScopeResolver
+  └─ 否 → resource 在 HOST_SCOPED_RESOURCES 里？
+              ├─ 是 → 按 SCOPE_RESOLVERS 注册顺序遍历，第一个返回非 {type:"none"} 的即为 scope
+              └─ 否 → scope = undefined（系统级检查）
+```
+
+**为什么可行**：所有 5 个现有 resolver（task、task-space、application、url-monitor-target、defaultProjectScopeResolver）在缺少参数时短路返回 `{type:"none"}`。性能开销可忽略。宿主通过 SCOPE_RESOLVERS map 的 key 插入顺序控制优先级——具体 resolver（task/task-space/application/url-monitor-target）排前，defaultProjectScopeResolver 排最后兜底。
+
+### 决策不变
+
+本修订不改 §背景、§候选方案、§决策的任何理由。核心方向——**移走模块装饰器里的宿主特有词汇（"task"、"task-space"、"application"、"project" 这些 resolver key），让模块零业务感知**——完全不变。修订的是机制细节（从"反查映射"简化为"优先级遍历"），不是决策本身。
+
+### 受影响的实施步骤
+
+实施章节保持原迁移顺序不变（Phase 1 双轨 → Phase 2 移除 scope 参数 → 验证 → back-port）。只是 Phase 1 的具体代码按本勘误的新机制写。
