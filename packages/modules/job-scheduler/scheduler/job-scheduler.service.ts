@@ -16,8 +16,6 @@ import { JobHandlerRegistryService, JobHandler } from "./handler-registry.servic
 const RECONCILE_INTERVAL_MS = 30_000;
 const CRON_JOB_NAME_PREFIX = "job-scheduler:";
 export const DEFAULT_TIMEZONE = "Asia/Shanghai";
-const DEFAULT_RUN_LIMIT = 50;
-const MAX_RUN_LIMIT = 200;
 const PG_UNIQUE_VIOLATION = "P2002";
 
 /// Emitted after a job run is persisted with status "failed". The scheduler
@@ -220,20 +218,16 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     return this.prisma.jobSchedule.findMany({ orderBy: { key: "asc" } });
   }
 
-  async listScheduleRuns(key: string, limitQuery?: string) {
+  async listScheduleRuns(key: string, page?: number, pageSize?: number) {
     const schedule = await this.prisma.jobSchedule.findUnique({ where: { key } });
     if (!schedule) {
       throw new NotFoundException(`Job schedule not found: ${key}`);
     }
 
-    const parsedLimit = Number.parseInt(limitQuery ?? "", 10);
-    const limit =
-      Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, MAX_RUN_LIMIT) : DEFAULT_RUN_LIMIT;
-
-    return this.prisma.jobRun.findMany({
-      where: { scheduleId: schedule.id },
-      orderBy: { startedAt: "desc" },
-      take: limit,
+    return this.prisma.findManyInManyPages({
+      model: Prisma.ModelName.JobRun,
+      pagination: { page, pageSize },
+      findManyArgs: { where: { scheduleId: schedule.id }, orderBy: { startedAt: "desc" } },
     });
   }
 

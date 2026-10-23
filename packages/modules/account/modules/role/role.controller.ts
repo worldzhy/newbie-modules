@@ -81,7 +81,7 @@ export class RoleController {
 
   @Get(":roleId")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.Role)
-  @ApiOperation({ summary: "Get a role with its permission rules" })
+  @ApiOperation({ summary: "Get a role with its permissions" })
   @ApiResponse({ type: RoleDetailResponseDto })
   async getRole(@Param("roleId") roleId: number): Promise<RoleDetailResponseDto> {
     const role = await this.prisma.role.findUniqueOrThrow({
@@ -149,7 +149,7 @@ export class RoleController {
 
   @Get(":roleId/permissions")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.Role)
-  @ApiOperation({ summary: "List the permission rules granted to a role" })
+  @ApiOperation({ summary: "List the permissions granted to a role" })
   @ApiResponse({ type: PermissionResponseDto, isArray: true })
   async listRolePermissions(@Param("roleId") roleId: number): Promise<PermissionResponseDto[]> {
     await this.prisma.role.findUniqueOrThrow({ where: { id: roleId } });
