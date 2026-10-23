@@ -44,8 +44,8 @@ export class PeopleEvaluationController {
   @Get("people-evaluation-periods/:id")
   @ApiOperation({ summary: "Get one evaluation period by id" })
   @ApiResponse({ status: 200, type: EvaluationPeriodDto })
-  getPeriod(@Param("id") id: string) {
-    return this.peopleEvaluation.getPeriod(id);
+  getPeriodById(@Param("id") id: string) {
+    return this.peopleEvaluation.getPeriodById(id);
   }
 
   @Post("people-evaluation-periods")

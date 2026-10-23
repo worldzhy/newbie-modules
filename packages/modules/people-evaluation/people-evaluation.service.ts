@@ -50,9 +50,13 @@ export class PeopleEvaluationService {
     });
   }
 
-  async getPeriod(id: string): Promise<PeopleEvaluationPeriod> {
-    const period = await this.prisma.peopleEvaluationPeriod.findUnique({ where: { id } });
-    if (!period) throw new NotFoundException(`PeopleEvaluationPeriod ${id} not found`);
+  async getPeriodById(id: string): Promise<PeopleEvaluationPeriod> {
+    const period = await this.prisma.peopleEvaluationPeriod.findUnique({
+      where: { id },
+    });
+    if (!period) {
+      throw new NotFoundException(`Evaluation period ${id} not found`);
+    }
     return period;
   }
 
