@@ -241,6 +241,7 @@ export class NotificationCenterService {
     return {
       succeeded: results.filter((result) => result.success).length,
       failed: results.filter((result) => !result.success).length,
+      results,
     };
   }
 

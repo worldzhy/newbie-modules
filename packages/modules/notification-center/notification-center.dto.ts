@@ -1,5 +1,6 @@
-import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsBoolean, IsIn, IsObject, IsOptional, IsString, IsUUID } from "class-validator";
+import { ApiProperty, ApiPropertyOptional, getSchemaPath } from "@nestjs/swagger";
+import { Type } from "class-transformer";
+import { IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, Allow } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { NOTIFICATION_SCOPES, SEVERITIES } from "./notification-center.constants";
 
@@ -206,12 +207,39 @@ export class UpdateNotificationCenterSettingDto {
   minimumSeverity?: string;
 }
 
+export class PushDeliveryResultDto {
+  @ApiProperty({ description: "Opaque recipient key, e.g. lark:group:oc_xxx" })
+  @IsString()
+  recipientKey!: string;
+
+  @ApiProperty({ description: "True when the push succeeded" })
+  @IsBoolean()
+  success!: boolean;
+
+  @ApiPropertyOptional({ description: "Provider error message when the push failed" })
+  @IsOptional()
+  @IsString()
+  error?: string;
+}
+
 export class TestPushResultDto {
   @ApiProperty({ description: "Number of system chats that accepted the test message" })
+  @IsNumber()
   succeeded!: number;
 
   @ApiProperty({ description: "Number of system chats that rejected the test message" })
+  @IsNumber()
   failed!: number;
+
+  @ApiProperty({
+    description: "Per-recipient delivery results so the caller can surface specific failures",
+    type: "array",
+    items: { $ref: getSchemaPath(PushDeliveryResultDto) },
+    isArray: true,
+  })
+  @Type(() => PushDeliveryResultDto)
+  @Allow()
+  results!: PushDeliveryResultDto[];
 }
 
 // ---------------------------------------------------------------------------
