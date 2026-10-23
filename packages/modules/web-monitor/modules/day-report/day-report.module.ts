@@ -1,9 +1,9 @@
 import { Module } from "@nestjs/common";
 import { DayReportNumService } from "./day-report-num.service";
-import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
+import { WebMonitorModelsModule } from "../../models/mongo/web-monitor-models.module";
 
 @Module({
-  imports: [MonitorModelsModule],
+  imports: [WebMonitorModelsModule],
   providers: [DayReportNumService],
   exports: [DayReportNumService],
 })

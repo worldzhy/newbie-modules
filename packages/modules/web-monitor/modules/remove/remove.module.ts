@@ -1,11 +1,11 @@
 import { Module } from "@nestjs/common";
 import { RemoveController } from "./remove.controller";
 import { RemoveService } from "./remove.service";
-import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
-import { MonitorClickhouseModule } from "../../models/clickhouse/monitor-clickhouse.module";
+import { WebMonitorModelsModule } from "../../models/mongo/web-monitor-models.module";
+import { WebMonitorClickhouseModule } from "../../models/clickhouse/web-monitor-clickhouse.module";
 
 @Module({
-  imports: [MonitorModelsModule, MonitorClickhouseModule],
+  imports: [WebMonitorModelsModule, WebMonitorClickhouseModule],
   controllers: [RemoveController],
   providers: [RemoveService],
   exports: [RemoveService],

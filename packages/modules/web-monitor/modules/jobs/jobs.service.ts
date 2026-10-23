@@ -12,8 +12,8 @@ import { RedisKeys } from "../../models/enum";
 import { WebReportTaskService } from "@modules/web-monitor/modules/web/services/report-task.service";
 import { WebPvuvipTaskService } from "@modules/web-monitor/modules/web/services/pvuvip-task.service";
 import { WebIpTaskService } from "@modules/web-monitor/modules/web/services/ip-task.service";
-import { MonitorModelsService } from "../../models/mongo/monitor-models.service";
-import { MonitorClickhouseService } from "../../models/clickhouse/monitor-clickhouse.service";
+import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
+import { WebMonitorClickhouseService } from "../../models/clickhouse/web-monitor-clickhouse.service";
 import { SystemDocument } from "../../models/mongo/system.schema";
 import { WEB_THRESHOLD_ALERT_EVENT, WebThresholdAlertCategory, WebThresholdAlertEvent } from "./threshold-alert.event";
 import ip from "ip";
@@ -33,8 +33,8 @@ export class JobsService implements OnModuleInit {
     private readonly webReportTask: WebReportTaskService,
     private readonly webPvuvipTask: WebPvuvipTaskService,
     private readonly webIpTask: WebIpTaskService,
-    private readonly models: MonitorModelsService,
-    private readonly clickhouse: MonitorClickhouseService,
+    private readonly models: WebMonitorModelsService,
+    private readonly clickhouse: WebMonitorClickhouseService,
     private readonly eventEmitter: EventEmitter2,
   ) {
     this.cfg = this.configService.get("modules.web-monitor") || {};

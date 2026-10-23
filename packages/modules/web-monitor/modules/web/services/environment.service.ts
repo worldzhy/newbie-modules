@@ -1,9 +1,9 @@
 import { Injectable } from "@nestjs/common";
-import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
+import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 
 @Injectable()
 export class EnvironmentService {
-  constructor(private readonly models: MonitorModelsService) {}
+  constructor(private readonly models: WebMonitorModelsService) {}
 
   async getDataGroupBy(type: number, url: string, appId: string, beginTime?: string, endTime?: string) {
     const match: Record<string, unknown> = { url };

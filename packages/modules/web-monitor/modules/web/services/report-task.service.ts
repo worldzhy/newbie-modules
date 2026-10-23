@@ -2,8 +2,8 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
-import { MonitorClickhouseService } from "../../../models/clickhouse/monitor-clickhouse.service";
-import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
+import { WebMonitorClickhouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
+import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 import { SystemDocument } from "../../../models/mongo/system.schema";
 import { func } from "../../../shared/utils";
 import { UAParser } from "ua-parser-js";
@@ -67,8 +67,8 @@ export class WebReportTaskService {
     private readonly config: ConfigService,
     private readonly redis: RedisService,
     private readonly site: SiteService,
-    private readonly models: MonitorModelsService,
-    private readonly ch: MonitorClickhouseService,
+    private readonly models: WebMonitorModelsService,
+    private readonly ch: WebMonitorClickhouseService,
   ) {
     this.cfg = this.config.get("modules.web-monitor") || {};
   }

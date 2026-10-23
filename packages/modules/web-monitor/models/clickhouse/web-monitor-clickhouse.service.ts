@@ -7,7 +7,7 @@ import WebErrorFactory from "./web/error";
 import WebSdkErrorFactory from "./web/sdk-error";
 
 @Injectable()
-export class MonitorClickhouseService implements OnModuleInit {
+export class WebMonitorClickhouseService implements OnModuleInit {
   private webAjaxFactory!: (appId: string) => Promise<ClickhouseModel>;
   private webErrorFactory!: (appId: string) => Promise<ClickhouseModel>;
   private webSdkErrorFactory!: () => Promise<ClickhouseModel>;

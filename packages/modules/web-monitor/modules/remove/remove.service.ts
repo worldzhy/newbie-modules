@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import dayjs from "dayjs";
-import { MonitorModelsService } from "../../models/mongo/monitor-models.service";
-import { MonitorClickhouseService } from "../../models/clickhouse/monitor-clickhouse.service";
+import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
+import { WebMonitorClickhouseService } from "../../models/clickhouse/web-monitor-clickhouse.service";
 
 type WebResourceType = "ajax" | "page" | "env" | "err" | "resource";
 
@@ -15,8 +15,8 @@ export interface CustomDeleteFilter {
 @Injectable()
 export class RemoveService {
   constructor(
-    private readonly models: MonitorModelsService,
-    private readonly clickhouse: MonitorClickhouseService,
+    private readonly models: WebMonitorModelsService,
+    private readonly clickhouse: WebMonitorClickhouseService,
   ) {}
 
   async customDelete(fil: CustomDeleteFilter) {

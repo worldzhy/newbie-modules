@@ -2,12 +2,12 @@ import { Module } from "@nestjs/common";
 import { SiteService } from "./site.service";
 import { SiteController } from "./site.controller";
 import { NodeCacheService } from "../../shared/node-cache.service";
-import { MonitorModelsModule } from "../../models/mongo/monitor-models.module";
+import { WebMonitorModelsModule } from "../../models/mongo/web-monitor-models.module";
 
-// Models are created lazily by MonitorModelsService on the shared connection,
+// Models are created lazily by WebMonitorModelsService on the shared connection,
 // so no MongooseModule.forFeature registration is needed here.
 @Module({
-  imports: [MonitorModelsModule],
+  imports: [WebMonitorModelsModule],
   controllers: [SiteController],
   providers: [SiteService, NodeCacheService],
   exports: [SiteService, NodeCacheService],

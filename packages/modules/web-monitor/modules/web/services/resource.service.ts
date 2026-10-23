@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
+import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 import { ConfigService } from "@nestjs/config";
 import { func } from "../../../shared/utils";
 
@@ -7,7 +7,7 @@ import { func } from "../../../shared/utils";
 export class ResourceService {
   private cfg: Record<string, unknown>;
   constructor(
-    private readonly models: MonitorModelsService,
+    private readonly models: WebMonitorModelsService,
     private readonly config: ConfigService,
   ) {
     this.cfg = this.config.get("modules.web-monitor") || {};

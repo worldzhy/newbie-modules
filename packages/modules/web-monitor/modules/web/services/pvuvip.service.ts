@@ -1,14 +1,14 @@
 import { Injectable } from "@nestjs/common";
-import { MonitorModelsService } from "../../../models/mongo/monitor-models.service";
-import { MonitorClickhouseService } from "../../../models/clickhouse/monitor-clickhouse.service";
+import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
+import { WebMonitorClickhouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { func } from "../../../shared/utils";
 
 @Injectable()
 export class PvuvipService {
   constructor(
-    private readonly models: MonitorModelsService,
-    private readonly ch: MonitorClickhouseService,
+    private readonly models: WebMonitorModelsService,
+    private readonly ch: WebMonitorClickhouseService,
     private readonly dayReportNum: DayReportNumService,
   ) {}
 
