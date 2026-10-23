@@ -1,6 +1,14 @@
 import { spawn } from "node:child_process";
 
 /**
+ * Source type tag for evidence rows. Aligns with the Prisma
+ * EvidenceSourceType enum declared in prisma/schema.prisma — same values,
+ * separate declaration because the registry package does not build the
+ * Prisma client (that happens only in the consumer app).
+ */
+export type EvidenceSourceType = "GIT" | "INCIDENT" | "TEST_TREND" | "WORK_DELIVERABLE";
+
+/**
  * Generic evidence collector contract (ADR-021).
  *
  * Collectors run on a collection window (a date range inside one
@@ -17,7 +25,7 @@ import { spawn } from "node:child_process";
  */
 export interface EvidenceCollector {
   /** Human-readable source tag. Must match EvidenceSourceType enum. */
-  readonly sourceType: "GIT" | "INCIDENT" | "TEST_TREND" | "WORK_DELIVERABLE";
+  readonly sourceType: EvidenceSourceType;
 
   /** Collect evidence for the given window and return batch-ready rows. */
   collect(window: EvidenceWindow): Promise<EvidenceRow[]>;

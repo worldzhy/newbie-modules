@@ -6,30 +6,16 @@
  * rubric's dimension anchors. All inputs are frozen snapshots at scoring
  * time so the decision trail is replayable.
  *
- * Formula (per dimension):
- *
- *   rawCount = sum(evidence rows for this dimension)
- *              + share_of_uncategorized (evidence with dimensionKey = null)
- *
- *   qualityMult = qualityBySourceType[evidence.sourceType]   (GIT=1.0, ...)
- *
- *   weightedCount = Σ(per_evidence: 1 × qualityMult)
- *
- *   score = 50 + clamp(log1p(weightedCount) / log1p(cap), 0, 1) × 50
- *
- *   cap = 50   (empirical ceiling — 50 commits/dim ≈ full-load Senior baseline)
- *
- *   // Optional anchor clamp: score must sit inside rubric's [anchorLow, anchorHigh]
- *   score = clamp(score, dimension.anchorLow ?? 50, dimension.anchorHigh ?? 100)
- *
- * Output: one { dimensionKey, score, evidenceRefs } row per dimension
- *         per evaluateeUserId.
+ * EvidenceSourceType values must match the alias exported from
+ * people-evidence-collector.ts — see that file for the list.
  */
+
+export type EvidenceSourceType = "GIT" | "INCIDENT" | "TEST_TREND" | "WORK_DELIVERABLE";
 
 export interface ScoringInputEvidence {
   id: string;
   dimensionKey: string | null;
-  sourceType: "GIT" | "INCIDENT" | "TEST_TREND" | "WORK_DELIVERABLE";
+  sourceType: EvidenceSourceType;
 }
 
 export interface ScoringInputDimension {
