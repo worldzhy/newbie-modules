@@ -236,6 +236,7 @@ export class TestPushResultDto {
     type: "array",
     items: {
       type: "object",
+      required: ["recipientKey", "success"],
       properties: {
         recipientKey: { type: "string", description: "Opaque recipient key, e.g. lark:group:oc_xxx" },
         success: { type: "boolean", description: "True when the push succeeded" },

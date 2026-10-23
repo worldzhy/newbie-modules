@@ -35,7 +35,23 @@ notification-center 作为 registry 模块，其推送端口 `NotificationPushPo
 - **换任意宿主装配 notification-center**：port 契约只要求宿主返回 per-recipient opaque key 和 success/failure，不泄漏 Lark 概念。Slack/企业微信宿主编码自己的 `slack:channel:Cxxx` 或 `wechat:group:wxid_xxx` 即可。
 - **recipientKey 的不可解释性**：registry 层不解析 key 内部结构，所有比较都是字符串等值比较，宿主编码格式变更不影响框架逻辑。
 - **项目推送轨道**：任何宿主的自行路由逻辑都可以通过 registry 暴露的 `recordFailure` / `resolveFailures` 将结果写回统一失败表。
-- **与现有契约兼容**：`TestPushResultDto` 保持 `{succeeded, failed}` 不变（service 内部聚合计数），前端契约不 breaking。
+- **与现有契约兼容**：`TestPushResultDto` 保持 `{succeeded, failed}` 聚合计数不变；新增 `results: PushDeliveryResult[]` 作为诊断扩展，是向后兼容的 additive change（旧前端只消费聚合计数不受影响）。
+
+## Extension: testPush returns per-recipient results
+
+After scheme B landed we noticed the `testPush` endpoint was delivering
+diagnosis value only up to aggregate counts `{succeeded: 2, failed: 1}`.
+Its sole purpose is diagnosing push pipeline health, but which chat failed
+and what error it returned required opening another page with the red-badge
+banner. That breaks the principle that a diagnostic tool should close the
+loop on itself.
+
+延伸决策：`TestPushResultDto` 在保留聚合计数的同时，附加 `results: PushDeliveryResult[]` 字段，由前端在 toast 中直接列出失败收件人的 label + error message。
+
+技术细节：
+- Swagger spec 内联 object schema（不用 `$ref: getSchemaPath(PushDeliveryResultDto)`），因为后者在 Controller 路由上不被直接引用时会产生 dangling `$ref`，导致 OpenAPI client generator（apits）无法解析。
+- `PushDeliveryResultDto` 类保留（class-transformer runtime type 用），OpenAPI 展示形态与 runtime shape 解耦。
+- 前端 toast 从 `recipientKey`（`${platform}:${type}:${id}`）解析 label，不要求 registry 知道 Lark 概念。
 
 ## 影响
 
