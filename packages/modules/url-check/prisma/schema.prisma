@@ -1,0 +1,63 @@
+// ! ------------------------------------------------------------ //
+// !              [Module] URL Check models                       //
+// ! ------------------------------------------------------------ //
+// * UrlCheckTarget                                               //
+// * UrlCheckIncident                                             //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+// One external URL probed on a fixed cadence (ADR-022). Targets are
+// project-owned; check parameters (60s interval, 10s timeout, HTTP < 400
+// = up) are global defaults, not per-target settings. The failure counter
+// and alert-open flag drive the down/recovered notification state machine:
+// an outage alert opens at 3 consecutive failures and closes on the first
+// success afterwards. Cross-schema FK to the host application.Project (same
+// pattern as ProjectMember → module/account.User).
+model UrlCheckTarget {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId             String    @db.Uuid
+  name                  String    @db.VarChar(255)
+  url                   String    @db.VarChar(2048)
+  isActive              Boolean   @default(true)
+  consecutiveFailures   Int       @default(0)
+  // Success streak while an alert is open; recovery requires sustained
+  // success (ADR-024), otherwise the counter stays 0.
+  consecutiveSuccesses  Int       @default(0)
+  isAlertOpen           Boolean   @default(false)
+  // When the currently open outage alert fired; null while no alert is open.
+  alertOpenedAt         DateTime?
+  lastCheckedAt         DateTime?
+  lastStatusCode        Int?
+  lastIsUp              Boolean?
+  createdByUserId       String?   @db.Uuid
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  project               Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  incidents             UrlCheckIncident[]
+
+  @@index([projectId])
+  @@index([isActive])
+  @@schema("module/url-check")
+}
+
+// One outage episode of a monitored target (ADR-023): opened in the same
+// transaction that opens the outage alert, closed (recoveredAt/durationMs)
+// in the same transaction that closes it. Incident history is the durable
+// record of outages; raw per-check rows stay in ClickHouse under a TTL.
+model UrlCheckIncident {
+  id                      String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  targetId                String          @db.Uuid
+  openedAt                DateTime
+  // Null while the outage is ongoing.
+  recoveredAt             DateTime?
+  // Computed when the incident closes; null while ongoing.
+  durationMs              Int?
+  // Peak consecutive failures observed during the incident.
+  peakConsecutiveFailures Int
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+  target                  UrlCheckTarget  @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([targetId])
+  @@index([targetId, recoveredAt])
+  @@schema("module/url-check")
+}
