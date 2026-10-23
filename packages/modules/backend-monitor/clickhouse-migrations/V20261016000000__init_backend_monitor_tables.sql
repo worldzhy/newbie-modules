@@ -10,7 +10,7 @@
 -- UUID (mapped from the installation externalRef, tokens may rotate),
 -- installation_id identifies the reporting MonitorInstallation (module-hub
 -- design section 9.2), request_id correlates errors with their request.
-CREATE TABLE IF NOT EXISTS backend_monitor_request_logs
+CREATE TABLE IF NOT EXISTS application_request_logs
 (
     application_id     UUID,
     -- MonitorInstallation that reported the row (module-hub design section 9.2).
@@ -47,10 +47,10 @@ TTL request_at + INTERVAL 90 DAY
 SETTINGS index_granularity = 8192;
 
 -- One row per unhandled exception/error reported by a backend-monitor
--- installation. request_id links back to the backend_monitor_request_logs row
+-- installation. request_id links back to the application_request_logs row
 -- when the error occurred during request processing; fingerprint groups
 -- equivalent errors.
-CREATE TABLE IF NOT EXISTS backend_monitor_error_logs
+CREATE TABLE IF NOT EXISTS application_error_logs
 (
     application_id     UUID,
     installation_id    UUID DEFAULT '00000000-0000-0000-0000-000000000000',
