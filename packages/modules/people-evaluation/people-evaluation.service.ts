@@ -2,9 +2,9 @@ import { ConflictException, Injectable, NotFoundException } from "@nestjs/common
 import { PeopleEvaluationRubricVersion, PeopleEvaluationPeriod, PeriodType } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
-  CreatePeopleEvaluationPeriodDto,
-  CreatePeopleEvaluationRubricVersionDto,
-  RecordPeopleEvaluationEvidenceDto,
+  CreatePeopleEvaluationPeriodRequestDto,
+  CreatePeopleEvaluationRubricVersionRequestDto,
+  RecordPeopleEvaluationEvidenceRequestDto,
 } from "./people-evaluation.dto";
 
 /**
@@ -30,7 +30,9 @@ export class PeopleEvaluationService {
     return this.prisma.peopleEvaluationRubricVersion.findFirst({ where: { isActive: true } });
   }
 
-  async createRubricVersion(input: CreatePeopleEvaluationRubricVersionDto): Promise<PeopleEvaluationRubricVersion> {
+  async createRubricVersion(
+    input: CreatePeopleEvaluationRubricVersionRequestDto,
+  ): Promise<PeopleEvaluationRubricVersion> {
     return this.prisma.peopleEvaluationRubricVersion.create({
       data: {
         version: input.version,
@@ -64,7 +66,7 @@ export class PeopleEvaluationService {
     return period;
   }
 
-  async createPeriod(input: CreatePeopleEvaluationPeriodDto): Promise<PeopleEvaluationPeriod> {
+  async createPeriod(input: CreatePeopleEvaluationPeriodRequestDto): Promise<PeopleEvaluationPeriod> {
     const rubric = await this.prisma.peopleEvaluationRubricVersion.findUnique({
       where: { id: input.rubricVersionId },
     });
@@ -99,7 +101,7 @@ export class PeopleEvaluationService {
    * the latest write (attribution is the writer's responsibility), the
    * same contract as the collect-evidence runner upsert.
    */
-  async recordEvidence(input: RecordPeopleEvaluationEvidenceDto): Promise<void> {
+  async recordEvidence(input: RecordPeopleEvaluationEvidenceRequestDto): Promise<void> {
     const data = {
       evaluateeUserId: input.evaluateeUserId,
       collectionPeriodId: input.collectionPeriodId,
