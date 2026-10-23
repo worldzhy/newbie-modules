@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickhouseModel } from "./clickhouse-model";
+import { ClickhouseModel } from "./clickhouse.model";
 import { ClickhouseTableConfig, ClickhouseColumnMeta, ClickhouseSchemaDiff } from "./clickhouse.types";
 
 /**
@@ -91,7 +91,7 @@ export class ClickhouseService implements OnModuleInit, OnModuleDestroy {
         await this.createTable(table, config);
       }
     }
-    return new ClickhouseModel<T>(this, table, config);
+    return new ClickhouseModel<T>(this.client, table, config);
   }
 
   // Fetch the column metadata of an existing table via DESCRIBE TABLE.

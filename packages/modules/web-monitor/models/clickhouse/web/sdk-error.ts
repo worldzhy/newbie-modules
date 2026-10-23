@@ -1,5 +1,5 @@
 import { ClickhouseDataType } from "@modules/clickhouse/clickhouse.types";
-import { ClickhouseModel } from "@modules/clickhouse/clickhouse-model";
+import { ClickhouseModel } from "@modules/clickhouse/clickhouse.model";
 import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
 import { ClickHouseTablePrefix } from "../../enum";
 

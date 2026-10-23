@@ -1,13 +1,18 @@
-import type { ClickhouseService } from "./clickhouse.service";
+import type { ClickHouseClient } from "@clickhouse/client";
+
 import type { ClickhouseDeleteObject, ClickhouseQueryObject, ClickhouseTableConfig } from "./clickhouse.types";
 
 /**
  * Model bound to a single ClickHouse table. Provides a query builder for find()
  * and an ALTER TABLE DELETE helper for delete().
+ *
+ * Executes through the ClickHouse client directly, so the dependency direction
+ * is service → model → client. The model never references ClickhouseService,
+ * which keeps the import graph acyclic.
  */
 export class ClickhouseModel<T = Record<string, unknown>> {
   constructor(
-    private readonly ch: ClickhouseService,
+    private readonly client: ClickHouseClient,
     private readonly table: string,
     private readonly config: ClickhouseTableConfig,
   ) {}
@@ -23,7 +28,7 @@ export class ClickhouseModel<T = Record<string, unknown>> {
       // Merge bound parameters from every subquery (later keys win on clash).
       if (qObj.queryParams) Object.assign(queryParams, qObj.queryParams);
     });
-    const result = await this.ch.query({
+    const result = await this.client.query({
       query: sql,
       format: "JSONEachRow",
       ...(Object.keys(queryParams).length ? { query_params: queryParams } : {}),
@@ -34,7 +39,7 @@ export class ClickhouseModel<T = Record<string, unknown>> {
   // ALTER TABLE ... DELETE WHERE ...
   async delete(delObj: ClickhouseDeleteObject): Promise<void> {
     const sql = `ALTER TABLE ${this.table} DELETE WHERE ${delObj.where}`;
-    await this.ch.query({
+    await this.client.query({
       query: sql,
       ...(delObj.queryParams ? { query_params: delObj.queryParams } : {}),
     });
@@ -44,7 +49,7 @@ export class ClickhouseModel<T = Record<string, unknown>> {
   async insertMany(rows: T[]): Promise<void> {
     if (!rows.length) return;
     const columns = Object.keys(this.config.schema);
-    await this.ch.insert({
+    await this.client.insert({
       table: this.table,
       values: rows.map((r) =>
         columns.reduce((obj, col) => ({ ...obj, [col]: (r as Record<string, unknown>)[col] ?? null }), {}),

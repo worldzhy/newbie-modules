@@ -1,6 +1,6 @@
 import { Injectable, OnModuleInit } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ClickhouseModel } from "@modules/clickhouse/clickhouse-model";
+import { ClickhouseModel } from "@modules/clickhouse/clickhouse.model";
 import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
 
 import WebAjaxFactory from "./web/ajax";
