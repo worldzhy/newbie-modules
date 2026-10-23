@@ -1,6 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsDate, IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, ValidateIf } from "class-validator";
+import {
+  IsBoolean,
+  IsDate,
+  IsEnum,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateIf,
+} from "class-validator";
 import { EvidenceSourceType, PeriodType } from "@generated/prisma/client";
 
 // --- Rubric versions ---------------------------------------------------
@@ -30,6 +40,17 @@ export class CreateRubricVersionDto {
   @IsString()
   @IsNotEmpty()
   companyDirectionStatement!: string;
+
+  @ApiPropertyOptional({ description: "Override rubric publish time — defaults to now" })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  publishedAt?: Date;
+
+  @ApiPropertyOptional({ description: "Whether this version is active immediately — defaults to true" })
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
 }
 
 export class RubricVersionDto {
@@ -118,4 +139,10 @@ export class RecordEvidenceDto {
   @IsObject()
   @IsNotEmpty()
   payload!: object;
+
+  @ApiPropertyOptional({ description: "Source event timestamp — defaults to now" })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  collectedAt?: Date;
 }
