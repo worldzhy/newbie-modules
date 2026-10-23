@@ -12,6 +12,7 @@ import {
   ValidateIf,
 } from "class-validator";
 import { EvidenceSourceType, PeriodType } from "@generated/prisma/client";
+import { CommonListResponseDto } from "@devbie/newbie/common.dto";
 
 // --- Rubric versions ---------------------------------------------------
 
@@ -106,6 +107,8 @@ export class CreatePeopleEvaluationPeriodResponseDto {
   @ApiProperty() periodEnd!: Date;
   @ApiProperty() status!: string;
 }
+
+export class ListPeopleEvaluationPeriodsResponseDto extends CommonListResponseDto<CreatePeopleEvaluationPeriodResponseDto> {}
 
 // --- Evidence ----------------------------------------------------------
 

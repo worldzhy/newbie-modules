@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { PeopleEvaluationRubricVersion, PeopleEvaluationPeriod, PeriodType } from "@generated/prisma/client";
+import { Prisma, PeopleEvaluationRubricVersion, PeopleEvaluationPeriod, PeriodType } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   CreatePeopleEvaluationPeriodRequestDto,
@@ -48,11 +48,11 @@ export class PeopleEvaluationService {
 
   // --- Evaluation periods ------------------------------------------------
 
-  async listPeriods(periodType?: PeriodType): Promise<PeopleEvaluationPeriod[]> {
+  async listPeriods(periodType?: PeriodType) {
     const where = periodType ? { type: periodType } : {};
-    return this.prisma.peopleEvaluationPeriod.findMany({
-      where,
-      orderBy: [{ periodStart: "desc" }],
+    return this.prisma.findManyInOnePage({
+      model: Prisma.ModelName.PeopleEvaluationPeriod,
+      findManyArgs: { where, orderBy: [{ periodStart: "desc" }] },
     });
   }
 

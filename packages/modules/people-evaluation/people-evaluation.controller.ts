@@ -5,6 +5,7 @@ import {
   CreatePeopleEvaluationRubricVersionRequestDto,
   CreatePeopleEvaluationPeriodResponseDto,
   ListPeopleEvaluationPeriodsRequestDto,
+  ListPeopleEvaluationPeriodsResponseDto,
   RecordPeopleEvaluationEvidenceRequestDto,
   CreatePeopleEvaluationRubricVersionResponseDto,
 } from "./people-evaluation.dto";
@@ -36,7 +37,7 @@ export class PeopleEvaluationController {
 
   @Get("periods")
   @ApiOperation({ summary: "List evaluation periods, optionally filtered by type" })
-  @ApiResponse({ status: 200, type: [CreatePeopleEvaluationPeriodResponseDto] })
+  @ApiResponse({ status: 200, type: ListPeopleEvaluationPeriodsResponseDto })
   listPeriods(@Query() query: ListPeopleEvaluationPeriodsRequestDto) {
     return this.peopleEvaluation.listPeriods(query.type);
   }
