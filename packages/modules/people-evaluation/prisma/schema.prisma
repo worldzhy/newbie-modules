@@ -5,17 +5,17 @@
 // !! ----------------------------------------------------------- //
 // !!            [Module] People Evaluation models                //
 // !! ----------------------------------------------------------- //
-// * PeopleRubricVersion                                          //
+// * PeopleEvaluationRubricVersion                                //
 // * PeopleEvaluationDimension                                    //
 // * PeopleEvaluationPeriod                                       //
-// * PeopleMemberHomeGround                                       //
+// * PeopleEvaluationMemberHomeGround                             //
 // * PeopleEvaluationEvidence                                     //
-// * PeopleWorkDeliverable                                        //
+// * PeopleEvaluationWorkDeliverable                              //
 // * PeopleEvaluationScore                                        //
-// * PeopleAiAssessment                                           //
-// * PeopleImprovementItem                                        //
-// * PeopleFloorTrigger                                           //
-// * PeoplePipPlan                                                //
+// * PeopleEvaluationAiAssessment                                 //
+// * PeopleEvaluationImprovementItem                              //
+// * PeopleEvaluationFloorTrigger                                 //
+// * PeopleEvaluationImprovementPlan                              //
 // * EvidenceSourceType (enum)                                    //
 // * PeriodType (enum)                                            //
 // * FloorTriggerStatus (enum)                                    //
@@ -32,16 +32,16 @@ enum EvidenceSourceType {
 }
 
 enum PeriodType {
-  COLLECTION // 采集期（月度）
-  REVIEW     // 评审期（季度）
+  COLLECTION
+  REVIEW
 
   @@schema("module/people-evaluation")
 }
 
 enum FloorTriggerStatus {
-  TRIGGERED    // 已触发，待主管介入
-  ACKNOWLEDGED // 主管已确认
-  RESOLVED     // 已解决（PIP 完成 / 评估后解除）
+  TRIGGERED
+  ACKNOWLEDGED
+  RESOLVED
 
   @@schema("module/people-evaluation")
 }
@@ -60,7 +60,7 @@ enum ImprovementItemStatus {
 /// contest the standards. All dimensions, rules and the company
 /// direction statement live here — revision history is the audit trail
 /// of "what was promised when".
-model PeopleRubricVersion {
+model PeopleEvaluationRubricVersion {
   id     String @id @default(uuid()) @db.Uuid
   version String @unique @db.VarChar(64) // e.g. "v0.1", "v1.0"
 
@@ -70,7 +70,7 @@ model PeopleRubricVersion {
   fullLoadBaselines Json @db.JsonB
   // Floor rules: thresholds and "consecutive N periods" conditions
   floorRules        Json @db.JsonB
-  // 公司发展方向声明 — 锚点文本 for AI qualitative judgments
+  // Company direction statement — anchor text for AI qualitative judgments
   companyDirectionStatement String @db.Text
 
   // ex ante anchor — members must see this before evaluation begins
@@ -82,7 +82,7 @@ model PeopleRubricVersion {
 
   evaluationDimensions PeopleEvaluationDimension[]
   evaluationPeriods    PeopleEvaluationPeriod[]
-  aiAssessments        PeopleAiAssessment[]
+  aiAssessments        PeopleEvaluationAiAssessment[]
 
   @@index([isActive])
   @@schema("module/people-evaluation")
@@ -102,7 +102,7 @@ model PeopleEvaluationDimension {
   anchorHigh   Float?
   description  String? @db.Text
 
-  rubricVersion PeopleRubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
+  rubricVersion PeopleEvaluationRubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
 
   @@unique([rubricVersionId, dimensionKey])
   @@index([rubricVersionId])
@@ -123,13 +123,13 @@ model PeopleEvaluationPeriod {
   // REVIEW periods may reference which COLLECTION periods are rolled up
   collectionPeriodIds Json? @db.JsonB
 
-  rubricVersion PeopleRubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
+  rubricVersion PeopleEvaluationRubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
 
-  homeGrounds   PeopleMemberHomeGround[]
+  homeGrounds   PeopleEvaluationMemberHomeGround[]
   evidences     PeopleEvaluationEvidence[]
-  deliverables  PeopleWorkDeliverable[]
+  deliverables  PeopleEvaluationWorkDeliverable[]
   scores        PeopleEvaluationScore[]
-  aiAssessments PeopleAiAssessment[]
+  aiAssessments PeopleEvaluationAiAssessment[]
 
   @@index([rubricVersionId])
   @@index([type, periodStart])
@@ -140,19 +140,19 @@ model PeopleEvaluationPeriod {
 /// dimensions in `homeDimensions` get treated as the specialty circle
 /// (higher weight + higher expectation), everything else is the growth
 /// circle (lower weight but must show period-over-period growth).
-model PeopleMemberHomeGround {
+model PeopleEvaluationMemberHomeGround {
   id        String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
-  periodId      String @db.Uuid
+  collectionPeriodId String @db.Uuid
 
   homeDimensions Json @db.JsonB // dimensionKey[]
-  // Weights keyed by dimensionKey.综合分 = Σ(维度分 × 权重)；本人权重可见
+  // Weights keyed by dimensionKey — member-visible contribution weight per dimension
   weights    Json   @db.JsonB
   declaredAt DateTime @default(now())
 
-  period PeopleEvaluationPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  period PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
 
-  @@unique([evaluateeUserId, periodId])
+  @@unique([evaluateeUserId, collectionPeriodId])
   @@index([evaluateeUserId])
   @@schema("module/people-evaluation")
 }
@@ -170,7 +170,7 @@ model PeopleEvaluationEvidence {
   dimensionKey String? @db.VarChar(64) // which evaluation dimension this feeds
 
   payload     Json   @db.JsonB
-  collectedAt DateTime
+  eventAt     DateTime // source event timestamp (git commit date, incident open time, ...)
 
   collectionPeriod PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
 
@@ -185,7 +185,7 @@ model PeopleEvaluationEvidence {
 /// Non-code work (research, prototypes, process work) must be declared here
 /// so it becomes first-class evidence — "work must be seen before it can be
 /// evaluated". Input for AI qualitative judgment too.
-model PeopleWorkDeliverable {
+model PeopleEvaluationWorkDeliverable {
   id           String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
   collectionPeriodId String @db.Uuid
@@ -230,7 +230,7 @@ model PeopleEvaluationScore {
 /// score. Anchored to the published rubric's company direction statement,
 /// which makes the "why" of any match / mismatch claim traceable. Visible
 /// to the member — hiding it would only fuel distrust of "AI in evaluation".
-model PeopleAiAssessment {
+model PeopleEvaluationAiAssessment {
   id           String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
   collectionPeriodId String @db.Uuid
@@ -246,7 +246,7 @@ model PeopleAiAssessment {
   reviewNote      String? @db.Text
 
   collectionPeriod PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
-  rubricVersion    PeopleRubricVersion   @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
+  rubricVersion    PeopleEvaluationRubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
 
   @@index([evaluateeUserId, collectionPeriodId])
   @@index([promptVersion])
@@ -256,7 +256,7 @@ model PeopleAiAssessment {
 /// An improvement item raised against a member — from a floor trigger,
 /// manager observation, or AI review. Independently trackable so it can
 /// cross period boundaries (e.g. PIP runs into the next quarter).
-model PeopleImprovementItem {
+model PeopleEvaluationImprovementItem {
   id           String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
 
@@ -277,7 +277,7 @@ model PeopleImprovementItem {
 /// collection periods below threshold" on any dimension a row is written.
 /// v0.x behavior: record only, no automatic action. v1.0: floor rules
 /// published in rubric; triggers talk → PIP.
-model PeopleFloorTrigger {
+model PeopleEvaluationFloorTrigger {
   id           String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
 
@@ -299,7 +299,7 @@ model PeopleFloorTrigger {
 /// single signed resolution by worldzhy ties everything together: what
 /// triggered it, what the milestones are, and the final call. Every field
 /// visible to the member.
-model PeoplePipPlan {
+model PeopleEvaluationImprovementPlan {
   id           String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
 
