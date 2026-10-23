@@ -52,7 +52,7 @@ export class CreatePeopleEvaluationDimensionRequestDto {
   description?: string;
 
   @ApiPropertyOptional({
-    type: [Object],
+    type: Object,
     isArray: true,
     description: 'Calibration examples: [{ level, kind: "positive"|"negative", example, rationale }]',
   })
@@ -69,7 +69,7 @@ export class CreatePeopleEvaluationRubricVersionRequestDto {
   version!: string;
 
   @ApiProperty({
-    type: [CreatePeopleEvaluationDimensionRequestDto],
+    type: CreatePeopleEvaluationDimensionRequestDto,
     isArray: true,
     description: "Dimensions of this rubric version — the single source of truth for judgment",
   })
@@ -118,7 +118,7 @@ export class CreatePeopleEvaluationRubricVersionResponseDto {
   @ApiProperty() publishedAt!: Date;
   @ApiProperty() isActive!: boolean;
   @ApiProperty() companyDirectionStatement!: string;
-  @ApiPropertyOptional({ type: [PeopleEvaluationDimensionResponseDto], isArray: true })
+  @ApiPropertyOptional({ type: PeopleEvaluationDimensionResponseDto, isArray: true })
   dimensions?: PeopleEvaluationDimensionResponseDto[];
   @ApiProperty() createdAt!: Date;
 }
@@ -152,7 +152,7 @@ export class CreatePeopleEvaluationPeriodRequestDto {
   status?: PeriodStatus;
 
   @ApiPropertyOptional({
-    type: [String],
+    type: String,
     isArray: true,
     description: "COLLECTION period ids rolled up by this REVIEW period",
   })
@@ -183,7 +183,7 @@ export class CreatePeopleEvaluationPeriodResponseDto {
   @ApiProperty() periodStart!: Date;
   @ApiProperty() periodEnd!: Date;
   @ApiProperty({ enum: PeriodStatus }) status!: PeriodStatus;
-  @ApiPropertyOptional({ type: [String], isArray: true }) collectionPeriodIds?: string[];
+  @ApiPropertyOptional({ type: String, isArray: true }) collectionPeriodIds?: string[];
 }
 
 export class ListPeopleEvaluationPeriodsResponseDto extends CommonListResponseDto<CreatePeopleEvaluationPeriodResponseDto> {}
@@ -201,7 +201,7 @@ export class DeclarePeopleEvaluationHomeGroundRequestDto {
   @IsNotEmpty()
   collectionPeriodId!: string;
 
-  @ApiProperty({ type: [String], isArray: true, description: "dimensionKey[] of the specialty circle" })
+  @ApiProperty({ type: String, isArray: true, description: "dimensionKey[] of the specialty circle" })
   @IsArray()
   @IsString({ each: true })
   homeDimensions!: string[];
@@ -211,7 +211,7 @@ export class PeopleEvaluationHomeGroundResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() evaluateeUserId!: string;
   @ApiProperty() collectionPeriodId!: string;
-  @ApiProperty({ type: [String], isArray: true }) homeDimensions!: string[];
+  @ApiProperty({ type: String, isArray: true }) homeDimensions!: string[];
   @ApiProperty() declaredAt!: Date;
 }
 
@@ -238,7 +238,7 @@ export class ReportPeopleEvaluationWorkspaceRequestDto {
   isCompany!: boolean;
 
   @ApiProperty({
-    type: [Object],
+    type: Object,
     isArray: true,
     description: "Workspace → repository mapping: [{ path, platform, repositoryFullName }]",
   })
@@ -272,13 +272,13 @@ export class ReportPeopleEvaluationSessionRequestDto {
   @ApiProperty() @IsNumber() messageCount!: number;
   @ApiProperty() @IsNumber() toolCallCount!: number;
 
-  @ApiPropertyOptional({ type: [String], isArray: true })
+  @ApiPropertyOptional({ type: String, isArray: true })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   toolNames?: string[];
 
-  @ApiPropertyOptional({ type: [String], isArray: true })
+  @ApiPropertyOptional({ type: String, isArray: true })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -320,7 +320,7 @@ export class PeopleEvaluationMemberWorkspaceResponseDto {
   @ApiProperty() workspaceKey!: string;
   @ApiProperty() rootPath!: string;
   @ApiProperty() isCompany!: boolean;
-  @ApiProperty({ type: [Object], isArray: true }) repositories!: object[];
+  @ApiProperty({ type: Object, isArray: true }) repositories!: object[];
   @ApiPropertyOptional() installationId?: string | null;
   @ApiProperty() reportedAt!: Date;
 }
@@ -361,7 +361,7 @@ export class UpsertPeopleEvaluationPacketRequestDto {
   @ApiProperty() @IsUUID() @IsNotEmpty() collectionPeriodId!: string;
 
   @ApiProperty({
-    type: [Object],
+    type: Object,
     isArray: true,
     description: "Deterministic evidence manifest entries",
   })
@@ -384,7 +384,7 @@ export class PeopleEvaluationEvidencePacketResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() evaluateeUserId!: string;
   @ApiProperty() collectionPeriodId!: string;
-  @ApiProperty({ type: [Object], isArray: true }) manifest!: object[];
+  @ApiProperty({ type: Object, isArray: true }) manifest!: object[];
   @ApiProperty() contentHash!: string;
   @ApiProperty() coverageStats!: object;
   @ApiProperty() generatedAt!: Date;
@@ -406,7 +406,7 @@ export class CreatePeopleEvaluationAssessmentRequestDto {
   @ApiProperty() @IsString() @IsNotEmpty() model!: string;
 
   @ApiProperty({
-    type: [Object],
+    type: Object,
     isArray: true,
     description:
       "Per-dimension judgments: [{ dimensionKey, score, confidence, coverage, evidenceRefs, rationale, unresolved? }]",
@@ -420,22 +420,22 @@ export class CreatePeopleEvaluationAssessmentRequestDto {
   @IsNotEmpty()
   overallText!: string;
 
-  @ApiPropertyOptional({ type: [Object], isArray: true })
+  @ApiPropertyOptional({ type: Object, isArray: true })
   @IsOptional()
   @IsArray()
   @IsObject({ each: true })
   highlights?: object[];
-  @ApiPropertyOptional({ type: [Object], isArray: true })
+  @ApiPropertyOptional({ type: Object, isArray: true })
   @IsOptional()
   @IsArray()
   @IsObject({ each: true })
   risks?: object[];
-  @ApiPropertyOptional({ type: [Object], isArray: true })
+  @ApiPropertyOptional({ type: Object, isArray: true })
   @IsOptional()
   @IsArray()
   @IsObject({ each: true })
   unresolved?: object[];
-  @ApiPropertyOptional({ type: [Object], isArray: true })
+  @ApiPropertyOptional({ type: Object, isArray: true })
   @IsOptional()
   @IsArray()
   @IsObject({ each: true })
@@ -466,7 +466,7 @@ export class PeopleEvaluationAssessmentResponseDto {
   @ApiProperty() blindSubjectId!: string;
   @ApiProperty() promptVersion!: string;
   @ApiProperty() model!: string;
-  @ApiProperty({ type: [Object], isArray: true }) dimensionScores!: object[];
+  @ApiProperty({ type: Object, isArray: true }) dimensionScores!: object[];
   @ApiProperty() overallText!: string;
   @ApiPropertyOptional({ type: [Object] }) highlights?: object[] | null;
   @ApiPropertyOptional({ type: [Object] }) risks?: object[] | null;
@@ -484,7 +484,7 @@ export class PeopleEvaluationAssessmentResponseDto {
 export class CreatePeopleEvaluationPipPlanRequestDto {
   @ApiProperty() @IsUUID() @IsNotEmpty() evaluateeUserId!: string;
 
-  @ApiProperty({ type: [String], isArray: true, description: "Assessment / risk ids that triggered the plan" })
+  @ApiProperty({ type: String, isArray: true, description: "Assessment / risk ids that triggered the plan" })
   @IsArray()
   @IsString({ each: true })
   triggerRefs!: string[];
@@ -492,7 +492,7 @@ export class CreatePeopleEvaluationPipPlanRequestDto {
   @ApiProperty() @Type(() => Date) @IsDate() startDate!: Date;
   @ApiProperty() @Type(() => Date) @IsDate() endDate!: Date;
 
-  @ApiProperty({ type: [Object], isArray: true, description: "[{ dueDate, description, status }]" })
+  @ApiProperty({ type: Object, isArray: true, description: "[{ dueDate, description, status }]" })
   @IsArray()
   @IsObject({ each: true })
   checkpoints!: object[];
@@ -505,10 +505,10 @@ export class CreatePeopleEvaluationPipPlanRequestDto {
 export class PeopleEvaluationPipPlanResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() evaluateeUserId!: string;
-  @ApiProperty({ type: [String], isArray: true }) triggerRefs!: string[];
+  @ApiProperty({ type: String, isArray: true }) triggerRefs!: string[];
   @ApiProperty() startDate!: Date;
   @ApiProperty() endDate!: Date;
-  @ApiProperty({ type: [Object], isArray: true }) checkpoints!: object[];
+  @ApiProperty({ type: Object, isArray: true }) checkpoints!: object[];
   @ApiPropertyOptional() result?: string | null;
   @ApiPropertyOptional() decisionNote?: string | null;
   @ApiPropertyOptional() decidedByUserId?: string | null;
