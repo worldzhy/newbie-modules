@@ -142,7 +142,7 @@ model PeopleEvaluationPeriod {
 /// circle (lower weight but must show period-over-period growth).
 model PeopleMemberHomeGround {
   id        String @id @default(uuid()) @db.Uuid
-  memberUserId String @db.Uuid
+  evaluateeUserId String @db.Uuid
   periodId      String @db.Uuid
 
   homeDimensions Json @db.JsonB // dimensionKey[]
@@ -152,8 +152,8 @@ model PeopleMemberHomeGround {
 
   period PeopleEvaluationPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
 
-  @@unique([memberUserId, periodId])
-  @@index([memberUserId])
+  @@unique([evaluateeUserId, periodId])
+  @@index([evaluateeUserId])
   @@schema("module/people-evaluation")
 }
 
@@ -162,7 +162,7 @@ model PeopleMemberHomeGround {
 /// collection time; module handovers do not migrate historical rows.
 model PeopleEvaluationEvidence {
   id           String @id @default(uuid()) @db.Uuid
-  memberUserId String @db.Uuid
+  evaluateeUserId String @db.Uuid
   collectionPeriodId String @db.Uuid
 
   sourceType   EvidenceSourceType
@@ -174,10 +174,10 @@ model PeopleEvaluationEvidence {
 
   collectionPeriod PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
 
-  @@index([memberUserId])
+  @@index([evaluateeUserId])
   @@index([collectionPeriodId])
   @@index([sourceType])
-  @@index([memberUserId, collectionPeriodId])
+  @@index([evaluateeUserId, collectionPeriodId])
   @@schema("module/people-evaluation")
 }
 
@@ -186,7 +186,7 @@ model PeopleEvaluationEvidence {
 /// evaluated". Input for AI qualitative judgment too.
 model PeopleWorkDeliverable {
   id           String @id @default(uuid()) @db.Uuid
-  memberUserId String @db.Uuid
+  evaluateeUserId String @db.Uuid
   collectionPeriodId String @db.Uuid
 
   title        String @db.VarChar(255)
@@ -197,7 +197,7 @@ model PeopleWorkDeliverable {
 
   collectionPeriod PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
 
-  @@index([memberUserId])
+  @@index([evaluateeUserId])
   @@index([collectionPeriodId])
   @@schema("module/people-evaluation")
 }
@@ -208,7 +208,7 @@ model PeopleWorkDeliverable {
 /// decision trail is replayable.
 model PeopleEvaluationScore {
   id           String @id @default(uuid()) @db.Uuid
-  memberUserId String @db.Uuid
+  evaluateeUserId String @db.Uuid
   collectionPeriodId String @db.Uuid
   dimensionKey String @db.VarChar(64)
 
@@ -220,8 +220,8 @@ model PeopleEvaluationScore {
 
   collectionPeriod PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
 
-  @@unique([memberUserId, collectionPeriodId, dimensionKey])
-  @@index([memberUserId, collectionPeriodId])
+  @@unique([evaluateeUserId, collectionPeriodId, dimensionKey])
+  @@index([evaluateeUserId, collectionPeriodId])
   @@schema("module/people-evaluation")
 }
 
@@ -231,7 +231,7 @@ model PeopleEvaluationScore {
 /// to the member — hiding it would only fuel distrust of "AI in evaluation".
 model PeopleAiAssessment {
   id           String @id @default(uuid()) @db.Uuid
-  memberUserId String @db.Uuid
+  evaluateeUserId String @db.Uuid
   collectionPeriodId String @db.Uuid
   rubricVersionId String @db.Uuid
 
@@ -247,7 +247,7 @@ model PeopleAiAssessment {
   collectionPeriod PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
   rubricVersion    PeopleRubricVersion   @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
 
-  @@index([memberUserId, collectionPeriodId])
+  @@index([evaluateeUserId, collectionPeriodId])
   @@index([promptVersion])
   @@schema("module/people-evaluation")
 }
@@ -257,7 +257,7 @@ model PeopleAiAssessment {
 /// cross period boundaries (e.g. PIP runs into the next quarter).
 model PeopleImprovementItem {
   id           String @id @default(uuid()) @db.Uuid
-  memberUserId String @db.Uuid
+  evaluateeUserId String @db.Uuid
 
   triggeredBy  String @db.VarChar(32)       // floor_trigger / manager / ai
   dimensionKey String? @db.VarChar(64)
@@ -267,7 +267,7 @@ model PeopleImprovementItem {
   openedAt     DateTime @default(now())
   closedAt     DateTime?
 
-  @@index([memberUserId])
+  @@index([evaluateeUserId])
   @@index([status])
   @@schema("module/people-evaluation")
 }
@@ -278,7 +278,7 @@ model PeopleImprovementItem {
 /// published in rubric; triggers talk → PIP.
 model PeopleFloorTrigger {
   id           String @id @default(uuid()) @db.Uuid
-  memberUserId String @db.Uuid
+  evaluateeUserId String @db.Uuid
 
   dimensionKey String @db.VarChar(64)
   consecutiveCollectionPeriods Int
@@ -288,9 +288,9 @@ model PeopleFloorTrigger {
   triggeredAt DateTime @default(now())
   resolvedAt  DateTime?
 
-  @@index([memberUserId])
+  @@index([evaluateeUserId])
   @@index([status])
-  @@index([memberUserId, dimensionKey, status])
+  @@index([evaluateeUserId, dimensionKey, status])
   @@schema("module/people-evaluation")
 }
 
@@ -300,7 +300,7 @@ model PeopleFloorTrigger {
 /// visible to the member.
 model PeoplePipPlan {
   id           String @id @default(uuid()) @db.Uuid
-  memberUserId String @db.Uuid
+  evaluateeUserId String @db.Uuid
 
   triggerRefs  Json @db.JsonB           // improvement_item + floor_trigger ids
   startDate    DateTime
@@ -314,6 +314,6 @@ model PeoplePipPlan {
   decidedAt       DateTime?
   createdAt       DateTime @default(now())
 
-  @@index([memberUserId])
+  @@index([evaluateeUserId])
   @@schema("module/people-evaluation")
 }
