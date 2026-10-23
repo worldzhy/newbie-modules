@@ -198,7 +198,7 @@ export const HOST_SCOPED_RESOURCES = Symbol("HOST_SCOPED_RESOURCES");
 | `GET /ec2-metric?projectId=` | `{scope:"project"}` | project resolver 命中 | 等价 |
 | `GET /task-spaces/by-project/:projectId` | **无 scope**（系统级） | project resolver 命中 → 项目级 | **行为变更**：成员从 403 → 允许 |
 
-最后一行是唯一的实际变更，方向为放宽且符合 ADR-019 语义（项目成员应能访问自己项目），但**必须知道它是白名单的副作用**，不是显式决策。若未来需要 action 级精度，应升级 token 类型为 `Record<resource, actions[]>`，而不是回到装饰器携带 key。
+最后一行是唯一的实际变更，方向为放宽且符合 nightwatch-backend ADR-019 的语义（项目成员应能访问自己项目），但**必须知道它是白名单的副作用**，不是显式决策。若未来需要 action 级精度，应升级 token 类型为 `Record<resource, actions[]>`，而不是回到装饰器携带 key。
 
 ### 3. 迁移面遗漏（已修）
 

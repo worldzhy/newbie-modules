@@ -3,6 +3,7 @@
 状态：已采纳
 日期：2026-10-23
 归属注记：本决策治理 registry 模块 notification-center 的推送失败可见性契约，存放于本仓。nightwatch-backend 侧的 application schema 方案（ADR-025，不成熟方案）已被删除。
+编号说明：2026-10-23 — 上文所指的 nightwatch-backend ADR-025（notification-push-failure-visibility，22cd950 新增、e464b50 删除）与当日晚些时候同号新建的 ADR-025-self-observation-via-seed 是两个不同决策；引用旧决策时以文件路径为准，勿按编号回溯。
 
 ## 背景
 
