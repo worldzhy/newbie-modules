@@ -53,6 +53,35 @@ loop on itself.
 - `PushDeliveryResultDto` 类保留（class-transformer runtime type 用），OpenAPI 展示形态与 runtime shape 解耦。
 - 前端 toast 从 `recipientKey`（`${platform}:${type}:${id}`）解析 label，不要求 registry 知道 Lark 概念。
 
+## Edge-case hardening: whole-track failures
+
+Both delivery tracks must never produce an orphan `NotificationRecord`
+with zero failure visibility after `notify()` has persisted the row.
+
+**System track (registry dispatchPush)** wraps `pushPort.pushSystemText()`
+in try/catch. When the adapter crashes wholesale (DB down enumerating
+bindings, Lark client broken, etc.), a failure row is recorded with
+`recipientKey = "__adapter__"` — a sentinel value outside the
+`${platform}:${type}:${id}` convention. The frontend banner renders this
+as "Push adapter (all system chats)" via a hard-coded branch.
+
+**Project track (host ProjectNotificationPushService)** wraps the whole
+post-`notify()` body (setting lookup → binding lookup → record read →
+Lark sends) in try/catch. Whole-track exceptions record a row with
+`recipientKey = "__project_push__"`, rendered as "Project push track".
+Per-recipient failures inside the `Promise.all` are handled individually
+(one bad binding never suppresses others).
+
+**testPush** wraps `pushPort.pushSystemText()` in try/catch and returns
+a synthetic `PushDeliveryResult` with `recipientKey = "__adapter__"`
+instead of throwing 500. The synthetic row is **not** persisted to
+`NotificationPushFailure` — testPush is a diagnostic tool and its
+ephemeral results must not pollute the real failure table.
+
+**dispatchPush** per-recipient DB writes use `Promise.all` (not serial
+`for...of await`): each row belongs to a different recipientKey with no
+write conflict, so parallelism is safe and avoids N+1 roundtrips.
+
 ## 影响
 
 **更容易**：

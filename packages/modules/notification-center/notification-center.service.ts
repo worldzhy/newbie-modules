@@ -271,6 +271,11 @@ export class NotificationCenterService {
         ],
       };
     }
+    // Self-heal unresolved failures for any recipient that succeeded in this test.
+    // testPush is the user's "I just fixed it — verify" tool, so its successes
+    // should wipe stale red-badge rows. Failures are NOT recorded (ephemeral).
+    const successfulKeys = results.filter((r) => r.success).map((r) => r.recipientKey);
+    await Promise.all(successfulKeys.map((key) => this.resolveFailures(key)));
     return {
       succeeded: results.filter((result) => result.success).length,
       failed: results.filter((result) => !result.success).length,
