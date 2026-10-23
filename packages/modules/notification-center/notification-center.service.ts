@@ -190,14 +190,29 @@ export class NotificationCenterService {
       return;
     }
     const text = detail ? `${title}\n${detail}` : title;
-    const results = await this.pushPort.pushSystemText(text);
-    for (const result of results) {
-      if (!result.success) {
-        await this.recordFailure(recordId, result.recipientKey, result.error ?? "unknown error");
-      } else {
-        await this.resolveFailures(result.recipientKey);
-      }
+    let results: PushDeliveryResult[];
+    try {
+      results = await this.pushPort.pushSystemText(text);
+    } catch (error) {
+      // Adapter-level failure (DB down while enumerating bindings, Lark client
+      // crash, etc.). The NotificationRecord is already persisted at this
+      // point; record a generic failure row so the orphan is visible instead
+      // of silently disappearing.
+      const message = error instanceof Error ? error.message : String(error);
+      await this.recordFailure(recordId, "__adapter__", `Push adapter failed: ${message}`);
+      return;
     }
+    // Per-recipient writes are independent (different recipientKeys, no row
+    // conflict). Run in parallel instead of serializing N roundtrips.
+    await Promise.all(
+      results.map(async (result) => {
+        if (!result.success) {
+          await this.recordFailure(recordId, result.recipientKey, result.error ?? "unknown error");
+        } else {
+          await this.resolveFailures(result.recipientKey);
+        }
+      }),
+    );
   }
 
   // --- Center settings -----------------------------------------------------
