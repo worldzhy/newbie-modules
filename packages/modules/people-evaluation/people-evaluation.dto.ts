@@ -144,5 +144,5 @@ export class RecordEvidenceDto {
   @IsOptional()
   @Type(() => Date)
   @IsDate()
-  collectedAt?: Date;
+  eventAt?: Date;
 }

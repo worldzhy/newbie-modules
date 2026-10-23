@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { PeopleEvaluationPeriod, PeopleRubricVersion, PeriodType } from "@generated/prisma/client";
+import { PeopleEvaluationRubricVersion, PeopleEvaluationPeriod, PeriodType } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { CreateEvaluationPeriodDto, CreateRubricVersionDto, RecordEvidenceDto } from "./people-evaluation.dto";
 
@@ -22,12 +22,12 @@ export class PeopleEvaluationService {
 
   // --- Rubric versions ---------------------------------------------------
 
-  async findActiveRubric(): Promise<PeopleRubricVersion | null> {
-    return this.prisma.peopleRubricVersion.findFirst({ where: { isActive: true } });
+  async findActiveRubric(): Promise<PeopleEvaluationRubricVersion | null> {
+    return this.prisma.peopleEvaluationRubricVersion.findFirst({ where: { isActive: true } });
   }
 
-  async createRubricVersion(input: CreateRubricVersionDto): Promise<PeopleRubricVersion> {
-    return this.prisma.peopleRubricVersion.create({
+  async createRubricVersion(input: CreateRubricVersionDto): Promise<PeopleEvaluationRubricVersion> {
+    return this.prisma.peopleEvaluationRubricVersion.create({
       data: {
         version: input.version,
         dimensionConfig: input.dimensionConfig,
@@ -61,14 +61,14 @@ export class PeopleEvaluationService {
   }
 
   async createPeriod(input: CreateEvaluationPeriodDto): Promise<PeopleEvaluationPeriod> {
-    const rubric = await this.prisma.peopleRubricVersion.findUnique({
+    const rubric = await this.prisma.peopleEvaluationRubricVersion.findUnique({
       where: { id: input.rubricVersionId },
     });
     if (!rubric) {
-      throw new NotFoundException(`PeopleRubricVersion ${input.rubricVersionId} not found`);
+      throw new NotFoundException(`PeopleEvaluationRubricVersion ${input.rubricVersionId} not found`);
     }
     if (!rubric.isActive) {
-      throw new ConflictException(`PeopleRubricVersion ${input.rubricVersionId} is not active`);
+      throw new ConflictException(`PeopleEvaluationRubricVersion ${input.rubricVersionId} is not active`);
     }
 
     return this.prisma.peopleEvaluationPeriod.create({
@@ -103,7 +103,7 @@ export class PeopleEvaluationService {
       sourceRef: input.sourceRef,
       dimensionKey: input.dimensionKey,
       payload: input.payload,
-      collectedAt: input.collectedAt ?? new Date(),
+      eventAt: input.eventAt ?? new Date(),
     };
 
     if (!input.sourceRef) {

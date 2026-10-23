@@ -12,20 +12,20 @@ import { PeopleEvaluationService } from "./people-evaluation.service";
 
 @ApiTags("People Evaluation")
 @ApiBearerAuth()
-@Controller()
+@Controller("people")
 export class PeopleEvaluationController {
   constructor(private readonly peopleEvaluation: PeopleEvaluationService) {}
 
   // --- Rubric versions ---------------------------------------------------
 
-  @Get("people-rubrics/active")
+  @Get("rubrics/active")
   @ApiOperation({ summary: "Find the currently active rubric version, or null" })
   @ApiResponse({ status: 200, type: RubricVersionDto, nullable: true })
   findActiveRubric() {
     return this.peopleEvaluation.findActiveRubric();
   }
 
-  @Post("people-rubrics")
+  @Post("rubrics")
   @ApiOperation({ summary: "Create and publish a new rubric version (ex ante anchor)" })
   @ApiResponse({ status: 201, type: RubricVersionDto })
   createRubricVersion(@Body() body: CreateRubricVersionDto) {
@@ -34,21 +34,21 @@ export class PeopleEvaluationController {
 
   // --- Evaluation periods ------------------------------------------------
 
-  @Get("people-evaluation-periods")
+  @Get("periods")
   @ApiOperation({ summary: "List evaluation periods, optionally filtered by type" })
   @ApiResponse({ status: 200, type: [EvaluationPeriodDto] })
   listPeriods(@Query() query: ListPeriodsQueryDto) {
     return this.peopleEvaluation.listPeriods(query.type);
   }
 
-  @Get("people-evaluation-periods/:id")
+  @Get("periods/:id")
   @ApiOperation({ summary: "Get one evaluation period by id" })
   @ApiResponse({ status: 200, type: EvaluationPeriodDto })
   getPeriodById(@Param("id") id: string) {
     return this.peopleEvaluation.getPeriodById(id);
   }
 
-  @Post("people-evaluation-periods")
+  @Post("periods")
   @ApiOperation({ summary: "Create a new evaluation period pinned to an existing rubric version" })
   @ApiResponse({ status: 201, type: EvaluationPeriodDto })
   createPeriod(@Body() body: CreateEvaluationPeriodDto) {
@@ -57,7 +57,7 @@ export class PeopleEvaluationController {
 
   // --- Evidence (pipeline hook) ------------------------------------------
 
-  @Post("people-evidences")
+  @Post("evidences")
   @ApiOperation({ summary: "Append one evidence row for an evaluatee in a collection period" })
   @ApiResponse({ status: 201 })
   recordEvidence(@Body() body: RecordEvidenceDto) {
