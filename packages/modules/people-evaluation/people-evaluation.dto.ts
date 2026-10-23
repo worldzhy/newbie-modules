@@ -1,20 +1,56 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsDate,
   IsEnum,
   IsNotEmpty,
+  IsNumber,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
   ValidateIf,
+  ValidateNested,
 } from "class-validator";
-import { EvidenceSourceType, PeriodType } from "@generated/prisma/client";
+import { EvidenceSourceType, PeriodStatus, PeriodType } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
 // --- Rubric versions ---------------------------------------------------
+
+export class CreatePeopleEvaluationDimensionRequestDto {
+  @ApiProperty({ description: 'Unique dimension key inside the rubric, e.g. "architecture-design"' })
+  @IsString()
+  @IsNotEmpty()
+  dimensionKey!: string;
+
+  @ApiProperty({ description: "Human-readable dimension name" })
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @ApiPropertyOptional({ description: "Lower anchor of the expected score band" })
+  @IsOptional()
+  @IsNumber()
+  anchorLow?: number;
+
+  @ApiPropertyOptional({ description: "Upper anchor of the expected score band" })
+  @IsOptional()
+  @IsNumber()
+  anchorHigh?: number;
+
+  @ApiPropertyOptional({ description: "Full-load reference baseline, published ex ante" })
+  @IsOptional()
+  @IsString()
+  fullLoadBaseRef?: string;
+
+  @ApiPropertyOptional({ description: "Dimension description" })
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
 
 export class CreatePeopleEvaluationRubricVersionRequestDto {
   @ApiProperty({ description: 'Semantic version string, e.g. "v0.1"' })
@@ -22,15 +58,16 @@ export class CreatePeopleEvaluationRubricVersionRequestDto {
   @IsNotEmpty()
   version!: string;
 
-  @ApiProperty({ description: "Per-dimension anchor config JSON" })
-  @IsObject()
-  @IsNotEmpty()
-  dimensionConfig!: object;
-
-  @ApiProperty({ description: "Per-dimension full-load baseline ref JSON" })
-  @IsObject()
-  @IsNotEmpty()
-  fullLoadBaselines!: object;
+  @ApiProperty({
+    type: [CreatePeopleEvaluationDimensionRequestDto],
+    isArray: true,
+    description: "Dimensions of this rubric version — the single source of truth for scoring",
+  })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreatePeopleEvaluationDimensionRequestDto)
+  dimensions!: CreatePeopleEvaluationDimensionRequestDto[];
 
   @ApiProperty({ description: "Floor rule thresholds JSON" })
   @IsObject()
@@ -41,6 +78,11 @@ export class CreatePeopleEvaluationRubricVersionRequestDto {
   @IsString()
   @IsNotEmpty()
   companyDirectionStatement!: string;
+
+  @ApiPropertyOptional({ description: "Host calibration for machine scoring JSON (evidenceCap, scoreFloor)" })
+  @IsOptional()
+  @IsObject()
+  scoringConfig?: object;
 
   @ApiPropertyOptional({ description: "Override rubric publish time — defaults to now" })
   @IsOptional()
@@ -54,12 +96,24 @@ export class CreatePeopleEvaluationRubricVersionRequestDto {
   isActive?: boolean;
 }
 
+export class PeopleEvaluationDimensionResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() dimensionKey!: string;
+  @ApiProperty() name!: string;
+  @ApiPropertyOptional() anchorLow?: number | null;
+  @ApiPropertyOptional() anchorHigh?: number | null;
+  @ApiPropertyOptional() fullLoadBaseRef?: string | null;
+  @ApiPropertyOptional() description?: string | null;
+}
+
 export class CreatePeopleEvaluationRubricVersionResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() version!: string;
   @ApiProperty() publishedAt!: Date;
   @ApiProperty() isActive!: boolean;
   @ApiProperty() companyDirectionStatement!: string;
+  @ApiPropertyOptional({ type: [PeopleEvaluationDimensionResponseDto], isArray: true })
+  dimensions?: PeopleEvaluationDimensionResponseDto[];
   @ApiProperty() createdAt!: Date;
 }
 
@@ -86,10 +140,27 @@ export class CreatePeopleEvaluationPeriodRequestDto {
   @IsDate()
   periodEnd!: Date;
 
-  @ApiPropertyOptional({ description: 'Status hint — defaults to "upcoming"' })
+  @ApiPropertyOptional({ enum: PeriodStatus, description: "Initial status — defaults to UPCOMING" })
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsEnum(PeriodStatus)
+  status?: PeriodStatus;
+
+  @ApiPropertyOptional({
+    type: [String],
+    isArray: true,
+    description: "COLLECTION period ids rolled up by this REVIEW period",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsUUID("4", { each: true })
+  collectionPeriodIds?: string[];
+}
+
+export class UpdatePeopleEvaluationPeriodStatusRequestDto {
+  @ApiProperty({ enum: PeriodStatus })
+  @ValidateIf(() => true)
+  @IsEnum(PeriodStatus)
+  status!: PeriodStatus;
 }
 
 export class ListPeopleEvaluationPeriodsRequestDto extends CommonListRequestDto {
@@ -105,7 +176,8 @@ export class CreatePeopleEvaluationPeriodResponseDto {
   @ApiProperty() type!: PeriodType;
   @ApiProperty() periodStart!: Date;
   @ApiProperty() periodEnd!: Date;
-  @ApiProperty() status!: string;
+  @ApiProperty({ enum: PeriodStatus }) status!: PeriodStatus;
+  @ApiPropertyOptional({ type: [String], isArray: true }) collectionPeriodIds?: string[];
 }
 
 export class ListPeopleEvaluationPeriodsResponseDto extends CommonListResponseDto<CreatePeopleEvaluationPeriodResponseDto> {}

@@ -39,6 +39,8 @@ export interface EvidenceRow {
   sourceRef?: string;
   /** Which evaluation dimension this evidence feeds (null if multi-purpose). */
   dimensionKey?: string;
+  /** Signed weighted contribution. Negative for evaluatee-caused incidents. */
+  contribution?: number;
   /** Free-form JSON payload specific to the source type. */
   payload: Record<string, unknown>;
   /** Timestamp of the source event (e.g. git commit date), NOT the collection-run time. */
@@ -52,6 +54,10 @@ export interface EvidenceRow {
  * mounts its repos where the backend can see them. Attribution is purely
  * by commit author email matching — no ProjectMember FK walk.
  *
+ * Dimension attribution is host vocabulary and therefore injected: the
+ * host passes a `classifyDimension` callback (or nothing, leaving commits
+ * uncategorized so scoring spreads them evenly).
+ *
  * Dedupe key: `${repoPath}:${commitHash}`. Running the collector twice on
  * the same window produces identical rows.
  */
@@ -62,6 +68,8 @@ export class GitEvidenceCollector implements EvidenceCollector {
     private readonly repoConfigs: { path: string; repoName: string }[],
     /** Lowercased email → evaluateeUserId. Host supplies the mapping. */
     private readonly emailToUserId: Record<string, string>,
+    /** Host-supplied dimension classifier; omit to leave commits uncategorized. */
+    private readonly options: { classifyDimension?: (subject: string) => string | undefined } = {},
   ) {}
 
   async collect(window: EvidenceWindow): Promise<EvidenceRow[]> {
@@ -105,7 +113,7 @@ export class GitEvidenceCollector implements EvidenceCollector {
           rows.push({
             evaluateeUserId: userId,
             sourceRef: `git:${repoName}:${hash.slice(0, 8)}`,
-            dimensionKey: this.guessDimension(subject),
+            dimensionKey: this.options.classifyDimension?.(subject),
             payload: { hash, subject, repoName, authorEmail: email },
             eventAt: new Date(dateStr),
           });
@@ -113,20 +121,5 @@ export class GitEvidenceCollector implements EvidenceCollector {
         resolve(rows);
       });
     });
-  }
-
-  /**
-   * Lightweight dimension guess from commit subject keywords. This is
-   * v0.x heuristic — real scoring reads the evidence in the pipeline,
-   * dimensionKey here is a hint for the front-end grouping view.
-   */
-  private guessDimension(subject: string): string | undefined {
-    const lower = subject.toLowerCase();
-    if (/(test|jest|spec|e2e)/.test(lower)) return "test-discipline";
-    if (/(docker|deploy|compose|ci|workflow|buildx)/.test(lower)) return "devops-productionization";
-    if (/(security|auth|jwt|cve|secret|permission)/.test(lower)) return "security-awareness";
-    if (/(lint|prettier|eslint|rule|adr|governance)/.test(lower)) return "engineering-governance";
-    if (/(arch|design|prisma|nest|newbie|fewbie|schema)/.test(lower)) return "architecture-design";
-    return undefined; // leave blank for commits that don't map cleanly
   }
 }

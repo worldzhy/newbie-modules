@@ -38,6 +38,14 @@ enum PeriodType {
   @@schema("module/people-evaluation")
 }
 
+enum PeriodStatus {
+  UPCOMING
+  ACTIVE
+  CLOSED
+
+  @@schema("module/people-evaluation")
+}
+
 enum FloorTriggerStatus {
   TRIGGERED
   ACKNOWLEDGED
@@ -57,21 +65,20 @@ enum ImprovementItemStatus {
 
 /// Versioned rubric that anchors every evaluation period. Published
 /// ex ante before any period of this version starts so members can
-/// contest the standards. All dimensions, rules and the company
-/// direction statement live here — revision history is the audit trail
-/// of "what was promised when".
+/// contest the standards. Dimensions live in their own table (the single
+/// source of truth for scoring); this row carries the rules and the
+/// direction statement — revision history is the audit trail of
+/// "what was promised when".
 model PeopleEvaluationRubricVersion {
   id     String @id @default(uuid()) @db.Uuid
   version String @unique @db.VarChar(64) // e.g. "v0.1", "v1.0"
 
-  // Dimension configuration JSON: [{dimensionKey, anchorLow, anchorHigh, fullLoadBaseRef}]
-  dimensionConfig   Json @db.JsonB
-  // Per-dimension full-load baseline refs keyed by dimensionKey
-  fullLoadBaselines Json @db.JsonB
   // Floor rules: thresholds and "consecutive N periods" conditions
   floorRules        Json @db.JsonB
   // Company direction statement — anchor text for AI qualitative judgments
   companyDirectionStatement String @db.Text
+  // Host calibration for machine scoring: { evidenceCap?: number, scoreFloor?: number }
+  scoringConfig     Json? @db.JsonB
 
   // ex ante anchor — members must see this before evaluation begins
   publishedAt DateTime
@@ -84,23 +91,26 @@ model PeopleEvaluationRubricVersion {
   evaluationPeriods    PeopleEvaluationPeriod[]
   aiAssessments        PeopleEvaluationAiAssessment[]
 
-  @@index([isActive])
+  @@index([isActive, publishedAt])
   @@schema("module/people-evaluation")
 }
 
 /// One evaluation dimension inside a rubric version. The same dimension key
 /// can appear across rubric versions with revised anchors — each version is
-/// a frozen snapshot so historical scores stay interpretable.
+/// a frozen snapshot so historical scores stay interpretable. Scoring reads
+/// dimensions from this table only.
 model PeopleEvaluationDimension {
   id              String @id @default(uuid()) @db.Uuid
   rubricVersionId String @db.Uuid
 
   // Unique within a rubric version, e.g. "architecture-design"
-  dimensionKey String @db.VarChar(64)
-  name         String @db.VarChar(128)
-  anchorLow    Float?
-  anchorHigh   Float?
-  description  String? @db.Text
+  dimensionKey    String  @db.VarChar(64)
+  name            String  @db.VarChar(128)
+  anchorLow       Float?
+  anchorHigh      Float?
+  // Full-load reference baseline — qualitative industry anchor published ex ante
+  fullLoadBaseRef String? @db.Text
+  description     String? @db.Text
 
   rubricVersion PeopleEvaluationRubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
 
@@ -118,7 +128,7 @@ model PeopleEvaluationPeriod {
   type            PeriodType
   periodStart     DateTime
   periodEnd       DateTime
-  status          String @default("upcoming") @db.VarChar(16) // upcoming / active / closed
+  status          PeriodStatus @default(UPCOMING)
 
   // REVIEW periods may reference which COLLECTION periods are rolled up
   collectionPeriodIds Json? @db.JsonB
