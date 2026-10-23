@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PeopleEvaluationPeriod, PeopleEvidenceSourceType, PeopleRubricVersion } from "@generated/prisma/client";
+import { PeopleEvaluationPeriod, EvidenceSourceType, PeopleRubricVersion } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 /**
@@ -45,7 +45,7 @@ export class PeopleEvaluationService {
 
   // --- Evaluation periods ------------------------------------------------
 
-  async listPeriods(periodType?: PeoplePeriodType): Promise<PeopleEvaluationPeriod[]> {
+  async listPeriods(periodType?: PeriodType): Promise<PeopleEvaluationPeriod[]> {
     const where = periodType ? { type: periodType } : {};
     return this.prisma.peopleEvaluationPeriod.findMany({
       where,
@@ -117,11 +117,11 @@ export interface CreateRubricVersionInput {
   isActive?: boolean;
 }
 
-export type PeoplePeriodType = PeopleEvaluationPeriod["type"];
+export type PeriodType = PeopleEvaluationPeriod["type"];
 
 export interface CreateEvaluationPeriodInput {
   rubricVersionId: string;
-  type: PeoplePeriodType;
+  type: PeriodType;
   periodStart: Date;
   periodEnd: Date;
   status?: string;
@@ -130,7 +130,7 @@ export interface CreateEvaluationPeriodInput {
 export interface RecordEvidenceInput {
   evaluateeUserId: string;
   collectionPeriodId: string;
-  sourceType: PeopleEvidenceSourceType;
+  sourceType: EvidenceSourceType;
   sourceRef?: string;
   dimensionKey?: string;
   payload: object;

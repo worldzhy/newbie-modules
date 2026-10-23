@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { IsDate, IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, ValidateIf } from "class-validator";
-import { PeopleEvidenceSourceType, PeoplePeriodType } from "@generated/prisma/client";
+import { EvidenceSourceType, PeriodType } from "@generated/prisma/client";
 
 // --- Rubric versions ---------------------------------------------------
 
@@ -49,10 +49,10 @@ export class CreateEvaluationPeriodDto {
   @IsNotEmpty()
   rubricVersionId!: string;
 
-  @ApiProperty({ enum: PeoplePeriodType })
+  @ApiProperty({ enum: PeriodType })
   @ValidateIf(() => true)
-  @IsEnum(PeoplePeriodType)
-  type!: PeoplePeriodType;
+  @IsEnum(PeriodType)
+  type!: PeriodType;
 
   @ApiProperty()
   @Type(() => Date)
@@ -71,16 +71,16 @@ export class CreateEvaluationPeriodDto {
 }
 
 export class ListPeriodsQueryDto {
-  @ApiPropertyOptional({ enum: PeoplePeriodType, description: "Filter by period type" })
+  @ApiPropertyOptional({ enum: PeriodType, description: "Filter by period type" })
   @IsOptional()
-  @IsEnum(PeoplePeriodType)
-  type?: PeoplePeriodType;
+  @IsEnum(PeriodType)
+  type?: PeriodType;
 }
 
 export class EvaluationPeriodDto {
   @ApiProperty() id!: string;
   @ApiProperty() rubricVersionId!: string;
-  @ApiProperty() type!: PeoplePeriodType;
+  @ApiProperty() type!: PeriodType;
   @ApiProperty() periodStart!: Date;
   @ApiProperty() periodEnd!: Date;
   @ApiProperty() status!: string;
@@ -99,10 +99,10 @@ export class RecordEvidenceDto {
   @IsNotEmpty()
   collectionPeriodId!: string;
 
-  @ApiProperty({ enum: PeopleEvidenceSourceType })
+  @ApiProperty({ enum: EvidenceSourceType })
   @ValidateIf(() => true)
-  @IsEnum(PeopleEvidenceSourceType)
-  sourceType!: PeopleEvidenceSourceType;
+  @IsEnum(EvidenceSourceType)
+  sourceType!: EvidenceSourceType;
 
   @ApiPropertyOptional({ description: 'Source reference, e.g. "git:nw-backend"' })
   @IsOptional()
