@@ -19,13 +19,13 @@ import { getMigrationStatus, runMigrations, type ClickhouseMigrationConfig } fro
  */
 
 // Default modules root: this file lives at
-// <modulesRoot>/clickhouse/migration/migrate-cli.(ts|js) in both the source
+// <moduleRoot>/clickhouse/migration/migrate-cli.(ts|js) in both the source
 // tree (src/modules) and the compiled tree (dist/src/modules).
 const DEFAULT_MODULES_ROOT = path.resolve(__dirname, "..", "..");
 
 export interface CliOptions {
   cwd: string;
-  modulesRoot?: string | string[];
+  modulesRoots?: string | string[];
 }
 
 /** Minimal .env parser (KEY=VALUE lines, `export ` prefix, quotes, comments). */
@@ -69,16 +69,16 @@ export async function runMigrateCli(argv: string[], options: CliOptions): Promis
   const command = argv[0];
   // Repeatable flag: hosts with application-layer migration directories pass
   // one --modules-root per tree; all roots share one history table.
-  const rootFlags = argv
+  const moduleRoots = argv
     .filter((arg) => arg.startsWith("--modules-root="))
     .map((arg) => arg.slice("--modules-root=".length));
-  const modulesRoot = rootFlags.length > 0 ? rootFlags : (options.modulesRoot ?? DEFAULT_MODULES_ROOT);
+  const modulesRoots = moduleRoots.length > 0 ? moduleRoots : (options.modulesRoots ?? DEFAULT_MODULES_ROOT);
   const cwd = options.cwd;
   const config = resolveConfig(cwd);
   const log = (message: string): void => console.log(`[clickhouse-migrate] ${message}`);
 
   if (command === "deploy") {
-    const result = await runMigrations(config, modulesRoot, log);
+    const result = await runMigrations(config, modulesRoots, log);
     for (const migration of result.executed) {
       console.log(`  applied ${migration.version} ${migration.name}`);
     }
@@ -86,7 +86,7 @@ export async function runMigrateCli(argv: string[], options: CliOptions): Promis
   }
 
   if (command === "status") {
-    const status = await getMigrationStatus(config, modulesRoot);
+    const status = await getMigrationStatus(config, modulesRoots);
     console.log(`Database:  ${status.database}`);
     console.log(`Applied:   ${status.applied.length}`);
     for (const row of status.applied) {

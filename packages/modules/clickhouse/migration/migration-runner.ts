@@ -54,14 +54,14 @@ export interface MigrationResult extends MigrationPlan {
   executed: DiscoveredMigration[];
 }
 
-interface MigrationLog {
+interface MigrationLogger {
   (message: string): void;
 }
 
 const HISTORY_TABLE = "_clickhouse_schema_migrations";
 const MIGRATION_DIR_NAME = "clickhouse-migrations";
-// V20261016000000__init_backend_monitor_tables.sql (8 or 14 digit timestamp)
-const MIGRATION_FILE_PATTERN = /^V(\d{8}(?:\d{6})?)__([a-z0-9_]+)\.sql$/;
+// V20261016000000__init_backend_monitor_tables.sql (14 digit timestamp)
+const MIGRATION_FILE_PATTERN = /^V(\d{14})__([a-z0-9_]+)\.sql$/;
 // Database/table identifiers we generate ourselves must stay injection-safe;
 // they only ever come from CLICKHOUSE_DB env and the constant above.
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_]+$/;
@@ -173,13 +173,13 @@ function isLineCommentStart(sql: string, index: number): boolean {
 
 /**
  * Discover migration files across every scanned root:
- * `<modulesRoot>/<moduleKey>/clickhouse-migrations/V*.sql`. Multiple roots
+ * `<root>/<moduleKey>/clickhouse-migrations/V*.sql`. Multiple roots
  * (e.g. the assembled module tree plus a host application tree) are scanned
  * in order and merged. Versions must be globally unique across all roots;
  * results are ordered by version.
  */
-export async function discoverMigrations(modulesRoot: string | string[]): Promise<DiscoveredMigration[]> {
-  const roots = Array.isArray(modulesRoot) ? modulesRoot : [modulesRoot];
+export async function discoverMigrations(modulesRoots: string | string[]): Promise<DiscoveredMigration[]> {
+  const roots = Array.isArray(modulesRoots) ? modulesRoots : [modulesRoots];
   const discovered: DiscoveredMigration[] = [];
 
   for (const root of roots) {
@@ -351,7 +351,7 @@ async function withClient<T>(
 export async function runPlan(
   executor: MigrationExecutor,
   plan: MigrationPlan,
-  log: MigrationLog = () => undefined,
+  log: MigrationLogger = () => undefined,
 ): Promise<DiscoveredMigration[]> {
   const executed: DiscoveredMigration[] = [];
   for (const migration of plan.pending) {
@@ -380,14 +380,14 @@ export async function runPlan(
  */
 export async function runMigrations(
   config: ClickhouseMigrationConfig,
-  modulesRoot: string | string[],
-  log: MigrationLog = () => undefined,
+  modulesRoots: string | string[],
+  log: MigrationLogger = () => undefined,
 ): Promise<MigrationResult> {
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
   }
   return withClient(config, async (client) => {
-    const discovered = await discoverMigrations(modulesRoot);
+    const discovered = await discoverMigrations(modulesRoots);
     const applied = await readAppliedMigrations(client);
     const plan = planMigrations(discovered, applied);
     const executed = await runPlan(client, plan, log);
@@ -404,13 +404,13 @@ export async function runMigrations(
 /** Read-only view used by the `status` command. */
 export async function getMigrationStatus(
   config: ClickhouseMigrationConfig,
-  modulesRoot: string | string[],
+  modulesRoots: string | string[],
 ): Promise<MigrationPlan & { database: string }> {
   if (!config.database) {
     throw new Error("CLICKHOUSE_DB is not set; the migration runner needs an explicit target database.");
   }
   return withClient(config, async (client) => {
-    const discovered = await discoverMigrations(modulesRoot);
+    const discovered = await discoverMigrations(modulesRoots);
     const applied = await readAppliedMigrations(client);
     return { ...planMigrations(discovered, applied), database: config.database };
   });
