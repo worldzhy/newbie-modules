@@ -20,9 +20,9 @@ export interface SessionMessageRow {
 /**
  * Transcript storage for collected agent sessions.
  *
- * The transcript is the raw material the assessment agent drills into; PG only
- * keeps the session index (PeopleEvaluationAgentSession). Rows are chunked by
- * the worklog agent before upload and compressed by the ClickHouse column codec.
+ * The transcript is the raw material the evaluation agent drills into; PG only
+ * keeps the session index (PeopleEvaluationSession). Rows are chunked by the
+ * installation agent before upload and compressed by the ClickHouse column codec.
  */
 @Injectable()
 export class PeopleEvaluationSessionStore {

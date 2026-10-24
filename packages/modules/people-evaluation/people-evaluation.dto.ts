@@ -1,11 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
   IsDate,
   IsEnum,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -15,12 +17,12 @@ import {
   ValidateIf,
   ValidateNested,
 } from "class-validator";
-import { PeriodStatus, PeriodType } from "@generated/prisma/client";
+import { PeopleEvaluationPeriodStatus, PeopleEvaluationPeriodType } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
 // --- Rubric versions ---------------------------------------------------
 
-export class CreateDimensionRequestDto {
+export class PeopleEvaluationDimensionDto {
   @ApiProperty({ description: 'Unique dimension key inside the rubric, e.g. "ai-collaboration"' })
   @IsString()
   @IsNotEmpty()
@@ -62,22 +64,22 @@ export class CreateDimensionRequestDto {
   calibrationExamples?: object[];
 }
 
-export class CreateRubricVersionRequestDto {
+export class CreatePeopleEvaluationRubricVersionRequestDto {
   @ApiProperty({ description: 'Semantic version string, e.g. "v0.1"' })
   @IsString()
   @IsNotEmpty()
   version!: string;
 
   @ApiProperty({
-    type: CreateDimensionRequestDto,
+    type: PeopleEvaluationDimensionDto,
     isArray: true,
     description: "Dimensions of this rubric version — the single source of truth for judgment",
   })
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
-  @Type(() => CreateDimensionRequestDto)
-  dimensions!: CreateDimensionRequestDto[];
+  @Type(() => PeopleEvaluationDimensionDto)
+  dimensions!: PeopleEvaluationDimensionDto[];
 
   @ApiPropertyOptional({ description: "Floor rule thresholds JSON — reported as risks, never applied mechanically" })
   @IsOptional()
@@ -101,7 +103,7 @@ export class CreateRubricVersionRequestDto {
   isActive?: boolean;
 }
 
-export class DimensionResponseDto {
+export class PeopleEvaluationDimensionResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() dimensionKey!: string;
   @ApiProperty() name!: string;
@@ -112,29 +114,29 @@ export class DimensionResponseDto {
   @ApiPropertyOptional({ type: [Object] }) calibrationExamples?: object[] | null;
 }
 
-export class RubricVersionResponseDto {
+export class PeopleEvaluationRubricVersionResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() version!: string;
   @ApiProperty() publishedAt!: Date;
   @ApiProperty() isActive!: boolean;
   @ApiProperty() companyDirectionStatement!: string;
-  @ApiPropertyOptional({ type: DimensionResponseDto, isArray: true })
-  dimensions?: DimensionResponseDto[];
+  @ApiPropertyOptional({ type: PeopleEvaluationDimensionResponseDto, isArray: true })
+  dimensions?: PeopleEvaluationDimensionResponseDto[];
   @ApiProperty() createdAt!: Date;
 }
 
 // --- Evaluation periods ------------------------------------------------
 
-export class CreatePeriodRequestDto {
+export class CreatePeopleEvaluationPeriodRequestDto {
   @ApiProperty({ description: "Rubric version this period is judged against" })
   @IsUUID()
   @IsNotEmpty()
   rubricVersionId!: string;
 
-  @ApiProperty({ enum: PeriodType })
+  @ApiProperty({ enum: PeopleEvaluationPeriodType })
   @ValidateIf(() => true)
-  @IsEnum(PeriodType)
-  type!: PeriodType;
+  @IsEnum(PeopleEvaluationPeriodType)
+  type!: PeopleEvaluationPeriodType;
 
   @ApiProperty()
   @Type(() => Date)
@@ -146,10 +148,10 @@ export class CreatePeriodRequestDto {
   @IsDate()
   periodEnd!: Date;
 
-  @ApiPropertyOptional({ enum: PeriodStatus, description: "Initial status — defaults to UPCOMING" })
+  @ApiPropertyOptional({ enum: PeopleEvaluationPeriodStatus, description: "Initial status — defaults to UPCOMING" })
   @IsOptional()
-  @IsEnum(PeriodStatus)
-  status?: PeriodStatus;
+  @IsEnum(PeopleEvaluationPeriodStatus)
+  status?: PeopleEvaluationPeriodStatus;
 
   @ApiPropertyOptional({
     type: String,
@@ -162,35 +164,35 @@ export class CreatePeriodRequestDto {
   collectionPeriodIds?: string[];
 }
 
-export class UpdatePeriodStatusRequestDto {
-  @ApiProperty({ enum: PeriodStatus })
+export class UpdatePeopleEvaluationPeriodStatusRequestDto {
+  @ApiProperty({ enum: PeopleEvaluationPeriodStatus })
   @ValidateIf(() => true)
-  @IsEnum(PeriodStatus)
-  status!: PeriodStatus;
+  @IsEnum(PeopleEvaluationPeriodStatus)
+  status!: PeopleEvaluationPeriodStatus;
 }
 
-export class ListPeriodsRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({ enum: PeriodType, description: "Filter by period type" })
+export class ListPeopleEvaluationPeriodsRequestDto extends CommonListRequestDto {
+  @ApiPropertyOptional({ enum: PeopleEvaluationPeriodType, description: "Filter by period type" })
   @IsOptional()
-  @IsEnum(PeriodType)
-  type?: PeriodType;
+  @IsEnum(PeopleEvaluationPeriodType)
+  type?: PeopleEvaluationPeriodType;
 }
 
-export class PeriodResponseDto {
+export class PeopleEvaluationPeriodResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() rubricVersionId!: string;
-  @ApiProperty() type!: PeriodType;
+  @ApiProperty() type!: PeopleEvaluationPeriodType;
   @ApiProperty() periodStart!: Date;
   @ApiProperty() periodEnd!: Date;
-  @ApiProperty({ enum: PeriodStatus }) status!: PeriodStatus;
+  @ApiProperty({ enum: PeopleEvaluationPeriodStatus }) status!: PeopleEvaluationPeriodStatus;
   @ApiPropertyOptional({ type: String, isArray: true }) collectionPeriodIds?: string[];
 }
 
-export class ListPeriodsResponseDto extends CommonListResponseDto<PeriodResponseDto> {}
+export class ListPeopleEvaluationPeriodsResponseDto extends CommonListResponseDto<PeopleEvaluationPeriodResponseDto> {}
 
 // --- Home ground -------------------------------------------------------
 
-export class DeclareHomeGroundRequestDto {
+export class UpdatePeopleEvaluationHomeGroundRequestDto {
   @ApiProperty({ description: "Who declares the specialty circle (evaluatee userId)" })
   @IsUUID()
   @IsNotEmpty()
@@ -207,7 +209,7 @@ export class DeclareHomeGroundRequestDto {
   homeDimensions!: string[];
 }
 
-export class HomeGroundResponseDto {
+export class PeopleEvaluationHomeGroundResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() evaluateeUserId!: string;
   @ApiProperty() collectionPeriodId!: string;
@@ -215,9 +217,15 @@ export class HomeGroundResponseDto {
   @ApiProperty() declaredAt!: Date;
 }
 
-// --- Worklog-reported context ------------------------------------------
+// --- Reported evidence context -----------------------------------------
 
-export class WorkspaceResponseDto {
+export class ListPeopleEvaluationWorkspacesRequestDto {
+  @ApiProperty({ description: "Evaluatee whose reported workspaces are listed" })
+  @IsUUID()
+  evaluateeUserId!: string;
+}
+
+export class PeopleEvaluationWorkspaceResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() evaluateeUserId!: string;
   @ApiProperty() workspaceKey!: string;
@@ -226,11 +234,21 @@ export class WorkspaceResponseDto {
   @ApiProperty() reportedAt!: Date;
 }
 
-export class AgentSessionResponseDto {
+export class ListPeopleEvaluationSessionsRequestDto extends CommonListRequestDto {
+  @ApiProperty({ description: "Evaluatee whose collected sessions are listed" })
+  @IsUUID()
+  evaluateeUserId!: string;
+
+  @ApiPropertyOptional({ description: "Restrict to one collection period" })
+  @IsOptional()
+  @IsUUID()
+  collectionPeriodId?: string;
+}
+
+export class PeopleEvaluationSessionResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() evaluateeUserId!: string;
   @ApiPropertyOptional() collectionPeriodId?: string | null;
-  @ApiPropertyOptional() memberWorkspaceId?: string | null;
   @ApiProperty() externalSessionId!: string;
   @ApiProperty() workspaceKey!: string;
   @ApiProperty() model!: string;
@@ -244,7 +262,15 @@ export class AgentSessionResponseDto {
   @ApiProperty() endedAt!: Date;
 }
 
-export class DeclaredDocumentResponseDto {
+export class ListPeopleEvaluationSessionsResponseDto extends CommonListResponseDto<PeopleEvaluationSessionResponseDto> {}
+
+export class ListPeopleEvaluationDeclaredDocumentsRequestDto extends CommonListRequestDto {
+  @ApiProperty({ description: "Evaluatee whose declared documents are listed" })
+  @IsUUID()
+  evaluateeUserId!: string;
+}
+
+export class PeopleEvaluationDeclaredDocumentResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() evaluateeUserId!: string;
   @ApiProperty() workspaceKey!: string;
@@ -255,16 +281,39 @@ export class DeclaredDocumentResponseDto {
   @ApiProperty() createdAt!: Date;
 }
 
-// --- Evidence packets --------------------------------------------------
+export class ListPeopleEvaluationDeclaredDocumentsResponseDto extends CommonListResponseDto<PeopleEvaluationDeclaredDocumentResponseDto> {}
 
-export class UpsertPacketRequestDto {
+// --- Home-ground read --------------------------------------------------
+
+export class GetPeopleEvaluationHomeGroundRequestDto {
+  @ApiProperty({ description: "Evaluatee whose home-ground declaration is read" })
+  @IsUUID()
+  evaluateeUserId!: string;
+
+  @ApiProperty({ description: "Collection period of the declaration" })
+  @IsUUID()
+  collectionPeriodId!: string;
+}
+
+// --- Evaluation result manifest ----------------------------------------
+
+export class PeopleEvaluationResultManifestResponseDto {
+  @ApiProperty({ description: "SHA-256 over the canonical manifest" }) contentHash!: string;
+  @ApiProperty({ type: Object, description: "Coverage statistics by layer and source" }) coverageStats!: object;
+  @ApiProperty({ type: Object, isArray: true, description: "Deterministic evidence manifest entries" })
+  manifest!: object[];
+}
+
+// --- Evaluation results ------------------------------------------------
+
+export class CreatePeopleEvaluationResultInput {
   @ApiProperty() @IsUUID() @IsNotEmpty() evaluateeUserId!: string;
   @ApiProperty() @IsUUID() @IsNotEmpty() collectionPeriodId!: string;
 
   @ApiProperty({
     type: Object,
     isArray: true,
-    description: "Deterministic evidence manifest entries",
+    description: "Deterministic evidence manifest entries the run was judged from",
   })
   @IsArray()
   @IsObject({ each: true })
@@ -279,24 +328,6 @@ export class UpsertPacketRequestDto {
   @IsObject()
   @IsNotEmpty()
   coverageStats!: object;
-}
-
-export class EvidencePacketResponseDto {
-  @ApiProperty() id!: string;
-  @ApiProperty() evaluateeUserId!: string;
-  @ApiProperty() collectionPeriodId!: string;
-  @ApiProperty({ type: Object, isArray: true }) manifest!: object[];
-  @ApiProperty() contentHash!: string;
-  @ApiProperty() coverageStats!: object;
-  @ApiProperty() generatedAt!: Date;
-}
-
-// --- Assessments -------------------------------------------------------
-
-export class CreateAssessmentRequestDto {
-  @ApiProperty() @IsUUID() @IsNotEmpty() evaluateeUserId!: string;
-  @ApiProperty() @IsUUID() @IsNotEmpty() collectionPeriodId!: string;
-  @ApiProperty() @IsUUID() @IsNotEmpty() packetId!: string;
 
   @ApiProperty({ description: "Blind subject id the model saw instead of the real identity" })
   @IsString()
@@ -347,23 +378,28 @@ export class CreateAssessmentRequestDto {
   disagreement?: object;
 }
 
-export class ReviewAssessmentRequestDto {
-  @ApiProperty({ description: "Supervisor userId recording the final call" })
-  @IsUUID()
-  @IsNotEmpty()
-  reviewedByUserId!: string;
-
+export class UpdatePeopleEvaluationResultReviewRequestDto {
   @ApiPropertyOptional({ description: "Supervisor note visible to the member" })
   @IsOptional()
   @IsString()
   reviewNote?: string;
 }
 
-export class AssessmentResponseDto {
+export class ListPeopleEvaluationResultsRequestDto {
+  @ApiProperty({ description: "Evaluatee whose results are listed" })
+  @IsUUID()
+  evaluateeUserId!: string;
+
+  @ApiPropertyOptional({ description: "Restrict to one collection period" })
+  @IsOptional()
+  @IsUUID()
+  collectionPeriodId?: string;
+}
+
+export class PeopleEvaluationResultResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() evaluateeUserId!: string;
   @ApiProperty() collectionPeriodId!: string;
-  @ApiProperty() packetId!: string;
   @ApiProperty() blindSubjectId!: string;
   @ApiProperty() promptVersion!: string;
   @ApiProperty() model!: string;
@@ -374,6 +410,7 @@ export class AssessmentResponseDto {
   @ApiPropertyOptional({ type: [Object] }) unresolved?: object[] | null;
   @ApiPropertyOptional({ type: [Object] }) skipped?: object[] | null;
   @ApiPropertyOptional() disagreement?: object | null;
+  @ApiProperty({ type: Object, description: "Coverage declaration for this run" }) coverageStats!: object;
   @ApiPropertyOptional() reviewedByUserId?: string | null;
   @ApiPropertyOptional() reviewedAt?: Date | null;
   @ApiPropertyOptional() reviewNote?: string | null;
@@ -382,10 +419,10 @@ export class AssessmentResponseDto {
 
 // --- PIP plans ---------------------------------------------------------
 
-export class CreatePipPlanRequestDto {
+export class CreatePeopleEvaluationPipPlanRequestDto {
   @ApiProperty() @IsUUID() @IsNotEmpty() evaluateeUserId!: string;
 
-  @ApiProperty({ type: String, isArray: true, description: "Assessment / risk ids that triggered the plan" })
+  @ApiProperty({ type: String, isArray: true, description: "Evaluation result ids that triggered the plan" })
   @IsArray()
   @IsString({ each: true })
   triggerRefs!: string[];
@@ -397,13 +434,30 @@ export class CreatePipPlanRequestDto {
   @IsArray()
   @IsObject({ each: true })
   checkpoints!: object[];
-
-  @ApiPropertyOptional() @IsOptional() @IsString() decisionNote?: string;
-  @ApiPropertyOptional() @IsOptional() @IsUUID() decidedByUserId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() result?: string;
 }
 
-export class PipPlanResponseDto {
+/** Values accepted for PeopleEvaluationPipPlan.result. */
+export const PEOPLE_EVALUATION_PIP_DECISIONS = ["completed", "failed", "extended"] as const;
+export type PeopleEvaluationPipDecision = (typeof PEOPLE_EVALUATION_PIP_DECISIONS)[number];
+
+export class UpdatePeopleEvaluationPipPlanDecisionRequestDto {
+  @ApiProperty({ enum: PEOPLE_EVALUATION_PIP_DECISIONS })
+  @IsIn(PEOPLE_EVALUATION_PIP_DECISIONS)
+  result!: string;
+
+  @ApiPropertyOptional({ description: "Supervisor rationale visible to the member" })
+  @IsOptional()
+  @IsString()
+  decisionNote?: string;
+}
+
+export class ListPeopleEvaluationPipPlansRequestDto {
+  @ApiProperty({ description: "Evaluatee whose PIP plans are listed" })
+  @IsUUID()
+  evaluateeUserId!: string;
+}
+
+export class PeopleEvaluationPipPlanResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() evaluateeUserId!: string;
   @ApiProperty({ type: String, isArray: true }) triggerRefs!: string[];
@@ -415,4 +469,215 @@ export class PipPlanResponseDto {
   @ApiPropertyOptional() decidedByUserId?: string | null;
   @ApiPropertyOptional() decidedAt?: Date | null;
   @ApiProperty() createdAt!: Date;
+}
+
+// --- Reported evidence ingest ------------------------------------------
+
+/** Hard caps keep one ingest call bounded (evidence batches are small by design). */
+export const MAX_WORKSPACES_PER_BATCH = 100;
+export const MAX_SESSIONS_PER_BATCH = 50;
+export const MAX_MESSAGES_PER_SESSION = 2000;
+export const MAX_DOCUMENTS_PER_BATCH = 100;
+
+/**
+ * Transcript origins the installation agent knows how to read. "trae-memory" is
+ * the IDE's own session summary (lower fidelity than a raw transcript) — the
+ * distinction travels end to end so coverage can state it explicitly.
+ */
+export enum PeopleEvaluationSessionSource {
+  CLAUDE = "claude",
+  CODEX = "codex",
+  TRAE_MEMORY = "trae-memory",
+}
+
+/**
+ * Session ingest payload roles — the installation agent normalizes provider-specific
+ * roles into this small set so the transcript stays tool-agnostic.
+ */
+export enum PeopleEvaluationMessageRole {
+  USER = "user",
+  ASSISTANT = "assistant",
+  TOOL = "tool",
+  SYSTEM = "system",
+}
+
+export class PeopleEvaluationWorkspaceDto {
+  @ApiProperty({ description: "IDE-side workspace identifier (stable across reports)" })
+  @IsString()
+  @IsNotEmpty()
+  workspaceKey!: string;
+
+  @ApiProperty({ description: "Absolute workspace root path" })
+  @IsString()
+  @IsNotEmpty()
+  rootPath!: string;
+}
+
+export class CreatePeopleEvaluationWorkspaceBatchRequestDto {
+  @ApiProperty({ type: [PeopleEvaluationWorkspaceDto], isArray: true })
+  @IsArray()
+  @ArrayMaxSize(MAX_WORKSPACES_PER_BATCH)
+  @ValidateNested({ each: true })
+  @Type(() => PeopleEvaluationWorkspaceDto)
+  workspaces!: PeopleEvaluationWorkspaceDto[];
+}
+
+export class PeopleEvaluationSessionMessageDto {
+  @ApiProperty({ description: "Monotonic sequence inside the session" })
+  @IsNumber()
+  seq!: number;
+
+  @ApiProperty({
+    description: 'Message role, e.g. "user" / "assistant" / "tool"',
+    enum: PeopleEvaluationMessageRole,
+    enumName: "PeopleEvaluationMessageRole",
+  })
+  @IsIn(Object.values(PeopleEvaluationMessageRole))
+  role!: PeopleEvaluationMessageRole;
+
+  @ApiProperty({ description: "Message content chunk (already redacted client-side)" })
+  @IsString()
+  content!: string;
+
+  @ApiPropertyOptional({ description: "Tool name when this message is a tool call/result" })
+  @IsOptional()
+  @IsString()
+  toolName?: string;
+
+  @ApiPropertyOptional({ description: "Raw JSON of tool calls in this message" })
+  @IsOptional()
+  @IsString()
+  toolCalls?: string;
+
+  @ApiPropertyOptional({ description: "Token count reported by the IDE, when known" })
+  @IsOptional()
+  @IsNumber()
+  tokenCount?: number;
+
+  @ApiPropertyOptional({ description: "Message timestamp — defaults to the session start" })
+  @IsOptional()
+  @Type(() => Date)
+  @IsDate()
+  createdAt?: Date;
+}
+
+export class PeopleEvaluationSessionDto {
+  @ApiProperty() @IsString() @IsNotEmpty() workspaceKey!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() externalSessionId!: string;
+
+  @ApiPropertyOptional({
+    description: 'Transcript origin: "claude" / "codex" / "trae-memory" — defaults to "claude"',
+    enum: PeopleEvaluationSessionSource,
+    enumName: "PeopleEvaluationSessionSource",
+  })
+  @IsOptional()
+  @IsEnum(PeopleEvaluationSessionSource)
+  source?: PeopleEvaluationSessionSource;
+
+  @ApiPropertyOptional() @IsOptional() @IsString() model?: string;
+  @ApiProperty() @IsNumber() turnCount!: number;
+  @ApiProperty() @IsNumber() messageCount!: number;
+  @ApiProperty() @IsNumber() toolCallCount!: number;
+
+  @ApiPropertyOptional({ type: [String], isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  toolNames?: string[];
+
+  @ApiPropertyOptional({ type: [String], isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  touchedFiles?: string[];
+
+  @ApiPropertyOptional() @IsOptional() @IsNumber() durationMs?: number;
+  @ApiProperty() @Type(() => Date) @IsDate() startedAt!: Date;
+  @ApiProperty() @Type(() => Date) @IsDate() endedAt!: Date;
+
+  @ApiProperty({ type: [PeopleEvaluationSessionMessageDto], isArray: true })
+  @IsArray()
+  @ArrayMaxSize(MAX_MESSAGES_PER_SESSION)
+  @ValidateNested({ each: true })
+  @Type(() => PeopleEvaluationSessionMessageDto)
+  messages!: PeopleEvaluationSessionMessageDto[];
+}
+
+export class CreatePeopleEvaluationSessionBatchRequestDto {
+  @ApiProperty({ type: [PeopleEvaluationSessionDto], isArray: true })
+  @IsArray()
+  @ArrayMaxSize(MAX_SESSIONS_PER_BATCH)
+  @ValidateNested({ each: true })
+  @Type(() => PeopleEvaluationSessionDto)
+  sessions!: PeopleEvaluationSessionDto[];
+}
+
+export class PeopleEvaluationDeclaredDocumentDto {
+  @ApiProperty() @IsString() @IsNotEmpty() workspaceKey!: string;
+  @ApiProperty() @IsString() @IsNotEmpty() title!: string;
+  @ApiProperty({ description: "Workspace-relative path — stable identity of the document" })
+  @IsString()
+  @IsNotEmpty()
+  refPath!: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
+  @ApiProperty({ description: "Document content, already redacted client-side" })
+  @IsString()
+  content!: string;
+  @ApiProperty() @Type(() => Date) @IsDate() capturedAt!: Date;
+}
+
+export class CreatePeopleEvaluationDeclaredDocumentBatchRequestDto {
+  @ApiProperty({ type: [PeopleEvaluationDeclaredDocumentDto], isArray: true })
+  @IsArray()
+  @ArrayMaxSize(MAX_DOCUMENTS_PER_BATCH)
+  @ValidateNested({ each: true })
+  @Type(() => PeopleEvaluationDeclaredDocumentDto)
+  documents!: PeopleEvaluationDeclaredDocumentDto[];
+}
+
+/** Installation enrollment (supervisor-side; carries the evaluatee the token reports for). */
+export class CreatePeopleEvaluationInstallationRequestDto {
+  @ApiProperty({ description: 'Human-readable label, e.g. "worldzhy-macbook"' })
+  @IsString()
+  @IsNotEmpty()
+  label!: string;
+
+  @ApiProperty({ description: "Evaluatee userId the token is allowed to report for" })
+  @IsUUID()
+  @IsNotEmpty()
+  evaluateeUserId!: string;
+
+  @ApiPropertyOptional({ description: "Host the installation agent runs on (informational)" })
+  @IsOptional()
+  @IsString()
+  hostname?: string;
+}
+
+export class ListPeopleEvaluationInstallationsRequestDto {
+  @ApiPropertyOptional({ description: "Filter by evaluatee userId" })
+  @IsOptional()
+  @IsUUID()
+  evaluateeUserId?: string;
+}
+
+export class PeopleEvaluationInstallationResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() label!: string;
+  @ApiProperty() evaluateeUserId!: string;
+  @ApiPropertyOptional() hostname?: string | null;
+  @ApiPropertyOptional() firstSeenAt?: Date | null;
+  @ApiPropertyOptional() lastSeenAt?: Date | null;
+  @ApiPropertyOptional() revokedAt?: Date | null;
+  @ApiProperty() online!: boolean;
+  @ApiProperty() createdAt!: Date;
+}
+
+/**
+ * Installation credential returned exactly once, by creation or token rotation.
+ * Installation rows only keep a hash, so this is the only time the plaintext
+ * token is available; GET / List responses never carry it.
+ */
+export class PeopleEvaluationInstallationCredentialResponseDto extends PeopleEvaluationInstallationResponseDto {
+  @ApiProperty({ description: "Plaintext token — shown once" })
+  token!: string;
 }

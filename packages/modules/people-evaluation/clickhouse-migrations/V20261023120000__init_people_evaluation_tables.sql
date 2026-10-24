@@ -2,14 +2,14 @@
 -- Idempotent: safe to re-run on an existing identical schema.
 
 -- One row per collected AI-agent session message chunk. The PG side keeps the
--- session index (PeopleEvaluationAgentSession); this table holds the transcript
--- the assessment agent drills into on demand.
--- `content` is chunked by the worklog agent and compressed with ZSTD on disk.
+-- session index (PeopleEvaluationSession); this table holds the transcript
+-- the evaluation agent drills into on demand.
+-- `content` is chunked by the installation agent and compressed with ZSTD on disk.
 CREATE TABLE IF NOT EXISTS people_evaluation_session_messages
 (
-    -- Evaluatee the session belongs to, resolved from the worklog token.
+    -- Evaluatee the session belongs to, resolved from the installation token.
     evaluatee_user_id UUID,
-    -- PG PeopleEvaluationAgentSession.id
+    -- PG PeopleEvaluationSession.id
     session_id     UUID,
     workspace_key  LowCardinality(String),
     -- Monotonic within a session; chunks keep their original ordering.

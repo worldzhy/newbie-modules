@@ -9,25 +9,24 @@
 // * PeopleEvaluationDimension                                    //
 // * PeopleEvaluationPeriod                                       //
 // * PeopleEvaluationHomeGround                                   //
-// * PeopleEvaluationMemberWorkspace                              //
-// * PeopleEvaluationAgentSession                                 //
-// * PeopleEvaluationEvidencePacket                               //
-// * PeopleEvaluationAssessment                                   //
+// * PeopleEvaluationWorkspace                                    //
+// * PeopleEvaluationSession                                      //
+// * PeopleEvaluationResult                                       //
 // * PeopleEvaluationPipPlan                                      //
 // * PeopleEvaluationDeclaredDocument                             //
-// * PeopleEvaluationWorklogInstallation                         //
-// * PeriodType (enum)                                            //
-// * PeriodStatus (enum)                                          //
+// * PeopleEvaluationInstallation                                 //
+// * PeopleEvaluationPeriodType (enum)                            //
+// * PeopleEvaluationPeriodStatus (enum)                          //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-enum PeriodType {
+enum PeopleEvaluationPeriodType {
   COLLECTION
   REVIEW
 
   @@schema("module/people-evaluation")
 }
 
-enum PeriodStatus {
+enum PeopleEvaluationPeriodStatus {
   UPCOMING
   ACTIVE
   CLOSED
@@ -43,7 +42,7 @@ model PeopleEvaluationRubricVersion {
   id     String @id @default(uuid()) @db.Uuid
   version String @unique @db.VarChar(64) // e.g. "v0.1", "v1.0"
 
-  // Floor rules: thresholds that the assessment agent must call out as risks.
+  // Floor rules: thresholds that the evaluation agent must call out as risks.
   // Never applied mechanically — the agent reports them, a human decides.
   floorRules Json? @db.JsonB
   // Company direction statement — anchor text for every qualitative judgment
@@ -56,8 +55,8 @@ model PeopleEvaluationRubricVersion {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  evaluationDimensions PeopleEvaluationDimension[]
-  evaluationPeriods    PeopleEvaluationPeriod[]
+  dimensions PeopleEvaluationDimension[]
+  periods    PeopleEvaluationPeriod[]
 
   @@index([isActive, publishedAt])
   @@schema("module/people-evaluation")
@@ -65,7 +64,7 @@ model PeopleEvaluationRubricVersion {
 
 /// One evaluation dimension inside a rubric version. The same dimension key
 /// can appear across rubric versions with revised anchors — each version is a
-/// frozen snapshot so historical assessments stay interpretable.
+/// frozen snapshot so historical evaluation results stay interpretable.
 model PeopleEvaluationDimension {
   id              String @id @default(uuid()) @db.Uuid
   rubricVersionId String @db.Uuid
@@ -73,7 +72,7 @@ model PeopleEvaluationDimension {
   // Unique within a rubric version, e.g. "architecture-design"
   dimensionKey String  @db.VarChar(64)
   name         String  @db.VarChar(128)
-  // Reference band the assessment is expected to land in
+  // Reference band the evaluation is expected to land in
   anchorLow    Float?
   anchorHigh   Float?
   // Full-load reference baseline — qualitative industry anchor published ex ante
@@ -96,20 +95,19 @@ model PeopleEvaluationDimension {
 model PeopleEvaluationPeriod {
   id              String @id @default(uuid()) @db.Uuid
   rubricVersionId String @db.Uuid
-  type            PeriodType
+  type            PeopleEvaluationPeriodType
   periodStart     DateTime
   periodEnd       DateTime
-  status          PeriodStatus @default(UPCOMING)
+  status          PeopleEvaluationPeriodStatus @default(UPCOMING)
 
   // REVIEW periods may reference which COLLECTION periods are rolled up
   collectionPeriodIds Json? @db.JsonB
 
   rubricVersion PeopleEvaluationRubricVersion @relation(fields: [rubricVersionId], references: [id], onDelete: Cascade)
 
-  homeGrounds   PeopleEvaluationHomeGround[]
-  agentSessions PeopleEvaluationAgentSession[]
-  packets       PeopleEvaluationEvidencePacket[]
-  assessments   PeopleEvaluationAssessment[]
+  homeGrounds PeopleEvaluationHomeGround[]
+  sessions    PeopleEvaluationSession[]
+  results     PeopleEvaluationResult[]
 
   @@index([rubricVersionId])
   @@index([type, periodStart])
@@ -118,7 +116,7 @@ model PeopleEvaluationPeriod {
 
 /// One evaluatee's home-ground declaration for a period. Dual-circle model:
 /// dimensions in `homeDimensions` are the specialty circle. No weights — the
-/// declaration is context for the assessment agent, never a scoring input.
+/// declaration is context for the evaluation agent, never a scoring input.
 model PeopleEvaluationHomeGround {
   id                 String @id @default(uuid()) @db.Uuid
   evaluateeUserId    String @db.Uuid
@@ -134,11 +132,11 @@ model PeopleEvaluationHomeGround {
   @@schema("module/people-evaluation")
 }
 
-/// A workspace declared by the member and reported by the worklog agent
+/// A workspace declared by the member and reported by the installation agent
 /// (ADR-030). The declared set is an allowlist: a workspace either is
 /// declared (and in scope) or does not exist here at all — there is no
 /// company/personal field, because undeclared paths are never reported.
-model PeopleEvaluationMemberWorkspace {
+model PeopleEvaluationWorkspace {
   id              String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
 
@@ -151,8 +149,7 @@ model PeopleEvaluationMemberWorkspace {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  installation  PeopleEvaluationWorklogInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
-  agentSessions PeopleEvaluationAgentSession[]
+  installation   PeopleEvaluationInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
 
   @@unique([evaluateeUserId, workspaceKey])
   @@index([evaluateeUserId])
@@ -162,14 +159,13 @@ model PeopleEvaluationMemberWorkspace {
 /// Index row for one AI-agent coding session collected from a company
 /// workspace. The transcript itself lives in ClickHouse
 /// (`people_evaluation_session_messages`); this row carries everything the
-/// assessment agent needs to decide whether to drill into the transcript.
-model PeopleEvaluationAgentSession {
+/// evaluation agent needs to decide whether to drill into the transcript.
+model PeopleEvaluationSession {
   id                 String  @id @default(uuid()) @db.Uuid
   evaluateeUserId    String  @db.Uuid
   collectionPeriodId String? @db.Uuid
-  memberWorkspaceId  String? @db.Uuid
 
-  // Worklog-side session identifier (stable, e.g. the IDE transcript id)
+  // Installation-side session identifier (stable, e.g. the IDE transcript id)
   externalSessionId String @db.VarChar(128)
   workspaceKey      String @db.VarChar(128)
   model             String @default("") @db.VarChar(128)
@@ -188,8 +184,7 @@ model PeopleEvaluationAgentSession {
   endedAt    DateTime
   ingestedAt DateTime @default(now())
 
-  collectionPeriod PeopleEvaluationPeriod?             @relation(fields: [collectionPeriodId], references: [id], onDelete: SetNull)
-  memberWorkspace  PeopleEvaluationMemberWorkspace?    @relation(fields: [memberWorkspaceId], references: [id], onDelete: SetNull)
+  collectionPeriod PeopleEvaluationPeriod? @relation(fields: [collectionPeriodId], references: [id], onDelete: SetNull)
 
   @@unique([evaluateeUserId, externalSessionId])
   @@index([evaluateeUserId, startedAt])
@@ -197,39 +192,22 @@ model PeopleEvaluationAgentSession {
   @@schema("module/people-evaluation")
 }
 
-/// Deterministic evidence manifest for one evaluatee × period. Built by code
-/// (platform facts + declared context), never by the model, so "what was
-/// available" and "what was actually consumed" can be compared afterwards.
-model PeopleEvaluationEvidencePacket {
+/// One evaluation run over an evidence manifest snapshot. Dimension scores are
+/// the model's judgments with explicit confidence and coverage — they are not
+/// mechanically recomputable from evidence counts, and there is deliberately
+/// no composite score.
+model PeopleEvaluationResult {
   id                 String @id @default(uuid()) @db.Uuid
   evaluateeUserId    String @db.Uuid
   collectionPeriodId String @db.Uuid
 
+  // Deterministic material snapshot the run was judged from
   // [{ id, layer, source, summary, eventAt, attributedBy }]
-  manifest      Json @db.JsonB
+  manifest      Json   @db.JsonB
   // SHA-256 over canonical manifest — detects drift between run and review
   contentHash   String @db.VarChar(64)
   // { fact: { total, bySource }, declared: { total, bySource }, unlinked: number }
-  coverageStats Json @db.JsonB
-  generatedAt   DateTime @default(now())
-
-  period      PeopleEvaluationPeriod       @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
-  assessments PeopleEvaluationAssessment[]
-
-  @@unique([evaluateeUserId, collectionPeriodId])
-  @@index([evaluateeUserId])
-  @@schema("module/people-evaluation")
-}
-
-/// One assessment run over an evidence packet. Dimension scores are the
-/// model's judgments with explicit confidence and coverage — they are not
-/// mechanically recomputable from evidence counts, and there is deliberately
-/// no composite score.
-model PeopleEvaluationAssessment {
-  id                 String @id @default(uuid()) @db.Uuid
-  evaluateeUserId    String @db.Uuid
-  collectionPeriodId String @db.Uuid
-  packetId           String @db.Uuid
+  coverageStats Json   @db.JsonB
 
   // Blind evaluation: the model saw `subject-{uuid}`, never the real identity
   blindSubjectId String @db.VarChar(64)
@@ -255,23 +233,21 @@ model PeopleEvaluationAssessment {
   reviewNote       String?   @db.Text
   createdAt        DateTime @default(now())
 
-  period PeopleEvaluationPeriod       @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
-  packet PeopleEvaluationEvidencePacket @relation(fields: [packetId], references: [id], onDelete: Cascade)
+  period PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
 
   @@index([evaluateeUserId, collectionPeriodId])
-  @@index([packetId])
   @@schema("module/people-evaluation")
 }
 
 /// PIP (Performance Improvement Plan) — the decision infrastructure. A single
 /// signed resolution by the supervisor ties everything together: which
-/// assessments triggered it, what the milestones are, and the final call.
+/// evaluation results triggered it, what the milestones are, and the final call.
 /// Every field visible to the member.
 model PeopleEvaluationPipPlan {
   id              String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
 
-  triggerRefs  Json     @db.JsonB // assessment + risk ids
+  triggerRefs  Json     @db.JsonB // evaluation result ids
   startDate    DateTime
   endDate      DateTime
   checkpoints  Json     @db.JsonB // [{dueDate, description, status}]
@@ -286,7 +262,7 @@ model PeopleEvaluationPipPlan {
   @@schema("module/people-evaluation")
 }
 
-/// A work artifact declared by the member's worklog agent (design notes,
+/// A work artifact declared by the member's installation agent (design notes,
 /// research, prototypes that live in the company workspace but never reach a
 /// commit). Declared layer only: it is context that must be corroborated by
 /// fact-layer evidence before it can support a strong conclusion.
@@ -308,12 +284,12 @@ model PeopleEvaluationDeclaredDocument {
   @@schema("module/people-evaluation")
 }
 
-/// Enrollment for the member-side worklog agent (ADR-029). Same shape as the
-/// backend-monitor installation: random UUID token, SHA-256 hash at rest,
+/// Enrollment for the member-side installation agent (ADR-029). Same shape as
+/// the backend-monitor installation: random UUID token, SHA-256 hash at rest,
 /// plaintext returned once, soft revocation. The row carries the evaluatee the
-/// token may report for, so a worklog agent can never write sessions for
+/// token may report for, so an installation agent can never write sessions for
 /// someone else.
-model PeopleEvaluationWorklogInstallation {
+model PeopleEvaluationInstallation {
   id               String  @id @default(uuid()) @db.Uuid
   label            String  @db.VarChar(128)
   evaluateeUserId  String  @db.Uuid
@@ -325,7 +301,7 @@ model PeopleEvaluationWorklogInstallation {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  workspaces PeopleEvaluationMemberWorkspace[]
+  workspaces PeopleEvaluationWorkspace[]
 
   @@index([evaluateeUserId])
   @@schema("module/people-evaluation")

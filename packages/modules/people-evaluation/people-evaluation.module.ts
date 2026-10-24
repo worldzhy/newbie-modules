@@ -3,46 +3,48 @@ import { installationResolverToken } from "@modules/security/ports/installation.
 
 import { PeopleEvaluationController } from "./people-evaluation.controller";
 import { PeopleEvaluationSessionStore } from "./people-evaluation-session.store";
-import { PeopleEvaluationService } from "./people-evaluation.service";
-import { PeopleEvaluationWorklogInstallationController } from "./controllers/worklog-installation.controller";
-import { PeopleEvaluationWorklogController } from "./controllers/worklog.controller";
-import { PeopleEvaluationWorklogInstallationService } from "./people-evaluation-worklog-installation.service";
-import { PeopleEvaluationWorklogTokenResolver } from "./people-evaluation-worklog-token.resolver";
+import { PeopleEvaluationRubricService } from "./people-evaluation-rubric.service";
+import { PeopleEvaluationEvidenceService } from "./people-evaluation-evidence.service";
+import { PeopleEvaluationResultService } from "./people-evaluation-result.service";
+import { PeopleEvaluationInstallationController } from "./controllers/installation.controller";
+import { PeopleEvaluationEvidenceController } from "./controllers/evidence.controller";
+import { PeopleEvaluationInstallationService } from "./people-evaluation-installation.service";
+import { PeopleEvaluationInstallationTokenResolver } from "./people-evaluation-installation-token.resolver";
 
 /**
  * PeopleEvaluationModule (ADR-029).
  *
  * Server surface for the evidence-driven evaluation. The module owns:
  * - rubric / period / home-ground administration and read APIs,
- * - worklog enrollment (one token per evaluatee installation, soft revocation),
+ * - installation enrollment (one token per evaluatee installation, soft revocation),
  * - the token-authenticated ingest endpoints (session index → PG, transcript → ClickHouse).
  *
- * It deliberately does NOT judge: evidence packets and assessments are written
+ * It deliberately does NOT judge: evidence manifests and evaluation results are written
  * by the consuming project's application layer, which has access to the
  * platform APIs and the LLM module.
  */
 @Global()
 @Module({
-  controllers: [
-    PeopleEvaluationController,
-    PeopleEvaluationWorklogInstallationController,
-    PeopleEvaluationWorklogController,
-  ],
+  controllers: [PeopleEvaluationController, PeopleEvaluationInstallationController, PeopleEvaluationEvidenceController],
   providers: [
-    PeopleEvaluationService,
-    PeopleEvaluationWorklogInstallationService,
+    PeopleEvaluationRubricService,
+    PeopleEvaluationEvidenceService,
+    PeopleEvaluationResultService,
+    PeopleEvaluationInstallationService,
     PeopleEvaluationSessionStore,
-    PeopleEvaluationWorklogTokenResolver,
-    // Bind the worklog token resolver to security's SPI port (ADR-016).
+    PeopleEvaluationInstallationTokenResolver,
+    // Bind the installation token resolver to security's SPI port (ADR-016).
     // useExisting keeps the singleton so the rejection cache is never duplicated.
     {
       provide: installationResolverToken("people-evaluation"),
-      useExisting: PeopleEvaluationWorklogTokenResolver,
+      useExisting: PeopleEvaluationInstallationTokenResolver,
     },
   ],
   exports: [
-    PeopleEvaluationService,
-    PeopleEvaluationWorklogInstallationService,
+    PeopleEvaluationRubricService,
+    PeopleEvaluationEvidenceService,
+    PeopleEvaluationResultService,
+    PeopleEvaluationInstallationService,
     PeopleEvaluationSessionStore,
     installationResolverToken("people-evaluation"),
   ],
