@@ -34,6 +34,8 @@ export const THREAT_INTELLIGENCE_SOURCE = {
   KNOWNSEC: "knownsec",
   FREEBUF: "freebuf",
   SIHOU: "sihou",
+  THE_HACKER_NEWS: "the-hacker-news",
+  BLEEPING_COMPUTER: "bleeping-computer",
   EXPLOIT_DB: "exploit-db",
 } as const;
 
@@ -45,6 +47,7 @@ export const THREAT_INTELLIGENCE_CATEGORY = {
   MALICIOUS_PACKAGE: "malicious-package",
   PLATFORM_EVENT: "platform-event",
   CN_NEWS: "cn-news",
+  EN_NEWS: "en-news",
 } as const;
 
 export type ThreatIntelligenceCategory =

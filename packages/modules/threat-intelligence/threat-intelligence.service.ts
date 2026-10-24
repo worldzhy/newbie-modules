@@ -1,7 +1,11 @@
 import { Inject, Injectable, Logger, NotFoundException, Optional } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { SourceAdapter, SourceIntelItem, SOURCE_ADAPTER } from "./adapters/source-adapter.port";
+import {
+  SourceIntelItem,
+  ThreatIntelligenceSourceAdapter,
+  THREAT_INTELLIGENCE_SOURCE_ADAPTERS,
+} from "./adapters/source-adapter.port";
 import { DEFAULT_MAX_ITEMS_PER_SOURCE, DEFAULT_RETENTION_DAYS } from "./threat-intelligence.constants";
 import { ListThreatIntelligenceItemsQuery } from "./threat-intelligence.dto";
 
@@ -11,7 +15,9 @@ export class ThreatIntelligenceService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Optional() @Inject(SOURCE_ADAPTER) private readonly adapters: SourceAdapter[] = [],
+    @Optional()
+    @Inject(THREAT_INTELLIGENCE_SOURCE_ADAPTERS)
+    private readonly adapters: ThreatIntelligenceSourceAdapter[] = [],
   ) {}
 
   /**

@@ -1,4 +1,4 @@
-import { SourceAdapter, SourceIntelItem } from "./source-adapter.port";
+import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
 import { fetchText } from "./http.util";
 import { parseRssItems, stripHtml } from "./rss.util";
 import {
@@ -16,7 +16,7 @@ const FEED_URL = "https://www.freebuf.com/feed";
  * externalId is the article URL. Severity defaults to info because news
  * items do not carry a severity rating.
  */
-export class FreeBufAdapter implements SourceAdapter {
+export class FreeBufAdapter implements ThreatIntelligenceSourceAdapter {
   readonly source = THREAT_INTELLIGENCE_SOURCE.FREEBUF;
 
   async fetchLatest(_since?: Date): Promise<SourceIntelItem[]> {

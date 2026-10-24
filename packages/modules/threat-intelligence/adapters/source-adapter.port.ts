@@ -31,10 +31,11 @@ export interface SourceIntelItem {
  * Port implemented by every information source adapter.
  *
  * Each adapter is registered as a provider and tagged with its source
- * identifier. The service collects all adapters via multi-binding and
- * invokes fetchLatest in sequence.
+ * identifier. The module gathers all adapters into an array via a factory
+ * provider (see threat-intelligence.module.ts) and the service invokes
+ * fetchLatest on each in sequence.
  */
-export interface SourceAdapter {
+export interface ThreatIntelligenceSourceAdapter {
   readonly source: ThreatIntelligenceSource;
 
   /**
@@ -46,4 +47,9 @@ export interface SourceAdapter {
   fetchLatest(since?: Date): Promise<SourceIntelItem[]>;
 }
 
-export const SOURCE_ADAPTER = Symbol("SourceAdapter");
+/**
+ * Injection token for the gathered array of all registered source adapters.
+ * Multi-binding via repeated token providers does not work with @Optional()
+ * injection, so the module builds the array in a single factory provider.
+ */
+export const THREAT_INTELLIGENCE_SOURCE_ADAPTERS = Symbol("ThreatIntelligenceSourceAdapters");

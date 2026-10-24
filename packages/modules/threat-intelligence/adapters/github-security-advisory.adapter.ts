@@ -1,4 +1,4 @@
-import { SourceAdapter, SourceIntelItem } from "./source-adapter.port";
+import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
 import { fetchJson } from "./http.util";
 import {
   THREAT_INTELLIGENCE_CATEGORY,
@@ -35,7 +35,7 @@ const API_URL = "https://api.github.com/advisories";
  * The public endpoint is rate-limited (60 req/hour unauthenticated); the
  * daily job fetches at most 100 items per run which fits comfortably.
  */
-export class GitHubSecurityAdvisoryAdapter implements SourceAdapter {
+export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAdapter {
   readonly source = THREAT_INTELLIGENCE_SOURCE.GITHUB_SECURITY_ADVISORY;
 
   private readonly perPage = 100;

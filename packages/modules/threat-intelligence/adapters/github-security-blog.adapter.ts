@@ -1,4 +1,4 @@
-import { SourceAdapter, SourceIntelItem } from "./source-adapter.port";
+import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
 import { fetchText } from "./http.util";
 import { parseRssItems, stripHtml } from "./rss.util";
 import {
@@ -17,7 +17,7 @@ const FEED_URL = "https://github.blog/category/security/feed/";
  * GitHub Actions vulnerabilities, supply-chain incidents). externalId is
  * the post URL.
  */
-export class GitHubSecurityBlogAdapter implements SourceAdapter {
+export class GitHubSecurityBlogAdapter implements ThreatIntelligenceSourceAdapter {
   readonly source = THREAT_INTELLIGENCE_SOURCE.GITHUB_SECURITY_BLOG;
 
   async fetchLatest(_since?: Date): Promise<SourceIntelItem[]> {

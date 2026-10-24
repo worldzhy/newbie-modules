@@ -1,4 +1,4 @@
-import { SourceAdapter, SourceIntelItem } from "./source-adapter.port";
+import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
 import { fetchJson } from "./http.util";
 import {
   THREAT_INTELLIGENCE_CATEGORY,
@@ -41,7 +41,7 @@ const CATALOG_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploi
  * The full catalog is fetched each run (currently ~1000 entries, ~500KB)
  * and the service deduplicates by CVE id.
  */
-export class CisaKevAdapter implements SourceAdapter {
+export class CisaKevAdapter implements ThreatIntelligenceSourceAdapter {
   readonly source = THREAT_INTELLIGENCE_SOURCE.CISA_KEV;
 
   async fetchLatest(_since?: Date): Promise<SourceIntelItem[]> {

@@ -1,4 +1,4 @@
-import { SourceAdapter, SourceIntelItem } from "./source-adapter.port";
+import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
 import { fetchText } from "./http.util";
 import { parseRssItems, stripHtml } from "./rss.util";
 import {
@@ -18,7 +18,7 @@ const DEFAULT_USER_AGENT = "threat-intelligence-collector (+https://github.com/w
  * the externalId. Severity is derived from the title or the "Content Type"
  * field in the description.
  */
-export class AwsSecurityBulletinsAdapter implements SourceAdapter {
+export class AwsSecurityBulletinsAdapter implements ThreatIntelligenceSourceAdapter {
   readonly source = THREAT_INTELLIGENCE_SOURCE.AWS_SECURITY_BULLETINS;
 
   async fetchLatest(_since?: Date): Promise<SourceIntelItem[]> {
