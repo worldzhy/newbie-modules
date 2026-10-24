@@ -1,6 +1,6 @@
 // Prisma schema fragment for the people-evaluation module (ADR-029).
 // This file is managed by @devbie/newbie-cli — assembled into the
-// consumer prisma tree on `newbie install`.
+// consumer prisma tree on `newbie modules install`.
 
 // !! ----------------------------------------------------------- //
 // !!            [Module] People Evaluation models                //

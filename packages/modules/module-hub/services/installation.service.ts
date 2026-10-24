@@ -88,7 +88,7 @@ export interface TargetActualComparison {
  * Pure read-time comparison between a stored targetSpec (modules.json shape)
  * and the last reported module snapshot (`newbie status --json` modules[]).
  *
- * The hub never dispatches the spec: developers/CI run `newbie update`, and
+ * The hub never dispatches the spec: developers/CI run `newbie modules update`, and
  * the next process-start "full" report proves convergence with its snapshot.
  */
 export function compareTargetWithSnapshot(

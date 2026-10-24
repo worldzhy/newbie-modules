@@ -22,7 +22,7 @@ import { ModuleHubReleaseService } from "../services/release.service";
  * - "ping": periodic liveness touch without snapshot.
  *
  * The hub never dispatches pending changes — module upgrades happen via
- * `newbie update` + deploy, and the resulting snapshot IS the receipt.
+ * `newbie modules update` + deploy, and the resulting snapshot IS the receipt.
  */
 @ApiTags("Module Hub")
 @Controller("module-hub")

@@ -14,7 +14,7 @@ import { ModuleHubReleaseService } from "./services/release.service";
  *   catalog). Protected by the host's own auth.
  * - ReportController: token-only open endpoint where running instances report
  *   process-start facts and periodic liveness. Module upgrades happen via
- *   `newbie update` + deploy; the resulting snapshot IS the receipt.
+ *   `newbie modules update` + deploy; the resulting snapshot IS the receipt.
  * - WebhookController: registry push ingestion. HMAC verified.
  */
 @Global()
