@@ -134,14 +134,10 @@ model PeopleEvaluationHomeGround {
   @@schema("module/people-evaluation")
 }
 
-/// A workspace declared by the member inside the IDE and reported by the
-/// collector. The company/personal split is self-declared and never
-/// adjudicated server-side: the incentive structure is that company work
-/// marked personal loses evidence, and personal work marked company finds no
-/// factual counterpart in the platform repositories.
-///
-/// `repositories` is the workspace → repository path mapping: the collector
-/// only reports, it never matches on the server.
+/// A workspace declared by the member and reported by the worklog agent
+/// (ADR-030). The declared set is an allowlist: a workspace either is
+/// declared (and in scope) or does not exist here at all — there is no
+/// company/personal field, because undeclared paths are never reported.
 model PeopleEvaluationMemberWorkspace {
   id              String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
@@ -149,9 +145,6 @@ model PeopleEvaluationMemberWorkspace {
   // IDE-side workspace identifier (stable across reports)
   workspaceKey String @db.VarChar(128)
   rootPath     String @db.VarChar(512)
-  isCompany    Boolean @default(true)
-  // [{ path, platform, repositoryFullName }]
-  repositories Json    @db.JsonB
 
   installationId String? @db.Uuid
   reportedAt     DateTime @default(now())

@@ -3,12 +3,10 @@ import { Type } from "class-transformer";
 import {
   ArrayMaxSize,
   IsArray,
-  IsBoolean,
   IsDate,
   IsIn,
   IsNotEmpty,
   IsNumber,
-  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -44,15 +42,6 @@ export class CollectorWorkspaceItemDto {
   @IsString()
   @IsNotEmpty()
   rootPath!: string;
-
-  @ApiProperty({ description: "Self-declared company/personal split" })
-  @IsBoolean()
-  isCompany!: boolean;
-
-  @ApiProperty({ type: [Object], isArray: true, description: "[{ path, platform, repositoryFullName }]" })
-  @IsArray()
-  @IsObject({ each: true })
-  repositories!: object[];
 }
 
 export class CollectorWorkspaceReportDto {

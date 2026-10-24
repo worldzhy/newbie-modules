@@ -232,19 +232,6 @@ export class ReportPeopleEvaluationWorkspaceRequestDto {
   @IsString()
   @IsNotEmpty()
   rootPath!: string;
-
-  @ApiProperty({ description: "Self-declared company/personal split" })
-  @IsBoolean()
-  isCompany!: boolean;
-
-  @ApiProperty({
-    type: Object,
-    isArray: true,
-    description: "Workspace → repository mapping: [{ path, platform, repositoryFullName }]",
-  })
-  @IsArray()
-  @IsObject({ each: true })
-  repositories!: object[];
 }
 
 export class ReportPeopleEvaluationSessionRequestDto {
@@ -324,8 +311,6 @@ export class PeopleEvaluationMemberWorkspaceResponseDto {
   @ApiProperty() evaluateeUserId!: string;
   @ApiProperty() workspaceKey!: string;
   @ApiProperty() rootPath!: string;
-  @ApiProperty() isCompany!: boolean;
-  @ApiProperty({ type: Object, isArray: true }) repositories!: object[];
   @ApiPropertyOptional() installationId?: string | null;
   @ApiProperty() reportedAt!: Date;
 }
