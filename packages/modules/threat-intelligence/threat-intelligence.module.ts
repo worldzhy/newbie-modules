@@ -19,20 +19,37 @@ import { GitHubSecurityBlogAdapter } from "./adapters/github-security-blog.adapt
  * items against its projects is a host concern (nightwatch-backend keeps
  * that layer in src/application/project/security).
  *
- * Adapters are multi-bound on the SOURCE_ADAPTER token so the service can
- * iterate over all of them. Adding a new source = implement SourceAdapter
- * and add one provider entry below.
+ * Adapters are gathered into an array via a factory provider and injected
+ * on the SOURCE_ADAPTER token. Adding a new source = implement SourceAdapter,
+ * register it as a provider, and add it to the factory inject list below.
  */
 @Global()
 @Module({
   controllers: [ThreatIntelligenceController],
   providers: [
     ThreatIntelligenceService,
-    { provide: SOURCE_ADAPTER, useClass: GitHubSecurityAdvisoryAdapter },
-    { provide: SOURCE_ADAPTER, useClass: CisaKevAdapter },
-    { provide: SOURCE_ADAPTER, useClass: AwsSecurityBulletinsAdapter },
-    { provide: SOURCE_ADAPTER, useClass: GitHubSecurityBlogAdapter },
-    { provide: SOURCE_ADAPTER, useClass: FreeBufAdapter },
+    GitHubSecurityAdvisoryAdapter,
+    CisaKevAdapter,
+    AwsSecurityBulletinsAdapter,
+    GitHubSecurityBlogAdapter,
+    FreeBufAdapter,
+    {
+      provide: SOURCE_ADAPTER,
+      useFactory: (
+        ghsa: GitHubSecurityAdvisoryAdapter,
+        cisa: CisaKevAdapter,
+        aws: AwsSecurityBulletinsAdapter,
+        ghblog: GitHubSecurityBlogAdapter,
+        freebuf: FreeBufAdapter,
+      ) => [ghsa, cisa, aws, ghblog, freebuf],
+      inject: [
+        GitHubSecurityAdvisoryAdapter,
+        CisaKevAdapter,
+        AwsSecurityBulletinsAdapter,
+        GitHubSecurityBlogAdapter,
+        FreeBufAdapter,
+      ],
+    },
   ],
   exports: [ThreatIntelligenceService],
 })
