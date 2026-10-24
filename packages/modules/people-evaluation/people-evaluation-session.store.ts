@@ -5,7 +5,7 @@ import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 export const SESSION_MESSAGE_TABLE = "people_evaluation_session_messages";
 
 export interface SessionMessageRow {
-  member_user_id: string;
+  evaluatee_user_id: string;
   session_id: string;
   workspace_key: string;
   seq: number;
@@ -22,7 +22,7 @@ export interface SessionMessageRow {
  *
  * The transcript is the raw material the assessment agent drills into; PG only
  * keeps the session index (PeopleEvaluationAgentSession). Rows are chunked by
- * the collector before upload and compressed by the ClickHouse column codec.
+ * the worklog agent before upload and compressed by the ClickHouse column codec.
  */
 @Injectable()
 export class PeopleEvaluationSessionStore {
@@ -44,7 +44,7 @@ export class PeopleEvaluationSessionStore {
   ): Promise<SessionMessageRow[]> {
     const result = await this.clickhouse.query({
       query: [
-        `SELECT member_user_id, session_id, workspace_key, seq, role, content, tool_name, tool_calls, token_count, created_at`,
+        `SELECT evaluatee_user_id, session_id, workspace_key, seq, role, content, tool_name, tool_calls, token_count, created_at`,
         `FROM ${SESSION_MESSAGE_TABLE}`,
         `WHERE session_id = {sessionId:UUID} AND seq >= {fromSeq:UInt32}`,
         `ORDER BY seq ASC`,

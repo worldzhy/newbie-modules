@@ -13,22 +13,22 @@ import {
   ValidateNested,
 } from "class-validator";
 
-/** Hard caps keep one ingest call bounded (collector batches are small by design). */
+/** Hard caps keep one ingest call bounded (worklog batches are small by design). */
 export const MAX_WORKSPACES_PER_BATCH = 100;
 export const MAX_SESSIONS_PER_BATCH = 50;
 export const MAX_MESSAGES_PER_SESSION = 2000;
 export const MAX_DOCUMENTS_PER_BATCH = 100;
 
 /**
- * Transcript origins the collector knows how to read. "trae-memory" is the
+ * Transcript origins the worklog agent knows how to read. "trae-memory" is the
  * IDE's own session summary (lower fidelity than a raw transcript) — the
  * distinction travels end to end so coverage can state it explicitly.
  */
-export const COLLECTOR_SESSION_SOURCES = ["claude", "codex", "trae-memory"] as const;
-export type CollectorSessionSource = (typeof COLLECTOR_SESSION_SOURCES)[number];
+export const WORKLOG_SESSION_SOURCES = ["claude", "codex", "trae-memory"] as const;
+export type WorklogSessionSource = (typeof WORKLOG_SESSION_SOURCES)[number];
 
-export class CollectorWorkspaceItemDto {
-  @ApiProperty({ description: "Member the workspace belongs to" })
+export class WorklogWorkspaceItemDto {
+  @ApiProperty({ description: "Evaluatee the workspace belongs to" })
   @IsUUID()
   @IsNotEmpty()
   evaluateeUserId!: string;
@@ -44,16 +44,16 @@ export class CollectorWorkspaceItemDto {
   rootPath!: string;
 }
 
-export class CollectorWorkspaceReportDto {
-  @ApiProperty({ type: [CollectorWorkspaceItemDto], isArray: true })
+export class WorklogWorkspaceReportDto {
+  @ApiProperty({ type: [WorklogWorkspaceItemDto], isArray: true })
   @IsArray()
   @ArrayMaxSize(MAX_WORKSPACES_PER_BATCH)
   @ValidateNested({ each: true })
-  @Type(() => CollectorWorkspaceItemDto)
-  workspaces!: CollectorWorkspaceItemDto[];
+  @Type(() => WorklogWorkspaceItemDto)
+  workspaces!: WorklogWorkspaceItemDto[];
 }
 
-export class CollectorSessionMessageDto {
+export class WorklogSessionMessageDto {
   @ApiProperty({ description: "Monotonic sequence inside the session" })
   @IsNumber()
   seq!: number;
@@ -89,17 +89,17 @@ export class CollectorSessionMessageDto {
   createdAt?: Date;
 }
 
-export class CollectorSessionItemDto {
+export class WorklogSessionItemDto {
   @ApiProperty() @IsUUID() @IsNotEmpty() evaluateeUserId!: string;
   @ApiProperty() @IsString() @IsNotEmpty() workspaceKey!: string;
   @ApiProperty() @IsString() @IsNotEmpty() externalSessionId!: string;
 
   @ApiPropertyOptional({
     description: 'Transcript origin: "claude" / "codex" / "trae-memory" — defaults to "claude"',
-    enum: COLLECTOR_SESSION_SOURCES,
+    enum: WORKLOG_SESSION_SOURCES,
   })
   @IsOptional()
-  @IsIn(COLLECTOR_SESSION_SOURCES)
+  @IsIn(WORKLOG_SESSION_SOURCES)
   source?: string;
 
   @ApiPropertyOptional() @IsOptional() @IsString() model?: string;
@@ -123,24 +123,24 @@ export class CollectorSessionItemDto {
   @ApiProperty() @Type(() => Date) @IsDate() startedAt!: Date;
   @ApiProperty() @Type(() => Date) @IsDate() endedAt!: Date;
 
-  @ApiProperty({ type: [CollectorSessionMessageDto], isArray: true })
+  @ApiProperty({ type: [WorklogSessionMessageDto], isArray: true })
   @IsArray()
   @ArrayMaxSize(MAX_MESSAGES_PER_SESSION)
   @ValidateNested({ each: true })
-  @Type(() => CollectorSessionMessageDto)
-  messages!: CollectorSessionMessageDto[];
+  @Type(() => WorklogSessionMessageDto)
+  messages!: WorklogSessionMessageDto[];
 }
 
-export class CollectorSessionReportDto {
-  @ApiProperty({ type: [CollectorSessionItemDto], isArray: true })
+export class WorklogSessionReportDto {
+  @ApiProperty({ type: [WorklogSessionItemDto], isArray: true })
   @IsArray()
   @ArrayMaxSize(MAX_SESSIONS_PER_BATCH)
   @ValidateNested({ each: true })
-  @Type(() => CollectorSessionItemDto)
-  sessions!: CollectorSessionItemDto[];
+  @Type(() => WorklogSessionItemDto)
+  sessions!: WorklogSessionItemDto[];
 }
 
-export class CollectorDocumentItemDto {
+export class WorklogDocumentItemDto {
   @ApiProperty() @IsUUID() @IsNotEmpty() evaluateeUserId!: string;
   @ApiProperty() @IsString() @IsNotEmpty() workspaceKey!: string;
   @ApiProperty() @IsString() @IsNotEmpty() title!: string;
@@ -155,44 +155,44 @@ export class CollectorDocumentItemDto {
   @ApiProperty() @Type(() => Date) @IsDate() capturedAt!: Date;
 }
 
-export class CollectorDocumentReportDto {
-  @ApiProperty({ type: [CollectorDocumentItemDto], isArray: true })
+export class WorklogDocumentReportDto {
+  @ApiProperty({ type: [WorklogDocumentItemDto], isArray: true })
   @IsArray()
   @ArrayMaxSize(MAX_DOCUMENTS_PER_BATCH)
   @ValidateNested({ each: true })
-  @Type(() => CollectorDocumentItemDto)
-  documents!: CollectorDocumentItemDto[];
+  @Type(() => WorklogDocumentItemDto)
+  documents!: WorklogDocumentItemDto[];
 }
 
-/** Installation enrollment (supervisor-side; carries the member the token reports for). */
-export class CreateCollectorInstallationDto {
+/** Worklog installation enrollment (supervisor-side; carries the evaluatee the token reports for). */
+export class CreateWorklogInstallationRequestDto {
   @ApiProperty({ description: 'Human-readable label, e.g. "worldzhy-macbook"' })
   @IsString()
   @IsNotEmpty()
   label!: string;
 
-  @ApiProperty({ description: "Member userId the token is allowed to report for" })
+  @ApiProperty({ description: "Evaluatee userId the token is allowed to report for" })
   @IsUUID()
   @IsNotEmpty()
-  memberUserId!: string;
+  evaluateeUserId!: string;
 
-  @ApiPropertyOptional({ description: "Host the collector runs on (informational)" })
+  @ApiPropertyOptional({ description: "Host the worklog agent runs on (informational)" })
   @IsOptional()
   @IsString()
   hostname?: string;
 }
 
-export class ListCollectorInstallationsQueryDto {
-  @ApiPropertyOptional({ description: "Filter by member userId" })
+export class ListWorklogInstallationsRequestDto {
+  @ApiPropertyOptional({ description: "Filter by evaluatee userId" })
   @IsOptional()
   @IsUUID()
-  memberUserId?: string;
+  evaluateeUserId?: string;
 }
 
-export class CollectorInstallationResponseDto {
+export class WorklogInstallationResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() label!: string;
-  @ApiProperty() memberUserId!: string;
+  @ApiProperty() evaluateeUserId!: string;
   @ApiPropertyOptional() hostname?: string | null;
   @ApiPropertyOptional() firstSeenAt?: Date | null;
   @ApiPropertyOptional() lastSeenAt?: Date | null;
@@ -202,24 +202,24 @@ export class CollectorInstallationResponseDto {
 }
 
 /**
- * Self-service collector profile. Tokens are stored as hashes, so the profile
+ * Self-service worklog profile. Tokens are stored as hashes, so the profile
  * can only carry a freshly rotated token — downloading it invalidates the
- * token the collector currently runs with.
+ * token the worklog agent currently runs with.
  */
-export class CollectorProfileResponseDto {
-  @ApiProperty({ description: "API base URL the collector posts to" })
+export class WorklogProfileResponseDto {
+  @ApiProperty({ description: "API base URL the worklog agent posts to" })
   endpoint!: string;
   @ApiProperty({ description: "Freshly rotated plaintext token — shown once" })
   token!: string;
-  @ApiProperty({ description: "Member the token reports for" })
-  memberUserId!: string;
+  @ApiProperty({ description: "Evaluatee the token reports for" })
+  evaluateeUserId!: string;
 }
 
 /**
- * Session ingest payload roles — the collector normalizes provider-specific
+ * Session ingest payload roles — the worklog agent normalizes provider-specific
  * roles into this small set so the transcript stays tool-agnostic.
  */
-export enum CollectorMessageRole {
+export enum WorklogMessageRole {
   USER = "user",
   ASSISTANT = "assistant",
   TOOL = "tool",

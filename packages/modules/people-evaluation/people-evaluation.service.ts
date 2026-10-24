@@ -8,22 +8,24 @@ import {
 } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
-  CreatePeopleEvaluationPeriodRequestDto,
-  CreatePeopleEvaluationRubricVersionRequestDto,
-  CreatePeopleEvaluationAssessmentRequestDto,
-  CreatePeopleEvaluationPipPlanRequestDto,
-  DeclarePeopleEvaluationHomeGroundRequestDto,
-  ListPeopleEvaluationPeriodsRequestDto,
-  ReportPeopleEvaluationDocumentRequestDto,
-  ReportPeopleEvaluationSessionRequestDto,
-  ReportPeopleEvaluationWorkspaceRequestDto,
-  ReviewPeopleEvaluationAssessmentRequestDto,
-  UpsertPeopleEvaluationPacketRequestDto,
+  CreateAssessmentRequestDto,
+  CreatePeriodRequestDto,
+  CreatePipPlanRequestDto,
+  CreateRubricVersionRequestDto,
+  DeclareHomeGroundRequestDto,
+  ListPeriodsRequestDto,
+  ReviewAssessmentRequestDto,
+  UpsertPacketRequestDto,
 } from "./people-evaluation.dto";
+import {
+  WorklogDocumentItemDto,
+  WorklogSessionItemDto,
+  WorklogWorkspaceItemDto,
+} from "./people-evaluation-worklog.dto";
 
 /**
  * PeopleEvaluationService — persistence layer for rubric versions, periods,
- * collector-reported workspaces/sessions, evidence packets, assessments and
+ * worklog-reported workspaces/sessions, evidence packets, assessments and
  * PIP plans (ADR-029).
  *
  * The service never judges: evidence construction, coverage accounting and
@@ -51,9 +53,7 @@ export class PeopleEvaluationService {
    * version deactivates every other version in the same transaction so exactly
    * one rubric is active at a time.
    */
-  async createRubricVersion(
-    input: CreatePeopleEvaluationRubricVersionRequestDto,
-  ): Promise<PeopleEvaluationRubricVersion> {
+  async createRubricVersion(input: CreateRubricVersionRequestDto): Promise<PeopleEvaluationRubricVersion> {
     const dimensionKeys = input.dimensions.map((dimension) => dimension.dimensionKey);
     if (new Set(dimensionKeys).size !== dimensionKeys.length) {
       throw new BadRequestException("Duplicate dimensionKey in rubric dimensions");
@@ -95,7 +95,7 @@ export class PeopleEvaluationService {
 
   // --- Evaluation periods ------------------------------------------------
 
-  async listPeriods(query: ListPeopleEvaluationPeriodsRequestDto) {
+  async listPeriods(query: ListPeriodsRequestDto) {
     const where = query.type ? { type: query.type } : {};
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.PeopleEvaluationPeriod,
@@ -124,7 +124,7 @@ export class PeopleEvaluationService {
     });
   }
 
-  async createPeriod(input: CreatePeopleEvaluationPeriodRequestDto): Promise<PeopleEvaluationPeriod> {
+  async createPeriod(input: CreatePeriodRequestDto): Promise<PeopleEvaluationPeriod> {
     const rubric = await this.prisma.peopleEvaluationRubricVersion.findUnique({
       where: { id: input.rubricVersionId },
     });
@@ -214,7 +214,7 @@ export class PeopleEvaluationService {
    * The declaration is context for the assessment agent — it never carries
    * weights into any computation.
    */
-  async declareHomeGround(input: DeclarePeopleEvaluationHomeGroundRequestDto) {
+  async declareHomeGround(input: DeclareHomeGroundRequestDto) {
     const period = await this.getPeriodById(input.collectionPeriodId);
     if (period.type !== PeriodType.COLLECTION) {
       throw new BadRequestException("Home ground can only be declared on COLLECTION periods");
@@ -235,13 +235,13 @@ export class PeopleEvaluationService {
     });
   }
 
-  // --- Collector-reported workspaces / sessions --------------------------
+  // --- Worklog-reported workspaces / sessions ----------------------------
 
   /**
-   * Upsert a workspace report. Called by the collector ingest path only — the
+   * Upsert a workspace report. Called by the worklog ingest path only — the
    * workspace split is self-declared by the member and never adjudicated here.
    */
-  async reportWorkspace(installationId: string, input: ReportPeopleEvaluationWorkspaceRequestDto) {
+  async reportWorkspace(installationId: string, input: WorklogWorkspaceItemDto) {
     return this.prisma.peopleEvaluationMemberWorkspace.upsert({
       where: {
         evaluateeUserId_workspaceKey: {
@@ -269,7 +269,7 @@ export class PeopleEvaluationService {
    * chunks land in ClickHouse; this row is what the assessment agent lists
    * and drills into.
    */
-  async reportSession(input: ReportPeopleEvaluationSessionRequestDto) {
+  async reportSession(input: WorklogSessionItemDto) {
     const period = await this.findCollectionPeriodAt(input.startedAt);
     return this.prisma.peopleEvaluationAgentSession.upsert({
       where: {
@@ -344,8 +344,8 @@ export class PeopleEvaluationService {
 
   // --- Declared documents ------------------------------------------------
 
-  /** Upsert a declared work artifact reported by the collector. */
-  async reportDocument(input: ReportPeopleEvaluationDocumentRequestDto) {
+  /** Upsert a declared work artifact reported by the worklog agent. */
+  async reportDocument(input: WorklogDocumentItemDto) {
     return this.prisma.peopleEvaluationDeclaredDocument.upsert({
       where: {
         evaluateeUserId_workspaceKey_refPath: {
@@ -398,7 +398,7 @@ export class PeopleEvaluationService {
   // --- Evidence packets --------------------------------------------------
 
   /** Create or replace the deterministic packet for one evaluatee × period. */
-  async upsertPacket(input: UpsertPeopleEvaluationPacketRequestDto) {
+  async upsertPacket(input: UpsertPacketRequestDto) {
     const data = {
       evaluateeUserId: input.evaluateeUserId,
       collectionPeriodId: input.collectionPeriodId,
@@ -429,7 +429,7 @@ export class PeopleEvaluationService {
 
   // --- Assessments -------------------------------------------------------
 
-  async createAssessment(input: CreatePeopleEvaluationAssessmentRequestDto) {
+  async createAssessment(input: CreateAssessmentRequestDto) {
     const packet = await this.getPacket(input.packetId);
     if (packet.evaluateeUserId !== input.evaluateeUserId || packet.collectionPeriodId !== input.collectionPeriodId) {
       throw new BadRequestException("Assessment evaluatee/period does not match its evidence packet");
@@ -478,7 +478,7 @@ export class PeopleEvaluationService {
   }
 
   /** Record the supervisor's final call on an assessment. */
-  async reviewAssessment(id: string, input: ReviewPeopleEvaluationAssessmentRequestDto) {
+  async reviewAssessment(id: string, input: ReviewAssessmentRequestDto) {
     await this.getAssessment(id);
     return this.prisma.peopleEvaluationAssessment.update({
       where: { id },
@@ -492,7 +492,7 @@ export class PeopleEvaluationService {
 
   // --- PIP plans ---------------------------------------------------------
 
-  async createPipPlan(input: CreatePeopleEvaluationPipPlanRequestDto) {
+  async createPipPlan(input: CreatePipPlanRequestDto) {
     if (input.startDate >= input.endDate) {
       throw new BadRequestException("startDate must be before endDate");
     }

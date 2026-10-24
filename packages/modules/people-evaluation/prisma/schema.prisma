@@ -15,7 +15,7 @@
 // * PeopleEvaluationAssessment                                   //
 // * PeopleEvaluationPipPlan                                      //
 // * PeopleEvaluationDeclaredDocument                             //
-// * PeopleEvaluationCollectorInstallation                        //
+// * PeopleEvaluationWorklogInstallation                         //
 // * PeriodType (enum)                                            //
 // * PeriodStatus (enum)                                          //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
@@ -151,7 +151,7 @@ model PeopleEvaluationMemberWorkspace {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  installation  PeopleEvaluationCollectorInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
+  installation  PeopleEvaluationWorklogInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
   agentSessions PeopleEvaluationAgentSession[]
 
   @@unique([evaluateeUserId, workspaceKey])
@@ -169,7 +169,7 @@ model PeopleEvaluationAgentSession {
   collectionPeriodId String? @db.Uuid
   memberWorkspaceId  String? @db.Uuid
 
-  // Collector-side session identifier (stable, e.g. the IDE transcript id)
+  // Worklog-side session identifier (stable, e.g. the IDE transcript id)
   externalSessionId String @db.VarChar(128)
   workspaceKey      String @db.VarChar(128)
   model             String @default("") @db.VarChar(128)
@@ -286,10 +286,10 @@ model PeopleEvaluationPipPlan {
   @@schema("module/people-evaluation")
 }
 
-/// A work artifact declared by the member's collector (design notes, research,
-/// prototypes that live in the company workspace but never reach a commit).
-/// Declared layer only: it is context that must be corroborated by fact-layer
-/// evidence before it can support a strong conclusion.
+/// A work artifact declared by the member's worklog agent (design notes,
+/// research, prototypes that live in the company workspace but never reach a
+/// commit). Declared layer only: it is context that must be corroborated by
+/// fact-layer evidence before it can support a strong conclusion.
 model PeopleEvaluationDeclaredDocument {
   id              String @id @default(uuid()) @db.Uuid
   evaluateeUserId String @db.Uuid
@@ -308,25 +308,25 @@ model PeopleEvaluationDeclaredDocument {
   @@schema("module/people-evaluation")
 }
 
-/// Enrollment for the member-side work collector (ADR-029). Same shape as the
+/// Enrollment for the member-side worklog agent (ADR-029). Same shape as the
 /// backend-monitor installation: random UUID token, SHA-256 hash at rest,
-/// plaintext returned once, soft revocation. The row carries the member the
-/// token may report for, so a collector can never write sessions for someone
-/// else.
-model PeopleEvaluationCollectorInstallation {
-  id           String  @id @default(uuid()) @db.Uuid
-  label        String  @db.VarChar(128)
-  memberUserId String  @db.Uuid
-  tokenHash    String  @unique @db.VarChar(64)
-  hostname     String? @db.VarChar(255)
-  firstSeenAt  DateTime?
-  lastSeenAt   DateTime?
-  revokedAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+/// plaintext returned once, soft revocation. The row carries the evaluatee the
+/// token may report for, so a worklog agent can never write sessions for
+/// someone else.
+model PeopleEvaluationWorklogInstallation {
+  id               String  @id @default(uuid()) @db.Uuid
+  label            String  @db.VarChar(128)
+  evaluateeUserId  String  @db.Uuid
+  tokenHash        String  @unique @db.VarChar(64)
+  hostname         String? @db.VarChar(255)
+  firstSeenAt      DateTime?
+  lastSeenAt       DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   workspaces PeopleEvaluationMemberWorkspace[]
 
-  @@index([memberUserId])
+  @@index([evaluateeUserId])
   @@schema("module/people-evaluation")
 }

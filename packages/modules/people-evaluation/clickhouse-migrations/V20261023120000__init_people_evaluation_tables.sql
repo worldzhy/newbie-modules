@@ -4,11 +4,11 @@
 -- One row per collected AI-agent session message chunk. The PG side keeps the
 -- session index (PeopleEvaluationAgentSession); this table holds the transcript
 -- the assessment agent drills into on demand.
--- `content` is chunked by the collector and compressed with ZSTD on disk.
+-- `content` is chunked by the worklog agent and compressed with ZSTD on disk.
 CREATE TABLE IF NOT EXISTS people_evaluation_session_messages
 (
-    -- Evaluatee (member) the session belongs to, resolved from the collector token.
-    member_user_id UUID,
+    -- Evaluatee the session belongs to, resolved from the worklog token.
+    evaluatee_user_id UUID,
     -- PG PeopleEvaluationAgentSession.id
     session_id     UUID,
     workspace_key  LowCardinality(String),
@@ -25,5 +25,5 @@ CREATE TABLE IF NOT EXISTS people_evaluation_session_messages
 )
 ENGINE = MergeTree()
 PARTITION BY toYYYYMM(created_at)
-ORDER BY (member_user_id, session_id, seq)
+ORDER BY (evaluatee_user_id, session_id, seq)
 SETTINGS index_granularity = 8192;

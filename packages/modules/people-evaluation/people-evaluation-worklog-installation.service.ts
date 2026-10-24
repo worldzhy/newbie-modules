@@ -1,62 +1,62 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PeopleEvaluationCollectorInstallation } from "@generated/prisma/client";
+import { PeopleEvaluationWorklogInstallation } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
-/** A collector that has not reported for this long is shown as offline. */
-export const COLLECTOR_ONLINE_THRESHOLD_SECONDS = 180;
+/** A worklog agent that has not reported for this long is shown as offline. */
+export const WORKLOG_ONLINE_THRESHOLD_SECONDS = 180;
 
-export function hashCollectorToken(token: string): string {
+export function hashWorklogToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
 /**
- * Enrollment registry for member-side work collectors (ADR-029).
+ * Enrollment registry for member-side worklog agents (ADR-029).
  *
  * Same contract as the backend-monitor installation: one random UUID token per
  * installation, stored only as a SHA-256 hash, plaintext returned exactly once,
- * soft revocation (rows retained). The row pins the member the token may report
- * for, so a leaked token cannot write evidence for another member.
+ * soft revocation (rows retained). The row pins the evaluatee the token may
+ * report for, so a leaked token cannot write evidence for another member.
  */
 @Injectable()
-export class PeopleEvaluationInstallationService {
+export class PeopleEvaluationWorklogInstallationService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private withDerivedState(row: PeopleEvaluationCollectorInstallation) {
+  private withDerivedState(row: PeopleEvaluationWorklogInstallation) {
     const online =
       !row.revokedAt &&
       row.lastSeenAt != null &&
-      Date.now() - new Date(row.lastSeenAt).getTime() <= COLLECTOR_ONLINE_THRESHOLD_SECONDS * 1000;
+      Date.now() - new Date(row.lastSeenAt).getTime() <= WORKLOG_ONLINE_THRESHOLD_SECONDS * 1000;
     const { tokenHash: _tokenHash, ...rest } = row;
     return { ...rest, online };
   }
 
-  /** Enroll a collector installation. The plaintext token is returned ONCE. */
-  async create(input: { label: string; memberUserId: string; hostname?: string }) {
+  /** Enroll a worklog installation. The plaintext token is returned ONCE. */
+  async create(input: { label: string; evaluateeUserId: string; hostname?: string }) {
     const token = randomUUID();
-    const row = await this.prisma.peopleEvaluationCollectorInstallation.create({
+    const row = await this.prisma.peopleEvaluationWorklogInstallation.create({
       data: {
         label: input.label,
-        memberUserId: input.memberUserId,
+        evaluateeUserId: input.evaluateeUserId,
         hostname: input.hostname ?? null,
-        tokenHash: hashCollectorToken(token),
+        tokenHash: hashWorklogToken(token),
       },
     });
     return { ...this.withDerivedState(row), token };
   }
 
-  async list(query: { memberUserId?: string }) {
-    const rows = await this.prisma.peopleEvaluationCollectorInstallation.findMany({
-      where: query.memberUserId ? { memberUserId: query.memberUserId } : undefined,
+  async list(query: { evaluateeUserId?: string }) {
+    const rows = await this.prisma.peopleEvaluationWorklogInstallation.findMany({
+      where: query.evaluateeUserId ? { evaluateeUserId: query.evaluateeUserId } : undefined,
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => this.withDerivedState(row));
   }
 
   async getOrThrow(id: string) {
-    const row = await this.prisma.peopleEvaluationCollectorInstallation.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException(`Collector installation ${id} not found.`);
+    const row = await this.prisma.peopleEvaluationWorklogInstallation.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException(`Worklog installation ${id} not found.`);
     return row;
   }
 
@@ -68,9 +68,9 @@ export class PeopleEvaluationInstallationService {
   async regenerateToken(id: string) {
     await this.getOrThrow(id);
     const token = randomUUID();
-    await this.prisma.peopleEvaluationCollectorInstallation.update({
+    await this.prisma.peopleEvaluationWorklogInstallation.update({
       where: { id },
-      data: { tokenHash: hashCollectorToken(token) },
+      data: { tokenHash: hashWorklogToken(token) },
     });
     return { id, token };
   }
@@ -78,7 +78,7 @@ export class PeopleEvaluationInstallationService {
   /** Soft revocation: ingest is rejected (401), reported rows are retained. */
   async revoke(id: string) {
     await this.getOrThrow(id);
-    await this.prisma.peopleEvaluationCollectorInstallation.update({
+    await this.prisma.peopleEvaluationWorklogInstallation.update({
       where: { id },
       data: { revokedAt: new Date() },
     });
@@ -87,8 +87,8 @@ export class PeopleEvaluationInstallationService {
 
   /** Token-only authentication for the ingest endpoints. */
   async resolveByToken(token: string) {
-    const row = await this.prisma.peopleEvaluationCollectorInstallation.findUnique({
-      where: { tokenHash: hashCollectorToken(token) },
+    const row = await this.prisma.peopleEvaluationWorklogInstallation.findUnique({
+      where: { tokenHash: hashWorklogToken(token) },
     });
     if (!row || row.revokedAt) return null;
     return row;
@@ -97,7 +97,7 @@ export class PeopleEvaluationInstallationService {
   /** Refresh liveness on ingest. firstSeenAt is written once. */
   async touchOnIngest(id: string, hostname?: string) {
     const now = new Date();
-    await this.prisma.peopleEvaluationCollectorInstallation.update({
+    await this.prisma.peopleEvaluationWorklogInstallation.update({
       where: { id },
       data: {
         firstSeenAt: (await this.getOrThrow(id)).firstSeenAt ?? now,
