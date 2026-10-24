@@ -1,0 +1,14 @@
+{
+  "key": "threat-intel",
+  "layer": "feature",
+  "module": {
+    "file": "threat-intel.module",
+    "className": "ThreatIntelModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["llm"],
+  "config-service": {},
+  "env": {},
+  "dependencies": {},
+  "devDependencies": {}
+}

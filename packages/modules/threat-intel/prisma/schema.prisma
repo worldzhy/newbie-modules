@@ -1,0 +1,66 @@
+// !! ------------------------------------------------------------ //
+// !!               [Module] Threat Intel models                          //
+// !! ------------------------------------------------------------ //
+// * ThreatIntelItem                                                    //
+// * ThreatIntelMatch                                                   //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+// A single piece of external threat intelligence, deduplicated by
+// (source, externalId). One row per unique intel item; re-fetching the
+// same item updates rawPayload / fetchedAt and bumps lastSeenAt.
+model ThreatIntelItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  source      String   @db.VarChar(50)
+  category    String   @db.VarChar(30)
+  // Stable identifier within the source: CVE ID, ecosystem+package,
+  // vendor+event-id, or a title fingerprint. Together with `source` it
+  // forms the deduplication key.
+  externalId  String   @db.VarChar(512)
+  title       String   @db.VarChar(1024)
+  summary     String?  @db.Text
+  url         String?  @db.VarChar(1024)
+  publishedAt DateTime?
+  severity    String   @default("info") @db.VarChar(15)
+  // Signal tags: kev, has-exploit, exploited-in-wild.
+  signalTags  String[]
+  rawPayload  Json?
+  fetchedAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  matches ThreatIntelMatch[]
+
+  @@unique([source, externalId])
+  @@index([category])
+  @@index([severity])
+  @@index([publishedAt])
+  @@schema("module/threat-intel")
+}
+
+// A match between a threat intel item and a managed project. The host
+// supplies the project security profile; this module only records the
+// match outcome. matchType=entity means a hard entity hit; semantic
+// means the LLM re-ranker found a semantic relation backed by evidence.
+model ThreatIntelMatch {
+  id            String    @id @default(uuid()) @db.Uuid
+  itemId        String    @db.Uuid
+  projectId     String    @db.Uuid
+  applicationId String?   @db.Uuid
+  matchType     String    @db.VarChar(20)
+  matchedEntity String?   @db.VarChar(512)
+  evidence      String?   @db.Text
+  confidence    String    @default("medium") @db.VarChar(15)
+  status        String    @default("open") @db.VarChar(20)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  resolvedAt    DateTime?
+
+  item ThreatIntelItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@index([projectId])
+  @@index([projectId, status])
+  @@index([projectId, confidence])
+  @@schema("module/threat-intel")
+}
