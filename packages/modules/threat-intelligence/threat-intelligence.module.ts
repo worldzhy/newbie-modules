@@ -28,11 +28,11 @@ import { GitHubSecurityBlogAdapter } from "./adapters/github-security-blog.adapt
   controllers: [ThreatIntelligenceController],
   providers: [
     ThreatIntelligenceService,
-    { provide: SOURCE_ADAPTER, useClass: GitHubSecurityAdvisoryAdapter, multi: true },
-    { provide: SOURCE_ADAPTER, useClass: CisaKevAdapter, multi: true },
-    { provide: SOURCE_ADAPTER, useClass: AwsSecurityBulletinsAdapter, multi: true },
-    { provide: SOURCE_ADAPTER, useClass: GitHubSecurityBlogAdapter, multi: true },
-    { provide: SOURCE_ADAPTER, useClass: FreeBufAdapter, multi: true },
+    { provide: SOURCE_ADAPTER, useClass: GitHubSecurityAdvisoryAdapter },
+    { provide: SOURCE_ADAPTER, useClass: CisaKevAdapter },
+    { provide: SOURCE_ADAPTER, useClass: AwsSecurityBulletinsAdapter },
+    { provide: SOURCE_ADAPTER, useClass: GitHubSecurityBlogAdapter },
+    { provide: SOURCE_ADAPTER, useClass: FreeBufAdapter },
   ],
   exports: [ThreatIntelligenceService],
 })
