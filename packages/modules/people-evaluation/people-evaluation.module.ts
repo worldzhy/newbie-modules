@@ -34,7 +34,7 @@ import { PeopleEvaluationWorklogTokenResolver } from "./people-evaluation-worklo
     PeopleEvaluationSessionStore,
     PeopleEvaluationWorklogTokenResolver,
     // Bind the worklog token resolver to security's SPI port (ADR-016).
-    // useExisting keeps the singleton so the token cache is never duplicated.
+    // useExisting keeps the singleton so the rejection cache is never duplicated.
     {
       provide: installationResolverToken("people-evaluation"),
       useExisting: PeopleEvaluationWorklogTokenResolver,

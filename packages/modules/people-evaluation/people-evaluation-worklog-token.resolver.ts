@@ -3,8 +3,6 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 import { PeopleEvaluationWorklogInstallationService } from "./people-evaluation-worklog-installation.service";
 
-/** Positive token cache lifetime; tokens rarely change. */
-const POSITIVE_TTL_MS = 60_000;
 /** Negative cache lifetime: invalid tokens are rejected without hammering PG. */
 const NEGATIVE_TTL_MS = 10_000;
 const MAX_CACHE_ENTRIES = 10_000;
@@ -17,9 +15,7 @@ export interface ResolvedWorklogToken {
   evaluateeUserId: string;
 }
 
-interface CachedToken {
-  installationId: string | null;
-  evaluateeUserId: string | null;
+interface CachedRejection {
   expiresAt: number;
 }
 
@@ -30,12 +26,18 @@ interface CachedToken {
  * InstallationAuthGuard can authenticate the ingest endpoints. The resolved
  * evaluateeUserId is the single authorization fact for ingest: a worklog agent
  * may only write evidence for its own evaluatee.
+ *
+ * Valid tokens are deliberately not cached: revocation and rotation must take
+ * effect on the very next request, and evidence for a performance evaluation
+ * must not keep flowing after access is withdrawn. Ingest is a low-frequency
+ * batched writer, so one indexed lookup per request is negligible; only
+ * rejected tokens are cached, to absorb garbage traffic.
  */
 @Injectable()
 export class PeopleEvaluationWorklogTokenResolver implements InstallationResolver {
   readonly kind = "people-evaluation";
 
-  private readonly cache = new Map<string, CachedToken>();
+  private readonly rejections = new Map<string, CachedRejection>();
 
   constructor(private readonly installations: PeopleEvaluationWorklogInstallationService) {}
 
@@ -43,40 +45,33 @@ export class PeopleEvaluationWorklogTokenResolver implements InstallationResolve
     const now = Date.now();
 
     if (!UUID_PATTERN.test(token)) {
-      this.putNegativeCache(token, now);
+      this.reject(token, now);
       throw new UnauthorizedException("Invalid people-evaluation worklog token.");
     }
 
-    const cached = this.cache.get(token);
-    if (cached) {
-      if (cached.expiresAt <= now) {
-        this.cache.delete(token);
-      } else if (!cached.installationId || !cached.evaluateeUserId) {
-        throw new UnauthorizedException("Invalid people-evaluation worklog token.");
+    const rejection = this.rejections.get(token);
+    if (rejection) {
+      if (rejection.expiresAt <= now) {
+        this.rejections.delete(token);
       } else {
-        return { installationId: cached.installationId, evaluateeUserId: cached.evaluateeUserId };
+        throw new UnauthorizedException("Invalid people-evaluation worklog token.");
       }
     }
 
     const installation = await this.installations.resolveByToken(token);
     if (!installation) {
-      this.putNegativeCache(token, now);
+      this.reject(token, now);
       throw new UnauthorizedException("Invalid people-evaluation worklog token.");
     }
 
-    this.cache.set(token, {
-      installationId: installation.id,
-      evaluateeUserId: installation.evaluateeUserId,
-      expiresAt: now + POSITIVE_TTL_MS,
-    });
     return { installationId: installation.id, evaluateeUserId: installation.evaluateeUserId };
   }
 
-  private putNegativeCache(token: string, now: number): void {
-    if (this.cache.size >= MAX_CACHE_ENTRIES) {
-      const oldest = this.cache.keys().next().value;
-      if (oldest !== undefined) this.cache.delete(oldest);
+  private reject(token: string, now: number): void {
+    if (this.rejections.size >= MAX_CACHE_ENTRIES) {
+      const oldest = this.rejections.keys().next().value;
+      if (oldest !== undefined) this.rejections.delete(oldest);
     }
-    this.cache.set(token, { installationId: null, evaluateeUserId: null, expiresAt: now + NEGATIVE_TTL_MS });
+    this.rejections.set(token, { expiresAt: now + NEGATIVE_TTL_MS });
   }
 }
