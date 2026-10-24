@@ -180,6 +180,9 @@ model PeopleEvaluationAgentSession {
   externalSessionId String @db.VarChar(128)
   workspaceKey      String @db.VarChar(128)
   model             String @default("") @db.VarChar(128)
+  // Transcript origin: "claude" / "codex" (raw transcripts) or "trae-memory"
+  // (the IDE's own session summaries — lower fidelity, never mixed up with raw).
+  source            String @default("claude") @db.VarChar(32)
 
   turnCount     Int @default(0)
   messageCount  Int @default(0)

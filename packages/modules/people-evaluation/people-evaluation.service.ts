@@ -287,6 +287,7 @@ export class PeopleEvaluationService {
         collectionPeriodId: period?.id,
         workspaceKey: input.workspaceKey,
         externalSessionId: input.externalSessionId,
+        source: input.source ?? "claude",
         model: input.model ?? "",
         turnCount: input.turnCount,
         messageCount: input.messageCount,
@@ -300,6 +301,7 @@ export class PeopleEvaluationService {
       update: {
         collectionPeriodId: period?.id,
         workspaceKey: input.workspaceKey,
+        source: input.source ?? "claude",
         model: input.model ?? "",
         turnCount: input.turnCount,
         messageCount: input.messageCount,

@@ -74,6 +74,7 @@ export class PeopleEvaluationCollectorController {
         evaluateeUserId: session.evaluateeUserId,
         workspaceKey: session.workspaceKey,
         externalSessionId: session.externalSessionId,
+        source: session.source,
         model: session.model,
         turnCount: session.turnCount,
         messageCount: session.messageCount,

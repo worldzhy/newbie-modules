@@ -268,6 +268,11 @@ export class ReportPeopleEvaluationSessionRequestDto {
   @IsString()
   model?: string;
 
+  @ApiPropertyOptional({ description: 'Transcript origin: "claude" / "codex" / "trae-memory"' })
+  @IsOptional()
+  @IsString()
+  source?: string;
+
   @ApiProperty() @IsNumber() turnCount!: number;
   @ApiProperty() @IsNumber() messageCount!: number;
   @ApiProperty() @IsNumber() toolCallCount!: number;

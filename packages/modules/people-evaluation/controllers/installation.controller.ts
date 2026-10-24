@@ -1,10 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { UserRequest } from "@modules/security/security.interface";
 
 import {
   CollectorInstallationResponseDto,
+  CollectorProfileResponseDto,
   CreateCollectorInstallationDto,
   ListCollectorInstallationsQueryDto,
 } from "../people-evaluation-collector.dto";
@@ -35,6 +37,33 @@ export class PeopleEvaluationInstallationController {
   @ApiOkResponse({ type: CollectorInstallationResponseDto, isArray: true })
   list(@Query() query: ListCollectorInstallationsQueryDto) {
     return this.installations.list(query);
+  }
+
+  @Get("mine")
+  @ApiOperation({ summary: "List the authenticated member's own collector installations" })
+  @ApiOkResponse({ type: CollectorInstallationResponseDto, isArray: true })
+  listMine(@Req() request: UserRequest) {
+    return this.installations.list({ memberUserId: request.user.userId });
+  }
+
+  @Post(":id/profile")
+  @ApiOperation({
+    summary:
+      "Download the member's collector profile (endpoint + token + userId). Rotates the token: " +
+      "the previously running collector config stops working.",
+  })
+  @ApiOkResponse({ type: CollectorProfileResponseDto })
+  async downloadProfile(@Param("id") id: string, @Req() request: UserRequest): Promise<CollectorProfileResponseDto> {
+    const installation = await this.installations.getOrThrow(id);
+    if (installation.memberUserId !== request.user.userId) {
+      throw new ForbiddenException("You can only download a profile for your own collector installation.");
+    }
+    const { token } = await this.installations.regenerateToken(id);
+    return {
+      endpoint: `${request.protocol}://${request.get("host")}`,
+      token,
+      memberUserId: installation.memberUserId,
+    };
   }
 
   @Get(":id")

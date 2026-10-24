@@ -5,6 +5,7 @@ import {
   IsArray,
   IsBoolean,
   IsDate,
+  IsIn,
   IsNotEmpty,
   IsNumber,
   IsObject,
@@ -19,6 +20,14 @@ export const MAX_WORKSPACES_PER_BATCH = 100;
 export const MAX_SESSIONS_PER_BATCH = 50;
 export const MAX_MESSAGES_PER_SESSION = 2000;
 export const MAX_DOCUMENTS_PER_BATCH = 100;
+
+/**
+ * Transcript origins the collector knows how to read. "trae-memory" is the
+ * IDE's own session summary (lower fidelity than a raw transcript) — the
+ * distinction travels end to end so coverage can state it explicitly.
+ */
+export const COLLECTOR_SESSION_SOURCES = ["claude", "codex", "trae-memory"] as const;
+export type CollectorSessionSource = (typeof COLLECTOR_SESSION_SOURCES)[number];
 
 export class CollectorWorkspaceItemDto {
   @ApiProperty({ description: "Member the workspace belongs to" })
@@ -95,6 +104,14 @@ export class CollectorSessionItemDto {
   @ApiProperty() @IsUUID() @IsNotEmpty() evaluateeUserId!: string;
   @ApiProperty() @IsString() @IsNotEmpty() workspaceKey!: string;
   @ApiProperty() @IsString() @IsNotEmpty() externalSessionId!: string;
+
+  @ApiPropertyOptional({
+    description: 'Transcript origin: "claude" / "codex" / "trae-memory" — defaults to "claude"',
+    enum: COLLECTOR_SESSION_SOURCES,
+  })
+  @IsOptional()
+  @IsIn(COLLECTOR_SESSION_SOURCES)
+  source?: string;
 
   @ApiPropertyOptional() @IsOptional() @IsString() model?: string;
   @ApiProperty() @IsNumber() turnCount!: number;
@@ -193,6 +210,20 @@ export class CollectorInstallationResponseDto {
   @ApiPropertyOptional() revokedAt?: Date | null;
   @ApiProperty() online!: boolean;
   @ApiProperty() createdAt!: Date;
+}
+
+/**
+ * Self-service collector profile. Tokens are stored as hashes, so the profile
+ * can only carry a freshly rotated token — downloading it invalidates the
+ * token the collector currently runs with.
+ */
+export class CollectorProfileResponseDto {
+  @ApiProperty({ description: "API base URL the collector posts to" })
+  endpoint!: string;
+  @ApiProperty({ description: "Freshly rotated plaintext token — shown once" })
+  token!: string;
+  @ApiProperty({ description: "Member the token reports for" })
+  memberUserId!: string;
 }
 
 /**
