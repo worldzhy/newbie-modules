@@ -137,7 +137,9 @@ export class ThreatIntelligenceService {
     const [items, total] = await Promise.all([
       this.prisma.threatIntelligenceItem.findMany({
         where,
-        orderBy: { publishedAt: "desc" },
+        // publishedAt is nullable and many items share the same second (KEV
+        // dateAdded, same-day news); id keeps offset pagination stable.
+        orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
         take: query.limit ?? 20,
         skip: query.offset ?? 0,
       }),

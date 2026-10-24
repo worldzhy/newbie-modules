@@ -62,7 +62,10 @@ export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAd
     const ghsaId = advisory.ghsa_id;
     if (!ghsaId) return null;
     const title = advisory.summary?.trim() || `Security advisory ${ghsaId}`;
-    const externalId = advisory.cve_id || ghsaId;
+    // The dedup key must always be the GHSA id: one CVE often maps to
+    // multiple GHSAs, and keying on the CVE id would make them overwrite
+    // each other on upsert. The CVE id stays available in summary/rawPayload.
+    const externalId = ghsaId;
     const category = this.detectCategory(advisory);
     return {
       source: this.source,

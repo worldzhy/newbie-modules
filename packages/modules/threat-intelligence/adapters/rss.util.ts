@@ -18,7 +18,7 @@ export interface RssItem {
  * Parse an RSS 2.0 feed into a list of items.
  */
 export function parseRssItems(xml: string): RssItem[] {
-  const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
+  const itemBlocks = xml.match(/<item(?:\s[^>]*)?>[\s\S]*?<\/item>/g) ?? [];
   return itemBlocks.map((block) => ({
     title: extractTag(block, "title"),
     link: extractTag(block, "link"),
@@ -30,12 +30,21 @@ export function parseRssItems(xml: string): RssItem[] {
 
 function extractTag(block: string, tag: string): string {
   const match = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
-  return match ? match[1].trim() : "";
+  return match ? unwrapCdata(match[1].trim()) : "";
+}
+
+/**
+ * WordPress-style feeds wrap title/description/guid in CDATA; unwrap it so
+ * downstream consumers never see the `<![CDATA[` markers.
+ */
+function unwrapCdata(value: string): string {
+  const match = value.match(/^<!\[CDATA\[([\s\S]*?)\]\]>$/);
+  return match ? match[1].trim() : value;
 }
 
 /** Strip HTML tags and decode common entities for plain-text summaries. */
 export function stripHtml(html: string): string {
-  return html
+  return unwrapCdata(html.trim())
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
