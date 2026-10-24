@@ -6,7 +6,7 @@
     "className": "ThreatIntelModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["llm"],
+  "moduleDependencies": [],
   "config-service": {},
   "env": {},
   "dependencies": {},

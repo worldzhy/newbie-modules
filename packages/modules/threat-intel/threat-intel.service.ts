@@ -2,32 +2,8 @@ import { Inject, Injectable, Logger, NotFoundException, Optional } from "@nestjs
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { SourceAdapter, SourceIntelItem, SOURCE_ADAPTER } from "./adapters/source-adapter.port";
-import { MatchReRanker } from "./llm/match-re-ranker";
-import {
-  PROJECT_SECURITY_PROFILE_PORT,
-  ProjectSecurityProfile,
-  ProjectSecurityProfilePort,
-} from "./project-security-profile.port";
-import {
-  DEFAULT_MAX_ITEMS_PER_SOURCE,
-  DEFAULT_RETENTION_DAYS,
-  THREAT_INTEL_CONFIDENCE,
-  THREAT_INTEL_MATCH_STATUS,
-  THREAT_INTEL_MATCH_TYPE,
-  ThreatIntelSeverity,
-} from "./threat-intel.constants";
-import { ListThreatIntelItemsQuery, ListThreatIntelMatchesQuery } from "./threat-intel.dto";
-
-const SEVERITY_RANK: Record<ThreatIntelSeverity, number> = {
-  critical: 4,
-  high: 3,
-  medium: 2,
-  low: 1,
-  info: 0,
-};
-
-/** Items below this severity never go through the LLM re-ranker. */
-const RE_RANK_MIN_SEVERITY: ThreatIntelSeverity = "medium";
+import { DEFAULT_MAX_ITEMS_PER_SOURCE, DEFAULT_RETENTION_DAYS } from "./threat-intel.constants";
+import { ListThreatIntelItemsQuery } from "./threat-intel.dto";
 
 @Injectable()
 export class ThreatIntelService {
@@ -36,51 +12,26 @@ export class ThreatIntelService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() @Inject(SOURCE_ADAPTER) private readonly adapters: SourceAdapter[] = [],
-    private readonly reRanker: MatchReRanker,
-    @Optional()
-    @Inject(PROJECT_SECURITY_PROFILE_PORT)
-    private readonly profilePort?: ProjectSecurityProfilePort,
   ) {}
 
   /**
-   * Run the full collection + matching pipeline. Called by the daily
+   * Run the collection pipeline: fetch from every registered source adapter,
+   * then deduplicate and persist by (source, externalId). Called by the daily
    * scheduled job and the manual trigger endpoint.
+   *
+   * Matching against projects is a host concern and intentionally lives
+   * outside this module.
    */
-  async collectAndMatch(since?: Date): Promise<{ collected: number; matched: number }> {
+  async collect(since?: Date): Promise<{ collected: number }> {
     const items = await this.fetchAllSources(since);
     if (items.length === 0) {
       this.logger.log("No new threat intel items collected.");
-      return { collected: 0, matched: 0 };
+      return { collected: 0 };
     }
 
     const upserted = await this.upsertItems(items);
     this.logger.log(`Collected ${items.length} items, ${upserted} new/updated.`);
-
-    if (!this.profilePort) {
-      this.logger.warn("No ProjectSecurityProfilePort provider registered; skipping matching.");
-      return { collected: upserted, matched: 0 };
-    }
-
-    const profiles = await this.profilePort.listProfiles();
-    if (profiles.length === 0) {
-      this.logger.warn("No project security profiles available; skipping matching.");
-      return { collected: upserted, matched: 0 };
-    }
-
-    let matchedCount = 0;
-    // Re-fetch the persisted items (with ids) for matching.
-    const persisted = await this.prisma.threatIntelItem.findMany({
-      where: { source: { in: items.map((i) => i.source) } },
-      orderBy: { fetchedAt: "desc" },
-      take: items.length,
-    });
-
-    for (const item of persisted) {
-      const created = await this.matchItem(item, profiles);
-      matchedCount += created;
-    }
-
-    return { collected: upserted, matched: matchedCount };
+    return { collected: upserted };
   }
 
   private async fetchAllSources(since?: Date): Promise<SourceIntelItem[]> {
@@ -136,108 +87,6 @@ export class ThreatIntelService {
   }
 
   /**
-   * Match one item against all project profiles.
-   *
-   * Stage 1 (hard recall): exact entity substring match against title +
-   * summary. Stage 2 (LLM re-rank): only for items that had no hard hit
-   * AND meet the severity/signal threshold, to control token cost.
-   *
-   * Returns the number of new matches created.
-   */
-  private async matchItem(
-    item: { id: string; title: string; summary: string | null; severity: string; signalTags: string[] },
-    profiles: ProjectSecurityProfile[],
-  ): Promise<number> {
-    const haystack = `${item.title}\n${item.summary ?? ""}`.toLowerCase();
-    let created = 0;
-
-    for (const profile of profiles) {
-      if (profile.entities.length === 0) {
-        continue;
-      }
-
-      const hardHits = profile.entities.filter((e) => haystack.includes(e.value.toLowerCase()));
-      if (hardHits.length > 0) {
-        await this.createMatch({
-          itemId: item.id,
-          projectId: profile.projectId,
-          applicationId: profile.applicationId,
-          matchType: THREAT_INTEL_MATCH_TYPE.ENTITY,
-          matchedEntity: hardHits[0].value,
-          evidence: hardHits.map((h) => h.value).join(", "),
-          confidence: THREAT_INTEL_CONFIDENCE.HIGH,
-        });
-        created += 1;
-        continue;
-      }
-
-      // Stage 2: LLM re-rank only for sufficiently severe items.
-      if (this.shouldReRank(item.severity as ThreatIntelSeverity, item.signalTags)) {
-        const verdict = await this.reRanker.reRank(
-          { title: item.title, summary: item.summary ?? undefined },
-          profile.entities,
-        );
-        if (verdict.finalRelevant) {
-          const matched = verdict.entityMatches.find((m) => m.matched);
-          await this.createMatch({
-            itemId: item.id,
-            projectId: profile.projectId,
-            applicationId: profile.applicationId,
-            matchType: THREAT_INTEL_MATCH_TYPE.SEMANTIC,
-            matchedEntity: matched?.entity ?? null,
-            evidence: verdict.reason,
-            confidence: THREAT_INTEL_CONFIDENCE.MEDIUM,
-          });
-          created += 1;
-        }
-      }
-    }
-
-    return created;
-  }
-
-  private shouldReRank(severity: ThreatIntelSeverity, signalTags: string[]): boolean {
-    return SEVERITY_RANK[severity] >= SEVERITY_RANK[RE_RANK_MIN_SEVERITY] || signalTags.length > 0;
-  }
-
-  private async createMatch(data: {
-    itemId: string;
-    projectId: string;
-    applicationId?: string;
-    matchType: string;
-    matchedEntity: string | null;
-    evidence: string | null;
-    confidence: string;
-  }): Promise<void> {
-    // Avoid duplicate matches for the same (item, project, entity).
-    await this.prisma.threatIntelMatch.upsert({
-      where: {
-        itemId_projectId_matchedEntity: {
-          itemId: data.itemId,
-          projectId: data.projectId,
-          matchedEntity: data.matchedEntity ?? "",
-        },
-      },
-      update: {
-        matchType: data.matchType,
-        evidence: data.evidence,
-        confidence: data.confidence,
-        status: THREAT_INTEL_MATCH_STATUS.OPEN,
-      },
-      create: {
-        itemId: data.itemId,
-        projectId: data.projectId,
-        applicationId: data.applicationId ?? null,
-        matchType: data.matchType,
-        matchedEntity: data.matchedEntity ?? "",
-        evidence: data.evidence,
-        confidence: data.confidence,
-        status: THREAT_INTEL_MATCH_STATUS.OPEN,
-      },
-    });
-  }
-
-  /**
    * Single retention cleanup point. Prunes items older than
    * `retentionDays` and enforces `maxItemsPerSource` per source.
    * This is the ONLY place that deletes threat intel data.
@@ -278,7 +127,6 @@ export class ThreatIntelService {
     if (query.category) where.category = query.category;
     if (query.severity) where.severity = query.severity;
     if (query.source) where.source = query.source;
-    if (query.matchedOnly) where.matches = { some: {} };
 
     const [items, total] = await Promise.all([
       this.prisma.threatIntelItem.findMany({
@@ -293,39 +141,8 @@ export class ThreatIntelService {
   }
 
   async getItem(id: string) {
-    const item = await this.prisma.threatIntelItem.findUnique({
-      where: { id },
-      include: { matches: true },
-    });
+    const item = await this.prisma.threatIntelItem.findUnique({ where: { id } });
     if (!item) throw new NotFoundException(`Threat intel item ${id} not found.`);
     return item;
-  }
-
-  async listMatches(query: ListThreatIntelMatchesQuery) {
-    const where: Prisma.ThreatIntelMatchWhereInput = {};
-    if (query.projectId) where.projectId = query.projectId;
-    if (query.status) where.status = query.status;
-    if (query.confidence) where.confidence = query.confidence;
-
-    const [matches, total] = await Promise.all([
-      this.prisma.threatIntelMatch.findMany({
-        where,
-        orderBy: { createdAt: "desc" },
-        take: query.limit ?? 20,
-        skip: query.offset ?? 0,
-        include: { item: true },
-      }),
-      this.prisma.threatIntelMatch.count({ where }),
-    ]);
-    return { matches, total };
-  }
-
-  async updateMatchStatus(id: string, status: string) {
-    const match = await this.prisma.threatIntelMatch.findUnique({ where: { id } });
-    if (!match) throw new NotFoundException(`Threat intel match ${id} not found.`);
-    return this.prisma.threatIntelMatch.update({
-      where: { id },
-      data: { status, resolvedAt: status === THREAT_INTEL_MATCH_STATUS.RESOLVED ? new Date() : null },
-    });
   }
 }

@@ -1,23 +1,22 @@
 import { Global, Module } from "@nestjs/common";
 import { ThreatIntelController } from "./threat-intel.controller";
 import { ThreatIntelService } from "./threat-intel.service";
-import { MatchReRanker } from "./llm/match-re-ranker";
 
 /**
  * External threat intelligence module (ADR-031).
  *
- * Collects intel from registered source adapters, deduplicates by
- * (source, externalId), matches against project security profiles
- * (hard entity recall + LLM structured re-rank), and records matches.
+ * Platform-level collection layer: gathers intel from registered source
+ * adapters, deduplicates by (source, externalId), stores it, and exposes
+ * read APIs plus the retention cleanup.
  *
- * Source adapters and the project security profile port are provided by
- * the host via multi-binding; this registry module ships the collection
- * and matching pipeline only.
+ * This module knows nothing about projects. Whether and how a host matches
+ * items against its projects is a host concern (nightwatch-backend keeps
+ * that layer in src/application/project/security).
  */
 @Global()
 @Module({
   controllers: [ThreatIntelController],
-  providers: [ThreatIntelService, MatchReRanker],
+  providers: [ThreatIntelService],
   exports: [ThreatIntelService],
 })
 export class ThreatIntelModule {}

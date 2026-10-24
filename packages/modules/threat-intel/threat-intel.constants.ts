@@ -68,30 +68,6 @@ export const THREAT_INTEL_SIGNAL_TAG = {
 
 export type ThreatIntelSignalTag = (typeof THREAT_INTEL_SIGNAL_TAG)[keyof typeof THREAT_INTEL_SIGNAL_TAG];
 
-export const THREAT_INTEL_MATCH_TYPE = {
-  ENTITY: "entity",
-  SEMANTIC: "semantic",
-} as const;
-
-export type ThreatIntelMatchType = (typeof THREAT_INTEL_MATCH_TYPE)[keyof typeof THREAT_INTEL_MATCH_TYPE];
-
-export const THREAT_INTEL_MATCH_STATUS = {
-  OPEN: "open",
-  ACKNOWLEDGED: "acknowledged",
-  RESOLVED: "resolved",
-  FALSE_POSITIVE: "false-positive",
-} as const;
-
-export type ThreatIntelMatchStatus = (typeof THREAT_INTEL_MATCH_STATUS)[keyof typeof THREAT_INTEL_MATCH_STATUS];
-
-export const THREAT_INTEL_CONFIDENCE = {
-  HIGH: "high",
-  MEDIUM: "medium",
-  LOW: "low",
-} as const;
-
-export type ThreatIntelConfidence = (typeof THREAT_INTEL_CONFIDENCE)[keyof typeof THREAT_INTEL_CONFIDENCE];
-
 /**
  * Default retention window for threat intel items. Older items are pruned
  * by the single retention cleanup job (see ThreatIntelService.pruneExpired).
