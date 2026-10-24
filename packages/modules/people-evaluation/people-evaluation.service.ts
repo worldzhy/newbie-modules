@@ -267,9 +267,10 @@ export class PeopleEvaluationService {
   /**
    * Upsert the PG index row for one collected agent session. Transcript
    * chunks land in ClickHouse; this row is what the assessment agent lists
-   * and drills into.
+   * and drills into. The ingest DTO is the single payload contract; the index
+   * simply does not use the transcript slice of it.
    */
-  async reportSession(input: WorklogSessionItemDto) {
+  async reportSession(input: Omit<WorklogSessionItemDto, "messages">) {
     const period = await this.findCollectionPeriodAt(input.startedAt);
     return this.prisma.peopleEvaluationAgentSession.upsert({
       where: {
