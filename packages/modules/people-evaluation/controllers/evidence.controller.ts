@@ -9,6 +9,7 @@ import {
   CreatePeopleEvaluationDeclaredDocumentBatchRequestDto,
   CreatePeopleEvaluationSessionBatchRequestDto,
   CreatePeopleEvaluationWorkspaceBatchRequestDto,
+  GetPeopleEvaluationByIdRequestDto,
   ListPeopleEvaluationDeclaredDocumentsRequestDto,
   ListPeopleEvaluationDeclaredDocumentsResponseDto,
   ListPeopleEvaluationSessionsRequestDto,
@@ -70,34 +71,29 @@ export class PeopleEvaluationEvidenceController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "Report collected agent sessions: index to PG, transcript chunks to ClickHouse" })
   @ApiResponse({ status: 204, description: "Batch stored." })
+  @ApiResponse({ status: 400, description: `More than ${MAX_SESSIONS_PER_BATCH} sessions in one batch.` })
   @ApiResponse({ status: 401, description: "Invalid or revoked installation token." })
-  @ApiResponse({ status: 413, description: `More than ${MAX_SESSIONS_PER_BATCH} sessions in one batch.` })
   async reportSessions(
     @Req() req: Request & { installation: ResolvedPeopleEvaluationInstallationToken },
     @Body() body: CreatePeopleEvaluationSessionBatchRequestDto,
   ): Promise<void> {
     const { evaluateeUserId, installationId } = req.installation;
 
-    for (const session of body.sessions) {
-      const index = await this.evidence.reportSession(evaluateeUserId, {
-        workspaceKey: session.workspaceKey,
-        externalSessionId: session.externalSessionId,
-        source: session.source,
-        model: session.model,
-        turnCount: session.turnCount,
-        messageCount: session.messageCount,
-        toolCallCount: session.toolCallCount,
-        toolNames: session.toolNames,
-        touchedFiles: session.touchedFiles,
-        durationMs: session.durationMs,
-        startedAt: session.startedAt,
-        endedAt: session.endedAt,
-      });
+    // Idempotent re-ingest: the PG index is an upsert keyed by
+    // (evaluateeUserId, externalSessionId), and transcript chunks dedupe on
+    // (session_id, seq) in ClickHouse. If a CH insert fails after its PG
+    // upsert succeeded, the agent simply re-posts the batch — the retried
+    // upsert is a no-op and the retried chunks collapse on read.
+    const indexes = await this.evidence.reportSessions(
+      evaluateeUserId,
+      body.sessions.map(({ messages: _messages, ...index }) => index),
+    );
 
+    for (const [position, session] of body.sessions.entries()) {
       await this.sessions.insertMessages(
         session.messages.map((message) => ({
           evaluatee_user_id: evaluateeUserId,
-          session_id: index.id,
+          session_id: indexes[position].id,
           workspace_key: session.workspaceKey,
           seq: message.seq,
           role: message.role,
@@ -160,7 +156,7 @@ export class PeopleEvaluationEvidenceController {
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.PeopleEvaluationDeclaredDocument)
   @ApiOperation({ summary: "Get one declared work artifact, including its content" })
   @ApiResponse({ status: 200, type: PeopleEvaluationDeclaredDocumentResponseDto })
-  getDocument(@Param("id") id: string) {
-    return this.evidence.getDocument(id);
+  getDocument(@Param() params: GetPeopleEvaluationByIdRequestDto) {
+    return this.evidence.getDocument(params.id);
   }
 }

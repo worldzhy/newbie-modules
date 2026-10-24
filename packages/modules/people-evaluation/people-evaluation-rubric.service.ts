@@ -50,35 +50,40 @@ export class PeopleEvaluationRubricService {
     const publishedAt = input.publishedAt ?? new Date();
     const isActive = input.isActive ?? true;
 
-    return this.prisma.$transaction(async (tx) => {
-      if (isActive) {
-        await tx.peopleEvaluationRubricVersion.updateMany({
-          where: { isActive: true },
-          data: { isActive: false },
-        });
-      }
-      return tx.peopleEvaluationRubricVersion.create({
-        data: {
-          version: input.version,
-          floorRules: input.floorRules,
-          companyDirectionStatement: input.companyDirectionStatement,
-          publishedAt,
-          isActive,
-          dimensions: {
-            create: input.dimensions.map((dimension) => ({
-              dimensionKey: dimension.dimensionKey,
-              name: dimension.name,
-              anchorLow: dimension.anchorLow,
-              anchorHigh: dimension.anchorHigh,
-              fullLoadBaseRef: dimension.fullLoadBaseRef,
-              description: dimension.description,
-              calibrationExamples: dimension.calibrationExamples,
-            })),
+    // Serializable so two concurrent publishes cannot both observe "no other
+    // active version" and leave two active rows.
+    return this.prisma.$transaction(
+      async (tx) => {
+        if (isActive) {
+          await tx.peopleEvaluationRubricVersion.updateMany({
+            where: { isActive: true },
+            data: { isActive: false },
+          });
+        }
+        return tx.peopleEvaluationRubricVersion.create({
+          data: {
+            version: input.version,
+            floorRules: input.floorRules,
+            companyDirectionStatement: input.companyDirectionStatement,
+            publishedAt,
+            isActive,
+            dimensions: {
+              create: input.dimensions.map((dimension) => ({
+                dimensionKey: dimension.dimensionKey,
+                name: dimension.name,
+                anchorLow: dimension.anchorLow,
+                anchorHigh: dimension.anchorHigh,
+                fullLoadBaseRef: dimension.fullLoadBaseRef,
+                description: dimension.description,
+                calibrationExamples: dimension.calibrationExamples,
+              })),
+            },
           },
-        },
-        include: { dimensions: true },
-      });
-    });
+          include: { dimensions: true },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   // --- Evaluation periods ------------------------------------------------
@@ -110,11 +115,11 @@ export class PeopleEvaluationRubricService {
     if (!rubric.isActive) {
       throw new ConflictException(`PeopleEvaluationRubricVersion ${input.rubricVersionId} is not active`);
     }
-    if (input.periodStart >= input.periodEnd) {
+    if (input.periodStart.getTime() >= input.periodEnd.getTime()) {
       throw new BadRequestException("periodStart must be before periodEnd");
     }
     // Ex ante anchor: a period cannot start before its rubric was published.
-    if (input.periodStart < rubric.publishedAt) {
+    if (input.periodStart.getTime() < rubric.publishedAt.getTime()) {
       throw new BadRequestException(
         `Period cannot start before rubric ${rubric.version} was published at ${rubric.publishedAt.toISOString()}`,
       );
@@ -159,7 +164,6 @@ export class PeopleEvaluationRubricService {
         type: input.type,
         periodStart: input.periodStart,
         periodEnd: input.periodEnd,
-        status: input.status ?? PeopleEvaluationPeriodStatus.UPCOMING,
         collectionPeriodIds: input.collectionPeriodIds,
       },
     });
@@ -190,13 +194,25 @@ export class PeopleEvaluationRubricService {
 
   /**
    * Declare (or re-declare) the specialty circle for one evaluatee × period.
-   * The declaration is context for the evaluation agent — it never carries
-   * weights into any computation.
+   * Every declared dimension must exist in the rubric version the period is
+   * pinned to — the circle is context for the evaluation agent and a typo'd
+   * key would silently drop out of the judgment.
    */
   async declareHomeGround(input: UpdatePeopleEvaluationHomeGroundRequestDto) {
     const period = await this.getPeriodById(input.collectionPeriodId);
     if (period.type !== PeopleEvaluationPeriodType.COLLECTION) {
       throw new BadRequestException("Home ground can only be declared on COLLECTION periods");
+    }
+    const dimensions = await this.prisma.peopleEvaluationDimension.findMany({
+      where: { rubricVersionId: period.rubricVersionId },
+      select: { dimensionKey: true },
+    });
+    const knownKeys = new Set(dimensions.map((dimension) => dimension.dimensionKey));
+    const unknown = input.homeDimensions.filter((key) => !knownKeys.has(key));
+    if (unknown.length > 0) {
+      throw new BadRequestException(
+        `homeDimensions must reference dimension keys of rubric version ${period.rubricVersionId}: ${unknown.join(", ")}`,
+      );
     }
     return this.prisma.peopleEvaluationHomeGround.upsert({
       where: {

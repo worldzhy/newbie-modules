@@ -6,6 +6,7 @@ import { UserRequest } from "@modules/security/security.interface";
 
 import {
   CreatePeopleEvaluationInstallationRequestDto,
+  GetPeopleEvaluationByIdRequestDto,
   ListPeopleEvaluationInstallationsRequestDto,
   PeopleEvaluationInstallationCredentialResponseDto,
   PeopleEvaluationInstallationResponseDto,
@@ -54,23 +55,23 @@ export class PeopleEvaluationInstallationController {
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.PeopleEvaluationInstallation)
   @ApiOperation({ summary: "Get one installation (no token)" })
   @ApiOkResponse({ type: PeopleEvaluationInstallationResponseDto })
-  get(@Param("id") id: string) {
-    return this.installations.get(id);
+  get(@Param() params: GetPeopleEvaluationByIdRequestDto) {
+    return this.installations.get(params.id);
   }
 
   @Post(":id/token/regenerate")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.PeopleEvaluationInstallation)
   @ApiOperation({ summary: "Rotate the installation token (plaintext returned once)" })
   @ApiCreatedResponse({ type: PeopleEvaluationInstallationCredentialResponseDto })
-  regenerate(@Param("id") id: string) {
-    return this.installations.regenerateToken(id);
+  regenerate(@Param() params: GetPeopleEvaluationByIdRequestDto) {
+    return this.installations.regenerateToken(params.id);
   }
 
   @Delete(":id")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.PeopleEvaluationInstallation)
   @ApiOperation({ summary: "Revoke an installation agent; subsequent ingest gets 401" })
   @ApiOkResponse()
-  revoke(@Param("id") id: string) {
-    return this.installations.revoke(id);
+  revoke(@Param() params: GetPeopleEvaluationByIdRequestDto) {
+    return this.installations.revoke(params.id);
   }
 }

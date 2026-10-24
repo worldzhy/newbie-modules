@@ -23,6 +23,11 @@ export interface SessionMessageRow {
  * The transcript is the raw material the evaluation agent drills into; PG only
  * keeps the session index (PeopleEvaluationSession). Rows are chunked by the
  * installation agent before upload and compressed by the ClickHouse column codec.
+ *
+ * The table engine is ReplacingMergeTree(ingested_at) keyed by
+ * (evaluatee_user_id, session_id, seq): re-ingesting the same batch inserts
+ * duplicate rows that collapse into the newest version. Reads must use FINAL
+ * so duplicates are invisible even before the background merge runs.
  */
 @Injectable()
 export class PeopleEvaluationSessionStore {
@@ -45,7 +50,7 @@ export class PeopleEvaluationSessionStore {
     const result = await this.clickhouse.query({
       query: [
         `SELECT evaluatee_user_id, session_id, workspace_key, seq, role, content, tool_name, tool_calls, token_count, created_at`,
-        `FROM ${SESSION_MESSAGE_TABLE}`,
+        `FROM ${SESSION_MESSAGE_TABLE} FINAL`,
         `WHERE session_id = {sessionId:UUID} AND seq >= {fromSeq:UInt32}`,
         `ORDER BY seq ASC`,
         `LIMIT {limit:UInt32}`,
@@ -63,7 +68,7 @@ export class PeopleEvaluationSessionStore {
   /** Number of stored message rows per session — used in coverage accounting. */
   async countMessages(sessionId: string): Promise<number> {
     const result = await this.clickhouse.query({
-      query: `SELECT count() AS total FROM ${SESSION_MESSAGE_TABLE} WHERE session_id = {sessionId:UUID}`,
+      query: `SELECT count() AS total FROM ${SESSION_MESSAGE_TABLE} FINAL WHERE session_id = {sessionId:UUID}`,
       format: "JSONEachRow",
       query_params: { sessionId },
     });

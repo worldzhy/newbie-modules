@@ -14,11 +14,19 @@ import {
   IsOptional,
   IsString,
   IsUUID,
-  ValidateIf,
   ValidateNested,
 } from "class-validator";
 import { PeopleEvaluationPeriodStatus, PeopleEvaluationPeriodType } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
+
+// --- Path params ---------------------------------------------------------
+
+/** Path-parameter envelope for every people-evaluation `:id` route — all ids are UUIDs. */
+export class GetPeopleEvaluationByIdRequestDto {
+  @ApiProperty({ type: String, format: "uuid" })
+  @IsUUID()
+  id!: string;
+}
 
 // --- Rubric versions ---------------------------------------------------
 
@@ -133,8 +141,7 @@ export class CreatePeopleEvaluationPeriodRequestDto {
   @IsNotEmpty()
   rubricVersionId!: string;
 
-  @ApiProperty({ enum: PeopleEvaluationPeriodType })
-  @ValidateIf(() => true)
+  @ApiProperty({ type: String, enum: PeopleEvaluationPeriodType })
   @IsEnum(PeopleEvaluationPeriodType)
   type!: PeopleEvaluationPeriodType;
 
@@ -148,11 +155,6 @@ export class CreatePeopleEvaluationPeriodRequestDto {
   @IsDate()
   periodEnd!: Date;
 
-  @ApiPropertyOptional({ enum: PeopleEvaluationPeriodStatus, description: "Initial status — defaults to UPCOMING" })
-  @IsOptional()
-  @IsEnum(PeopleEvaluationPeriodStatus)
-  status?: PeopleEvaluationPeriodStatus;
-
   @ApiPropertyOptional({
     type: String,
     isArray: true,
@@ -165,8 +167,7 @@ export class CreatePeopleEvaluationPeriodRequestDto {
 }
 
 export class UpdatePeopleEvaluationPeriodStatusRequestDto {
-  @ApiProperty({ enum: PeopleEvaluationPeriodStatus })
-  @ValidateIf(() => true)
+  @ApiProperty({ type: String, enum: PeopleEvaluationPeriodStatus })
   @IsEnum(PeopleEvaluationPeriodStatus)
   status!: PeopleEvaluationPeriodStatus;
 }
@@ -252,6 +253,7 @@ export class PeopleEvaluationSessionResponseDto {
   @ApiProperty() externalSessionId!: string;
   @ApiProperty() workspaceKey!: string;
   @ApiProperty() model!: string;
+  @ApiProperty({ description: 'Transcript origin: "claude" / "codex" / "trae-memory"' }) source!: string;
   @ApiProperty() turnCount!: number;
   @ApiProperty() messageCount!: number;
   @ApiProperty() toolCallCount!: number;
@@ -277,6 +279,10 @@ export class PeopleEvaluationDeclaredDocumentResponseDto {
   @ApiProperty() title!: string;
   @ApiProperty() refPath!: string;
   @ApiPropertyOptional() description?: string | null;
+  @ApiPropertyOptional({
+    description: "Document content — present only on the single-document read (GET /people/evidence/documents/:id)",
+  })
+  content?: string;
   @ApiProperty() capturedAt!: Date;
   @ApiProperty() createdAt!: Date;
 }
@@ -306,75 +312,33 @@ export class PeopleEvaluationResultManifestResponseDto {
 
 // --- Evaluation results ------------------------------------------------
 
+/**
+ * Internal write payload for evaluation results — never bound to an HTTP
+ * endpoint (results are written by the evaluation runner through the service),
+ * so it intentionally carries no Swagger/class-validator decorators.
+ */
 export class CreatePeopleEvaluationResultInput {
-  @ApiProperty() @IsUUID() @IsNotEmpty() evaluateeUserId!: string;
-  @ApiProperty() @IsUUID() @IsNotEmpty() collectionPeriodId!: string;
-
-  @ApiProperty({
-    type: Object,
-    isArray: true,
-    description: "Deterministic evidence manifest entries the run was judged from",
-  })
-  @IsArray()
-  @IsObject({ each: true })
+  evaluateeUserId!: string;
+  collectionPeriodId!: string;
+  /** Deterministic evidence manifest entries the run was judged from */
   manifest!: object[];
-
-  @ApiProperty({ description: "SHA-256 over the canonical manifest" })
-  @IsString()
-  @IsNotEmpty()
+  /** SHA-256 over the canonical manifest */
   contentHash!: string;
-
-  @ApiProperty({ description: "Coverage statistics by layer and source" })
-  @IsObject()
-  @IsNotEmpty()
+  /** Coverage statistics by layer and source */
   coverageStats!: object;
-
-  @ApiProperty({ description: "Blind subject id the model saw instead of the real identity" })
-  @IsString()
-  @IsNotEmpty()
+  /** Blind subject id the model saw instead of the real identity */
   blindSubjectId!: string;
-
-  @ApiProperty() @IsString() @IsNotEmpty() promptVersion!: string;
-  @ApiProperty() @IsString() @IsNotEmpty() model!: string;
-
-  @ApiProperty({
-    type: Object,
-    isArray: true,
-    description:
-      "Per-dimension judgments: [{ dimensionKey, score, confidence, coverage, evidenceRefs, rationale, unresolved? }]",
-  })
-  @IsArray()
-  @IsObject({ each: true })
+  promptVersion!: string;
+  model!: string;
+  /** [{ dimensionKey, score, confidence, coverage, evidenceRefs, rationale, unresolved? }] */
   dimensionScores!: object[];
-
-  @ApiProperty({ description: "Overall judgment text — no composite score is produced" })
-  @IsString()
-  @IsNotEmpty()
+  /** Overall judgment text — no composite score is produced */
   overallText!: string;
-
-  @ApiPropertyOptional({ type: Object, isArray: true })
-  @IsOptional()
-  @IsArray()
-  @IsObject({ each: true })
   highlights?: object[];
-  @ApiPropertyOptional({ type: Object, isArray: true })
-  @IsOptional()
-  @IsArray()
-  @IsObject({ each: true })
   risks?: object[];
-  @ApiPropertyOptional({ type: Object, isArray: true })
-  @IsOptional()
-  @IsArray()
-  @IsObject({ each: true })
   unresolved?: object[];
-  @ApiPropertyOptional({ type: Object, isArray: true })
-  @IsOptional()
-  @IsArray()
-  @IsObject({ each: true })
   skipped?: object[];
-  @ApiPropertyOptional({ description: "Dual-model disagreement list, when the mode is enabled" })
-  @IsOptional()
-  @IsObject()
+  /** Dual-model disagreement list, when the mode is enabled */
   disagreement?: object;
 }
 
@@ -424,7 +388,7 @@ export class CreatePeopleEvaluationPipPlanRequestDto {
 
   @ApiProperty({ type: String, isArray: true, description: "Evaluation result ids that triggered the plan" })
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID("4", { each: true })
   triggerRefs!: string[];
 
   @ApiProperty() @Type(() => Date) @IsDate() startDate!: Date;

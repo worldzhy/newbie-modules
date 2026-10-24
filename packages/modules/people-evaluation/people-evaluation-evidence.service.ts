@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PeopleEvaluationPeriod, PeopleEvaluationPeriodType, Prisma } from "@generated/prisma/client";
+import { PeopleEvaluationPeriodType, PeopleEvaluationSession, Prisma } from "@generated/prisma/client";
 import { CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
@@ -64,13 +64,41 @@ export class PeopleEvaluationEvidenceService {
   // --- Collected sessions --------------------------------------------------
 
   /**
-   * Upsert the PG index row for one collected agent session. Transcript
-   * chunks land in ClickHouse; this row is what the evaluation agent lists
-   * and drills into. The ingest DTO is the single payload contract; the index
-   * simply does not use the transcript slice of it.
+   * Upsert the PG index rows for one reported session batch. Collection
+   * periods are looked up once per batch (not once per session), then each
+   * session is attributed in memory. Transcript chunks land in ClickHouse;
+   * these rows are what the evaluation agent lists and drills into.
    */
-  async reportSession(evaluateeUserId: string, input: Omit<PeopleEvaluationSessionDto, "messages">) {
-    const period = await this.findCollectionPeriodAt(input.startedAt);
+  async reportSessions(evaluateeUserId: string, inputs: Omit<PeopleEvaluationSessionDto, "messages">[]) {
+    if (inputs.length === 0) return [];
+    const starts = inputs.map((input) => input.startedAt.getTime());
+    const periods = await this.prisma.peopleEvaluationPeriod.findMany({
+      where: {
+        type: PeopleEvaluationPeriodType.COLLECTION,
+        periodStart: { lte: new Date(Math.max(...starts)) },
+        periodEnd: { gt: new Date(Math.min(...starts)) },
+      },
+      orderBy: { periodStart: "desc" },
+    });
+
+    const indexes: PeopleEvaluationSession[] = [];
+    for (const input of inputs) {
+      const startedAt = input.startedAt.getTime();
+      const period =
+        periods.find(
+          (candidate) => candidate.periodStart.getTime() <= startedAt && candidate.periodEnd.getTime() > startedAt,
+        ) ?? null;
+      indexes.push(await this.upsertSessionIndex(evaluateeUserId, input, period?.id ?? null));
+    }
+    return indexes;
+  }
+
+  /** Upsert one session index row, keyed by (evaluateeUserId, externalSessionId). */
+  private async upsertSessionIndex(
+    evaluateeUserId: string,
+    input: Omit<PeopleEvaluationSessionDto, "messages">,
+    collectionPeriodId: string | null,
+  ) {
     return this.prisma.peopleEvaluationSession.upsert({
       where: {
         evaluateeUserId_externalSessionId: {
@@ -80,7 +108,7 @@ export class PeopleEvaluationEvidenceService {
       },
       create: {
         evaluateeUserId,
-        collectionPeriodId: period?.id,
+        collectionPeriodId,
         workspaceKey: input.workspaceKey,
         externalSessionId: input.externalSessionId,
         source: input.source ?? "claude",
@@ -95,7 +123,7 @@ export class PeopleEvaluationEvidenceService {
         endedAt: input.endedAt,
       },
       update: {
-        collectionPeriodId: period?.id,
+        collectionPeriodId,
         workspaceKey: input.workspaceKey,
         source: input.source ?? "claude",
         model: input.model ?? "",
@@ -125,9 +153,12 @@ export class PeopleEvaluationEvidenceService {
         orderBy: [{ startedAt: "asc" }, { id: "asc" }],
         select: {
           id: true,
+          evaluateeUserId: true,
+          collectionPeriodId: true,
           externalSessionId: true,
           workspaceKey: true,
           model: true,
+          source: true,
           turnCount: true,
           messageCount: true,
           toolCallCount: true,
@@ -141,20 +172,7 @@ export class PeopleEvaluationEvidenceService {
     });
   }
 
-  /** Locates the COLLECTION period containing an event timestamp, if any. */
-  private async findCollectionPeriodAt(at: Date): Promise<PeopleEvaluationPeriod | null> {
-    return this.prisma.peopleEvaluationPeriod.findFirst({
-      where: {
-        type: PeopleEvaluationPeriodType.COLLECTION,
-        periodStart: { lte: at },
-        periodEnd: { gt: at },
-      },
-      orderBy: { periodStart: "desc" },
-    });
-  }
-
   // --- Declared documents --------------------------------------------------
-
   /** Upsert a declared work artifact reported by the installation agent. */
   async reportDocument(evaluateeUserId: string, input: PeopleEvaluationDeclaredDocumentDto) {
     return this.prisma.peopleEvaluationDeclaredDocument.upsert({
@@ -194,11 +212,13 @@ export class PeopleEvaluationEvidenceService {
         orderBy: { capturedAt: "desc" },
         select: {
           id: true,
+          evaluateeUserId: true,
           workspaceKey: true,
           title: true,
           refPath: true,
           description: true,
           capturedAt: true,
+          createdAt: true,
         },
       },
     });

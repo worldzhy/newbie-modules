@@ -5,6 +5,9 @@
 -- session index (PeopleEvaluationSession); this table holds the transcript
 -- the evaluation agent drills into on demand.
 -- `content` is chunked by the installation agent and compressed with ZSTD on disk.
+-- ReplacingMergeTree dedupes re-ingested batches on the ORDER BY key
+-- (evaluatee_user_id, session_id, seq), keeping the row with the newest
+-- ingested_at; reads use FINAL so duplicates are invisible before merging.
 CREATE TABLE IF NOT EXISTS people_evaluation_session_messages
 (
     -- Evaluatee the session belongs to, resolved from the installation token.
@@ -23,7 +26,7 @@ CREATE TABLE IF NOT EXISTS people_evaluation_session_messages
     created_at     DateTime64(3, 'UTC'),
     ingested_at    DateTime64(3, 'UTC') DEFAULT now64()
 )
-ENGINE = MergeTree()
+ENGINE = ReplacingMergeTree(ingested_at)
 PARTITION BY toYYYYMM(created_at)
 ORDER BY (evaluatee_user_id, session_id, seq)
 SETTINGS index_granularity = 8192;

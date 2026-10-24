@@ -7,6 +7,7 @@ import {
   CreatePeopleEvaluationPeriodRequestDto,
   CreatePeopleEvaluationPipPlanRequestDto,
   CreatePeopleEvaluationRubricVersionRequestDto,
+  GetPeopleEvaluationByIdRequestDto,
   GetPeopleEvaluationHomeGroundRequestDto,
   ListPeopleEvaluationPeriodsRequestDto,
   ListPeopleEvaluationPeriodsResponseDto,
@@ -81,8 +82,8 @@ export class PeopleEvaluationController {
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.PeopleEvaluationPeriod)
   @ApiOperation({ summary: "Get one evaluation period by id" })
   @ApiResponse({ status: 200, type: PeopleEvaluationPeriodResponseDto })
-  getPeriodById(@Param("id") id: string) {
-    return this.rubric.getPeriodById(id);
+  getPeriodById(@Param() params: GetPeopleEvaluationByIdRequestDto) {
+    return this.rubric.getPeriodById(params.id);
   }
 
   @Post("periods")
@@ -97,8 +98,11 @@ export class PeopleEvaluationController {
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.PeopleEvaluationPeriod)
   @ApiOperation({ summary: "Advance a period through UPCOMING → ACTIVE → CLOSED" })
   @ApiResponse({ status: 200, type: PeopleEvaluationPeriodResponseDto })
-  transitionPeriodStatus(@Param("id") id: string, @Body() body: UpdatePeopleEvaluationPeriodStatusRequestDto) {
-    return this.rubric.transitionPeriodStatus(id, body.status);
+  transitionPeriodStatus(
+    @Param() params: GetPeopleEvaluationByIdRequestDto,
+    @Body() body: UpdatePeopleEvaluationPeriodStatusRequestDto,
+  ) {
+    return this.rubric.transitionPeriodStatus(params.id, body.status);
   }
 
   // --- Home ground -------------------------------------------------------
@@ -133,16 +137,16 @@ export class PeopleEvaluationController {
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.PeopleEvaluationResult)
   @ApiOperation({ summary: "Get one evaluation result, including its coverage declaration" })
   @ApiResponse({ status: 200, type: PeopleEvaluationResultResponseDto })
-  getResult(@Param("id") id: string) {
-    return this.results.getResult(id);
+  getResult(@Param() params: GetPeopleEvaluationByIdRequestDto) {
+    return this.results.getResult(params.id);
   }
 
   @Get("evaluation-results/:id/manifest")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.PeopleEvaluationResult)
   @ApiOperation({ summary: "Get the archived material snapshot an evaluation result was judged from" })
   @ApiResponse({ status: 200, type: PeopleEvaluationResultManifestResponseDto })
-  getResultManifest(@Param("id") id: string) {
-    return this.results.getResultManifest(id);
+  getResultManifest(@Param() params: GetPeopleEvaluationByIdRequestDto) {
+    return this.results.getResultManifest(params.id);
   }
 
   @Patch("evaluation-results/:id/review")
@@ -150,11 +154,11 @@ export class PeopleEvaluationController {
   @ApiOperation({ summary: "Record the supervisor's final call on an evaluation result" })
   @ApiResponse({ status: 200, type: PeopleEvaluationResultResponseDto })
   updateResultReview(
-    @Param("id") id: string,
+    @Param() params: GetPeopleEvaluationByIdRequestDto,
     @Req() request: UserRequest,
     @Body() body: UpdatePeopleEvaluationResultReviewRequestDto,
   ) {
-    return this.results.updateResultReview(id, request.user.userId, body);
+    return this.results.updateResultReview(params.id, request.user.userId, body);
   }
 
   // --- PIP plans ---------------------------------------------------------
@@ -180,10 +184,10 @@ export class PeopleEvaluationController {
   @ApiOperation({ summary: "Record the supervisor's decision on a PIP plan" })
   @ApiResponse({ status: 201, type: PeopleEvaluationPipPlanResponseDto })
   decidePipPlan(
-    @Param("id") id: string,
+    @Param() params: GetPeopleEvaluationByIdRequestDto,
     @Req() request: UserRequest,
     @Body() body: UpdatePeopleEvaluationPipPlanDecisionRequestDto,
   ) {
-    return this.results.decidePipPlan(id, request.user.userId, body);
+    return this.results.decidePipPlan(params.id, request.user.userId, body);
   }
 }
