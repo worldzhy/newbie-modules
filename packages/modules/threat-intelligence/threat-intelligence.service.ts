@@ -2,12 +2,12 @@ import { Inject, Injectable, Logger, NotFoundException, Optional } from "@nestjs
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { SourceAdapter, SourceIntelItem, SOURCE_ADAPTER } from "./adapters/source-adapter.port";
-import { DEFAULT_MAX_ITEMS_PER_SOURCE, DEFAULT_RETENTION_DAYS } from "./threat-intel.constants";
-import { ListThreatIntelItemsQuery } from "./threat-intel.dto";
+import { DEFAULT_MAX_ITEMS_PER_SOURCE, DEFAULT_RETENTION_DAYS } from "./threat-intelligence.constants";
+import { ListThreatIntelligenceItemsQuery } from "./threat-intelligence.dto";
 
 @Injectable()
-export class ThreatIntelService {
-  private readonly logger = new Logger(ThreatIntelService.name);
+export class ThreatIntelligenceService {
+  private readonly logger = new Logger(ThreatIntelligenceService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -56,7 +56,7 @@ export class ThreatIntelService {
   async upsertItems(items: SourceIntelItem[]): Promise<number> {
     let touched = 0;
     for (const item of items) {
-      await this.prisma.threatIntelItem.upsert({
+      await this.prisma.threatIntelligenceItem.upsert({
         where: { source_externalId: { source: item.source, externalId: item.externalId } },
         update: {
           title: item.title,
@@ -96,23 +96,23 @@ export class ThreatIntelService {
     maxItemsPerSource = DEFAULT_MAX_ITEMS_PER_SOURCE,
   ): Promise<{ deleted: number }> {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-    const deletedByAge = await this.prisma.threatIntelItem.deleteMany({
+    const deletedByAge = await this.prisma.threatIntelligenceItem.deleteMany({
       where: { lastSeenAt: { lt: cutoff } },
     });
 
     let deletedByCap = 0;
-    const sources = await this.prisma.threatIntelItem.groupBy({ by: ["source"], _count: true });
+    const sources = await this.prisma.threatIntelligenceItem.groupBy({ by: ["source"], _count: true });
     for (const group of sources) {
       if (group._count <= maxItemsPerSource) continue;
       const overflow = group._count - maxItemsPerSource;
-      const toDelete = await this.prisma.threatIntelItem.findMany({
+      const toDelete = await this.prisma.threatIntelligenceItem.findMany({
         where: { source: group.source },
         orderBy: { lastSeenAt: "asc" },
         take: overflow,
         select: { id: true },
       });
       if (toDelete.length > 0) {
-        await this.prisma.threatIntelItem.deleteMany({ where: { id: { in: toDelete.map((i) => i.id) } } });
+        await this.prisma.threatIntelligenceItem.deleteMany({ where: { id: { in: toDelete.map((i) => i.id) } } });
         deletedByCap += toDelete.length;
       }
     }
@@ -122,26 +122,26 @@ export class ThreatIntelService {
 
   // ----- Read API -----
 
-  async listItems(query: ListThreatIntelItemsQuery) {
-    const where: Prisma.ThreatIntelItemWhereInput = {};
+  async listItems(query: ListThreatIntelligenceItemsQuery) {
+    const where: Prisma.ThreatIntelligenceItemWhereInput = {};
     if (query.category) where.category = query.category;
     if (query.severity) where.severity = query.severity;
     if (query.source) where.source = query.source;
 
     const [items, total] = await Promise.all([
-      this.prisma.threatIntelItem.findMany({
+      this.prisma.threatIntelligenceItem.findMany({
         where,
         orderBy: { publishedAt: "desc" },
         take: query.limit ?? 20,
         skip: query.offset ?? 0,
       }),
-      this.prisma.threatIntelItem.count({ where }),
+      this.prisma.threatIntelligenceItem.count({ where }),
     ]);
     return { items, total };
   }
 
   async getItem(id: string) {
-    const item = await this.prisma.threatIntelItem.findUnique({ where: { id } });
+    const item = await this.prisma.threatIntelligenceItem.findUnique({ where: { id } });
     if (!item) throw new NotFoundException(`Threat intel item ${id} not found.`);
     return item;
   }

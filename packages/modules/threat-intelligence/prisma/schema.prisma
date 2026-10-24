@@ -1,7 +1,7 @@
 // !! ------------------------------------------------------------ //
-// !!               [Module] Threat Intel models                          //
+// !!               [Module] Threat Intelligence models                  //
 // !! ------------------------------------------------------------ //
-// * ThreatIntelItem                                                    //
+// * ThreatIntelligenceItem                                                    //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 // A single piece of external threat intelligence, deduplicated by
@@ -11,7 +11,7 @@
 // Project matching is intentionally NOT modelled here: this module is the
 // platform-level collection layer only. A host that wants to relate items
 // to its own projects owns that table and that logic.
-model ThreatIntelItem {
+model ThreatIntelligenceItem {
   id          String   @id @default(uuid()) @db.Uuid
   source      String   @db.VarChar(50)
   category    String   @db.VarChar(30)
@@ -36,5 +36,5 @@ model ThreatIntelItem {
   @@index([category])
   @@index([severity])
   @@index([publishedAt])
-  @@schema("module/threat-intel")
+  @@schema("module/threat-intelligence")
 }

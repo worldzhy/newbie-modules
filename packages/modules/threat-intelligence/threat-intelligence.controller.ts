@@ -2,33 +2,33 @@ import { Controller, Get, Param, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
-import { ThreatIntelService } from "./threat-intel.service";
-import { ListThreatIntelItemsQuery, ThreatIntelItemDto } from "./threat-intel.dto";
+import { ThreatIntelligenceService } from "./threat-intelligence.service";
+import { ListThreatIntelligenceItemsQuery, ThreatIntelligenceItemDto } from "./threat-intelligence.dto";
 
 @ApiTags("Threat Intel")
 @ApiBearerAuth()
-@Controller("threat-intel")
-export class ThreatIntelController {
-  constructor(private readonly service: ThreatIntelService) {}
+@Controller("threat-intelligence")
+export class ThreatIntelligenceController {
+  constructor(private readonly service: ThreatIntelligenceService) {}
 
   @Get("items")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.ThreatIntelItem)
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.ThreatIntelligenceItem)
   @ApiOperation({ summary: "List threat intel items with filters" })
-  @ApiResponse({ status: 200, type: [ThreatIntelItemDto] })
-  async listItems(@Query() query: ListThreatIntelItemsQuery) {
+  @ApiResponse({ status: 200, type: [ThreatIntelligenceItemDto] })
+  async listItems(@Query() query: ListThreatIntelligenceItemsQuery) {
     return this.service.listItems(query);
   }
 
   @Get("items/:id")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.ThreatIntelItem)
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.ThreatIntelligenceItem)
   @ApiOperation({ summary: "Get a threat intel item" })
-  @ApiResponse({ status: 200, type: ThreatIntelItemDto })
+  @ApiResponse({ status: 200, type: ThreatIntelligenceItemDto })
   async getItem(@Param("id") id: string) {
     return this.service.getItem(id);
   }
 
   @Post("collect")
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.ThreatIntelItem)
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.ThreatIntelligenceItem)
   @ApiOperation({ summary: "Manually trigger the collection pipeline" })
   @ApiResponse({ status: 200, description: "Collection result" })
   async collect() {

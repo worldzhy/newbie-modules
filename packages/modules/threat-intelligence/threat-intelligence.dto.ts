@@ -1,26 +1,26 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
-  THREAT_INTEL_CATEGORY,
-  THREAT_INTEL_SEVERITY,
-  THREAT_INTEL_SOURCE,
-  ThreatIntelCategory,
-  ThreatIntelSeverity,
-  ThreatIntelSource,
-} from "./threat-intel.constants";
+  THREAT_INTELLIGENCE_CATEGORY,
+  THREAT_INTELLIGENCE_SEVERITY,
+  THREAT_INTELLIGENCE_SOURCE,
+  ThreatIntelligenceCategory,
+  ThreatIntelligenceSeverity,
+  ThreatIntelligenceSource,
+} from "./threat-intelligence.constants";
 
-const SOURCES = Object.values(THREAT_INTEL_SOURCE);
-const CATEGORIES = Object.values(THREAT_INTEL_CATEGORY);
-const SEVERITIES = Object.values(THREAT_INTEL_SEVERITY);
+const SOURCES = Object.values(THREAT_INTELLIGENCE_SOURCE);
+const CATEGORIES = Object.values(THREAT_INTELLIGENCE_CATEGORY);
+const SEVERITIES = Object.values(THREAT_INTELLIGENCE_SEVERITY);
 
-export class ListThreatIntelItemsQuery {
+export class ListThreatIntelligenceItemsQuery {
   @ApiPropertyOptional({ enum: CATEGORIES })
-  category?: ThreatIntelCategory;
+  category?: ThreatIntelligenceCategory;
 
   @ApiPropertyOptional({ enum: SEVERITIES })
-  severity?: ThreatIntelSeverity;
+  severity?: ThreatIntelligenceSeverity;
 
   @ApiPropertyOptional({ enum: SOURCES })
-  source?: ThreatIntelSource;
+  source?: ThreatIntelligenceSource;
 
   @ApiPropertyOptional({ minimum: 1, default: 20 })
   limit?: number;
@@ -29,16 +29,16 @@ export class ListThreatIntelItemsQuery {
   offset?: number;
 }
 
-export class ThreatIntelItemDto {
+export class ThreatIntelligenceItemDto {
   @ApiProperty() id!: string;
-  @ApiProperty({ enum: SOURCES }) source!: ThreatIntelSource;
-  @ApiProperty({ enum: CATEGORIES }) category!: ThreatIntelCategory;
+  @ApiProperty({ enum: SOURCES }) source!: ThreatIntelligenceSource;
+  @ApiProperty({ enum: CATEGORIES }) category!: ThreatIntelligenceCategory;
   @ApiProperty() externalId!: string;
   @ApiProperty() title!: string;
   @ApiPropertyOptional() summary?: string | null;
   @ApiPropertyOptional() url?: string | null;
   @ApiPropertyOptional({ type: String, format: "date-time" }) publishedAt?: Date | null;
-  @ApiProperty({ enum: SEVERITIES }) severity!: ThreatIntelSeverity;
+  @ApiProperty({ enum: SEVERITIES }) severity!: ThreatIntelligenceSeverity;
   @ApiProperty({ type: String, isArray: true }) signalTags!: string[];
   @ApiProperty({ type: String, format: "date-time" }) fetchedAt!: Date;
   @ApiProperty({ type: String, format: "date-time" }) lastSeenAt!: Date;

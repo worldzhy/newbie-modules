@@ -1,6 +1,6 @@
 import { Global, Module } from "@nestjs/common";
-import { ThreatIntelController } from "./threat-intel.controller";
-import { ThreatIntelService } from "./threat-intel.service";
+import { ThreatIntelligenceController } from "./threat-intelligence.controller";
+import { ThreatIntelligenceService } from "./threat-intelligence.service";
 
 /**
  * External threat intelligence module (ADR-031).
@@ -15,8 +15,8 @@ import { ThreatIntelService } from "./threat-intel.service";
  */
 @Global()
 @Module({
-  controllers: [ThreatIntelController],
-  providers: [ThreatIntelService],
-  exports: [ThreatIntelService],
+  controllers: [ThreatIntelligenceController],
+  providers: [ThreatIntelligenceService],
+  exports: [ThreatIntelligenceService],
 })
-export class ThreatIntelModule {}
+export class ThreatIntelligenceModule {}

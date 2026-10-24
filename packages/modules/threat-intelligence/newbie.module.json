@@ -1,9 +1,9 @@
 {
-  "key": "threat-intel",
+  "key": "threat-intelligence",
   "layer": "feature",
   "module": {
-    "file": "threat-intel.module",
-    "className": "ThreatIntelModule"
+    "file": "threat-intelligence.module",
+    "className": "ThreatIntelligenceModule"
   },
   "schema": "prisma/schema.prisma",
   "moduleDependencies": [],

@@ -1,13 +1,13 @@
 /**
- * Canonical enums for the threat-intel module.
+ * Canonical enums for the threat-intelligence module.
  *
  * Source identifiers are stable keys used by adapters and stored on
- * `ThreatIntelItem.source`. Categories partition items so deduplication
+ * `ThreatIntelligenceItem.source`. Categories partition items so deduplication
  * keys never collide across categories.
  */
 
 /** Information source identifiers. Each adapter registers exactly one. */
-export const THREAT_INTEL_SOURCE = {
+export const THREAT_INTELLIGENCE_SOURCE = {
   NVD: "nvd",
   CISA_KEV: "cisa-kev",
   GITHUB_SECURITY_ADVISORY: "github-security-advisory",
@@ -37,19 +37,20 @@ export const THREAT_INTEL_SOURCE = {
   EXPLOIT_DB: "exploit-db",
 } as const;
 
-export type ThreatIntelSource = (typeof THREAT_INTEL_SOURCE)[keyof typeof THREAT_INTEL_SOURCE];
+export type ThreatIntelligenceSource = (typeof THREAT_INTELLIGENCE_SOURCE)[keyof typeof THREAT_INTELLIGENCE_SOURCE];
 
 /** Item category. Determines the deduplication key semantics. */
-export const THREAT_INTEL_CATEGORY = {
+export const THREAT_INTELLIGENCE_CATEGORY = {
   CVE: "cve",
   MALICIOUS_PACKAGE: "malicious-package",
   PLATFORM_EVENT: "platform-event",
   CN_NEWS: "cn-news",
 } as const;
 
-export type ThreatIntelCategory = (typeof THREAT_INTEL_CATEGORY)[keyof typeof THREAT_INTEL_CATEGORY];
+export type ThreatIntelligenceCategory =
+  (typeof THREAT_INTELLIGENCE_CATEGORY)[keyof typeof THREAT_INTELLIGENCE_CATEGORY];
 
-export const THREAT_INTEL_SEVERITY = {
+export const THREAT_INTELLIGENCE_SEVERITY = {
   CRITICAL: "critical",
   HIGH: "high",
   MEDIUM: "medium",
@@ -57,20 +58,22 @@ export const THREAT_INTEL_SEVERITY = {
   INFO: "info",
 } as const;
 
-export type ThreatIntelSeverity = (typeof THREAT_INTEL_SEVERITY)[keyof typeof THREAT_INTEL_SEVERITY];
+export type ThreatIntelligenceSeverity =
+  (typeof THREAT_INTELLIGENCE_SEVERITY)[keyof typeof THREAT_INTELLIGENCE_SEVERITY];
 
 /** Signal tags mark an item with high-priority threat indicators. */
-export const THREAT_INTEL_SIGNAL_TAG = {
+export const THREAT_INTELLIGENCE_SIGNAL_TAG = {
   KEV: "kev",
   HAS_EXPLOIT: "has-exploit",
   EXPLOITED_IN_WILD: "exploited-in-wild",
 } as const;
 
-export type ThreatIntelSignalTag = (typeof THREAT_INTEL_SIGNAL_TAG)[keyof typeof THREAT_INTEL_SIGNAL_TAG];
+export type ThreatIntelligenceSignalTag =
+  (typeof THREAT_INTELLIGENCE_SIGNAL_TAG)[keyof typeof THREAT_INTELLIGENCE_SIGNAL_TAG];
 
 /**
  * Default retention window for threat intel items. Older items are pruned
- * by the single retention cleanup job (see ThreatIntelService.pruneExpired).
+ * by the single retention cleanup job (see ThreatIntelligenceService.pruneExpired).
  */
 export const DEFAULT_RETENTION_DAYS = 90;
 

@@ -1,9 +1,9 @@
 import {
-  ThreatIntelCategory,
-  ThreatIntelSeverity,
-  ThreatIntelSignalTag,
-  ThreatIntelSource,
-} from "../threat-intel.constants";
+  ThreatIntelligenceCategory,
+  ThreatIntelligenceSeverity,
+  ThreatIntelligenceSignalTag,
+  ThreatIntelligenceSource,
+} from "../threat-intelligence.constants";
 
 /**
  * A normalized threat intel item as produced by a source adapter.
@@ -13,16 +13,16 @@ import {
  * (source, externalId).
  */
 export interface SourceIntelItem {
-  source: ThreatIntelSource;
-  category: ThreatIntelCategory;
+  source: ThreatIntelligenceSource;
+  category: ThreatIntelligenceCategory;
   /** Stable identifier within the source (CVE ID, ecosystem+package, etc.). */
   externalId: string;
   title: string;
   summary?: string;
   url?: string;
   publishedAt?: Date;
-  severity: ThreatIntelSeverity;
-  signalTags: ThreatIntelSignalTag[];
+  severity: ThreatIntelligenceSeverity;
+  signalTags: ThreatIntelligenceSignalTag[];
   /** Raw upstream payload for audit / re-processing. */
   rawPayload: unknown;
 }
@@ -35,7 +35,7 @@ export interface SourceIntelItem {
  * invokes fetchLatest in sequence.
  */
 export interface SourceAdapter {
-  readonly source: ThreatIntelSource;
+  readonly source: ThreatIntelligenceSource;
 
   /**
    * Fetch the latest batch of items from this source. Implementations
