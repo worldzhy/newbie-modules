@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, Logger, NotFoundException, Optional } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { SourceAdapter, SourceIntelItem, SOURCE_ADAPTER } from "./adapters/source-adapter.port";
@@ -35,9 +35,11 @@ export class ThreatIntelService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @Inject(SOURCE_ADAPTER) private readonly adapters: SourceAdapter[],
+    @Optional() @Inject(SOURCE_ADAPTER) private readonly adapters: SourceAdapter[] = [],
     private readonly reRanker: MatchReRanker,
-    @Inject(PROJECT_SECURITY_PROFILE_PORT) private readonly profilePort: ProjectSecurityProfilePort,
+    @Optional()
+    @Inject(PROJECT_SECURITY_PROFILE_PORT)
+    private readonly profilePort?: ProjectSecurityProfilePort,
   ) {}
 
   /**
@@ -53,6 +55,11 @@ export class ThreatIntelService {
 
     const upserted = await this.upsertItems(items);
     this.logger.log(`Collected ${items.length} items, ${upserted} new/updated.`);
+
+    if (!this.profilePort) {
+      this.logger.warn("No ProjectSecurityProfilePort provider registered; skipping matching.");
+      return { collected: upserted, matched: 0 };
+    }
 
     const profiles = await this.profilePort.listProfiles();
     if (profiles.length === 0) {
@@ -222,7 +229,7 @@ export class ThreatIntelService {
         projectId: data.projectId,
         applicationId: data.applicationId ?? null,
         matchType: data.matchType,
-        matchedEntity: data.matchedEntity,
+        matchedEntity: data.matchedEntity ?? "",
         evidence: data.evidence,
         confidence: data.confidence,
         status: THREAT_INTEL_MATCH_STATUS.OPEN,

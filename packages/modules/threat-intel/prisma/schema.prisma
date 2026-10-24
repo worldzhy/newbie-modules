@@ -48,7 +48,10 @@ model ThreatIntelMatch {
   projectId     String    @db.Uuid
   applicationId String?   @db.Uuid
   matchType     String    @db.VarChar(20)
-  matchedEntity String?   @db.VarChar(512)
+  // Normalized matched entity label. Empty string when no specific entity
+  // was named (e.g. vendor-level match). NOT NULL so the
+  // (itemId, projectId, matchedEntity) unique constraint is enforceable.
+  matchedEntity String    @default("") @db.VarChar(512)
   evidence      String?   @db.Text
   confidence    String    @default("medium") @db.VarChar(15)
   status        String    @default("open") @db.VarChar(20)
@@ -58,6 +61,7 @@ model ThreatIntelMatch {
 
   item ThreatIntelItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
 
+  @@unique([itemId, projectId, matchedEntity])
   @@index([itemId])
   @@index([projectId])
   @@index([projectId, status])
