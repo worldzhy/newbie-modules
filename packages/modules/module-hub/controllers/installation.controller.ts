@@ -34,7 +34,7 @@ export class InstallationController {
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.ModuleHubInstallation)
   @ApiCreatedResponse()
   async create(@Body() body: CreateHubInstallationDto, @Req() request: UserRequest) {
-    return this.installations.create(body, request.user.userId);
+    return this.installations.create({ ...body, actor: request.user.userId });
   }
 
   @Get("installations")
