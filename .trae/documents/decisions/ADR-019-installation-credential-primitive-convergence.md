@@ -57,3 +57,4 @@ ADR-009 落地时是 5 个 collector（heartbeat / health / backend-monitor / mo
 - **术语**：决策 4 所列 store 端口方法 `updateTokenHash` 在实际实现中命名为 `replaceTokenHash`；两者指同一方法，后续引用以代码为准。
 - **负缓存的边界被显式确认**：只缓存"格式合法但库中不存在"的 token；格式非法者不查库也不入缓存，否则垃圾流量会按上限淘汰掉真正需要吸收的条目（实现与 `installation-token.verifier.test.ts` 已固化该行为）。
 - **并发窗口（接受）**：collector 先读取再写入，两步之间行被删除时 Prisma 抛 P2025 并表现为 500 而非 404。installation 行全生命周期只做软吊销、代码中不存在硬删除路径，故该窗口在实践中不可达；如将来引入硬删除或级联删除，需在 store 适配层把 P2025 映射为 NotFound。
+- **绑定层收敛（2026-10-25 二轮评审后落地）**：六个 collector 曾各自手写同一份四方法 store 适配闭包（24 份逐字重复）。现由 `security/installation/prisma-installation-credential-store.ts` 的 `prismaInstallationCredentialStore(delegate)` 统一绑定——delegate 以结构化类型声明，security 不 import Prisma；collector 构造函数缩为一行。同时审计上下文收敛为各服务的 `credentialAudit(actor)` 私有 helper，`detail` 从公共 `InstallationCredentialAudit` 拆出为 `InstallationEnrollAudit`（仅 enroll 携带）。表结构仍归 collector，本工厂只做形状适配，不引入框架耦合。

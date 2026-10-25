@@ -3,11 +3,13 @@ import { PeopleEvaluationInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import {
+  InstallationCredentialAudit,
   InstallationCredentialStore,
   issueInstallationCredential,
   revokeInstallationCredential,
   rotateInstallationCredential,
 } from "@modules/security/installation/installation-credential";
+import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 import {
   CreatePeopleEvaluationInstallationRequestDto,
@@ -50,17 +52,15 @@ export class PeopleEvaluationInstallationService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
-    this.credentials = {
-      create: (draft) => this.prisma.peopleEvaluationInstallation.create({ data: draft }),
-      findByTokenHash: (tokenHash) => this.prisma.peopleEvaluationInstallation.findUnique({ where: { tokenHash } }),
-      replaceTokenHash: async (id, tokenHash) => {
-        await this.prisma.peopleEvaluationInstallation.update({ where: { id }, data: { tokenHash } });
-      },
-      setRevokedAt: async (id, revokedAt) => {
-        await this.prisma.peopleEvaluationInstallation.update({ where: { id }, data: { revokedAt } });
-      },
-    };
+    this.credentials = prismaInstallationCredentialStore<
+      PeopleEvaluationInstallationDraft,
+      PeopleEvaluationInstallation
+    >(this.prisma.peopleEvaluationInstallation);
     this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
+  }
+
+  private credentialAudit(actor?: string): InstallationCredentialAudit {
+    return { recorder: this.auditLogService, resourceType: AUDIT_RESOURCE_TYPE, actorId: actor };
   }
 
   private withDerivedState(row: PeopleEvaluationInstallation) {
@@ -85,9 +85,7 @@ export class PeopleEvaluationInstallationService {
         hostname: input.hostname ?? null,
       },
       {
-        recorder: this.auditLogService,
-        resourceType: AUDIT_RESOURCE_TYPE,
-        actorId: actor,
+        ...this.credentialAudit(actor),
         detail: { label: input.label, evaluateeUserId: input.evaluateeUserId },
       },
     );
@@ -115,22 +113,14 @@ export class PeopleEvaluationInstallationService {
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string, actor?: string): Promise<PeopleEvaluationInstallationCredentialResponseDto> {
     await this.getOrThrow(id);
-    const { token } = await rotateInstallationCredential(this.credentials, id, {
-      recorder: this.auditLogService,
-      resourceType: AUDIT_RESOURCE_TYPE,
-      actorId: actor,
-    });
+    const { token } = await rotateInstallationCredential(this.credentials, id, this.credentialAudit(actor));
     return { ...this.withDerivedState(await this.getOrThrow(id)), token };
   }
 
   /** Soft revocation: ingest is rejected (401), reported rows are retained. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return revokeInstallationCredential(this.credentials, id, {
-      recorder: this.auditLogService,
-      resourceType: AUDIT_RESOURCE_TYPE,
-      actorId: actor,
-    });
+    return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   /** Token-only authentication for the ingest endpoints. */

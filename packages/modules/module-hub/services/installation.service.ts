@@ -3,11 +3,13 @@ import { ModuleHubInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import {
+  InstallationCredentialAudit,
   InstallationCredentialStore,
   issueInstallationCredential,
   revokeInstallationCredential,
   rotateInstallationCredential,
 } from "@modules/security/installation/installation-credential";
+import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
@@ -178,17 +180,14 @@ export class ModuleHubInstallationService implements InstallationResolver {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
-    this.credentials = {
-      create: (draft) => this.prisma.moduleHubInstallation.create({ data: draft }),
-      findByTokenHash: (tokenHash) => this.prisma.moduleHubInstallation.findUnique({ where: { tokenHash } }),
-      replaceTokenHash: async (id, tokenHash) => {
-        await this.prisma.moduleHubInstallation.update({ where: { id }, data: { tokenHash } });
-      },
-      setRevokedAt: async (id, revokedAt) => {
-        await this.prisma.moduleHubInstallation.update({ where: { id }, data: { revokedAt } });
-      },
-    };
+    this.credentials = prismaInstallationCredentialStore<ModuleHubInstallationDraft, ModuleHubInstallation>(
+      this.prisma.moduleHubInstallation,
+    );
     this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
+  }
+
+  private credentialAudit(actor?: string): InstallationCredentialAudit {
+    return { recorder: this.auditLogService, resourceType: AUDIT_RESOURCE_TYPE, actorId: actor };
   }
 
   private withDerivedState(row: ModuleHubInstallation) {
@@ -210,9 +209,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
         externalRef: input.externalRef ?? null,
       },
       {
-        recorder: this.auditLogService,
-        resourceType: AUDIT_RESOURCE_TYPE,
-        actorId: input.actor,
+        ...this.credentialAudit(input.actor),
         detail: { label: input.label, externalRef: input.externalRef ?? null },
       },
     );
@@ -321,21 +318,13 @@ export class ModuleHubInstallationService implements InstallationResolver {
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return rotateInstallationCredential(this.credentials, id, {
-      recorder: this.auditLogService,
-      resourceType: AUDIT_RESOURCE_TYPE,
-      actorId: actor,
-    });
+    return rotateInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   /** Soft revocation: reports are rejected (401), rows are retained for audit. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return revokeInstallationCredential(this.credentials, id, {
-      recorder: this.auditLogService,
-      resourceType: AUDIT_RESOURCE_TYPE,
-      actorId: actor,
-    });
+    return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   /** Token-only authentication for the report endpoint. */

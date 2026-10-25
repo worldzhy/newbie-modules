@@ -62,7 +62,10 @@ export interface InstallationCredentialAudit {
   readonly resourceType: string;
   /** Acting user id; omitted for provisioning/system-originated changes. */
   readonly actorId?: string | null;
-  /** Extra context recorded on enroll (e.g. label, externalRef). */
+}
+
+/** Enrollment additionally records the draft context (e.g. label, externalRef). */
+export interface InstallationEnrollAudit extends InstallationCredentialAudit {
   readonly detail?: Record<string, unknown>;
 }
 
@@ -76,7 +79,7 @@ const INSTALLATION_ACTOR_TYPE = "host";
 export async function issueInstallationCredential<TDraft, TRow extends InstallationCredentialRecord>(
   store: InstallationCredentialStore<TDraft, TRow>,
   draft: TDraft,
-  audit: InstallationCredentialAudit,
+  audit: InstallationEnrollAudit,
 ): Promise<{ record: TRow; token: string }> {
   const token = generateInstallationToken();
   const record = await store.create({ ...draft, tokenHash: hashInstallationToken(token) });

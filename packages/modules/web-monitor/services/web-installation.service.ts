@@ -3,12 +3,14 @@ import { WebMonitorInstallation } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import {
+  InstallationCredentialAudit,
   InstallationCredentialStore,
   issueInstallationCredential,
   restoreInstallationCredential,
   revokeInstallationCredential,
   rotateInstallationCredential,
 } from "@modules/security/installation/installation-credential";
+import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 
 import { func } from "../shared/utils";
@@ -44,17 +46,14 @@ export class WebInstallationService {
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
-    this.credentials = {
-      create: (draft) => this.prisma.webMonitorInstallation.create({ data: draft }),
-      findByTokenHash: (tokenHash) => this.prisma.webMonitorInstallation.findUnique({ where: { tokenHash } }),
-      replaceTokenHash: async (id, tokenHash) => {
-        await this.prisma.webMonitorInstallation.update({ where: { id }, data: { tokenHash } });
-      },
-      setRevokedAt: async (id, revokedAt) => {
-        await this.prisma.webMonitorInstallation.update({ where: { id }, data: { revokedAt } });
-      },
-    };
+    this.credentials = prismaInstallationCredentialStore<WebInstallationDraft, WebMonitorInstallation>(
+      this.prisma.webMonitorInstallation,
+    );
     this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
+  }
+
+  private credentialAudit(actor?: string): InstallationCredentialAudit {
+    return { recorder: this.auditLogService, resourceType: AUDIT_RESOURCE_TYPE, actorId: actor };
   }
 
   private withDerivedState<T extends { revokedAt: Date | null; lastSeenAt: Date | null; tokenHash: string }>(
@@ -80,9 +79,7 @@ export class WebInstallationService {
       this.credentials,
       { label: input.label, externalRef: input.externalRef ?? null, appKey },
       {
-        recorder: this.auditLogService,
-        resourceType: AUDIT_RESOURCE_TYPE,
-        actorId: actor,
+        ...this.credentialAudit(actor),
         detail: { label: input.label, externalRef: input.externalRef ?? null },
       },
     );
@@ -115,31 +112,19 @@ export class WebInstallationService {
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return rotateInstallationCredential(this.credentials, id, {
-      recorder: this.auditLogService,
-      resourceType: AUDIT_RESOURCE_TYPE,
-      actorId: actor,
-    });
+    return rotateInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   /** Soft revocation: reports are rejected (401), rows are retained. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return revokeInstallationCredential(this.credentials, id, {
-      recorder: this.auditLogService,
-      resourceType: AUDIT_RESOURCE_TYPE,
-      actorId: actor,
-    });
+    return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   /** Re-enable a revoked installation by clearing the revocation marker. */
   async unrevoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return restoreInstallationCredential(this.credentials, id, {
-      recorder: this.auditLogService,
-      resourceType: AUDIT_RESOURCE_TYPE,
-      actorId: actor,
-    });
+    return restoreInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   /** Token-only authentication for the report endpoint. */
