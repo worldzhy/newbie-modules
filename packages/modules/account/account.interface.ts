@@ -22,6 +22,16 @@ export interface LoginSessionResponse {
  */
 export type LoginResult = LoginSessionResponse | TotpTokenResponse;
 
+/**
+ * Outcome of the shared session-issuance exit (AuthService.issueLoginSession):
+ * either an MFA challenge, or the freshly minted credentials. Channels choose
+ * which fields to expose publicly — browser channels carry the refresh token
+ * in an httpOnly cookie, while the WeChat mini-program (no cookie jar)
+ * receives it in the response body.
+ */
+export type IssuedLoginSession =
+  { mfaChallenge: TotpTokenResponse } | { token: string; refreshToken: string; tokenExpiresInSeconds: number };
+
 export interface MfaTokenPayload {
   userId: string;
   type: MfaMethod;
