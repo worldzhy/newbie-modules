@@ -8,7 +8,9 @@
   "schema": "prisma/schema.prisma",
   "moduleDependencies": ["audit", "security"],
   "dependencies": {
-    "@octokit/rest": "latest"
+    "@octokit/rest": "latest",
+    "@devbie/module-hub-cli": "^1.0.0"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "cli": "module-hub"
 }
