@@ -5,7 +5,7 @@
 
 > 归属：registry 模块边界与契约决策 → 本仓。宿主侧实施（主体来源、凭证与外部访问、通知模板、调度装配、读模型与 UI）归 nightwatch-backend / nightwatch-frontend，随本决策同步改造。
 >
-> Supersedes（**在本 ADR 被采纳后生效**）：newbie-modules ADR-018 的 D1「match 表 scope 形状」与 `ScopeEntitiesProvider` 端口契约——本 ADR 用统一的 finding 表与证据端口取代 match 表与实体来源端口。ADR-018 的 D2（通知与调度留宿主）与 D3（registry 出通用查询端点）的分层原则保持生效。本 ADR 被采纳时，ADR-018 的状态行应改为「已采纳（D1 与 `ScopeEntitiesProvider` 由 ADR-022 取代）」，正文不改。
+> 与既有 ADR 的关系：**本 ADR 不取代任何 ADR**。`threat-intelligence`、`aws-audit`、`dependency-scan` 三个模块及其既有契约（含 newbie-modules ADR-018 的 match 表 scope 形状与 `ScopeEntitiesProvider` 端口）原样保留、继续生效；本 ADR 只新建 `security-evaluation` 模块，四个模块并存。切换、下线与旧模块处置由用户后续单独决定，不在本 ADR 决定。
 
 ## 背景
 
@@ -30,7 +30,7 @@
 
 ## 决策
 
-选 **A**。决定性理由：问题不在「三个模块太多了」，而在**同一个模式被实现了三遍**，且三角关系中缺失了「资产」这一根支柱——没有资产清单，任何体检报告都退化为问题列表，任何新增检查族都要再写一套资产身份。把三者收进一个 bounded context、资产作为第一等实体、判定器作为插件，才能让「同一份代码资产在不同准则族下的结论」第一次可以并列呈现。
+选 **A**。决定性理由：问题不在「三个模块太多了」，而在**同一个模式被实现了三遍**，且三角关系中缺失了「资产」这一根支柱——没有资产清单，任何体检报告都退化为问题列表，任何新增检查族都要再写一套资产身份。把三者对应的能力收进一个新的 bounded context、资产作为第一等实体、判定器作为插件，才能让「同一份代码资产在不同准则族下的结论」第一次可以并列呈现。
 
 ### D1. 命名与子域划分
 
@@ -90,9 +90,13 @@ security-evaluation/
 
 原样保留：OSV 版本区间判定、KEV 与 signalTags、B3 精排协议与 false-positive 负缓存、`AwsAuditReport.limitations` 式的覆盖率诚实声明、ADR-008 仓库可访问性谓词、finding fingerprint 幂等 upsert 与「未复现即 resolved」的收敛逻辑。
 
-### 旧实现处置
+### 并存与切换边界
 
-`aws-audit` / `dependency-scan` / `threat-intelligence` 三个模块在本模块完成切换后整体删除；宿主侧 `project-security` 子域的 rollup / risk-snapshot / 通知改为消费本模块。nightwatch 未上线、无真实业务数据，按「未上线系统禁止过度考虑迁移」处理：不写数据迁移、不做双写、不保留兼容层。
+三个既有模块（`aws-audit` / `dependency-scan` / `threat-intelligence`）**一行不动**，继续按各自契约运行；宿主侧 `project-security` 子域在切换前仍消费它们。本 ADR 只做加法：新建 `security-evaluation`，不修改、不删除、不迁移任何现有模块与数据。
+
+由此产生一条已知代价，必须显式承认：并存期间存在**两套知识采集与两套相关性匹配**（`threat-intelligence` 的采集与 match pipeline，与本模块 `knowledge/` + `judgment/` 的 INTEL 判定器）。这在切换前是预期成本——本模块的价值在于证明「资产清单 + 统一 finding 生命周期 + 多轴报告」这套模型成立，而不是与旧模块争运行时。并存期间不得把两边结果混进同一份报告或同一个评分分母。
+
+切换时点、切换方式（一次性切换还是按检查族逐个切换）以及旧模块的最终处置，均属后续决策，不在本 ADR 决定。
 
 ## 跨宿主 / 演进检验（registry 模块设计必填）
 
@@ -120,6 +124,6 @@ security-evaluation/
 
 更容易：资产维度成为所有报告与查询的共同坐标，覆盖率、漏洞反查资产、资产差异都成为可回答的问题；三种判定共用一套 run 与 finding 生命周期，趋势与 MTTR 口径统一；新增检查族（secret / IaC / 镜像扫描）只需新增 `factType` 与判定器，不新增表；规则的 control 映射只有一份。
 
-更难：模块体量显著大于任一原模块，需要靠子域边界而不是包边界维持可读性；资产清单为空时报告会暴露「覆盖率不足」这一过去被掩盖的事实（这正是期望行为）；删除三个旧模块与宿主的聚合改造必须在一个里程碑内收口，不能长期并存两套安全数据。
+更难：模块体量显著大于任一原模块，需要靠子域边界而不是包边界维持可读性；资产清单为空时报告会暴露「覆盖率不足」这一过去被掩盖的事实（这正是期望行为）；并存期间要维护两套安全数据与两套知识采集，且必须抵抗「把两边结果混进同一份报告」的诱惑，直到切换决策作出。
 
-后续工作：① 本 ADR 被采纳后，同步 newbie-modules ADR-018 的状态行；② 被三个旧模块取代的宿主侧 ADR 由宿主仓各自改状态，不做跨仓正文副本；③ 行为级测试随代码交付：finding 生命周期与幂等、覆盖率口径、urgency 派生、知识清理后 finding 完整性、运行并发约束。
+后续工作：① 按 D1 的子域边界交付模块骨架与 DEPENDENCY / CLOUD_CONFIG 判定器；② 宿主侧装配与切换在旧模块保持运行的前提下单独排期，不在本 ADR 内收口；③ 行为级测试随代码交付：finding 生命周期与幂等、覆盖率口径、urgency 派生、知识清理后 finding 完整性、运行并发约束。

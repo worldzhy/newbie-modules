@@ -5,6 +5,11 @@
 
 > 归属：registry 模块词汇与契约决策 → 本仓。本 ADR 只决定命名与被评对象的界定，不决定 work-evaluation 的模块内容（准则条目、证据采集范围）。
 
+> Errata（2026-10-25，用户校正，正文保留原样）：
+>
+> 1. **不做删除处置**：旧模块 `people-evaluation` 只冻结、长期保留，不设删除时点。D1 中「待切换完成后整体删除」、决策段「旧模块的终态是被删除」、以及影响段「旧模块删除后消失」均不再成立；两模块并存是长期状态，是否切换、是否删除由用户后续单独决定。
+> 2. **`work` 词根是同一词族的刻意一致，不是命名冲突**：`work-evaluation`（评估）、`workspace`（工作区证据）、`worklog`（采集 agent）三者对应良好，词根相同表示同领域。下文「命名风险与处置」段不再作为需要缓解的风险，`work-evaluation` 的命名得到确认。
+
 ## 背景
 
 `people-evaluation` 的词汇把被评对象写成「人」：README 明确写着「The person being evaluated is `evaluateeUserId` everywhere」。但它的证据与准则全部指向**工作**：
