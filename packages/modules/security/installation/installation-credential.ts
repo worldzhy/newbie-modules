@@ -61,7 +61,7 @@ export interface InstallationCredentialAudit {
   /** Audit resource type, e.g. "heartbeat-installation". */
   readonly resourceType: string;
   /** Acting user id; omitted for provisioning/system-originated changes. */
-  readonly actorId?: string;
+  readonly actorId?: string | null;
   /** Extra context recorded on enroll (e.g. label, externalRef). */
   readonly detail?: Record<string, unknown>;
 }
@@ -84,7 +84,7 @@ export async function issueInstallationCredential<TDraft, TRow extends Installat
     resourceType: audit.resourceType,
     resourceId: record.id,
     actorType: INSTALLATION_ACTOR_TYPE,
-    actorId: audit.actorId ?? "unknown",
+    actorId: audit.actorId ?? null,
     detail: audit.detail,
   });
   return { record, token };
@@ -106,7 +106,7 @@ export async function rotateInstallationCredential(
     resourceType: audit.resourceType,
     resourceId: id,
     actorType: INSTALLATION_ACTOR_TYPE,
-    actorId: audit.actorId ?? "unknown",
+    actorId: audit.actorId ?? null,
   });
   return { id, token };
 }
@@ -125,7 +125,7 @@ export async function revokeInstallationCredential(
     resourceType: audit.resourceType,
     resourceId: id,
     actorType: INSTALLATION_ACTOR_TYPE,
-    actorId: audit.actorId ?? "unknown",
+    actorId: audit.actorId ?? null,
   });
   return { id, revoked: true };
 }
@@ -145,7 +145,7 @@ export async function restoreInstallationCredential(
     resourceType: audit.resourceType,
     resourceId: id,
     actorType: INSTALLATION_ACTOR_TYPE,
-    actorId: audit.actorId ?? "unknown",
+    actorId: audit.actorId ?? null,
   });
   return { id, revoked: false };
 }

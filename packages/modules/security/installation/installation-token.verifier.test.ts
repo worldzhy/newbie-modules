@@ -46,13 +46,22 @@ describe("installation token verifier (ADR-019)", () => {
     assert.equal(resolved?.id, row.id);
   });
 
-  it("rejects malformed tokens without touching storage", async () => {
+  it("rejects malformed tokens and keeps them out of the rejection cache", async () => {
     const lookup = new FakeLookup();
-    const verifier = new InstallationTokenVerifier(lookup);
+    const verifier = new InstallationTokenVerifier(lookup, { maxCacheEntries: 1 });
+    const unknown = generateInstallationToken();
 
-    assert.equal(await verifier.verify("not-a-uuid"), null);
-    assert.equal(await verifier.verify("not-a-uuid"), null);
-    assert.equal(lookup.lookups, 0);
+    assert.equal(await verifier.verify(unknown), null);
+    assert.equal(lookup.lookups, 1);
+
+    // Malformed tokens never reach storage, so they must not evict remembered
+    // unknowns either: otherwise garbage traffic turns the cache into a dump.
+    for (let index = 0; index < 3; index++) {
+      assert.equal(await verifier.verify(`bad-token-${index}`), null);
+    }
+
+    assert.equal(await verifier.verify(unknown), null);
+    assert.equal(lookup.lookups, 1);
   });
 
   it("rejects unknown tokens and remembers them until the TTL expires", async () => {

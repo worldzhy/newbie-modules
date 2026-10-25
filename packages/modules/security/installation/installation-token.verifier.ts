@@ -54,10 +54,7 @@ export class InstallationTokenVerifier<TRow extends InstallationCredentialRecord
   async verify(token: string): Promise<TRow | null> {
     const now = this.now();
 
-    if (!isInstallationTokenWellFormed(token)) {
-      this.reject(token, now);
-      return null;
-    }
+    if (!isInstallationTokenWellFormed(token)) return null;
 
     const rejectedUntil = this.rejections.get(token);
     if (rejectedUntil !== undefined) {

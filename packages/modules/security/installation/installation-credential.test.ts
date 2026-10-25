@@ -106,13 +106,13 @@ describe("installation credential primitives (ADR-019)", () => {
     assert.deepEqual(audit.events[0].params.detail, { label: "fake" });
   });
 
-  it("falls back to an unknown actor when none is supplied", async () => {
+  it("leaves the actor id empty when none is supplied", async () => {
     const store = new FakeStore();
     const audit = new FakeAudit();
 
     await issueInstallationCredential(store, { label: "api" }, auditContext(audit));
 
-    assert.equal(audit.events[0].params.actorId, "unknown");
+    assert.equal(audit.events[0].params.actorId, null);
     assert.equal(audit.events[0].params.actorType, "host");
   });
 
