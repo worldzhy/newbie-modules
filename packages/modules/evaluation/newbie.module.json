@@ -1,0 +1,13 @@
+{
+  "key": "evaluation",
+  "layer": "capability",
+  "module": {
+    "file": "evaluation.module",
+    "className": "EvaluationModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": [],
+  "config-service": {},
+  "env": {},
+  "dependencies": {}
+}

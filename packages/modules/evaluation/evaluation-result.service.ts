@@ -1,0 +1,144 @@
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { EvaluationRunStatus, Prisma } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+
+import { EvaluationCriteriaService } from "./evaluation-criteria.service";
+import { EvaluationCoverageStats, EvaluationEvidenceItem, EvaluationVerdict } from "./ports/evaluation.contracts";
+import { hashManifest, validateCoverageStats, validateJudgment } from "./evaluation-invariants";
+
+/**
+ * Fields returned by every result read. The archived `manifest` snapshot is
+ * excluded on purpose — it is a large JSON blob served only by the dedicated
+ * manifest read.
+ */
+const RESULT_SELECT = {
+  id: true,
+  runId: true,
+  subjectId: true,
+  criteriaVersionId: true,
+  contentHash: true,
+  coverageStats: true,
+  verdicts: true,
+  summary: true,
+  metadata: true,
+  createdAt: true,
+} satisfies Prisma.EvaluationResultSelect;
+
+const ACTIVE_STATUSES: EvaluationRunStatus[] = [EvaluationRunStatus.QUEUED, EvaluationRunStatus.RUNNING];
+
+export interface CreateEvaluationResultInput {
+  runId: string;
+  manifest: readonly EvaluationEvidenceItem[];
+  coverageStats: EvaluationCoverageStats;
+  verdicts: readonly EvaluationVerdict[];
+  summary?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ListEvaluationResultsInput {
+  subjectId: string;
+  criteriaVersionId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+/**
+ * EvaluationResultService — the immutable conclusion snapshot (ADR-020 D5.1).
+ *
+ * A rerun writes a new row through a new run; there is deliberately no update
+ * path here, so an archived manifest and its content hash cannot be rewritten.
+ * The hash is computed from the manifest rather than accepted from the caller —
+ * a caller-supplied hash could disagree with the snapshot it describes.
+ */
+@Injectable()
+export class EvaluationResultService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly criteria: EvaluationCriteriaService,
+  ) {}
+
+  async createResult(input: CreateEvaluationResultInput) {
+    const run = await this.prisma.evaluationRun.findUnique({ where: { id: input.runId } });
+    if (!run) throw new NotFoundException(`Evaluation run ${input.runId} not found`);
+    if (!ACTIVE_STATUSES.includes(run.status)) {
+      throw new ConflictException(`Evaluation run ${input.runId} already finished as ${run.status}`);
+    }
+
+    const coverageProblems = validateCoverageStats(input.coverageStats);
+    if (coverageProblems.length > 0) throw new BadRequestException(coverageProblems);
+
+    const criteria = await this.criteria.listCriteria(run.criteriaVersionId);
+    const judgmentProblems = validateJudgment({
+      criteria,
+      verdicts: input.verdicts,
+      findings: [],
+    });
+    if (judgmentProblems.length > 0) throw new BadRequestException(judgmentProblems);
+
+    try {
+      return await this.prisma.evaluationResult.create({
+        data: {
+          runId: input.runId,
+          subjectId: run.subjectId,
+          criteriaVersionId: run.criteriaVersionId,
+          manifest: input.manifest as unknown as Prisma.InputJsonValue,
+          contentHash: hashManifest(input.manifest),
+          coverageStats: input.coverageStats as unknown as Prisma.InputJsonValue,
+          verdicts: input.verdicts as unknown as Prisma.InputJsonValue,
+          summary: input.summary,
+          metadata: input.metadata as Prisma.InputJsonValue | undefined,
+        },
+        select: RESULT_SELECT,
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new ConflictException(`Evaluation run ${input.runId} already has a result`);
+      }
+      throw error;
+    }
+  }
+
+  async getResult(id: string) {
+    const result = await this.prisma.evaluationResult.findUnique({ where: { id }, select: RESULT_SELECT });
+    if (!result) throw new NotFoundException(`Evaluation result ${id} not found`);
+    return result;
+  }
+
+  /** Archived material snapshot: the only manifest read path. */
+  async getResultManifest(id: string) {
+    const result = await this.prisma.evaluationResult.findUnique({
+      where: { id },
+      select: { contentHash: true, coverageStats: true, manifest: true },
+    });
+    if (!result) throw new NotFoundException(`Evaluation result ${id} not found`);
+    return result;
+  }
+
+  async getResultForRun(runId: string) {
+    const result = await this.prisma.evaluationResult.findUnique({ where: { runId }, select: RESULT_SELECT });
+    if (!result) throw new NotFoundException(`Evaluation run ${runId} has no result`);
+    return result;
+  }
+
+  async listResults(query: ListEvaluationResultsInput) {
+    return this.prisma.findManyInManyPages({
+      model: Prisma.ModelName.EvaluationResult,
+      pagination: { page: query.page, pageSize: query.pageSize },
+      findManyArgs: {
+        where: {
+          subjectId: query.subjectId,
+          ...(query.criteriaVersionId ? { criteriaVersionId: query.criteriaVersionId } : {}),
+        },
+        orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+        select: RESULT_SELECT,
+      },
+    });
+  }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const { code, message } = error as { code?: unknown; message?: unknown };
+  if (code === "P2002") return true;
+  return typeof message === "string" && message.includes("EvaluationResult_runId_key");
+}
