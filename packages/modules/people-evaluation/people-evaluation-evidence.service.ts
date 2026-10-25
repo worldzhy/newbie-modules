@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PeopleEvaluationPeriodType, PeopleEvaluationSession, Prisma } from "@generated/prisma/client";
+import { PeopleEvaluationPeriodType, Prisma } from "@generated/prisma/client";
 import { CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
@@ -81,16 +81,15 @@ export class PeopleEvaluationEvidenceService {
       orderBy: { periodStart: "desc" },
     });
 
-    const indexes: PeopleEvaluationSession[] = [];
-    for (const input of inputs) {
+    const upserts = inputs.map((input) => {
       const startedAt = input.startedAt.getTime();
       const period =
         periods.find(
           (candidate) => candidate.periodStart.getTime() <= startedAt && candidate.periodEnd.getTime() > startedAt,
         ) ?? null;
-      indexes.push(await this.upsertSessionIndex(evaluateeUserId, input, period?.id ?? null));
-    }
-    return indexes;
+      return this.upsertSessionIndex(evaluateeUserId, input, period?.id ?? null);
+    });
+    return Promise.all(upserts);
   }
 
   /** Upsert one session index row, keyed by (evaluateeUserId, externalSessionId). */

@@ -6,6 +6,7 @@ import { PeopleEvaluationSessionStore } from "./people-evaluation-session.store"
 import { PeopleEvaluationRubricService } from "./people-evaluation-rubric.service";
 import { PeopleEvaluationEvidenceService } from "./people-evaluation-evidence.service";
 import { PeopleEvaluationResultService } from "./people-evaluation-result.service";
+import { PeopleEvaluationRunService } from "./people-evaluation-run.service";
 import { PeopleEvaluationInstallationController } from "./controllers/installation.controller";
 import { PeopleEvaluationEvidenceController } from "./controllers/evidence.controller";
 import { PeopleEvaluationInstallationService } from "./people-evaluation-installation.service";
@@ -30,6 +31,7 @@ import { PeopleEvaluationInstallationTokenResolver } from "./people-evaluation-i
     PeopleEvaluationRubricService,
     PeopleEvaluationEvidenceService,
     PeopleEvaluationResultService,
+    PeopleEvaluationRunService,
     PeopleEvaluationInstallationService,
     PeopleEvaluationSessionStore,
     PeopleEvaluationInstallationTokenResolver,
@@ -44,6 +46,7 @@ import { PeopleEvaluationInstallationTokenResolver } from "./people-evaluation-i
     PeopleEvaluationRubricService,
     PeopleEvaluationEvidenceService,
     PeopleEvaluationResultService,
+    PeopleEvaluationRunService,
     PeopleEvaluationInstallationService,
     PeopleEvaluationSessionStore,
     installationResolverToken("people-evaluation"),

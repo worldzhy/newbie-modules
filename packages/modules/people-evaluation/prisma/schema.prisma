@@ -12,11 +12,13 @@
 // * PeopleEvaluationWorkspace                                    //
 // * PeopleEvaluationSession                                      //
 // * PeopleEvaluationResult                                       //
+// * PeopleEvaluationRun                                          //
 // * PeopleEvaluationPipPlan                                      //
 // * PeopleEvaluationDeclaredDocument                             //
 // * PeopleEvaluationInstallation                                 //
 // * PeopleEvaluationPeriodType (enum)                            //
 // * PeopleEvaluationPeriodStatus (enum)                          //
+// * PeopleEvaluationRunStatus (enum)                             //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 enum PeopleEvaluationPeriodType {
@@ -108,6 +110,7 @@ model PeopleEvaluationPeriod {
   homeGrounds PeopleEvaluationHomeGround[]
   sessions    PeopleEvaluationSession[]
   results     PeopleEvaluationResult[]
+  runs        PeopleEvaluationRun[]
 
   @@index([rubricVersionId])
   @@index([type, periodStart])
@@ -236,6 +239,49 @@ model PeopleEvaluationResult {
   period PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
 
   @@index([evaluateeUserId, collectionPeriodId])
+  @@schema("module/people-evaluation")
+}
+
+enum PeopleEvaluationRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+
+  @@schema("module/people-evaluation")
+}
+
+/// One on-demand evaluation attempt. The row is the durable state of a run that
+/// can take minutes: it carries status, failure reason and timestamps so the
+/// caller learns the outcome instead of polling a results list blindly.
+///
+/// Concurrency is enforced in the database, not in process memory: a partial
+/// unique index on (evaluateeUserId, collectionPeriodId) covering the active
+/// statuses (declared in the migration as raw SQL — Prisma cannot express
+/// partial indexes) means a second concurrent request for the same member and
+/// period fails at insert time, on every replica alike.
+model PeopleEvaluationRun {
+  id                 String @id @default(uuid()) @db.Uuid
+  evaluateeUserId    String @db.Uuid
+  collectionPeriodId String @db.Uuid
+
+  status PeopleEvaluationRunStatus @default(QUEUED)
+  // Optional second LLM scope for the disagreement check; null = single-model run.
+  secondaryModelScope String? @db.VarChar(128)
+  // Result produced once the run succeeds; scalar reference, no FK by design.
+  resultId String? @db.Uuid
+  // Failure reason when status = FAILED. Message only, never a stack trace.
+  error String? @db.Text
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  period PeopleEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
+
+  @@index([evaluateeUserId, collectionPeriodId])
+  @@index([status])
   @@schema("module/people-evaluation")
 }
 

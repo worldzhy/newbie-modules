@@ -16,7 +16,11 @@ import {
   IsUUID,
   ValidateNested,
 } from "class-validator";
-import { PeopleEvaluationPeriodStatus, PeopleEvaluationPeriodType } from "@generated/prisma/client";
+import {
+  PeopleEvaluationPeriodStatus,
+  PeopleEvaluationPeriodType,
+  PeopleEvaluationRunStatus,
+} from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
 // --- Path params ---------------------------------------------------------
@@ -645,3 +649,56 @@ export class PeopleEvaluationInstallationCredentialResponseDto extends PeopleEva
   @ApiProperty({ description: "Plaintext token — shown once" })
   token!: string;
 }
+
+// --- Evaluation runs -----------------------------------------------------
+
+/**
+ * Request to open an on-demand evaluation run. The run is a resource: the
+ * response carries its id and the caller polls `GET /people/evaluation-runs/:id`
+ * for status and failure reason instead of guessing from the results list.
+ */
+export class CreatePeopleEvaluationRunRequestDto {
+  @ApiProperty({ description: "Member to evaluate" })
+  @IsUUID()
+  evaluateeUserId!: string;
+
+  @ApiProperty({ description: "Collection period to evaluate against" })
+  @IsUUID()
+  collectionPeriodId!: string;
+
+  @ApiPropertyOptional({ description: "Optional second LLM scope for a disagreement check" })
+  @IsOptional()
+  @IsString()
+  secondaryModelScope?: string;
+}
+
+export class PeopleEvaluationRunResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() evaluateeUserId!: string;
+  @ApiProperty() collectionPeriodId!: string;
+  @ApiProperty({ enum: PeopleEvaluationRunStatus })
+  status!: PeopleEvaluationRunStatus;
+  @ApiPropertyOptional({ type: String }) secondaryModelScope?: string | null;
+  @ApiPropertyOptional({ description: "Set once the run succeeds", type: String })
+  resultId?: string | null;
+  @ApiPropertyOptional({ description: "Failure reason when status is FAILED", type: String })
+  error?: string | null;
+  @ApiPropertyOptional({ type: Date }) startedAt?: Date | null;
+  @ApiPropertyOptional({ type: Date }) finishedAt?: Date | null;
+  @ApiProperty() createdAt!: Date;
+  @ApiProperty() updatedAt!: Date;
+}
+
+export class ListPeopleEvaluationRunsRequestDto extends CommonListRequestDto {
+  @ApiPropertyOptional({ description: "Filter by member" })
+  @IsOptional()
+  @IsUUID()
+  evaluateeUserId?: string;
+
+  @ApiPropertyOptional({ description: "Filter by collection period" })
+  @IsOptional()
+  @IsUUID()
+  collectionPeriodId?: string;
+}
+
+export class ListPeopleEvaluationRunsResponseDto extends CommonListResponseDto<PeopleEvaluationRunResponseDto> {}

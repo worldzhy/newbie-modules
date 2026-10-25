@@ -89,22 +89,24 @@ export class PeopleEvaluationEvidenceController {
       body.sessions.map(({ messages: _messages, ...index }) => index),
     );
 
-    for (const [position, session] of body.sessions.entries()) {
-      await this.sessions.insertMessages(
-        session.messages.map((message) => ({
-          evaluatee_user_id: evaluateeUserId,
-          session_id: indexes[position].id,
-          workspace_key: session.workspaceKey,
-          seq: message.seq,
-          role: message.role,
-          content: message.content,
-          tool_name: message.toolName ?? "",
-          tool_calls: message.toolCalls ?? "",
-          token_count: message.tokenCount ?? 0,
-          created_at: (message.createdAt ?? session.startedAt).toISOString(),
-        })),
-      );
-    }
+    await Promise.all(
+      body.sessions.map((session, position) =>
+        this.sessions.insertMessages(
+          session.messages.map((message) => ({
+            evaluatee_user_id: evaluateeUserId,
+            session_id: indexes[position].id,
+            workspace_key: session.workspaceKey,
+            seq: message.seq,
+            role: message.role,
+            content: message.content,
+            tool_name: message.toolName ?? "",
+            tool_calls: message.toolCalls ?? "",
+            token_count: message.tokenCount ?? 0,
+            created_at: (message.createdAt ?? session.startedAt).toISOString(),
+          })),
+        ),
+      ),
+    );
 
     await this.installations.touchOnIngest(installationId);
   }

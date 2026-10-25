@@ -167,15 +167,11 @@ export class PeopleEvaluationResultService {
    * a silent re-decision is rejected with 409.
    */
   async decidePipPlan(id: string, actorUserId: string, input: UpdatePeopleEvaluationPipPlanDecisionRequestDto) {
-    const plan = await this.prisma.peopleEvaluationPipPlan.findUnique({ where: { id } });
-    if (!plan) {
-      throw new NotFoundException(`PIP plan ${id} not found`);
-    }
-    if (plan.result !== null) {
-      throw new ConflictException(`PIP plan ${id} is already decided as ${plan.result}`);
-    }
-    return this.prisma.peopleEvaluationPipPlan.update({
-      where: { id },
+    // Conditional update guards the read-check-write race: only the request that
+    // actually flips result from null wins. A concurrent request sees count 0
+    // and surfaces a clean 409 instead of silently overwriting the first decision.
+    const updated = await this.prisma.peopleEvaluationPipPlan.updateMany({
+      where: { id, result: null },
       data: {
         result: input.result,
         decisionNote: input.decisionNote,
@@ -183,5 +179,11 @@ export class PeopleEvaluationResultService {
         decidedAt: new Date(),
       },
     });
+    if (updated.count === 0) {
+      const plan = await this.prisma.peopleEvaluationPipPlan.findUnique({ where: { id } });
+      if (!plan) throw new NotFoundException(`PIP plan ${id} not found`);
+      throw new ConflictException(`PIP plan ${id} is already decided as ${plan.result}`);
+    }
+    return this.prisma.peopleEvaluationPipPlan.findUnique({ where: { id } });
   }
 }

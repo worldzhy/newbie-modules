@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { PeopleEvaluationInstallation } from "@generated/prisma/client";
+import { PeopleEvaluationInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   CreatePeopleEvaluationInstallationRequestDto,
@@ -10,6 +10,9 @@ import {
 
 /** An installation agent that has not reported for this long is shown as offline. */
 export const PEOPLE_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS = 180;
+
+/** Database schema for the people-evaluation module (mirrors prisma @@schema). */
+const PEOPLE_EVALUATION_SCHEMA = "module/people-evaluation";
 
 export function hashPeopleEvaluationInstallationToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
@@ -106,7 +109,7 @@ export class PeopleEvaluationInstallationService {
    */
   async touchOnIngest(id: string): Promise<void> {
     await this.prisma.$executeRaw`
-      UPDATE "module/people-evaluation"."PeopleEvaluationInstallation"
+      UPDATE ${Prisma.raw(`"${PEOPLE_EVALUATION_SCHEMA}"."PeopleEvaluationInstallation"`)}
       SET "firstSeenAt" = COALESCE("firstSeenAt", NOW()),
           "lastSeenAt" = NOW()
       WHERE "id" = ${id}::uuid
