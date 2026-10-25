@@ -1,29 +1,61 @@
-import { createHash, randomUUID } from "node:crypto";
-
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { WebMonitorInstallation } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
+import {
+  InstallationCredentialStore,
+  issueInstallationCredential,
+  restoreInstallationCredential,
+  revokeInstallationCredential,
+  rotateInstallationCredential,
+} from "@modules/security/installation/installation-credential";
+import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 
 import { func } from "../shared/utils";
 
 /** Reports flush near-continuously; three minutes without one marks stale. */
 export const ONLINE_THRESHOLD_SECONDS = 180;
 
-export function hashWebToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+/** Audit resource type for installation credential events. */
+const AUDIT_RESOURCE_TYPE = "web-monitor-installation";
+
+/** Domain columns stored next to the credential (ADR-019). */
+interface WebInstallationDraft {
+  label: string;
+  externalRef: string | null;
+  appKey: string;
 }
 
 /**
  * Registry of web-monitor browser-SDK installations. One token = one FRONTEND
  * application reporting to /web-monitor/report with the token in the body.
  *
- * Mirrors the hub/heartbeat/backend-monitor installation pattern (random UUID
- * token, SHA-256 hash, one-time plaintext return, soft revocation) by copying
- * the code rather than sharing a runtime dependency, per registry module
- * philosophy. Replaces the retired application.Agent (WEB_MONITOR) identity.
+ * Token generation, hashing, lifecycle and verification come from security
+ * (ADR-019); this class only adapts the table, mints the immutable appKey and
+ * projects domain state. Replaces the retired application.Agent (WEB_MONITOR)
+ * identity.
  */
 @Injectable()
 export class WebInstallationService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly credentials: InstallationCredentialStore<WebInstallationDraft, WebMonitorInstallation>;
+  private readonly tokenVerifier: InstallationTokenVerifier<WebMonitorInstallation>;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {
+    this.credentials = {
+      create: (draft) => this.prisma.webMonitorInstallation.create({ data: draft }),
+      findByTokenHash: (tokenHash) => this.prisma.webMonitorInstallation.findUnique({ where: { tokenHash } }),
+      replaceTokenHash: async (id, tokenHash) => {
+        await this.prisma.webMonitorInstallation.update({ where: { id }, data: { tokenHash } });
+      },
+      setRevokedAt: async (id, revokedAt) => {
+        await this.prisma.webMonitorInstallation.update({ where: { id }, data: { revokedAt } });
+      },
+    };
+    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
+  }
 
   private withDerivedState<T extends { revokedAt: Date | null; lastSeenAt: Date | null; tokenHash: string }>(
     row: T,
@@ -41,19 +73,20 @@ export class WebInstallationService {
    * are returned ONCE; appKey is immutable across rotations because it is
    * embedded in Mongo collection / ClickHouse table names.
    */
-  async create(input: { label: string; externalRef?: string }) {
-    const token = randomUUID();
+  async create(input: { label: string; externalRef?: string }, actor?: string) {
     // func.randomString appends Date.now(); keep only the leading random part.
     const appKey = func.randomString(7).slice(0, 7);
-    const row = await this.prisma.webMonitorInstallation.create({
-      data: {
-        label: input.label,
-        externalRef: input.externalRef ?? null,
-        appKey,
-        tokenHash: hashWebToken(token),
+    const { record, token } = await issueInstallationCredential(
+      this.credentials,
+      { label: input.label, externalRef: input.externalRef ?? null, appKey },
+      {
+        recorder: this.auditLogService,
+        resourceType: AUDIT_RESOURCE_TYPE,
+        actorId: actor,
+        detail: { label: input.label, externalRef: input.externalRef ?? null },
       },
-    });
-    return { ...this.withDerivedState(row), token };
+    );
+    return { ...this.withDerivedState(record), token };
   }
 
   async list(query: { externalRef?: string }) {
@@ -80,37 +113,38 @@ export class WebInstallationService {
   }
 
   /** Rotate the token; the old hash stops working immediately. */
-  async regenerateToken(id: string) {
+  async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
-    const token = randomUUID();
-    await this.prisma.webMonitorInstallation.update({
-      where: { id },
-      data: { tokenHash: hashWebToken(token) },
+    return rotateInstallationCredential(this.credentials, id, {
+      recorder: this.auditLogService,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      actorId: actor,
     });
-    return { id, token };
   }
 
   /** Soft revocation: reports are rejected (401), rows are retained. */
-  async revoke(id: string) {
+  async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    await this.prisma.webMonitorInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
-    return { id, revoked: true };
+    return revokeInstallationCredential(this.credentials, id, {
+      recorder: this.auditLogService,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      actorId: actor,
+    });
   }
 
   /** Re-enable a revoked installation by clearing the revocation marker. */
-  async unrevoke(id: string) {
+  async unrevoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    await this.prisma.webMonitorInstallation.update({ where: { id }, data: { revokedAt: null } });
-    return { id, revoked: false };
+    return restoreInstallationCredential(this.credentials, id, {
+      recorder: this.auditLogService,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      actorId: actor,
+    });
   }
 
   /** Token-only authentication for the report endpoint. */
   async resolveByToken(token: string) {
-    const row = await this.prisma.webMonitorInstallation.findUnique({
-      where: { tokenHash: hashWebToken(token) },
-    });
-    if (!row || row.revokedAt) return null;
-    return row;
+    return this.tokenVerifier.verify(token);
   }
 
   /**

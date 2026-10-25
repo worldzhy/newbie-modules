@@ -1,8 +1,14 @@
-import { createHash, randomUUID } from "node:crypto";
-
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { BackendMonitorInstallation } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
+import {
+  InstallationCredentialStore,
+  issueInstallationCredential,
+  revokeInstallationCredential,
+  rotateInstallationCredential,
+} from "@modules/security/installation/installation-credential";
+import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 
 /** Probes flush roughly every 5s; three minutes without a batch marks stale. */
 export const ONLINE_THRESHOLD_SECONDS = 180;
@@ -24,8 +30,15 @@ export interface InstallationPresence {
   revokedOnly: boolean;
 }
 
-export function hashMonitorToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+/** Audit resource type for installation credential events. */
+const AUDIT_RESOURCE_TYPE = "backend-monitor-installation";
+
+/** Domain columns stored next to the credential (ADR-019). */
+interface BackendMonitorInstallationDraft {
+  label: string;
+  externalRef: string | null;
+  env: string | null;
+  kind: string | null;
 }
 
 /**
@@ -33,13 +46,33 @@ export function hashMonitorToken(token: string): string {
  * Phase 3 pilot). One token = one installation; the running process presents
  * it as X-Backend-Monitor-Token on /backend-monitor/ingest.
  *
- * Mirrors the hub/heartbeat installation pattern (random UUID token, SHA-256
- * hash, one-time plaintext return, soft revocation) by copying the code rather
- * than sharing a runtime dependency, per registry module philosophy.
+ * Token generation, hashing, lifecycle and verification come from security
+ * (ADR-019); this class only adapts the table and projects domain state.
  */
 @Injectable()
 export class MonitorInstallationService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly credentials: InstallationCredentialStore<
+    BackendMonitorInstallationDraft,
+    BackendMonitorInstallation
+  >;
+  private readonly tokenVerifier: InstallationTokenVerifier<BackendMonitorInstallation>;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {
+    this.credentials = {
+      create: (draft) => this.prisma.backendMonitorInstallation.create({ data: draft }),
+      findByTokenHash: (tokenHash) => this.prisma.backendMonitorInstallation.findUnique({ where: { tokenHash } }),
+      replaceTokenHash: async (id, tokenHash) => {
+        await this.prisma.backendMonitorInstallation.update({ where: { id }, data: { tokenHash } });
+      },
+      setRevokedAt: async (id, revokedAt) => {
+        await this.prisma.backendMonitorInstallation.update({ where: { id }, data: { revokedAt } });
+      },
+    };
+    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
+  }
 
   private withDerivedState(row: BackendMonitorInstallation) {
     const online =
@@ -51,18 +84,23 @@ export class MonitorInstallationService {
   }
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
-  async create(input: { label: string; externalRef?: string; env?: string; kind?: string }) {
-    const token = randomUUID();
-    const row = await this.prisma.backendMonitorInstallation.create({
-      data: {
+  async create(input: { label: string; externalRef?: string; env?: string; kind?: string }, actor?: string) {
+    const { record, token } = await issueInstallationCredential(
+      this.credentials,
+      {
         label: input.label,
         externalRef: input.externalRef ?? null,
         env: input.env ?? null,
         kind: input.kind ?? null,
-        tokenHash: hashMonitorToken(token),
       },
-    });
-    return { ...this.withDerivedState(row), token };
+      {
+        recorder: this.auditLogService,
+        resourceType: AUDIT_RESOURCE_TYPE,
+        actorId: actor,
+        detail: { label: input.label, externalRef: input.externalRef ?? null },
+      },
+    );
+    return { ...this.withDerivedState(record), token };
   }
 
   async list(query: { externalRef?: string }) {
@@ -126,30 +164,28 @@ export class MonitorInstallationService {
   }
 
   /** Rotate the token; the old hash stops working immediately. */
-  async regenerateToken(id: string) {
+  async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
-    const token = randomUUID();
-    await this.prisma.backendMonitorInstallation.update({
-      where: { id },
-      data: { tokenHash: hashMonitorToken(token) },
+    return rotateInstallationCredential(this.credentials, id, {
+      recorder: this.auditLogService,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      actorId: actor,
     });
-    return { id, token };
   }
 
   /** Soft revocation: ingest is rejected (401), rows are retained. */
-  async revoke(id: string) {
+  async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    await this.prisma.backendMonitorInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
-    return { id, revoked: true };
+    return revokeInstallationCredential(this.credentials, id, {
+      recorder: this.auditLogService,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      actorId: actor,
+    });
   }
 
   /** Token-only authentication for the ingest endpoint. */
   async resolveByToken(token: string) {
-    const row = await this.prisma.backendMonitorInstallation.findUnique({
-      where: { tokenHash: hashMonitorToken(token) },
-    });
-    if (!row || row.revokedAt) return null;
-    return row;
+    return this.tokenVerifier.verify(token);
   }
 
   /**

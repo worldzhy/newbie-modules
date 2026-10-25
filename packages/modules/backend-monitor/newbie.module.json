@@ -7,7 +7,7 @@
     "className": "BackendMonitorModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["clickhouse", "security", "llm"],
+  "moduleDependencies": ["audit", "clickhouse", "security", "llm"],
   "config-service": {},
   "env": {},
   "dependencies": {},

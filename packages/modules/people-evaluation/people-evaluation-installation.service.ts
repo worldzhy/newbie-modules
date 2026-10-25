@@ -1,8 +1,14 @@
-import { createHash, randomUUID } from "node:crypto";
-
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { PeopleEvaluationInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
+import {
+  InstallationCredentialStore,
+  issueInstallationCredential,
+  revokeInstallationCredential,
+  rotateInstallationCredential,
+} from "@modules/security/installation/installation-credential";
+import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 import {
   CreatePeopleEvaluationInstallationRequestDto,
   PeopleEvaluationInstallationCredentialResponseDto,
@@ -14,21 +20,48 @@ export const PEOPLE_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS = 180;
 /** Database schema for the people-evaluation module (mirrors prisma @@schema). */
 const PEOPLE_EVALUATION_SCHEMA = "module/people-evaluation";
 
-export function hashPeopleEvaluationInstallationToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+/** Audit resource type for installation credential events. */
+const AUDIT_RESOURCE_TYPE = "people-evaluation-installation";
+
+/** Domain columns stored next to the credential (ADR-019). */
+interface PeopleEvaluationInstallationDraft {
+  label: string;
+  evaluateeUserId: string;
+  hostname: string | null;
 }
 
 /**
  * Enrollment registry for member-side installation agents (ADR-029).
  *
- * Same contract as the backend-monitor installation: one random UUID token per
- * installation, stored only as a SHA-256 hash, plaintext returned exactly once,
- * soft revocation (rows retained). The row pins the evaluatee the token may
- * report for, so a leaked token cannot write evidence for another member.
+ * Token generation, hashing, lifecycle and verification come from security
+ * (ADR-019); this class only adapts the table and projects domain state. The
+ * row still pins the evaluatee the token may report for, so a leaked token
+ * cannot write evidence for another member.
  */
 @Injectable()
 export class PeopleEvaluationInstallationService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly credentials: InstallationCredentialStore<
+    PeopleEvaluationInstallationDraft,
+    PeopleEvaluationInstallation
+  >;
+  private readonly tokenVerifier: InstallationTokenVerifier<PeopleEvaluationInstallation>;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {
+    this.credentials = {
+      create: (draft) => this.prisma.peopleEvaluationInstallation.create({ data: draft }),
+      findByTokenHash: (tokenHash) => this.prisma.peopleEvaluationInstallation.findUnique({ where: { tokenHash } }),
+      replaceTokenHash: async (id, tokenHash) => {
+        await this.prisma.peopleEvaluationInstallation.update({ where: { id }, data: { tokenHash } });
+      },
+      setRevokedAt: async (id, revokedAt) => {
+        await this.prisma.peopleEvaluationInstallation.update({ where: { id }, data: { revokedAt } });
+      },
+    };
+    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
+  }
 
   private withDerivedState(row: PeopleEvaluationInstallation) {
     const online =
@@ -42,17 +75,23 @@ export class PeopleEvaluationInstallationService {
   /** Enroll an installation. The plaintext token is returned ONCE. */
   async create(
     input: CreatePeopleEvaluationInstallationRequestDto,
+    actor?: string,
   ): Promise<PeopleEvaluationInstallationCredentialResponseDto> {
-    const token = randomUUID();
-    const row = await this.prisma.peopleEvaluationInstallation.create({
-      data: {
+    const { record, token } = await issueInstallationCredential(
+      this.credentials,
+      {
         label: input.label,
         evaluateeUserId: input.evaluateeUserId,
         hostname: input.hostname ?? null,
-        tokenHash: hashPeopleEvaluationInstallationToken(token),
       },
-    });
-    return { ...this.withDerivedState(row), token };
+      {
+        recorder: this.auditLogService,
+        resourceType: AUDIT_RESOURCE_TYPE,
+        actorId: actor,
+        detail: { label: input.label, evaluateeUserId: input.evaluateeUserId },
+      },
+    );
+    return { ...this.withDerivedState(record), token };
   }
 
   async list(query: { evaluateeUserId?: string }) {
@@ -74,33 +113,29 @@ export class PeopleEvaluationInstallationService {
   }
 
   /** Rotate the token; the old hash stops working immediately. */
-  async regenerateToken(id: string): Promise<PeopleEvaluationInstallationCredentialResponseDto> {
+  async regenerateToken(id: string, actor?: string): Promise<PeopleEvaluationInstallationCredentialResponseDto> {
     await this.getOrThrow(id);
-    const token = randomUUID();
-    const row = await this.prisma.peopleEvaluationInstallation.update({
-      where: { id },
-      data: { tokenHash: hashPeopleEvaluationInstallationToken(token) },
+    const { token } = await rotateInstallationCredential(this.credentials, id, {
+      recorder: this.auditLogService,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      actorId: actor,
     });
-    return { ...this.withDerivedState(row), token };
+    return { ...this.withDerivedState(await this.getOrThrow(id)), token };
   }
 
   /** Soft revocation: ingest is rejected (401), reported rows are retained. */
-  async revoke(id: string) {
+  async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    await this.prisma.peopleEvaluationInstallation.update({
-      where: { id },
-      data: { revokedAt: new Date() },
+    return revokeInstallationCredential(this.credentials, id, {
+      recorder: this.auditLogService,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      actorId: actor,
     });
-    return { id, revoked: true };
   }
 
   /** Token-only authentication for the ingest endpoints. */
   async resolveByToken(token: string) {
-    const row = await this.prisma.peopleEvaluationInstallation.findUnique({
-      where: { tokenHash: hashPeopleEvaluationInstallationToken(token) },
-    });
-    if (!row || row.revokedAt) return null;
-    return row;
+    return this.tokenVerifier.verify(token);
   }
 
   /**

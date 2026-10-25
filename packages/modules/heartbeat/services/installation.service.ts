@@ -1,8 +1,14 @@
-import { createHash, randomUUID } from "node:crypto";
-
 import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import { HeartbeatInstallation, Prisma } from "@generated/prisma/client";
+import { HeartbeatInstallation } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
+import {
+  InstallationCredentialStore,
+  issueInstallationCredential,
+  revokeInstallationCredential,
+  rotateInstallationCredential,
+} from "@modules/security/installation/installation-credential";
+import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** Requested interval between client pings; echoed back in the ping response. */
@@ -13,8 +19,13 @@ export const ONLINE_THRESHOLD_SECONDS = PING_INTERVAL_SECONDS * 3;
 
 const ONLINE_THRESHOLD_MILLISECONDS = ONLINE_THRESHOLD_SECONDS * 1000;
 
-export function hashHeartbeatToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+/** Audit resource type for installation credential events. */
+const AUDIT_RESOURCE_TYPE = "heartbeat-installation";
+
+/** Domain columns stored next to the credential (ADR-019). */
+interface HeartbeatInstallationDraft {
+  label: string;
+  externalRef: string | null;
 }
 
 /**
@@ -45,23 +56,45 @@ export class HeartbeatInstallationService implements InstallationResolver {
   /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
   readonly legacyHeader = "x-heartbeat-token";
 
-  constructor(private readonly prisma: PrismaService) {}
+  // Credential mechanism comes from security (ADR-019); this class only adapts
+  // its table and projects the domain state.
+  private readonly credentials: InstallationCredentialStore<HeartbeatInstallationDraft, HeartbeatInstallation>;
+  private readonly tokenVerifier: InstallationTokenVerifier<HeartbeatInstallation>;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {
+    this.credentials = {
+      create: (draft) => this.prisma.heartbeatInstallation.create({ data: draft }),
+      findByTokenHash: (tokenHash) => this.prisma.heartbeatInstallation.findUnique({ where: { tokenHash } }),
+      replaceTokenHash: async (id, tokenHash) => {
+        await this.prisma.heartbeatInstallation.update({ where: { id }, data: { tokenHash } });
+      },
+      setRevokedAt: async (id, revokedAt) => {
+        await this.prisma.heartbeatInstallation.update({ where: { id }, data: { revokedAt } });
+      },
+    };
+    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
+  }
 
   // -------------------------------------------------------------------------
   // Installation lifecycle (host integration API)
   // -------------------------------------------------------------------------
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
-  async create(input: { label: string; externalRef?: string }) {
-    const token = randomUUID();
-    const row = await this.prisma.heartbeatInstallation.create({
-      data: {
-        label: input.label,
-        externalRef: input.externalRef ?? null,
-        tokenHash: hashHeartbeatToken(token),
+  async create(input: { label: string; externalRef?: string }, actor?: string) {
+    const { record, token } = await issueInstallationCredential(
+      this.credentials,
+      { label: input.label, externalRef: input.externalRef ?? null },
+      {
+        recorder: this.auditLogService,
+        resourceType: AUDIT_RESOURCE_TYPE,
+        actorId: actor,
+        detail: { label: input.label, externalRef: input.externalRef ?? null },
       },
-    });
-    return { ...this.withDerivedState(row), token };
+    );
+    return { ...this.withDerivedState(record), token };
   }
 
   async list(query: { externalRef?: string }) {
@@ -83,36 +116,23 @@ export class HeartbeatInstallationService implements InstallationResolver {
   }
 
   /** Rotate the token; the old hash stops working immediately. */
-  async regenerateToken(id: string) {
-    const token = randomUUID();
-    try {
-      await this.prisma.heartbeatInstallation.update({
-        where: { id },
-        data: { tokenHash: hashHeartbeatToken(token) },
-      });
-    } catch (error) {
-      if (this.isMissingRowError(error)) {
-        throw new NotFoundException(`Installation ${id} not found.`);
-      }
-      throw error;
-    }
-    return { id, token };
+  async regenerateToken(id: string, actor?: string) {
+    await this.getOrThrow(id);
+    return rotateInstallationCredential(this.credentials, id, {
+      recorder: this.auditLogService,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      actorId: actor,
+    });
   }
 
   /** Soft revocation: pings are rejected (401), rows are retained for audit. */
-  async revoke(id: string) {
-    try {
-      await this.prisma.heartbeatInstallation.update({
-        where: { id },
-        data: { revokedAt: new Date() },
-      });
-    } catch (error) {
-      if (this.isMissingRowError(error)) {
-        throw new NotFoundException(`Installation ${id} not found.`);
-      }
-      throw error;
-    }
-    return { id, revoked: true };
+  async revoke(id: string, actor?: string) {
+    await this.getOrThrow(id);
+    return revokeInstallationCredential(this.credentials, id, {
+      recorder: this.auditLogService,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      actorId: actor,
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -206,9 +226,7 @@ export class HeartbeatInstallationService implements InstallationResolver {
    * revoked tokens both return null so the two cases stay indistinguishable.
    */
   async resolveByToken(token: string): Promise<HeartbeatInstallation | null> {
-    return this.prisma.heartbeatInstallation.findFirst({
-      where: { tokenHash: hashHeartbeatToken(token), revokedAt: null },
-    });
+    return this.tokenVerifier.verify(token);
   }
 
   /**
@@ -262,9 +280,5 @@ export class HeartbeatInstallationService implements InstallationResolver {
       Date.now() - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS;
     const { tokenHash: _tokenHash, ...rest } = row;
     return { ...rest, online };
-  }
-
-  private isMissingRowError(error: unknown): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
   }
 }
