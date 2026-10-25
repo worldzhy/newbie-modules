@@ -49,9 +49,6 @@ model WorkEvaluationPeriod {
   periodEnd         DateTime
   status            WorkEvaluationPeriodStatus @default(UPCOMING)
 
-  // REVIEW periods may reference which COLLECTION periods are rolled up
-  collectionPeriodIds Json? @db.JsonB
-
   homeGrounds WorkEvaluationHomeGround[]
   sessions    WorkEvaluationSession[]
 

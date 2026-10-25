@@ -65,14 +65,15 @@ export class WorkEvaluationSessionStore {
     return (await result.json()) as SessionMessageRow[];
   }
 
-  /** Number of stored message rows per session — used in coverage accounting. */
-  async countMessages(sessionId: string): Promise<number> {
+  /** Message counts for many sessions in one query — coverage accounting. */
+  async countMessagesBySession(sessionIds: string[]): Promise<Map<string, number>> {
+    if (sessionIds.length === 0) return new Map();
     const result = await this.clickhouse.query({
-      query: `SELECT count() AS total FROM ${SESSION_MESSAGE_TABLE} FINAL WHERE session_id = {sessionId:UUID}`,
+      query: `SELECT session_id, count() AS total FROM ${SESSION_MESSAGE_TABLE} FINAL WHERE session_id IN {sessionIds:Array(UUID)} GROUP BY session_id`,
       format: "JSONEachRow",
-      query_params: { sessionId },
+      query_params: { sessionIds },
     });
-    const rows = (await result.json()) as { total: string | number }[];
-    return Number(rows[0]?.total ?? 0);
+    const rows = (await result.json()) as { session_id: string; total: string | number }[];
+    return new Map(rows.map((row) => [row.session_id, Number(row.total)]));
   }
 }

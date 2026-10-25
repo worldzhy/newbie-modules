@@ -194,16 +194,6 @@ export class CreateWorkEvaluationPeriodRequestDto {
   @Type(() => Date)
   @IsDate()
   periodEnd!: Date;
-
-  @ApiPropertyOptional({
-    type: String,
-    isArray: true,
-    description: "COLLECTION period ids rolled up by this REVIEW period",
-  })
-  @IsOptional()
-  @IsArray()
-  @IsUUID("4", { each: true })
-  collectionPeriodIds?: string[];
 }
 
 export class UpdateWorkEvaluationPeriodStatusRequestDto {
@@ -226,7 +216,6 @@ export class WorkEvaluationPeriodResponseDto {
   @ApiProperty() periodStart!: Date;
   @ApiProperty() periodEnd!: Date;
   @ApiProperty({ enum: WorkEvaluationPeriodStatus }) status!: WorkEvaluationPeriodStatus;
-  @ApiPropertyOptional({ type: String, isArray: true }) collectionPeriodIds?: string[];
 }
 
 export class ListWorkEvaluationPeriodsResponseDto extends CommonListResponseDto<WorkEvaluationPeriodResponseDto> {}

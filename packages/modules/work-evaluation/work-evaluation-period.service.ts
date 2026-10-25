@@ -71,48 +71,43 @@ export class WorkEvaluationPeriodService {
       );
     }
 
-    const overlapping = await this.prisma.workEvaluationPeriod.findFirst({
-      where: {
-        type: input.type,
-        periodStart: { lt: input.periodEnd },
-        periodEnd: { gt: input.periodStart },
-      },
-      select: { id: true, periodStart: true, periodEnd: true },
-    });
-    if (overlapping) {
-      throw new ConflictException(
-        `Period overlaps existing ${input.type} period ${overlapping.id} (${overlapping.periodStart.toISOString()} – ${overlapping.periodEnd.toISOString()})`,
+    const overlappingWhere = {
+      type: input.type,
+      periodStart: { lt: input.periodEnd },
+      periodEnd: { gt: input.periodStart },
+    };
+    // The overlap check and the insert must be atomic: a serializable
+    // transaction makes two concurrent creators of overlapping periods fail
+    // one of them instead of both succeeding.
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const overlapping = await tx.workEvaluationPeriod.findFirst({
+            where: overlappingWhere,
+            select: { id: true, periodStart: true, periodEnd: true },
+          });
+          if (overlapping) {
+            throw new ConflictException(
+              `Period overlaps existing ${input.type} period ${overlapping.id} (${overlapping.periodStart.toISOString()} – ${overlapping.periodEnd.toISOString()})`,
+            );
+          }
+          return tx.workEvaluationPeriod.create({
+            data: {
+              criteriaVersionId: input.criteriaVersionId,
+              type: input.type,
+              periodStart: input.periodStart,
+              periodEnd: input.periodEnd,
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+        throw new ConflictException("Concurrent period creation detected; retry the request");
+      }
+      throw error;
     }
-
-    if (input.collectionPeriodIds && input.collectionPeriodIds.length > 0) {
-      if (input.type !== WorkEvaluationPeriodType.REVIEW) {
-        throw new BadRequestException("collectionPeriodIds is only allowed on REVIEW periods");
-      }
-      const collectionPeriods = await this.prisma.workEvaluationPeriod.findMany({
-        where: { id: { in: input.collectionPeriodIds } },
-        select: { id: true, type: true },
-      });
-      if (collectionPeriods.length !== input.collectionPeriodIds.length) {
-        throw new BadRequestException("collectionPeriodIds contains unknown period ids");
-      }
-      const nonCollection = collectionPeriods.filter((period) => period.type !== WorkEvaluationPeriodType.COLLECTION);
-      if (nonCollection.length > 0) {
-        throw new BadRequestException(
-          `collectionPeriodIds must reference COLLECTION periods: ${nonCollection.map((period) => period.id).join(", ")}`,
-        );
-      }
-    }
-
-    return this.prisma.workEvaluationPeriod.create({
-      data: {
-        criteriaVersionId: input.criteriaVersionId,
-        type: input.type,
-        periodStart: input.periodStart,
-        periodEnd: input.periodEnd,
-        collectionPeriodIds: input.collectionPeriodIds,
-      },
-    });
   }
 
   /**
@@ -130,7 +125,16 @@ export class WorkEvaluationPeriodService {
     if (!allowedTransitions[period.status].includes(target)) {
       throw new ConflictException(`Illegal period status transition ${period.status} → ${target}`);
     }
-    return this.prisma.workEvaluationPeriod.update({ where: { id }, data: { status: target } });
+    // Conditional update: a concurrent transition that moved the row off the
+    // status we validated makes this a no-op instead of silently winning.
+    const updated = await this.prisma.workEvaluationPeriod.updateMany({
+      where: { id, status: period.status },
+      data: { status: target },
+    });
+    if (updated.count === 0) {
+      throw new ConflictException(`Period ${id} status changed concurrently; retry the transition`);
+    }
+    return this.getPeriodById(id);
   }
 
   // --- Home ground -------------------------------------------------------

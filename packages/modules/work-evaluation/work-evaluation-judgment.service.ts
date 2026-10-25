@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 
 import { ChatMessage, ChatModelPort, ModelToolCall, ToolSpecification } from "@modules/llm/chat-model.port";
 import { ChatModelResolver } from "@modules/llm/chat-model.resolver";
@@ -9,6 +9,8 @@ import { EvaluationCoverageBucket, EvaluationVerdict } from "@modules/evaluation
 import { EvaluationJudgment, JudgmentInput, JudgmentPort } from "@modules/evaluation/ports/judgment.port";
 
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
+import { createDrillRedactor, redactDeep } from "./work-evaluation-redaction";
+import { readWorkEvaluationSubjectMetadata } from "./work-evaluation-subject";
 import {
   DEFAULT_WORK_EVALUATION_PHASE_BUDGET,
   DEFAULT_WORK_EVALUATION_SCOPE,
@@ -34,17 +36,6 @@ interface PhaseResult {
 }
 
 /**
- * Subject metadata this feature's SubjectProvider is expected to attach
- * (README §subjectKey): the collection period that bounds the window, the
- * evaluatee, and the identity tokens that keep the judgment blind.
- */
-interface WorkEvaluationSubjectMetadata {
-  periodId: string;
-  evaluateeUserId: string;
-  identityTokens?: string[];
-}
-
-/**
  * WorkEvaluationJudgmentService — the JudgmentPort for subject kind "work"
  * (ADR-024). A bounded, read-only, three-phase agent: advocate finds support,
  * skeptic attacks it and names evidence gaps, synthesis must answer every
@@ -67,7 +58,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
   ) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    const metadata = await this.subjectMetadata(input.subject.id);
+    const metadata = await readWorkEvaluationSubjectMetadata(this.subjects, input.subject.id);
     const scope = readScopeOverride(input.runConfig) ?? DEFAULT_WORK_EVALUATION_SCOPE;
     const port = await this.resolver.resolve(scope);
 
@@ -93,17 +84,24 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
     for (const item of input.evidence) {
       collectedBySource[item.source] = (collectedBySource[item.source] ?? 0) + 1;
     }
-    const promptInput = {
-      blindSubjectId,
-      criteria,
-      homeCriteria,
-      versionMetadata,
-      coverageStats: {
-        collected: { total: input.evidence.length, bySource: collectedBySource },
-        note: input.evidence.length === 0 ? "no evidence collected for this run" : undefined,
+    // Structural invariant: everything the model sees is redacted up front.
+    // The drill tools keep their own redactor; the prompt input passes through
+    // the same scrubber so no field can leak the subject's identity.
+    const redact = createDrillRedactor(identityTokens);
+    const promptInput = redactDeep(
+      {
+        blindSubjectId,
+        criteria,
+        homeCriteria,
+        versionMetadata,
+        coverageStats: {
+          collected: { total: input.evidence.length, bySource: collectedBySource },
+          note: input.evidence.length === 0 ? "no evidence collected for this run" : undefined,
+        },
+        manifest: input.evidence,
       },
-      manifest: input.evidence,
-    };
+      redact,
+    );
     const system = buildSystemPrompt(promptInput);
 
     const advocate = await this.runPhase({
@@ -146,7 +144,18 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
       }),
     });
 
-    const parsed = parseJudgmentOutput(synthesis.text, criteria);
+    let parsed: ReturnType<typeof parseJudgmentOutput>;
+    try {
+      parsed = parseJudgmentOutput(synthesis.text, criteria);
+    } catch (error) {
+      if (synthesis.stopReason) {
+        throw new Error(
+          `Judgment synthesis stopped early (${synthesis.stopReason}) and returned no parseable verdicts; failing the run rather than recording a partial judgment.`,
+          { cause: error },
+        );
+      }
+      throw error;
+    }
     const verdicts: EvaluationVerdict[] = parsed.verdicts;
 
     // Skeptic challenges the synthesis could not answer stay on the record:
@@ -291,24 +300,13 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
 
   // --- run inputs ------------------------------------------------------------
 
-  /** The full subject row carries the metadata the ref shape omits. */
-  private async subjectMetadata(subjectId: string): Promise<WorkEvaluationSubjectMetadata> {
-    const subject = await this.subjects.getSubject(subjectId);
-    const metadata = (subject.metadata ?? {}) as Partial<WorkEvaluationSubjectMetadata>;
-    if (typeof metadata.periodId !== "string" || typeof metadata.evaluateeUserId !== "string") {
-      throw new BadRequestException(
-        `Evaluation subject ${subjectId} is missing periodId/evaluateeUserId metadata (see work-evaluation README).`,
-      );
-    }
-    return metadata as WorkEvaluationSubjectMetadata;
-  }
-
   private async homeCriteria(evaluateeUserId: string, periodId: string): Promise<string[]> {
     try {
       const homeGround = await this.periods.getHomeGround(evaluateeUserId, periodId);
       return Array.isArray(homeGround.homeCriteria) ? (homeGround.homeCriteria as string[]) : [];
-    } catch {
-      return [];
+    } catch (error) {
+      if (error instanceof NotFoundException) return [];
+      throw error;
     }
   }
 }

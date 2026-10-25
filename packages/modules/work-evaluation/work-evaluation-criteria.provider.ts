@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
 import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
 import { CriteriaProvider, CriteriaSelection } from "@modules/evaluation/ports/criteria.provider";
 import { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
+import { readWorkEvaluationSubjectMetadata } from "./work-evaluation-subject";
 
 /**
  * WorkEvaluationCriteriaProvider — the CriteriaProvider for subject kind
@@ -21,14 +22,7 @@ export class WorkEvaluationCriteriaProvider implements CriteriaProvider {
   ) {}
 
   async selectVersion(subject: EvaluationSubjectRef): Promise<CriteriaSelection> {
-    // The ref shape carries no metadata; the full row is what has periodId.
-    const row = await this.subjects.getSubject(subject.id);
-    const metadata = (row.metadata ?? {}) as { periodId?: unknown };
-    if (typeof metadata.periodId !== "string" || metadata.periodId.length === 0) {
-      throw new BadRequestException(
-        `Evaluation subject ${subject.id} is missing periodId metadata (see work-evaluation README).`,
-      );
-    }
+    const metadata = await readWorkEvaluationSubjectMetadata(this.subjects, subject.id);
     const period = await this.periods.getPeriodById(metadata.periodId);
     const version = await this.criteria.getVersion(period.criteriaVersionId);
     return { family: version.family, version: version.version };

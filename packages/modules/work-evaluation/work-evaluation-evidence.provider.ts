@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
 import { EvidenceCollection, EvidenceProvider } from "@modules/evaluation/ports/evidence.provider";
@@ -10,12 +10,7 @@ import {
 
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 import { WorkEvaluationSessionStore } from "./work-evaluation-session.store";
-
-/** Subject metadata the host SubjectProvider attaches (README §subjectKey). */
-interface WorkEvaluationSubjectMetadata {
-  periodId: string;
-  evaluateeUserId: string;
-}
+import { readWorkEvaluationSubjectMetadata } from "./work-evaluation-subject";
 
 /**
  * WorkEvaluationEvidenceProvider — the EvidenceProvider for subject kind
@@ -27,6 +22,10 @@ interface WorkEvaluationSubjectMetadata {
  * `declaredUnlinked` instead of entering the manifest. Transcripts stay in
  * ClickHouse; the manifest carries index data only and the judgment port
  * drills in through its read-only tools (skeleton evidence-payload rule).
+ *
+ * The manifest is part of what the model sees under a blind subject id, so
+ * member-supplied paths (workspace rootPath, document refPath) never enter
+ * summaries, refs or payloads — ids and workspace keys only.
  */
 @Injectable()
 export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
@@ -40,7 +39,7 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
   ) {}
 
   async collect(subject: EvaluationSubjectRef): Promise<EvidenceCollection> {
-    const metadata = await this.subjectMetadata(subject.id);
+    const metadata = await readWorkEvaluationSubjectMetadata(this.subjects, subject.id);
     const period = await this.periods.getPeriodById(metadata.periodId);
     const window = { since: period.periodStart, until: period.periodEnd };
     const evaluateeUserId = metadata.evaluateeUserId;
@@ -55,8 +54,8 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
         where: { evaluateeUserId, capturedAt: { gte: window.since, lt: window.until } },
         orderBy: { capturedAt: "asc" },
         // The manifest needs index fields only; content stays in Postgres and
-        // is read back through the judgment drill tools.
-        select: { id: true, workspaceKey: true, title: true, refPath: true, capturedAt: true },
+        // is read back through the judgment drill tools by document id.
+        select: { id: true, workspaceKey: true, capturedAt: true },
       }),
       this.prisma.workEvaluationHomeGround.findUnique({
         where: { evaluateeUserId_collectionPeriodId: { evaluateeUserId, collectionPeriodId: period.id } },
@@ -75,9 +74,8 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
         id: `workspace:${workspace.id}`,
         layer: "declared",
         source: "workspace",
-        summary: `Workspace "${workspace.workspaceKey}" declared (${workspace.rootPath})`,
+        summary: `Workspace "${workspace.workspaceKey}" declared`,
         observedAt: workspace.reportedAt,
-        refs: [workspace.rootPath],
         payload: { workspaceKey: workspace.workspaceKey, installationId: workspace.installationId },
       });
     }
@@ -105,10 +103,9 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
         id: `document:${document.id}`,
         layer: "declared",
         source: "declared-document",
-        summary: document.title,
+        summary: `Document declared in workspace "${document.workspaceKey}"`,
         observedAt: document.capturedAt,
-        refs: [document.refPath],
-        payload: { documentId: document.id, workspaceKey: document.workspaceKey, refPath: document.refPath },
+        payload: { documentId: document.id, workspaceKey: document.workspaceKey },
       });
     }
     if (homeGround) {
@@ -131,45 +128,39 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
   }
 
   /**
-   * Cheapest availability check the session store offers: one message count
-   * per manifest session. A session whose transcript cannot be confirmed keeps
-   * its manifest entry (the index data is still valid) but is listed in
-   * `skipped`, so nothing is dropped silently (ADR-020 D5.2).
+   * Transcript availability probe: one aggregated ClickHouse query counts the
+   * messages of all manifest sessions. A session whose transcript is missing
+   * or empty keeps its manifest entry (the index data is still valid) but is
+   * listed in `skipped`, so nothing is dropped silently (ADR-020 D5.2). If the
+   * query itself fails, every session is reported skipped with the error.
    */
   private async probeTranscripts(sessions: { id: string }[]): Promise<EvaluationCoverageBucket> {
     if (sessions.length === 0) return { total: 0 };
-    const skippedIds: string[] = [];
-    let firstError: string | undefined;
-    await Promise.all(
-      sessions.map(async (session) => {
-        try {
-          await this.sessionStore.countMessages(session.id);
-        } catch (error) {
-          firstError ??= error instanceof Error ? error.message : String(error);
-          skippedIds.push(`session:${session.id}`);
-          this.logger.warn(`Transcript probe failed for session ${session.id}: ${firstError}`);
-        }
-      }),
-    );
-    if (skippedIds.length === 0) return { total: 0 };
-    skippedIds.sort();
-    return {
-      total: skippedIds.length,
-      bySource: { session: skippedIds.length },
-      note: `Transcript availability check failed in ClickHouse for ${skippedIds.length} session(s): ${firstError ?? "unknown error"}`,
-      items: skippedIds,
-    };
-  }
-
-  private async subjectMetadata(subjectId: string): Promise<WorkEvaluationSubjectMetadata> {
-    const subject = await this.subjects.getSubject(subjectId);
-    const metadata = (subject.metadata ?? {}) as Partial<WorkEvaluationSubjectMetadata>;
-    if (typeof metadata.periodId !== "string" || typeof metadata.evaluateeUserId !== "string") {
-      throw new BadRequestException(
-        `Evaluation subject ${subjectId} is missing periodId/evaluateeUserId metadata (see work-evaluation README).`,
-      );
+    let counts: Map<string, number>;
+    try {
+      counts = await this.sessionStore.countMessagesBySession(sessions.map((session) => session.id));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Transcript availability check failed in ClickHouse: ${message}`);
+      const items = sessions.map((session) => `session:${session.id}`).sort();
+      return {
+        total: items.length,
+        bySource: { session: items.length },
+        note: `Transcript availability check failed in ClickHouse for ${items.length} session(s): ${message}`,
+        items,
+      };
     }
-    return metadata as WorkEvaluationSubjectMetadata;
+    const missing = sessions
+      .filter((session) => !counts.get(session.id))
+      .map((session) => `session:${session.id}`)
+      .sort();
+    if (missing.length === 0) return { total: 0 };
+    return {
+      total: missing.length,
+      bySource: { session: missing.length },
+      note: `Transcript unavailable in ClickHouse for ${missing.length} session(s) (missing or empty)`,
+      items: missing,
+    };
   }
 }
 
