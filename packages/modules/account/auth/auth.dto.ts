@@ -107,11 +107,26 @@ export class LoginByPasswordResponseDto {
 }
 
 /**
- * Response DTO for Google OAuth redirect callback. A successful handshake
- * returns the platform access token, identical to password login; the refresh
- * token is delivered through an HttpOnly cookie.
+ * Request DTO for completing login by approving a new subnet — the token comes
+ * from the approval link sent to the account's email.
  */
-export class GoogleOAuthRedirectResponseDto extends LoginByPasswordResponseDto {}
+export class LoginByApprovedSubnetRequestDto {
+  @ApiProperty({ type: String })
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+}
+
+/**
+ * Request DTO for verifying the signup email — the token comes from the
+ * verification link sent to the address being confirmed.
+ */
+export class SignupEmailVerifyRequestDto {
+  @ApiProperty({ type: String })
+  @IsString()
+  @IsNotEmpty()
+  token!: string;
+}
 
 /**
  * Response DTO for sending verification code.
@@ -170,14 +185,17 @@ export class LogoutResponseDto {
 }
 
 export class TotpLoginDto {
+  @ApiProperty({ type: String, description: "Short-lived MFA challenge token from the initial login attempt." })
   @IsString()
   @IsNotEmpty()
   token!: string;
 
+  @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
   origin?: string;
 
+  @ApiProperty({ type: String, description: "The 6-digit authenticator code." })
   @IsString()
   @Length(6)
   @IsNotEmpty()

@@ -17,7 +17,7 @@ import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/
 import { TokenService } from "@modules/security/token/token.service";
 import { TokenSubject } from "@modules/security/token/token.constants";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
-import { LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
+import { LoginByApprovedSubnetRequestDto, LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "@modules/account/auth/login-audit";
 
@@ -36,13 +36,14 @@ export class LoginByApprovedSubnetController {
   @NoGuard()
   @ApiOperation({ summary: "Login by approving a new subnet via token" })
   @ApiResponse({ type: LoginByPasswordResponseDto })
-  async approveSubnet(
+  async loginByApproveSubnet(
     @Ip() ipAddress: string,
     @Headers("User-Agent") userAgent: string,
-    @Body("token") token: string,
+    @Body() body: LoginByApprovedSubnetRequestDto,
     @Res({ passthrough: true }) response: Response,
   ) {
     // [step 1] Verify token
+    const { token } = body;
     if (!token) throw new UnprocessableEntityException(NO_TOKEN_PROVIDED);
     let userId: string;
     try {

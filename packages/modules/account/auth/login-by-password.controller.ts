@@ -36,7 +36,7 @@ export class LoginByPasswordController {
   @ApiOperation({ summary: "Login with account and password" })
   @ApiResponse({ type: LoginByPasswordResponseDto })
   async loginByPassword(
-    @Body() body: LoginByPasswordRequestDto, // Is it required for guard?
+    @Body() body: LoginByPasswordRequestDto,
     @Ip() ipAddress: string,
     @Headers("User-Agent") userAgent: string,
     @Req() request: UserRequest,

@@ -5,7 +5,7 @@ import { Request, Response } from "express";
 import { GuardByGoogle } from "@modules/security/authentication/google-oauth/google.decorator";
 import { GoogleUserResDto } from "@modules/security/authentication/google-oauth/dto/google-user.dto";
 import { AuthService } from "@modules/account/auth/auth.service";
-import { GoogleOAuthRedirectResponseDto } from "@modules/account/auth/auth.dto";
+import { LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
 
 /**
  * Google OAuth login endpoints.
@@ -36,7 +36,7 @@ export class LoginByGoogleController {
   @GuardByGoogle()
   @Get("login-by-google/redirect")
   @ApiOperation({ summary: "Google OAuth redirect callback" })
-  @ApiResponse({ type: GoogleOAuthRedirectResponseDto })
+  @ApiResponse({ type: LoginByPasswordResponseDto })
   async googleOAuthredirect(
     @Req() request: Request & { user: GoogleUserResDto },
     @Res() response: Response,
