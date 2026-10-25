@@ -46,6 +46,11 @@ export interface StartEvaluationRunInput {
   /** Omit to let the feature's CriteriaProvider pick the applicable version. */
   criteriaVersionId?: string;
   requestedByRef?: string;
+  /**
+   * Opaque per-run feature config (ADR-023), stored on the row and threaded to
+   * the judgment port verbatim. Small knobs only — the skeleton never reads it.
+   */
+  config?: Record<string, unknown>;
 }
 
 export interface ListEvaluationRunsInput {
@@ -101,6 +106,7 @@ export class EvaluationRunService {
           subjectId: input.subjectId,
           criteriaVersionId,
           requestedByRef: input.requestedByRef,
+          config: input.config as Prisma.InputJsonValue | undefined,
           status: EvaluationRunStatus.QUEUED,
         },
       });

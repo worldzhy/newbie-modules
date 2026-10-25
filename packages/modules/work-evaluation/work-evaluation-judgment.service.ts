@@ -1,0 +1,333 @@
+import { randomUUID } from "node:crypto";
+import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+
+import { ChatMessage, ChatModelPort, ModelToolCall, ToolSpecification } from "@modules/llm/chat-model.port";
+import { ChatModelResolver } from "@modules/llm/chat-model.resolver";
+import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
+import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
+import { EvaluationCoverageBucket, EvaluationVerdict } from "@modules/evaluation/ports/evaluation.contracts";
+import { EvaluationJudgment, JudgmentInput, JudgmentPort } from "@modules/evaluation/ports/judgment.port";
+
+import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
+import {
+  DEFAULT_WORK_EVALUATION_PHASE_BUDGET,
+  DEFAULT_WORK_EVALUATION_SCOPE,
+  WORK_EVALUATION_MAX_TOOL_ROUNDS,
+  WORK_EVALUATION_PHASE_TIMEOUT_MS,
+  WORK_EVALUATION_PROMPT_VERSION,
+  WorkEvaluationPhaseBudget,
+  WorkEvaluationVersionPromptMetadata,
+  buildAdvocateInstruction,
+  buildSkepticInstruction,
+  buildSynthesisInstruction,
+  buildSystemPrompt,
+  parseJudgmentOutput,
+} from "./work-evaluation-judgment.prompt";
+import { WorkEvaluationJudgmentRunState, WorkEvaluationJudgmentTools } from "./work-evaluation-judgment.tools";
+
+type PhaseName = keyof WorkEvaluationPhaseBudget;
+type PhaseStopReason = "token-budget" | "time-limit" | "tool-round-limit";
+
+interface PhaseResult {
+  text: string;
+  stopReason?: PhaseStopReason;
+}
+
+/**
+ * Subject metadata this feature's SubjectProvider is expected to attach
+ * (README §subjectKey): the collection period that bounds the window, the
+ * evaluatee, and the identity tokens that keep the judgment blind.
+ */
+interface WorkEvaluationSubjectMetadata {
+  periodId: string;
+  evaluateeUserId: string;
+  identityTokens?: string[];
+}
+
+/**
+ * WorkEvaluationJudgmentService — the JudgmentPort for subject kind "work"
+ * (ADR-024). A bounded, read-only, three-phase agent: advocate finds support,
+ * skeptic attacks it and names evidence gaps, synthesis must answer every
+ * challenge on the record. The subject is presented under a blind id so
+ * persona and level cannot leak into the judgment.
+ *
+ * Only SCORED criteria are judged here — ASSERTION criteria produce findings,
+ * and this feature's first slice declares none.
+ */
+@Injectable()
+export class WorkEvaluationJudgmentService implements JudgmentPort {
+  private readonly logger = new Logger(WorkEvaluationJudgmentService.name);
+
+  constructor(
+    private readonly resolver: ChatModelResolver,
+    private readonly tools: WorkEvaluationJudgmentTools,
+    private readonly subjects: EvaluationSubjectService,
+    private readonly criteriaService: EvaluationCriteriaService,
+    private readonly periods: WorkEvaluationPeriodService,
+  ) {}
+
+  async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
+    const metadata = await this.subjectMetadata(input.subject.id);
+    const scope = readScopeOverride(input.runConfig) ?? DEFAULT_WORK_EVALUATION_SCOPE;
+    const port = await this.resolver.resolve(scope);
+
+    const version = await this.criteriaService.getVersion(input.criteriaVersion.id);
+    const versionMetadata = (version.metadata ?? {}) as WorkEvaluationVersionPromptMetadata;
+
+    // Only SCORED criteria produce verdicts; ASSERTION criteria belong to a
+    // finding pipeline this feature does not declare yet.
+    const criteria = input.criteria.filter((criterion) => criterion.kind === "SCORED");
+
+    const homeCriteria = await this.homeCriteria(metadata.evaluateeUserId, metadata.periodId);
+    const blindSubjectId = `subject-${randomUUID()}`;
+    const identityTokens = new Set<string>([...(metadata.identityTokens ?? []), input.subject.displayName]);
+    const state = this.tools.startRun(identityTokens);
+
+    const budget = { ...DEFAULT_WORK_EVALUATION_PHASE_BUDGET, ...readBudgetOverride(input.runConfig) };
+    const tokenUsage = { total: 0, byPhase: {} as Record<string, number> };
+    const specifications = this.tools.specifications();
+    // The skeleton hands the judgment only the collected items (the coverage
+    // buckets are composed after judging), so the prompt's coverage view is
+    // computed here from the manifest itself.
+    const collectedBySource: Record<string, number> = {};
+    for (const item of input.evidence) {
+      collectedBySource[item.source] = (collectedBySource[item.source] ?? 0) + 1;
+    }
+    const promptInput = {
+      blindSubjectId,
+      criteria,
+      homeCriteria,
+      versionMetadata,
+      coverageStats: {
+        collected: { total: input.evidence.length, bySource: collectedBySource },
+        note: input.evidence.length === 0 ? "no evidence collected for this run" : undefined,
+      },
+      manifest: input.evidence,
+    };
+    const system = buildSystemPrompt(promptInput);
+
+    const advocate = await this.runPhase({
+      state,
+      port,
+      phase: "advocate",
+      budgetTokens: budget.advocate,
+      context: { evaluateeUserId: metadata.evaluateeUserId, periodId: metadata.periodId, manifest: input.evidence },
+      specifications,
+      tokenUsage,
+      system,
+      instruction: buildAdvocateInstruction(),
+    });
+
+    const skeptic = await this.runPhase({
+      state,
+      port,
+      phase: "skeptic",
+      budgetTokens: budget.skeptic,
+      context: { evaluateeUserId: metadata.evaluateeUserId, periodId: metadata.periodId, manifest: input.evidence },
+      specifications,
+      tokenUsage,
+      system,
+      instruction: buildSkepticInstruction(advocate.text),
+    });
+
+    const synthesis = await this.runPhase({
+      state,
+      port,
+      phase: "synthesis",
+      budgetTokens: budget.synthesis,
+      context: { evaluateeUserId: metadata.evaluateeUserId, periodId: metadata.periodId, manifest: input.evidence },
+      specifications,
+      tokenUsage,
+      system,
+      instruction: buildSynthesisInstruction({
+        criteria,
+        advocateText: advocate.text,
+        skepticText: skeptic.text,
+      }),
+    });
+
+    const parsed = parseJudgmentOutput(synthesis.text, criteria);
+    const verdicts: EvaluationVerdict[] = parsed.verdicts;
+
+    // Skeptic challenges the synthesis could not answer stay on the record:
+    // they are appended to the summary rather than dropped (the skeleton
+    // result shape has no dedicated field for them).
+    const summary =
+      parsed.unresolved.length > 0
+        ? `${parsed.summary}\n\nUnresolved challenges:\n${parsed.unresolved
+            .map((item) => `- ${item.challenge} — ${item.response || "unanswered"}`)
+            .join("\n")}`
+        : parsed.summary;
+
+    // Every early stop is recorded as skipped work — a phase that ran out of
+    // budget, time or tool rounds must never look like it read everything.
+    const stopSkipped = (
+      [
+        { phase: "advocate" as PhaseName, stopReason: advocate.stopReason },
+        { phase: "skeptic" as PhaseName, stopReason: skeptic.stopReason },
+        { phase: "synthesis" as PhaseName, stopReason: synthesis.stopReason },
+      ] as { phase: PhaseName; stopReason?: PhaseStopReason }[]
+    ).filter((stop) => stop.stopReason);
+
+    const skippedItems = [
+      ...parsed.skipped.map((item) => item.what),
+      ...stopSkipped.map((stop) => `${stop.phase} drill-down`),
+    ];
+    const skippedReasons = [
+      ...parsed.skipped.map((item) => item.reason),
+      ...stopSkipped.map((stop) => `phase stopped early (${stop.stopReason})`),
+    ];
+    const skipped: EvaluationCoverageBucket | undefined =
+      skippedItems.length > 0
+        ? {
+            total: skippedItems.length,
+            note: skippedReasons.filter(Boolean).join("; ") || "not read",
+            items: skippedItems,
+          }
+        : undefined;
+
+    return {
+      verdicts,
+      findings: [],
+      evaluatedRefs: Array.from(new Set(verdicts.flatMap((verdict) => verdict.evidenceRefs))),
+      skipped,
+      summary,
+      metadata: {
+        model: port.modelId,
+        scope,
+        promptVersion: WORK_EVALUATION_PROMPT_VERSION,
+        tokenUsage,
+      },
+    };
+  }
+
+  // --- agent loop ----------------------------------------------------------
+
+  private async runPhase(input: {
+    state: WorkEvaluationJudgmentRunState;
+    port: ChatModelPort;
+    phase: PhaseName;
+    budgetTokens: number;
+    context: { evaluateeUserId: string; periodId: string; manifest: JudgmentInput["evidence"] };
+    specifications: ToolSpecification[];
+    tokenUsage: { total: number; byPhase: Record<string, number> };
+    system: string;
+    instruction: string;
+  }): Promise<PhaseResult> {
+    let spent = 0;
+    let rounds = 0;
+    const deadline = Date.now() + WORK_EVALUATION_PHASE_TIMEOUT_MS[input.phase];
+    const messages: ChatMessage[] = [
+      { role: "system", content: input.system },
+      { role: "user", content: input.instruction },
+    ];
+
+    for (;;) {
+      if (Date.now() >= deadline) {
+        this.logger.warn(
+          `Judgment phase ${input.phase} exceeded its ${WORK_EVALUATION_PHASE_TIMEOUT_MS[input.phase]}ms time limit.`,
+        );
+        return { text: "", stopReason: "time-limit" };
+      }
+
+      const result = await input.port.complete({
+        messages,
+        tools: input.specifications,
+        temperature: 0.1,
+      });
+      spent += result.usage?.totalTokens ?? 0;
+      input.tokenUsage.total += result.usage?.totalTokens ?? 0;
+      input.tokenUsage.byPhase[input.phase] = spent;
+
+      if (spent >= input.budgetTokens) {
+        this.logger.warn(`Judgment phase ${input.phase} exhausted its token budget (${spent}/${input.budgetTokens}).`);
+        return { text: result.text, stopReason: "token-budget" };
+      }
+
+      if (result.toolCalls.length === 0) {
+        return { text: result.text };
+      }
+
+      // A provider that omits usage can never trip the token budget; the round
+      // and wall-clock ceilings are what keep that case bounded.
+      if (rounds >= WORK_EVALUATION_MAX_TOOL_ROUNDS) {
+        this.logger.warn(
+          `Judgment phase ${input.phase} reached its ${WORK_EVALUATION_MAX_TOOL_ROUNDS}-round tool limit.`,
+        );
+        return { text: result.text, stopReason: "tool-round-limit" };
+      }
+      rounds++;
+
+      messages.push({ role: "assistant", content: result.text, toolCalls: result.toolCalls });
+      for (const call of result.toolCalls) {
+        messages.push(await this.executeTool(input.state, input.context, call));
+      }
+    }
+  }
+
+  private async executeTool(
+    state: WorkEvaluationJudgmentRunState,
+    context: { evaluateeUserId: string; periodId: string; manifest: JudgmentInput["evidence"] },
+    call: ModelToolCall,
+  ): Promise<ChatMessage> {
+    try {
+      const output = await this.tools.execute(state, context, call.name, call.arguments);
+      return {
+        role: "tool",
+        toolCallId: call.id,
+        toolName: call.name,
+        toolResult: JSON.stringify(output),
+      };
+    } catch (error) {
+      return {
+        role: "tool",
+        toolCallId: call.id,
+        toolName: call.name,
+        toolResult: error instanceof Error ? error.message : String(error),
+        toolError: true,
+      };
+    }
+  }
+
+  // --- run inputs ------------------------------------------------------------
+
+  /** The full subject row carries the metadata the ref shape omits. */
+  private async subjectMetadata(subjectId: string): Promise<WorkEvaluationSubjectMetadata> {
+    const subject = await this.subjects.getSubject(subjectId);
+    const metadata = (subject.metadata ?? {}) as Partial<WorkEvaluationSubjectMetadata>;
+    if (typeof metadata.periodId !== "string" || typeof metadata.evaluateeUserId !== "string") {
+      throw new BadRequestException(
+        `Evaluation subject ${subjectId} is missing periodId/evaluateeUserId metadata (see work-evaluation README).`,
+      );
+    }
+    return metadata as WorkEvaluationSubjectMetadata;
+  }
+
+  private async homeCriteria(evaluateeUserId: string, periodId: string): Promise<string[]> {
+    try {
+      const homeGround = await this.periods.getHomeGround(evaluateeUserId, periodId);
+      return Array.isArray(homeGround.homeCriteria) ? (homeGround.homeCriteria as string[]) : [];
+    } catch {
+      return [];
+    }
+  }
+}
+
+/** runConfig.modelScope picks the llm scope this run judges with (ADR-023). */
+function readScopeOverride(runConfig: Record<string, unknown> | null): string | undefined {
+  const scope = runConfig?.modelScope;
+  return typeof scope === "string" && scope.trim() ? scope : undefined;
+}
+
+/** runConfig.budget overrides per-phase token budgets (small knobs only). */
+function readBudgetOverride(runConfig: Record<string, unknown> | null): Partial<WorkEvaluationPhaseBudget> {
+  const budget = runConfig?.budget;
+  if (!budget || typeof budget !== "object") return {};
+  const record = budget as Record<string, unknown>;
+  const override: Partial<WorkEvaluationPhaseBudget> = {};
+  for (const phase of ["advocate", "skeptic", "synthesis"] as const) {
+    const value = Number(record[phase]);
+    if (Number.isFinite(value) && value > 0) override[phase] = value;
+  }
+  return override;
+}

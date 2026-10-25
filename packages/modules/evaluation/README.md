@@ -132,6 +132,15 @@ under invariant 4. A feature that implements the four ports inherits all of
 it and must not drive the run state machine through `EvaluationRunService`
 directly.
 
+A run may carry an opaque per-run `config` (ADR-023): the trigger passes it to
+`startRun`, it is stored on the run row and threaded to the judgment port as
+`JudgmentInput.runConfig`. The skeleton never reads a key from it — model
+selection, budget overrides and similar knobs are feature-defined. The
+judgment's `metadata` (which model, scope and prompt version actually ran) is
+persisted verbatim into `EvaluationResult.metadata`, so results of different
+runs stay comparable. Config holds small knobs only; large material follows
+the evidence-payload rule below.
+
 The result row is persisted before the run is closed, so a process crash in
 between leaves a run the reaper eventually fails while its result row already
 exists. A FAILED run with a result is a possible, self-consistent state and

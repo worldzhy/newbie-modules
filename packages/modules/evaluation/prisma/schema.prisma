@@ -164,6 +164,9 @@ model EvaluationRun {
   status EvaluationRunStatus @default(QUEUED)
   // Opaque host-side actor id; no foreign key by design
   requestedByRef String? @db.VarChar(128)
+  // Opaque per-run feature config, threaded to the judgment port verbatim
+  // (ADR-023). The skeleton never reads a key from it.
+  config Json? @db.JsonB
   // Failure reason when status = FAILED. Message only, never a stack trace.
   error String? @db.Text
 

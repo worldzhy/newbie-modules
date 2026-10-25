@@ -83,6 +83,7 @@ export class EvaluationRunnerService {
         criteriaVersion,
         criteria,
         evidence: evidence.items,
+        runConfig: (running.config as Record<string, unknown> | null) ?? null,
       });
 
       const coverage = composeCoverageStats({
@@ -100,6 +101,7 @@ export class EvaluationRunnerService {
         coverageStats: coverage.stats,
         verdicts: judgment.verdicts,
         summary: judgment.summary,
+        metadata: judgment.metadata,
       });
 
       await this.runs.assertActive(running.id, startedAt);

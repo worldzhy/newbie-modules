@@ -44,6 +44,7 @@ export default [
       "packages/modules/order/order.dto.ts",
       "packages/modules/people-evaluation/people-evaluation.dto.ts",
       "packages/modules/shortcut/shortcut-item.dto.ts",
+      "packages/modules/work-evaluation/work-evaluation.dto.ts",
     ],
     rules: {
       "@darraghor/nestjs-typed/all-properties-have-explicit-defined": "off",

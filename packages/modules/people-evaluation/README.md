@@ -1,5 +1,10 @@
 # newbie.people-evaluation
 
+> **Frozen (ADR-021, 2026-10-26).** This module is superseded by
+> [`work-evaluation`](../work-evaluation/README.md), the first feature module on the
+> generic `evaluation` skeleton (ADR-020). No new development happens here; the
+> package is kept only as the historical record of the people-specific design.
+
 Evidence-driven performance evaluation: rubric and period administration, evidence
 ingest, archived evaluation results and PIP plans. The design source is devbie
 ADR-030 (vocabulary), devbie ADR-032 (result-centric evidence) and the host-level

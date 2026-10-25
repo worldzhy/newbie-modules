@@ -23,6 +23,12 @@ export interface JudgmentInput {
   criteriaVersion: EvaluationCriteriaVersionRef;
   criteria: EvaluationCriterionRef[];
   evidence: EvaluationEvidenceItem[];
+  /**
+   * Opaque per-run config the trigger passed (ADR-023) — e.g. which model to
+   * judge with. Null when the run was opened without one; the port decides
+   * what each key means.
+   */
+  runConfig: Record<string, unknown> | null;
 }
 
 export interface EvaluationJudgment {
@@ -35,6 +41,12 @@ export interface EvaluationJudgment {
   /** Material a judgment budget cut off; merged into the run's skipped bucket. */
   skipped?: EvaluationCoverageBucket;
   summary?: string;
+  /**
+   * Execution facts of this judgment (ADR-023 D2) — the model, scope and
+   * prompt version actually used — persisted verbatim into
+   * `EvaluationResult.metadata` so runs stay comparable.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 export interface JudgmentPort {
