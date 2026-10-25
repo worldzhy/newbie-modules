@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import dayjs from "dayjs";
 import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
 import { WebMonitorClickHouseService } from "../../models/clickhouse/web-monitor-clickhouse.service";
@@ -22,7 +22,7 @@ export class RemoveService {
   async customDelete(fil: CustomDeleteFilter) {
     const { appId, type = "", resource = [], time = [] } = fil;
     if (!time.length) {
-      throw new Error("A time must be selected");
+      throw new BadRequestException("A time must be selected");
     }
 
     const startTime = dayjs(new Date(time[0]).valueOf()).format("YYYY-MM-DD 00:00:00");

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Post, Body, Query } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { SiteService } from "./site.service";
 import { func } from "../../shared/utils";
@@ -57,8 +57,8 @@ export class SiteController {
   async deleteWebSiteUser(@Body() body: Record<string, unknown>) {
     const appId = body.appId;
     const userToken = body.userToken;
-    if (!appId) throw new Error("Delete a user from the system: appId must not be empty");
-    if (!userToken) throw new Error("Delete a user from the system: user token must not be empty");
+    if (!appId) throw new BadRequestException("Delete a user from the system: appId must not be empty");
+    if (!userToken) throw new BadRequestException("Delete a user from the system: user token must not be empty");
     const result = await this.site.deleteWebSiteUser(String(appId), String(userToken));
     return func.result({ data: result });
   }
@@ -69,8 +69,8 @@ export class SiteController {
   async addWebSiteUser(@Body() body: Record<string, unknown>) {
     const appId = body.appId;
     const userToken = body.userToken;
-    if (!appId) throw new Error("Add a user to the system: appId must not be empty");
-    if (!userToken) throw new Error("Add a user to the system: user token must not be empty");
+    if (!appId) throw new BadRequestException("Add a user to the system: appId must not be empty");
+    if (!userToken) throw new BadRequestException("Add a user to the system: user token must not be empty");
     const result = await this.site.addWebSiteUser(String(appId), String(userToken));
     return func.result({ data: result });
   }
@@ -81,7 +81,7 @@ export class SiteController {
   async deleteSite(@Body() body: Record<string, unknown>) {
     const appId = body.appId;
     const type = body.type;
-    if (!appId) throw new Error("Delete a system: appId must not be empty");
+    if (!appId) throw new BadRequestException("Delete a system: appId must not be empty");
     const result = await this.site.deleteSite(String(appId), String(type));
     return func.result({ data: result });
   }

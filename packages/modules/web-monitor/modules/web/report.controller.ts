@@ -46,10 +46,17 @@ export class WebReportController {
     @Headers() headers: Record<string, string | undefined>,
     @Body() body: Record<string, unknown> | string,
   ) {
-    let query: Record<string, unknown> = typeof body === "string" ? JSON.parse(body) : body;
-
-    if (req.headers["content-type"] && req.headers["content-type"].includes("text/plain")) {
-      query = JSON.parse(body as string);
+    let query: Record<string, unknown>;
+    try {
+      query = typeof body === "string" ? JSON.parse(body) : body;
+      if (req.headers["content-type"] && req.headers["content-type"].includes("text/plain")) {
+        query = JSON.parse(body as string);
+      }
+    } catch {
+      throw new BadRequestException("Invalid report payload");
+    }
+    if (!query || typeof query !== "object") {
+      throw new BadRequestException("Invalid report payload");
     }
 
     const { installationId, appKey } = req.installation;
