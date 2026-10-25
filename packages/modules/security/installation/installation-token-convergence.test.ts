@@ -9,8 +9,14 @@ import { describe, it } from "node:test";
  * The 2026-10 audit found the sixth collector had copied the token mechanism
  * again, drifting on revocation semantics and audit coverage. Sharing the
  * primitives is only durable if a new collector cannot quietly mint its own
- * token: this scan fails as soon as a collector reintroduces token generation,
- * token hashing or a local UUID token regex.
+ * token: this scan rejects the known spellings of the mechanism — `randomUUID(`,
+ * `createHash("sha256")`, a `\d{8}-…` or `[0-9a-f]{8}-…` UUID regex literal, and
+ * any `tokenHash:` column written without importing the shared primitives.
+ *
+ * The scan is a convention guard, not a proof: a collector minting tokens with
+ * `randomBytes`/HMAC and storing them under a differently named column would
+ * slip through. Keep the credential column named `tokenHash` and review new
+ * collectors for that pattern.
  *
  * Adding a collector does NOT require editing this file — the scan walks every
  * collector directory that is present, so a new module is covered on assembly.
@@ -43,7 +49,7 @@ function listTypeScriptFiles(directory: string): string[] {
 }
 
 /** Guards one collector source file against re-implementing the mechanism. */
-export function assertCollectorSource(source: string, file: string): void {
+function assertCollectorSource(source: string, file: string): void {
   assert.doesNotMatch(
     source,
     TOKEN_GENERATION_PATTERN,
@@ -76,7 +82,7 @@ describe("installation credential convergence (ADR-019)", () => {
   for (const moduleKey of COLLECTOR_MODULES) {
     const moduleDir = join(MODULES_DIR, moduleKey);
 
-    it(`${moduleKey}: no self-generated installation tokens`, () => {
+    it(`${moduleKey}: no self-implemented token mechanism`, () => {
       // A consumer may not assemble every collector; absence is not a failure.
       if (!existsSync(moduleDir)) return;
 
