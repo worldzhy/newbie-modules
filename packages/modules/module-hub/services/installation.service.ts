@@ -309,7 +309,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
       resourceType: AUDIT_RESOURCE_TYPE,
       resourceId: id,
       actorType: "host",
-      actorId: actor ?? "unknown",
+      actorId: actor ?? null,
       detail: { spec },
     });
     return { id, targetSpec: spec };
