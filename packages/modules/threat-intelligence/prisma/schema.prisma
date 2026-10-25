@@ -7,10 +7,6 @@
 // A single piece of external threat intelligence, deduplicated by
 // (source, externalId). One row per unique intel item; re-fetching the
 // same item updates rawPayload / fetchedAt and bumps lastSeenAt.
-//
-// Project matching is intentionally NOT modelled here: this module is the
-// platform-level collection layer only. A host that wants to relate items
-// to its own projects owns that table and that logic.
 model ThreatIntelligenceItem {
   id          String   @id @default(uuid()) @db.Uuid
   source      String   @db.VarChar(50)
@@ -36,5 +32,36 @@ model ThreatIntelligenceItem {
   @@index([category])
   @@index([severity])
   @@index([publishedAt])
+  @@schema("module/threat-intelligence")
+}
+
+// A relevance verdict linking one intel item to one matchable scope
+// (ADR-018). scopeType/scopeId are generic scope coordinates stored without
+// foreign keys — the module never names host concepts. itemId deliberately
+// has no FK to ThreatIntelligenceItem either: retention pruning must not be
+// blocked by match history, so consumers tolerate dangling references.
+model ThreatIntelligenceMatch {
+  id            String    @id @default(uuid()) @db.Uuid
+  itemId        String    @db.Uuid
+  scopeType     String    @db.VarChar(50)
+  scopeId       String    @db.VarChar(64)
+  matchType     String    @db.VarChar(20)
+  // Normalized matched entity label. Empty string when no specific entity
+  // was named (e.g. vendor-level match). NOT NULL so the
+  // (scopeType, scopeId, itemId, matchedEntity) unique constraint is
+  // enforceable.
+  matchedEntity String    @default("") @db.VarChar(512)
+  evidence      String?   @db.Text
+  confidence    String    @default("medium") @db.VarChar(15)
+  status        String    @default("open") @db.VarChar(20)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  resolvedAt    DateTime?
+
+  @@unique([scopeType, scopeId, itemId, matchedEntity])
+  @@index([itemId])
+  @@index([status])
+  @@index([scopeType, scopeId, status])
+  @@index([scopeType, scopeId, confidence])
   @@schema("module/threat-intelligence")
 }

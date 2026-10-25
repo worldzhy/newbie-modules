@@ -1,6 +1,9 @@
 import { Global, Module } from "@nestjs/common";
 import { ThreatIntelligenceController } from "./threat-intelligence.controller";
 import { ThreatIntelligenceService } from "./threat-intelligence.service";
+import { ThreatIntelligenceMatchController } from "./matching/threat-intelligence-match.controller";
+import { ThreatIntelligenceMatchService } from "./matching/threat-intelligence-match.service";
+import { ThreatIntelligenceReRanker } from "./matching/threat-intelligence-re-ranker";
 import { THREAT_INTELLIGENCE_SOURCE_ADAPTERS } from "./adapters/source-adapter.port";
 import { AwsSecurityBulletinsAdapter } from "./adapters/aws-security-bulletins.adapter";
 import { BleepingComputerAdapter } from "./adapters/bleeping-computer.adapter";
@@ -11,15 +14,18 @@ import { GitHubSecurityBlogAdapter } from "./adapters/github-security-blog.adapt
 import { TheHackerNewsAdapter } from "./adapters/the-hacker-news.adapter";
 
 /**
- * External threat intelligence module (ADR-031).
+ * External threat intelligence module (ADR-018).
  *
- * Platform-level collection layer: gathers intel from registered source
- * adapters, deduplicates by (source, externalId), stores it, and exposes
- * read APIs plus the retention cleanup.
+ * Delivers the full collect + organize capability: source adapters gather
+ * intel, items are deduplicated by (source, externalId), and the matching
+ * pipeline (hard entity recall + LLM structured re-rank, B3 protocol)
+ * relates items to matchable scopes via the host-bound
+ * ScopeEntitiesProvider port (matching/scope-entities.port.ts).
  *
- * This module knows nothing about projects. Whether and how a host matches
- * items against its projects is a host concern (nightwatch-backend keeps
- * that layer in src/application/project/security).
+ * The module never names host scope concepts: matches store generic
+ * (scopeType, scopeId) coordinates without foreign keys. Notification
+ * templates, digests, and scheduling remain host concerns — the module only
+ * emits "threat-intelligence.match-created" domain events.
  *
  * Adapters are gathered into an array via a factory provider and injected
  * on the THREAT_INTELLIGENCE_SOURCE_ADAPTERS token. Adding a new source =
@@ -28,9 +34,11 @@ import { TheHackerNewsAdapter } from "./adapters/the-hacker-news.adapter";
  */
 @Global()
 @Module({
-  controllers: [ThreatIntelligenceController],
+  controllers: [ThreatIntelligenceController, ThreatIntelligenceMatchController],
   providers: [
     ThreatIntelligenceService,
+    ThreatIntelligenceMatchService,
+    ThreatIntelligenceReRanker,
     GitHubSecurityAdvisoryAdapter,
     CisaKevAdapter,
     AwsSecurityBulletinsAdapter,
@@ -60,6 +68,6 @@ import { TheHackerNewsAdapter } from "./adapters/the-hacker-news.adapter";
       ],
     },
   ],
-  exports: [ThreatIntelligenceService],
+  exports: [ThreatIntelligenceService, ThreatIntelligenceMatchService],
 })
 export class ThreatIntelligenceModule {}
