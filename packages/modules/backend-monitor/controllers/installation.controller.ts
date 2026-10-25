@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { UserRequest } from "@modules/security/security.interface";
 
 import { CreateMonitorInstallationDto, ListMonitorInstallationsQueryDto } from "../monitor-installation.dto";
 import { MonitorInstallationService } from "../services/monitor-installation.service";
@@ -22,8 +23,8 @@ export class InstallationController {
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Enroll a backend-monitor deployment installation" })
   @ApiCreatedResponse()
-  create(@Body() body: CreateMonitorInstallationDto) {
-    return this.installations.create(body);
+  create(@Body() body: CreateMonitorInstallationDto, @Req() request: UserRequest) {
+    return this.installations.create(body, request.user.userId);
   }
 
   @Get()
@@ -46,15 +47,15 @@ export class InstallationController {
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Rotate the report token (plaintext returned once)" })
   @ApiOkResponse()
-  regenerate(@Param("id") id: string) {
-    return this.installations.regenerateToken(id);
+  regenerate(@Param("id") id: string, @Req() request: UserRequest) {
+    return this.installations.regenerateToken(id, request.user.userId);
   }
 
   @Delete(":id")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.BackendMonitorInstallation)
   @ApiOperation({ summary: "Revoke an installation; subsequent ingest gets 401" })
   @ApiOkResponse()
-  revoke(@Param("id") id: string) {
-    return this.installations.revoke(id);
+  revoke(@Param("id") id: string, @Req() request: UserRequest) {
+    return this.installations.revoke(id, request.user.userId);
   }
 }

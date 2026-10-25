@@ -6,7 +6,7 @@
     "className": "PeopleEvaluationModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["account"],
+  "moduleDependencies": ["account", "audit", "security", "llm", "clickhouse"],
   "config-service": {},
   "env": {},
   "dependencies": {}

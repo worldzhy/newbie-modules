@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { assertPublicHttpUrl } from "./public-url";
@@ -39,7 +39,7 @@ const STATS_BUCKET_EXPRESSION: Record<StatsWindow, string> = {
 export class UrlCheckService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly clickhouse: ClickhouseService,
+    private readonly clickhouse: ClickHouseService,
   ) {}
 
   list(projectId: string) {

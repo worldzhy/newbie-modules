@@ -1,8 +1,9 @@
-import { Body, Controller, Delete, Get, Param, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { UserRequest } from "@modules/security/security.interface";
 
 import { CreateHeartbeatInstallationDto, ListHeartbeatInstallationsQueryDto } from "../heartbeat.dto";
 import { HeartbeatInstallationService } from "../services/installation.service";
@@ -20,8 +21,8 @@ export class InstallationController {
   @Post("installations")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.HeartbeatInstallation)
   @ApiCreatedResponse()
-  async create(@Body() body: CreateHeartbeatInstallationDto) {
-    return this.installations.create(body);
+  async create(@Body() body: CreateHeartbeatInstallationDto, @Req() request: UserRequest) {
+    return this.installations.create(body, request.user.userId);
   }
 
   @Get("installations")
@@ -41,14 +42,14 @@ export class InstallationController {
   @Post("installations/:id/token/regenerate")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.HeartbeatInstallation)
   @ApiOkResponse()
-  async regenerateToken(@Param() params: CommonGetByStringIdRequestDto) {
-    return this.installations.regenerateToken(params.id);
+  async regenerateToken(@Param() params: CommonGetByStringIdRequestDto, @Req() request: UserRequest) {
+    return this.installations.regenerateToken(params.id, request.user.userId);
   }
 
   @Delete("installations/:id")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.HeartbeatInstallation)
   @ApiOkResponse()
-  async revoke(@Param() params: CommonGetByStringIdRequestDto) {
-    return this.installations.revoke(params.id);
+  async revoke(@Param() params: CommonGetByStringIdRequestDto, @Req() request: UserRequest) {
+    return this.installations.revoke(params.id, request.user.userId);
   }
 }

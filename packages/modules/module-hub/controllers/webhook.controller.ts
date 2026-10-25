@@ -44,7 +44,7 @@ export class WebhookController {
     const secret = this.config.get<string>("MODULE_HUB_GITHUB_WEBHOOK_SECRET");
     if (!secret) {
       throw new ServiceUnavailableException(
-        "Registry webhook is not configured (MODULE_HUB_GITHUB_WEBHOOK_SECRET missing); use the fallback sync instead.",
+        "Registry webhook is not configured (MODULE_HUB_GITHUB_WEBHOOK_SECRET missing); use POST /module-hub/catalog/sync instead.",
       );
     }
     if (event !== "push") {

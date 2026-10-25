@@ -8,14 +8,15 @@ import {
   WebMonitorWebTopDatasResponseDto,
 } from "./analysis.dto";
 import { WebMonitorEnvironmentResponseDto } from "./environment.dto";
-import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { PermissionAction } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 @ApiTags("Frontend Monitor / Web / Analysis")
-@RequireOwner()
 @Controller("/web-monitor/analysis")
 export class WebMonitorAnalysisController {
   constructor(private readonly analysisService: WebMonitorAnalysisService) {}
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getAnalysislist")
   @ApiOperation({ summary: "Get user funnel analysis list" })
   @ApiResponse({ type: ListWebMonitorAnalysisUsersResponseDto })
@@ -31,6 +32,7 @@ export class WebMonitorAnalysisController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getAnalysisOneList")
   @ApiOperation({ summary: "Get single user behavior track list" })
   @ApiResponse({ type: WebMonitorEnvironmentResponseDto, isArray: true })
@@ -42,6 +44,7 @@ export class WebMonitorAnalysisController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getTopDatas")
   @ApiOperation({ summary: "Get top data statistics" })
   @ApiResponse({ type: WebMonitorWebTopDatasResponseDto })
@@ -56,6 +59,7 @@ export class WebMonitorAnalysisController {
     return func.result({ data });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getProvinceCount")
   @ApiOperation({ summary: "Get province count statistics" })
   @ApiResponse({ type: WebMonitorProvinceCountResponseDto })

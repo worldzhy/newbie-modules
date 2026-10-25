@@ -377,4 +377,206 @@ export class GitHubService {
       if (octokitStatus(e) !== 404) throw e;
     }
   }
+
+  // --- Read-only evidence surface (people-evaluation, ADR-029) ------------
+
+  /**
+   * Every repository the current installation can read. This is the
+   * organization-level read scope: evidence collection never relies on a
+   * local checkout or on a per-repository allowlist.
+   */
+  async listAccessibleRepositories(): Promise<
+    { owner: string; repo: string; fullName: string; isPrivate: boolean; pushedAt: Date | null }[]
+  > {
+    const result: {
+      owner: string;
+      repo: string;
+      fullName: string;
+      isPrivate: boolean;
+      pushedAt: Date | null;
+    }[] = [];
+    for (let page = 1; page <= MAX_EVIDENCE_PAGES; page++) {
+      const { data } = await this.client().apps.listReposAccessibleToInstallation({ per_page: 100, page });
+      for (const repository of data.repositories) {
+        result.push({
+          owner: repository.owner.login,
+          repo: repository.name,
+          fullName: repository.full_name,
+          isPrivate: repository.private,
+          pushedAt: repository.pushed_at ? new Date(repository.pushed_at) : null,
+        });
+      }
+      if (data.repositories.length < 100) break;
+    }
+    return result;
+  }
+
+  /**
+   * Commit metadata for one repository inside a time window. Attribution
+   * carries both the platform account id (primary key for member mapping)
+   * and the author email (fallback only).
+   */
+  async listCommits(
+    owner: string,
+    repo: string,
+    window: { since: Date; until: Date },
+  ): Promise<GitHubCommitEvidence[]> {
+    const commits: GitHubCommitEvidence[] = [];
+    for (let page = 1; page <= MAX_EVIDENCE_PAGES; page++) {
+      const { data } = await this.client().repos.listCommits({
+        owner,
+        repo,
+        since: window.since.toISOString(),
+        until: window.until.toISOString(),
+        per_page: 100,
+        page,
+      });
+      for (const item of data) {
+        commits.push({
+          sha: item.sha,
+          repoFullName: `${owner}/${repo}`,
+          subject: item.commit.message.split("\n")[0],
+          authoredAt: new Date(item.commit.author?.date ?? item.commit.committer?.date ?? Date.now()),
+          authorAccountId: item.author ? String(item.author.id) : null,
+          authorLogin: item.author?.login ?? null,
+          authorEmail: item.commit.author?.email ?? null,
+          authorName: item.commit.author?.name ?? null,
+        });
+      }
+      if (data.length < 100) break;
+    }
+    return commits;
+  }
+
+  /** Full commit detail including per-file patches — fetched on demand. */
+  async getCommitDetail(owner: string, repo: string, sha: string): Promise<GitHubCommitDetail> {
+    const { data } = await this.client().repos.getCommit({ owner, repo, ref: sha });
+    return {
+      sha: data.sha,
+      message: data.commit.message,
+      additions: data.stats?.additions ?? 0,
+      deletions: data.stats?.deletions ?? 0,
+      filesChanged: data.files?.length ?? 0,
+      files: (data.files ?? []).map((file) => ({
+        filename: file.filename,
+        status: file.status,
+        additions: file.additions,
+        deletions: file.deletions,
+        patch: file.patch ?? "",
+      })),
+    };
+  }
+
+  /** Pull requests updated inside the window (state "all"). */
+  async listPullRequests(
+    owner: string,
+    repo: string,
+    window: { since: Date; until: Date },
+  ): Promise<GitHubPullRequestEvidence[]> {
+    const pullRequests: GitHubPullRequestEvidence[] = [];
+    for (let page = 1; page <= MAX_EVIDENCE_PAGES; page++) {
+      const { data } = await this.client().pulls.list({
+        owner,
+        repo,
+        state: "all",
+        sort: "updated",
+        direction: "desc",
+        per_page: 100,
+        page,
+      });
+      let reachedWindowStart = false;
+      for (const item of data) {
+        const updatedAt = new Date(item.updated_at);
+        if (updatedAt < window.since) {
+          reachedWindowStart = true;
+          break;
+        }
+        if (updatedAt >= window.until) continue;
+        pullRequests.push({
+          number: item.number,
+          repoFullName: `${owner}/${repo}`,
+          title: item.title,
+          state: item.state,
+          createdAt: new Date(item.created_at),
+          updatedAt,
+          mergedAt: item.merged_at ? new Date(item.merged_at) : null,
+          authorAccountId: item.user ? String(item.user.id) : null,
+          authorLogin: item.user?.login ?? null,
+        });
+      }
+      if (reachedWindowStart || data.length < 100) break;
+    }
+    return pullRequests;
+  }
+
+  /** Review activity on one pull request, including the reviewer identity. */
+  async listPullRequestReviews(owner: string, repo: string, pullNumber: number): Promise<GitHubReviewEvidence[]> {
+    const reviews: GitHubReviewEvidence[] = [];
+    for (let page = 1; page <= MAX_EVIDENCE_PAGES; page++) {
+      const { data } = await this.client().pulls.listReviews({
+        owner,
+        repo,
+        pull_number: pullNumber,
+        per_page: 100,
+        page,
+      });
+      for (const review of data) {
+        if (!review.submitted_at) continue;
+        reviews.push({
+          pullNumber,
+          repoFullName: `${owner}/${repo}`,
+          state: review.state,
+          submittedAt: new Date(review.submitted_at),
+          authorAccountId: review.user ? String(review.user.id) : null,
+          authorLogin: review.user?.login ?? null,
+        });
+      }
+      if (data.length < 100) break;
+    }
+    return reviews;
+  }
+}
+
+/** Page fence for evidence reads — a runaway installation never scans forever. */
+const MAX_EVIDENCE_PAGES = 50;
+
+export interface GitHubCommitEvidence {
+  sha: string;
+  repoFullName: string;
+  subject: string;
+  authoredAt: Date;
+  authorAccountId: string | null;
+  authorLogin: string | null;
+  authorEmail: string | null;
+  authorName: string | null;
+}
+
+export interface GitHubCommitDetail {
+  sha: string;
+  message: string;
+  additions: number;
+  deletions: number;
+  filesChanged: number;
+  files: { filename: string; status: string; additions: number; deletions: number; patch: string }[];
+}
+
+export interface GitHubPullRequestEvidence {
+  number: number;
+  repoFullName: string;
+  title: string;
+  state: string;
+  createdAt: Date;
+  updatedAt: Date;
+  mergedAt: Date | null;
+  authorAccountId: string | null;
+  authorLogin: string | null;
+}
+
+export interface GitHubReviewEvidence {
+  pullNumber: number;
+  repoFullName: string;
+  state: string;
+  submittedAt: Date;
+  authorAccountId: string | null;
+  authorLogin: string | null;
 }

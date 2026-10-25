@@ -14,6 +14,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
 /**
  * Maximum number of events accepted per array in a single ingest batch.
@@ -230,26 +231,11 @@ export class CreateBackendMonitorIngestDto {
 }
 
 /** Query parameters for listing backend request logs. */
-export class ListBackendMonitorRequestLogsRequestDto {
+export class ListBackendMonitorRequestLogsRequestDto extends CommonListRequestDto {
   @ApiProperty({ type: String, description: "Application ID (UUID)" })
   @IsNotEmpty()
   @IsUUID()
   applicationId!: string;
-
-  @ApiPropertyOptional({ type: Number, description: "Page number, starts from 0" })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Type(() => Number)
-  page?: number;
-
-  @ApiPropertyOptional({ type: Number, description: "Items per page, capped at 100" })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  @Type(() => Number)
-  pageSize?: number;
 
   @ApiPropertyOptional({ type: String, description: "Search by path keyword" })
   @IsOptional()
@@ -272,26 +258,11 @@ export class ListBackendMonitorRequestLogsRequestDto {
 }
 
 /** Query parameters for listing backend error logs. */
-export class ListBackendMonitorErrorLogsRequestDto {
+export class ListBackendMonitorErrorLogsRequestDto extends CommonListRequestDto {
   @ApiProperty({ type: String, description: "Application ID (UUID)" })
   @IsNotEmpty()
   @IsUUID()
   applicationId!: string;
-
-  @ApiPropertyOptional({ type: Number, description: "Page number, starts from 0" })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Type(() => Number)
-  page?: number;
-
-  @ApiPropertyOptional({ type: Number, description: "Items per page, capped at 100" })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  @Type(() => Number)
-  pageSize?: number;
 
   @ApiPropertyOptional({
     type: String,
@@ -388,18 +359,6 @@ export class BackendMonitorErrorLogResponseDto {
   ingested_at!: string;
 }
 
-export class ListBackendMonitorRequestLogsResponseDto {
-  @ApiProperty({ type: BackendMonitorRequestLogResponseDto, isArray: true })
-  records!: BackendMonitorRequestLogResponseDto[];
+export class ListBackendMonitorRequestLogsResponseDto extends CommonListResponseDto<BackendMonitorRequestLogResponseDto> {}
 
-  @ApiProperty({ type: Number })
-  total!: number;
-}
-
-export class ListBackendMonitorErrorLogsResponseDto {
-  @ApiProperty({ type: BackendMonitorErrorLogResponseDto, isArray: true })
-  records!: BackendMonitorErrorLogResponseDto[];
-
-  @ApiProperty({ type: Number })
-  total!: number;
-}
+export class ListBackendMonitorErrorLogsResponseDto extends CommonListResponseDto<BackendMonitorErrorLogResponseDto> {}

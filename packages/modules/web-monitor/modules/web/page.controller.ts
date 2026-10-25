@@ -8,14 +8,15 @@ import {
   ListWebMonitorPageVisitsResponseDto,
   WebMonitorRealTimePageItemResponseDto,
 } from "./page.dto";
-import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { PermissionAction } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 @ApiTags("Frontend Monitor / Web / Pages")
-@RequireOwner()
 @Controller("/web-monitor/pages")
 export class PageController {
   constructor(private readonly pageSrv: PageService) {}
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getAveragePageList")
   @ApiOperation({ summary: "Get average page performance list" })
   @ApiResponse({ type: ListWebMonitorPageAveragesResponseDto })
@@ -26,6 +27,7 @@ export class PageController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getRealTimeAveragePageList")
   @ApiOperation({ summary: "Get real-time average page performance list" })
   @ApiResponse({ type: WebMonitorRealTimePageItemResponseDto, isArray: true })
@@ -43,6 +45,7 @@ export class PageController {
     return func.result({ data });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getOnePageList")
   @ApiOperation({ summary: "Get single page performance or visit list" })
   @ApiResponse({ type: ListWebMonitorPageVisitsResponseDto })
@@ -54,6 +57,7 @@ export class PageController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getPageDetails")
   @ApiOperation({ summary: "Get single page details" })
   @ApiResponse({ type: WebMonitorPageDetailResponseDto })

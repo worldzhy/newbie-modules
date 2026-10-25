@@ -73,7 +73,7 @@ export class ListRolesResponseDto extends CommonListResponseDto {
 }
 
 /**
- * Response DTO for a role with its permission rules.
+ * Response DTO for a role with its permissions.
  */
 export class RoleDetailResponseDto extends RoleResponseDto {
   @ApiProperty({ type: PermissionResponseDto, isArray: true })

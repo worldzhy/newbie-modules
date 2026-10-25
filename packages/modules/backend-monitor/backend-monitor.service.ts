@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, PayloadTooLargeException } from "@nestjs/common";
-import { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { computeErrorFingerprint } from "./error-fingerprint.util";
 import { MonitorTokenResolver, ResolvedMonitorToken } from "./monitor-token.resolver";
 import {
@@ -70,7 +70,7 @@ function toClickHouseDate(date: Date): string {
 @Injectable()
 export class BackendMonitorService {
   constructor(
-    private readonly clickhouse: ClickhouseService,
+    private readonly clickhouse: ClickHouseService,
     private readonly monitorTokenResolver: MonitorTokenResolver,
   ) {}
 
@@ -210,14 +210,14 @@ export class BackendMonitorService {
   }
 
   /** Queries paginated request logs. All values are bound as query parameters. */
-  async listRequestLogs(
-    query: ListBackendMonitorRequestLogsRequestDto,
-  ): Promise<{ records: RequestLogRow[]; total: number }> {
+  async listRequestLogs(query: ListBackendMonitorRequestLogsRequestDto): Promise<{
+    records: RequestLogRow[];
+    pagination: { page: number; pageSize: number; countOfCurrentPage: number; countOfTotal: number };
+  }> {
     const safeField = ALLOWED_REQUEST_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "request_at";
     const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
     const keyword = query.keyword ? `%${query.keyword}%` : "%";
-    const page = query.page ?? 0;
-    const pageSize = query.pageSize ?? 20;
+    const { page = 0, pageSize = 20 } = query;
 
     const countResult = await this.clickhouse.query({
       query: `
@@ -259,18 +259,21 @@ export class BackendMonitorService {
     });
     const records = (await dataResult.json()) as RequestLogRow[];
 
-    return { records, total };
+    return {
+      records,
+      pagination: { page, pageSize, countOfCurrentPage: records.length, countOfTotal: total },
+    };
   }
 
   /** Queries paginated error logs. All values are bound as query parameters. */
-  async listErrorLogs(
-    query: ListBackendMonitorErrorLogsRequestDto,
-  ): Promise<{ records: ErrorLogRow[]; total: number }> {
+  async listErrorLogs(query: ListBackendMonitorErrorLogsRequestDto): Promise<{
+    records: ErrorLogRow[];
+    pagination: { page: number; pageSize: number; countOfCurrentPage: number; countOfTotal: number };
+  }> {
     const safeField = ALLOWED_ERROR_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "occurred_at";
     const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
     const keyword = query.keyword ? `%${query.keyword}%` : "%";
-    const page = query.page ?? 0;
-    const pageSize = query.pageSize ?? 20;
+    const { page = 0, pageSize = 20 } = query;
 
     const countResult = await this.clickhouse.query({
       query: `
@@ -316,6 +319,9 @@ export class BackendMonitorService {
     });
     const records = (await dataResult.json()) as ErrorLogRow[];
 
-    return { records, total };
+    return {
+      records,
+      pagination: { page, pageSize, countOfCurrentPage: records.length, countOfTotal: total },
+    };
   }
 }

@@ -1,0 +1,300 @@
+// Prisma schema fragment for the evaluation capability module (ADR-020).
+// This file is managed by @devbie/newbie-cli — assembled into the consumer
+// prisma tree on `newbie modules apply`.
+//
+// The skeleton holds no host vocabulary: no foreign keys point outside this
+// schema, and every host-side identity is an opaque scalar (`requestedByRef`,
+// `deciderRef`, `scopeId`).
+
+// !! ----------------------------------------------------------- //
+// !!                [Module] Evaluation models                   //
+// !! ----------------------------------------------------------- //
+// * EvaluationCriteriaVersion                                    //
+// * EvaluationCriterion                                          //
+// * EvaluationSubject                                            //
+// * EvaluationRun                                                //
+// * EvaluationResult                                             //
+// * EvaluationFinding                                            //
+// * EvaluationRemediationPlan                                    //
+// * EvaluationCriterionKind (enum)                               //
+// * EvaluationRunStatus (enum)                                   //
+// * EvaluationFindingStatus (enum)                               //
+// * EvaluationFindingSeverity (enum)                             //
+// * EvaluationRemediationStatus (enum)                           //
+// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+enum EvaluationCriterionKind {
+  // Produces a verdict inside EvaluationResult.
+  SCORED
+  // Produces an EvaluationFinding that survives across runs.
+  ASSERTION
+
+  @@schema("module/evaluation")
+}
+
+enum EvaluationRunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+
+  @@schema("module/evaluation")
+}
+
+enum EvaluationFindingStatus {
+  OPEN
+  RESOLVED
+  SUPPRESSED
+
+  @@schema("module/evaluation")
+}
+
+enum EvaluationFindingSeverity {
+  INFO
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+
+  @@schema("module/evaluation")
+}
+
+enum EvaluationRemediationStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+
+  @@schema("module/evaluation")
+}
+
+/// A frozen set of criteria a run is judged against (ADR-020 D5.5). A draft is
+/// editable; publishing is one-way, after which every write is rejected and
+/// changes require a new version. `kind` is the subject kind these criteria
+/// apply to; `family` is the feature-defined group (rubric, cis-aws-1.5, ...).
+model EvaluationCriteriaVersion {
+  id     String @id @default(uuid()) @db.Uuid
+  kind   String @db.VarChar(64)
+  family String @db.VarChar(64)
+
+  version     String  @db.VarChar(64)
+  description String? @db.Text
+  // Feature-defined configuration shared by all criteria of the version
+  metadata    Json?   @db.JsonB
+
+  // Null while draft. Set once at publication; never cleared.
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  criteria EvaluationCriterion[]
+  runs     EvaluationRun[]
+  results  EvaluationResult[]
+
+  @@unique([kind, family, version])
+  @@index([kind, family, publishedAt])
+  @@schema("module/evaluation")
+}
+
+/// One criterion inside a version. `criterionKey` is unique inside the version
+/// and is the key verdicts and findings reference — never the row id, so a
+/// result stays interpretable after the version is superseded.
+model EvaluationCriterion {
+  id                String @id @default(uuid()) @db.Uuid
+  criteriaVersionId String @db.Uuid
+
+  criterionKey String                  @db.VarChar(64)
+  kind         EvaluationCriterionKind
+  name         String                  @db.VarChar(255)
+  description  String?                 @db.Text
+  // Feature-defined judgment configuration (anchors, fact requirements,
+  // control id); the judgment logic itself stays in the feature's code.
+  metadata     Json?                   @db.JsonB
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  criteriaVersion EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Cascade)
+
+  @@unique([criteriaVersionId, criterionKey])
+  @@index([criteriaVersionId])
+  @@schema("module/evaluation")
+}
+
+/// The object being evaluated (ADR-020 D1). Identity is feature-defined through
+/// `subjectKey`; the host assigns meaning to `scopeType` / `scopeId`, which are
+/// plain scalars with no foreign key — this module knows no host entity.
+model EvaluationSubject {
+  id String @id @default(uuid()) @db.Uuid
+
+  kind        String @db.VarChar(64)
+  scopeType   String @db.VarChar(64)
+  scopeId     String @db.VarChar(128)
+  subjectKey  String @db.VarChar(255)
+  displayName String @db.VarChar(255)
+
+  metadata Json? @db.JsonB
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  runs             EvaluationRun[]
+  results          EvaluationResult[]
+  findings         EvaluationFinding[]
+  remediationPlans EvaluationRemediationPlan[]
+
+  @@unique([kind, scopeType, scopeId, subjectKey])
+  @@index([kind, scopeType, scopeId])
+  @@schema("module/evaluation")
+}
+
+/// One evaluation attempt. Concurrency is enforced in the database, not in
+/// process memory: a partial unique index over the active statuses on
+/// (subjectId, criteriaVersionId) — the consumer migration must declare it in
+/// raw SQL, Prisma cannot express partial indexes:
+///
+///   CREATE UNIQUE INDEX "EvaluationRun_one_active_per_subject_version"
+///     ON "module/evaluation"."EvaluationRun" ("subjectId", "criteriaVersionId")
+///     WHERE "status" IN ('QUEUED', 'RUNNING');
+model EvaluationRun {
+  id                String @id @default(uuid()) @db.Uuid
+  subjectId         String @db.Uuid
+  criteriaVersionId String @db.Uuid
+
+  status EvaluationRunStatus @default(QUEUED)
+  // Opaque host-side actor id; no foreign key by design
+  requestedByRef String? @db.VarChar(128)
+  // Failure reason when status = FAILED. Message only, never a stack trace.
+  error String? @db.Text
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  subject         EvaluationSubject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  criteriaVersion EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Restrict)
+
+  // At most one result per run.
+  result EvaluationResult?
+
+  @@index([subjectId, criteriaVersionId])
+  @@index([status])
+  @@schema("module/evaluation")
+}
+
+/// The archived conclusion of one run (ADR-020 D5.1): `manifest`,
+/// `contentHash` and `coverageStats` describe the material it was judged from
+/// and are never rewritten — a rerun writes a new row. There is deliberately no
+/// composite score field (D5.3); multi-axis scores belong to the feature's read
+/// model.
+model EvaluationResult {
+  id                String @id @default(uuid()) @db.Uuid
+  runId             String @unique @db.Uuid
+  subjectId         String @db.Uuid
+  criteriaVersionId String @db.Uuid
+
+  // Archived evidence snapshot: [{ id, layer, source, summary, observedAt, refs }]
+  manifest      Json    @db.JsonB
+  // SHA-256 over the canonical manifest, computed by the skeleton
+  contentHash   String  @db.VarChar(64)
+  // { evaluated, declaredUnlinked, skipped } — each { total, bySource?, note?, items? }
+  coverageStats Json    @db.JsonB
+
+  // Scored verdicts: [{ criterionKey, score, confidence, coverage, evidenceRefs, rationale }]
+  verdicts Json    @db.JsonB
+  summary  String? @db.Text
+  metadata Json?   @db.JsonB
+
+  createdAt DateTime @default(now())
+
+  run             EvaluationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  subject         EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  criteriaVersion EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Restrict)
+
+  @@index([subjectId, createdAt])
+  @@index([criteriaVersionId])
+  @@schema("module/evaluation")
+}
+
+/// An assertion-type conclusion (ADR-020 D2). Unlike a verdict it has an
+/// identity — `(subjectId, family, fingerprint)` — and a lifecycle that spans
+/// runs: first seen once, last seen by whichever run still observed it,
+/// resolved when it stops appearing. `family` is copied from the run's
+/// criteria version, so a rerun under a new version of the same family keeps
+/// the finding's identity, and one family never resolves another family's
+/// findings. `firstSeenAt` is never rewritten.
+model EvaluationFinding {
+  id        String @id @default(uuid()) @db.Uuid
+  subjectId String @db.Uuid
+
+  // Criteria family of the run that owns this finding's lifecycle
+  family       String                    @db.VarChar(64)
+  // Stable identity of the assertion within the subject and family
+  fingerprint  String                    @db.VarChar(128)
+  criterionKey String                    @db.VarChar(64)
+  severity     EvaluationFindingSeverity
+  status       EvaluationFindingStatus   @default(OPEN)
+
+  title  String  @db.VarChar(255)
+  detail String? @db.Text
+  // Feature-defined extra material (evidence refs, signal tags, urgency inputs)
+  metadata Json? @db.JsonB
+
+  firstSeenRunId String? @db.Uuid
+  lastSeenRunId  String? @db.Uuid
+
+  firstSeenAt DateTime
+  lastSeenAt  DateTime
+  resolvedAt  DateTime?
+  // Mandatory when status = SUPPRESSED: why a human silenced this finding
+  suppressionNote String? @db.Text
+  // Opaque host-side actor id of whoever suppressed the finding
+  suppressedByRef String? @db.VarChar(128)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subject EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([subjectId, family, fingerprint])
+  @@index([subjectId, status])
+  @@index([status, severity])
+  @@schema("module/evaluation")
+}
+
+/// The remediation object (ADR-020 D1): findings or results a plan answers to,
+/// the checkpoints that track progress, and the named decider. `triggerRefs`
+/// is validated against this schema's tables by the service — the plan can
+/// never be anchored on material that does not exist.
+model EvaluationRemediationPlan {
+  id        String @id @default(uuid()) @db.Uuid
+  subjectId String @db.Uuid
+
+  status EvaluationRemediationStatus @default(OPEN)
+
+  // Finding or result ids that triggered the plan; validated by the service
+  triggerRefs Json @db.JsonB
+  // The named decision maker (opaque host-side actor id) — required by D1
+  deciderRef  String @db.VarChar(128)
+
+  startDate DateTime
+  dueDate   DateTime?
+  // [{ dueDate, description, status }]
+  checkpoints Json? @db.JsonB
+
+  // completed / failed / extended, recorded when the plan closes
+  decisionNote String?   @db.Text
+  decidedAt    DateTime?
+  // Opaque host-side actor id of whoever recorded the decision; `deciderRef`
+  // names the accountable decision maker, this records who actually acted
+  decidedByRef String?   @db.VarChar(128)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subject EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@index([subjectId, status])
+  @@schema("module/evaluation")
+}

@@ -1,9 +1,9 @@
 import { Global, Module } from "@nestjs/common";
-import { WebMonitorClickhouseService } from "./web-monitor-clickhouse.service";
+import { WebMonitorClickHouseService } from "./web-monitor-clickhouse.service";
 
 @Global()
 @Module({
-  providers: [WebMonitorClickhouseService],
-  exports: [WebMonitorClickhouseService],
+  providers: [WebMonitorClickHouseService],
+  exports: [WebMonitorClickHouseService],
 })
-export class WebMonitorClickhouseModule {}
+export class WebMonitorClickHouseModule {}

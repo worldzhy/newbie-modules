@@ -4,14 +4,11 @@ import * as Lark from "@larksuiteoapi/node-sdk";
 import { Response } from "express";
 import { UserStatus } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { SessionService } from "@modules/account/modules/session/session.service";
-import { TokenService } from "@modules/security/token/token.service";
-import { CookieService } from "@modules/security/cookie/cookie.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
-import { TwoFactorService } from "@modules/account/modules/two-factor/two-factor.service";
-import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "@modules/account/auth/login-audit";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
+import { AuthService } from "@modules/account/auth/auth.service";
 import { LoginResult } from "@modules/account/account.interface";
 
 const FEISHU_AUTHORIZE_URL = "https://accounts.feishu.cn/open-apis/authen/v1/authorize";
@@ -51,12 +48,9 @@ export class LarkAuthService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly sessionService: SessionService,
-    private readonly tokenService: TokenService,
-    private readonly cookieService: CookieService,
     private readonly approvedSubnetService: ApprovedSubnetService,
     private readonly auditLogService: AuditLogService,
-    private readonly twoFactorService: TwoFactorService,
+    private readonly authService: AuthService,
   ) {}
 
   private get appId(): string {
@@ -176,7 +170,6 @@ export class LarkAuthService {
             larkOpenId: openId,
             larkUnionId: unionId ?? undefined,
             phone: existing.phone ?? phone ?? undefined,
-            lastLoginAt: new Date(),
           },
         });
       }
@@ -195,7 +188,6 @@ export class LarkAuthService {
             larkOpenId: openId,
             larkUnionId: unionId ?? undefined,
             email: existing.email ?? email ?? undefined,
-            lastLoginAt: new Date(),
           },
         });
       }
@@ -214,7 +206,6 @@ export class LarkAuthService {
           email: email || undefined,
           phone: phone || undefined,
           emails: email ? { create: { email, isVerified: true } } : undefined,
-          lastLoginAt: new Date(),
           roles: {
             create: {
               role: { connectOrCreate: { where: { name: "USER" }, create: { name: "USER", isBuiltin: true } } },
@@ -243,7 +234,6 @@ export class LarkAuthService {
       await this.prisma.user.update({
         where: { id: user.id },
         data: {
-          lastLoginAt: new Date(),
           name: user.name ?? displayName ?? undefined,
           uiAvatarsUrl: user.uiAvatarsUrl ?? avatarUrl ?? undefined,
           larkUnionId: user.larkUnionId ?? unionId ?? undefined,
@@ -253,26 +243,18 @@ export class LarkAuthService {
       });
     }
 
-    // [step 3.5] Account-level TOTP gate. Lark OAuth bypasses the email-
-    // verification and location eligibility gates by design, but the
-    // account-level second factor applies to every channel; the client
-    // completes the challenge through /auth/login-by-totp.
-    const mfaChallenge = await this.twoFactorService.evaluateLoginMfaGate(user.id);
-    if (mfaChallenge) return mfaChallenge;
-
-    // [step 4] Issue the session. Lark OAuth has already proven identity, so
-    // the email-verification and location gates are bypassed (same as the
-    // WeChat login path). Existing sessions are left intact for multi-device.
-    const session = await this.sessionService.generate({ ipAddress, userAgent, userId: user.id });
-
-    this.cookieService.set(response, this.cookieService.generateForRefreshToken(session.refreshToken));
-
-    await this.auditLogService.record(AuditEvent.LOGIN, { actorId: user.id, ipAddress, userAgent });
-
-    const accessTokenInfo = this.tokenService.verifyUserAccessToken(session.accessToken);
-    return {
-      token: session.accessToken,
-      tokenExpiresInSeconds: accessTokenInfo.exp - accessTokenInfo.iat,
-    };
+    // [step 4] Issue the session through the shared exit. Lark OAuth has
+    // already proven identity, so the email-verification and location
+    // eligibility gates inside AuthService.login() are bypassed by design;
+    // the TOTP gate, lastLoginAt update, rate-limit reset, refresh cookie and
+    // LOGIN audit stay uniform with every other channel.
+    const issued = await this.authService.issueLoginSession({
+      ipAddress,
+      userAgent,
+      userId: user.id,
+      response,
+    });
+    if ("mfaChallenge" in issued) return issued.mfaChallenge;
+    return { token: issued.token, tokenExpiresInSeconds: issued.tokenExpiresInSeconds };
   }
 }

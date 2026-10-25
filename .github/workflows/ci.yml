@@ -25,7 +25,7 @@ jobs:
       # Module business-logic tests (e.g. account/auth/login-audit-coverage.test.ts)
       # cannot run standalone here: this registry has no NestJS/zod/etc.
       # dependencies installed, by design (modules are copied into a consumer
-      # project via `newbie install`, not built in place). The real
+      # project via `newbie modules apply`, not built in place). The real
       # enforcement point for those tests is the consumer's own CI
       # (see nightwatch-backend/.github/workflows/ci.yml `npm test`), which
       # picks them up once the module is assembled.

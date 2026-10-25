@@ -30,6 +30,13 @@ import { join } from "node:path";
  *    the account-level TOTP gate (`evaluateLoginMfaGate`, ADR-007) before
  *    generating it, so enabling TOTP protects every login channel, not just
  *    the ones routed through the shared AuthService.login().
+ *
+ * A fourth check pins the shared-issuance structure: out-of-band identity
+ * channels (Lark OAuth, WeChat mini-program) must not mint sessions directly
+ * at all — they route through AuthService.issueLoginSession() so the TOTP
+ * gate, rate-limit reset, refresh-token transport and LOGIN audit cannot
+ * drift per channel again (the 2026-10 review found Lark/WeChat each running
+ * a private issuance path behind checks 2-3).
  */
 
 const AUTH_DIR = __dirname;
@@ -54,6 +61,14 @@ const LOOKBACK_LINES = 8;
 const SUCCESS_SESSION_PATTERN = /sessionService\.generate\(/;
 const SUCCESS_AUDIT_PATTERN = /AuditEvent\.LOGIN\b/;
 const TOTP_GATE_PATTERN = /evaluateLoginMfaGate\(/;
+
+/**
+ * Out-of-band identity channels that resolve the user without the credential
+ * eligibility gates (OAuth profile / mini-program phone ownership). They must
+ * issue sessions exclusively through AuthService.issueLoginSession().
+ */
+const SHARED_ISSUANCE_CHANNEL_FILES = ["lark/lark-auth.service.ts", "wechat/auth.service.ts"];
+const SHARED_ISSUANCE_PATTERN = /authService\.issueLoginSession\(/;
 
 function readLines(relativePath: string): string[] {
   return readFileSync(join(AUTH_DIR, relativePath), "utf8").split("\n");
@@ -100,6 +115,23 @@ describe("login audit coverage contract", () => {
         `${relativePath} mints a session via sessionService.generate() but never calls ` +
           `evaluateLoginMfaGate() — every session-minting login path must enforce the ` +
           `account-level TOTP gate before generating the session (see ADR-007).`,
+      );
+    });
+  }
+
+  for (const relativePath of SHARED_ISSUANCE_CHANNEL_FILES) {
+    it(`${relativePath}: issues sessions only through the shared AuthService.issueLoginSession()`, () => {
+      const content = readLines(relativePath).join("\n");
+      assert.ok(
+        !SUCCESS_SESSION_PATTERN.test(content),
+        `${relativePath} mints a session directly via sessionService.generate() — out-of-band identity ` +
+          `channels must route through AuthService.issueLoginSession() so the TOTP gate, rate-limit ` +
+          `reset, refresh-token transport and LOGIN audit stay uniform across channels.`,
+      );
+      assert.ok(
+        SHARED_ISSUANCE_PATTERN.test(content),
+        `${relativePath} never calls authService.issueLoginSession() — the channel must issue sessions ` +
+          `through the shared exit instead of a private path.`,
       );
     });
   }

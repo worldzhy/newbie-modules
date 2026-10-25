@@ -1,0 +1,71 @@
+// !! ------------------------------------------------------------ //
+// !!               [Module] Threat Intelligence models                  //
+// !! ------------------------------------------------------------ //
+// * ThreatIntelligenceItem                                                    //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+// A single piece of external threat intelligence, deduplicated by
+// (source, externalId). One row per unique intel item; re-fetching the
+// same item refreshes rawPayload and bumps lastSeenAt. fetchedAt stays at
+// the first-seen time on purpose: the match pipeline walks it oldest-first
+// so every collection batch eventually gets evaluated.
+model ThreatIntelligenceItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  source      String   @db.VarChar(50)
+  category    String   @db.VarChar(30)
+  // Stable identifier within the source: CVE ID, ecosystem+package,
+  // vendor+event-id, or a title fingerprint. Together with `source` it
+  // forms the deduplication key.
+  externalId  String   @db.VarChar(512)
+  title       String   @db.VarChar(1024)
+  summary     String?  @db.Text
+  url         String?  @db.VarChar(1024)
+  publishedAt DateTime?
+  severity    String   @default("info") @db.VarChar(15)
+  // Signal tags: kev, has-exploit, exploited-in-wild.
+  signalTags  String[]
+  rawPayload  Json?
+  fetchedAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([category])
+  @@index([severity])
+  @@index([publishedAt])
+  // Match-pipeline keyset scan: WHERE fetchedAt >= since ORDER BY fetchedAt, id.
+  @@index([fetchedAt])
+  @@schema("module/threat-intelligence")
+}
+
+// A relevance verdict linking one intel item to one matchable scope
+// (ADR-018). scopeType/scopeId are generic scope coordinates stored without
+// foreign keys — the module never names host concepts. itemId deliberately
+// has no FK to ThreatIntelligenceItem either: retention pruning must not be
+// blocked by match history, so consumers tolerate dangling references.
+model ThreatIntelligenceMatch {
+  id            String    @id @default(uuid()) @db.Uuid
+  itemId        String    @db.Uuid
+  scopeType     String    @db.VarChar(50)
+  scopeId       String    @db.VarChar(64)
+  matchType     String    @db.VarChar(20)
+  // Normalized matched entity label. Empty string when no specific entity
+  // was named (e.g. vendor-level match). NOT NULL so the
+  // (scopeType, scopeId, itemId, matchedEntity) unique constraint is
+  // enforceable.
+  matchedEntity String    @default("") @db.VarChar(512)
+  evidence      String?   @db.Text
+  confidence    String    @default("medium") @db.VarChar(15)
+  status        String    @default("open") @db.VarChar(20)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  resolvedAt    DateTime?
+
+  @@unique([scopeType, scopeId, itemId, matchedEntity])
+  @@index([itemId])
+  @@index([status])
+  @@index([scopeType, scopeId, status])
+  @@index([scopeType, scopeId, confidence])
+  @@schema("module/threat-intelligence")
+}

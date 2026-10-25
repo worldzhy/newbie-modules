@@ -5,6 +5,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TokenService } from "@modules/security/token/token.service";
 import { TokenSubject } from "@modules/security/token/token.constants";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
+import { SignupEmailVerifyRequestDto } from "@modules/account/auth/auth.dto";
 
 @ApiTags("Account / Auth")
 @Controller("auth")
@@ -18,8 +19,9 @@ export class SignupEmailVerifyController {
   @NoGuard()
   @ApiOperation({ summary: "Verify email after signup via token" })
   @ApiResponse({ type: Boolean })
-  async approveSubnet(@Body("token") token: string) {
+  async signupEmailVerify(@Body() body: SignupEmailVerifyRequestDto) {
     // [step 1] Verify token
+    const { token } = body;
     if (!token) throw new UnprocessableEntityException(NO_TOKEN_PROVIDED);
     const { id } = this.tokenService.verify<{ id: number }>({
       token,

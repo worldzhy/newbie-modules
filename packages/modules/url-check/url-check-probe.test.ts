@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 import type { EventEmitter2 } from "@nestjs/event-emitter";
 import type { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import type { ClickhouseService } from "@modules/clickhouse/clickhouse.service";
+import type { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { UrlCheckProbeService } from "./url-check-probe.service";
 
 /**
@@ -121,7 +121,7 @@ function createHarness(targetOverrides: Partial<FakeTargetRow> = {}, seedInciden
 
   const service = new UrlCheckProbeService(
     prisma as unknown as PrismaService,
-    clickhouse as unknown as ClickhouseService,
+    clickhouse as unknown as ClickHouseService,
     emitter as unknown as EventEmitter2,
   );
 

@@ -1,8 +1,10 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req } from "@nestjs/common";
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { AuditActorType } from "@modules/audit/audit-log.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { UserRequest } from "@modules/security/security.interface";
 
 import { CreateHubInstallationDto, ListHubInstallationsQueryDto, SetHubTargetSpecDto } from "../module-hub.dto";
 import { ModuleHubInstallationService } from "../services/installation.service";
@@ -32,8 +34,8 @@ export class InstallationController {
   @Post("installations")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.ModuleHubInstallation)
   @ApiCreatedResponse()
-  async create(@Body() body: CreateHubInstallationDto) {
-    return this.installations.create(body);
+  async create(@Body() body: CreateHubInstallationDto, @Req() request: UserRequest) {
+    return this.installations.create({ ...body, actor: request.user.userId });
   }
 
   @Get("installations")
@@ -63,23 +65,23 @@ export class InstallationController {
   async setTargetSpec(
     @Param() params: CommonGetByStringIdRequestDto,
     @Body() body: SetHubTargetSpecDto,
-    @Query("actor") actor?: string,
+    @Req() request: UserRequest,
   ) {
-    return this.installations.setTargetSpec(params.id, body.spec, actor);
+    return this.installations.setTargetSpec(params.id, body.spec, request.user.userId);
   }
 
   @Post("installations/:id/token/regenerate")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.ModuleHubInstallation)
   @ApiOkResponse()
-  async regenerateToken(@Param() params: CommonGetByStringIdRequestDto, @Query("actor") actor?: string) {
-    return this.installations.regenerateToken(params.id, actor);
+  async regenerateToken(@Param() params: CommonGetByStringIdRequestDto, @Req() request: UserRequest) {
+    return this.installations.regenerateToken(params.id, request.user.userId);
   }
 
   @Delete("installations/:id")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.ModuleHubInstallation)
   @ApiOkResponse()
-  async revoke(@Param() params: CommonGetByStringIdRequestDto, @Query("actor") actor?: string) {
-    return this.installations.revoke(params.id, actor);
+  async revoke(@Param() params: CommonGetByStringIdRequestDto, @Req() request: UserRequest) {
+    return this.installations.revoke(params.id, request.user.userId);
   }
 
   // -- Catalog ---------------------------------------------------------------
@@ -96,5 +98,20 @@ export class InstallationController {
   @ApiOkResponse()
   async moduleReleases(@Param("moduleKey") moduleKey: string) {
     return this.releases.getReleasesForModule(moduleKey);
+  }
+
+  /**
+   * Operator-triggered catalog sync: pull the registry HEAD and ingest any
+   * missing (module, commit) pairs. Repairs a missed webhook delivery; the
+   * shared idempotent upsert makes re-runs no-ops.
+   */
+  @Post("catalog/sync")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.HubModuleRelease)
+  @ApiOkResponse()
+  async syncCatalog(@Req() request: UserRequest) {
+    return this.releases.syncCatalogFromRegistry({
+      actorType: AuditActorType.USER,
+      actorId: request.user.userId,
+    });
   }
 }

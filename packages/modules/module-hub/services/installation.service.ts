@@ -1,9 +1,16 @@
-import { createHash, randomUUID } from "node:crypto";
-
 import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ModuleHubInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
+import {
+  InstallationCredentialAudit,
+  InstallationCredentialStore,
+  issueInstallationCredential,
+  revokeInstallationCredential,
+  rotateInstallationCredential,
+} from "@modules/security/installation/installation-credential";
+import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
+import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** An installation reports every 60s; three missed intervals marks it offline (design §4.2). */
@@ -27,22 +34,23 @@ export interface InstallationPresence {
 }
 
 /**
- * Module-hub audit events. The audit module's event set is open (domain
- * modules define their own `domain.action` strings); these are the ones the
- * hub emits. Routine reports (ping/full) are NOT audited.
+ * Module-hub audit events that are NOT part of the shared credential
+ * lifecycle (ADR-019). Credential events (enroll/rotate/revoke) come from
+ * security's InstallationAuditEvent; routine reports (ping/full) are NOT
+ * audited.
  */
 export const ModuleHubAuditEvent = {
-  INSTALLATION_ENROLL: "installation.enroll",
   INSTALLATION_TARGET_SPEC: "installation.target-spec",
-  INSTALLATION_ROTATE: "installation.rotate",
-  INSTALLATION_REVOKE: "installation.revoke",
 } as const;
 
 /** Resource type for installation-scoped audit rows. */
-const INSTALLATION_RESOURCE_TYPE = "module-hub-installation";
+const AUDIT_RESOURCE_TYPE = "module-hub-installation";
 
-export function hashInstallationToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+/** Domain columns stored next to the credential (ADR-019). */
+interface ModuleHubInstallationDraft {
+  label: string;
+  repoUrl: string | null;
+  externalRef: string | null;
 }
 
 // --- target-spec vs reported snapshot (read-time, design §3 targetSpec) ------
@@ -88,7 +96,7 @@ export interface TargetActualComparison {
  * Pure read-time comparison between a stored targetSpec (modules.json shape)
  * and the last reported module snapshot (`newbie status --json` modules[]).
  *
- * The hub never dispatches the spec: developers/CI run `newbie update`, and
+ * The hub never dispatches the spec: developers/CI run `newbie modules update`, and
  * the next process-start "full" report proves convergence with its snapshot.
  */
 export function compareTargetWithSnapshot(
@@ -163,10 +171,24 @@ export class ModuleHubInstallationService implements InstallationResolver {
   /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
   readonly legacyHeader = "x-module-hub-token";
 
+  // Credential mechanism comes from security (ADR-019); this class only adapts
+  // its table and projects the domain state.
+  private readonly credentials: InstallationCredentialStore<ModuleHubInstallationDraft, ModuleHubInstallation>;
+  private readonly tokenVerifier: InstallationTokenVerifier<ModuleHubInstallation>;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
-  ) {}
+  ) {
+    this.credentials = prismaInstallationCredentialStore<ModuleHubInstallationDraft, ModuleHubInstallation>(
+      this.prisma.moduleHubInstallation,
+    );
+    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
+  }
+
+  private credentialAudit(actor?: string): InstallationCredentialAudit {
+    return { recorder: this.auditLogService, resourceType: AUDIT_RESOURCE_TYPE, actorId: actor };
+  }
 
   private withDerivedState(row: ModuleHubInstallation) {
     const online =
@@ -179,23 +201,19 @@ export class ModuleHubInstallationService implements InstallationResolver {
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
   async create(input: { label: string; repoUrl?: string; externalRef?: string; actor?: string }) {
-    const token = randomUUID();
-    const row = await this.prisma.moduleHubInstallation.create({
-      data: {
+    const { record, token } = await issueInstallationCredential(
+      this.credentials,
+      {
         label: input.label,
         repoUrl: input.repoUrl ?? null,
         externalRef: input.externalRef ?? null,
-        tokenHash: hashInstallationToken(token),
       },
-    });
-    await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_ENROLL, {
-      resourceType: INSTALLATION_RESOURCE_TYPE,
-      resourceId: row.id,
-      actorType: "host",
-      actorId: input.actor ?? "unknown",
-      detail: { label: input.label, externalRef: input.externalRef ?? null },
-    });
-    return { ...this.withDerivedState(row), token };
+      {
+        ...this.credentialAudit(input.actor),
+        detail: { label: input.label, externalRef: input.externalRef ?? null },
+      },
+    );
+    return { ...this.withDerivedState(record), token };
   }
 
   async list(query: { externalRef?: string }) {
@@ -288,10 +306,10 @@ export class ModuleHubInstallationService implements InstallationResolver {
       data: { targetSpec: spec === null ? Prisma.DbNull : (spec as Prisma.InputJsonValue) },
     });
     await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_TARGET_SPEC, {
-      resourceType: INSTALLATION_RESOURCE_TYPE,
+      resourceType: AUDIT_RESOURCE_TYPE,
       resourceId: id,
       actorType: "host",
-      actorId: actor ?? "unknown",
+      actorId: actor ?? null,
       detail: { spec },
     });
     return { id, targetSpec: spec };
@@ -300,40 +318,18 @@ export class ModuleHubInstallationService implements InstallationResolver {
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
-    const token = randomUUID();
-    await this.prisma.moduleHubInstallation.update({
-      where: { id },
-      data: { tokenHash: hashInstallationToken(token) },
-    });
-    await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_ROTATE, {
-      resourceType: INSTALLATION_RESOURCE_TYPE,
-      resourceId: id,
-      actorType: "host",
-      actorId: actor ?? "unknown",
-    });
-    return { id, token };
+    return rotateInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   /** Soft revocation: reports are rejected (401), rows are retained for audit. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    await this.prisma.moduleHubInstallation.update({ where: { id }, data: { revokedAt: new Date() } });
-    await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_REVOKE, {
-      resourceType: INSTALLATION_RESOURCE_TYPE,
-      resourceId: id,
-      actorType: "host",
-      actorId: actor ?? "unknown",
-    });
-    return { id, revoked: true };
+    return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   /** Token-only authentication for the report endpoint. */
   async resolveByToken(token: string) {
-    const row = await this.prisma.moduleHubInstallation.findUnique({
-      where: { tokenHash: hashInstallationToken(token) },
-    });
-    if (!row || row.revokedAt) return null;
-    return row;
+    return this.tokenVerifier.verify(token);
   }
 
   /**

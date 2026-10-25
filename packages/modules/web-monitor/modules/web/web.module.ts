@@ -1,5 +1,5 @@
 import { Module } from "@nestjs/common";
-import { WebMonitorClickhouseModule } from "../../models/clickhouse/web-monitor-clickhouse.module";
+import { WebMonitorClickHouseModule } from "../../models/clickhouse/web-monitor-clickhouse.module";
 import { WebMonitorModelsModule } from "../../models/mongo/web-monitor-models.module";
 import { SharedModule } from "../../shared/shared.module";
 import { DayReportModule } from "@modules/web-monitor/modules/day-report/day-report.module";
@@ -31,7 +31,7 @@ import { WebPvuvipTaskService } from "./services/pvuvip-task.service";
 import { WebIpTaskService } from "./services/ip-task.service";
 
 @Module({
-  imports: [WebMonitorClickhouseModule, WebMonitorModelsModule, SharedModule, DayReportModule, SiteModule],
+  imports: [WebMonitorClickHouseModule, WebMonitorModelsModule, SharedModule, DayReportModule, SiteModule],
   controllers: [
     WebReportController,
     AjaxController,

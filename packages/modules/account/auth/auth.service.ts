@@ -23,7 +23,7 @@ import { verifyEmail } from "@modules/account/helpers/validator";
 import { GeolocationService } from "@modules/audit/helpers/geolocation.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
 import { TwoFactorService } from "@modules/account/modules/two-factor/two-factor.service";
-import { LoginResult } from "@modules/account/account.interface";
+import { IssuedLoginSession, LoginResult } from "@modules/account/account.interface";
 import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "./login-audit";
 import { SessionService } from "@modules/account/modules/session/session.service";
@@ -72,14 +72,37 @@ export class AuthService {
       userAgent: params.userAgent,
     });
 
-    // [step 0.5] Account-level TOTP gate. Sitting inside the shared login exit,
-    // it protects every channel routed through here (password, verification
-    // code, Google, approved-subnet); Lark and WeChat mint sessions directly
-    // and call the same gate from TwoFactorService before generating theirs.
-    const mfaChallenge = await this.twoFactorService.evaluateLoginMfaGate(params.userId, params.mfaVerified);
-    if (mfaChallenge) return mfaChallenge;
+    const issued = await this.issueLoginSession(params);
+    if ("mfaChallenge" in issued) return issued.mfaChallenge;
+    return { token: issued.token, tokenExpiresInSeconds: issued.tokenExpiresInSeconds };
+  }
 
-    // [step 1] Update last login time and generate a new session atomically.
+  /**
+   * Shared session-issuance exit for every login channel. Channels that resolve
+   * identity out-of-band (Lark OAuth, WeChat mini-program) bypass
+   * checkLoginEligibility by design but must still issue sessions through here,
+   * so the account-level TOTP gate, lastLoginAt update, per-user rate-limit
+   * reset, refresh-token transport, LOGIN audit and token-expiry computation
+   * stay uniform across channels (ADR-006/ADR-007).
+   *
+   * When `response` is provided the refresh token is set as an httpOnly cookie;
+   * cookie-less clients (the WeChat mini-program) read it from the returned
+   * credentials instead.
+   */
+  async issueLoginSession(params: {
+    ipAddress: string;
+    userAgent: string;
+    userId: string;
+    response?: Response;
+    mfaVerified?: boolean;
+  }): Promise<IssuedLoginSession> {
+    // [step 1] Account-level TOTP gate. Sitting in the single issuance exit, it
+    // protects every login channel; the client completes the challenge through
+    // /auth/login-by-totp before any session exists.
+    const mfaChallenge = await this.twoFactorService.evaluateLoginMfaGate(params.userId, params.mfaVerified);
+    if (mfaChallenge) return { mfaChallenge };
+
+    // [step 2] Update last login time and generate a new session atomically.
     // Existing sessions are intentionally left intact: the platform supports
     // concurrent sessions across multiple devices.
     const session = await this.prisma.$transaction(async (tx) => {
@@ -95,12 +118,14 @@ export class AuthService {
       });
     });
 
-    // [step 2] Reset the per-user login rate limit so earlier failed attempts
+    // [step 3] Reset the per-user login rate limit so earlier failed attempts
     // do not lock out a user who finally authenticated successfully.
     await this.limitLoginByUserService.delete(params.userId);
 
-    // [step 4] Set refresh token in cookie.
-    this.cookieService.set(params.response, this.cookieService.generateForRefreshToken(session.refreshToken));
+    // [step 4] Set the refresh token cookie for browser clients.
+    if (params.response) {
+      this.cookieService.set(params.response, this.cookieService.generateForRefreshToken(session.refreshToken));
+    }
 
     // [step 5] Record the login.
     await this.auditLogService.record(AuditEvent.LOGIN, {
@@ -109,10 +134,11 @@ export class AuthService {
       userAgent: params.userAgent,
     });
 
-    // [step 6] Return access token.
+    // [step 6] Return the minted credentials; callers decide what to expose.
     const accessTokenInfo = this.tokenService.verifyUserAccessToken(session.accessToken);
     return {
       token: session.accessToken,
+      refreshToken: session.refreshToken,
       tokenExpiresInSeconds: accessTokenInfo.exp - accessTokenInfo.iat,
     };
   }

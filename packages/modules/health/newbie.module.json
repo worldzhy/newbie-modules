@@ -7,7 +7,7 @@
     "className": "HealthModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
+  "moduleDependencies": ["audit", "security"],
   "sdk": "@devbie/health-sdk",
   "dependencies": {},
   "devDependencies": {}

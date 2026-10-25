@@ -407,3 +407,34 @@ export class ListUsersRequestDto extends CommonListRequestDto {
   @IsString({ each: true })
   roles?: string[];
 }
+
+/**
+ * Request DTO for linking an external platform identity to a user (ADR-029 in
+ * nightwatch-backend). Attribution for evidence uses the platform account id —
+ * this mapping is what turns a platform commit author into a member.
+ */
+export class LinkExternalIdentityDto {
+  @ApiProperty({ type: String, description: 'Platform tag, e.g. "GITHUB" or "BITBUCKET"' })
+  @IsString()
+  @IsNotEmpty()
+  platform!: string;
+
+  @ApiProperty({ type: String, description: "Stable account id on the platform (never the display name)" })
+  @IsString()
+  @IsNotEmpty()
+  externalAccountId!: string;
+
+  @ApiPropertyOptional({ type: String, description: "Human-readable handle, for operator convenience only" })
+  @IsOptional()
+  @IsString()
+  displayName?: string;
+}
+
+export class ExternalIdentityResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() userId!: string;
+  @ApiProperty() platform!: string;
+  @ApiProperty() externalAccountId!: string;
+  @ApiPropertyOptional() displayName?: string | null;
+  @ApiProperty() linkedAt!: Date;
+}

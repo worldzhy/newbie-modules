@@ -7,14 +7,15 @@ import {
   ListWebMonitorAjaxMarkUsersResponseDto,
   ListWebMonitorAjaxOnesResponseDto,
 } from "./ajax.dto";
-import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { PermissionAction } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 @ApiTags("Frontend Monitor / Web / Ajax")
-@RequireOwner()
 @Controller("/web-monitor/ajax")
 export class AjaxController {
   constructor(private readonly ajax: AjaxService) {}
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getPageAjaxsAvg")
   @ApiOperation({ summary: "Get page ajax average performance" })
   @ApiResponse({ type: ListWebMonitorAjaxAveragesResponseDto })
@@ -31,6 +32,7 @@ export class AjaxController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getAverageAjaxList")
   @ApiOperation({ summary: "Get average ajax performance list" })
   @ApiResponse({ type: ListWebMonitorAjaxAveragesResponseDto })
@@ -41,6 +43,7 @@ export class AjaxController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getOneAjaxList")
   @ApiOperation({ summary: "Get single ajax average performance data" })
   @ApiResponse({ type: ListWebMonitorAjaxOnesResponseDto })
@@ -60,6 +63,7 @@ export class AjaxController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getMarkUserAjaxList")
   @ApiOperation({ summary: "Get marked user ajax list" })
   @ApiResponse({ type: ListWebMonitorAjaxMarkUsersResponseDto })

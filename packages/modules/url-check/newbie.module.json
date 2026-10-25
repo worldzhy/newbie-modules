@@ -6,6 +6,7 @@
     "file": "url-check.module",
     "className": "UrlCheckModule"
   },
+  "schema": "prisma/schema.prisma",
   "moduleDependencies": ["clickhouse", "security"],
   "config-service": {},
   "env": {},

@@ -70,7 +70,7 @@ const MODULES = [
   {
     key: "clickhouse",
     file: "clickhouse",
-    className: "ClickhouseModule",
+    className: "ClickHouseModule",
     schema: false,
   },
   {

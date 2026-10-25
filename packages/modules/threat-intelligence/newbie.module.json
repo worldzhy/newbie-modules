@@ -1,0 +1,14 @@
+{
+  "key": "threat-intelligence",
+  "layer": "feature",
+  "module": {
+    "file": "threat-intelligence.module",
+    "className": "ThreatIntelligenceModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security", "llm"],
+  "config-service": {},
+  "env": {},
+  "dependencies": {},
+  "devDependencies": {}
+}

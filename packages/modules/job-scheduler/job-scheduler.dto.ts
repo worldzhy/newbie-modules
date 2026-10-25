@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { IsBoolean, IsOptional, IsString } from "class-validator";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
 export class JobScheduleDto {
   @ApiProperty()
@@ -79,7 +80,6 @@ export class UpdateJobScheduleDto {
   timezone?: string;
 }
 
-export class ListJobRunsRequestDto {
-  @ApiPropertyOptional({ default: 50, description: "Maximum runs to return (1-200)" })
-  limit?: string;
-}
+export class ListJobRunsRequestDto extends CommonListRequestDto {}
+
+export class ListJobRunsResponseDto extends CommonListResponseDto<JobRunDto> {}

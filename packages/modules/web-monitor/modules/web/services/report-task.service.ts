@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
-import { WebMonitorClickhouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
+import { WebMonitorClickHouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
 import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 import { SystemDocument } from "../../../models/mongo/system.schema";
 import { func } from "../../../shared/utils";
@@ -68,7 +68,7 @@ export class WebReportTaskService {
     private readonly redis: RedisService,
     private readonly site: SiteService,
     private readonly models: WebMonitorModelsService,
-    private readonly ch: WebMonitorClickhouseService,
+    private readonly ch: WebMonitorClickHouseService,
   ) {
     this.cfg = this.config.get("modules.web-monitor") || {};
   }
@@ -79,22 +79,28 @@ export class WebReportTaskService {
     else bucket[appId] = [row];
   }
 
-  private async collectQueueItem(raw: string, buckets: DrainBuckets) {
+  private async collectQueueItem(raw: string, buckets: DrainBuckets): Promise<string | null> {
     let query: Record<string, unknown>;
     try {
       query = JSON.parse(raw);
     } catch {
-      return;
+      return null;
     }
     const querytype = query.type || ReportType.PagePerf;
     const item = this.handleWebData(query);
     if (query.type === ReportType.SdkError) {
       this.collectSdkError(item, buckets.sdkErrors);
-      return;
+      return item.appId || null;
     }
-    if (!item.appId) return;
+    if (!item.appId) {
+      this.logger.warn("web report item dropped: missing appId");
+      return null;
+    }
     const system = await this.site.getSiteForAppId(item.appId);
-    if (!system) return;
+    if (!system) {
+      this.logger.warn(`web report item dropped: site not found for appId=${item.appId}`);
+      return null;
+    }
     // All anomaly-relevant data is always persisted; thresholds define what an
     // anomaly is, collection switches are intentionally not supported.
     if (querytype === ReportType.PagePerf) this.collectPages(item, system.slowPageTime, buckets.appPages);
@@ -102,6 +108,7 @@ export class WebReportTaskService {
     this.collectErrors(item, buckets.appErrors);
     if (querytype === ReportType.PagePerf) await this.collectEnvironment(item, buckets.appEnvironments);
     this.collectCustoms(item, buckets.appCustoms);
+    return item.appId;
   }
 
   private collectPages(item: WebReportItem, slowPageTime = 5, appPages: Record<string, Record<string, unknown>[]>) {
@@ -287,53 +294,78 @@ export class WebReportTaskService {
     // One round trip for the whole batch instead of one RPOP per report
     // (RPOP key count, Redis >= 6.2).
     const raws = (await this.redis.getClient().rpop(RedisKeys.WEB_REPORT_DATAS, count)) || [];
+    const rawsByApp: Record<string, string[]> = {};
     for (const raw of raws) {
       try {
-        await this.collectQueueItem(raw, buckets);
+        const appId = await this.collectQueueItem(raw, buckets);
+        if (appId) (rawsByApp[appId] ||= []).push(raw);
       } catch (e: unknown) {
         // A single malformed/poisoned item must not abort the rest of the batch.
         this.logger.error("web report item processing failed", e instanceof Error ? e.message : String(e));
       }
     }
-    await this.flushBuckets(buckets);
+    const failedAppIds = await this.flushBuckets(buckets);
+    if (failedAppIds.size) {
+      // Re-queue the raw payloads of every app whose flush failed so the next
+      // tick retries them instead of silently dropping the batch. Duplicates
+      // are acceptable for append-only analytics; loss is not.
+      let requeued = 0;
+      for (const appId of failedAppIds) {
+        for (const raw of rawsByApp[appId] ?? []) {
+          await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DATAS, raw);
+          requeued += 1;
+        }
+      }
+      this.logger.warn(
+        `web report flush failed; re-queued ${requeued} reports for apps: ${[...failedAppIds].join(",")}`,
+      );
+    }
   }
 
-  private async flushBuckets(buckets: DrainBuckets) {
-    const flush = async (label: string, write: () => Promise<unknown>) => {
+  private async flushBuckets(buckets: DrainBuckets): Promise<Set<string>> {
+    const failedAppIds = new Set<string>();
+    const flush = async (label: string, appId: string, write: () => Promise<unknown>) => {
       try {
         await write();
       } catch (e: unknown) {
         // One failing destination must not suppress the remaining flushes.
+        failedAppIds.add(appId);
         this.logger.error(`web report flush failed (${label})`, e instanceof Error ? e.message : String(e));
       }
     };
     for (const appId of Object.keys(buckets.appAjaxs)) {
       const rows = buckets.appAjaxs[appId];
-      if (rows.length) await flush(`ajax:${appId}`, async () => (await this.ch.WebAjax(appId)).insertMany(rows));
+      if (rows.length) await flush(`ajax:${appId}`, appId, async () => (await this.ch.WebAjax(appId)).insertMany(rows));
     }
     for (const appId of Object.keys(buckets.appErrors)) {
       const rows = buckets.appErrors[appId];
-      if (rows.length) await flush(`error:${appId}`, async () => (await this.ch.WebError(appId)).insertMany(rows));
+      if (rows.length)
+        await flush(`error:${appId}`, appId, async () => (await this.ch.WebError(appId)).insertMany(rows));
     }
     if (buckets.sdkErrors.length) {
-      await flush("sdk-error", async () => (await this.ch.WebSdkError()).insertMany(buckets.sdkErrors));
+      // SDK-error payloads are not produced by handleWebData today; a failure
+      // here cannot be attributed to a single app, so it is logged but not
+      // re-queued (no raws are keyed under the empty app id).
+      await flush("sdk-error", "", async () => (await this.ch.WebSdkError()).insertMany(buckets.sdkErrors));
     }
     for (const appId of Object.keys(buckets.appPages)) {
       const rows = buckets.appPages[appId];
-      if (rows.length) await flush(`page:${appId}`, () => this.models.WebPage(appId).insertMany(rows));
+      if (rows.length) await flush(`page:${appId}`, appId, () => this.models.WebPage(appId).insertMany(rows));
     }
     for (const appId of Object.keys(buckets.appEnvironments)) {
       const rows = buckets.appEnvironments[appId];
-      if (rows.length) await flush(`environment:${appId}`, () => this.models.WebEnvironment(appId).insertMany(rows));
+      if (rows.length)
+        await flush(`environment:${appId}`, appId, () => this.models.WebEnvironment(appId).insertMany(rows));
     }
     for (const appId of Object.keys(buckets.appResources)) {
       const rows = buckets.appResources[appId];
-      if (rows.length) await flush(`resource:${appId}`, () => this.models.WebResource(appId).insertMany(rows));
+      if (rows.length) await flush(`resource:${appId}`, appId, () => this.models.WebResource(appId).insertMany(rows));
     }
     for (const appId of Object.keys(buckets.appCustoms)) {
       const rows = buckets.appCustoms[appId];
-      if (rows.length) await flush(`custom:${appId}`, () => this.models.WebCustom(appId).insertMany(rows));
+      if (rows.length) await flush(`custom:${appId}`, appId, () => this.models.WebCustom(appId).insertMany(rows));
     }
+    return failedAppIds;
   }
 
   private handleWebData(query: Record<string, unknown>): WebReportItem {

@@ -42,6 +42,7 @@ export default [
       "packages/modules/membership/subscription/subscription.dto.ts",
       "packages/modules/membership/subscription/wechat-subscription/wechat-subscription.dto.ts",
       "packages/modules/order/order.dto.ts",
+      "packages/modules/people-evaluation/people-evaluation.dto.ts",
       "packages/modules/shortcut/shortcut-item.dto.ts",
     ],
     rules: {

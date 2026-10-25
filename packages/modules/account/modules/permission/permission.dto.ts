@@ -8,21 +8,21 @@ import { IsEnum, IsInt, IsNotEmpty, IsOptional, IsString, IsUUID } from "class-v
  * Mirrors the writable scalar columns of the Permission model.
  */
 export class CreatePermissionDto {
-  @ApiProperty({ enum: PermissionAction, description: "The action allowed by this rule." })
+  @ApiProperty({ enum: PermissionAction, description: "The action allowed by this permission." })
   @IsEnum(PermissionAction)
   action!: PermissionAction;
 
-  @ApiProperty({ type: String, description: "The resource (Prisma model name) the rule applies to." })
+  @ApiProperty({ type: String, description: "The resource (Prisma model name) the permission applies to." })
   @IsString()
   @IsNotEmpty()
   resource!: string;
 
-  @ApiPropertyOptional({ type: String, description: "Scopes the rule to a specific trusted user id." })
+  @ApiPropertyOptional({ type: String, description: "Scopes the permission to a specific trusted user id." })
   @IsUUID()
   @IsOptional()
   trustedUserId?: string;
 
-  @ApiPropertyOptional({ type: Number, description: "Scopes the rule to a specific role id." })
+  @ApiPropertyOptional({ type: Number, description: "Scopes the permission to a specific role id." })
   @IsInt()
   @IsOptional()
   roleId?: number;

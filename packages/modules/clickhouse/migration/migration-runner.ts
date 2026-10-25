@@ -22,7 +22,7 @@ import path from "node:path";
  *   therefore be idempotent (CREATE/ADD ... IF NOT EXISTS, forward-only).
  */
 
-export interface ClickhouseMigrationConfig {
+export interface ClickHouseMigrationConfig {
   url: string;
   username: string;
   password: string;
@@ -282,7 +282,7 @@ export function planMigrations(discovered: DiscoveredMigration[], applied: Appli
  * database so a fresh ClickHouse volume (before first connection) bootstraps
  * cleanly.
  */
-async function ensureDatabase(config: ClickhouseMigrationConfig): Promise<void> {
+async function ensureDatabase(config: ClickHouseMigrationConfig): Promise<void> {
   if (!IDENTIFIER_PATTERN.test(config.database)) {
     throw new Error(`Unsafe CLICKHOUSE_DB value '${config.database}': expected [A-Za-z0-9_]+`);
   }
@@ -323,7 +323,7 @@ export type MigrationExecutor = Pick<ClickHouseClient, "command" | "insert">;
 
 /** Run fn against a connected client scoped to the target database. */
 async function withClient<T>(
-  config: ClickhouseMigrationConfig,
+  config: ClickHouseMigrationConfig,
   fn: (client: ClickHouseClient) => Promise<T>,
 ): Promise<T> {
   await ensureDatabase(config);
@@ -378,7 +378,7 @@ export async function runPlan(
  * list of files executed in this run.
  */
 export async function runMigrations(
-  config: ClickhouseMigrationConfig,
+  config: ClickHouseMigrationConfig,
   moduleRoots: string[],
   log: MigrationLogger = () => undefined,
 ): Promise<MigrationResult> {
@@ -402,7 +402,7 @@ export async function runMigrations(
 
 /** Read-only view used by the `status` command. */
 export async function getMigrationStatus(
-  config: ClickhouseMigrationConfig,
+  config: ClickHouseMigrationConfig,
   moduleRoots: string[],
 ): Promise<MigrationPlan & { database: string }> {
   if (!config.database) {

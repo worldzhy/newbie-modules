@@ -3,7 +3,13 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagg
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { JobSchedulerService } from "./scheduler/job-scheduler.service";
-import { JobRunDto, JobScheduleDto, ListJobRunsRequestDto, UpdateJobScheduleDto } from "./job-scheduler.dto";
+import {
+  JobRunDto,
+  JobScheduleDto,
+  ListJobRunsRequestDto,
+  ListJobRunsResponseDto,
+  UpdateJobScheduleDto,
+} from "./job-scheduler.dto";
 
 @ApiTags("Job Scheduler")
 @ApiBearerAuth()
@@ -21,10 +27,10 @@ export class JobSchedulerController {
 
   @Get("schedules/:key/runs")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.JobRun)
-  @ApiOperation({ summary: "List recent execution runs for a job schedule" })
-  @ApiResponse({ status: 200, type: [JobRunDto] })
-  listScheduleRuns(@Param("key") key: string, @Query() query: ListJobRunsRequestDto): Promise<JobRunDto[]> {
-    return this.jobScheduler.listScheduleRuns(key, query.limit) as Promise<JobRunDto[]>;
+  @ApiOperation({ summary: "List execution runs for a job schedule" })
+  @ApiResponse({ status: 200, type: ListJobRunsResponseDto })
+  listScheduleRuns(@Param("key") key: string, @Query() query: ListJobRunsRequestDto): Promise<ListJobRunsResponseDto> {
+    return this.jobScheduler.listScheduleRuns(key, query.page, query.pageSize) as Promise<ListJobRunsResponseDto>;
   }
 
   @Patch("schedules/:key")

@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, Get, Ip, Query, Req, Res } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiFoundResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
@@ -28,7 +28,7 @@ export class LoginByLarkController {
     private readonly cookieService: CookieService,
   ) {}
 
-  @ApiOkResponse()
+  @ApiFoundResponse({ description: "Redirect to the Feishu authorization page." })
   @NoGuard()
   @Get("login-by-lark")
   @ApiOperation({ summary: "Initiate Feishu OAuth login (redirects to Feishu)" })
@@ -39,7 +39,10 @@ export class LoginByLarkController {
     response.redirect(this.larkAuthService.buildAuthorizeUrl(state));
   }
 
-  @ApiOkResponse()
+  @ApiFoundResponse({
+    description:
+      "Redirect to the frontend callback; the session token or MFA challenge travels in the URL hash fragment.",
+  })
   @NoGuard()
   @Get("login-by-lark/redirect")
   @ApiOperation({ summary: "Feishu OAuth redirect callback" })

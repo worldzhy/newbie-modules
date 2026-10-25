@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { DeleteResult } from "mongodb";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
 import { func } from "../../shared/utils";
@@ -9,7 +10,17 @@ export class SiteService {
   constructor(
     private readonly models: WebMonitorModelsService,
     private readonly nodeCache: NodeCacheService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /** Project IDs the caller is a member of. Empty means "no projects". */
+  private async userProjectIds(userId: string): Promise<string[]> {
+    const rows = await this.prisma.projectMember.findMany({
+      where: { userId },
+      select: { projectId: true },
+    });
+    return rows.map((r) => r.projectId);
+  }
 
   async saveSiteData(body: Record<string, unknown>) {
     const type = typeof body.type === "string" ? body.type : undefined;
@@ -100,12 +111,19 @@ export class SiteService {
     return await this.models.System().findOne({ appId: appId }).exec();
   }
 
-  async getSitesForUserId(query: Record<string, unknown>) {
+  async getSitesForUserId(query: Record<string, unknown>, userId: string) {
     const { systemName, type, projectId } = query;
     const param: Record<string, unknown> = {};
     if (systemName) param.systemName = new RegExp(String(systemName));
     if (type) param.type = type;
-    if (projectId) param.projectId = projectId;
+    const projectIds = await this.userProjectIds(userId);
+    // Restrict to the caller's projects; an explicit projectId filter is honoured
+    // only when it is one of the caller's own projects.
+    if (projectId && projectIds.includes(String(projectId))) {
+      param.projectId = projectId;
+    } else {
+      param.projectId = { $in: projectIds };
+    }
     return (await this.models.System().find(param).exec()) || [];
   }
 
@@ -126,6 +144,17 @@ export class SiteService {
 
   async getWebSiteList() {
     return (await this.models.System().find({ type: "web" }).exec()) || [];
+  }
+
+  /** List web sites belonging to projects the caller is a member of. */
+  async getWebSiteListForUser(userId: string) {
+    const projectIds = await this.userProjectIds(userId);
+    return (
+      (await this.models
+        .System()
+        .find({ type: "web", projectId: { $in: projectIds } })
+        .exec()) || []
+    );
   }
 
   async deleteWebSiteUser(appId: string, userToken: string) {

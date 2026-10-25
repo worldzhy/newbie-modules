@@ -1,8 +1,16 @@
-import { createHash, randomUUID } from "node:crypto";
-
 import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { HealthInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AuditLogService } from "@modules/audit/audit-log.service";
+import {
+  InstallationCredentialAudit,
+  InstallationCredentialStore,
+  issueInstallationCredential,
+  revokeInstallationCredential,
+  rotateInstallationCredential,
+} from "@modules/security/installation/installation-credential";
+import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
+import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** Requested interval between client snapshots; echoed back in the response. */
@@ -13,8 +21,13 @@ export const ONLINE_THRESHOLD_SECONDS = SNAPSHOT_INTERVAL_SECONDS * 3;
 
 const ONLINE_THRESHOLD_MILLISECONDS = ONLINE_THRESHOLD_SECONDS * 1000;
 
-export function hashHealthToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
+/** Audit resource type for installation credential events. */
+const AUDIT_RESOURCE_TYPE = "health-installation";
+
+/** Domain columns stored next to the credential (ADR-019). */
+interface HealthInstallationDraft {
+  label: string;
+  externalRef: string | null;
 }
 
 /** Derived health state of an installation. */
@@ -71,23 +84,36 @@ export class HealthInstallationService implements InstallationResolver {
   /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
   readonly legacyHeader = "x-health-token";
 
-  constructor(private readonly prisma: PrismaService) {}
+  // Credential mechanism comes from security (ADR-019); this class only adapts
+  // its table and projects the domain state.
+  private readonly credentials: InstallationCredentialStore<HealthInstallationDraft, HealthInstallation>;
+  private readonly tokenVerifier: InstallationTokenVerifier<HealthInstallation>;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogService: AuditLogService,
+  ) {
+    this.credentials = prismaInstallationCredentialStore<HealthInstallationDraft, HealthInstallation>(
+      this.prisma.healthInstallation,
+    );
+    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
+  }
 
   // -------------------------------------------------------------------------
   // Installation lifecycle (host integration API)
   // -------------------------------------------------------------------------
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
-  async create(input: { label: string; externalRef?: string }) {
-    const token = randomUUID();
-    const row = await this.prisma.healthInstallation.create({
-      data: {
-        label: input.label,
-        externalRef: input.externalRef ?? null,
-        tokenHash: hashHealthToken(token),
+  async create(input: { label: string; externalRef?: string }, actor?: string) {
+    const { record, token } = await issueInstallationCredential(
+      this.credentials,
+      { label: input.label, externalRef: input.externalRef ?? null },
+      {
+        ...this.credentialAudit(actor),
+        detail: { label: input.label, externalRef: input.externalRef ?? null },
       },
-    });
-    return { ...this.withDerivedState(row), token };
+    );
+    return { ...this.withDerivedState(record), token };
   }
 
   async list(query: { externalRef?: string }) {
@@ -109,36 +135,15 @@ export class HealthInstallationService implements InstallationResolver {
   }
 
   /** Rotate the token; the old hash stops working immediately. */
-  async regenerateToken(id: string) {
-    const token = randomUUID();
-    try {
-      await this.prisma.healthInstallation.update({
-        where: { id },
-        data: { tokenHash: hashHealthToken(token) },
-      });
-    } catch (error) {
-      if (this.isMissingRowError(error)) {
-        throw new NotFoundException(`Installation ${id} not found.`);
-      }
-      throw error;
-    }
-    return { id, token };
+  async regenerateToken(id: string, actor?: string) {
+    await this.getOrThrow(id);
+    return rotateInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   /** Soft revocation: snapshots are rejected (401), rows retained for audit. */
-  async revoke(id: string) {
-    try {
-      await this.prisma.healthInstallation.update({
-        where: { id },
-        data: { revokedAt: new Date() },
-      });
-    } catch (error) {
-      if (this.isMissingRowError(error)) {
-        throw new NotFoundException(`Installation ${id} not found.`);
-      }
-      throw error;
-    }
-    return { id, revoked: true };
+  async revoke(id: string, actor?: string) {
+    await this.getOrThrow(id);
+    return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
   }
 
   // -------------------------------------------------------------------------
@@ -290,9 +295,7 @@ export class HealthInstallationService implements InstallationResolver {
    * revoked tokens both return null so the two cases stay indistinguishable.
    */
   async resolveByToken(token: string): Promise<HealthInstallation | null> {
-    return this.prisma.healthInstallation.findFirst({
-      where: { tokenHash: hashHealthToken(token), revokedAt: null },
-    });
+    return this.tokenVerifier.verify(token);
   }
 
   /**
@@ -376,13 +379,13 @@ export class HealthInstallationService implements InstallationResolver {
     return result;
   }
 
+  private credentialAudit(actor?: string): InstallationCredentialAudit {
+    return { recorder: this.auditLogService, resourceType: AUDIT_RESOURCE_TYPE, actorId: actor };
+  }
+
   private withDerivedState(row: HealthInstallation) {
     const state = this.deriveState(row.lastSnapshotAt, row.lastSnapshotStatus);
     const { tokenHash: _tokenHash, ...rest } = row;
     return { ...rest, state };
-  }
-
-  private isMissingRowError(error: unknown): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025";
   }
 }

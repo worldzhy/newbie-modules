@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import { getMigrationStatus, runMigrations, type ClickhouseMigrationConfig } from "./migration-runner";
+import { getMigrationStatus, runMigrations, type ClickHouseMigrationConfig } from "./migration-runner";
 
 /**
  * Deployment/standalone frontend for the ClickHouse migration engine.
@@ -55,7 +55,7 @@ export function loadDotEnv(cwd: string): void {
   }
 }
 
-export function resolveConfig(cwd: string): ClickhouseMigrationConfig {
+export function resolveConfig(cwd: string): ClickHouseMigrationConfig {
   loadDotEnv(cwd);
   return {
     url: process.env.CLICKHOUSE_URL || "http://localhost:8123",

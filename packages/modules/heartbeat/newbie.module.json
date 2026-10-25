@@ -7,7 +7,7 @@
     "className": "HeartbeatModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
+  "moduleDependencies": ["audit", "security"],
   "sdk": "@devbie/heartbeat-sdk",
   "dependencies": {},
   "devDependencies": {}
