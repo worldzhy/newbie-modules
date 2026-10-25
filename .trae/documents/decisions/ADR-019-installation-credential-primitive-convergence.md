@@ -51,3 +51,9 @@ ADR-009 落地时是 5 个 collector（heartbeat / health / backend-monitor / mo
 - 一次性改动面跨 registry 六模块（heartbeat / health / module-hub / backend-monitor / web-monitor / people-evaluation）+ security，并按 registry-first 流程同步到消费仓 nightwatch-backend。
 
 **范围外（本次不做）**：`InstallationPresence`（enrolled / online / lastSeenAt / revokedOnly）在四个模块重复派生，语义一致、仅阈值不同；可在后续里程碑以"带阈值参数的共享派生函数"收敛，不属于凭证原语。
+
+## 勘误（2026-10-25，评审后补记，正文不改）
+
+- **术语**：决策 4 所列 store 端口方法 `updateTokenHash` 在实际实现中命名为 `replaceTokenHash`；两者指同一方法，后续引用以代码为准。
+- **负缓存的边界被显式确认**：只缓存"格式合法但库中不存在"的 token；格式非法者不查库也不入缓存，否则垃圾流量会按上限淘汰掉真正需要吸收的条目（实现与 `installation-token.verifier.test.ts` 已固化该行为）。
+- **并发窗口（接受）**：collector 先读取再写入，两步之间行被删除时 Prisma 抛 P2025 并表现为 500 而非 404。installation 行全生命周期只做软吊销、代码中不存在硬删除路径，故该窗口在实践中不可达；如将来引入硬删除或级联删除，需在 store 适配层把 P2025 映射为 NotFound。

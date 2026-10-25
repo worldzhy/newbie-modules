@@ -42,7 +42,7 @@ export const ModuleHubAuditEvent = {
 } as const;
 
 /** Resource type for installation-scoped audit rows. */
-const INSTALLATION_RESOURCE_TYPE = "module-hub-installation";
+const AUDIT_RESOURCE_TYPE = "module-hub-installation";
 
 /** Domain columns stored next to the credential (ADR-019). */
 interface ModuleHubInstallationDraft {
@@ -211,7 +211,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
       },
       {
         recorder: this.auditLogService,
-        resourceType: INSTALLATION_RESOURCE_TYPE,
+        resourceType: AUDIT_RESOURCE_TYPE,
         actorId: input.actor,
         detail: { label: input.label, externalRef: input.externalRef ?? null },
       },
@@ -309,7 +309,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
       data: { targetSpec: spec === null ? Prisma.DbNull : (spec as Prisma.InputJsonValue) },
     });
     await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_TARGET_SPEC, {
-      resourceType: INSTALLATION_RESOURCE_TYPE,
+      resourceType: AUDIT_RESOURCE_TYPE,
       resourceId: id,
       actorType: "host",
       actorId: actor ?? "unknown",
@@ -323,7 +323,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
     await this.getOrThrow(id);
     return rotateInstallationCredential(this.credentials, id, {
       recorder: this.auditLogService,
-      resourceType: INSTALLATION_RESOURCE_TYPE,
+      resourceType: AUDIT_RESOURCE_TYPE,
       actorId: actor,
     });
   }
@@ -333,7 +333,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
     await this.getOrThrow(id);
     return revokeInstallationCredential(this.credentials, id, {
       recorder: this.auditLogService,
-      resourceType: INSTALLATION_RESOURCE_TYPE,
+      resourceType: AUDIT_RESOURCE_TYPE,
       actorId: actor,
     });
   }

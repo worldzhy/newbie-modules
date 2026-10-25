@@ -24,7 +24,10 @@ const PRIMITIVES_IMPORT_PATTERN = /@modules\/security\/installation\//;
 const TOKEN_COLUMN_ASSIGNMENT_PATTERN = /\btokenHash\s*:/;
 const TOKEN_GENERATION_PATTERN = /randomUUID\(/;
 const TOKEN_HASHING_PATTERN = /createHash\(\s*["']sha256["']\s*\)/;
-const UUID_TOKEN_LITERAL_PATTERN = /\\d\{8\}-\\d\{4\}-\\d\{4\}/;
+/** `\d{8}-\d{4}-…` written as a regex literal. */
+const UUID_TOKEN_ESCAPE_PATTERN = /\\d\{8\}-\\d\{4\}-\\d\{4\}/;
+/** `[0-9a-f]{8}-[0-9a-f]{4}…` character-class spelling of the same shape. */
+const UUID_TOKEN_CHARACTER_CLASS_PATTERN = /\[0-9a-f\]\{8\}-\[0-9a-f\]\{4\}/i;
 
 function listTypeScriptFiles(directory: string): string[] {
   const files: string[] = [];
@@ -39,6 +42,36 @@ function listTypeScriptFiles(directory: string): string[] {
   return files;
 }
 
+/** Guards one collector source file against re-implementing the mechanism. */
+export function assertCollectorSource(source: string, file: string): void {
+  assert.doesNotMatch(
+    source,
+    TOKEN_GENERATION_PATTERN,
+    `${file} generates its own token; use issueInstallationCredential() from @modules/security/installation (ADR-019).`,
+  );
+  assert.doesNotMatch(
+    source,
+    TOKEN_HASHING_PATTERN,
+    `${file} hashes tokens itself; use hashInstallationToken() from @modules/security/installation (ADR-019).`,
+  );
+  assert.doesNotMatch(
+    source,
+    UUID_TOKEN_ESCAPE_PATTERN,
+    `${file} redefines the token format; use isInstallationTokenWellFormed() from @modules/security/installation (ADR-019).`,
+  );
+  assert.doesNotMatch(
+    source,
+    UUID_TOKEN_CHARACTER_CLASS_PATTERN,
+    `${file} redefines the token format; use isInstallationTokenWellFormed() from @modules/security/installation (ADR-019).`,
+  );
+  if (!TOKEN_COLUMN_ASSIGNMENT_PATTERN.test(source)) return;
+  assert.match(
+    source,
+    PRIMITIVES_IMPORT_PATTERN,
+    `${file} stores a token hash without importing the shared credential primitives (ADR-019).`,
+  );
+}
+
 describe("installation credential convergence (ADR-019)", () => {
   for (const moduleKey of COLLECTOR_MODULES) {
     const moduleDir = join(MODULES_DIR, moduleKey);
@@ -48,37 +81,25 @@ describe("installation credential convergence (ADR-019)", () => {
       if (!existsSync(moduleDir)) return;
 
       for (const file of listTypeScriptFiles(moduleDir)) {
-        const source = readFileSync(file, "utf8");
-        assert.doesNotMatch(
-          source,
-          TOKEN_GENERATION_PATTERN,
-          `${file} generates its own token; use issueInstallationCredential() from @modules/security/installation (ADR-019).`,
-        );
-        assert.doesNotMatch(
-          source,
-          TOKEN_HASHING_PATTERN,
-          `${file} hashes tokens itself; use hashInstallationToken() from @modules/security/installation (ADR-019).`,
-        );
-        assert.doesNotMatch(
-          source,
-          UUID_TOKEN_LITERAL_PATTERN,
-          `${file} redefines the token format; use isInstallationTokenWellFormed() from @modules/security/installation (ADR-019).`,
-        );
-      }
-    });
-
-    it(`${moduleKey}: token storage goes through the shared primitives`, () => {
-      if (!existsSync(moduleDir)) return;
-
-      for (const file of listTypeScriptFiles(moduleDir)) {
-        const source = readFileSync(file, "utf8");
-        if (!TOKEN_COLUMN_ASSIGNMENT_PATTERN.test(source)) continue;
-        assert.match(
-          source,
-          PRIMITIVES_IMPORT_PATTERN,
-          `${file} stores a token hash without importing the shared credential primitives (ADR-019).`,
-        );
+        assertCollectorSource(readFileSync(file, "utf8"), file);
       }
     });
   }
+
+  it("detects every mechanism the scan claims to cover", () => {
+    assert.throws(() => assertCollectorSource("const token = randomUUID();", "sample.ts"), /generates its own token/);
+    assert.throws(() => assertCollectorSource('const hash = createHash("sha256");', "sample.ts"), /hashes tokens/);
+    assert.throws(() => assertCollectorSource("const pattern = /^\\d{8}-\\d{4}-\\d{4}/;", "sample.ts"), /redefines/);
+    assert.throws(
+      () => assertCollectorSource("const pattern = /^[0-9a-f]{8}-[0-9a-f]{4}/i;", "sample.ts"),
+      /redefines/,
+    );
+    assert.throws(() => assertCollectorSource("const data = { tokenHash: value };", "sample.ts"), /without importing/);
+    assert.doesNotThrow(() =>
+      assertCollectorSource(
+        'import { hashInstallationToken } from "@modules/security/installation/installation-credential";\nconst data = { tokenHash: hashInstallationToken(token) };',
+        "sample.ts",
+      ),
+    );
+  });
 });
