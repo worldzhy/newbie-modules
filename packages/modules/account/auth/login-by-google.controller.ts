@@ -1,11 +1,10 @@
 import { Controller, Get, Ip, Req, Res } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiFoundResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Request, Response } from "express";
 import { GuardByGoogle } from "@modules/security/authentication/google-oauth/google.decorator";
 import { GoogleUserResDto } from "@modules/security/authentication/google-oauth/dto/google-user.dto";
 import { AuthService } from "@modules/account/auth/auth.service";
-import { LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
 
 /**
  * Google OAuth login endpoints.
@@ -25,7 +24,7 @@ export class LoginByGoogleController {
     private readonly config: ConfigService,
   ) {}
 
-  @ApiOkResponse()
+  @ApiFoundResponse({ description: "Redirect to the Google authorization page." })
   @GuardByGoogle()
   @Get("login-by-google")
   @ApiOperation({ summary: "Initiate Google OAuth login (redirects to Google)" })
@@ -36,7 +35,10 @@ export class LoginByGoogleController {
   @GuardByGoogle()
   @Get("login-by-google/redirect")
   @ApiOperation({ summary: "Google OAuth redirect callback" })
-  @ApiResponse({ type: LoginByPasswordResponseDto })
+  @ApiFoundResponse({
+    description:
+      "Redirect to the frontend callback; the session token or MFA challenge travels in the URL hash fragment.",
+  })
   async googleOAuthredirect(
     @Req() request: Request & { user: GoogleUserResDto },
     @Res() response: Response,
