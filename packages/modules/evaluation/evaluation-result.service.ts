@@ -64,7 +64,8 @@ export class EvaluationResultService {
       throw new ConflictException(`Evaluation run ${input.runId} already finished as ${run.status}`);
     }
 
-    const coverageProblems = validateCoverageStats(input.coverageStats);
+    const manifestIds = new Set(input.manifest.map((item) => item.id));
+    const coverageProblems = validateCoverageStats(input.coverageStats, manifestIds);
     if (coverageProblems.length > 0) throw new BadRequestException(coverageProblems);
 
     const criteria = await this.criteria.listCriteria(run.criteriaVersionId);
@@ -72,6 +73,7 @@ export class EvaluationResultService {
       criteria,
       verdicts: input.verdicts,
       findings: [],
+      evidenceIds: manifestIds,
     });
     if (judgmentProblems.length > 0) throw new BadRequestException(judgmentProblems);
 

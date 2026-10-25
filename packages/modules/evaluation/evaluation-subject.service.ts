@@ -9,6 +9,8 @@ export interface ListEvaluationSubjectsInput {
   kind: string;
   scopeType: string;
   scopeId: string;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface SyncEvaluationSubjectsInput extends EvaluationScope {
@@ -60,9 +62,13 @@ export class EvaluationSubjectService {
   }
 
   /**
-   * Host-driven subject sync: ask the host what exists in a scope, then make
-   * the local registry agree. The skeleton never enumerates on its own because
-   * it has no access to host identity.
+   * Host-driven subject sync: ask the host what exists in a scope, then upsert
+   * whatever it declares. The skeleton never enumerates on its own because it
+   * has no access to host identity.
+   *
+   * Sync is deliberately upsert-only: a subject the host no longer lists is
+   * NOT deleted here. Removal semantics (retire, archive, cascade to findings)
+   * belong to the first feature that actually needs them.
    */
   async syncSubjects(input: SyncEvaluationSubjectsInput) {
     const provider = this.providers.getSubjectProvider();
@@ -77,9 +83,13 @@ export class EvaluationSubjectService {
   }
 
   async listSubjects(query: ListEvaluationSubjectsInput) {
-    return this.prisma.evaluationSubject.findMany({
-      where: { kind: query.kind, scopeType: query.scopeType, scopeId: query.scopeId },
-      orderBy: [{ displayName: "asc" }, { id: "asc" }],
+    return this.prisma.findManyInManyPages({
+      model: Prisma.ModelName.EvaluationSubject,
+      pagination: { page: query.page, pageSize: query.pageSize },
+      findManyArgs: {
+        where: { kind: query.kind, scopeType: query.scopeType, scopeId: query.scopeId },
+        orderBy: [{ displayName: "asc" }, { id: "asc" }],
+      },
     });
   }
 }

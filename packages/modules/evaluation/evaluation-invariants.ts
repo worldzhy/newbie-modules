@@ -61,24 +61,43 @@ export interface ComposeCoverageInput {
   skippedBuckets: readonly (EvaluationCoverageBucket | undefined)[];
 }
 
+export interface ComposeCoverageResult {
+  stats: EvaluationCoverageStats;
+  /**
+   * Evaluated refs that name no collected item. Non-empty means the judgment
+   * examined material that is not in the manifest — the caller must reject the
+   * run rather than archive an unattributable coverage claim.
+   */
+  problems: string[];
+}
+
 /**
  * Compose the three coverage buckets of a result (ADR-020 D5.2). The evaluated
  * bucket is derived from what the judgment actually examined, never asserted by
  * the caller; skipped buckets are merged so no source of dropped material can
- * disappear.
+ * disappear. An evaluated ref unknown to the manifest is reported as a problem
+ * instead of being silently bucketed under an "unknown" source.
  */
-export function composeCoverageStats(input: ComposeCoverageInput): EvaluationCoverageStats {
+export function composeCoverageStats(input: ComposeCoverageInput): ComposeCoverageResult {
   const evaluatedRefs = [...new Set(input.evaluatedRefs)];
   const byId = new Map(input.items.map((item) => [item.id, item]));
   const bySource: Record<string, number> = {};
+  const problems: string[] = [];
   for (const ref of evaluatedRefs) {
-    const source = byId.get(ref)?.source ?? "unknown";
-    bySource[source] = (bySource[source] ?? 0) + 1;
+    const item = byId.get(ref);
+    if (!item) {
+      problems.push(`evaluated ref ${ref} is not part of the collected evidence`);
+      continue;
+    }
+    bySource[item.source] = (bySource[item.source] ?? 0) + 1;
   }
   return {
-    evaluated: { total: evaluatedRefs.length, bySource, items: evaluatedRefs },
-    declaredUnlinked: normalizeBucket(input.declaredUnlinked),
-    skipped: mergeBuckets(input.skippedBuckets),
+    stats: {
+      evaluated: { total: evaluatedRefs.length, bySource, items: evaluatedRefs },
+      declaredUnlinked: normalizeBucket(input.declaredUnlinked),
+      skipped: mergeBuckets(input.skippedBuckets),
+    },
+    problems,
   };
 }
 
@@ -106,13 +125,19 @@ function mergeBuckets(buckets: readonly (EvaluationCoverageBucket | undefined)[]
     if (bucket.note) notes.push(bucket.note);
   }
   if (Object.keys(bySource).length > 0) merged.bySource = bySource;
-  if (items.length > 0) merged.items = [...new Set(items)];
+  // Not deduplicated: one entry per skipped count, so items.length === total
+  // stays checkable by validateCoverageStats.
+  if (items.length > 0) merged.items = items;
   if (notes.length > 0) merged.note = notes.join("; ");
   return merged;
 }
 
-/** Problems that make a coverage snapshot unacceptable (ADR-020 D5.2). */
-export function validateCoverageStats(stats: EvaluationCoverageStats): string[] {
+/**
+ * Problems that make a coverage snapshot unacceptable (ADR-020 D5.2). When
+ * `manifestIds` is given, every evaluated item must be part of the archived
+ * manifest — an evaluated ref that is not cannot be attributed to a source.
+ */
+export function validateCoverageStats(stats: EvaluationCoverageStats, manifestIds?: ReadonlySet<string>): string[] {
   const problems: string[] = [];
   for (const name of ["evaluated", "declaredUnlinked", "skipped"] as const) {
     const bucket = stats?.[name];
@@ -121,6 +146,13 @@ export function validateCoverageStats(stats: EvaluationCoverageStats): string[] 
       continue;
     }
     problems.push(...validateBucket(name, bucket));
+  }
+  if (stats?.evaluated?.items && manifestIds) {
+    for (const ref of stats.evaluated.items) {
+      if (!manifestIds.has(ref)) {
+        problems.push(`coverageStats.evaluated references ${ref} which is not in the manifest`);
+      }
+    }
   }
   return problems;
 }
@@ -144,6 +176,9 @@ function validateBucket(name: string, bucket: EvaluationCoverageBucket): string[
       problems.push("coverageStats.skipped must list the dropped item ids");
     }
   }
+  if (name === "skipped" && bucket.items && bucket.items.length !== bucket.total) {
+    problems.push(`coverageStats.skipped.items lists ${bucket.items.length} ids but total is ${bucket.total}`);
+  }
   if (name === "declaredUnlinked" && bucket.total > 0 && !bucket.note) {
     problems.push("coverageStats.declaredUnlinked requires a note explaining the gap");
   }
@@ -154,12 +189,16 @@ function validateBucket(name: string, bucket: EvaluationCoverageBucket): string[
  * Judgment consistency: verdicts belong to SCORED criteria, findings belong to
  * ASSERTION criteria, and every reference resolves inside the version
  * (ADR-020 D2). Findings stay out of the result, so a scored criterion cannot
- * smuggle one in and vice versa.
+ * smuggle one in and vice versa. When `evidenceIds` is given, every
+ * `evidenceRefs` entry of a verdict or finding must name a manifest item —
+ * citing material that was never collected is a judgment defect.
  */
 export function validateJudgment(input: {
   criteria: readonly EvaluationCriterionRef[];
   verdicts: readonly EvaluationVerdict[];
   findings: readonly EvaluationFindingCandidate[];
+  /** Ids of the run's manifest items; when set, evidence refs must resolve. */
+  evidenceIds?: ReadonlySet<string>;
 }): string[] {
   const problems: string[] = [];
   const criteria = new Map(input.criteria.map((criterion) => [criterion.criterionKey, criterion]));
@@ -181,6 +220,13 @@ export function validateJudgment(input: {
     if (!Number.isFinite(verdict.score)) {
       problems.push(`verdict ${verdict.criterionKey} has a non-finite score`);
     }
+    if (input.evidenceIds) {
+      for (const ref of verdict.evidenceRefs) {
+        if (!input.evidenceIds.has(ref)) {
+          problems.push(`verdict ${verdict.criterionKey} references unknown evidence ${ref}`);
+        }
+      }
+    }
   }
 
   const seenFindings = new Set<string>();
@@ -201,6 +247,13 @@ export function validateJudgment(input: {
       problems.push(`finding ${identity} appears more than once`);
     }
     seenFindings.add(identity);
+    if (input.evidenceIds) {
+      for (const ref of finding.evidenceRefs ?? []) {
+        if (!input.evidenceIds.has(ref)) {
+          problems.push(`finding ${finding.criterionKey} references unknown evidence ${ref}`);
+        }
+      }
+    }
   }
 
   return problems;

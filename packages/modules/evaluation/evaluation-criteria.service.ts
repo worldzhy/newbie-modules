@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { EvaluationCriterionKind, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
@@ -30,6 +30,8 @@ export interface ListEvaluationCriteriaVersionsInput {
   kind: string;
   family?: string;
   includeDrafts?: boolean;
+  page?: number;
+  pageSize?: number;
 }
 
 /**
@@ -55,31 +57,47 @@ export class EvaluationCriteriaService {
     });
   }
 
-  /** Draft-only. A published version is immutable, not merely guarded. */
+  /**
+   * Draft-only, written as a conditional update: the `publishedAt: null` guard
+   * is part of the UPDATE, so a publication that lands between the check and
+   * the write cannot be overwritten — the write simply matches no row.
+   */
   async updateVersion(id: string, input: UpdateEvaluationCriteriaVersionInput) {
-    await this.assertDraftVersion(id, "update criteria version");
-    return this.prisma.evaluationCriteriaVersion.update({
-      where: { id },
+    const updated = await this.prisma.evaluationCriteriaVersion.updateMany({
+      where: { id, publishedAt: null },
       data: {
         description: input.description,
         metadata: input.metadata as Prisma.InputJsonValue | undefined,
       },
     });
+    if (updated.count === 0) await this.assertNotPublished(id, "update criteria version");
+    return this.requireVersion(id);
   }
 
   /**
    * Publish exactly once. The conditional update is what makes two concurrent
    * publications safe: only the request that flips `publishedAt` from null
-   * wins, the other sees the row already published.
+   * wins, the other sees the row already published. A version with no criteria
+   * is refused — publishing an empty rubric would make every run vacuous.
    */
   async publishVersion(id: string) {
+    const version = await this.requireVersion(id);
+    if (version.publishedAt) {
+      throw new ConflictException(
+        `Evaluation criteria version ${version.kind}/${version.family}/${version.version} is already published`,
+      );
+    }
+    const criteriaCount = await this.prisma.evaluationCriterion.count({ where: { criteriaVersionId: id } });
+    if (criteriaCount === 0) {
+      throw new BadRequestException(
+        `Cannot publish evaluation criteria version ${version.kind}/${version.family}/${version.version}: it has no criteria`,
+      );
+    }
     const published = await this.prisma.evaluationCriteriaVersion.updateMany({
       where: { id, publishedAt: null },
       data: { publishedAt: new Date() },
     });
     if (published.count === 0) {
-      const version = await this.prisma.evaluationCriteriaVersion.findUnique({ where: { id } });
-      if (!version) throw new NotFoundException(`Evaluation criteria version ${id} not found`);
       throw new ConflictException(
         `Evaluation criteria version ${version.kind}/${version.family}/${version.version} is already published`,
       );
@@ -92,13 +110,17 @@ export class EvaluationCriteriaService {
   }
 
   async listVersions(query: ListEvaluationCriteriaVersionsInput) {
-    return this.prisma.evaluationCriteriaVersion.findMany({
-      where: {
-        kind: query.kind,
-        ...(query.family ? { family: query.family } : {}),
-        ...(query.includeDrafts ? {} : { publishedAt: { not: null } }),
+    return this.prisma.findManyInManyPages({
+      model: Prisma.ModelName.EvaluationCriteriaVersion,
+      pagination: { page: query.page, pageSize: query.pageSize },
+      findManyArgs: {
+        where: {
+          kind: query.kind,
+          ...(query.family ? { family: query.family } : {}),
+          ...(query.includeDrafts ? {} : { publishedAt: { not: null } }),
+        },
+        orderBy: [{ family: "asc" }, { version: "desc" }],
       },
-      orderBy: [{ family: "asc" }, { version: "desc" }],
     });
   }
 
@@ -110,38 +132,44 @@ export class EvaluationCriteriaService {
   }
 
   async addCriterion(versionId: string, input: CreateEvaluationCriterionInput) {
-    await this.assertDraftVersion(versionId, "add a criterion");
-    return this.prisma.evaluationCriterion.create({
-      data: {
-        criteriaVersionId: versionId,
-        criterionKey: input.criterionKey,
-        kind: input.kind as EvaluationCriterionKind,
-        name: input.name,
-        description: input.description,
-        metadata: input.metadata as Prisma.InputJsonValue | undefined,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      await this.lockDraftVersion(tx, versionId, "add a criterion");
+      return tx.evaluationCriterion.create({
+        data: {
+          criteriaVersionId: versionId,
+          criterionKey: input.criterionKey,
+          kind: input.kind as EvaluationCriterionKind,
+          name: input.name,
+          description: input.description,
+          metadata: input.metadata as Prisma.InputJsonValue | undefined,
+        },
+      });
     });
   }
 
   async updateCriterion(criterionId: string, input: Partial<CreateEvaluationCriterionInput>) {
-    const criterion = await this.prisma.evaluationCriterion.findUnique({ where: { id: criterionId } });
-    if (!criterion) throw new NotFoundException(`Evaluation criterion ${criterionId} not found`);
-    await this.assertDraftVersion(criterion.criteriaVersionId, "update a criterion");
-    return this.prisma.evaluationCriterion.update({
-      where: { id: criterionId },
-      data: {
-        name: input.name,
-        description: input.description,
-        metadata: input.metadata as Prisma.InputJsonValue | undefined,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const criterion = await tx.evaluationCriterion.findUnique({ where: { id: criterionId } });
+      if (!criterion) throw new NotFoundException(`Evaluation criterion ${criterionId} not found`);
+      await this.lockDraftVersion(tx, criterion.criteriaVersionId, "update a criterion");
+      return tx.evaluationCriterion.update({
+        where: { id: criterionId },
+        data: {
+          name: input.name,
+          description: input.description,
+          metadata: input.metadata as Prisma.InputJsonValue | undefined,
+        },
+      });
     });
   }
 
   async removeCriterion(criterionId: string) {
-    const criterion = await this.prisma.evaluationCriterion.findUnique({ where: { id: criterionId } });
-    if (!criterion) throw new NotFoundException(`Evaluation criterion ${criterionId} not found`);
-    await this.assertDraftVersion(criterion.criteriaVersionId, "remove a criterion");
-    await this.prisma.evaluationCriterion.delete({ where: { id: criterionId } });
+    return this.prisma.$transaction(async (tx) => {
+      const criterion = await tx.evaluationCriterion.findUnique({ where: { id: criterionId } });
+      if (!criterion) throw new NotFoundException(`Evaluation criterion ${criterionId} not found`);
+      await this.lockDraftVersion(tx, criterion.criteriaVersionId, "remove a criterion");
+      await tx.evaluationCriterion.delete({ where: { id: criterionId } });
+    });
   }
 
   /** Criteria in the shape the judgment port consumes. */
@@ -164,13 +192,30 @@ export class EvaluationCriteriaService {
     return version;
   }
 
-  /** A published version is frozen: the only way forward is a new version. */
-  private async assertDraftVersion(id: string, action: string): Promise<void> {
-    const version = await this.requireVersion(id);
+  /**
+   * Shared guard for the criterion write paths. The `FOR UPDATE` row lock is
+   * what closes the publish race: a concurrent `publishVersion` blocks on the
+   * lock until this transaction commits and then either sees a still-draft row
+   * (the criterion change landed before publication — legal) or publishes first
+   * and makes this transaction see the published row (rejected here).
+   */
+  private async lockDraftVersion(tx: Prisma.TransactionClient, id: string, action: string): Promise<void> {
+    await tx.$queryRaw`SELECT "id" FROM "module/evaluation"."EvaluationCriteriaVersion" WHERE "id" = ${id}::uuid FOR UPDATE`;
+    const version = await tx.evaluationCriteriaVersion.findUnique({ where: { id } });
+    if (!version) throw new NotFoundException(`Evaluation criteria version ${id} not found`);
     if (!isCriteriaVersionMutable(version.publishedAt)) {
       throw new ConflictException(
         `Cannot ${action}: ${version.kind}/${version.family}/${version.version} is published and therefore immutable`,
       );
     }
+  }
+
+  /** Explain a conditional write that matched no row: not found, or published. */
+  private async assertNotPublished(id: string, action: string): Promise<void> {
+    const version = await this.prisma.evaluationCriteriaVersion.findUnique({ where: { id } });
+    if (!version) throw new NotFoundException(`Evaluation criteria version ${id} not found`);
+    throw new ConflictException(
+      `Cannot ${action}: ${version.kind}/${version.family}/${version.version} is published and therefore immutable`,
+    );
   }
 }

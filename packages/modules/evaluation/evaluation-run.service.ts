@@ -1,4 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from "@nestjs/common";
 import { EvaluationRun, EvaluationRunStatus, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
@@ -7,12 +14,27 @@ import { EvaluationSubjectRef } from "./ports/evaluation.contracts";
 import { toSubjectRef } from "./evaluation-subject.service";
 
 /**
- * A run whose row has not moved for this long is treated as dead. Longer than
- * any judgment budget, so an active row past this means the process died
- * mid-run — keeping it would wedge the partial unique index and block every
- * later run for the same subject and version.
+ * Runner tuning, bound by the host when the defaults do not fit. Bind the
+ * token with a partial object; unset fields fall back to the defaults.
  */
-const STALE_RUN_TIMEOUT_MS = 30 * 60 * 1000;
+export const evaluationRunOptionsToken = "EVALUATION_RUN_OPTIONS";
+
+export interface EvaluationRunOptions {
+  /**
+   * Ms an active row may go untouched before the stale-run reaper fails it.
+   * Must be longer than any judgment budget: an active row past this means the
+   * process died mid-run — keeping it would wedge the partial unique index and
+   * block every later run for the same subject and version. Default 30 minutes.
+   */
+  staleRunTimeoutMs?: number;
+  /** Ms between runner heartbeats that keep a judging run fresh. Default 60 seconds. */
+  heartbeatIntervalMs?: number;
+}
+
+export const DEFAULT_EVALUATION_RUN_OPTIONS: Required<EvaluationRunOptions> = {
+  staleRunTimeoutMs: 30 * 60 * 1000,
+  heartbeatIntervalMs: 60 * 1000,
+};
 
 /** Failure text is stored for the caller, not for a bug report: cap it. */
 const MAX_ERROR_LENGTH = 1000;
@@ -46,7 +68,14 @@ export class EvaluationRunService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly providers: EvaluationProviderRegistry,
+    @Optional()
+    @Inject(evaluationRunOptionsToken)
+    private readonly options: EvaluationRunOptions = {},
   ) {}
+
+  private get staleRunTimeoutMs(): number {
+    return this.options.staleRunTimeoutMs ?? DEFAULT_EVALUATION_RUN_OPTIONS.staleRunTimeoutMs;
+  }
 
   /**
    * Open a run against a published criteria version. Rejects with 409 when an
@@ -113,6 +142,33 @@ export class EvaluationRunService {
     });
   }
 
+  /** Heartbeat: prove the process is alive without touching the state machine. */
+  async touch(id: string): Promise<void> {
+    await this.prisma.evaluationRun.updateMany({
+      where: { id, status: { in: ACTIVE_STATUSES } },
+      data: { updatedAt: new Date() },
+    });
+  }
+
+  /**
+   * Fencing check for the runner: the row must still be active and still be
+   * the same execution (`startedAt` unchanged). A row that fails this check
+   * was reaped as stale or closed concurrently — the caller must stop writing
+   * on its behalf.
+   */
+  async assertActive(id: string, startedAt: Date | null): Promise<void> {
+    const run = await this.prisma.evaluationRun.findUnique({ where: { id } });
+    if (!run) throw new NotFoundException(`Evaluation run ${id} not found`);
+    if (!ACTIVE_STATUSES.includes(run.status)) {
+      throw new ConflictException(
+        `Evaluation run ${id} is no longer active (status ${run.status}) — superseded or reaped as stale`,
+      );
+    }
+    if ((run.startedAt?.getTime() ?? null) !== (startedAt?.getTime() ?? null)) {
+      throw new ConflictException(`Evaluation run ${id} was restarted while this execution was in flight`);
+    }
+  }
+
   async findById(id: string): Promise<EvaluationRun> {
     const run = await this.prisma.evaluationRun.findUnique({ where: { id } });
     if (!run) throw new NotFoundException(`Evaluation run ${id} not found`);
@@ -168,7 +224,7 @@ export class EvaluationRunService {
         subjectId,
         criteriaVersionId,
         status: { in: ACTIVE_STATUSES },
-        updatedAt: { lt: new Date(Date.now() - STALE_RUN_TIMEOUT_MS) },
+        updatedAt: { lt: new Date(Date.now() - this.staleRunTimeoutMs) },
       },
       data: {
         status: EvaluationRunStatus.FAILED,

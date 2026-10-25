@@ -86,21 +86,34 @@ describe("criteria version publication (ADR-020 D5.5)", () => {
 
 describe("coverage composition (ADR-020 D5.2)", () => {
   it("derives the evaluated bucket from what the judgment examined, not from a caller count", () => {
-    const stats = composeCoverageStats({
+    const { stats, problems } = composeCoverageStats({
       items: EVIDENCE,
       evaluatedRefs: ["e1", "e2", "e2"],
       declaredUnlinked: { total: 1, note: "design note has no fact link" },
       skippedBuckets: [],
     });
 
+    assert.deepEqual(problems, []);
     assert.equal(stats.evaluated.total, 2);
     assert.deepEqual(stats.evaluated.bySource, { lockfile: 2 });
     assert.deepEqual(stats.evaluated.items, ["e1", "e2"]);
     assert.equal(stats.skipped.total, 0);
   });
 
+  it("reports an evaluated ref that names no collected item instead of bucketing it as unknown", () => {
+    const { stats, problems } = composeCoverageStats({
+      items: EVIDENCE,
+      evaluatedRefs: ["e1", "ghost"],
+      declaredUnlinked: { total: 0 },
+      skippedBuckets: [],
+    });
+
+    assert.ok(problems.some((problem) => problem.includes("ghost")));
+    assert.deepEqual(stats.evaluated.bySource, { lockfile: 1 });
+  });
+
   it("merges collector and judgment cut-offs instead of letting one overwrite the other", () => {
-    const stats = composeCoverageStats({
+    const { stats, problems } = composeCoverageStats({
       items: EVIDENCE,
       evaluatedRefs: ["e1"],
       declaredUnlinked: { total: 0 },
@@ -110,6 +123,7 @@ describe("coverage composition (ADR-020 D5.2)", () => {
       ],
     });
 
+    assert.deepEqual(problems, []);
     assert.equal(stats.skipped.total, 3);
     assert.deepEqual(stats.skipped.items, ["e2", "e3", "e4"]);
     assert.match(stats.skipped.note ?? "", /registry unreachable/);
@@ -122,6 +136,23 @@ describe("coverage composition (ADR-020 D5.2)", () => {
 
     assert.ok(problems.some((problem) => problem.includes("note")));
     assert.ok(problems.some((problem) => problem.includes("dropped item ids")));
+  });
+
+  it("rejects a skipped bucket whose item list disagrees with its total", () => {
+    const mismatched = { ...BASE_COVERAGE, skipped: { total: 3, note: "budget", items: ["e2"] } };
+    const problems = validateCoverageStats(mismatched);
+
+    assert.ok(problems.some((problem) => problem.includes("lists 1 ids but total is 3")));
+  });
+
+  it("rejects evaluated items that are not part of the archived manifest", () => {
+    const stats = {
+      ...BASE_COVERAGE,
+      evaluated: { total: 2, bySource: { lockfile: 2 }, items: ["e1", "ghost"] },
+    };
+    const problems = validateCoverageStats(stats, new Set(EVIDENCE.map((item) => item.id)));
+
+    assert.ok(problems.some((problem) => problem.includes("ghost") && problem.includes("not in the manifest")));
   });
 
   it("rejects an unexplained declared-unlinked gap and inconsistent source counts", () => {
@@ -137,13 +168,14 @@ describe("coverage composition (ADR-020 D5.2)", () => {
   });
 
   it("accepts a fully covered run", () => {
-    const stats = composeCoverageStats({
+    const { stats, problems } = composeCoverageStats({
       items: EVIDENCE,
       evaluatedRefs: ["e1", "e2", "e3"],
       declaredUnlinked: { total: 0 },
       skippedBuckets: [],
     });
 
+    assert.deepEqual(problems, []);
     assert.deepEqual(validateCoverageStats(stats), []);
   });
 });
@@ -213,5 +245,43 @@ describe("judgment consistency (ADR-020 D2)", () => {
 
     assert.ok(problems.some((problem) => problem.includes("appears more than once")));
     assert.ok(problems.some((problem) => problem.includes("missing-tests/same")));
+  });
+
+  it("rejects evidence refs that name no manifest item, on verdicts and findings alike", () => {
+    const evidenceIds = new Set(["e1", "e2"]);
+    const verdictProblems = validateJudgment({
+      criteria,
+      verdicts: [{ ...verdict("architecture"), evidenceRefs: ["e1", "ghost"] }],
+      findings: [],
+      evidenceIds,
+    });
+    const findingProblems = validateJudgment({
+      criteria,
+      verdicts: [],
+      findings: [
+        {
+          criterionKey: "missing-tests",
+          fingerprint: "module:map",
+          severity: "MEDIUM",
+          title: "Module map has no tests",
+          evidenceRefs: ["ghost"],
+        },
+      ],
+      evidenceIds,
+    });
+
+    assert.ok(verdictProblems.some((problem) => problem.includes("references unknown evidence ghost")));
+    assert.ok(findingProblems.some((problem) => problem.includes("references unknown evidence ghost")));
+  });
+
+  it("accepts evidence refs that resolve inside the manifest", () => {
+    const problems = validateJudgment({
+      criteria,
+      verdicts: [{ ...verdict("architecture"), evidenceRefs: ["e1", "e2"] }],
+      findings: [],
+      evidenceIds: new Set(["e1", "e2"]),
+    });
+
+    assert.deepEqual(problems, []);
   });
 });

@@ -16,9 +16,17 @@ import { EvaluationSubjectService } from "./evaluation-subject.service";
  * deliberately exposes no HTTP surface: endpoints, read models and scheduling
  * belong to the feature that builds on it.
  *
+ * `EvaluationRunnerService.run` is the only write entry of the run lifecycle —
+ * it owns the heartbeat, the fencing checks and the state machine transitions.
+ * The other exported services are for reads, criteria administration and human
+ * decisions (suppression, remediation); a feature must not drive the run state
+ * machine through `EvaluationRunService` directly.
+ *
  * The four ports (SubjectProvider, EvidenceProvider, CriteriaProvider,
  * JudgmentPort) are bound by the host and by features under the tokens in
- * `ports/`; this module only looks them up.
+ * `ports/`; the optional EvaluationObserver port reports run completions and
+ * finding lifecycle changes to whoever binds it. Runner tuning goes through
+ * `evaluationRunOptionsToken`. This module only ever looks bindings up.
  */
 @Global()
 @Module({

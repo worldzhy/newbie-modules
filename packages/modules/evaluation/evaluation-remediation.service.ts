@@ -22,6 +22,16 @@ export interface CreateEvaluationRemediationPlanInput {
 export interface DecideEvaluationRemediationPlanInput {
   status: "COMPLETED" | "CANCELLED";
   decisionNote?: string;
+  /**
+   * Opaque host-side actor id of whoever records the decision. `deciderRef`
+   * names the accountable decision maker; this records who actually acted, and
+   * the two may differ (delegate, system closure). Required.
+   */
+  decidedByRef: string;
+}
+
+export interface UpdateEvaluationRemediationCheckpointInput {
+  status: string;
 }
 
 export interface ListEvaluationRemediationPlansInput {
@@ -47,6 +57,10 @@ export class EvaluationRemediationService {
     if (input.triggerRefs.length === 0) throw new BadRequestException("triggerRefs must not be empty");
     if (input.dueDate && input.dueDate.getTime() <= input.startDate.getTime()) {
       throw new BadRequestException("dueDate must be after startDate");
+    }
+    if (input.checkpoints) {
+      const checkpointProblems = validateCheckpoints(input.checkpoints);
+      if (checkpointProblems.length > 0) throw new BadRequestException(checkpointProblems);
     }
 
     const subject = await this.prisma.evaluationSubject.findUnique({ where: { id: input.subjectId } });
@@ -89,11 +103,13 @@ export class EvaluationRemediationService {
    * wins, the other sees the plan already closed.
    */
   async decidePlan(id: string, input: DecideEvaluationRemediationPlanInput) {
+    if (!input.decidedByRef?.trim()) throw new BadRequestException("decidedByRef is required");
     const updated = await this.prisma.evaluationRemediationPlan.updateMany({
       where: { id, status: EvaluationRemediationStatus.OPEN },
       data: {
         status: input.status as EvaluationRemediationStatus,
         decisionNote: input.decisionNote,
+        decidedByRef: input.decidedByRef,
         decidedAt: new Date(),
       },
     });
@@ -103,6 +119,27 @@ export class EvaluationRemediationService {
       throw new ConflictException(`Evaluation remediation plan ${id} is already ${plan.status}`);
     }
     return this.requirePlan(id);
+  }
+
+  /**
+   * Progress one checkpoint of an open plan. Closing the plan freezes its
+   * checkpoints: progress after a decision is a contradiction.
+   */
+  async updateCheckpoint(id: string, index: number, input: UpdateEvaluationRemediationCheckpointInput) {
+    if (!input.status.trim()) throw new BadRequestException("checkpoint status is required");
+    const plan = await this.requirePlan(id);
+    if (plan.status !== EvaluationRemediationStatus.OPEN) {
+      throw new ConflictException(`Evaluation remediation plan ${id} is already ${plan.status}`);
+    }
+    const checkpoints = (plan.checkpoints ?? []) as unknown as EvaluationRemediationCheckpoint[];
+    if (!Array.isArray(checkpoints) || !Number.isInteger(index) || index < 0 || index >= checkpoints.length) {
+      throw new NotFoundException(`Evaluation remediation plan ${id} has no checkpoint at index ${index}`);
+    }
+    checkpoints[index] = { ...checkpoints[index], status: input.status };
+    return this.prisma.evaluationRemediationPlan.update({
+      where: { id },
+      data: { checkpoints: checkpoints as unknown as Prisma.InputJsonValue },
+    });
   }
 
   async getPlan(id: string) {
@@ -128,4 +165,29 @@ export class EvaluationRemediationService {
     if (!plan) throw new NotFoundException(`Evaluation remediation plan ${id} not found`);
     return plan;
   }
+}
+
+/**
+ * Checkpoints are stored as JSON, so the shape is enforced at the boundary:
+ * each entry must be `{ dueDate, description, status }` with a parseable
+ * dueDate and non-empty text fields.
+ */
+function validateCheckpoints(checkpoints: readonly EvaluationRemediationCheckpoint[]): string[] {
+  const problems: string[] = [];
+  checkpoints.forEach((checkpoint, index) => {
+    if (typeof checkpoint !== "object" || checkpoint === null || Array.isArray(checkpoint)) {
+      problems.push(`checkpoints[${index}] must be an object`);
+      return;
+    }
+    if (typeof checkpoint.description !== "string" || !checkpoint.description.trim()) {
+      problems.push(`checkpoints[${index}].description must be a non-empty string`);
+    }
+    if (typeof checkpoint.status !== "string" || !checkpoint.status.trim()) {
+      problems.push(`checkpoints[${index}].status must be a non-empty string`);
+    }
+    if (typeof checkpoint.dueDate !== "string" || Number.isNaN(Date.parse(checkpoint.dueDate))) {
+      problems.push(`checkpoints[${index}].dueDate must be a date string`);
+    }
+  });
+  return problems;
 }

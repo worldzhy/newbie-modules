@@ -4,6 +4,7 @@ import { ModuleRef } from "@nestjs/core";
 import { CriteriaProvider, criteriaProviderToken } from "./ports/criteria.provider";
 import { EvidenceProvider, evidenceProviderToken } from "./ports/evidence.provider";
 import { JudgmentPort, judgmentPortToken } from "./ports/judgment.port";
+import { EvaluationObserver, evaluationObserverToken } from "./ports/observer.port";
 import { SubjectProvider, subjectProviderToken } from "./ports/subject.provider";
 
 /**
@@ -41,6 +42,18 @@ export class EvaluationProviderRegistry {
       judgmentPortToken(kind),
       `JudgmentPort for subject kind "${kind}" (bind ${judgmentPortToken(kind)})`,
     );
+  }
+
+  /**
+   * The observer is the one port that may legally be absent: an unbound
+   * observer means no notifications, not a wiring error.
+   */
+  getObserver(): EvaluationObserver | null {
+    try {
+      return this.moduleRef.get<EvaluationObserver>(evaluationObserverToken, { strict: false });
+    } catch {
+      return null;
+    }
   }
 
   private get<T>(token: string, description: string): T {

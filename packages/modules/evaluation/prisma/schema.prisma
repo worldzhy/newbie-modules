@@ -218,14 +218,19 @@ model EvaluationResult {
 }
 
 /// An assertion-type conclusion (ADR-020 D2). Unlike a verdict it has an
-/// identity — `fingerprint` — and a lifecycle that spans runs: first seen once,
-/// last seen by whichever run still observed it, resolved when it stops
-/// appearing. `firstSeenAt` is never rewritten.
+/// identity — `(subjectId, family, fingerprint)` — and a lifecycle that spans
+/// runs: first seen once, last seen by whichever run still observed it,
+/// resolved when it stops appearing. `family` is copied from the run's
+/// criteria version, so a rerun under a new version of the same family keeps
+/// the finding's identity, and one family never resolves another family's
+/// findings. `firstSeenAt` is never rewritten.
 model EvaluationFinding {
   id        String @id @default(uuid()) @db.Uuid
   subjectId String @db.Uuid
 
-  // Stable identity of the assertion within the subject
+  // Criteria family of the run that owns this finding's lifecycle
+  family       String                    @db.VarChar(64)
+  // Stable identity of the assertion within the subject and family
   fingerprint  String                    @db.VarChar(128)
   criterionKey String                    @db.VarChar(64)
   severity     EvaluationFindingSeverity
@@ -244,13 +249,15 @@ model EvaluationFinding {
   resolvedAt  DateTime?
   // Mandatory when status = SUPPRESSED: why a human silenced this finding
   suppressionNote String? @db.Text
+  // Opaque host-side actor id of whoever suppressed the finding
+  suppressedByRef String? @db.VarChar(128)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   subject EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectId, fingerprint])
+  @@unique([subjectId, family, fingerprint])
   @@index([subjectId, status])
   @@index([status, severity])
   @@schema("module/evaluation")
@@ -279,6 +286,9 @@ model EvaluationRemediationPlan {
   // completed / failed / extended, recorded when the plan closes
   decisionNote String?   @db.Text
   decidedAt    DateTime?
+  // Opaque host-side actor id of whoever recorded the decision; `deciderRef`
+  // names the accountable decision maker, this records who actually acted
+  decidedByRef String?   @db.VarChar(128)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
