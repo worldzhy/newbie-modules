@@ -79,7 +79,10 @@ export class EvaluationFindingService {
    * Close findings the run did not observe, scoped to the run's family: a run
    * of one family must never resolve another family's findings. The cutoff is
    * the run's start time: anything last seen before it was absent from this
-   * pass, and runs for one subject and version are serialized by the database.
+   * pass. Runs of one subject and version are serialized by the database, but
+   * two versions of the same family may legitimately run concurrently — so the
+   * close is a compare-and-set on the listed `lastSeenAt`, and a finding that
+   * was re-observed or suppressed after the listing is left untouched.
    */
   async resolveAbsentFindings(run: EvaluationRun): Promise<number> {
     const cutoff = run.startedAt ?? run.createdAt;
@@ -92,15 +95,17 @@ export class EvaluationFindingService {
         lastSeenAt: { lt: cutoff },
         NOT: { lastSeenRunId: run.id },
       },
-      select: { id: true, fingerprint: true, severity: true },
+      select: { id: true, fingerprint: true, severity: true, lastSeenAt: true },
     });
 
     let resolvedCount = 0;
     for (const finding of absent) {
-      // Conditional per row: a human may have suppressed the finding between
-      // the listing and now — that decision wins over this resolution.
+      // Compare-and-set per row: resolve only if nothing touched the row since
+      // the listing. A human suppression wins (status changed); a concurrent
+      // run of another version in the same family that re-observed the finding
+      // also wins (lastSeenAt moved) — both leave the row untouched here.
       const resolved = await this.prisma.evaluationFinding.updateMany({
-        where: { id: finding.id, status: EvaluationFindingStatus.OPEN },
+        where: { id: finding.id, status: EvaluationFindingStatus.OPEN, lastSeenAt: finding.lastSeenAt },
         data: { status: EvaluationFindingStatus.RESOLVED, resolvedAt: new Date() },
       });
       if (resolved.count === 0) continue;
@@ -252,28 +257,39 @@ export class EvaluationFindingService {
     observedAt: Date,
   ): Promise<EvaluationFinding> {
     // A suppressed finding stays suppressed: the suppression is a human
-    // decision about a known problem, not a cache to be invalidated.
+    // decision about a known problem, not a cache to be invalidated. The write
+    // is a compare-and-set on the status we read, so a suppression (or a
+    // concurrent run of the same family) landing between the read and the
+    // write is never stomped.
     const reopened = existing.status === EvaluationFindingStatus.RESOLVED;
-    const updated = await this.prisma.evaluationFinding.update({
-      where: { id: existing.id },
-      data: {
-        criterionKey: candidate.criterionKey,
-        severity: candidate.severity,
-        title: candidate.title,
-        detail: candidate.detail,
-        metadata: candidate.metadata as Prisma.InputJsonValue | undefined,
-        lastSeenRunId: run.id,
-        lastSeenAt: observedAt,
-        ...(reopened
-          ? {
-              status: EvaluationFindingStatus.OPEN,
-              resolvedAt: null,
-              suppressionNote: null,
-              suppressedByRef: null,
-            }
-          : {}),
-      },
+    const observation = {
+      criterionKey: candidate.criterionKey,
+      severity: candidate.severity,
+      title: candidate.title,
+      detail: candidate.detail,
+      metadata: candidate.metadata as Prisma.InputJsonValue | undefined,
+      lastSeenRunId: run.id,
+      lastSeenAt: observedAt,
+    };
+    const written = await this.prisma.evaluationFinding.updateMany({
+      where: { id: existing.id, status: existing.status },
+      data: reopened
+        ? {
+            ...observation,
+            status: EvaluationFindingStatus.OPEN,
+            resolvedAt: null,
+            suppressionNote: null,
+            suppressedByRef: null,
+          }
+        : observation,
     });
+    if (written.count === 0) {
+      // The status changed between our read and this write. Refresh the
+      // observation fields only; the lifecycle decision that beat us stands.
+      await this.prisma.evaluationFinding.updateMany({ where: { id: existing.id }, data: observation });
+      return this.requireFinding(existing.id);
+    }
+    const updated = await this.requireFinding(existing.id);
     if (reopened) {
       await this.notifyFindingChanged({
         findingId: updated.id,

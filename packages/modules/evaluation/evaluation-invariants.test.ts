@@ -13,6 +13,7 @@ import type {
   EvaluationCoverageStats,
   EvaluationCriterionRef,
   EvaluationEvidenceItem,
+  EvaluationFindingCandidate,
   EvaluationVerdict,
 } from "./ports/evaluation.contracts";
 
@@ -283,5 +284,31 @@ describe("judgment consistency (ADR-020 D2)", () => {
     });
 
     assert.deepEqual(problems, []);
+  });
+
+  it("rejects a verdict with an unknown confidence", () => {
+    const bad = { ...verdict("architecture"), confidence: "certain" } as unknown as EvaluationVerdict;
+    const problems = validateJudgment({ criteria, verdicts: [bad], findings: [] });
+    assert.ok(problems.some((problem) => problem.includes("unknown confidence")));
+  });
+
+  it("rejects a verdict with malformed coverage counts", () => {
+    const fractional = { ...verdict("architecture"), coverage: { included: 1.5, skipped: 0 } };
+    const negative = { ...verdict("architecture"), coverage: { included: 1, skipped: -1 } };
+    for (const bad of [fractional, negative]) {
+      const problems = validateJudgment({ criteria, verdicts: [bad], findings: [] });
+      assert.ok(problems.some((problem) => problem.includes("coverage must hold")));
+    }
+  });
+
+  it("rejects a finding with an unknown severity", () => {
+    const bad: EvaluationFindingCandidate = {
+      criterionKey: "missing-tests",
+      fingerprint: "module:map",
+      severity: "TRIVIAL" as EvaluationFindingCandidate["severity"],
+      title: "Module map has no tests",
+    };
+    const problems = validateJudgment({ criteria, verdicts: [], findings: [bad] });
+    assert.ok(problems.some((problem) => problem.includes("unknown severity")));
   });
 });

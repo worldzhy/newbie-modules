@@ -127,7 +127,10 @@ export class EvaluationRunnerService {
         resolvedFindingCount,
       };
     } catch (error) {
-      await this.runs.markFailed(running.id, error);
+      // The row may already be terminal (reaped as stale underneath us):
+      // failing it again conflicts, and that secondary failure must not mask
+      // the original error.
+      await this.runs.markFailed(running.id, error).catch(() => undefined);
       await this.notifyRunFinished({
         runId: running.id,
         subjectId: running.subjectId,

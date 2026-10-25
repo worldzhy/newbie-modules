@@ -192,7 +192,14 @@ function validateBucket(name: string, bucket: EvaluationCoverageBucket): string[
  * smuggle one in and vice versa. When `evidenceIds` is given, every
  * `evidenceRefs` entry of a verdict or finding must name a manifest item —
  * citing material that was never collected is a judgment defect.
+ *
+ * Enum-typed fields are checked at runtime too: the judgment comes from feature
+ * code across a port boundary, so a garbage severity or confidence must be a
+ * 400 here, not a database error at insert time.
  */
+const CONFIDENCES = new Set(["high", "medium", "low"]);
+const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
+
 export function validateJudgment(input: {
   criteria: readonly EvaluationCriterionRef[];
   verdicts: readonly EvaluationVerdict[];
@@ -220,6 +227,13 @@ export function validateJudgment(input: {
     if (!Number.isFinite(verdict.score)) {
       problems.push(`verdict ${verdict.criterionKey} has a non-finite score`);
     }
+    if (!CONFIDENCES.has(verdict.confidence)) {
+      problems.push(`verdict ${verdict.criterionKey} has an unknown confidence "${verdict.confidence}"`);
+    }
+    const { included, skipped } = verdict.coverage ?? {};
+    if (!Number.isInteger(included) || included < 0 || !Number.isInteger(skipped) || skipped < 0) {
+      problems.push(`verdict ${verdict.criterionKey} coverage must hold non-negative integer included/skipped counts`);
+    }
     if (input.evidenceIds) {
       for (const ref of verdict.evidenceRefs) {
         if (!input.evidenceIds.has(ref)) {
@@ -240,7 +254,10 @@ export function validateJudgment(input: {
       problems.push(`finding ${finding.criterionKey} targets SCORED criterion`);
     }
     if (!finding.fingerprint) {
-      problems.push(`finding ${finding.criterionKey} has no fingerprint`);
+      problems.push(`finding for ${finding.criterionKey} has an empty fingerprint`);
+    }
+    if (!SEVERITIES.has(finding.severity)) {
+      problems.push(`finding ${finding.fingerprint} has an unknown severity "${finding.severity}"`);
     }
     const identity = `${finding.criterionKey}/${finding.fingerprint}`;
     if (seenFindings.has(identity)) {

@@ -26,7 +26,10 @@ One concept, one word.
   Identity is `(subject, family, fingerprint)`: `family` is copied from the
   run's criteria version, so a rerun under a new version of the same family
   keeps the finding alive, and one family's run never resolves another
-  family's findings.
+  family's findings. Two versions of one family may run concurrently, so
+  resolution and re-observation are compare-and-set writes — a human
+  suppression, or a re-observation by the concurrent run, is never
+  overwritten.
 - **remediation plan** (`EvaluationRemediationPlan`) — the object that answers
   to findings or results of one subject, with a named decider.
 
@@ -84,8 +87,11 @@ sense, and tracking a problem inside a JSON blob makes it untrackable.
    Liveness around the constraint is two-sided: the runner heartbeats the row
    while a judgment works (a long judgment must not look abandoned to the
    stale-run reaper), and a fencing check before every write stops the runner
-   if the row was closed or reaped underneath it. The reaper timeout and the
-   heartbeat interval are host-tunable via `evaluationRunOptionsToken`.
+   if the row was closed or reaped underneath it. The terminal transitions
+   themselves are conditional writes whose matched-row count is checked, so a
+   transition that lost the race conflicts instead of reporting a state the
+   row never reached. The reaper timeout and the heartbeat interval are
+   host-tunable via `evaluationRunOptionsToken`.
 
 5. **Published criteria are read-only.** Version updates are conditional writes
    (`WHERE publishedAt IS NULL`); criterion adds, updates and removals lock the
@@ -125,6 +131,11 @@ findings, close the run — with the heartbeat and fencing checks described
 under invariant 4. A feature that implements the four ports inherits all of
 it and must not drive the run state machine through `EvaluationRunService`
 directly.
+
+The result row is persisted before the run is closed, so a process crash in
+between leaves a run the reaper eventually fails while its result row already
+exists. A FAILED run with a result is a possible, self-consistent state and
+readers must tolerate it.
 
 ## Evidence payloads
 

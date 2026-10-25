@@ -136,10 +136,18 @@ export class EvaluationRemediationService {
       throw new NotFoundException(`Evaluation remediation plan ${id} has no checkpoint at index ${index}`);
     }
     checkpoints[index] = { ...checkpoints[index], status: input.status };
-    return this.prisma.evaluationRemediationPlan.update({
-      where: { id },
+    // Conditional write: a decision landing between the read and this write
+    // freezes the checkpoints — progress on a closed plan is a contradiction.
+    const written = await this.prisma.evaluationRemediationPlan.updateMany({
+      where: { id, status: EvaluationRemediationStatus.OPEN },
       data: { checkpoints: checkpoints as unknown as Prisma.InputJsonValue },
     });
+    if (written.count === 0) {
+      throw new ConflictException(
+        `Evaluation remediation plan ${id} was closed while the checkpoint was being updated`,
+      );
+    }
+    return this.requirePlan(id);
   }
 
   async getPlan(id: string) {

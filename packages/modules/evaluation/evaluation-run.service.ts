@@ -124,15 +124,16 @@ export class EvaluationRunService {
 
   /** Terminal success. The result row is written before this is called. */
   async markSucceeded(id: string): Promise<void> {
-    await this.prisma.evaluationRun.updateMany({
+    const updated = await this.prisma.evaluationRun.updateMany({
       where: { id, status: { in: ACTIVE_STATUSES } },
       data: { status: EvaluationRunStatus.SUCCEEDED, finishedAt: new Date() },
     });
+    if (updated.count === 0) await this.assertStillActive(id, "succeeded");
   }
 
   /** Terminal failure; the reason is what the caller sees in the run history. */
   async markFailed(id: string, error: unknown): Promise<void> {
-    await this.prisma.evaluationRun.updateMany({
+    const updated = await this.prisma.evaluationRun.updateMany({
       where: { id, status: { in: ACTIVE_STATUSES } },
       data: {
         status: EvaluationRunStatus.FAILED,
@@ -140,6 +141,19 @@ export class EvaluationRunService {
         finishedAt: new Date(),
       },
     });
+    if (updated.count === 0) await this.assertStillActive(id, "failed");
+  }
+
+  /**
+   * A terminal transition that matched no row must not be silent: the runner
+   * would otherwise report success for a run the reaper already failed.
+   */
+  private async assertStillActive(id: string, transition: string): Promise<never> {
+    const run = await this.prisma.evaluationRun.findUnique({ where: { id } });
+    if (!run) throw new NotFoundException(`Evaluation run ${id} not found`);
+    throw new ConflictException(
+      `Evaluation run ${id} cannot be marked ${transition}: it is already ${run.status} (superseded or reaped as stale)`,
+    );
   }
 
   /** Heartbeat: prove the process is alive without touching the state machine. */
