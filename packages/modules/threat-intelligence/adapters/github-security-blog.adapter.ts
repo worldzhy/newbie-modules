@@ -1,11 +1,7 @@
 import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
 import { fetchText } from "./http.util";
-import { parseRssItems, stripHtml } from "./rss.util";
-import {
-  THREAT_INTELLIGENCE_CATEGORY,
-  THREAT_INTELLIGENCE_SEVERITY,
-  THREAT_INTELLIGENCE_SOURCE,
-} from "../threat-intelligence.constants";
+import { inferNewsSeverity, parseRssItems, RssItem, stripHtml } from "./rss.util";
+import { THREAT_INTELLIGENCE_CATEGORY, THREAT_INTELLIGENCE_SOURCE } from "../threat-intelligence.constants";
 
 const FEED_URL = "https://github.blog/category/security/feed/";
 
@@ -25,14 +21,11 @@ export class GitHubSecurityBlogAdapter implements ThreatIntelligenceSourceAdapte
     return parseRssItems(xml).map((item) => this.mapItem(item));
   }
 
-  private mapItem(item: {
-    title: string;
-    link: string;
-    guid: string;
-    description: string;
-    pubDate: string;
-  }): SourceIntelItem {
-    const severity = this.parseSeverity(item.title);
+  private mapItem(item: RssItem): SourceIntelItem {
+    const severity = inferNewsSeverity(item.title, {
+      high: ["critical", "cve"],
+      medium: ["vulnerability", "security advisory"],
+    });
     return {
       source: this.source,
       category: THREAT_INTELLIGENCE_CATEGORY.PLATFORM_EVENT,
@@ -45,15 +38,5 @@ export class GitHubSecurityBlogAdapter implements ThreatIntelligenceSourceAdapte
       signalTags: [],
       rawPayload: item,
     };
-  }
-
-  private parseSeverity(
-    title: string,
-  ): (typeof THREAT_INTELLIGENCE_SEVERITY)[keyof typeof THREAT_INTELLIGENCE_SEVERITY] {
-    const lower = title.toLowerCase();
-    if (lower.includes("critical") || lower.includes("cve")) return THREAT_INTELLIGENCE_SEVERITY.HIGH;
-    if (lower.includes("vulnerability") || lower.includes("security advisory"))
-      return THREAT_INTELLIGENCE_SEVERITY.MEDIUM;
-    return THREAT_INTELLIGENCE_SEVERITY.INFO;
   }
 }

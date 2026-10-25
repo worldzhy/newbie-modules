@@ -1,11 +1,7 @@
 import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
 import { fetchText } from "./http.util";
-import { parseRssItems, stripHtml } from "./rss.util";
-import {
-  THREAT_INTELLIGENCE_CATEGORY,
-  THREAT_INTELLIGENCE_SEVERITY,
-  THREAT_INTELLIGENCE_SOURCE,
-} from "../threat-intelligence.constants";
+import { inferNewsSeverity, parseRssItems, RssItem, stripHtml } from "./rss.util";
+import { THREAT_INTELLIGENCE_CATEGORY, THREAT_INTELLIGENCE_SOURCE } from "../threat-intelligence.constants";
 
 const FEED_URL = "https://feeds.feedburner.com/TheHackersNews";
 const DEFAULT_USER_AGENT = "threat-intelligence-collector (+https://github.com/worldzhy)";
@@ -28,13 +24,7 @@ export class TheHackerNewsAdapter implements ThreatIntelligenceSourceAdapter {
     return parseRssItems(xml).map((item) => this.mapItem(item));
   }
 
-  private mapItem(item: {
-    title: string;
-    link: string;
-    guid: string;
-    description: string;
-    pubDate: string;
-  }): SourceIntelItem {
+  private mapItem(item: RssItem): SourceIntelItem {
     return {
       source: this.source,
       category: THREAT_INTELLIGENCE_CATEGORY.EN_NEWS,
@@ -43,20 +33,9 @@ export class TheHackerNewsAdapter implements ThreatIntelligenceSourceAdapter {
       summary: item.description ? stripHtml(item.description).slice(0, 1000) : undefined,
       url: item.link,
       publishedAt: item.pubDate ? new Date(item.pubDate) : undefined,
-      severity: this.parseSeverity(item.title),
+      severity: inferNewsSeverity(item.title),
       signalTags: [],
       rawPayload: item,
     };
-  }
-
-  private parseSeverity(
-    title: string,
-  ): (typeof THREAT_INTELLIGENCE_SEVERITY)[keyof typeof THREAT_INTELLIGENCE_SEVERITY] {
-    const lower = title.toLowerCase();
-    if (lower.includes("critical") || lower.includes("cve") || lower.includes("zero-day"))
-      return THREAT_INTELLIGENCE_SEVERITY.HIGH;
-    if (lower.includes("vulnerability") || lower.includes("exploit") || lower.includes("ransomware"))
-      return THREAT_INTELLIGENCE_SEVERITY.MEDIUM;
-    return THREAT_INTELLIGENCE_SEVERITY.INFO;
   }
 }

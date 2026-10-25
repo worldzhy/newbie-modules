@@ -110,7 +110,9 @@ export class ThreatIntelligenceService {
         title: item.title,
         summary: item.summary ?? null,
         url: item.url ?? null,
-        publishedAt,
+        // On update, a transient parse failure must not erase a previously
+        // stored publishedAt — only overwrite when the new value is valid.
+        ...(publishedAt ? { publishedAt } : {}),
         severity: item.severity,
         signalTags: item.signalTags,
         rawPayload: item.rawPayload as Prisma.InputJsonValue,

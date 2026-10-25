@@ -1,6 +1,6 @@
 import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
 import { fetchText } from "./http.util";
-import { parseRssItems, stripHtml } from "./rss.util";
+import { parseRssItems, RssItem, stripHtml } from "./rss.util";
 import {
   THREAT_INTELLIGENCE_CATEGORY,
   THREAT_INTELLIGENCE_SEVERITY,
@@ -29,13 +29,7 @@ export class AwsSecurityBulletinsAdapter implements ThreatIntelligenceSourceAdap
     return parseRssItems(xml).map((item) => this.mapItem(item));
   }
 
-  private mapItem(item: {
-    title: string;
-    link: string;
-    guid: string;
-    description: string;
-    pubDate: string;
-  }): SourceIntelItem {
+  private mapItem(item: RssItem): SourceIntelItem {
     const externalId = this.extractBulletinId(item.link) || item.guid;
     const severity = this.parseSeverity(item.title, item.description);
     return {

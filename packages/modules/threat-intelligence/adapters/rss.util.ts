@@ -6,6 +6,8 @@
  * structure and regex extraction is sufficient.
  */
 
+import { THREAT_INTELLIGENCE_SEVERITY, ThreatIntelligenceSeverity } from "../threat-intelligence.constants";
+
 export interface RssItem {
   title: string;
   link: string;
@@ -19,7 +21,7 @@ export interface RssItem {
  */
 export function parseRssItems(xml: string): RssItem[] {
   const itemBlocks = xml.match(/<item(?:\s[^>]*)?>[\s\S]*?<\/item>/g) ?? [];
-  return itemBlocks.map((block) => ({
+  return itemBlocks.map((block: string) => ({
     title: extractTag(block, "title"),
     link: extractTag(block, "link"),
     guid: extractTag(block, "guid"),
@@ -54,4 +56,21 @@ export function stripHtml(html: string): string {
     .replace(/&#39;/g, "'")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Infer a severity for news items, which carry no upstream severity rating,
+ * from title keywords. Defaults cover the common English security-news
+ * vocabulary; adapters pass `overrides` to tune either tier.
+ */
+export function inferNewsSeverity(
+  title: string,
+  overrides?: { high?: string[]; medium?: string[] },
+): ThreatIntelligenceSeverity {
+  const high = overrides?.high ?? ["critical", "cve", "zero-day"];
+  const medium = overrides?.medium ?? ["vulnerability", "exploit", "ransomware"];
+  const lower = title.toLowerCase();
+  if (high.some((keyword) => lower.includes(keyword))) return THREAT_INTELLIGENCE_SEVERITY.HIGH;
+  if (medium.some((keyword) => lower.includes(keyword))) return THREAT_INTELLIGENCE_SEVERITY.MEDIUM;
+  return THREAT_INTELLIGENCE_SEVERITY.INFO;
 }

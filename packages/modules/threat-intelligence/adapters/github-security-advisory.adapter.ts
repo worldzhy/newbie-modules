@@ -3,7 +3,6 @@ import { fetchJson } from "./http.util";
 import {
   THREAT_INTELLIGENCE_CATEGORY,
   THREAT_INTELLIGENCE_SEVERITY,
-  THREAT_INTELLIGENCE_SIGNAL_TAG,
   THREAT_INTELLIGENCE_SOURCE,
 } from "../threat-intelligence.constants";
 
@@ -67,7 +66,10 @@ export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAd
     // multiple GHSAs, and keying on the CVE id would make them overwrite
     // each other on upsert. The CVE id stays available in summary/rawPayload.
     const externalId = ghsaId;
-    const category = this.detectCategory(advisory);
+    // Everything maps to CVE: advisories with a package ecosystem are either
+    // component CVEs or malicious-package reports, and we cannot reliably
+    // tell the two apart without parsing description text.
+    const category = THREAT_INTELLIGENCE_CATEGORY.CVE;
     return {
       source: this.source,
       category,
@@ -80,20 +82,6 @@ export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAd
       signalTags: [],
       rawPayload: advisory,
     };
-  }
-
-  private detectCategory(
-    advisory: GitHubAdvisory,
-  ): (typeof THREAT_INTELLIGENCE_CATEGORY)[keyof typeof THREAT_INTELLIGENCE_CATEGORY] {
-    const ecosystems = (advisory.vulnerabilities ?? [])
-      .map((v) => v.package?.ecosystem)
-      .filter((e): e is string => Boolean(e));
-    const hasPackage = ecosystems.length > 0;
-    // GitHub advisories with a package ecosystem are either component CVEs
-    // or malicious-package reports; both map to CVE here because the
-    // deduplication key is the CVE/GHSA id and we cannot reliably tell
-    // malicious-package from a normal CVE without parsing description text.
-    return hasPackage ? THREAT_INTELLIGENCE_CATEGORY.CVE : THREAT_INTELLIGENCE_CATEGORY.CVE;
   }
 
   private buildSummary(advisory: GitHubAdvisory): string | undefined {
@@ -122,6 +110,3 @@ export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAd
     }
   }
 }
-
-// Re-export signal tag so callers that wire the adapter can see the type.
-export { THREAT_INTELLIGENCE_SIGNAL_TAG };

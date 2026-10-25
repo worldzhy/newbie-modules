@@ -6,7 +6,13 @@
  * keys never collide across categories.
  */
 
-/** Information source identifiers. Each adapter registers exactly one. */
+/**
+ * Information source identifiers. Each adapter registers exactly one.
+ *
+ * The taxonomy is intentionally pre-registered beyond the implemented
+ * adapters (ADR-031 source catalog): filters and stored rows stay stable
+ * as new adapters land, so values without a current adapter are expected.
+ */
 export const THREAT_INTELLIGENCE_SOURCE = {
   NVD: "nvd",
   CISA_KEV: "cisa-kev",
