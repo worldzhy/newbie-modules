@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req } from "@ne
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { AuditActorType } from "@modules/audit/audit-log.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 
@@ -97,5 +98,20 @@ export class InstallationController {
   @ApiOkResponse()
   async moduleReleases(@Param("moduleKey") moduleKey: string) {
     return this.releases.getReleasesForModule(moduleKey);
+  }
+
+  /**
+   * Operator-triggered catalog sync: pull the registry HEAD and ingest any
+   * missing (module, commit) pairs. Repairs a missed webhook delivery; the
+   * shared idempotent upsert makes re-runs no-ops.
+   */
+  @Post("catalog/sync")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.HubModuleRelease)
+  @ApiOkResponse()
+  async syncCatalog(@Req() request: UserRequest) {
+    return this.releases.syncCatalogFromRegistry({
+      actorType: AuditActorType.USER,
+      actorId: request.user.userId,
+    });
   }
 }

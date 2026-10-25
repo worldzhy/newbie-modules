@@ -1,11 +1,10 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Prisma } from "@generated/prisma/client";
+import { Octokit } from "@octokit/rest";
+import { HubModuleRelease, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { AuditLogService } from "@modules/audit/audit-log.service";
+import { AuditActorType, AuditLogService } from "@modules/audit/audit-log.service";
 
-/** Fallback registry sync cadence (design: every 10 minutes). */
-const FALLBACK_SYNC_INTERVAL_MS = 10 * 60 * 1000;
 /** Registry module directory prefix inside the registry monorepo. */
 const REGISTRY_MODULES_PREFIX = "packages/modules/";
 const MODULE_MANIFEST_FILE = "newbie.module.json";
@@ -30,52 +29,56 @@ interface GithubPushPayload {
   commits?: { added?: string[]; modified?: string[] }[];
 }
 
+/** Who/what triggered an ingestion, recorded on the release.ingest audit row. */
+interface IngestTrigger {
+  actorType: string;
+  actorId: string;
+}
+
+/** Default trigger for the webhook ingestion path. */
+const WEBHOOK_TRIGGER: IngestTrigger = { actorType: AuditActorType.SYSTEM, actorId: "webhook" };
+
+// Octokit request errors carry a numeric `status`.
+function octokitStatus(error: unknown): number | undefined {
+  return (error as { status?: number }).status;
+}
+
 /**
- * Registry catalog management: ingestion from the GitHub push webhook plus a
- * periodic fallback sync (local development / missed deliveries). The Prisma
+ * Registry catalog management: ingestion from the GitHub push webhook plus an
+ * operator-triggered sync (local development / missed deliveries). The Prisma
  * `@@unique([moduleKey, sourceCommit])` makes both paths mutually idempotent.
  */
 @Injectable()
-export class ModuleHubReleaseService implements OnModuleInit, OnModuleDestroy {
+export class ModuleHubReleaseService {
   private readonly logger = new Logger(ModuleHubReleaseService.name);
-  private fallbackTimer?: NodeJS.Timeout;
+  private readonly octokit: Octokit;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly auditLogService: AuditLogService,
-  ) {}
-
-  onModuleInit(): void {
-    // Periodic fallback so that a missing/misfired webhook never stalls the
-    // catalog. Failures are logged, never thrown into the host process.
-    this.fallbackTimer = setInterval(() => {
-      void this.fallbackSync().catch((error: unknown) => {
-        this.logger.warn(`registry fallback sync failed: ${(error as Error).message}`);
-      });
-    }, FALLBACK_SYNC_INTERVAL_MS);
-    this.fallbackTimer.unref();
+  ) {
+    // The registry repository is public; the optional token only raises the
+    // GitHub rate limit (or unlocks a private registry mirror).
+    this.octokit = new Octokit({
+      auth: this.config.get<string>("MODULE_HUB_REGISTRY_REPO_TOKEN"),
+      userAgent: "newbie-module-hub",
+    });
   }
 
-  onModuleDestroy(): void {
-    if (this.fallbackTimer) clearInterval(this.fallbackTimer);
-  }
-
-  private get registryRepo(): string {
-    return this.config.get<string>("MODULE_HUB_REGISTRY_REPO") ?? "worldzhy/newbie-modules";
-  }
-
-  private githubHeaders(): Record<string, string> {
-    const token = this.config.get<string>("MODULE_HUB_REGISTRY_REPO_TOKEN");
-    return {
-      accept: "application/vnd.github+json",
-      "user-agent": "newbie-module-hub",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-    };
+  private get registryRepo(): { owner: string; repo: string } {
+    const fullName = this.config.get<string>("MODULE_HUB_REGISTRY_REPO") ?? "worldzhy/newbie-modules";
+    const [owner, repo] = fullName.split("/");
+    return { owner, repo };
   }
 
   /** Upsert one (moduleKey, sourceCommit) pair. */
-  async ingestRelease(moduleKey: string, sourceCommit: string, manifest: ManifestShape, actor = "webhook") {
+  async ingestRelease(
+    moduleKey: string,
+    sourceCommit: string,
+    manifest: ManifestShape,
+    trigger: IngestTrigger = WEBHOOK_TRIGGER,
+  ): Promise<HubModuleRelease> {
     const row = await this.prisma.hubModuleRelease.upsert({
       where: { moduleKey_sourceCommit: { moduleKey, sourceCommit } },
       update: {},
@@ -84,24 +87,23 @@ export class ModuleHubReleaseService implements OnModuleInit, OnModuleDestroy {
     await this.auditLogService.record(RELEASE_INGEST_EVENT, {
       resourceType: RELEASE_RESOURCE_TYPE,
       resourceId: moduleKey,
-      actorType: "system",
-      actorId: actor,
+      actorType: trigger.actorType,
+      actorId: trigger.actorId,
       detail: { moduleKey, sourceCommit },
     });
     return row;
   }
 
   /** Latest release per module key. */
-  async getCatalog() {
-    return this.prisma.$queryRaw`
-      SELECT DISTINCT ON ("moduleKey") *
-      FROM "module/module-hub"."HubModuleRelease"
-      ORDER BY "moduleKey", "publishedAt" DESC
-    `;
+  async getCatalog(): Promise<HubModuleRelease[]> {
+    return this.prisma.hubModuleRelease.findMany({
+      distinct: ["moduleKey"],
+      orderBy: [{ moduleKey: "asc" }, { publishedAt: "desc" }],
+    });
   }
 
   /** Full release history of one module. */
-  async getReleasesForModule(moduleKey: string) {
+  async getReleasesForModule(moduleKey: string): Promise<HubModuleRelease[]> {
     return this.prisma.hubModuleRelease.findMany({
       where: { moduleKey },
       orderBy: { publishedAt: "desc" },
@@ -110,13 +112,11 @@ export class ModuleHubReleaseService implements OnModuleInit, OnModuleDestroy {
 
   /** Most recently ingested registry commit, surfaced in agent poll responses. */
   async getLatestRegistrySourceCommit(): Promise<string | null> {
-    const rows = (await this.prisma.$queryRaw`
-      SELECT "sourceCommit"
-      FROM "module/module-hub"."HubModuleRelease"
-      ORDER BY "publishedAt" DESC
-      LIMIT 1
-    `) as Array<{ sourceCommit: string }>;
-    return rows[0]?.sourceCommit ?? null;
+    const row = await this.prisma.hubModuleRelease.findFirst({
+      orderBy: { publishedAt: "desc" },
+      select: { sourceCommit: true },
+    });
+    return row?.sourceCommit ?? null;
   }
 
   /**
@@ -146,57 +146,63 @@ export class ModuleHubReleaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Fallback path: diff the registry HEAD tree against the catalog and ingest
-   * any (module, headCommit) pairs we have not seen yet.
+   * Operator-triggered sync: diff the registry HEAD tree against the catalog
+   * and ingest any (module, headCommit) pairs not seen yet. Repairs a missed
+   * webhook delivery through the same idempotent upsert.
    */
-  async fallbackSync(): Promise<void> {
-    const repo = this.registryRepo;
-    const heads = await this.githubJson<Array<{ sha: string }>>(`/repos/${repo}/commits?per_page=1`);
-    const headSha = heads[0]?.sha;
-    if (!headSha) {
-      this.logger.warn(`registry fallback sync: no commits found for ${repo}`);
-      return;
+  async syncCatalogFromRegistry(trigger: IngestTrigger): Promise<{ headCommit: string; ingested: string[] }> {
+    const { owner, repo } = this.registryRepo;
+    const { data: commits } = await this.octokit.repos.listCommits({ owner, repo, per_page: 1 });
+    const headCommit = commits[0]?.sha;
+    if (!headCommit) {
+      throw new Error(`registry catalog sync: no commits found for ${owner}/${repo}`);
     }
-    const tree = await this.githubJson<{ tree: Array<{ path: string }> }>(
-      `/repos/${repo}/git/trees/${headSha}?recursive=1`,
-    );
+    const { data: tree } = await this.octokit.git.getTree({
+      owner,
+      repo,
+      tree_sha: headCommit,
+      recursive: "true",
+    });
+    if (tree.truncated) {
+      this.logger.warn(`registry tree ${owner}/${repo}@${headCommit} is truncated; some modules may be missed`);
+    }
 
     const keys = new Set<string>();
     for (const node of tree.tree) {
-      const match = /^packages\/modules\/([^/]+)\/newbie\.module\.json$/.exec(node.path);
+      const match = node.path ? /^packages\/modules\/([^/]+)\/newbie\.module\.json$/.exec(node.path) : null;
       if (match) keys.add(match[1]);
     }
 
+    const ingested: string[] = [];
     for (const key of keys) {
       const existing = await this.prisma.hubModuleRelease.findUnique({
-        where: { moduleKey_sourceCommit: { moduleKey: key, sourceCommit: headSha } },
+        where: { moduleKey_sourceCommit: { moduleKey: key, sourceCommit: headCommit } },
         select: { id: true },
       });
       if (existing) continue;
-      const manifest = await this.fetchManifestAtCommit(key, headSha);
+      const manifest = await this.fetchManifestAtCommit(key, headCommit);
       if (!manifest) continue;
-      await this.ingestRelease(key, headSha, manifest, "fallback-sync");
+      await this.ingestRelease(key, headCommit, manifest, trigger);
+      ingested.push(key);
     }
+    return { headCommit, ingested };
   }
 
   private async fetchManifestAtCommit(moduleKey: string, commit: string): Promise<ManifestShape | null> {
-    const response = await fetch(
-      `https://api.github.com/repos/${this.registryRepo}/contents/` +
-        `${REGISTRY_MODULES_PREFIX}${moduleKey}/${MODULE_MANIFEST_FILE}?ref=${commit}`,
-      { headers: { ...this.githubHeaders(), accept: "application/vnd.github.raw+json" } },
-    );
-    if (response.status === 404) return null;
-    if (!response.ok) {
-      throw new Error(`GitHub contents API failed for ${moduleKey}@${commit}: HTTP ${response.status}`);
+    const { owner, repo } = this.registryRepo;
+    try {
+      const { data } = await this.octokit.repos.getContent({
+        owner,
+        repo,
+        path: `${REGISTRY_MODULES_PREFIX}${moduleKey}/${MODULE_MANIFEST_FILE}`,
+        ref: commit,
+      });
+      // The contents API returns an array for directories; we only read files.
+      if (Array.isArray(data) || data.type !== "file") return null;
+      return JSON.parse(Buffer.from(data.content, "base64").toString("utf-8")) as ManifestShape;
+    } catch (error: unknown) {
+      if (octokitStatus(error) === 404) return null;
+      throw error;
     }
-    return (await response.json()) as ManifestShape;
-  }
-
-  private async githubJson<T>(path: string): Promise<T> {
-    const response = await fetch(`https://api.github.com${path}`, { headers: this.githubHeaders() });
-    if (!response.ok) {
-      throw new Error(`GitHub API ${path} failed: HTTP ${response.status}`);
-    }
-    return (await response.json()) as T;
   }
 }

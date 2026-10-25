@@ -7,6 +7,8 @@
   },
   "schema": "prisma/schema.prisma",
   "moduleDependencies": ["audit", "security"],
-  "dependencies": {},
+  "dependencies": {
+    "@octokit/rest": "latest"
+  },
   "devDependencies": {}
 }

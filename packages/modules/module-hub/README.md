@@ -15,13 +15,17 @@ The report endpoint carries two kinds:
 - `kind="full"` — process-start self-registration with runtime facts and module snapshot.
 - `kind="ping"` — periodic liveness touch without snapshot.
 
+Catalog ingestion has two paths: the GitHub push webhook (automatic) and
+`POST /module-hub/catalog/sync` (operator-triggered — local development or a
+missed webhook delivery). Both share the same idempotent upsert.
+
 ## Environment Variables
 
-| Variable                           | Required                                | Description                           |
-| ---------------------------------- | --------------------------------------- | ------------------------------------- |
-| `MODULE_HUB_GITHUB_WEBHOOK_SECRET` | For webhook                             | GitHub webhook HMAC secret            |
-| `MODULE_HUB_REGISTRY_REPO`         | No (default: `worldzhy/newbie-modules`) | Registry repository for fallback sync |
-| `MODULE_HUB_REGISTRY_REPO_TOKEN`   | No                                      | GitHub API token for private repos    |
+| Variable                           | Required                                | Description                                         |
+| ---------------------------------- | --------------------------------------- | --------------------------------------------------- |
+| `MODULE_HUB_GITHUB_WEBHOOK_SECRET` | For webhook                             | GitHub webhook HMAC secret                          |
+| `MODULE_HUB_REGISTRY_REPO`         | No (default: `worldzhy/newbie-modules`) | Registry repository read by the manual catalog sync |
+| `MODULE_HUB_REGISTRY_REPO_TOKEN`   | No                                      | GitHub API token for private repos                  |
 
 ## Design Reference
 
