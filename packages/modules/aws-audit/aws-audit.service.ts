@@ -1,8 +1,9 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { AwsAuditScan, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import { EventCatalogService } from "@modules/event-emitter/event-catalog.service";
 import { getCallerIdentity } from "@modules/aws-identity/aws-sts.helper";
 import type { AwsCredentialsProvider } from "@modules/aws-identity/aws-sts.helper";
 import { EC2Client, DescribeInstancesCommand, DescribeSecurityGroupsCommand, SecurityGroup } from "@aws-sdk/client-ec2";
@@ -141,8 +142,14 @@ interface IamPolicyDocument {
   Statement?: IamPolicyStatement | IamPolicyStatement[];
 }
 
+/** Emitted after a scan completes successfully and its findings are persisted. */
+export const AWS_AUDIT_SCAN_COMPLETED_EVENT = "aws-audit.scan-completed";
+
+/** Emitted after a scan fails and the failure is persisted. */
+export const AWS_AUDIT_SCAN_FAILED_EVENT = "aws-audit.scan-failed";
+
 @Injectable()
-export class AwsAuditService {
+export class AwsAuditService implements OnModuleInit {
   private readonly logger = new Logger(AwsAuditService.name);
   private readonly severityRank: Record<Severity, number> = { high: 3, medium: 2, low: 1 };
   private readonly policyCache = new Map<string, Promise<ManagedPolicyAnalysis>>();
@@ -184,7 +191,30 @@ export class AwsAuditService {
     private readonly prisma: PrismaService,
     private readonly credentialService: AwsCredentialsService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly eventCatalog: EventCatalogService,
   ) {}
+
+  onModuleInit() {
+    this.eventCatalog.declareEvent({
+      key: AWS_AUDIT_SCAN_COMPLETED_EVENT,
+      name: "AWS audit scan completed",
+      description: "Emitted after an audit scan completes successfully and its findings are persisted.",
+      payloadExample: {
+        projectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
+        scanId: "ckv1a2b3c4d5e6f7g8h9i0j1",
+      },
+    });
+    this.eventCatalog.declareEvent({
+      key: AWS_AUDIT_SCAN_FAILED_EVENT,
+      name: "AWS audit scan failed",
+      description: "Emitted after an audit scan fails and the failure is persisted.",
+      payloadExample: {
+        projectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
+        scanId: "ckv1a2b3c4d5e6f7g8h9i0j1",
+        error: "AccessDenied: not authorized to perform iam:ListUsers",
+      },
+    });
+  }
 
   /**
    * Get a cached AWS SDK client for the given service, project and region.
@@ -352,7 +382,7 @@ export class AwsAuditService {
       });
 
       await this.upsertFindings(projectId, scanId, report.findings);
-      this.eventEmitter.emit("aws-audit.scan-completed", { projectId, scanId });
+      this.eventEmitter.emit(AWS_AUDIT_SCAN_COMPLETED_EVENT, { projectId, scanId });
     } catch (error: unknown) {
       await this.prisma.awsAuditScan.update({
         where: { id: scanId },
@@ -363,7 +393,7 @@ export class AwsAuditService {
         },
       });
       await this.pruneFailedScans(projectId, scanId);
-      this.eventEmitter.emit("aws-audit.scan-failed", {
+      this.eventEmitter.emit(AWS_AUDIT_SCAN_FAILED_EVENT, {
         projectId,
         scanId,
         error: this.getErrorMessage(error),

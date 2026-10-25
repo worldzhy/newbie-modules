@@ -8,7 +8,7 @@
     "className": "WebMonitorModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["audit", "clickhouse", "mongo", "redis", "security"],
+  "moduleDependencies": ["audit", "clickhouse", "event-emitter", "mongo", "redis", "security"],
   "sdk": "@devbie/web-monitor-sdk",
   "config-service": {
     "web-monitor": {

@@ -6,8 +6,9 @@
     "className": "TaskManagementModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["account", "security"],
+  "moduleDependencies": ["account", "event-emitter", "security"],
   "dependencies": {
+    "@nestjs/event-emitter": "latest",
     "chinese-days": "^1.5.7"
   }
 }

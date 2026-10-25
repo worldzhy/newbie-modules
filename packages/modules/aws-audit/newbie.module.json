@@ -6,7 +6,7 @@
     "className": "AwsAuditModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["aws-identity", "security"],
+  "moduleDependencies": ["aws-identity", "event-emitter", "security"],
   "config-service": {},
   "env": {},
   "dependencies": {

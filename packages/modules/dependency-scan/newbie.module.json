@@ -6,7 +6,7 @@
     "className": "DependencyScanModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["github", "security"],
+  "moduleDependencies": ["event-emitter", "github", "security"],
   "config-service": {},
   "env": {},
   "dependencies": {

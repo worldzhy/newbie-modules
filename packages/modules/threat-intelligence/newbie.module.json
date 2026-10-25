@@ -6,9 +6,11 @@
     "className": "ThreatIntelligenceModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security", "llm"],
+  "moduleDependencies": ["security", "llm", "event-emitter"],
   "config-service": {},
   "env": {},
-  "dependencies": {},
+  "dependencies": {
+    "@nestjs/event-emitter": "latest"
+  },
   "devDependencies": {}
 }

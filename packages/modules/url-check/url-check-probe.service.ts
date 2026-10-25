@@ -1,6 +1,7 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
+import { EventCatalogService } from "@modules/event-emitter/event-catalog.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { assertPublicHttpUrl, assertPubliclyResolvable } from "./public-url";
@@ -21,6 +22,12 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /** A target is up when the final response (redirects followed) is < 400. */
 const UP_STATUS_CEILING = 400;
+
+/** Fired when a target crosses into an alert-open state. */
+export const URL_CHECK_DOWN_EVENT = "url-check.down";
+
+/** Fired when a target recovers from an open alert. */
+export const URL_CHECK_RECOVERED_EVENT = "url-check.recovered";
 
 /** Fired when a target crosses into an alert-open state. */
 export interface UrlCheckDownEvent {
@@ -86,14 +93,46 @@ function toClickHouseDate(date: Date): string {
  * subscribes and routes through whatever notification channel it chooses.
  */
 @Injectable()
-export class UrlCheckProbeService {
+export class UrlCheckProbeService implements OnModuleInit {
   private readonly logger = new Logger(UrlCheckProbeService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly clickhouse: ClickHouseService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly eventCatalog: EventCatalogService,
   ) {}
+
+  onModuleInit() {
+    this.eventCatalog.declareEvent({
+      key: URL_CHECK_DOWN_EVENT,
+      name: "URL check target down",
+      description: "Emitted when a target crosses into an alert-open state after consecutive probe failures.",
+      payloadExample: {
+        targetId: "ckv1a2b3c4d5e6f7g8h9i0j1",
+        projectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
+        name: "Marketing site",
+        url: "https://example.com/health",
+        error: "HTTP 503",
+        consecutiveFailures: 3,
+        downSince: "2026-01-01T00:00:00.000Z",
+      } satisfies UrlCheckDownEvent,
+    });
+    this.eventCatalog.declareEvent({
+      key: URL_CHECK_RECOVERED_EVENT,
+      name: "URL check target recovered",
+      description: "Emitted when a target recovers from an open alert after consecutive probe successes.",
+      payloadExample: {
+        targetId: "ckv1a2b3c4d5e6f7g8h9i0j1",
+        projectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
+        name: "Marketing site",
+        url: "https://example.com/health",
+        downSince: "2026-01-01T00:00:00.000Z",
+        recoveredAt: "2026-01-01T00:15:00.000Z",
+        downtimeMinutes: 15,
+      } satisfies UrlCheckRecoveredEvent,
+    });
+  }
 
   /** One full check cycle over every active target, with bounded concurrency. */
   async runChecks(): Promise<void> {
@@ -274,7 +313,7 @@ export class UrlCheckProbeService {
         consecutiveFailures,
         downSince: openedAt.toISOString(),
       };
-      this.eventEmitter.emit("url-check.down", event);
+      this.eventEmitter.emit(URL_CHECK_DOWN_EVENT, event);
     } catch (error) {
       this.logger.error(
         `Failed to emit url-check.down for target ${target.id}: ${
@@ -296,7 +335,7 @@ export class UrlCheckProbeService {
         recoveredAt: recoveredAt.toISOString(),
         downtimeMinutes: openedAt ? Math.max(0, Math.round((recoveredAt.getTime() - openedAt.getTime()) / 60000)) : 0,
       };
-      this.eventEmitter.emit("url-check.recovered", event);
+      this.eventEmitter.emit(URL_CHECK_RECOVERED_EVENT, event);
     } catch (error) {
       this.logger.error(
         `Failed to emit url-check.recovered for target ${target.id}: ${
