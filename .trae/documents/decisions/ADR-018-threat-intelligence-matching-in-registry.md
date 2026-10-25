@@ -1,7 +1,9 @@
 # ADR-018: threat-intelligence 整理层下沉 registry（模块交付完整收集+整理能力）
 
-状态：提议中
+状态：已采纳（2026-10-25 实施并交付）
 日期：2026-10-25
+
+> Errata（2026-10-25，代码评审后）：SPI 实体类型 `ProfileEntity` 更名为 `ScopeEntity`（`matching/scope-entities.port.ts`），契约语义不变；另修正 match 扫描为 oldest-first 分页（消除积压饿死）、`match-created` 事件仅在新建时发出、`matchedEntity` 契约改为非空。下文及「跨宿主检验」表中出现的旧名仅作历史记录。
 
 Supersedes: nightwatch-backend ADR-031 的第 0 节「分层：平台模块 vs 宿主消费层」及其在第 5 节数据模型、第 6 节定时任务编排、「跨宿主 / 演进检验」中的相关推论（"平台模块不依赖 llm、不认识 Project/Application、B3 匹配与 ThreatIntelligenceMatch 落库归宿主消费层"）。ADR-031 其余章节（信息源分类 A2、匹配判定协议 B3 的方法论、项目画像 C2、保留策略、通知策略）保持生效。
 

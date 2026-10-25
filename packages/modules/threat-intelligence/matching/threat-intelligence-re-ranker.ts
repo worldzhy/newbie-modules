@@ -1,7 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ChatModelResolver } from "@modules/llm/chat-model.resolver";
 import { ChatModelPort } from "@modules/llm/chat-model.port";
-import { ProfileEntity } from "./scope-entities.port";
+import { ScopeEntity } from "./scope-entities.port";
 
 /** LLM scope bound to the threat-intelligence match connection. */
 export const THREAT_INTELLIGENCE_LLM_SCOPE = "threat-intelligence";
@@ -66,7 +66,7 @@ export class ThreatIntelligenceReRanker {
 
   constructor(private readonly resolver: ChatModelResolver) {}
 
-  async reRank(item: { title: string; summary?: string }, entities: ProfileEntity[]): Promise<ReRankVerdict> {
+  async reRank(item: { title: string; summary?: string }, entities: ScopeEntity[]): Promise<ReRankVerdict> {
     if (entities.length === 0) {
       return {
         kind: "not-relevant",
@@ -153,7 +153,7 @@ export class ThreatIntelligenceReRanker {
    * Enforce the B3 hard constraint: finalRelevant requires at least one
    * entity match. We do not trust the LLM's own finalRelevant flag alone.
    */
-  private enforceHardConstraint(verdict: ReRankVerdict, entities: ProfileEntity[]): ReRankVerdict {
+  private enforceHardConstraint(verdict: ReRankVerdict, entities: ScopeEntity[]): ReRankVerdict {
     const hasEntityMatch = verdict.entityMatches.some((m) => m.matched);
     if (!hasEntityMatch) {
       return { ...verdict, kind: "not-relevant", finalRelevant: false };

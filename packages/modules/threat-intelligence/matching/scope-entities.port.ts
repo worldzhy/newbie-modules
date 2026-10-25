@@ -16,7 +16,7 @@ export const THREAT_INTELLIGENCE_SCOPE_ENTITIES_PROVIDER = Symbol("THREAT_INTELL
  * A single entity that an intel item is checked against.
  * Examples: "next", "worldzhy/nightwatch-backend", "github.com".
  */
-export interface ProfileEntity {
+export interface ScopeEntity {
   /** Entity label, e.g. package name, vendor, repository slug, or domain. */
   value: string;
   /** Optional human-readable context shown in the LLM prompt. */
@@ -29,7 +29,7 @@ export interface ScopeEntities {
   scopeType: string;
   /** Host-defined scope identifier. Stored without a foreign key. */
   scopeId: string;
-  entities: ProfileEntity[];
+  entities: ScopeEntity[];
 }
 
 export interface ScopeEntitiesProvider {

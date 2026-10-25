@@ -57,7 +57,11 @@ export class ThreatIntelligenceMatchDto {
   @ApiProperty() scopeType!: string;
   @ApiProperty() scopeId!: string;
   @ApiProperty({ enum: MATCH_TYPES }) matchType!: ThreatIntelligenceMatchType;
-  @ApiPropertyOptional({ type: String, nullable: true }) matchedEntity?: string | null;
+  @ApiProperty({
+    type: String,
+    description: "Entity that triggered the match; empty when no specific entity was named",
+  })
+  matchedEntity!: string;
   @ApiPropertyOptional({ type: String, nullable: true }) evidence?: string | null;
   @ApiProperty({ enum: CONFIDENCES }) confidence!: ThreatIntelligenceMatchConfidence;
   @ApiProperty({ enum: MATCH_STATUSES }) status!: ThreatIntelligenceMatchStatus;

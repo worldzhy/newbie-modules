@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { ThreatIntelligenceReRanker, type ReRankVerdict } from "./threat-intelligence-re-ranker";
-import type { ProfileEntity } from "./scope-entities.port";
+import type { ScopeEntity } from "./scope-entities.port";
 
 /**
  * Behavior-level tests for the B3 matching protocol.
@@ -13,7 +13,7 @@ import type { ProfileEntity } from "./scope-entities.port";
  * mocked chat model so the constraint is verified end-to-end.
  */
 
-const entities: ProfileEntity[] = [
+const entities: ScopeEntity[] = [
   { value: "next", context: "framework" },
   { value: "postgres", context: "database" },
 ];

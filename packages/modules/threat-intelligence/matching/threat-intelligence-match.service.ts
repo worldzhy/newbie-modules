@@ -31,8 +31,16 @@ const RE_RANK_MIN_SEVERITY: ThreatIntelligenceSeverity = "medium";
 /** How far back collection lookups consider items when matching. */
 const DEFAULT_MATCH_WINDOW_DAYS = 7;
 
-/** Safety cap for one matching run so a bulk import cannot stall the event loop. */
-const DEFAULT_MATCH_ITEM_LIMIT = 200;
+/**
+ * Work budget for one matching run, counted in (item, scope) pairs rather
+ * than items, so a bulk import cannot stall the event loop with LLM calls.
+ * The window itself is always scanned end to end in cheap keyset pages;
+ * only the expensive per-pair matcher is budgeted.
+ */
+const MATCH_PAIR_BUDGET_PER_RUN = 200;
+
+/** Items read per keyset page while looking for pairs that still need work. */
+const MATCH_SCAN_PAGE_SIZE = 200;
 
 /** Fields returned by the match read/update APIs; everything else stays internal. */
 const MATCH_SELECT = {
@@ -79,8 +87,9 @@ function entityAppearsIn(haystack: string, entity: string): boolean {
  * collection-only and never invents matches.
  *
  * Emits "threat-intelligence.match-created" with
- * { matchId, scopeType, scopeId, itemId, confidence } for every upserted
- * match; notification fan-out is a host concern.
+ * { matchId, scopeType, scopeId, itemId, confidence } for every newly
+ * created match; re-evaluations stay silent. Notification fan-out is a host
+ * concern.
  */
 @Injectable()
 export class ThreatIntelligenceMatchService {
@@ -108,7 +117,15 @@ export class ThreatIntelligenceMatchService {
     return { collected, evaluated, matched };
   }
 
-  /** Match items fetched since `since` against all scope entity sets. */
+  /**
+   * Match items fetched since `since` against all scope entity sets.
+   *
+   * The window is scanned oldest-first in keyset pages and pairs that already
+   * produced a row are skipped before the budget is spent, so every run
+   * advances through the backlog: a collection batch larger than one page can
+   * never be permanently starved by newer items. `evaluated` counts the
+   * (item, scope) pairs that actually reached the matcher.
+   */
   async matchRecentItems(since: Date): Promise<{ evaluated: number; matched: number }> {
     if (!this.scopeEntitiesProvider) {
       this.logger.warn("No ScopeEntitiesProvider bound by the host; skipping matching (collection still ran).");
@@ -120,32 +137,43 @@ export class ThreatIntelligenceMatchService {
       return { evaluated: 0, matched: 0 };
     }
 
-    const items = await this.prisma.threatIntelligenceItem.findMany({
-      where: { fetchedAt: { gte: since } },
-      orderBy: { fetchedAt: "desc" },
-      take: DEFAULT_MATCH_ITEM_LIMIT,
-      select: { id: true, title: true, summary: true, severity: true, signalTags: true },
-    });
-    if (items.length === 0) {
-      return { evaluated: 0, matched: 0 };
-    }
-
-    // Skip (item, scope) pairs that already produced a match so a rerun
-    // does not pay the LLM cost again.
-    const existing = await this.prisma.threatIntelligenceMatch.findMany({
-      where: { itemId: { in: items.map((item) => item.id) } },
-      select: { itemId: true, scopeType: true, scopeId: true },
-    });
-    const alreadyMatched = new Set(existing.map((match) => `${match.itemId}:${match.scopeType}:${match.scopeId}`));
-
+    let cursorId: string | undefined;
+    let evaluated = 0;
     let matched = 0;
-    for (const item of items) {
-      for (const scope of scopes) {
-        if (alreadyMatched.has(`${item.id}:${scope.scopeType}:${scope.scopeId}`)) continue;
-        matched += await this.matchItem(item, scope);
+
+    while (evaluated < MATCH_PAIR_BUDGET_PER_RUN) {
+      const items = await this.prisma.threatIntelligenceItem.findMany({
+        where: { fetchedAt: { gte: since } },
+        orderBy: [{ fetchedAt: "asc" }, { id: "asc" }],
+        take: MATCH_SCAN_PAGE_SIZE,
+        ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
+        select: { id: true, title: true, summary: true, severity: true, signalTags: true },
+      });
+      if (items.length === 0) break;
+      cursorId = items[items.length - 1].id;
+
+      // Skip (item, scope) pairs that already produced a match so a rerun
+      // does not pay the LLM cost again.
+      const existing = await this.prisma.threatIntelligenceMatch.findMany({
+        where: { itemId: { in: items.map((item) => item.id) } },
+        select: { itemId: true, scopeType: true, scopeId: true },
+      });
+      const alreadyMatched = new Set(existing.map((match) => `${match.itemId}:${match.scopeType}:${match.scopeId}`));
+
+      for (const item of items) {
+        for (const scope of scopes) {
+          if (alreadyMatched.has(`${item.id}:${scope.scopeType}:${scope.scopeId}`)) continue;
+          if (evaluated >= MATCH_PAIR_BUDGET_PER_RUN) break;
+          matched += await this.matchItem(item, scope);
+          evaluated += 1;
+        }
+        if (evaluated >= MATCH_PAIR_BUDGET_PER_RUN) break;
       }
+
+      if (items.length < MATCH_SCAN_PAGE_SIZE) break;
     }
-    return { evaluated: items.length, matched };
+
+    return { evaluated, matched };
   }
 
   /**
@@ -272,6 +300,7 @@ export class ThreatIntelligenceMatchService {
       where: { scopeType_scopeId_itemId_matchedEntity: uniqueWhere },
       select: { id: true },
     });
+    const created = existing === null;
     const match = await this.prisma.threatIntelligenceMatch.upsert({
       where: { scopeType_scopeId_itemId_matchedEntity: uniqueWhere },
       update: {
@@ -292,14 +321,18 @@ export class ThreatIntelligenceMatchService {
         status: THREAT_INTELLIGENCE_MATCH_STATUS.OPEN,
       },
     });
-    this.eventEmitter.emit("threat-intelligence.match-created", {
-      matchId: match.id,
-      scopeType: data.scopeType,
-      scopeId: data.scopeId,
-      itemId: data.itemId,
-      confidence: data.confidence,
-    });
-    return existing === null;
+    // Re-evaluating an existing match must not look like a new finding to
+    // subscribers (notifications are keyed on the created event semantics).
+    if (created) {
+      this.eventEmitter.emit("threat-intelligence.match-created", {
+        matchId: match.id,
+        scopeType: data.scopeType,
+        scopeId: data.scopeId,
+        itemId: data.itemId,
+        confidence: data.confidence,
+      });
+    }
+    return created;
   }
 
   async listMatches(query: ListThreatIntelligenceMatchesQuery) {
