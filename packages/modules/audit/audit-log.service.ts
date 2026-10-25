@@ -35,6 +35,7 @@ export const AuditEvent = {
   API_KEY_DELETED: "api-key.deleted",
   SESSION_REVOKED: "session.revoked",
   MFA_ENABLED: "mfa.enabled",
+  MFA_REBOUND: "mfa.rebound",
   MFA_DISABLED: "mfa.disabled",
 } as const;
 

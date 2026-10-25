@@ -6,10 +6,10 @@ import { func } from "../../shared/utils";
 import { PvuvipService } from "./services/pvuvip.service";
 import { WebMonitorPvUvIpResponseDto } from "./pvuvip.dto";
 import parser from "cron-parser";
-import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { PermissionAction } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 @ApiTags("Frontend Monitor / Web / PvUvIp")
-@RequireOwner()
 @Controller("/web-monitor/pvuvip")
 export class PvuvipController {
   private cfg: Record<string, unknown>;
@@ -21,6 +21,7 @@ export class PvuvipController {
     this.cfg = this.configService.get("modules.web-monitor") || {};
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getPvUvIpSurveyToday")
   @ApiOperation({ summary: "Get today's PV/UV/IP survey" })
   @ApiResponse({ type: Object })
@@ -41,6 +42,7 @@ export class PvuvipController {
     return func.result({ time: betweenTime, data: { ...survey, num } });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getPvUvIpSurveyOne")
   @ApiOperation({ summary: "Get PV/UV/IP survey for a time range" })
   @ApiResponse({ type: WebMonitorPvUvIpResponseDto })
@@ -53,6 +55,7 @@ export class PvuvipController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getHistoryPvUvIplist")
   @ApiOperation({ summary: "Get history PV/UV/IP list" })
   @ApiResponse({ type: WebMonitorPvUvIpResponseDto, isArray: true })
@@ -69,6 +72,7 @@ export class PvuvipController {
     return func.result({ data: rows || [] });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getPvUvIpList")
   @ApiOperation({ summary: "Get PV/UV/IP data list" })
   @ApiResponse({ type: Object })
@@ -85,6 +89,7 @@ export class PvuvipController {
     return func.result({ time: betweenTime, data });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getPvUvIpOne")
   @ApiOperation({ summary: "Get single PV/UV/IP survey" })
   @ApiResponse({ type: Object })

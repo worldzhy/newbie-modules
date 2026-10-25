@@ -3,14 +3,15 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { EnvironmentService } from "./services/environment.service";
 import { WebMonitorEnvironmentGroupByItemResponseDto, WebMonitorEnvironmentResponseDto } from "./environment.dto";
-import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { PermissionAction } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 @ApiTags("Frontend Monitor / Web / Environment")
-@RequireOwner()
 @Controller("/web-monitor/environment")
 export class EnvironmentController {
   constructor(private readonly envSrv: EnvironmentService) {}
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getDataGroupBy")
   @ApiOperation({ summary: "Get environment data grouped by type" })
   @ApiResponse({ type: WebMonitorEnvironmentGroupByItemResponseDto, isArray: true })
@@ -28,6 +29,7 @@ export class EnvironmentController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getEnvironmentForPage")
   @ApiOperation({ summary: "Get environment info for a page" })
   @ApiResponse({ type: WebMonitorEnvironmentResponseDto })

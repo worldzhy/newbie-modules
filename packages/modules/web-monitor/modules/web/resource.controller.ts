@@ -2,14 +2,15 @@ import { Controller, Get, Query } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { ResourceService } from "./services/resource.service";
-import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { PermissionAction } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 @ApiTags("Frontend Monitor / Web / Resource")
-@RequireOwner()
 @Controller("/web-monitor/resource")
 export class ResourceController {
   constructor(private readonly resourceSrv: ResourceService) {}
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getResourceForType")
   @ApiOperation({ summary: "Get resource performance list by type" })
   @ApiResponse({ type: Object })
@@ -29,6 +30,7 @@ export class ResourceController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getAverageResourceList")
   @ApiOperation({ summary: "Get average resource performance list" })
   @ApiResponse({ type: Object })
@@ -39,6 +41,7 @@ export class ResourceController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getOneResourceAvg")
   @ApiOperation({ summary: "Get single resource average performance" })
   @ApiResponse({ type: Object })
@@ -55,6 +58,7 @@ export class ResourceController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getOneResourceList")
   @ApiOperation({ summary: "Get single resource performance list" })
   @ApiResponse({ type: Object })
@@ -73,6 +77,7 @@ export class ResourceController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getOneResourceDetail")
   @ApiOperation({ summary: "Get single resource details" })
   @ApiResponse({ type: Object })

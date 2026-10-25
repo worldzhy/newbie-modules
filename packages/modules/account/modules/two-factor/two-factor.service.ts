@@ -33,40 +33,62 @@ export class TwoFactorService {
   /**
    * Begin TOTP enrollment. Generates a fresh secret and stores it as pending
    * (twoFactorMethod stays NONE until a code is confirmed through enable()).
+   *
+   * If TOTP is already enabled, the caller must prove possession of the current
+   * credential (password or a valid code) before a new pending secret is
+   * issued — this prevents a stolen session from silently rotating the live
+   * authenticator (ADR-033).
    */
-  async setup(userId: string): Promise<{ secret: string; otpauthUrl: string; qrCodeDataUrl: string }> {
+  async setup(
+    userId: string,
+    params: { password?: string; code?: string } = {},
+  ): Promise<{ secret: string; otpauthUrl: string; qrCodeDataUrl: string }> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { email: true },
+      select: { email: true, twoFactorMethod: true, twoFactorSecret: true, password: true },
     });
     if (!user.email) {
       throw new BadRequestException("An email address is required to enroll an authenticator.");
+    }
+
+    if (user.twoFactorMethod === MfaMethod.TOTP) {
+      const ok = await this.verifyCurrentCredential(user.twoFactorSecret, user.password, params);
+      if (!ok) {
+        throw new BadRequestException("Provide your current password or a valid authenticator code.");
+      }
     }
 
     const secret = generateSecret();
     const otpauthUrl = generateURI({ issuer: TOTP_ISSUER, label: user.email, secret });
     const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
+    // The active secret is never overwritten here; enable() promotes the pending
+    // value only after a valid code is presented against it.
     await this.prisma.user.update({
       where: { id: userId },
-      data: { twoFactorSecret: secret },
+      data: { pendingTwoFactorSecret: secret },
     });
     return { secret, otpauthUrl, qrCodeDataUrl };
   }
 
-  /** Confirm the pending secret with a code, then switch TOTP on. */
+  /**
+   * Confirm the pending secret with a code, then atomically promote it to the
+   * active secret and switch TOTP on. The active secret is replaced only after
+   * the pending code verifies, so a failed enable leaves the live credential
+   * intact.
+   */
   async enable(userId: string, code: string): Promise<{ twoFactorMethod: MfaMethod }> {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { twoFactorSecret: true },
+      select: { twoFactorMethod: true, pendingTwoFactorSecret: true },
     });
-    if (!user.twoFactorSecret) {
+    if (!user.pendingTwoFactorSecret) {
       throw new BadRequestException("Start enrollment before confirming a code.");
     }
 
     const result = await verify({
       token: code,
-      secret: user.twoFactorSecret,
+      secret: user.pendingTwoFactorSecret,
       epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
     });
     if (!result.valid) {
@@ -75,7 +97,11 @@ export class TwoFactorService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { twoFactorMethod: MfaMethod.TOTP },
+      data: {
+        twoFactorSecret: user.pendingTwoFactorSecret,
+        twoFactorMethod: MfaMethod.TOTP,
+        pendingTwoFactorSecret: null,
+      },
     });
     return { twoFactorMethod: MfaMethod.TOTP };
   }
@@ -87,26 +113,40 @@ export class TwoFactorService {
       select: { password: true, twoFactorSecret: true },
     });
 
-    const passwordMatches =
-      params.password && user.password ? await compareHash(params.password, user.password) : false;
-    const codeMatches =
-      params.code && user.twoFactorSecret
-        ? (
-            await verify({
-              token: params.code,
-              secret: user.twoFactorSecret,
-              epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
-            })
-          ).valid
-        : false;
-    if (!passwordMatches && !codeMatches) {
+    const ok = await this.verifyCurrentCredential(user.twoFactorSecret, user.password, params);
+    if (!ok) {
       throw new BadRequestException("Provide your current password or a valid authenticator code.");
     }
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { twoFactorMethod: MfaMethod.NONE, twoFactorSecret: null },
+      data: { twoFactorMethod: MfaMethod.NONE, twoFactorSecret: null, pendingTwoFactorSecret: null },
     });
+  }
+
+  /**
+   * Shared credential check for re-bind (setup while enabled) and disable.
+   * Accepts the current password or a valid TOTP code against the active
+   * secret. Returns false (rather than throwing) so callers can attach the
+   * operation-specific error message.
+   */
+  private async verifyCurrentCredential(
+    activeSecret: string | null,
+    passwordHash: string | null,
+    params: { password?: string; code?: string },
+  ): Promise<boolean> {
+    const passwordMatches = params.password && passwordHash ? await compareHash(params.password, passwordHash) : false;
+    const codeMatches =
+      params.code && activeSecret
+        ? (
+            await verify({
+              token: params.code,
+              secret: activeSecret,
+              epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
+            })
+          ).valid
+        : false;
+    return passwordMatches || codeMatches;
   }
 
   /** Whether the user has TOTP enabled. */

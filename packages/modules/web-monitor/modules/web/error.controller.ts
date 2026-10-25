@@ -7,14 +7,15 @@ import {
   ListWebMonitorErrorMarkUsersResponseDto,
   ListWebMonitorErrorOnesResponseDto,
 } from "./error.dto";
-import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { PermissionAction } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 @ApiTags("Frontend Monitor / Web / Error")
-@RequireOwner()
 @Controller("/web-monitor/error")
 export class ErrorController {
   constructor(private readonly errorSrv: ErrorService) {}
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getAverageErrorList")
   @ApiOperation({ summary: "Get average error category list" })
   @ApiResponse({ type: ListWebMonitorErrorsResponseDto })
@@ -25,6 +26,7 @@ export class ErrorController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getOneErrorList")
   @ApiOperation({ summary: "Get single error resource list" })
   @ApiResponse({ type: ListWebMonitorErrorOnesResponseDto })
@@ -36,6 +38,7 @@ export class ErrorController {
     return func.result({ data: result });
   }
 
+  @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getMarkUserErrorList")
   @ApiOperation({ summary: "Get marked user error list" })
   @ApiResponse({ type: ListWebMonitorErrorMarkUsersResponseDto })

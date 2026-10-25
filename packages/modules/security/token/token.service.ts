@@ -1,5 +1,6 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { createHash } from "crypto";
 import cryptoRandomString from "crypto-random-string";
 import { JwtPayload, sign, SignOptions, verify } from "jsonwebtoken";
 import { v4 } from "uuid";
@@ -141,6 +142,15 @@ export class TokenService {
         subject: TokenSubject.USER_REFRESH_TOKEN,
       },
     });
+  }
+
+  /**
+   * Deterministic SHA-256 hex digest of a token. Used to store refresh tokens
+   * as hashes at rest (ADR-034): lookup and rotation match by hash, and a
+   * database read never yields a usable credential.
+   */
+  hashToken(token: string): string {
+    return createHash("sha256").update(token).digest("hex");
   }
 
   /**

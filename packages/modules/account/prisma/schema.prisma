@@ -32,6 +32,10 @@ model User {
   twoFactorMethod      MfaMethod        @default(NONE)
   twoFactorPhone       String?
   twoFactorSecret      String?
+  // Pending TOTP secret awaiting confirmation via enable(). The active
+  // twoFactorSecret is only overwritten inside enable() after a valid code
+  // is presented against this pending value (ADR-033).
+  pendingTwoFactorSecret String?
   lastLoginAt          DateTime?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
@@ -128,7 +132,17 @@ model VerificationCode {
 model Session {
   id              Int      @id @default(autoincrement())
   accessToken     String   @unique
-  refreshToken    String   @unique
+  // SHA-256 hex of the current refresh token. The plaintext is never stored
+  // (ADR-034); refresh matches by hash and rotates with a CAS update.
+  refreshTokenHash        String   @unique
+  // Hash of the token rotated out by the most recent refresh. Used to detect
+  // idempotent retries of the same rotation within the short reuse window.
+  previousRefreshTokenHash String?  @unique
+  // Timestamp of the last successful rotation; bounds the idempotency window.
+  rotatedAt               DateTime?
+  // Plaintext of the freshly minted refresh token, retained only for the
+  // idempotency window so a retried refresh returns the same token pair.
+  refreshTokenNext        String?
   ipAddress       String
   userAgent       String?
   city            String?
@@ -142,7 +156,7 @@ model Session {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId          String   @db.Uuid
 
-  // @unique already creates indexes for accessToken and refreshToken.
+  // @unique already creates indexes for accessToken and the hash columns.
   @@index([userId])
   @@schema("module/account")
 }
