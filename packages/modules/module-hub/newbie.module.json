@@ -9,7 +9,7 @@
   "moduleDependencies": ["audit", "security"],
   "dependencies": {
     "@octokit/rest": "latest",
-    "@devbie/module-hub-cli": "^1.0.1"
+    "@devbie/module-hub-cli": "^1.0.2"
   },
   "devDependencies": {},
   "cli": "module-hub"
