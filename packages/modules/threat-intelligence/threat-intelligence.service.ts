@@ -9,6 +9,25 @@ import {
 import { DEFAULT_MAX_ITEMS_PER_SOURCE, DEFAULT_RETENTION_DAYS } from "./threat-intelligence.constants";
 import { ListThreatIntelligenceItemsQuery } from "./threat-intelligence.dto";
 
+/** Fields returned by read APIs; rawPayload stays internal to the store. */
+const ITEM_SELECT = {
+  id: true,
+  source: true,
+  category: true,
+  externalId: true,
+  title: true,
+  summary: true,
+  url: true,
+  publishedAt: true,
+  severity: true,
+  signalTags: true,
+  fetchedAt: true,
+  lastSeenAt: true,
+} satisfies Prisma.ThreatIntelligenceItemSelect;
+
+/** How many upserts run in parallel per batch. */
+const UPSERT_BATCH_SIZE = 20;
+
 @Injectable()
 export class ThreatIntelligenceService {
   private readonly logger = new Logger(ThreatIntelligenceService.name);
@@ -57,39 +76,59 @@ export class ThreatIntelligenceService {
 
   /**
    * Upsert items by (source, externalId). Returns the count of rows
-   * touched (new + updated).
+   * touched (new + updated). Runs in small concurrent batches; a single
+   * malformed row is logged and skipped instead of aborting the run.
    */
   async upsertItems(items: SourceIntelItem[]): Promise<number> {
     let touched = 0;
-    for (const item of items) {
-      await this.prisma.threatIntelligenceItem.upsert({
-        where: { source_externalId: { source: item.source, externalId: item.externalId } },
-        update: {
-          title: item.title,
-          summary: item.summary ?? null,
-          url: item.url ?? null,
-          publishedAt: item.publishedAt ?? null,
-          severity: item.severity,
-          signalTags: item.signalTags,
-          rawPayload: item.rawPayload as Prisma.InputJsonValue,
-          lastSeenAt: new Date(),
-        },
-        create: {
-          source: item.source,
-          category: item.category,
-          externalId: item.externalId,
-          title: item.title,
-          summary: item.summary ?? null,
-          url: item.url ?? null,
-          publishedAt: item.publishedAt ?? null,
-          severity: item.severity,
-          signalTags: item.signalTags,
-          rawPayload: item.rawPayload as Prisma.InputJsonValue,
-        },
-      });
-      touched += 1;
+    for (let i = 0; i < items.length; i += UPSERT_BATCH_SIZE) {
+      const batch = items.slice(i, i + UPSERT_BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map((item) => this.upsertOne(item)));
+      for (const [index, result] of results.entries()) {
+        if (result.status === "fulfilled") {
+          touched += 1;
+        } else {
+          this.logger.warn(
+            `Skipping item ${batch[index].source}/${batch[index].externalId}: ${
+              result.reason instanceof Error ? result.reason.message : String(result.reason)
+            }`,
+          );
+        }
+      }
     }
     return touched;
+  }
+
+  private async upsertOne(item: SourceIntelItem): Promise<void> {
+    // Feeds occasionally carry unparsable dates; an Invalid Date would make
+    // Prisma throw, so fall back to null instead of poisoning the batch.
+    const publishedAt =
+      item.publishedAt instanceof Date && !Number.isNaN(item.publishedAt.getTime()) ? item.publishedAt : null;
+    await this.prisma.threatIntelligenceItem.upsert({
+      where: { source_externalId: { source: item.source, externalId: item.externalId } },
+      update: {
+        title: item.title,
+        summary: item.summary ?? null,
+        url: item.url ?? null,
+        publishedAt,
+        severity: item.severity,
+        signalTags: item.signalTags,
+        rawPayload: item.rawPayload as Prisma.InputJsonValue,
+        lastSeenAt: new Date(),
+      },
+      create: {
+        source: item.source,
+        category: item.category,
+        externalId: item.externalId,
+        title: item.title,
+        summary: item.summary ?? null,
+        url: item.url ?? null,
+        publishedAt,
+        severity: item.severity,
+        signalTags: item.signalTags,
+        rawPayload: item.rawPayload as Prisma.InputJsonValue,
+      },
+    });
   }
 
   /**
@@ -142,6 +181,7 @@ export class ThreatIntelligenceService {
         orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
         take: query.limit ?? 20,
         skip: query.offset ?? 0,
+        select: ITEM_SELECT,
       }),
       this.prisma.threatIntelligenceItem.count({ where }),
     ]);
@@ -149,7 +189,7 @@ export class ThreatIntelligenceService {
   }
 
   async getItem(id: string) {
-    const item = await this.prisma.threatIntelligenceItem.findUnique({ where: { id } });
+    const item = await this.prisma.threatIntelligenceItem.findUnique({ where: { id }, select: ITEM_SELECT });
     if (!item) throw new NotFoundException(`Threat intel item ${id} not found.`);
     return item;
   }

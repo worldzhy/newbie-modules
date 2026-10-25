@@ -62,11 +62,13 @@ export class AwsSecurityBulletinsAdapter implements ThreatIntelligenceSourceAdap
     title: string,
     description: string,
   ): (typeof THREAT_INTELLIGENCE_SEVERITY)[keyof typeof THREAT_INTELLIGENCE_SEVERITY] {
-    const text = `${title} ${stripHtml(description)}`.toLowerCase();
-    if (text.includes("critical")) return THREAT_INTELLIGENCE_SEVERITY.CRITICAL;
-    if (text.includes("high") || text.includes("important")) return THREAT_INTELLIGENCE_SEVERITY.HIGH;
-    if (text.includes("medium") || text.includes("moderate")) return THREAT_INTELLIGENCE_SEVERITY.MEDIUM;
-    if (text.includes("low")) return THREAT_INTELLIGENCE_SEVERITY.LOW;
+    // Word-boundary matching: substring "low" also matches "below"/"follow",
+    // which previously misclassified bulletins with no severity keyword.
+    const text = `${title} ${stripHtml(description)}`;
+    if (/\bcritical\b/i.test(text)) return THREAT_INTELLIGENCE_SEVERITY.CRITICAL;
+    if (/\bhigh\b/i.test(text) || /\bimportant\b/i.test(text)) return THREAT_INTELLIGENCE_SEVERITY.HIGH;
+    if (/\bmedium\b/i.test(text) || /\bmoderate\b/i.test(text)) return THREAT_INTELLIGENCE_SEVERITY.MEDIUM;
+    if (/\blow\b/i.test(text)) return THREAT_INTELLIGENCE_SEVERITY.LOW;
     return THREAT_INTELLIGENCE_SEVERITY.INFO;
   }
 }

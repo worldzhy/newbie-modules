@@ -47,8 +47,9 @@ export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAd
       direction: "desc",
     });
     if (since) {
-      // GitHub uses ISO-8601 without ms; strip fractional seconds.
-      params.set("published_at", since.toISOString().replace(/\.\d+Z$/, "Z"));
+      // GitHub filters advisories with `published` (exact date or a
+      // `>=YYYY-MM-DDTHH:MM:SSZ` range); `published_at` is silently ignored.
+      params.set("published", `>=${since.toISOString().replace(/\.\d+Z$/, "Z")}`);
     }
     const advisories = await fetchJson<GitHubAdvisory[]>(this.source, `${API_URL}?${params.toString()}`, {
       headers: { Accept: "application/vnd.github+json", "User-Agent": "threat-intelligence-collector" },

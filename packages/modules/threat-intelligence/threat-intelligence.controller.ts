@@ -3,7 +3,11 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagg
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { ThreatIntelligenceService } from "./threat-intelligence.service";
-import { ListThreatIntelligenceItemsQuery, ThreatIntelligenceItemDto } from "./threat-intelligence.dto";
+import {
+  ListThreatIntelligenceItemsQuery,
+  ListThreatIntelligenceItemsResponseDto,
+  ThreatIntelligenceItemDto,
+} from "./threat-intelligence.dto";
 
 @ApiTags("Threat Intel")
 @ApiBearerAuth()
@@ -14,7 +18,7 @@ export class ThreatIntelligenceController {
   @Get("items")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.ThreatIntelligenceItem)
   @ApiOperation({ summary: "List threat intel items with filters" })
-  @ApiResponse({ status: 200, type: [ThreatIntelligenceItemDto] })
+  @ApiResponse({ status: 200, type: ListThreatIntelligenceItemsResponseDto })
   async listItems(@Query() query: ListThreatIntelligenceItemsQuery) {
     return this.service.listItems(query);
   }
