@@ -1,5 +1,12 @@
--- Initial ClickHouse schema for the work-evaluation module (ADR-021, ADR-024).
--- Idempotent: safe to re-run on an existing identical schema.
+-- ClickHouse schema model of the work-evaluation module (ADR-021, ADR-024).
+--
+-- Pre-launch there is no ClickHouse migration pipeline (2026-10-26 rule): this
+-- file is the module's schema definition, applied directly against the
+-- platform ClickHouse database, e.g.
+--   docker exec -i nightwatch-backend-clickhouse clickhouse-client \
+--     --database nightwatch --multiquery < packages/modules/work-evaluation/clickhouse/schema.sql
+-- It is idempotent: safe to re-run on an existing identical schema. When the
+-- migration pipeline is enabled later, this file becomes its V1 baseline.
 
 -- One row per collected AI-agent session message chunk. The PG side keeps the
 -- session index (WorkEvaluationSession); this table holds the transcript

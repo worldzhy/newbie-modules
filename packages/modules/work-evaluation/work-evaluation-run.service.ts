@@ -27,10 +27,11 @@ export interface StartWorkEvaluationRunInput {
  * WorkEvaluationRunService — thin façade over the evaluation skeleton's run
  * lifecycle and read services (ADR-024, spec §4.4/§4.5).
  *
- * The trigger is fire-and-forget: the skeleton's `runner.run` owns the whole
- * run lifecycle synchronously (open row → judge → close), so this service
- * dispatches and returns before any run row exists. The controller answers
- * 202 immediately; clients discover the run through `listRuns`.
+ * The trigger follows the skeleton's two-phase contract (ADR-029):
+ * `runner.open` performs admission synchronously — already-active runs,
+ * unpublished criteria versions and missing subjects surface as 400/404/409
+ * before the 202 — then the judgment execution continues fire-and-forget.
+ * Clients observe progress through `getRun`/`listRuns`.
  */
 @Injectable()
 export class WorkEvaluationRunService {
@@ -46,10 +47,10 @@ export class WorkEvaluationRunService {
   ) {}
 
   /**
-   * Dispatch a run against a member and a period. Period eligibility and the
-   * evaluatee's existence are validated synchronously so the caller still gets
-   * a 400/404 before the 202; everything past this point is observed through
-   * the run row.
+   * Dispatch a run against a member and a period. Period eligibility, the
+   * evaluatee's existence and skeleton admission are validated synchronously
+   * so the caller gets 400/404/409 before the 202; everything past admission
+   * is observed through the run row.
    */
   async startRun(input: StartWorkEvaluationRunInput): Promise<void> {
     const period = await this.periods.getPeriodById(input.periodId);
@@ -83,12 +84,14 @@ export class WorkEvaluationRunService {
       requestedByRef: input.requestedByRef,
       config: { ...input.config, periodId: period.id },
     };
-    // The runner records every terminal state on the run row itself; this
-    // catch only keeps a rejected fire-and-forget promise from surfacing as
-    // an unhandled rejection.
-    void this.runner.run(built).catch((error: unknown) => {
+    // Admission happens on the request path via `open`; only the judgment
+    // execution is detached. The runner records every terminal state on the
+    // run row itself, this catch merely keeps the detached promise from
+    // surfacing as an unhandled rejection.
+    const run = await this.runner.open(built);
+    void this.runner.execute(run).catch((error: unknown) => {
       this.logger.error(
-        `Evaluation run for subject ${subject.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Evaluation run ${run.id} for subject ${subject.id} failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
   }

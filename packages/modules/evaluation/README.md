@@ -168,8 +168,10 @@ actually needs them.
 
 ## Scope
 
-No controllers: HTTP endpoints, read models, notification templates and
-scheduling belong to the feature. No `llm` dependency: deterministic judgments
+One controller only (ADR-029): the decision surface over skeleton-owned
+aggregates — finding suppression/reopening and remediation plans. Read models,
+feature endpoints, notification templates and scheduling belong to the feature.
+No `llm` dependency: deterministic judgments
 (version ranges, configuration baselines) must not be pulled into the LLM stack,
 and features that do need a model inject their own judgment port implementation
 (ADR-018 stays valid at the feature level).

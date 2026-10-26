@@ -1,6 +1,7 @@
 import { Global, Module } from "@nestjs/common";
 
 import { EvaluationCriteriaService } from "./evaluation-criteria.service";
+import { EvaluationDecisionController } from "./evaluation-decision.controller";
 import { EvaluationFindingService } from "./evaluation-finding.service";
 import { EvaluationProviderRegistry } from "./evaluation-provider.registry";
 import { EvaluationRemediationService } from "./evaluation-remediation.service";
@@ -12,9 +13,12 @@ import { EvaluationSubjectService } from "./evaluation-subject.service";
 /**
  * EvaluationModule (ADR-020) — the capability skeleton.
  *
- * The module owns the seven tables, the run lifecycle and the invariants. It
- * deliberately exposes no HTTP surface: endpoints, read models and scheduling
- * belong to the feature that builds on it.
+ * The module owns the seven tables, the run lifecycle and the invariants. Its
+ * HTTP surface is deliberately minimal (ADR-029): the decision controller for
+ * suppression/reopening and remediation — lifecycle operations over
+ * skeleton-owned aggregates that every feature family shares. Read models,
+ * feature-specific endpoints and scheduling belong to the feature that builds
+ * on it.
  *
  * `EvaluationRunnerService.run` is the only write entry of the run lifecycle —
  * it owns the heartbeat, the fencing checks and the state machine transitions.
@@ -30,6 +34,7 @@ import { EvaluationSubjectService } from "./evaluation-subject.service";
  */
 @Global()
 @Module({
+  controllers: [EvaluationDecisionController],
   providers: [
     EvaluationProviderRegistry,
     EvaluationCriteriaService,

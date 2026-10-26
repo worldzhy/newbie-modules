@@ -10,7 +10,7 @@ import { EvaluationJudgment, JudgmentInput, JudgmentPort } from "@modules/evalua
 
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 import { createDrillRedactor, redactDeep } from "./work-evaluation-redaction";
-import { requirePeriodId } from "./work-evaluation-run-config";
+import { readBudgetOverride, readScopeOverride, requirePeriodId } from "./work-evaluation-run-config";
 import {
   DEFAULT_WORK_EVALUATION_PHASE_BUDGET,
   DEFAULT_WORK_EVALUATION_SCOPE,
@@ -340,23 +340,4 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
     add(user?.lastName);
     return tokens;
   }
-}
-
-/** runConfig.modelScope picks the llm scope this run judges with (ADR-023). */
-function readScopeOverride(runConfig: Record<string, unknown> | null): string | undefined {
-  const scope = runConfig?.modelScope;
-  return typeof scope === "string" && scope.trim() ? scope : undefined;
-}
-
-/** runConfig.budget overrides per-phase token budgets (small knobs only). */
-function readBudgetOverride(runConfig: Record<string, unknown> | null): Partial<WorkEvaluationPhaseBudget> {
-  const budget = runConfig?.budget;
-  if (!budget || typeof budget !== "object") return {};
-  const record = budget as Record<string, unknown>;
-  const override: Partial<WorkEvaluationPhaseBudget> = {};
-  for (const phase of ["advocate", "skeptic", "synthesis"] as const) {
-    const value = Number(record[phase]);
-    if (Number.isFinite(value) && value > 0) override[phase] = value;
-  }
-  return override;
 }

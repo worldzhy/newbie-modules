@@ -166,12 +166,12 @@ The authoritative route list is the module spec
 | `/work-evaluation/runs`                                             | platform JWT                                    | Trigger and list runs                                        |
 | `/work-evaluation/results`                                          | platform JWT                                    | Read archived results                                        |
 
-`POST /work-evaluation/runs { subjectId, criteriaVersionId?, config? }` is
-fire-and-forget: the controller kicks off the skeleton runner and answers 202
-immediately. Clients discover the run by polling
-`GET /work-evaluation/runs?subjectId=` (newest first) — the skeleton's
-`runner.run` holds the run lifecycle synchronously, so the feature cannot
-return the run row up front.
+`POST /work-evaluation/runs { evaluateeUserId, periodId, requestedByRef?, config? }`
+follows the skeleton's two-phase contract (ADR-029): admission — period
+eligibility, evaluatee existence, published criteria version, no active run —
+is answered synchronously as 400/404/409 before the 202; the judgment
+execution then continues in the background. Clients observe progress by
+polling `GET /work-evaluation/runs?subjectId=` (newest first).
 
 Ingest payloads carry no evaluatee identity: the installation token resolves to
 exactly one evaluatee, so there is no second identity source to reconcile.
