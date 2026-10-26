@@ -38,4 +38,4 @@
 - [ ] 4.3 切片 4：多轴报告（合规 / 情报 / 趋势 / MTTR）+ 整改绑定 + 通知模板
 - [ ] 4.4 切换与旧模块处置：由用户单独决策，不在本 spec 范围。当前决策见 ADR-036（D1-B 并轨、等价闸门三项）；旧模块删除单独立项
 - [x] 4.5 骨架 run 生命周期事件：按 ADR-032 在骨架声明 `evaluation.run-succeeded` / `evaluation.run-failed`，runner 终态落库后唯一发射，宿主按 ADR-028 决定激活（registry `be919c1` / backend `d68bc96`；`evaluation-runner-events.test.ts` 6 项行为测试绿，宿主未激活事件目录属预期）
-- [ ] 4.6 切片 2.6：非 CIS 自定义规则族 `aws-custom`（10 条）+ 采集契约扩展（3 个新 factType + 4 个 payload 扩展）+ 骨架 `family → evaluationKey` 改名 + per-draft severity + policy-as-finding-unit + coverage 按 requiredFactTypes + 共享采集 freshness。按 ADR-033 + ADR-037 交付；合规轴按 evaluationKey 过滤
+- [x] 4.6 切片 2.6：非 CIS 自定义规则族 `aws-custom`（10 条）+ 采集契约扩展（3 个新 factType + 4 个 payload 扩展）+ 骨架 `family → evaluationKey` 改名 + per-draft severity + policy-as-finding-unit + coverage 按 requiredFactTypes + 共享采集 freshness。按 ADR-033 + ADR-037 交付；合规轴按 evaluationKey 过滤。registry `75454ff`+`ad17969`+`2c4db2a`+`8492c8f`、backend `e100da4`+`b4b31a7`+`21d1755`；E2E 真实 AWS 账号双 run 均 SUCCEEDED（cis-aws-1.5 90s 全量采集，aws-custom 5s 命中 1h freshness 缓存），findings 按 evaluationKey 独立分布（cis 159 OPEN / custom 57 OPEN），旧指纹 72 条自动 RESOLVED，finding 生命周期正常
