@@ -48,7 +48,7 @@ export interface SecurityEvaluationReport {
 /**
  * SecurityEvaluationReportService — the single-axis read model of the first
  * slice (ADR-022 D6): assets, coverage, findings, trend and MTTR. There is no
- * composite score and no cross-family weighting; adding a second axis is a
+ * composite score and no cross-evaluationKey weighting; adding a second axis is a
  * later milestone, not a field to sneak in here.
  */
 @Injectable()

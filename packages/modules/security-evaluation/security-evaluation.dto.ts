@@ -182,10 +182,10 @@ export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestD
   @IsUUID()
   subjectId!: string;
 
-  @ApiPropertyOptional({ description: 'Restrict to one criteria family, e.g. "dependency-osv"' })
+  @ApiPropertyOptional({ description: 'Restrict to one criteria evaluationKey, e.g. "dependency-osv"' })
   @IsOptional()
   @IsString()
-  family?: string;
+  evaluationKey?: string;
 
   @ApiPropertyOptional({ enum: EvaluationFindingStatus })
   @IsOptional()
@@ -202,7 +202,7 @@ export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestD
 export class SecurityEvaluationFindingResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty() family!: string;
+  @ApiProperty() evaluationKey!: string;
   @ApiProperty() fingerprint!: string;
   @ApiProperty() criterionKey!: string;
   @ApiProperty({ enum: EvaluationFindingSeverity }) severity!: EvaluationFindingSeverity;
@@ -283,7 +283,7 @@ export class SecurityEvaluationReportMttrDto {
   @ApiProperty() windowDays!: number;
 }
 
-/** Single-axis report (ADR-022 D6): no composite score, no cross-family weighting. */
+/** Single-axis report (ADR-022 D6): no composite score, no cross-evaluationKey weighting. */
 export class SecurityEvaluationReportResponseDto {
   @ApiProperty() generatedAt!: Date;
   @ApiProperty({ type: SecurityEvaluationReportAssetsDto }) assets!: SecurityEvaluationReportAssetsDto;

@@ -80,11 +80,11 @@ enum EvaluationResultReviewStatus {
 /// A frozen set of criteria a run is judged against (ADR-020 D5.5). A draft is
 /// editable; publishing is one-way, after which every write is rejected and
 /// changes require a new version. `kind` is the subject kind these criteria
-/// apply to; `family` is the feature-defined group (rubric, cis-aws-1.5, ...).
+/// apply to; `evaluationKey` is the feature-defined group (rubric, cis-aws-1.5, ...).
 model EvaluationCriteriaVersion {
   id     String @id @default(uuid()) @db.Uuid
   kind   String @db.VarChar(64)
-  family String @db.VarChar(64)
+  evaluationKey String @db.VarChar(64)
 
   version     String  @db.VarChar(64)
   description String? @db.Text
@@ -101,8 +101,8 @@ model EvaluationCriteriaVersion {
   runs     EvaluationRun[]
   results  EvaluationResult[]
 
-  @@unique([kind, family, version])
-  @@index([kind, family, publishedAt])
+  @@unique([kind, evaluationKey, version])
+  @@index([kind, evaluationKey, publishedAt])
   @@schema("module/evaluation")
 }
 
@@ -241,19 +241,19 @@ model EvaluationResult {
 }
 
 /// An assertion-type conclusion (ADR-020 D2). Unlike a verdict it has an
-/// identity — `(subjectId, family, fingerprint)` — and a lifecycle that spans
+/// identity — `(subjectId, evaluationKey, fingerprint)` — and a lifecycle that spans
 /// runs: first seen once, last seen by whichever run still observed it,
-/// resolved when it stops appearing. `family` is copied from the run's
-/// criteria version, so a rerun under a new version of the same family keeps
-/// the finding's identity, and one family never resolves another family's
+/// resolved when it stops appearing. `evaluationKey` is copied from the run's
+/// criteria version, so a rerun under a new version of the same evaluationKey keeps
+/// the finding's identity, and one evaluationKey never resolves another evaluationKey's
 /// findings. `firstSeenAt` is never rewritten.
 model EvaluationFinding {
   id        String @id @default(uuid()) @db.Uuid
   subjectId String @db.Uuid
 
-  // Criteria family of the run that owns this finding's lifecycle
-  family       String                    @db.VarChar(64)
-  // Stable identity of the assertion within the subject and family
+  // Criteria evaluationKey of the run that owns this finding's lifecycle
+  evaluationKey       String                    @db.VarChar(64)
+  // Stable identity of the assertion within the subject and evaluationKey
   fingerprint  String                    @db.VarChar(128)
   criterionKey String                    @db.VarChar(64)
   severity     EvaluationFindingSeverity
@@ -280,7 +280,7 @@ model EvaluationFinding {
 
   subject EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectId, family, fingerprint])
+  @@unique([subjectId, evaluationKey, fingerprint])
   @@index([subjectId, status])
   @@index([status, severity])
   @@schema("module/evaluation")

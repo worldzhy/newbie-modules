@@ -16,7 +16,7 @@ lands in a later slice on the same run and finding lifecycle.
 | Asset    | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state facts.                                                                               |
 | Fact     | `SecurityEvaluationAssetFact`: something observed about an asset right now (`factType`, `factKey`, small intrinsic `value`). Facts are upserted, never deleted here; history lives in the archived run manifest. |
 | Criteria | Code-defined and published idempotently as `EvaluationCriteriaVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                     |
-| Finding  | Skeleton `EvaluationFinding` with identity `(subjectId, family, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                         |
+| Finding  | Skeleton `EvaluationFinding` with identity `(subjectId, evaluationKey, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                  |
 | Urgency  | Derived band P1–P4 from severity and exposure. Not a stored score and not a composite.                                                                                                                           |
 
 ## Subject kinds and scopes
@@ -54,7 +54,7 @@ open decision (ADR-022).
 Each CIS criterion carries `controlId`, `severity`, `remediation` and
 `factRequirements` in its metadata; the judgment reads severity from there, and
 the seed and the rulebook draw from one source. A rule change ships as a new
-version of the family, never an in-place edit.
+version of the evaluationKey, never an in-place edit.
 
 ## Port bindings
 
@@ -64,7 +64,7 @@ The module implements the skeleton's kind-scoped ports for both kinds:
 - `EVALUATION_EVIDENCE:repository` → `SecurityEvaluationEvidenceProvider`
 - `EVALUATION_EVIDENCE:cloud-account` → `SecurityEvaluationCloudConfigEvidenceProvider`
 - `EVALUATION_JUDGMENT:{repository|cloud-account}` → `SecurityEvaluationJudgmentService`
-  (dispatches on `criteriaVersion.family`: `dependency-osv`, `cis-aws-1.5`)
+  (dispatches on `criteriaVersion.evaluationKey`: `dependency-osv`, `cis-aws-1.5`)
 
 The host must bind two more ports, owned by this module:
 
@@ -104,9 +104,9 @@ trigger conditions:
 
 ```ts
 SECURITY_EVALUATION_SCHEDULES = [
-  { family: "dependency-osv", subjectKind: "repository", recommendedInterval: "daily" },
-  { family: "cis-aws-1.5", subjectKind: "cloud-account", recommendedInterval: "daily" },
-  { family: "threat-intel-relevance", subjectKind: "repository", recommendedInterval: "hourly" },
+  { evaluationKey: "dependency-osv", subjectKind: "repository", recommendedInterval: "daily" },
+  { evaluationKey: "cis-aws-1.5", subjectKind: "cloud-account", recommendedInterval: "daily" },
+  { evaluationKey: "threat-intel-relevance", subjectKind: "repository", recommendedInterval: "hourly" },
 ];
 ```
 
@@ -120,7 +120,7 @@ SECURITY_EVALUATION_SCHEDULES = [
 | POST   | `/security-evaluation/runs`                  | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously. |
 | GET    | `/security-evaluation/runs`                  | Run history for a subject.                                                                          |
 | GET    | `/security-evaluation/results`               | Archived results (manifest excluded).                                                               |
-| GET    | `/security-evaluation/findings`              | Findings with family / status / severity filters.                                                   |
+| GET    | `/security-evaluation/findings`              | Findings with evaluationKey / status / severity filters.                                            |
 | GET    | `/security-evaluation/report`                | Single-axis report: assets, coverage, findings, trend, MTTR.                                        |
 
 ## Limitations
@@ -133,7 +133,7 @@ SECURITY_EVALUATION_SCHEDULES = [
 - Data source is osv.dev; an OSV outage degrades coverage (skipped packages), it
   does not silently pass.
 - The CIS catalog covers the initial ten controls only; catalog growth is a new
-  family version. Cloud findings carry exposure `internal` until a reachability
+  evaluationKey version. Cloud findings carry exposure `internal` until a reachability
   signal exists, so urgency derives no relief.
-- The report has no composite score and no cross-family weighting (ADR-020 D5.3,
+- The report has no composite score and no cross-evaluationKey weighting (ADR-020 D5.3,
   ADR-022 D6). A second axis is a later milestone, not a field to sneak in.

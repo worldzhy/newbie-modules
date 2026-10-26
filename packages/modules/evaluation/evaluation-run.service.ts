@@ -104,7 +104,7 @@ export class EvaluationRunService {
     const version = await this.requirePublishedVersion(criteriaVersionId);
     if (version.kind !== subject.kind) {
       throw new BadRequestException(
-        `Criteria version ${version.family}/${version.version} judges kind "${version.kind}", not "${subject.kind}"`,
+        `Criteria version ${version.evaluationKey}/${version.version} judges kind "${version.kind}", not "${subject.kind}"`,
       );
     }
 
@@ -230,11 +230,16 @@ export class EvaluationRunService {
       );
     }
     const version = await this.prisma.evaluationCriteriaVersion.findFirst({
-      where: { kind: subject.kind, family: selection.family, version: selection.version, publishedAt: { not: null } },
+      where: {
+        kind: subject.kind,
+        evaluationKey: selection.evaluationKey,
+        version: selection.version,
+        publishedAt: { not: null },
+      },
     });
     if (!version) {
       throw new NotFoundException(
-        `Criteria version ${selection.family}/${selection.version} is not published for kind "${subject.kind}"`,
+        `Criteria version ${selection.evaluationKey}/${selection.version} is not published for kind "${subject.kind}"`,
       );
     }
     return version.id;

@@ -13,8 +13,8 @@ import { SecurityEvaluationDependencyJudgment } from "./dependency/security-eval
  * feature (ADR-022 D3).
  *
  * The skeleton binds one judgment port per subject kind, so every mechanism is
- * dispatched here on the run's criteria family instead of fighting the token
- * scheme. An unknown family is a contract error, not a silent pass.
+ * dispatched here on the run's criteria evaluationKey instead of fighting the token
+ * scheme. An unknown evaluationKey is a contract error, not a silent pass.
  */
 @Injectable()
 export class SecurityEvaluationJudgmentService implements JudgmentPort {
@@ -24,14 +24,14 @@ export class SecurityEvaluationJudgmentService implements JudgmentPort {
   ) {}
 
   judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    switch (input.criteriaVersion.family) {
+    switch (input.criteriaVersion.evaluationKey) {
       case SECURITY_EVALUATION_FAMILY_DEPENDENCY:
         return this.dependency.judge(input);
       case SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION:
         return this.cloudConfig.judge(input);
       default:
         throw new BadRequestException(
-          `No security-evaluation judgment is implemented for criteria family "${input.criteriaVersion.family}".`,
+          `No security-evaluation judgment is implemented for criteria evaluationKey "${input.criteriaVersion.evaluationKey}".`,
         );
     }
   }

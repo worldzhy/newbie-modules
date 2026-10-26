@@ -26,13 +26,13 @@ export class SecurityEvaluationCriteriaProvider implements CriteriaProvider {
       case SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY:
         await this.seed.ensureDependencyBaseline();
         return {
-          family: SECURITY_EVALUATION_FAMILY_DEPENDENCY,
+          evaluationKey: SECURITY_EVALUATION_FAMILY_DEPENDENCY,
           version: SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
         };
       case SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT:
         await this.seed.ensureCloudConfigBaseline();
         return {
-          family: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+          evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
           version: SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION,
         };
       default:

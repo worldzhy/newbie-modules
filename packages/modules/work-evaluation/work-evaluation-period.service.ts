@@ -53,12 +53,12 @@ export class WorkEvaluationPeriodService {
     const version = await this.criteria.getVersion(input.criteriaVersionId);
     if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new BadRequestException(
-        `Criteria version ${version.family}/${version.version} judges kind "${version.kind}", not "${WORK_EVALUATION_SUBJECT_KIND}"`,
+        `Criteria version ${version.evaluationKey}/${version.version} judges kind "${version.kind}", not "${WORK_EVALUATION_SUBJECT_KIND}"`,
       );
     }
     if (!version.publishedAt) {
       throw new ConflictException(
-        `Criteria version ${version.family}/${version.version} is a draft and cannot anchor a period`,
+        `Criteria version ${version.evaluationKey}/${version.version} is a draft and cannot anchor a period`,
       );
     }
     if (input.periodStart.getTime() >= input.periodEnd.getTime()) {
@@ -67,7 +67,7 @@ export class WorkEvaluationPeriodService {
     // Ex ante anchor: a period cannot start before its criteria were published.
     if (input.periodStart.getTime() < version.publishedAt.getTime()) {
       throw new BadRequestException(
-        `Period cannot start before criteria version ${version.family}/${version.version} was published at ${version.publishedAt.toISOString()}`,
+        `Period cannot start before criteria version ${version.evaluationKey}/${version.version} was published at ${version.publishedAt.toISOString()}`,
       );
     }
 

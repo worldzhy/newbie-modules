@@ -7,7 +7,7 @@ import { isCriteriaVersionMutable } from "./evaluation-invariants";
 
 export interface CreateEvaluationCriteriaVersionInput {
   kind: string;
-  family: string;
+  evaluationKey: string;
   version: string;
   description?: string;
   metadata?: Record<string, unknown>;
@@ -28,7 +28,7 @@ export interface CreateEvaluationCriterionInput {
 
 export interface ListEvaluationCriteriaVersionsInput {
   kind: string;
-  family?: string;
+  evaluationKey?: string;
   includeDrafts?: boolean;
   page?: number;
   pageSize?: number;
@@ -49,7 +49,7 @@ export class EvaluationCriteriaService {
     return this.prisma.evaluationCriteriaVersion.create({
       data: {
         kind: input.kind,
-        family: input.family,
+        evaluationKey: input.evaluationKey,
         version: input.version,
         description: input.description,
         metadata: input.metadata as Prisma.InputJsonValue | undefined,
@@ -84,13 +84,13 @@ export class EvaluationCriteriaService {
     const version = await this.requireVersion(id);
     if (version.publishedAt) {
       throw new ConflictException(
-        `Evaluation criteria version ${version.kind}/${version.family}/${version.version} is already published`,
+        `Evaluation criteria version ${version.kind}/${version.evaluationKey}/${version.version} is already published`,
       );
     }
     const criteriaCount = await this.prisma.evaluationCriterion.count({ where: { criteriaVersionId: id } });
     if (criteriaCount === 0) {
       throw new BadRequestException(
-        `Cannot publish evaluation criteria version ${version.kind}/${version.family}/${version.version}: it has no criteria`,
+        `Cannot publish evaluation criteria version ${version.kind}/${version.evaluationKey}/${version.version}: it has no criteria`,
       );
     }
     const published = await this.prisma.evaluationCriteriaVersion.updateMany({
@@ -99,7 +99,7 @@ export class EvaluationCriteriaService {
     });
     if (published.count === 0) {
       throw new ConflictException(
-        `Evaluation criteria version ${version.kind}/${version.family}/${version.version} is already published`,
+        `Evaluation criteria version ${version.kind}/${version.evaluationKey}/${version.version} is already published`,
       );
     }
     return this.requireVersion(id);
@@ -116,18 +116,18 @@ export class EvaluationCriteriaService {
       findManyArgs: {
         where: {
           kind: query.kind,
-          ...(query.family ? { family: query.family } : {}),
+          ...(query.evaluationKey ? { evaluationKey: query.evaluationKey } : {}),
           ...(query.includeDrafts ? {} : { publishedAt: { not: null } }),
         },
-        orderBy: [{ family: "asc" }, { version: "desc" }],
+        orderBy: [{ evaluationKey: "asc" }, { version: "desc" }],
       },
     });
   }
 
   /** Resolve a published version by its natural key; null when it does not exist. */
-  async findPublishedVersion(kind: string, family: string, version: string) {
+  async findPublishedVersion(kind: string, evaluationKey: string, version: string) {
     return this.prisma.evaluationCriteriaVersion.findFirst({
-      where: { kind, family, version, publishedAt: { not: null } },
+      where: { kind, evaluationKey, version, publishedAt: { not: null } },
     });
   }
 
@@ -205,7 +205,7 @@ export class EvaluationCriteriaService {
     if (!version) throw new NotFoundException(`Evaluation criteria version ${id} not found`);
     if (!isCriteriaVersionMutable(version.publishedAt)) {
       throw new ConflictException(
-        `Cannot ${action}: ${version.kind}/${version.family}/${version.version} is published and therefore immutable`,
+        `Cannot ${action}: ${version.kind}/${version.evaluationKey}/${version.version} is published and therefore immutable`,
       );
     }
   }
@@ -215,7 +215,7 @@ export class EvaluationCriteriaService {
     const version = await this.prisma.evaluationCriteriaVersion.findUnique({ where: { id } });
     if (!version) throw new NotFoundException(`Evaluation criteria version ${id} not found`);
     throw new ConflictException(
-      `Cannot ${action}: ${version.kind}/${version.family}/${version.version} is published and therefore immutable`,
+      `Cannot ${action}: ${version.kind}/${version.evaluationKey}/${version.version} is published and therefore immutable`,
     );
   }
 }

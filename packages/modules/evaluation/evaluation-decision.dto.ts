@@ -136,8 +136,8 @@ export class ListEvaluationRemediationPlansRequestDto extends CommonListRequestD
 export class EvaluationFindingResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty({ description: "Feature family that observed the finding, e.g. repository, cloud-account, work" })
-  family!: string;
+  @ApiProperty({ description: "Feature evaluationKey that observed the finding, e.g. repository, cloud-account, work" })
+  evaluationKey!: string;
   @ApiProperty({ description: "Stable logical identity used to dedupe across runs" })
   fingerprint!: string;
   @ApiProperty() criterionKey!: string;

@@ -93,7 +93,7 @@ The module binds the three kind-scoped feature ports of the evaluation skeleton
 via `useExisting`:
 
 - `criteriaProviderToken("work")` — resolves the run's `config.periodId` to the
-  period's pinned `{ family, version }` of its criteria version.
+  period's pinned `{ evaluationKey, version }` of its criteria version.
 - `evidenceProviderToken("work")` — collects the evidence manifest for one run
   over the period's window.
 - `judgmentPortToken("work")` — the three-phase model judgment below.

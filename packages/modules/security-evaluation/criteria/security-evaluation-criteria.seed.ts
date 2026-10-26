@@ -25,7 +25,7 @@ interface CriterionSeed {
 
 interface BaselineSeed {
   kind: string;
-  family: string;
+  evaluationKey: string;
   version: string;
   description: string;
   metadata: Record<string, unknown>;
@@ -60,7 +60,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   async ensureDependencyBaseline(): Promise<void> {
     await this.ensureBaseline({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
-      family: SECURITY_EVALUATION_FAMILY_DEPENDENCY,
+      evaluationKey: SECURITY_EVALUATION_FAMILY_DEPENDENCY,
       version: SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
       description: "Dependency vulnerability baseline: installed npm packages are matched against OSV.",
       metadata: { ecosystem: "npm", dataSource: "https://osv.dev" },
@@ -79,7 +79,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   async ensureCloudConfigBaseline(): Promise<void> {
     await this.ensureBaseline({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
-      family: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+      evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
       version: SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION,
       description: `${SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK}: collected account configuration facts are asserted per control.`,
       metadata: { benchmark: SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK },
@@ -104,22 +104,22 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   }
 
   private async ensureBaseline(baseline: BaselineSeed): Promise<void> {
-    const seedKey = `${baseline.kind}/${baseline.family}/${baseline.version}`;
+    const seedKey = `${baseline.kind}/${baseline.evaluationKey}/${baseline.version}`;
     if (this.seededFamilies.has(seedKey)) return;
 
-    let row = await this.findVersion(baseline.kind, baseline.family, baseline.version);
+    let row = await this.findVersion(baseline.kind, baseline.evaluationKey, baseline.version);
     if (!row) {
       try {
         row = await this.criteria.createVersion({
           kind: baseline.kind,
-          family: baseline.family,
+          evaluationKey: baseline.evaluationKey,
           version: baseline.version,
           description: baseline.description,
           metadata: baseline.metadata,
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
-        row = await this.findVersion(baseline.kind, baseline.family, baseline.version);
+        row = await this.findVersion(baseline.kind, baseline.evaluationKey, baseline.version);
         if (!row) throw error;
       }
     }
@@ -138,10 +138,10 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
       }
     }
 
-    const latest = await this.findVersion(baseline.kind, baseline.family, baseline.version);
+    const latest = await this.findVersion(baseline.kind, baseline.evaluationKey, baseline.version);
     if (!latest) {
       throw new Error(
-        `Criteria version ${baseline.kind}/${baseline.family}/${baseline.version} disappeared during seeding`,
+        `Criteria version ${baseline.kind}/${baseline.evaluationKey}/${baseline.version} disappeared during seeding`,
       );
     }
     if (!latest.publishedAt) {
@@ -155,8 +155,8 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     this.seededFamilies.add(seedKey);
   }
 
-  private findVersion(kind: string, family: string, version: string) {
-    return this.prisma.evaluationCriteriaVersion.findFirst({ where: { kind, family, version } });
+  private findVersion(kind: string, evaluationKey: string, version: string) {
+    return this.prisma.evaluationCriteriaVersion.findFirst({ where: { kind, evaluationKey, version } });
   }
 }
 

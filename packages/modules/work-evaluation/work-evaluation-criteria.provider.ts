@@ -27,6 +27,6 @@ export class WorkEvaluationCriteriaProvider implements CriteriaProvider {
     if (!periodId) return null;
     const period = await this.periods.getPeriodById(periodId);
     const version = await this.criteria.getVersion(period.criteriaVersionId);
-    return { family: version.family, version: version.version };
+    return { evaluationKey: version.evaluationKey, version: version.version };
   }
 }

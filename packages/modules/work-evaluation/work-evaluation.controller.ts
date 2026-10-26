@@ -86,7 +86,7 @@ export class WorkEvaluationController {
   async createCriteriaVersion(@Body() body: CreateWorkEvaluationCriteriaVersionRequestDto) {
     return this.criteria.createVersion({
       kind: WORK_EVALUATION_SUBJECT_KIND,
-      family: body.family,
+      evaluationKey: body.evaluationKey,
       version: body.version,
       description: body.description,
       metadata: body.metadata as Record<string, unknown> | undefined,

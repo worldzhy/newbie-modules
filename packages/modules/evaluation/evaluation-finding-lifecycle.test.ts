@@ -8,7 +8,7 @@ import { EvaluationFindingService } from "./evaluation-finding.service";
 /**
  * Behavior-level test for the assertion lifecycle (ADR-020 D2): a finding
  * outlives the run that produced it, keeps its first-seen timestamp, resolves
- * when a later run of the same family no longer observes it, reopens when it
+ * when a later run of the same evaluationKey no longer observes it, reopens when it
  * reappears, and never lets a re-run overwrite a human suppression.
  *
  * The fake below is the finding table plus the two criteria lookups the service
@@ -24,7 +24,7 @@ const EVIDENCE_ID = "pkg:npm:lodash@4.17.20";
 interface FakeFindingRow {
   id: string;
   subjectId: string;
-  family: string;
+  evaluationKey: string;
   fingerprint: string;
   criterionKey: string;
   severity: string;
@@ -52,7 +52,7 @@ function fakePrisma() {
       findUnique: async (args: {
         where: {
           id?: string;
-          subjectId_family_fingerprint?: { subjectId: string; family: string; fingerprint: string };
+          subjectId_family_fingerprint?: { subjectId: string; evaluationKey: string; fingerprint: string };
         };
       }) => {
         const unique = args.where.subjectId_family_fingerprint;
@@ -61,7 +61,7 @@ function fakePrisma() {
             rows.find(
               (row) =>
                 row.subjectId === unique.subjectId &&
-                row.family === unique.family &&
+                row.evaluationKey === unique.evaluationKey &&
                 row.fingerprint === unique.fingerprint,
             ) ?? null
           );
@@ -71,7 +71,9 @@ function fakePrisma() {
       create: async ({ data }: { data: Omit<FakeFindingRow, "id" | "createdAt" | "updatedAt"> }) => {
         const duplicate = rows.some(
           (row) =>
-            row.subjectId === data.subjectId && row.family === data.family && row.fingerprint === data.fingerprint,
+            row.subjectId === data.subjectId &&
+            row.evaluationKey === data.evaluationKey &&
+            row.fingerprint === data.fingerprint,
         );
         if (duplicate) {
           const error = new Error(
@@ -107,7 +109,7 @@ function fakePrisma() {
       findMany: async (args: {
         where: {
           subjectId: string;
-          family: string;
+          evaluationKey: string;
           status?: string;
           lastSeenAt?: { lt: Date };
           NOT?: { lastSeenRunId?: string };
@@ -119,7 +121,7 @@ function fakePrisma() {
           .filter(
             (row) =>
               row.subjectId === where.subjectId &&
-              row.family === where.family &&
+              row.evaluationKey === where.evaluationKey &&
               (!where.status || row.status === where.status) &&
               (!where.lastSeenAt || row.lastSeenAt < where.lastSeenAt.lt) &&
               (!where.NOT?.lastSeenRunId || row.lastSeenRunId !== where.NOT.lastSeenRunId),
@@ -135,7 +137,7 @@ function fakePrisma() {
 function serviceFor(prisma: PrismaService) {
   const criteria = {
     listCriteria: async () => [{ criterionKey: CRITERION_KEY, kind: "ASSERTION", name: "Known vulnerability" }],
-    getVersion: async () => ({ id: VERSION_ID, kind: "repository", family: "dependency-osv", version: "1" }),
+    getVersion: async () => ({ id: VERSION_ID, kind: "repository", evaluationKey: "dependency-osv", version: "1" }),
   };
   const providers = { getObserver: () => undefined };
   return new EvaluationFindingService(prisma, criteria as never, providers as never);
@@ -187,7 +189,7 @@ test("a finding is created once, kept open across runs, resolved when absent and
   assert.deepEqual(reobserved.firstSeenAt, firstRun.startedAt);
   assert.equal(reobserved.lastSeenRunId, "run-2");
 
-  // A later run of the same family that does not observe it resolves it.
+  // A later run of the same evaluationKey that does not observe it resolves it.
   const thirdRun = runRow("run-3", new Date("2026-01-03T00:00:00.000Z"));
   assert.equal(await service.resolveAbsentFindings(thirdRun), 1);
   assert.equal(rows[0].status, "RESOLVED");
@@ -219,7 +221,7 @@ test("a suppressed finding stays suppressed when a later run observes it again",
   assert.equal(rows[0].suppressionNote, "Accepted risk for the build toolchain");
   assert.equal(rows[0].lastSeenRunId, "run-2");
 
-  // A suppression also survives a resolve pass in the same family.
+  // A suppression also survives a resolve pass in the same evaluationKey.
   const thirdRun = runRow("run-3", new Date("2026-01-03T00:00:00.000Z"));
   assert.equal(await service.resolveAbsentFindings(thirdRun), 0);
   assert.equal(rows[0].status, "SUPPRESSED");

@@ -26,7 +26,7 @@ import {
  * Human decision surface over skeleton-owned evaluation aggregates.
  *
  * Findings, results and remediation plans are skeleton domain objects shared
- * by every feature family, so their lifecycle operations (suppression,
+ * by every feature evaluationKey, so their lifecycle operations (suppression,
  * reopening, result review, remediation planning and checkpoint tracking) live
  * here rather than in any feature vocabulary (ADR-029, ADR-031). Attribution
  * follows the service contracts: the acting user is recorded automatically,

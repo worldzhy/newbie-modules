@@ -101,7 +101,7 @@ export class EvaluationRunnerService {
       const criteriaVersion: EvaluationCriteriaVersionRef = {
         id: version.id,
         kind: version.kind,
-        family: version.family,
+        evaluationKey: version.evaluationKey,
         version: version.version,
       };
       identity = {
@@ -109,7 +109,7 @@ export class EvaluationRunnerService {
         subjectId: running.subjectId,
         subjectKind: subject.kind,
         criteriaVersionId: running.criteriaVersionId,
-        family: version.family,
+        evaluationKey: version.evaluationKey,
       };
 
       const runConfig = (running.config as Record<string, unknown> | null) ?? null;
@@ -242,7 +242,7 @@ export class EvaluationRunnerService {
       subjectId: running.subjectId,
       subjectKind: subject.kind,
       criteriaVersionId: running.criteriaVersionId,
-      family: version.family,
+      evaluationKey: version.evaluationKey,
     };
   }
 }

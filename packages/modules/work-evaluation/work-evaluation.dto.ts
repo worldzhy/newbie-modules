@@ -80,10 +80,10 @@ export class WorkEvaluationCriterionMetadataDto {
 }
 
 export class CreateWorkEvaluationCriteriaVersionRequestDto {
-  @ApiProperty({ description: 'Feature-defined criteria family, e.g. "rubric"' })
+  @ApiProperty({ description: 'Feature-defined criteria evaluationKey, e.g. "rubric"' })
   @IsString()
   @IsNotEmpty()
-  family!: string;
+  evaluationKey!: string;
 
   @ApiProperty({ description: 'Semantic version string, e.g. "v0.1"' })
   @IsString()
@@ -103,10 +103,10 @@ export class CreateWorkEvaluationCriteriaVersionRequestDto {
 }
 
 export class ListWorkEvaluationCriteriaVersionsRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({ description: "Filter by criteria family" })
+  @ApiPropertyOptional({ description: "Filter by criteria evaluationKey" })
   @IsOptional()
   @IsString()
-  family?: string;
+  evaluationKey?: string;
 
   @ApiPropertyOptional({ description: "Include draft (unpublished) versions — defaults to published only" })
   @IsOptional()
@@ -149,7 +149,7 @@ export class CreateWorkEvaluationCriterionRequestDto {
 export class WorkEvaluationCriteriaVersionResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() kind!: string;
-  @ApiProperty() family!: string;
+  @ApiProperty() evaluationKey!: string;
   @ApiProperty() version!: string;
   @ApiPropertyOptional() description?: string | null;
   @ApiPropertyOptional({ type: WorkEvaluationCriteriaVersionMetadataDto })

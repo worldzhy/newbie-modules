@@ -40,7 +40,7 @@ export interface EvaluationSubjectRef {
 export interface EvaluationCriteriaVersionRef {
   id: string;
   kind: string;
-  family: string;
+  evaluationKey: string;
   version: string;
 }
 

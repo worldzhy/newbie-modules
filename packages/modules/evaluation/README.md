@@ -28,10 +28,10 @@ One concept, one word.
   overwrites the previous review, so the row always reflects exactly the
   latest say.
 - **finding** (`EvaluationFinding`) — the product of an `ASSERTION` criterion.
-  Identity is `(subject, family, fingerprint)`: `family` is copied from the
-  run's criteria version, so a rerun under a new version of the same family
-  keeps the finding alive, and one family's run never resolves another
-  family's findings. Two versions of one family may run concurrently, so
+  Identity is `(subject, evaluationKey, fingerprint)`: `evaluationKey` is copied from the
+  run's criteria version, so a rerun under a new version of the same evaluationKey
+  keeps the finding alive, and one evaluationKey's run never resolves another
+  evaluationKey's findings. Two versions of one evaluationKey may run concurrently, so
   resolution and re-observation are compare-and-set writes — a human
   suppression, or a re-observation by the concurrent run, is never
   overwritten.
@@ -50,15 +50,15 @@ sense, and tracking a problem inside a JSON blob makes it untrackable.
 
 ## Tables
 
-| Table                       | Owns                                                 |
-| --------------------------- | ---------------------------------------------------- |
-| `EvaluationCriteriaVersion` | kind / family / version, publication state           |
-| `EvaluationCriterion`       | criterion key, kind, name, feature-defined metadata  |
-| `EvaluationSubject`         | kind, scope coordinate, subject key, display name    |
-| `EvaluationRun`             | state machine, failure reason, actor reference       |
-| `EvaluationResult`          | manifest, content hash, coverage, verdicts, review   |
-| `EvaluationFinding`         | family + fingerprint identity, severity, suppression |
-| `EvaluationRemediationPlan` | trigger refs, decider, checkpoints, decision         |
+| Table                       | Owns                                                        |
+| --------------------------- | ----------------------------------------------------------- |
+| `EvaluationCriteriaVersion` | kind / evaluationKey / version, publication state           |
+| `EvaluationCriterion`       | criterion key, kind, name, feature-defined metadata         |
+| `EvaluationSubject`         | kind, scope coordinate, subject key, display name           |
+| `EvaluationRun`             | state machine, failure reason, actor reference              |
+| `EvaluationResult`          | manifest, content hash, coverage, verdicts, review          |
+| `EvaluationFinding`         | evaluationKey + fingerprint identity, severity, suppression |
+| `EvaluationRemediationPlan` | trigger refs, decider, checkpoints, decision                |
 
 ## Invariants (ADR-020 D5)
 
@@ -173,7 +173,7 @@ terminal row is written (ADR-032):
 | `evaluation.run-failed`    | the run is FAILED and its failure reason is persisted |
 
 The payload carries identity and terminal state only — `runId`, `subjectId`,
-`subjectKind`, `criteriaVersionId`, `family`, `status` and, on failure, `error`
+`subjectKind`, `criteriaVersionId`, `evaluationKey`, `status` and, on failure, `error`
 with the same text and truncation as the run row. Findings and coverage are
 deliberately absent: they are mutable read models, so a consumer queries the
 existing endpoints by `runId` / `subjectId` when it needs detail.

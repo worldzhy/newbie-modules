@@ -44,7 +44,7 @@ function inputFor(items: EvaluationEvidenceItem[], criteria = CRITERIA): Judgmen
     criteriaVersion: {
       id: "33333333-3333-4333-8333-333333333333",
       kind: "cloud-account",
-      family: "cis-aws-1.5",
+      evaluationKey: "cis-aws-1.5",
       version: "v1",
     },
     criteria,

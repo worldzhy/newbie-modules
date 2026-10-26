@@ -9,7 +9,7 @@ export const SECURITY_EVALUATION_SUBJECT_KINDS = [
 
 export type SecurityEvaluationSubjectKind = (typeof SECURITY_EVALUATION_SUBJECT_KINDS)[number];
 
-/** Criteria families. One family per judgment mechanism (ADR-022 D3). */
+/** Criteria families. One evaluationKey per judgment mechanism (ADR-022 D3). */
 export const SECURITY_EVALUATION_FAMILY_DEPENDENCY = "dependency-osv";
 export const SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION = "cis-aws-1.5";
 export const SECURITY_EVALUATION_FAMILY_INTELLIGENCE = "threat-intel-relevance";
@@ -59,17 +59,17 @@ export const SECURITY_EVALUATION_REPORT_TREND_WEEKS = 12;
  */
 export const SECURITY_EVALUATION_SCHEDULES = [
   {
-    family: SECURITY_EVALUATION_FAMILY_DEPENDENCY,
+    evaluationKey: SECURITY_EVALUATION_FAMILY_DEPENDENCY,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
     recommendedInterval: "daily",
   },
   {
-    family: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
     recommendedInterval: "daily",
   },
   {
-    family: SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+    evaluationKey: SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
     recommendedInterval: "hourly",
   },

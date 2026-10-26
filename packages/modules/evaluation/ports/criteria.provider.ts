@@ -12,7 +12,7 @@ import type { EvaluationSubjectRef } from "./evaluation.contracts";
 export const criteriaProviderToken = (kind: string): string => `EVALUATION_CRITERIA_PROVIDER:${kind}`;
 
 export interface CriteriaSelection {
-  family: string;
+  evaluationKey: string;
   version: string;
 }
 

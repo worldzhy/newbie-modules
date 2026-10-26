@@ -31,7 +31,7 @@ const SUBJECT = {
 const VERSION = {
   id: VERSION_ID,
   kind: "repository",
-  family: "dependency-osv",
+  evaluationKey: "dependency-osv",
   version: "1.0.0",
   publishedAt: new Date(),
 };
@@ -143,7 +143,7 @@ const EXPECTED_IDENTITY = {
   subjectId: SUBJECT_ID,
   subjectKind: "repository",
   criteriaVersionId: VERSION_ID,
-  family: "dependency-osv",
+  evaluationKey: "dependency-osv",
 };
 
 test("a successful run publishes evaluation.run-succeeded once with its identity", async () => {
