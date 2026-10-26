@@ -29,7 +29,7 @@
 - [x] 3.2 刷新容器 registry 缓存 → `modules add security-evaluation -y` → `NEWBIE_MODULES_REF=origin/dev modules update -y --force`（装配后与 registry diff 为空，pin 37c8a18）
 - [x] 3.3 `prisma db push` + `generate`（不生成 migration 文件）→ `tsc --noEmit` → `nest build` → 重启（BUILD_EXIT=0，`/security-evaluation/assets` 401 即路由已注册）
 - [x] 3.4 行为级测试：finding 生命周期（`evaluation-finding-lifecycle.test.ts`）、覆盖率口径（OSV 失败降级 `security-evaluation-dependency-judgment.test.ts` + lockfile 缺失/旧版/零包 `security-evaluation-evidence.provider.test.ts`）、run 并发 409（`evaluation-run-concurrency.test.ts` 服务级 + HTTP 实测 202→409）。同里程碑把 `EvaluationRunnerService` 拆为 `open`/`execute`/`run`，让 admission 在请求路径内答复 400/404/409
-- [ ] 3.5 `npm run apits` 重生成前端 API；backend 显式路径提交 + 推送 + fetch 核对
+- [x] 3.5 `npm run apits` 重生成前端 API（0 处 any，前端 tsc 0）；三仓显式路径提交 + 推送 + fetch 核对：registry `dc53541`、backend `60caec2`、frontend `0ed2f29`
 
 ## Phase 4 — 后续切片（各自里程碑再确认）
 
