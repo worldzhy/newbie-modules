@@ -1,0 +1,54 @@
+// Prisma schema fragment for the security-evaluation module (ADR-022).
+// This file is managed by @devbie/newbie-cli — assembled into the
+// consumer prisma tree on `newbie modules apply`.
+//
+// The run / result / criteria / finding tables belong to the evaluation
+// skeleton (`module/evaluation`, ADR-020). This feature only owns the asset
+// inventory: `subjectId` is a plain scalar with no relation — foreign keys
+// never cross schema boundaries.
+
+// !! ----------------------------------------------------------- //
+// !!            [Module] Security Evaluation models             //
+// !! ----------------------------------------------------------- //
+// * SecurityEvaluationAsset                                   //
+// * SecurityEvaluationAssetFact                               //
+// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+/// One evaluated asset, one-to-one with an EvaluationSubject row of this
+/// feature's kinds ("repository" / "cloud-account"). The skeleton owns the
+/// subject coordinate; this table owns the asset's inventory lifecycle.
+/// `naturalKey` is the feature's stable identity inside its scope — a
+/// repository full name or a cloud account id.
+model SecurityEvaluationAsset {
+  id          String   @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId   String   @unique @db.Uuid
+  naturalKey  String   @db.VarChar(512)
+  displayName String   @db.VarChar(255)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  facts SecurityEvaluationAssetFact[]
+
+  @@index([naturalKey])
+  @@schema("module/security-evaluation")
+}
+
+/// A current-state fact about an asset: the package installed at a version,
+/// or a cloud resource with its intrinsic attributes. Facts are upserted on
+/// collection and never deleted here; history lives in the archived run
+/// manifest, and a stale `observedAt` is what "not observed recently" means.
+model SecurityEvaluationAssetFact {
+  id         String   @id @default(uuid()) @db.Uuid
+  assetId    String   @db.Uuid
+  factType   String   @db.VarChar(64) // "package" | "resource" | ...
+  factKey    String   @db.VarChar(512) // "npm:lodash@4.17.20" / resource arn
+  value      Json?    @db.JsonB // small intrinsic values: version, isDev, region…
+  observedAt DateTime
+
+  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, factType, factKey])
+  @@index([assetId, factType])
+  @@schema("module/security-evaluation")
+}

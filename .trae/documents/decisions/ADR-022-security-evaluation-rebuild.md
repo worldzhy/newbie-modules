@@ -1,6 +1,6 @@
 # ADR-022: 安全评估板块重建为 security-evaluation
 
-状态：提议中
+状态：已采纳（2026-10-26 用户批准，同日按切片 1 实施）
 日期：2026-10-25
 
 > 归属：registry 模块边界与契约决策 → 本仓。宿主侧实施（主体来源、凭证与外部访问、通知模板、调度装配、读模型与 UI）归 nightwatch-backend / nightwatch-frontend，随本决策同步改造。
@@ -127,3 +127,8 @@ security-evaluation/
 更难：模块体量显著大于任一原模块，需要靠子域边界而不是包边界维持可读性；资产清单为空时报告会暴露「覆盖率不足」这一过去被掩盖的事实（这正是期望行为）；并存期间要维护两套安全数据与两套知识采集，且必须抵抗「把两边结果混进同一份报告」的诱惑，直到切换决策作出。
 
 后续工作：① 按 D1 的子域边界交付模块骨架与 DEPENDENCY / CLOUD_CONFIG 判定器；② 宿主侧装配与切换在旧模块保持运行的前提下单独排期，不在本 ADR 内收口；③ 行为级测试随代码交付：finding 生命周期与幂等、覆盖率口径、urgency 派生、知识清理后 finding 完整性、运行并发约束。
+
+## Errata
+
+- **D7 的 `Rule` 表由 `EvaluationCriterion.metadata` 承载**（2026-10-26，切片 1 实施回订）：不新建独立 `Rule` 表，CIS 规则落为 `family=cis-aws-1.5` 的 ASSERTION 准则——`ruleId` 即 `criterionKey`，`controlId` / `severity` / `factRequirements` / 修复指引随 `metadata` 携带。理由与本 ADR 背景第 4 条一致：独立 Rule 表会让准则清单与规则清单重新成为两份需要同步的真源。判定逻辑仍按 D7 留在代码里。
+- **D1/D2 的 subject kind 字面值以小写 kebab 落地**：`repository` / `cloud-account`（正文的 `REPOSITORY` / `CLOUD_RESOURCE` 视为概念名）。沿用骨架 `work` 的先例；`cloud-account` 对应正文的云资源主体，切片 2 由 CLOUD_CONFIG 判定器消费。
