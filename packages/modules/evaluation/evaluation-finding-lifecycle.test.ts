@@ -52,10 +52,10 @@ function fakePrisma() {
       findUnique: async (args: {
         where: {
           id?: string;
-          subjectId_family_fingerprint?: { subjectId: string; evaluationKey: string; fingerprint: string };
+          subjectId_evaluationKey_fingerprint?: { subjectId: string; evaluationKey: string; fingerprint: string };
         };
       }) => {
-        const unique = args.where.subjectId_family_fingerprint;
+        const unique = args.where.subjectId_evaluationKey_fingerprint;
         if (unique) {
           return (
             rows.find(
@@ -77,7 +77,7 @@ function fakePrisma() {
         );
         if (duplicate) {
           const error = new Error(
-            "Unique constraint failed: EvaluationFinding_subjectId_family_fingerprint_key",
+            "Unique constraint failed: EvaluationFinding_subjectId_evaluationKey_fingerprint_key",
           ) as Error & { code: string };
           error.code = "P2002";
           throw error;

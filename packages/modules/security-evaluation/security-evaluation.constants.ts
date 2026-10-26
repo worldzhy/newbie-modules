@@ -12,7 +12,14 @@ export type SecurityEvaluationSubjectKind = (typeof SECURITY_EVALUATION_SUBJECT_
 /** Criteria families. One evaluationKey per judgment mechanism (ADR-022 D3). */
 export const SECURITY_EVALUATION_FAMILY_DEPENDENCY = "dependency-osv";
 export const SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION = "cis-aws-1.5";
+export const SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM = "aws-custom";
 export const SECURITY_EVALUATION_FAMILY_INTELLIGENCE = "threat-intel-relevance";
+
+/** Cloud configuration families share one collection + judgment mechanism. */
+export const SECURITY_EVALUATION_CLOUD_CONFIG_FAMILIES = [
+  SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+  SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+] as const;
 
 /**
  * The criteria versions this build ships. Criteria are code-defined and
@@ -24,17 +31,22 @@ export const SECURITY_EVALUATION_DEPENDENCY_CRITERION_KEY = "dependency-vulnerab
 
 /** The first CIS criteria version this build ships (ADR-027 D3). */
 export const SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION = "v1";
+/** The first aws-custom criteria version this build ships (ADR-033/ADR-037). */
+export const SECURITY_EVALUATION_CLOUD_CUSTOM_CRITERIA_VERSION = "v1";
 
 /** Asset fact vocabulary. */
 export const SECURITY_EVALUATION_FACT_TYPE_PACKAGE = "package";
 
-/** Cloud configuration fact vocabulary (ADR-027 D2). */
+/** Cloud configuration fact vocabulary (ADR-027 D2, ADR-037 D6). */
 export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY = "aws.iam.account-password-policy";
 export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ROOT_CREDENTIAL = "aws.iam.root-credential";
 export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL = "aws.iam.user-credential";
+export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY = "aws.iam.access-key";
+export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT = "aws.iam.policy-document";
 export const SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY = "aws.s3.bucket-security";
 export const SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY = "aws.rds.instance-security";
 export const SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS = "aws.ec2.security-group-ingress";
+export const SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_INSTANCE_NETWORK = "aws.ec2.instance-network";
 
 /** npm is the only ecosystem parsed in this build, matching the predecessor. */
 export const SECURITY_EVALUATION_ECOSYSTEM_NPM = "npm";
@@ -65,6 +77,11 @@ export const SECURITY_EVALUATION_SCHEDULES = [
   },
   {
     evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
+    recommendedInterval: "daily",
+  },
+  {
+    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
     recommendedInterval: "daily",
   },

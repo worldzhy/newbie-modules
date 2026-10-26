@@ -305,7 +305,7 @@ export class EvaluationFindingService {
 
   private async findByFingerprint(subjectId: string, evaluationKey: string, fingerprint: string) {
     return this.prisma.evaluationFinding.findUnique({
-      where: { subjectId_family_fingerprint: { subjectId, evaluationKey, fingerprint } },
+      where: { subjectId_evaluationKey_fingerprint: { subjectId, evaluationKey, fingerprint } },
     });
   }
 
@@ -333,7 +333,7 @@ function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const { code, message } = error as { code?: unknown; message?: unknown };
   if (code === "P2002") return true;
-  return typeof message === "string" && message.includes("EvaluationFinding_subjectId_family_fingerprint_key");
+  return typeof message === "string" && message.includes("EvaluationFinding_subjectId_evaluationKey_fingerprint_key");
 }
 
 function describeError(error: unknown): string {

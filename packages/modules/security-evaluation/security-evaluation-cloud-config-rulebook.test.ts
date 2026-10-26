@@ -5,11 +5,16 @@ import {
   SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK,
   type CloudConfigFactSet,
 } from "./judgment/cloud-config/security-evaluation-cloud-config.rulebook";
+import {
+  SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+  SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+} from "./security-evaluation.constants";
 
 /**
- * Behavior-level tests for the CIS rulebook (ADR-027 D3): every control fails
- * on the configuration CIS considers non-compliant and passes otherwise. The
- * judges are pure, so the contract is testable without AWS or a database.
+ * Behavior-level tests for the cloud config rulebook (ADR-027 D3, ADR-037):
+ * every control fails on the configuration it considers non-compliant and
+ * passes otherwise. The judges are pure, so the contract is testable without
+ * AWS or a database.
  */
 
 function emptyFacts(): CloudConfigFactSet {
@@ -17,9 +22,12 @@ function emptyFacts(): CloudConfigFactSet {
     passwordPolicy: null,
     rootCredential: null,
     userCredentials: [],
+    accessKeys: [],
+    policies: [],
     buckets: [],
     rdsInstances: [],
     securityGroups: [],
+    instanceNetworks: [],
   };
 }
 
@@ -29,22 +37,50 @@ function judge(criterionKey: string, facts: CloudConfigFactSet) {
   return entry.judge(facts);
 }
 
-test("rulebook ships exactly the ten controls of the ADR-027 initial set", () => {
-  assert.deepEqual(
-    SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.map((entry) => entry.criterionKey),
-    [
-      "cis-1-4",
-      "cis-1-5",
-      "cis-1-8",
-      "cis-1-13",
-      "cis-1-15",
-      "cis-2-1-1",
-      "cis-2-1-2",
-      "cis-2-3-1",
-      "cis-4-1",
-      "cis-4-2",
-    ],
+const CIS_KEYS = [
+  "cis-1-4",
+  "cis-1-5",
+  "cis-1-8",
+  "cis-1-13",
+  "cis-1-15",
+  "cis-2-1-1",
+  "cis-2-1-2",
+  "cis-2-3-1",
+  "cis-4-1",
+  "cis-4-2",
+] as const;
+
+const CUSTOM_KEYS = [
+  "iam.access-key-no-usage",
+  "iam.access-key-old",
+  "iam.user-multiple-access-keys",
+  "iam.policy-notaction",
+  "iam.policy-star-on-star",
+  "iam.policy-service-wildcard",
+  "iam.policy-sensitive-action",
+  "rds.master-password-not-managed",
+  "s3.no-versioning",
+  "ec2.public-ip-with-public-ingress",
+] as const;
+
+test("rulebook ships ten CIS controls and ten aws-custom rules, each tagged to its family", () => {
+  const cis = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter(
+    (entry) => entry.evaluationKey === SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
   );
+  const custom = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter(
+    (entry) => entry.evaluationKey === SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+  );
+  assert.deepEqual(
+    cis.map((entry) => entry.criterionKey),
+    [...CIS_KEYS],
+  );
+  assert.deepEqual(
+    custom.map((entry) => entry.criterionKey),
+    [...CUSTOM_KEYS],
+  );
+  // CIS controls carry a controlId; custom rules do not.
+  assert.ok(cis.every((entry) => typeof entry.controlId === "string"));
+  assert.ok(custom.every((entry) => entry.controlId === undefined));
 });
 
 test("cis-1-4 fails only while the root account holds active access keys", () => {
@@ -80,12 +116,12 @@ test("cis-1-8 fails per console user without MFA and passes programmatic-only us
     {
       evidenceId: "cloud:aws.iam.user-credential:alice",
       factKey: "alice",
-      payload: { userName: "alice", passwordEnabled: true, mfaActive: false },
+      payload: { userName: "alice", passwordEnabled: true, mfaActive: false, passwordNextRotation: null },
     },
     {
       evidenceId: "cloud:aws.iam.user-credential:ci-bot",
       factKey: "ci-bot",
-      payload: { userName: "ci-bot", passwordEnabled: false, mfaActive: false },
+      payload: { userName: "ci-bot", passwordEnabled: false, mfaActive: false, passwordNextRotation: null },
     },
   ];
   const drafts = judge("cis-1-8", facts);
@@ -142,6 +178,7 @@ test("cis-2-1-1 fails per bucket without default encryption", () => {
         policyIsPublic: false,
         aclPublic: false,
         encryptionEnabled: false,
+        versioningEnabled: true,
       },
     },
     {
@@ -154,6 +191,7 @@ test("cis-2-1-1 fails per bucket without default encryption", () => {
         policyIsPublic: false,
         aclPublic: false,
         encryptionEnabled: true,
+        versioningEnabled: true,
       },
     },
   ];
@@ -179,6 +217,7 @@ test("cis-2-1-2 fails on a missing or partial PAB, a public policy, or a public 
       policyIsPublic: false,
       aclPublic: false,
       encryptionEnabled: true,
+      versioningEnabled: true,
       ...overrides,
     },
   });
@@ -217,12 +256,24 @@ test("cis-2-3-1 fails per publicly accessible or unencrypted instance", () => {
     {
       evidenceId: "cloud:aws.rds.instance-security:db1",
       factKey: "db1",
-      payload: { identifier: "db1", region: "us-east-1", publiclyAccessible: true, storageEncrypted: true },
+      payload: {
+        identifier: "db1",
+        region: "us-east-1",
+        publiclyAccessible: true,
+        storageEncrypted: true,
+        masterUserSecretManaged: true,
+      },
     },
     {
       evidenceId: "cloud:aws.rds.instance-security:db2",
       factKey: "db2",
-      payload: { identifier: "db2", region: "us-east-1", publiclyAccessible: false, storageEncrypted: true },
+      payload: {
+        identifier: "db2",
+        region: "us-east-1",
+        publiclyAccessible: false,
+        storageEncrypted: true,
+        masterUserSecretManaged: true,
+      },
     },
   ];
   const drafts = judge("cis-2-3-1", facts);

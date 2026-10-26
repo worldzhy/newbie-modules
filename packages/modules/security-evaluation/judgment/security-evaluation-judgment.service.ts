@@ -3,6 +3,7 @@ import type { EvaluationJudgment, JudgmentInput, JudgmentPort } from "@modules/e
 
 import {
   SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+  SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
   SECURITY_EVALUATION_FAMILY_DEPENDENCY,
 } from "../security-evaluation.constants";
 import { SecurityEvaluationCloudConfigJudgment } from "./cloud-config/security-evaluation-cloud-config.judgment";
@@ -28,6 +29,7 @@ export class SecurityEvaluationJudgmentService implements JudgmentPort {
       case SECURITY_EVALUATION_FAMILY_DEPENDENCY:
         return this.dependency.judge(input);
       case SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION:
+      case SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM:
         return this.cloudConfig.judge(input);
       default:
         throw new BadRequestException(

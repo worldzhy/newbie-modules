@@ -138,6 +138,6 @@ test("one failing resource among many yields one finding and full evaluation", a
   ];
   const judgment = await new SecurityEvaluationCloudConfigJudgment().judge(inputFor(items));
   const fingerprints = judgment.findings.map((finding) => finding.fingerprint).sort();
-  assert.deepEqual(fingerprints, ["aws:cis-2-1-1:plain", "aws:cis-2-1-2:plain"]);
+  assert.deepEqual(fingerprints, ["aws:cis-2-1-1:plain", "aws:cis-2-1-2:plain:public-access-block"]);
   assert.equal(judgment.evaluatedRefs.length, 2);
 });

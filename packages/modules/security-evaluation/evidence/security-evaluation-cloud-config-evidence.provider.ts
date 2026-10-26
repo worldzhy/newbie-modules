@@ -36,7 +36,7 @@ export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidencePr
 
   async collect(
     subject: EvaluationSubjectRef,
-    _criteriaVersion: EvaluationCriteriaVersionRef,
+    criteriaVersion: EvaluationCriteriaVersionRef,
   ): Promise<EvidenceCollection> {
     const access = this.cloudConfigurationAccess;
     if (!access) {
@@ -79,22 +79,25 @@ export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidencePr
     return {
       items,
       declaredUnlinked: { total: 0 },
-      skipped: this.computeSkipped(collection.failures),
+      skipped: this.computeSkipped(collection.failures, criteriaVersion.evaluationKey),
     };
   }
 
   /**
-   * Map collection failures onto the criteria that needed the missing facts:
-   * account-level failures skip the whole control (`<criterionKey>`),
-   * resource-level failures skip one resource of it (`<criterionKey>:<factKey>`).
+   * Map collection failures onto the criteria of the run's evaluationKey that
+   * needed the missing facts: account-level failures skip the whole control
+   * (`<criterionKey>`), resource-level failures skip one resource of it
+   * (`<criterionKey>:<factKey>`).
    */
-  private computeSkipped(failures: readonly CloudConfigurationFailure[]): EvaluationCoverageBucket {
+  private computeSkipped(
+    failures: readonly CloudConfigurationFailure[],
+    evaluationKey: string,
+  ): EvaluationCoverageBucket {
     const items = new Set<string>();
     const notes: string[] = [];
+    const entries = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
     for (const failure of failures) {
-      const affected = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter((entry) =>
-        entry.requiredFactTypes.includes(failure.factType),
-      );
+      const affected = entries.filter((entry) => entry.requiredFactTypes.includes(failure.factType));
       for (const entry of affected) {
         items.add(failure.factKey ? `${entry.criterionKey}:${failure.factKey}` : entry.criterionKey);
       }

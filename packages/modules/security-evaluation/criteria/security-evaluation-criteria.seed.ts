@@ -4,9 +4,11 @@ import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criter
 
 import {
   SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION,
+  SECURITY_EVALUATION_CLOUD_CUSTOM_CRITERIA_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_CRITERION_KEY,
   SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+  SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
   SECURITY_EVALUATION_FAMILY_DEPENDENCY,
   SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
@@ -77,13 +79,16 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
 
   /** CIS AWS Foundations Benchmark v1.5 initial set (ADR-027 D3). */
   async ensureCloudConfigBaseline(): Promise<void> {
+    const entries = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter(
+      (entry) => entry.evaluationKey === SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    );
     await this.ensureBaseline({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
       evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
       version: SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION,
       description: `${SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK}: collected account configuration facts are asserted per control.`,
       metadata: { benchmark: SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK },
-      criteria: SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.map((entry) => ({
+      criteria: entries.map((entry) => ({
         criterionKey: entry.criterionKey,
         name: entry.name,
         description: `${SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK} control ${entry.controlId}.`,
@@ -98,9 +103,35 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     });
   }
 
+  /** aws-custom rules inherited from the predecessor aws-audit module (ADR-033/ADR-037). */
+  async ensureCloudCustomBaseline(): Promise<void> {
+    const entries = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter(
+      (entry) => entry.evaluationKey === SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    );
+    await this.ensureBaseline({
+      kind: SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
+      evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+      version: SECURITY_EVALUATION_CLOUD_CUSTOM_CRITERIA_VERSION,
+      description:
+        "aws-custom: non-benchmark cloud configuration checks (access keys, IAM policies, RDS/S3/EC2 hardening) inherited from the predecessor aws-audit module.",
+      metadata: { benchmark: null },
+      criteria: entries.map((entry) => ({
+        criterionKey: entry.criterionKey,
+        name: entry.name,
+        description: entry.remediation,
+        metadata: {
+          severity: entry.severity,
+          remediation: entry.remediation,
+          factRequirements: [...entry.requiredFactTypes],
+        },
+      })),
+    });
+  }
+
   private async ensureAllBaselines(): Promise<void> {
     await this.ensureDependencyBaseline();
     await this.ensureCloudConfigBaseline();
+    await this.ensureCloudCustomBaseline();
   }
 
   private async ensureBaseline(baseline: BaselineSeed): Promise<void> {
