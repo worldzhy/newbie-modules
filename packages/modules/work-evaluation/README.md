@@ -75,21 +75,27 @@ relation — foreign keys never cross schema boundaries.
 
 ## Subject convention
 
-For kind `"work"`, `subjectKey = "<evaluateeUserId>:<collectionPeriodId>"`. The
-host's SubjectProvider attaches `metadata.periodId` (which pins the judgment
-window and resolves the criteria version) and optionally
-`metadata.identityTokens: string[]` — the evaluatee's registered emails,
-linked-account display names and profile name, used by the drill redactor to
-keep the judgment blind. The subject `displayName` is masked too.
+For kind `"work"`, `subjectKey = "<evaluateeUserId>"` and the scope coordinate
+is the member themself (`scopeType = "user"`, `scopeId = userId`). Subjects are
+registered lazily: `POST /work-evaluation/runs` takes `{ evaluateeUserId,
+periodId }` and upserts the subject row on first trigger (ADR-026 D2). The
+period is a **run-level** parameter carried on `run.config.periodId` — it picks
+the evidence window and resolves the pinned criteria version, and it never
+enters the subject identity, so one member keeps one subject across periods and
+findings do not fragment per cycle. Subject metadata is unused by this feature;
+the identity tokens that keep the judgment blind (registered emails,
+linked-account display names, profile name) are resolved live from the account
+at judgment time. The subject `displayName` is masked too.
 
 ## Port bindings
 
 The module binds the three kind-scoped feature ports of the evaluation skeleton
 via `useExisting`:
 
-- `criteriaProviderToken("work")` — resolves the subject's period to the pinned
-  `{ family, version }` of its criteria version.
-- `evidenceProviderToken("work")` — collects the evidence manifest for one run.
+- `criteriaProviderToken("work")` — resolves the run's `config.periodId` to the
+  period's pinned `{ family, version }` of its criteria version.
+- `evidenceProviderToken("work")` — collects the evidence manifest for one run
+  over the period's window.
 - `judgmentPortToken("work")` — the three-phase model judgment below.
 
 The installation-token resolver binds `installationResolverToken("work-evaluation")`,

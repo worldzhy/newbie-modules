@@ -1,4 +1,6 @@
-import { BadRequestException, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { WorkEvaluationPeriodStatus, WorkEvaluationPeriodType } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationResultService, ListEvaluationResultsInput } from "@modules/evaluation/evaluation-result.service";
 import {
   EvaluationRunService,
@@ -8,12 +10,14 @@ import {
 import { EvaluationRunnerService } from "@modules/evaluation/evaluation-runner.service";
 import { EvaluationSubjectService, ListEvaluationSubjectsInput } from "@modules/evaluation/evaluation-subject.service";
 
-import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
+import { WORK_EVALUATION_SUBJECT_KIND, WORK_EVALUATION_SUBJECT_SCOPE_TYPE } from "./work-evaluation.constants";
+import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 
 export interface StartWorkEvaluationRunInput {
-  subjectId: string;
-  /** Omit to let the period-pinned criteria version apply. */
-  criteriaVersionId?: string;
+  /** The member to evaluate; the subject row is registered lazily (ADR-026 D2). */
+  evaluateeUserId: string;
+  /** COLLECTION period that has started; pins the criteria version and evidence window. */
+  periodId: string;
   requestedByRef?: string;
   /** Opaque per-run config (ADR-023), e.g. modelScope for multi-model runs. */
   config?: Record<string, unknown>;
@@ -37,32 +41,54 @@ export class WorkEvaluationRunService {
     private readonly runs: EvaluationRunService,
     private readonly results: EvaluationResultService,
     private readonly subjects: EvaluationSubjectService,
+    private readonly periods: WorkEvaluationPeriodService,
+    private readonly prisma: PrismaService,
   ) {}
 
   /**
-   * Dispatch a run. Subject existence and kind are validated synchronously so
-   * the caller still gets a 400/404 before the 202; everything past this point
-   * is observed through the run row.
+   * Dispatch a run against a member and a period. Period eligibility and the
+   * evaluatee's existence are validated synchronously so the caller still gets
+   * a 400/404 before the 202; everything past this point is observed through
+   * the run row.
    */
   async startRun(input: StartWorkEvaluationRunInput): Promise<void> {
-    const subject = await this.subjects.getSubject(input.subjectId);
-    if (subject.kind !== WORK_EVALUATION_SUBJECT_KIND) {
+    const period = await this.periods.getPeriodById(input.periodId);
+    if (period.type !== WorkEvaluationPeriodType.COLLECTION) {
       throw new BadRequestException(
-        `Evaluation subject ${input.subjectId} has kind "${subject.kind}", not "${WORK_EVALUATION_SUBJECT_KIND}"`,
+        `Runs can only be dispatched against COLLECTION periods; period ${period.id} is ${period.type}`,
       );
     }
+    if (period.status === WorkEvaluationPeriodStatus.UPCOMING) {
+      throw new BadRequestException(
+        `Runs can only be dispatched against a period that has started; period ${period.id} is UPCOMING`,
+      );
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: input.evaluateeUserId },
+      select: { id: true, name: true, email: true },
+    });
+    if (!user) throw new NotFoundException(`User ${input.evaluateeUserId} not found`);
+
+    const subject = await this.subjects.ensureSubject({
+      kind: WORK_EVALUATION_SUBJECT_KIND,
+      scopeType: WORK_EVALUATION_SUBJECT_SCOPE_TYPE,
+      scopeId: user.id,
+      subjectKey: user.id,
+      displayName: user.name ?? user.email ?? user.id,
+    });
+
     const built: StartEvaluationRunInput = {
-      subjectId: input.subjectId,
-      criteriaVersionId: input.criteriaVersionId,
+      subjectId: subject.id,
       requestedByRef: input.requestedByRef,
-      config: input.config,
+      config: { ...input.config, periodId: period.id },
     };
     // The runner records every terminal state on the run row itself; this
     // catch only keeps a rejected fire-and-forget promise from surfacing as
     // an unhandled rejection.
     void this.runner.run(built).catch((error: unknown) => {
       this.logger.error(
-        `Evaluation run for subject ${input.subjectId} failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Evaluation run for subject ${subject.id} failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
   }

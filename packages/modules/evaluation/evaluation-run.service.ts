@@ -91,7 +91,8 @@ export class EvaluationRunService {
     const subject = await this.prisma.evaluationSubject.findUnique({ where: { id: input.subjectId } });
     if (!subject) throw new NotFoundException(`Evaluation subject ${input.subjectId} not found`);
 
-    const criteriaVersionId = input.criteriaVersionId ?? (await this.resolveVersionId(toSubjectRef(subject)));
+    const criteriaVersionId =
+      input.criteriaVersionId ?? (await this.resolveVersionId(toSubjectRef(subject), input.config ?? null));
     const version = await this.requirePublishedVersion(criteriaVersionId);
     if (version.kind !== subject.kind) {
       throw new BadRequestException(
@@ -210,8 +211,11 @@ export class EvaluationRunService {
   }
 
   /** Ask the feature which version applies, then resolve the published row. */
-  private async resolveVersionId(subject: EvaluationSubjectRef): Promise<string> {
-    const selection = await this.providers.getCriteriaProvider(subject.kind).selectVersion(subject);
+  private async resolveVersionId(
+    subject: EvaluationSubjectRef,
+    runConfig: Record<string, unknown> | null,
+  ): Promise<string> {
+    const selection = await this.providers.getCriteriaProvider(subject.kind).selectVersion(subject, runConfig);
     if (!selection) {
       throw new ConflictException(
         `No criteria version is applicable to subject ${subject.id} (kind "${subject.kind}")`,

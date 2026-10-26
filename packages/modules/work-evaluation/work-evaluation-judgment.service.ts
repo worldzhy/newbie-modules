@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ChatMessage, ChatModelPort, ModelToolCall, ToolSpecification } from "@modules/llm/chat-model.port";
 import { ChatModelResolver } from "@modules/llm/chat-model.resolver";
 import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
-import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
 import { EvaluationCoverageBucket, EvaluationVerdict } from "@modules/evaluation/ports/evaluation.contracts";
 import { EvaluationJudgment, JudgmentInput, JudgmentPort } from "@modules/evaluation/ports/judgment.port";
 
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 import { createDrillRedactor, redactDeep } from "./work-evaluation-redaction";
-import { readWorkEvaluationSubjectMetadata } from "./work-evaluation-subject";
+import { requirePeriodId } from "./work-evaluation-run-config";
 import {
   DEFAULT_WORK_EVALUATION_PHASE_BUDGET,
   DEFAULT_WORK_EVALUATION_SCOPE,
@@ -52,13 +52,17 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
   constructor(
     private readonly resolver: ChatModelResolver,
     private readonly tools: WorkEvaluationJudgmentTools,
-    private readonly subjects: EvaluationSubjectService,
+    private readonly prisma: PrismaService,
     private readonly criteriaService: EvaluationCriteriaService,
     private readonly periods: WorkEvaluationPeriodService,
   ) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    const metadata = await readWorkEvaluationSubjectMetadata(this.subjects, input.subject.id);
+    // The period is a run-level parameter (ADR-026); the evaluatee is the
+    // subject's key, and the identity tokens are resolved live from the
+    // account so a renamed member is masked without re-registering subjects.
+    const periodId = requirePeriodId(input.runConfig);
+    const evaluateeUserId = input.subject.subjectKey;
     const scope = readScopeOverride(input.runConfig) ?? DEFAULT_WORK_EVALUATION_SCOPE;
     const port = await this.resolver.resolve(scope);
 
@@ -69,9 +73,10 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
     // finding pipeline this feature does not declare yet.
     const criteria = input.criteria.filter((criterion) => criterion.kind === "SCORED");
 
-    const homeCriteria = await this.homeCriteria(metadata.evaluateeUserId, metadata.periodId);
+    const homeCriteria = await this.homeCriteria(evaluateeUserId, periodId);
     const blindSubjectId = `subject-${randomUUID()}`;
-    const identityTokens = new Set<string>([...(metadata.identityTokens ?? []), input.subject.displayName]);
+    const identityTokens = await this.loadIdentityTokens(evaluateeUserId);
+    identityTokens.add(input.subject.displayName);
     const state = this.tools.startRun(identityTokens);
 
     const budget = { ...DEFAULT_WORK_EVALUATION_PHASE_BUDGET, ...readBudgetOverride(input.runConfig) };
@@ -109,7 +114,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
       port,
       phase: "advocate",
       budgetTokens: budget.advocate,
-      context: { evaluateeUserId: metadata.evaluateeUserId, periodId: metadata.periodId, manifest: input.evidence },
+      context: { evaluateeUserId, periodId, manifest: input.evidence },
       specifications,
       tokenUsage,
       system,
@@ -121,7 +126,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
       port,
       phase: "skeptic",
       budgetTokens: budget.skeptic,
-      context: { evaluateeUserId: metadata.evaluateeUserId, periodId: metadata.periodId, manifest: input.evidence },
+      context: { evaluateeUserId, periodId, manifest: input.evidence },
       specifications,
       tokenUsage,
       system,
@@ -133,7 +138,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
       port,
       phase: "synthesis",
       budgetTokens: budget.synthesis,
-      context: { evaluateeUserId: metadata.evaluateeUserId, periodId: metadata.periodId, manifest: input.evidence },
+      context: { evaluateeUserId, periodId, manifest: input.evidence },
       specifications,
       tokenUsage,
       system,
@@ -308,6 +313,32 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
       if (error instanceof NotFoundException) return [];
       throw error;
     }
+  }
+
+  /**
+   * Free-text tokens that could re-identify the member in drill-down output:
+   * registered emails, linked-account display names and the profile name.
+   * Resolved live from the account (ADR-026 D3) so renames never require
+   * subject re-registration. Tokens shorter than four characters are dropped —
+   * masking on "Al" would destroy more signal than it protects.
+   */
+  private async loadIdentityTokens(userId: string): Promise<Set<string>> {
+    const [emails, identities, user] = await Promise.all([
+      this.prisma.email.findMany({ where: { userId }, select: { email: true } }),
+      this.prisma.accountExternalIdentity.findMany({ where: { userId }, select: { displayName: true } }),
+      this.prisma.user.findUnique({ where: { id: userId }, select: { name: true, firstName: true, lastName: true } }),
+    ]);
+    const tokens = new Set<string>();
+    const add = (value: string | null | undefined) => {
+      const token = value?.trim();
+      if (token && (token.includes("@") || token.length >= 4)) tokens.add(token);
+    };
+    for (const { email } of emails) add(email);
+    for (const { displayName } of identities) add(displayName);
+    add(user?.name);
+    add(user?.firstName);
+    add(user?.lastName);
+    return tokens;
   }
 }
 

@@ -1,16 +1,16 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
 import { EvidenceCollection, EvidenceProvider } from "@modules/evaluation/ports/evidence.provider";
 import {
   EvaluationCoverageBucket,
+  EvaluationCriteriaVersionRef,
   EvaluationEvidenceItem,
   EvaluationSubjectRef,
 } from "@modules/evaluation/ports/evaluation.contracts";
 
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
+import { requirePeriodId } from "./work-evaluation-run-config";
 import { WorkEvaluationSessionStore } from "./work-evaluation-session.store";
-import { readWorkEvaluationSubjectMetadata } from "./work-evaluation-subject";
 
 /**
  * WorkEvaluationEvidenceProvider — the EvidenceProvider for subject kind
@@ -33,16 +33,20 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly subjects: EvaluationSubjectService,
     private readonly periods: WorkEvaluationPeriodService,
     private readonly sessionStore: WorkEvaluationSessionStore,
   ) {}
 
-  async collect(subject: EvaluationSubjectRef): Promise<EvidenceCollection> {
-    const metadata = await readWorkEvaluationSubjectMetadata(this.subjects, subject.id);
-    const period = await this.periods.getPeriodById(metadata.periodId);
+  async collect(
+    subject: EvaluationSubjectRef,
+    _criteriaVersion: EvaluationCriteriaVersionRef,
+    runConfig?: Record<string, unknown> | null,
+  ): Promise<EvidenceCollection> {
+    // The period is a run-level parameter (ADR-026): runConfig.periodId picks
+    // the window, and the subject's key is the evaluatee.
+    const period = await this.periods.getPeriodById(requirePeriodId(runConfig));
     const window = { since: period.periodStart, until: period.periodEnd };
-    const evaluateeUserId = metadata.evaluateeUserId;
+    const evaluateeUserId = subject.subjectKey;
 
     const [workspaces, sessions, documents, homeGround] = await Promise.all([
       this.prisma.workEvaluationWorkspace.findMany({ where: { evaluateeUserId } }),

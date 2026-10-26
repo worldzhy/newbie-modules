@@ -547,22 +547,21 @@ export class WorkEvaluationInstallationCredentialResponseDto extends WorkEvaluat
 // --- Evaluation runs, results and subjects (skeleton shapes) -------------
 
 /**
- * Request to open an on-demand evaluation run (ADR-023, spec §4.4). The trigger
- * is fire-and-forget: the skeleton runner owns the whole run lifecycle
+ * Request to open an on-demand evaluation run (ADR-023/ADR-026, spec §4.4).
+ * The caller names the member and the period; the subject row is registered
+ * lazily and the period travels on the run's config. The trigger is
+ * fire-and-forget: the skeleton runner owns the whole run lifecycle
  * synchronously, so the response is a bare acknowledgement and the caller
  * discovers the run through `GET /work-evaluation/runs?subjectId=`.
  */
 export class StartWorkEvaluationRunRequestDto {
-  @ApiProperty({ description: 'Evaluation subject (kind "work") to evaluate' })
+  @ApiProperty({ description: "Member (user id) to evaluate; the work subject is registered lazily" })
   @IsUUID()
-  subjectId!: string;
+  evaluateeUserId!: string;
 
-  @ApiPropertyOptional({
-    description: "Override criteria version — defaults to the version pinned by the subject's period",
-  })
-  @IsOptional()
+  @ApiProperty({ description: "COLLECTION period that has started; pins the criteria version and the evidence window" })
   @IsUUID()
-  criteriaVersionId?: string;
+  periodId!: string;
 
   @ApiPropertyOptional({
     type: Object,

@@ -94,14 +94,17 @@ export class EvaluationRunnerService {
         version: version.version,
       };
 
-      const evidence = await this.providers.getEvidenceProvider(subject.kind).collect(subject, criteriaVersion);
+      const runConfig = (running.config as Record<string, unknown> | null) ?? null;
+      const evidence = await this.providers
+        .getEvidenceProvider(subject.kind)
+        .collect(subject, criteriaVersion, runConfig);
       const criteria = await this.criteria.listCriteria(criteriaVersion.id);
       const judgment = await this.providers.getJudgmentPort(subject.kind).judge({
         subject,
         criteriaVersion,
         criteria,
         evidence: evidence.items,
-        runConfig: (running.config as Record<string, unknown> | null) ?? null,
+        runConfig,
       });
 
       const coverage = composeCoverageStats({

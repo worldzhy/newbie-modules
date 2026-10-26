@@ -136,9 +136,13 @@ whole run. A feature that implements the four ports inherits all of it and must
 not drive the run state machine through `EvaluationRunService` directly.
 
 A run may carry an opaque per-run `config` (ADR-023): the trigger passes it to
-`startRun`, it is stored on the run row and threaded to the judgment port as
-`JudgmentInput.runConfig`. The skeleton never reads a key from it — model
-selection, budget overrides and similar knobs are feature-defined. The
+`startRun`, it is stored on the run row and threaded symmetrically to all three
+feature ports (ADR-026) — `CriteriaProvider.selectVersion(subject, runConfig?)`
+receives it when the feature picks the applicable version,
+`EvidenceProvider.collect(subject, criteriaVersion, runConfig?)` receives it at
+collection time, and the judgment port reads it as `JudgmentInput.runConfig`.
+The skeleton never reads a key from it — model selection, period windows,
+budget overrides and similar knobs are feature-defined. The
 judgment's `metadata` (which model, scope and prompt version actually ran) is
 persisted verbatim into `EvaluationResult.metadata`, so results of different
 runs stay comparable. Config holds small knobs only; large material follows
