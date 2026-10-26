@@ -21,7 +21,7 @@
 ## Phase 2 — registry 验证与提交
 
 - [x] 2.1 一次性容器内 `npm run format:check` + 三个新测试 + `evaluation-invariants` 回归
-- [ ] 2.2 显式路径提交（本模块全部文件 + ADR-022 状态/Errata + 本 spec 目录）→ HTTP/1.1 直推 dev → fetch 核对远端落地
+- [x] 2.2 显式路径提交（本模块全部文件 + ADR-022 状态/Errata + 本 spec 目录）→ HTTP/1.1 直推 dev → fetch 核对远端落地（`ba1f9e4`）
 
 ## Phase 3 — nightwatch-backend 装配（另排期，不在本里程碑收口）
 
