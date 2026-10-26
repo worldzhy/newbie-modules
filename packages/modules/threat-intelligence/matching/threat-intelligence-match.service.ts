@@ -14,6 +14,7 @@ import {
   THREAT_INTELLIGENCE_MATCH_CONFIDENCE,
   THREAT_INTELLIGENCE_MATCH_STATUS,
   THREAT_INTELLIGENCE_MATCH_TYPE,
+  type ThreatIntelligenceMatchConfidence,
 } from "./threat-intelligence-match.constants";
 import {
   THREAT_INTELLIGENCE_MATCH_CREATED_EVENT,
@@ -291,7 +292,7 @@ export class ThreatIntelligenceMatchService {
     matchType: string;
     matchedEntity: string | null;
     evidence: string | null;
-    confidence: string;
+    confidence: ThreatIntelligenceMatchConfidence;
   }): Promise<boolean> {
     // Avoid duplicate matches for the same (scope, item, entity).
     const uniqueWhere = {
