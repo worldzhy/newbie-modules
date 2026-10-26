@@ -37,5 +37,5 @@
 - [ ] 4.2 切片 3：knowledge/ 采集 + INTEL 判定器（ADR-018 护栏原样保留）
 - [ ] 4.3 切片 4：多轴报告（合规 / 情报 / 趋势 / MTTR）+ 整改绑定 + 通知模板
 - [ ] 4.4 切换与旧模块处置：由用户单独决策，不在本 spec 范围。当前决策见 ADR-036（D1-B 并轨、等价闸门三项）；旧模块删除单独立项
-- [ ] 4.5 骨架 run 生命周期事件：按 ADR-032 在骨架声明 `evaluation.run-succeeded` / `evaluation.run-failed`，runner 终态落库后唯一发射，宿主按 ADR-028 决定激活
+- [x] 4.5 骨架 run 生命周期事件：按 ADR-032 在骨架声明 `evaluation.run-succeeded` / `evaluation.run-failed`，runner 终态落库后唯一发射，宿主按 ADR-028 决定激活（registry `be919c1` / backend `d68bc96`；`evaluation-runner-events.test.ts` 6 项行为测试绿，宿主未激活事件目录属预期）
 - [ ] 4.6 切片 2.6：非 CIS 自定义规则族 `aws-custom`（10 条）+ 采集契约扩展（3 个新 factType + 2 个 payload 扩展），按 ADR-033 交付；合规轴按 family 过滤
