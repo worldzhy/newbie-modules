@@ -14,10 +14,11 @@ export interface StartSecurityEvaluationRunInput extends Omit<StartEvaluationRun
 /**
  * SecurityEvaluationRunService — thin façade over the skeleton's run lifecycle.
  *
- * The trigger is fire-and-forget, like the first feature: the skeleton's
- * runner owns the lifecycle synchronously, so this dispatches and returns
- * before any run row exists. Subject existence and kind are validated up front
- * so the caller still gets a 400/404 before the 202.
+ * Dispatch is two-phase. Admission (the skeleton opening the run row) stays on
+ * the request path, so a missing subject, a draft criteria version or an active
+ * run of the same subject and version still answers 400/404/409 instead of a
+ * 202 for a run that will never execute. Execution is fire-and-forget: the
+ * caller discovers the outcome by polling `GET /security-evaluation/runs`.
  */
 @Injectable()
 export class SecurityEvaluationRunService {
@@ -40,9 +41,10 @@ export class SecurityEvaluationRunService {
         `Evaluation subject ${input.subjectId} has kind "${subject.kind}"; this build only judges kind "${SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY}".`,
       );
     }
-    void this.runner.run(input).catch((error: unknown) => {
+    const run = await this.runner.open(input);
+    void this.runner.execute(run).catch((error: unknown) => {
       this.logger.error(
-        `Evaluation run for subject ${input.subjectId} failed: ${error instanceof Error ? error.message : String(error)}`,
+        `Evaluation run ${run.id} for subject ${input.subjectId} failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
   }

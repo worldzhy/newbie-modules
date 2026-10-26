@@ -147,7 +147,7 @@ CloudAccountAccessPort enumerate(asset, regions): resource[]      // 切片 2，
 | POST | `/security-evaluation/subjects/sync` | platform JWT | 触发宿主 SubjectProvider 同步资产（幂等） |
 | GET | `/security-evaluation/assets` | platform JWT | 资产清单（scope 过滤 + 分页） |
 | GET | `/security-evaluation/assets/:assetId/facts` | platform JWT | 资产事实（factType 过滤 + 分页） |
-| POST | `/security-evaluation/runs` | platform JWT | `{ subjectId, criteriaVersionId?, config? }` → 202，fire-and-forget |
+| POST | `/security-evaluation/runs` | platform JWT | `{ subjectId, criteriaVersionId?, config? }` → 202；admission 同步（subject/kind/版本/并发冲突，400/404/409），执行 fire-and-forget |
 | GET | `/security-evaluation/runs` | platform JWT | 按 subjectId 倒序查运行 |
 | GET | `/security-evaluation/results` | platform JWT | 读归档结果（manifest / coverage / verdicts） |
 | GET | `/security-evaluation/findings` | platform JWT | 发现列表（status / severity / family 过滤 + 分页） |

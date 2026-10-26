@@ -124,13 +124,16 @@ feature that evaluates two subject kinds binds the same instance under both.
 `EvaluationProviderRegistry` resolves them lazily, so this module carries no
 compile-time dependency on any feature.
 
-`EvaluationRunnerService.run` is the only write entry of the run lifecycle:
-open the run (concurrency decided by the database), collect evidence, judge,
-compose coverage, persist the immutable result, upsert findings, resolve absent
-findings, close the run — with the heartbeat and fencing checks described
-under invariant 4. A feature that implements the four ports inherits all of
-it and must not drive the run state machine through `EvaluationRunService`
-directly.
+`EvaluationRunnerService` is the only write entry of the run lifecycle, in two
+halves: `open` takes the admission decision synchronously (subject existence,
+criteria-version applicability, and the one-active-run conflict decided by the
+database — so a trigger can still answer 400/404/409 before accepting the
+request), and `execute` runs the opened row — collect evidence, judge, compose
+coverage, persist the immutable result, upsert findings, resolve absent
+findings, close the run — with the heartbeat and fencing checks described under
+invariant 4. `run` is the convenience pair of both for callers that await the
+whole run. A feature that implements the four ports inherits all of it and must
+not drive the run state machine through `EvaluationRunService` directly.
 
 A run may carry an opaque per-run `config` (ADR-023): the trigger passes it to
 `startRun`, it is stored on the run row and threaded to the judgment port as

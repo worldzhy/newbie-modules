@@ -213,6 +213,7 @@ function createHarness(options: { scopes?: ScopeEntities[] | null } = {}): Harne
     provider as never,
     reRanker as never,
     { emit: (name: string, payload: unknown) => events.push({ name, payload }) } as never,
+    { declareEvent: () => undefined } as never,
   );
   return { prisma, reRanker, events, service };
 }

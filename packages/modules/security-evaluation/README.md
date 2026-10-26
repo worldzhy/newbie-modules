@@ -87,16 +87,16 @@ SECURITY_EVALUATION_SCHEDULES = [
 
 ## Endpoints
 
-| Method | Path                                         | Purpose                                                         |
-| ------ | -------------------------------------------- | --------------------------------------------------------------- |
-| POST   | `/security-evaluation/subjects/sync`         | Ask the host provider to sync subjects and assets (idempotent). |
-| GET    | `/security-evaluation/assets`                | Asset inventory under a scope.                                  |
-| GET    | `/security-evaluation/assets/:assetId/facts` | Current-state facts of one asset.                               |
-| POST   | `/security-evaluation/runs`                  | Dispatch a run (202, fire-and-forget).                          |
-| GET    | `/security-evaluation/runs`                  | Run history for a subject.                                      |
-| GET    | `/security-evaluation/results`               | Archived results (manifest excluded).                           |
-| GET    | `/security-evaluation/findings`              | Findings with family / status / severity filters.               |
-| GET    | `/security-evaluation/report`                | Single-axis report: assets, coverage, findings, trend, MTTR.    |
+| Method | Path                                         | Purpose                                                                                             |
+| ------ | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| POST   | `/security-evaluation/subjects/sync`         | Ask the host provider to sync subjects and assets (idempotent).                                     |
+| GET    | `/security-evaluation/assets`                | Asset inventory under a scope.                                                                      |
+| GET    | `/security-evaluation/assets/:assetId/facts` | Current-state facts of one asset.                                                                   |
+| POST   | `/security-evaluation/runs`                  | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously. |
+| GET    | `/security-evaluation/runs`                  | Run history for a subject.                                                                          |
+| GET    | `/security-evaluation/results`               | Archived results (manifest excluded).                                                               |
+| GET    | `/security-evaluation/findings`              | Findings with family / status / severity filters.                                                   |
+| GET    | `/security-evaluation/report`                | Single-axis report: assets, coverage, findings, trend, MTTR.                                        |
 
 ## Limitations
 

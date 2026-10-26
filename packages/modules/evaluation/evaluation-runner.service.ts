@@ -1,4 +1,5 @@
 import { BadRequestException, Inject, Injectable, Logger, Optional } from "@nestjs/common";
+import type { EvaluationRun } from "@generated/prisma/client";
 
 import { EvaluationCriteriaService } from "./evaluation-criteria.service";
 import { EvaluationFindingService } from "./evaluation-finding.service";
@@ -53,10 +54,27 @@ export class EvaluationRunnerService {
     private readonly options: EvaluationRunOptions = {},
   ) {}
 
-  async run(input: StartEvaluationRunInput): Promise<EvaluationRunOutcome> {
+  /**
+   * Open the run synchronously and return the RUNNING row.
+   *
+   * Admission is the part that belongs to the request path: subject existence,
+   * criteria-version applicability and the one-active-run-per-subject-version
+   * conflict are all decided by the database here, so a caller dispatching a
+   * fire-and-forget run can still answer 400/404/409 before accepting it.
+   */
+  async open(input: StartEvaluationRunInput): Promise<EvaluationRun> {
     const run = await this.runs.startRun(input);
     await this.runs.markRunning(run.id);
-    const running = await this.runs.findById(run.id);
+    return this.runs.findById(run.id);
+  }
+
+  /** Open then execute in one call — for callers that can await the whole run. */
+  async run(input: StartEvaluationRunInput): Promise<EvaluationRunOutcome> {
+    return this.execute(await this.open(input));
+  }
+
+  /** Execute an already-open run. Errors are the execution's own, never admission's. */
+  async execute(running: EvaluationRun): Promise<EvaluationRunOutcome> {
     const startedAt = running.startedAt;
 
     const heartbeat = setInterval(() => {
