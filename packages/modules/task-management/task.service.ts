@@ -59,7 +59,12 @@ export interface ListTasksFilter {
 const TASK_STATUS_TRANSITIONS: Readonly<Record<TaskStatus, ReadonlySet<TaskStatus>>> = {
   [TaskStatus.PENDING]: new Set([TaskStatus.DEVELOPING, TaskStatus.CANCELLED]),
   [TaskStatus.DEVELOPING]: new Set([TaskStatus.TESTING, TaskStatus.CANCELLED]),
-  [TaskStatus.TESTING]: new Set([TaskStatus.DEVELOPING, TaskStatus.DEPLOYED, TaskStatus.CANCELLED]),
+  [TaskStatus.TESTING]: new Set([
+    TaskStatus.DEVELOPING,
+    TaskStatus.DEPLOYED,
+    TaskStatus.COMPLETED,
+    TaskStatus.CANCELLED,
+  ]),
   [TaskStatus.DEPLOYED]: new Set([TaskStatus.DEVELOPING, TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
   [TaskStatus.COMPLETED]: new Set<TaskStatus>(),
   [TaskStatus.CANCELLED]: new Set<TaskStatus>(),
