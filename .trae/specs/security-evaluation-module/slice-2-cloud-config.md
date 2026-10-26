@@ -1,6 +1,6 @@
 # Slice 2 实施规格：CLOUD_CONFIG（tasks.md Phase 4.1）
 
-Status: 待批准
+Status: 已交付（2026-10-26）——registry `0a265a2`、backend `d3caf8c`；E2E：真实 AWS 账号 run SUCCEEDED（134 facts、skipped=0、145 findings）。交付后契约无后续演变；当前真源即本文件 + ADR-027。交付期间唯一计划外变更：宿主采集器 bucket 循环改有界并发（E2E 实测串行 >25min，并发 8 后 <5min），属宿主层性能修复，不改变本规格任何契约。
 设计真源：ADR-027（已采纳方向，用户 2026-10-26 "执行吧" 批准）；本文件只固化实施级决策，不重复论证。
 
 ## 实施级决策（ADR-027 未细化的点）

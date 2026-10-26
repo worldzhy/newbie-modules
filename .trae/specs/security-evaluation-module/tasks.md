@@ -33,7 +33,7 @@
 
 ## Phase 4 — 后续切片（各自里程碑再确认）
 
-- [ ] 4.1 切片 2：CLOUD_CONFIG 判定器 + CIS 规则目录收敛 + 宿主 compliance 读模型
+- [x] 4.1 切片 2：CLOUD_CONFIG 判定器 + CIS 规则目录收敛 + 宿主 compliance 读模型。按 ADR-027 与 slice-2-cloud-config.md 交付：registry `0a265a2`、backend `d3caf8c`；E2E 真实 AWS 账号 run SUCCEEDED，134 facts、skipped=0、145 findings（`aws:cis-<control>:<resource>`），报告接口六轴齐；过程中发现 bucket 串行采集超时缺陷并以有界并发修复（宿主层）
 - [ ] 4.2 切片 3：knowledge/ 采集 + INTEL 判定器（ADR-018 护栏原样保留）
 - [ ] 4.3 切片 4：多轴报告（合规 / 情报 / 趋势 / MTTR）+ 整改绑定 + 通知模板
 - [ ] 4.4 切换与旧模块处置：由用户单独决策，不在本 spec 范围
