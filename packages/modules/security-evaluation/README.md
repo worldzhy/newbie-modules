@@ -5,8 +5,8 @@ The security feature on the evaluation skeleton (ADR-020), replacing the siloed
 a time (ADR-022). The legacy modules keep running unchanged; this module adds a
 parallel, asset-centred track and never reads or writes their tables.
 
-Shipped slice: **assets + DEPENDENCY**. CLOUD_CONFIG and INTEL land in later
-slices on the same run and finding lifecycle.
+Shipped slices: **assets + DEPENDENCY** and **CLOUD_CONFIG** (ADR-027). INTEL
+lands in a later slice on the same run and finding lifecycle.
 
 ## Vocabulary
 
@@ -22,8 +22,9 @@ slices on the same run and finding lifecycle.
 ## Subject kinds and scopes
 
 - `repository` — evidence is the repository's `package-lock.json`.
-- `cloud-account` — reserved for the CLOUD_CONFIG slice; no judgment is bound
-  for it in this build, so `POST /security-evaluation/runs` rejects it.
+- `cloud-account` — evidence is the account's configuration facts, collected
+  through the host-bound `CloudConfigurationAccess` port. Nightwatch maps one
+  configured `awsCrossAccountBinding` to one subject.
 
 Hosts declare subjects by calling `POST /security-evaluation/subjects/sync` with
 a scope; the skeleton's `SubjectProvider` does the enumeration and every returned
@@ -33,29 +34,51 @@ open decision (ADR-022).
 
 ## Fact types
 
-| `factType` | `factKey`              | `value`                         |
-| ---------- | ---------------------- | ------------------------------- |
-| `package`  | `npm:<name>@<version>` | `{ version, isDev, ecosystem }` |
+| `factType`                        | `factKey`                 | `value`                                                                                                                   |
+| --------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `package`                         | `npm:<name>@<version>`    | `{ version, isDev, ecosystem }`                                                                                           |
+| `aws.iam.account-password-policy` | `account-password-policy` | `{ exists, minimumPasswordLength, maxPasswordAgeDays, expirePasswords }`                                                  |
+| `aws.iam.root-credential`         | `root`                    | `{ passwordEnabled, mfaActive, activeAccessKeyCount }`                                                                    |
+| `aws.iam.user-credential`         | `<userName>`              | `{ userName, passwordEnabled, mfaActive }`                                                                                |
+| `aws.s3.bucket-security`          | `<bucketName>`            | `{ bucketName, region, publicAccessBlock \| null, policyIsPublic, aclPublic, encryptionEnabled }`                         |
+| `aws.rds.instance-security`       | `<identifier>`            | `{ identifier, region, publiclyAccessible, storageEncrypted }`                                                            |
+| `aws.ec2.security-group-ingress`  | `<groupId>`               | `{ groupId, region, publicIngress: [{ protocol, fromPort, toPort, cidr }] }` (internet-open rules only; empty means none) |
+
+## Criteria families
+
+| Family           | Kind            | Version | Content                                                                                 |
+| ---------------- | --------------- | ------- | --------------------------------------------------------------------------------------- |
+| `dependency-osv` | `repository`    | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                    |
+| `cis-aws-1.5`    | `cloud-account` | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027). |
+
+Each CIS criterion carries `controlId`, `severity`, `remediation` and
+`factRequirements` in its metadata; the judgment reads severity from there, and
+the seed and the rulebook draw from one source. A rule change ships as a new
+version of the family, never an in-place edit.
 
 ## Port bindings
 
-The module implements three of the skeleton's kind-scoped ports for
-`repository`:
+The module implements the skeleton's kind-scoped ports for both kinds:
 
-- `EVALUATION_CRITERIA:repository` → `SecurityEvaluationCriteriaProvider`
+- `EVALUATION_CRITERIA:{repository|cloud-account}` → `SecurityEvaluationCriteriaProvider`
 - `EVALUATION_EVIDENCE:repository` → `SecurityEvaluationEvidenceProvider`
-- `EVALUATION_JUDGMENT:repository` → `SecurityEvaluationJudgmentService`
-  (dispatches on `criteriaVersion.family`; `dependency-osv` today)
+- `EVALUATION_EVIDENCE:cloud-account` → `SecurityEvaluationCloudConfigEvidenceProvider`
+- `EVALUATION_JUDGMENT:{repository|cloud-account}` → `SecurityEvaluationJudgmentService`
+  (dispatches on `criteriaVersion.family`: `dependency-osv`, `cis-aws-1.5`)
 
-The host must bind one more port, owned by this module:
+The host must bind two more ports, owned by this module:
 
 ```ts
 { provide: securityEvaluationRepositoryAccessToken, useClass: YourRepositoryAccess }
+{ provide: securityEvaluationCloudConfigurationAccessToken, useClass: YourCloudConfigurationAccess }
 ```
 
 `RepositoryAccess.getFile(subject, path)` returns a file at the repository root
-or `null`. Nightwatch implements it with its `github` module. An unbound port is
-a wiring error: the run fails instead of reporting a vacuously clean result.
+or `null`. `CloudConfigurationAccess.collectFacts(subject)` returns raw
+configuration facts plus per-fact-type failures — never judged conclusions.
+Nightwatch implements them with its `github` and `aws-identity` modules. An
+unbound port is a wiring error: the run fails instead of reporting a vacuously
+clean result.
 
 ## Coverage buckets
 
@@ -63,14 +86,16 @@ Every run records the skeleton's three buckets:
 
 - `evaluated` — evidence items the judgment actually examined.
 - `declaredUnlinked` — dependencies declared in `package.json` but absent from
-  the lockfile. A declared dependency without an installed fact was not judged,
-  and saying so beats counting it as clean.
-- `skipped` — packages whose OSV batch query failed. Skipped always carries a
-  note and the item ids, never just a number.
+  the lockfile. The cloud-account mechanism has no such concept and always
+  reports an empty bucket.
+- `skipped` — packages whose OSV batch query failed, or cloud criteria whose
+  facts could not be collected. Cloud entries name the control
+  (`cis-1-13`) or the specific resource (`cis-2-1-1:<bucket>`). Skipped always
+  carries a note and the item ids, never just a number.
 
-An unreadable lockfile, an unsupported lockfile format, or a lockfile resolving
-zero packages fails the run. An empty evaluated set must never surface as a
-clean result.
+An unreadable lockfile, an unsupported lockfile format, a lockfile resolving
+zero packages, or a cloud account whose facts all failed to collect fails the
+run. An empty evaluated set must never surface as a clean result.
 
 ## Scheduling
 
@@ -107,5 +132,8 @@ SECURITY_EVALUATION_SCHEDULES = [
   `severitySource: "unknown"`.
 - Data source is osv.dev; an OSV outage degrades coverage (skipped packages), it
   does not silently pass.
+- The CIS catalog covers the initial ten controls only; catalog growth is a new
+  family version. Cloud findings carry exposure `internal` until a reachability
+  signal exists, so urgency derives no relief.
 - The report has no composite score and no cross-family weighting (ADR-020 D5.3,
   ADR-022 D6). A second axis is a later milestone, not a field to sneak in.

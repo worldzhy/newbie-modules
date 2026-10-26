@@ -8,36 +8,41 @@ import { SecurityEvaluationAssetService } from "./assets/security-evaluation-ass
 import { SecurityEvaluationAssetSyncService } from "./assets/security-evaluation-asset-sync.service";
 import { SecurityEvaluationCriteriaProvider } from "./criteria/security-evaluation-criteria.provider";
 import { SecurityEvaluationCriteriaSeed } from "./criteria/security-evaluation-criteria.seed";
+import { SecurityEvaluationCloudConfigEvidenceProvider } from "./evidence/security-evaluation-cloud-config-evidence.provider";
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
+import { SecurityEvaluationCloudConfigJudgment } from "./judgment/cloud-config/security-evaluation-cloud-config.judgment";
 import { SecurityEvaluationDependencyJudgment } from "./judgment/dependency/security-evaluation-dependency.judgment";
 import { SecurityEvaluationOsvClient } from "./judgment/dependency/security-evaluation-osv.client";
 import { SecurityEvaluationJudgmentService } from "./judgment/security-evaluation-judgment.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationController } from "./security-evaluation.controller";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
-import { SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY } from "./security-evaluation.constants";
+import {
+  SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
+  SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+} from "./security-evaluation.constants";
 
 /**
  * SecurityEvaluationModule (ADR-022) — the security feature on the evaluation
  * skeleton (ADR-020), shipped as the second feature after work-evaluation.
  *
- * Slice 1 owns:
- * - the asset inventory (`SecurityEvaluationAsset` / `SecurityEvaluationAssetFact`)
- *   materialised from the skeleton's subjects,
- * - the code-defined dependency criteria and their idempotent publication,
- * - the DEPENDENCY judgment: lockfile evidence into OSV, deterministic findings,
- * - the single-axis report read model.
+ * Slice 1 owns the asset inventory, the dependency criteria and the DEPENDENCY
+ * judgment; slice 2 (ADR-027) adds the CLOUD_CONFIG mechanism: the CIS AWS
+ * Foundations criteria for subject kind "cloud-account", its evidence provider
+ * and its rulebook judgment, dispatched by family through the same judgment
+ * service. INTEL arrives in a later slice with its own family dispatch.
  *
  * The run lifecycle, result immutability, finding lifecycle and subject registry
  * belong to the skeleton; this module only implements the ports and the HTTP
  * surface. Port bindings use `useExisting` so the singletons are never
  * duplicated (the registry resolves the ports by token from the global
- * container). CLOUD_CONFIG and INTEL arrive in later slices and will add their
- * own family dispatch, not new port bindings.
+ * container).
  *
- * `SECURITY_EVALUATION_REPOSITORY_ACCESS` is intentionally not bound here: the
- * host binds it (nightwatch uses its github module). An unbound port fails the
- * run with a wiring error rather than silently reporting a clean result.
+ * `SECURITY_EVALUATION_REPOSITORY_ACCESS` and
+ * `SECURITY_EVALUATION_CLOUD_CONFIGURATION_ACCESS` are intentionally not bound
+ * here: the host binds them (nightwatch uses its github and aws-identity
+ * modules). An unbound port fails the run with a wiring error rather than
+ * silently reporting a clean result.
  */
 @Global()
 @Module({
@@ -49,14 +54,21 @@ import { SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY } from "./security-evaluati
     SecurityEvaluationCriteriaSeed,
     SecurityEvaluationCriteriaProvider,
     SecurityEvaluationEvidenceProvider,
+    SecurityEvaluationCloudConfigEvidenceProvider,
     SecurityEvaluationOsvClient,
     SecurityEvaluationDependencyJudgment,
+    SecurityEvaluationCloudConfigJudgment,
     SecurityEvaluationJudgmentService,
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,
-    // Kind-scoped skeleton ports for the kind this slice judges (ADR-020 D4).
+    // Kind-scoped skeleton ports (ADR-020 D4). One judgment dispatcher serves
+    // both kinds; the family on the criteria version routes the mechanism.
     {
       provide: criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
+      useExisting: SecurityEvaluationCriteriaProvider,
+    },
+    {
+      provide: criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
       useExisting: SecurityEvaluationCriteriaProvider,
     },
     {
@@ -64,7 +76,15 @@ import { SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY } from "./security-evaluati
       useExisting: SecurityEvaluationEvidenceProvider,
     },
     {
+      provide: evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
+      useExisting: SecurityEvaluationCloudConfigEvidenceProvider,
+    },
+    {
       provide: judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
+      useExisting: SecurityEvaluationJudgmentService,
+    },
+    {
+      provide: judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
       useExisting: SecurityEvaluationJudgmentService,
     },
   ],
@@ -74,8 +94,11 @@ import { SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY } from "./security-evaluati
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,
     criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
+    criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
     evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
+    evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
     judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
+    judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
   ],
 })
 export class SecurityEvaluationModule {}
