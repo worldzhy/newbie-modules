@@ -37,12 +37,14 @@ export class SecurityEvaluationCloudConfigJudgment {
     );
 
     const findings: EvaluationFindingCandidate[] = [];
-    const consumedEvidenceIds = new Set<string>();
+
+    // A fact counts as evaluated if any rule in this family declares it as a
+    // required fact type — whether or not it produced a finding (ADR-037 D7).
+    const requiredFactTypes = new Set(entries.flatMap((entry) => [...entry.requiredFactTypes]));
 
     for (const entry of entries) {
       const criterionSeverity = severityByKey.get(entry.criterionKey) ?? entry.severity;
       for (const draft of entry.judge(facts)) {
-        for (const ref of draft.evidenceRefs) consumedEvidenceIds.add(ref);
         const severity = draft.severity ?? criterionSeverity;
         findings.push({
           criterionKey: entry.criterionKey,
@@ -63,10 +65,12 @@ export class SecurityEvaluationCloudConfigJudgment {
       }
     }
 
-    // Coverage counts only facts this family's rules actually consumed
-    // (ADR-037 D7); facts nobody needed land in the unconsumed bucket.
-    const evaluatedRefs = input.evidence.filter((item) => consumedEvidenceIds.has(item.id)).map((item) => item.id);
-    const unconsumedRefs = input.evidence.filter((item) => !consumedEvidenceIds.has(item.id)).map((item) => item.id);
+    const evaluatedRefs = input.evidence
+      .filter((item) => requiredFactTypes.has(String(item.payload?.factType)))
+      .map((item) => item.id);
+    const unconsumedRefs = input.evidence
+      .filter((item) => !requiredFactTypes.has(String(item.payload?.factType)))
+      .map((item) => item.id);
 
     const isCis = evaluationKey === "cis-aws-1.5";
     return Promise.resolve({

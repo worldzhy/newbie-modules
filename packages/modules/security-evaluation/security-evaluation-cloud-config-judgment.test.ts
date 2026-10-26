@@ -113,6 +113,12 @@ test("passing controls produce no findings and every collected fact is evaluated
 
 test("one failing resource among many yields one finding and full evaluation", async () => {
   const items = [
+    evidenceItem("aws.iam.account-password-policy", "account-password-policy", {
+      exists: true,
+      minimumPasswordLength: 14,
+      maxPasswordAgeDays: 90,
+      expirePasswords: true,
+    }),
     evidenceItem("aws.s3.bucket-security", "plain", {
       bucketName: "plain",
       region: "us-east-1",
@@ -120,6 +126,7 @@ test("one failing resource among many yields one finding and full evaluation", a
       policyIsPublic: false,
       aclPublic: false,
       encryptionEnabled: false,
+      versioningEnabled: true,
     }),
     evidenceItem("aws.s3.bucket-security", "sealed", {
       bucketName: "sealed",
@@ -134,10 +141,12 @@ test("one failing resource among many yields one finding and full evaluation", a
       policyIsPublic: false,
       aclPublic: false,
       encryptionEnabled: true,
+      versioningEnabled: true,
     }),
   ];
   const judgment = await new SecurityEvaluationCloudConfigJudgment().judge(inputFor(items));
   const fingerprints = judgment.findings.map((finding) => finding.fingerprint).sort();
   assert.deepEqual(fingerprints, ["aws:cis-2-1-1:plain", "aws:cis-2-1-2:plain:public-access-block"]);
-  assert.equal(judgment.evaluatedRefs.length, 2);
+  // All three facts are required by CIS rules, so all three are evaluated.
+  assert.equal(judgment.evaluatedRefs.length, 3);
 });
