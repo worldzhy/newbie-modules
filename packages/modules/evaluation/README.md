@@ -22,6 +22,11 @@ One concept, one word.
   active run per (subject, version).
 - **verdict** — the product of a `SCORED` criterion, stored inside
   `EvaluationResult`. Periodic, immutable, never closed.
+- **review** (`EvaluationResult.reviewStatus`) — the supervisor's explicit
+  verdict on an archived result (ADR-031): APPROVED endorses the AI
+  conclusion, REJECTED overrules it. The snapshot never changes; a re-review
+  overwrites the previous review, so the row always reflects exactly the
+  latest say.
 - **finding** (`EvaluationFinding`) — the product of an `ASSERTION` criterion.
   Identity is `(subject, family, fingerprint)`: `family` is copied from the
   run's criteria version, so a rerun under a new version of the same family
@@ -34,10 +39,11 @@ One concept, one word.
   to findings or results of one subject, with a named decider.
 
 Actor references follow the `*ByRef` naming: `requestedByRef` on a run,
-`suppressedByRef` on a suppressed finding, `decidedByRef` on a closed plan.
-They are opaque host-side actor ids — plain scalars, no foreign keys. Note the
-distinction on a plan: `deciderRef` names the accountable decision maker,
-`decidedByRef` records who actually recorded the decision.
+`suppressedByRef` on a suppressed finding, `reviewedByRef` on a reviewed
+result, `decidedByRef` on a closed plan. They are opaque host-side actor ids —
+plain scalars, no foreign keys. Note the distinction on a plan: `deciderRef`
+names the accountable decision maker, `decidedByRef` records who actually
+recorded the decision.
 
 Verdict and finding are deliberately not merged: closing a score makes no
 sense, and tracking a problem inside a JSON blob makes it untrackable.
@@ -50,15 +56,18 @@ sense, and tracking a problem inside a JSON blob makes it untrackable.
 | `EvaluationCriterion`       | criterion key, kind, name, feature-defined metadata  |
 | `EvaluationSubject`         | kind, scope coordinate, subject key, display name    |
 | `EvaluationRun`             | state machine, failure reason, actor reference       |
-| `EvaluationResult`          | manifest, content hash, coverage, verdicts           |
+| `EvaluationResult`          | manifest, content hash, coverage, verdicts, review   |
 | `EvaluationFinding`         | family + fingerprint identity, severity, suppression |
 | `EvaluationRemediationPlan` | trigger refs, decider, checkpoints, decision         |
 
 ## Invariants (ADR-020 D5)
 
 1. **Result snapshots are immutable.** `EvaluationResultService` has no update
-   path; a rerun is a new run and a new row. `contentHash` is computed by the
-   skeleton from the manifest, never accepted from the caller.
+   path for the archived snapshot; a rerun is a new run and a new row.
+   `contentHash` is computed by the skeleton from the manifest, never accepted
+   from the caller. The one write path the service does have is the supervisor
+   review (ADR-031), which touches only the review columns and never the
+   snapshot.
 2. **Coverage is always explainable.** `composeCoverageStats` derives the
    evaluated bucket from the evidence ids the judgment examined and merges every
    skipped bucket (collector + judgment budget). An evaluated ref that names no
@@ -169,7 +178,8 @@ actually needs them.
 ## Scope
 
 One controller only (ADR-029): the decision surface over skeleton-owned
-aggregates — finding suppression/reopening and remediation plans. Read models,
+aggregates — finding suppression/reopening, result review (ADR-031) and
+remediation plans. Read models,
 feature endpoints, notification templates and scheduling belong to the feature.
 No `llm` dependency: deterministic judgments
 (version ranges, configuration baselines) must not be pulled into the LLM stack,

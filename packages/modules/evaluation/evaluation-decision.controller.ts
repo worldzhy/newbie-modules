@@ -5,15 +5,19 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { UserRequest } from "@modules/security/security.interface";
 import { EvaluationFindingService } from "./evaluation-finding.service";
 import { EvaluationRemediationService } from "./evaluation-remediation.service";
+import { EvaluationResultService } from "./evaluation-result.service";
 import {
   CreateEvaluationRemediationPlanRequestDto,
   DecideEvaluationRemediationPlanRequestDto,
   EvaluationFindingResponseDto,
   EvaluationRemediationPlanResponseDto,
+  EvaluationResultResponseDto,
   GetEvaluationFindingByIdRequestDto,
   GetEvaluationRemediationPlanByIdRequestDto,
+  GetEvaluationResultByIdRequestDto,
   ListEvaluationRemediationPlansRequestDto,
   ListEvaluationRemediationPlansResponseDto,
+  ReviewEvaluationResultRequestDto,
   SuppressEvaluationFindingRequestDto,
   UpdateEvaluationRemediationCheckpointRequestDto,
 } from "./evaluation-decision.dto";
@@ -21,12 +25,12 @@ import {
 /**
  * Human decision surface over skeleton-owned evaluation aggregates.
  *
- * Findings and remediation plans are skeleton domain objects shared by every
- * feature family, so their lifecycle operations (suppression, reopening,
- * remediation planning and checkpoint tracking) live here rather than in any
- * feature vocabulary (ADR-029). Attribution follows the service contracts:
- * the acting user is recorded automatically, while the accountable decision
- * maker is always an explicit request field.
+ * Findings, results and remediation plans are skeleton domain objects shared
+ * by every feature family, so their lifecycle operations (suppression,
+ * reopening, result review, remediation planning and checkpoint tracking) live
+ * here rather than in any feature vocabulary (ADR-029, ADR-031). Attribution
+ * follows the service contracts: the acting user is recorded automatically,
+ * while the accountable decision maker is always an explicit request field.
  */
 @ApiTags("Evaluation")
 @ApiBearerAuth()
@@ -34,6 +38,7 @@ import {
 export class EvaluationDecisionController {
   constructor(
     private readonly findings: EvaluationFindingService,
+    private readonly results: EvaluationResultService,
     private readonly remediation: EvaluationRemediationService,
   ) {}
 
@@ -55,6 +60,25 @@ export class EvaluationDecisionController {
   @ApiOkResponse({ type: EvaluationFindingResponseDto })
   async reopenFinding(@Param() params: GetEvaluationFindingByIdRequestDto) {
     return this.findings.reopenFinding(params.id);
+  }
+
+  @Post("results/:id/review")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationResult)
+  @ApiOperation({
+    summary: "Record the supervisor verdict on a result (APPROVED endorses, REJECTED overrules); re-review overwrites",
+  })
+  @ApiOkResponse({ type: EvaluationResultResponseDto })
+  async reviewResult(
+    @Param() params: GetEvaluationResultByIdRequestDto,
+    @Body() body: ReviewEvaluationResultRequestDto,
+    @Req() request: UserRequest,
+  ) {
+    return this.results.reviewResult({
+      id: params.id,
+      reviewStatus: body.reviewStatus,
+      reviewedByRef: request.user.userId,
+      note: body.note,
+    });
   }
 
   @Post("remediation-plans")

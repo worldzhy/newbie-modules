@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { EvaluationRunStatus, Prisma } from "@generated/prisma/client";
+import { EvaluationResultReviewStatus, EvaluationRunStatus, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { EvaluationCriteriaService } from "./evaluation-criteria.service";
@@ -9,7 +9,8 @@ import { hashManifest, validateCoverageStats, validateJudgment } from "./evaluat
 /**
  * Fields returned by every result read. The archived `manifest` snapshot is
  * excluded on purpose — it is a large JSON blob served only by the dedicated
- * manifest read.
+ * manifest read. The supervisor review columns (ADR-031) ride along so every
+ * read face shows the current review state.
  */
 const RESULT_SELECT = {
   id: true,
@@ -21,6 +22,10 @@ const RESULT_SELECT = {
   verdicts: true,
   summary: true,
   metadata: true,
+  reviewStatus: true,
+  reviewedByRef: true,
+  reviewedAt: true,
+  reviewNote: true,
   createdAt: true,
 } satisfies Prisma.EvaluationResultSelect;
 
@@ -45,10 +50,16 @@ export interface ListEvaluationResultsInput {
 /**
  * EvaluationResultService — the immutable conclusion snapshot (ADR-020 D5.1).
  *
- * A rerun writes a new row through a new run; there is deliberately no update
- * path here, so an archived manifest and its content hash cannot be rewritten.
- * The hash is computed from the manifest rather than accepted from the caller —
- * a caller-supplied hash could disagree with the snapshot it describes.
+ * A rerun writes a new row through a new run; the archived manifest, its
+ * content hash and the verdicts have deliberately no update path, so the
+ * material a verdict was judged from cannot be rewritten. The hash is computed
+ * from the manifest rather than accepted from the caller — a caller-supplied
+ * hash could disagree with the snapshot it describes.
+ *
+ * The one lifecycle layer above the snapshot is the supervisor review
+ * (ADR-031): `reviewResult` writes only the review columns and records who
+ * decided. A re-review overwrites the previous review — the final say is the
+ * latest say, and the row always reflects exactly one review.
  */
 @Injectable()
 export class EvaluationResultService {
@@ -136,6 +147,39 @@ export class EvaluationResultService {
       },
     });
   }
+
+  /**
+   * Supervisor verdict on an archived conclusion (ADR-031): APPROVED endorses
+   * it, REJECTED overrules it. The archived snapshot is untouched — only the
+   * review columns move. A re-review overwrites the previous review, and an
+   * omitted note clears the previous one: the row always reflects exactly the
+   * latest say, never a blend of two.
+   */
+  async reviewResult(input: ReviewEvaluationResultInput) {
+    const result = await this.prisma.evaluationResult.findUnique({
+      where: { id: input.id },
+      select: { id: true },
+    });
+    if (!result) throw new NotFoundException(`Evaluation result ${input.id} not found`);
+
+    return this.prisma.evaluationResult.update({
+      where: { id: input.id },
+      data: {
+        reviewStatus: input.reviewStatus,
+        reviewedByRef: input.reviewedByRef,
+        reviewedAt: new Date(),
+        reviewNote: input.note ?? null,
+      },
+      select: RESULT_SELECT,
+    });
+  }
+}
+
+export interface ReviewEvaluationResultInput {
+  id: string;
+  reviewStatus: EvaluationResultReviewStatus;
+  reviewedByRef: string;
+  note?: string;
 }
 
 function isUniqueViolation(error: unknown): boolean {

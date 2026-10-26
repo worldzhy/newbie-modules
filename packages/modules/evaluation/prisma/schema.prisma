@@ -21,6 +21,7 @@
 // * EvaluationFindingStatus (enum)                               //
 // * EvaluationFindingSeverity (enum)                             //
 // * EvaluationRemediationStatus (enum)                           //
+// * EvaluationResultReviewStatus (enum)                          //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 enum EvaluationCriterionKind {
@@ -63,6 +64,15 @@ enum EvaluationRemediationStatus {
   OPEN
   COMPLETED
   CANCELLED
+
+  @@schema("module/evaluation")
+}
+
+enum EvaluationResultReviewStatus {
+  // Supervisor endorses the archived AI conclusion (ADR-031).
+  APPROVED
+  // Supervisor overrules the archived AI conclusion (ADR-031).
+  REJECTED
 
   @@schema("module/evaluation")
 }
@@ -188,9 +198,10 @@ model EvaluationRun {
 
 /// The archived conclusion of one run (ADR-020 D5.1): `manifest`,
 /// `contentHash` and `coverageStats` describe the material it was judged from
-/// and are never rewritten — a rerun writes a new row. There is deliberately no
-/// composite score field (D5.3); multi-axis scores belong to the feature's read
-/// model.
+/// and are never rewritten — a rerun writes a new row. The supervisor review
+/// columns (ADR-031) are the one lifecycle layer above the snapshot and never
+/// touch it. There is deliberately no composite score field (D5.3); multi-axis
+/// scores belong to the feature's read model.
 model EvaluationResult {
   id                String @id @default(uuid()) @db.Uuid
   runId             String @unique @db.Uuid
@@ -208,6 +219,15 @@ model EvaluationResult {
   verdicts Json    @db.JsonB
   summary  String? @db.Text
   metadata Json?   @db.JsonB
+
+  // Supervisor review of the archived conclusion (ADR-031). Every review is a
+  // full-state write: a re-review overwrites reviewer, time and note, so the
+  // row always reflects exactly the latest say.
+  reviewStatus  EvaluationResultReviewStatus?
+  // Opaque host-side actor id; no foreign key by design
+  reviewedByRef String?                       @db.VarChar(128)
+  reviewedAt    DateTime?
+  reviewNote    String?                       @db.Text
 
   createdAt DateTime @default(now())
 

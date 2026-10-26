@@ -15,16 +15,16 @@ import { EvaluationSubjectService } from "./evaluation-subject.service";
  *
  * The module owns the seven tables, the run lifecycle and the invariants. Its
  * HTTP surface is deliberately minimal (ADR-029): the decision controller for
- * suppression/reopening and remediation — lifecycle operations over
- * skeleton-owned aggregates that every feature family shares. Read models,
- * feature-specific endpoints and scheduling belong to the feature that builds
- * on it.
+ * suppression/reopening, result review (ADR-031) and remediation — lifecycle
+ * operations over skeleton-owned aggregates that every feature family shares.
+ * Read models, feature-specific endpoints and scheduling belong to the feature
+ * that builds on it.
  *
  * `EvaluationRunnerService.run` is the only write entry of the run lifecycle —
  * it owns the heartbeat, the fencing checks and the state machine transitions.
  * The other exported services are for reads, criteria administration and human
- * decisions (suppression, remediation); a feature must not drive the run state
- * machine through `EvaluationRunService` directly.
+ * decisions (suppression, result review, remediation); a feature must not
+ * drive the run state machine through `EvaluationRunService` directly.
  *
  * The four ports (SubjectProvider, EvidenceProvider, CriteriaProvider,
  * JudgmentPort) are bound by the host and by features under the tokens in

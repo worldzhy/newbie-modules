@@ -4,6 +4,7 @@ import {
   EvaluationFindingSeverity,
   EvaluationFindingStatus,
   EvaluationRemediationStatus,
+  EvaluationResultReviewStatus,
 } from "@generated/prisma/client";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
@@ -18,6 +19,26 @@ export class SuppressEvaluationFindingRequestDto {
   @ApiProperty({ description: "Why a human silenced this finding; kept on the finding for audit" })
   @IsString()
   note!: string;
+}
+
+export class GetEvaluationResultByIdRequestDto {
+  @ApiProperty({ description: "Result the review applies to" })
+  @IsUUID()
+  id!: string;
+}
+
+export class ReviewEvaluationResultRequestDto {
+  @ApiProperty({
+    enum: EvaluationResultReviewStatus,
+    description: "APPROVED endorses the archived AI conclusion, REJECTED overrules it",
+  })
+  @IsEnum(EvaluationResultReviewStatus)
+  reviewStatus!: EvaluationResultReviewStatus;
+
+  @ApiPropertyOptional({ description: "Why the supervisor endorsed or overruled the conclusion" })
+  @IsOptional()
+  @IsString()
+  note?: string;
 }
 
 export class EvaluationRemediationCheckpointRequestDto {
@@ -161,6 +182,38 @@ export class EvaluationRemediationPlanResponseDto {
   @ApiPropertyOptional({ type: Date }) closedAt?: Date | null;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
+}
+
+export class EvaluationResultResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty() runId!: string;
+  @ApiProperty() subjectId!: string;
+  @ApiProperty() criteriaVersionId!: string;
+  @ApiProperty({ description: "SHA-256 over the canonical manifest, computed by the skeleton" })
+  contentHash!: string;
+  @ApiProperty({
+    type: Object,
+    description: "{ evaluated, declaredUnlinked, skipped } — what the judgment saw and what it did not",
+  })
+  coverageStats!: object;
+  @ApiProperty({
+    type: Object,
+    description: "Scored verdicts: [{ criterionKey, score, confidence, coverage, evidenceRefs, rationale }]",
+  })
+  verdicts!: object;
+  @ApiPropertyOptional({ type: String }) summary?: string | null;
+  @ApiPropertyOptional({ type: Object }) metadata?: object | null;
+  @ApiPropertyOptional({
+    enum: EvaluationResultReviewStatus,
+    description: "Supervisor verdict on the archived conclusion (ADR-031)",
+  })
+  reviewStatus?: EvaluationResultReviewStatus | null;
+  @ApiPropertyOptional({ type: String, description: "Host actor reference who recorded the review" })
+  reviewedByRef?: string | null;
+  @ApiPropertyOptional({ type: Date }) reviewedAt?: Date | null;
+  @ApiPropertyOptional({ type: String, description: "Reviewer's note; cleared when a re-review omits it" })
+  reviewNote?: string | null;
+  @ApiProperty() createdAt!: Date;
 }
 
 export class ListEvaluationRemediationPlansResponseDto extends CommonListResponseDto<EvaluationRemediationPlanResponseDto> {}
