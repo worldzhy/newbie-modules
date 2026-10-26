@@ -36,4 +36,6 @@
 - [x] 4.1 切片 2：CLOUD_CONFIG 判定器 + CIS 规则目录收敛 + 宿主 compliance 读模型。按 ADR-027 与 slice-2-cloud-config.md 交付：registry `0a265a2`、backend `d3caf8c`；E2E 真实 AWS 账号 run SUCCEEDED，134 facts、skipped=0、145 findings（`aws:cis-<control>:<resource>`），报告接口六轴齐；过程中发现 bucket 串行采集超时缺陷并以有界并发修复（宿主层）
 - [ ] 4.2 切片 3：knowledge/ 采集 + INTEL 判定器（ADR-018 护栏原样保留）
 - [ ] 4.3 切片 4：多轴报告（合规 / 情报 / 趋势 / MTTR）+ 整改绑定 + 通知模板
-- [ ] 4.4 切换与旧模块处置：由用户单独决策，不在本 spec 范围
+- [ ] 4.4 切换与旧模块处置：由用户单独决策，不在本 spec 范围。当前决策见 ADR-036（D1-B 并轨、等价闸门三项）；旧模块删除单独立项
+- [ ] 4.5 骨架 run 生命周期事件：按 ADR-032 在骨架声明 `evaluation.run-succeeded` / `evaluation.run-failed`，runner 终态落库后唯一发射，宿主按 ADR-028 决定激活
+- [ ] 4.6 切片 2.6：非 CIS 自定义规则族 `aws-custom`（10 条）+ 采集契约扩展（3 个新 factType + 2 个 payload 扩展），按 ADR-033 交付；合规轴按 family 过滤
