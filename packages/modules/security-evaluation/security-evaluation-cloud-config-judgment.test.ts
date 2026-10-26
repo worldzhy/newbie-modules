@@ -59,9 +59,17 @@ const ROOT_WITH_KEYS = {
   activeAccessKeyCount: 1,
 };
 
+/** A compliant account password policy so cis-1-15 does not fire in isolated tests. */
+const COMPLIANT_PASSWORD_POLICY = evidenceItem("aws.iam.account-password-policy", "account-password-policy", {
+  exists: true,
+  minimumPasswordLength: 14,
+  maxPasswordAgeDays: 90,
+  expirePasswords: true,
+});
+
 test("a failing control produces a version-free fingerprint keyed by the resource", async () => {
   const judgment = await new SecurityEvaluationCloudConfigJudgment().judge(
-    inputFor([evidenceItem("aws.iam.root-credential", "root", ROOT_WITH_KEYS)]),
+    inputFor([COMPLIANT_PASSWORD_POLICY, evidenceItem("aws.iam.root-credential", "root", ROOT_WITH_KEYS)]),
   );
   assert.equal(judgment.findings.length, 1);
   const finding = judgment.findings[0];
@@ -80,7 +88,7 @@ test("severity is read from the criterion metadata, not hard-coded in the judgme
       : criterion,
   );
   const judgment = await new SecurityEvaluationCloudConfigJudgment().judge(
-    inputFor([evidenceItem("aws.iam.root-credential", "root", ROOT_WITH_KEYS)], criteria),
+    inputFor([COMPLIANT_PASSWORD_POLICY, evidenceItem("aws.iam.root-credential", "root", ROOT_WITH_KEYS)], criteria),
   );
   assert.equal(judgment.findings[0]?.severity, "LOW");
   // Urgency follows the overridden severity: LOW + internal exposure = P4.
