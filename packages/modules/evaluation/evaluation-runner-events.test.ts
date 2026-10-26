@@ -6,6 +6,7 @@ import type { EvaluationRun } from "@generated/prisma/client";
 import { EvaluationRunnerService } from "./evaluation-runner.service";
 import { formatRunError } from "./evaluation-run.service";
 import { EVALUATION_RUN_FAILED_EVENT, EVALUATION_RUN_SUCCEEDED_EVENT } from "./evaluation.events";
+import type { EvaluationRunFinishedEvent } from "./ports/observer.port";
 
 /**
  * Behavior-level test for the skeleton's run lifecycle events (ADR-032): the
@@ -51,11 +52,16 @@ interface BuildOptions {
   collect?: () => Promise<EvidenceCollectionStub>;
   subjectLookupFails?: boolean;
   emit?: () => void;
+  /** When set, markFailed conflicts as if the reaper already failed the row. */
+  reapedError?: string;
+  /** When set, the run row cannot be read back after the markFailed conflict. */
+  rowLookupFails?: boolean;
 }
 
 function buildRunner(options: BuildOptions = {}) {
   const terminal: TerminalRow[] = [];
   const emitted: { key: string; payload: Record<string, unknown> }[] = [];
+  const observed: EvaluationRunFinishedEvent[] = [];
 
   const running = {
     id: "run-1",
@@ -81,7 +87,11 @@ function buildRunner(options: BuildOptions = {}) {
     getJudgmentPort: () => ({
       judge: async () => ({ verdicts: [], findings: [], evaluatedRefs: [EVIDENCE_ID] }),
     }),
-    getObserver: () => null,
+    getObserver: () => ({
+      onRunFinished: async (event: EvaluationRunFinishedEvent) => {
+        observed.push(event);
+      },
+    }),
   };
 
   const subjects = {
@@ -103,7 +113,14 @@ function buildRunner(options: BuildOptions = {}) {
       terminal.push({ status: "SUCCEEDED" });
     },
     markFailed: async (_id: string, error: unknown) => {
+      if (options.reapedError !== undefined) {
+        throw new Error("Evaluation run run-1 cannot be marked failed: it is already FAILED (reaped as stale)");
+      }
       terminal.push({ status: "FAILED", error: formatRunError(error) });
+    },
+    findById: async () => {
+      if (options.rowLookupFails) throw new Error("Evaluation run run-1 not found");
+      return { ...running, status: "FAILED", error: options.reapedError ?? null };
     },
   };
 
@@ -135,7 +152,7 @@ function buildRunner(options: BuildOptions = {}) {
     { heartbeatIntervalMs: 60_000 },
   );
 
-  return { runner, running, terminal, emitted };
+  return { runner, running, terminal, emitted, observed };
 }
 
 const EXPECTED_IDENTITY = {
@@ -226,4 +243,40 @@ test("a run that fails before its identity is resolved is still failed, with no 
   assert.equal(terminal.length, 1);
   assert.equal(terminal[0].status, "FAILED");
   assert.equal(emitted.length, 0);
+});
+
+test("when the row was failed underneath, the event and the observer carry the row's error", async () => {
+  const reapedError = "Run expired as stale after 1800000ms without a heartbeat";
+  const { runner, running, terminal, emitted, observed } = buildRunner({
+    collect: async () => {
+      throw new Error("collector exploded");
+    },
+    reapedError,
+  });
+
+  await assert.rejects(() => runner.execute(running), /collector exploded/);
+
+  assert.equal(terminal.length, 0);
+  assert.equal(emitted.length, 1);
+  assert.equal(emitted[0].key, EVALUATION_RUN_FAILED_EVENT);
+  assert.deepEqual(emitted[0].payload, { ...EXPECTED_IDENTITY, status: "FAILED", error: reapedError });
+  assert.equal(observed.length, 1);
+  assert.equal(observed[0].error, reapedError);
+});
+
+test("when the row cannot be read back, the event falls back to the execution's own error", async () => {
+  const failure = new Error("collector exploded");
+  const { runner, running, terminal, emitted } = buildRunner({
+    collect: async () => {
+      throw failure;
+    },
+    reapedError: "stale",
+    rowLookupFails: true,
+  });
+
+  await assert.rejects(() => runner.execute(running), /collector exploded/);
+
+  assert.equal(terminal.length, 0);
+  assert.equal(emitted.length, 1);
+  assert.deepEqual(emitted[0].payload, { ...EXPECTED_IDENTITY, status: "FAILED", error: formatRunError(failure) });
 });

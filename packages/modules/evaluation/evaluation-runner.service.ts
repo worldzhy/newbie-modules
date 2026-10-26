@@ -169,21 +169,37 @@ export class EvaluationRunnerService {
         resolvedFindingCount,
       };
     } catch (error) {
-      // The row may already be terminal (reaped as stale underneath us):
-      // failing it again conflicts, and that secondary failure must not mask
-      // the original error.
-      await this.runs.markFailed(running.id, error).catch(() => undefined);
-      await this.publishRunTerminal(running, identity, { status: "FAILED", error: formatRunError(error) });
+      const persistedError = await this.persistFailure(running.id, error);
+      await this.publishRunTerminal(running, identity, { status: "FAILED", error: persistedError });
       await this.notifyRunFinished({
         runId: running.id,
         subjectId: running.subjectId,
         criteriaVersionId: running.criteriaVersionId,
         status: "FAILED",
-        error: describe(error),
+        error: persistedError,
       });
       throw error;
     } finally {
       clearInterval(heartbeat);
+    }
+  }
+
+  /**
+   * Fail the run and return the failure text every channel must report
+   * (ADR-032 D5): what the row actually persists. When the terminal write
+   * conflicts — the stale-run reaper already closed the row with its own
+   * reason — the row's text wins, so the event, the observer and the stored
+   * state can never drift apart. The original error is the fallback only when
+   * the row itself is unreadable; either way the caller rethrows it, and this
+   * secondary path never masks it.
+   */
+  private async persistFailure(id: string, error: unknown): Promise<string> {
+    try {
+      await this.runs.markFailed(id, error);
+      return formatRunError(error);
+    } catch {
+      const run = await this.runs.findById(id).catch(() => null);
+      return run?.error ?? formatRunError(error);
     }
   }
 
