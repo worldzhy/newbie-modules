@@ -39,6 +39,14 @@ export const DEFAULT_EVALUATION_RUN_OPTIONS: Required<EvaluationRunOptions> = {
 /** Failure text is stored for the caller, not for a bug report: cap it. */
 const MAX_ERROR_LENGTH = 1000;
 
+/**
+ * The single failure text the run row and the `evaluation.run-failed` event
+ * share (ADR-032 D5): one source, one truncation, so the two can never drift.
+ */
+export function formatRunError(error: unknown): string {
+  return describeError(error).slice(0, MAX_ERROR_LENGTH);
+}
+
 const ACTIVE_STATUSES: EvaluationRunStatus[] = [EvaluationRunStatus.QUEUED, EvaluationRunStatus.RUNNING];
 
 export interface StartEvaluationRunInput {
@@ -144,7 +152,7 @@ export class EvaluationRunService {
       where: { id, status: { in: ACTIVE_STATUSES } },
       data: {
         status: EvaluationRunStatus.FAILED,
-        error: describeError(error).slice(0, MAX_ERROR_LENGTH),
+        error: formatRunError(error),
         finishedAt: new Date(),
       },
     });

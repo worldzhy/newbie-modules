@@ -6,8 +6,10 @@
     "className": "EvaluationModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
+  "moduleDependencies": ["security", "event-emitter"],
   "config-service": {},
   "env": {},
-  "dependencies": {}
+  "dependencies": {
+    "@nestjs/event-emitter": "latest"
+  }
 }

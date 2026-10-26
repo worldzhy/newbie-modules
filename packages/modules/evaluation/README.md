@@ -162,6 +162,27 @@ between leaves a run the reaper eventually fails while its result row already
 exists. A FAILED run with a result is a possible, self-consistent state and
 readers must tolerate it.
 
+## Run lifecycle events
+
+The skeleton declares two events, and only the runner emits them — after the
+terminal row is written (ADR-032):
+
+| Event                      | Fired when                                            |
+| -------------------------- | ----------------------------------------------------- |
+| `evaluation.run-succeeded` | the run is SUCCEEDED and its result is archived       |
+| `evaluation.run-failed`    | the run is FAILED and its failure reason is persisted |
+
+The payload carries identity and terminal state only — `runId`, `subjectId`,
+`subjectKind`, `criteriaVersionId`, `family`, `status` and, on failure, `error`
+with the same text and truncation as the run row. Findings and coverage are
+deliberately absent: they are mutable read models, so a consumer queries the
+existing endpoints by `runId` / `subjectId` when it needs detail.
+
+Features must not emit these events themselves — one run has one event source.
+The declarations live in `evaluation.events.ts`; activating them in the event
+catalog is the host's decision (ADR-028). A publish failure is logged and
+swallowed; it never changes the run's terminal state.
+
 ## Evidence payloads
 
 `EvaluationEvidenceItem.payload` is for small intrinsic values only — a version

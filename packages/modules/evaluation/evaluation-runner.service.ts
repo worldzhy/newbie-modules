@@ -1,7 +1,15 @@
 import { BadRequestException, Inject, Injectable, Logger, Optional } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import type { EvaluationRun } from "@generated/prisma/client";
 
 import { EvaluationCriteriaService } from "./evaluation-criteria.service";
+import {
+  EVALUATION_RUN_FAILED_EVENT,
+  EVALUATION_RUN_SUCCEEDED_EVENT,
+  EvaluationRunEventIdentity,
+  EvaluationRunFailedEvent,
+  EvaluationRunSucceededEvent,
+} from "./evaluation.events";
 import { EvaluationFindingService } from "./evaluation-finding.service";
 import { EvaluationProviderRegistry } from "./evaluation-provider.registry";
 import { EvaluationResultService } from "./evaluation-result.service";
@@ -10,6 +18,7 @@ import {
   EvaluationRunOptions,
   EvaluationRunService,
   evaluationRunOptionsToken,
+  formatRunError,
   StartEvaluationRunInput,
 } from "./evaluation-run.service";
 import { EvaluationSubjectService, toSubjectRef } from "./evaluation-subject.service";
@@ -49,6 +58,7 @@ export class EvaluationRunnerService {
     private readonly runs: EvaluationRunService,
     private readonly results: EvaluationResultService,
     private readonly findings: EvaluationFindingService,
+    private readonly events: EventEmitter2,
     @Optional()
     @Inject(evaluationRunOptionsToken)
     private readonly options: EvaluationRunOptions = {},
@@ -76,6 +86,7 @@ export class EvaluationRunnerService {
   /** Execute an already-open run. Errors are the execution's own, never admission's. */
   async execute(running: EvaluationRun): Promise<EvaluationRunOutcome> {
     const startedAt = running.startedAt;
+    let identity: EvaluationRunEventIdentity | undefined;
 
     const heartbeat = setInterval(() => {
       this.runs.touch(running.id).catch((error: unknown) => {
@@ -92,6 +103,13 @@ export class EvaluationRunnerService {
         kind: version.kind,
         family: version.family,
         version: version.version,
+      };
+      identity = {
+        runId: running.id,
+        subjectId: running.subjectId,
+        subjectKind: subject.kind,
+        criteriaVersionId: running.criteriaVersionId,
+        family: version.family,
       };
 
       const runConfig = (running.config as Record<string, unknown> | null) ?? null;
@@ -137,6 +155,7 @@ export class EvaluationRunnerService {
 
       await this.runs.assertActive(running.id, startedAt);
       await this.runs.markSucceeded(running.id);
+      await this.publishRunTerminal(running, identity, { status: "SUCCEEDED" });
       await this.notifyRunFinished({
         runId: running.id,
         subjectId: running.subjectId,
@@ -154,6 +173,7 @@ export class EvaluationRunnerService {
       // failing it again conflicts, and that secondary failure must not mask
       // the original error.
       await this.runs.markFailed(running.id, error).catch(() => undefined);
+      await this.publishRunTerminal(running, identity, { status: "FAILED", error: formatRunError(error) });
       await this.notifyRunFinished({
         runId: running.id,
         subjectId: running.subjectId,
@@ -176,6 +196,54 @@ export class EvaluationRunnerService {
     } catch (error) {
       this.logger.warn(`EvaluationObserver.onRunFinished failed for run ${event.runId}: ${describe(error)}`);
     }
+  }
+
+  /**
+   * Publish the run's terminal event (ADR-032). This is the only emit site of
+   * `evaluation.run-*`; features must not emit their own. The row is already
+   * terminal when this runs, and a publish failure is logged, never promoted —
+   * an event channel problem must not change what the run concluded.
+   */
+  private async publishRunTerminal(
+    running: EvaluationRun,
+    identity: EvaluationRunEventIdentity | undefined,
+    outcome: { status: "SUCCEEDED" } | { status: "FAILED"; error: string },
+  ): Promise<void> {
+    try {
+      const resolved = identity ?? (await this.resolveRunIdentity(running));
+      if (outcome.status === "FAILED") {
+        this.events.emit(EVALUATION_RUN_FAILED_EVENT, {
+          ...resolved,
+          status: "FAILED",
+          error: outcome.error,
+        } satisfies EvaluationRunFailedEvent);
+        return;
+      }
+      this.events.emit(EVALUATION_RUN_SUCCEEDED_EVENT, {
+        ...resolved,
+        status: "SUCCEEDED",
+      } satisfies EvaluationRunSucceededEvent);
+    } catch (error) {
+      this.logger.warn(`Terminal event for evaluation run ${running.id} could not be published: ${describe(error)}`);
+    }
+  }
+
+  /**
+   * Best-effort identity for a run that failed before subject and version were
+   * read. Both rows were verified at admission and the run row references them,
+   * so this only fails in a pathological deleted-row state — in which case the
+   * failure is logged and the event skipped, never emitted with blanks.
+   */
+  private async resolveRunIdentity(running: EvaluationRun): Promise<EvaluationRunEventIdentity> {
+    const subject = await this.subjects.getSubject(running.subjectId);
+    const version = await this.criteria.getVersion(running.criteriaVersionId);
+    return {
+      runId: running.id,
+      subjectId: running.subjectId,
+      subjectKind: subject.kind,
+      criteriaVersionId: running.criteriaVersionId,
+      family: version.family,
+    };
   }
 }
 
