@@ -1,8 +1,7 @@
-import { Inject, Injectable, Logger, NotFoundException, OnModuleInit, Optional } from "@nestjs/common";
+import { Inject, Injectable, Logger, NotFoundException, Optional } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { EventCatalogService } from "@modules/event-emitter/event-catalog.service";
 import { ThreatIntelligenceService } from "../threat-intelligence.service";
 import { ThreatIntelligenceSeverity } from "../threat-intelligence.constants";
 import {
@@ -13,10 +12,13 @@ import {
 import { ThreatIntelligenceReRanker } from "./threat-intelligence-re-ranker";
 import {
   THREAT_INTELLIGENCE_MATCH_CONFIDENCE,
-  THREAT_INTELLIGENCE_MATCH_CREATED_EVENT,
   THREAT_INTELLIGENCE_MATCH_STATUS,
   THREAT_INTELLIGENCE_MATCH_TYPE,
 } from "./threat-intelligence-match.constants";
+import {
+  THREAT_INTELLIGENCE_MATCH_CREATED_EVENT,
+  type ThreatIntelligenceMatchCreatedEvent,
+} from "../threat-intelligence.events";
 import { ListThreatIntelligenceMatchesQuery } from "./threat-intelligence-match.dto";
 
 const SEVERITY_RANK: Record<ThreatIntelligenceSeverity, number> = {
@@ -94,7 +96,7 @@ function entityAppearsIn(haystack: string, entity: string): boolean {
  * concern.
  */
 @Injectable()
-export class ThreatIntelligenceMatchService implements OnModuleInit {
+export class ThreatIntelligenceMatchService {
   private readonly logger = new Logger(ThreatIntelligenceMatchService.name);
 
   constructor(
@@ -105,23 +107,7 @@ export class ThreatIntelligenceMatchService implements OnModuleInit {
     private readonly scopeEntitiesProvider: ScopeEntitiesProvider | undefined,
     private readonly reRanker: ThreatIntelligenceReRanker,
     private readonly eventEmitter: EventEmitter2,
-    private readonly eventCatalog: EventCatalogService,
   ) {}
-
-  onModuleInit() {
-    this.eventCatalog.declareEvent({
-      key: THREAT_INTELLIGENCE_MATCH_CREATED_EVENT,
-      name: "Threat intelligence match created",
-      description: "Emitted only for a genuinely newly created match; re-evaluating an existing match stays silent.",
-      payloadExample: {
-        matchId: "ckv1a2b3c4d5e6f7g8h9i0j1",
-        scopeType: "repository",
-        scopeId: "ckv1a2b3c4d5e6f7g8h9i0j2",
-        itemId: "ckv1a2b3c4d5e6f7g8h9i0j3",
-        confidence: "high",
-      },
-    });
-  }
 
   /**
    * Full pipeline: collect from all sources, then match recent items
@@ -348,7 +334,7 @@ export class ThreatIntelligenceMatchService implements OnModuleInit {
         scopeId: data.scopeId,
         itemId: data.itemId,
         confidence: data.confidence,
-      });
+      } satisfies ThreatIntelligenceMatchCreatedEvent);
     }
     return created;
   }

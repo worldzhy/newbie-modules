@@ -123,7 +123,6 @@ function createHarness(targetOverrides: Partial<FakeTargetRow> = {}, seedInciden
     prisma as unknown as PrismaService,
     clickhouse as unknown as ClickHouseService,
     emitter as unknown as EventEmitter2,
-    { declareEvent: () => undefined } as never,
   );
 
   return {

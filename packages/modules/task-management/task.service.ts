@@ -1,29 +1,12 @@
-import { ConflictException, Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Prisma } from "@generated/prisma/client";
 import { TaskStatus } from "@generated/prisma/enums";
-import { EventCatalogService } from "@modules/event-emitter/event-catalog.service";
 import { CreateTaskItemDto, UpdateTaskRequestDto } from "./task.dto";
+import { TASK_STATUS_CHANGED_EVENT, type TaskStatusChangedEvent } from "./task-management.events";
 
 export { TaskStatus };
-
-/**
- * Emitted after a task's status actually transitions (a validated move between
- * two distinct states). Same-status updates and non-status edits do not emit.
- * The module deliberately knows nothing about projects or notifications — the
- * host application resolves the space and routes alerts.
- */
-export const TASK_STATUS_CHANGED_EVENT = "task-management.status-changed";
-
-export interface TaskStatusChangedEvent {
-  taskId: string;
-  title: string;
-  spaceId: string;
-  previousStatus: TaskStatus;
-  status: TaskStatus;
-  operatorName?: string;
-}
 
 export interface Operator {
   participantId?: string;
@@ -71,31 +54,13 @@ const TASK_STATUS_TRANSITIONS: Readonly<Record<TaskStatus, ReadonlySet<TaskStatu
 };
 
 @Injectable()
-export class TaskService implements OnModuleInit {
+export class TaskService {
   private readonly logger = new Logger(TaskService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly eventCatalog: EventCatalogService,
   ) {}
-
-  onModuleInit() {
-    this.eventCatalog.declareEvent({
-      key: TASK_STATUS_CHANGED_EVENT,
-      name: "Task status changed",
-      description:
-        "Emitted after a task's status actually transitions (a validated move between two distinct states). Same-status updates and non-status edits do not emit.",
-      payloadExample: {
-        taskId: "ckv1a2b3c4d5e6f7g8h9i0j1",
-        title: "Ship the milestone",
-        spaceId: "ckv1a2b3c4d5e6f7g8h9i0j2",
-        previousStatus: "PENDING",
-        status: "DEVELOPING",
-        operatorName: "worldzhy",
-      } satisfies TaskStatusChangedEvent,
-    });
-  }
 
   async createTask(data: CreateTaskInput) {
     return await this.prisma.task.create({

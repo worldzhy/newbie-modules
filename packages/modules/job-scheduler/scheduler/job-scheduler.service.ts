@@ -11,32 +11,15 @@ import { CronJob } from "cron";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { EventCatalogService } from "@modules/event-emitter/event-catalog.service";
 import { JobHandlerRegistryService, JobHandler } from "./handler-registry.service";
+import { JOB_RUN_FAILED_EVENT, type JobRunFailedEvent } from "../job-scheduler.events";
 
 const RECONCILE_INTERVAL_MS = 30_000;
 const CRON_JOB_NAME_PREFIX = "job-scheduler:";
 export const DEFAULT_TIMEZONE = "Asia/Shanghai";
 const PG_UNIQUE_VIOLATION = "P2002";
 
-/// Emitted after a job run is persisted with status "failed". The scheduler
-/// stays decoupled from notification-center; application-layer listeners turn
-/// this event into notifications.
-export const JOB_RUN_FAILED_EVENT = "job-scheduler.run-failed";
-
 export type JobTrigger = "schedule" | "manual";
-
-export interface JobRunFailedEvent {
-  runId: number;
-  scheduleId: number;
-  scheduleKey: string;
-  handlerKey: string;
-  trigger: JobTrigger;
-  startedAt: string;
-  finishedAt: string;
-  durationMs: number;
-  error: string;
-}
 
 export interface JobScheduleDeclaration {
   key: string;
@@ -74,26 +57,9 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly jobHandlerRegistry: JobHandlerRegistryService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly eventCatalog: EventCatalogService,
   ) {}
 
   async onModuleInit() {
-    this.eventCatalog.declareEvent({
-      key: JOB_RUN_FAILED_EVENT,
-      name: "Job run failed",
-      description: "Emitted after a scheduled or manual job run is persisted with status failed.",
-      payloadExample: {
-        runId: 42,
-        scheduleId: 7,
-        scheduleKey: "dependency-scan.daily",
-        handlerKey: "dependency-scan.run",
-        trigger: "schedule",
-        startedAt: "2026-01-01T00:00:00.000Z",
-        finishedAt: "2026-01-01T00:00:05.000Z",
-        durationMs: 5000,
-        error: "connect ETIMEDOUT 10.0.0.1:443",
-      } satisfies JobRunFailedEvent,
-    });
     await this.reconcile();
     this.reconcileTimer = setInterval(() => {
       this.reconcile().catch((error) => {

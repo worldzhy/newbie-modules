@@ -30,6 +30,3 @@ export const THREAT_INTELLIGENCE_MATCH_CONFIDENCE = {
 
 export type ThreatIntelligenceMatchConfidence =
   (typeof THREAT_INTELLIGENCE_MATCH_CONFIDENCE)[keyof typeof THREAT_INTELLIGENCE_MATCH_CONFIDENCE];
-
-/** Emitted only for a genuinely newly created match; re-evaluations stay silent. */
-export const THREAT_INTELLIGENCE_MATCH_CREATED_EVENT = "threat-intelligence.match-created";

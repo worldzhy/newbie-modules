@@ -4,7 +4,6 @@ import { CronJob } from "cron";
 import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { RedisService } from "@modules/redis/redis.service";
-import { EventCatalogService } from "@modules/event-emitter/event-catalog.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
 import { func } from "../../shared/utils";
@@ -37,7 +36,6 @@ export class JobsService implements OnModuleInit {
     private readonly models: WebMonitorModelsService,
     private readonly clickhouse: WebMonitorClickHouseService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly eventCatalog: EventCatalogService,
   ) {
     this.cfg = this.configService.get("modules.web-monitor") || {};
   }
@@ -47,25 +45,6 @@ export class JobsService implements OnModuleInit {
   // This module only keeps the high-frequency report-queue consumer loop,
   // which intentionally stays a plain CronJob outside job-scheduler.
   async onModuleInit() {
-    this.eventCatalog.declareEvent({
-      key: WEB_THRESHOLD_ALERT_EVENT,
-      name: "Web monitor threshold alert",
-      description:
-        "Emitted when a monitored system breaches a performance or error threshold in the evaluation window.",
-      payloadExample: {
-        appId: "nightwatch-web",
-        systemName: "Nightwatch Web",
-        projectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
-        signal: "slow-page",
-        severity: "high",
-        count: 12,
-        affectedUsers: 8,
-        thresholdMs: 3000,
-        windowMs: 60000,
-        windowStartedAt: "2026-01-01T00:00:00.000Z",
-        topItems: ["/dashboard — 4200ms avg, 12 occurrence(s)"],
-      } satisfies WebThresholdAlertEvent,
-    });
     this.registerReportStoreTask();
   }
 

@@ -1,15 +1,12 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { EventDeclaration } from "./event-definition";
 
-/// Business modules declare the events they emit at startup. The catalog is
-/// the baseline of "which events should exist"; the EventEmission log records
+export type { EventDeclaration } from "./event-definition";
+
+/// The host activates event declarations at startup, choosing which of the
+/// module-owned contracts (ADR-028) it wants on the bus. The catalog is the
+/// baseline of "which events should exist"; the EventEmission log records
 /// what actually fired, including emissions nobody declared.
-export interface EventDeclaration {
-  key: string;
-  name?: string;
-  description?: string;
-  payloadExample?: unknown;
-}
-
 @Injectable()
 export class EventCatalogService {
   private readonly logger = new Logger(EventCatalogService.name);
