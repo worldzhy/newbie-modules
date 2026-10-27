@@ -169,18 +169,13 @@ export class AuthService {
       fallback: email.split("@")[0],
     });
 
-    // Create user with the default USER role.
+    // Create user. Default role assignment is a host concern (see ADR-040).
     const user = await this.prisma.user.create({
       data: {
         ...data,
         email,
         emails: { create: { email } },
         uiAvatarsUrl,
-        roles: {
-          create: {
-            role: { connectOrCreate: { where: { name: "USER" }, create: { name: "USER", isBuiltin: true } } },
-          },
-        },
       },
       include: { emails: { select: { id: true } } },
     });
@@ -336,11 +331,6 @@ export class AuthService {
           name: params.displayName || null,
           uiAvatarsUrl,
           emails: { create: { email, isVerified: true } },
-          roles: {
-            create: {
-              role: { connectOrCreate: { where: { name: "USER" }, create: { name: "USER", isBuiltin: true } } },
-            },
-          },
         },
       });
       // Approving the current subnet lets the location check inside login()

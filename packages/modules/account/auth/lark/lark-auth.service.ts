@@ -206,11 +206,6 @@ export class LarkAuthService {
           email: email || undefined,
           phone: phone || undefined,
           emails: email ? { create: { email, isVerified: true } } : undefined,
-          roles: {
-            create: {
-              role: { connectOrCreate: { where: { name: "USER" }, create: { name: "USER", isBuiltin: true } } },
-            },
-          },
         },
       });
       // Approve the current subnet so a first-time Lark login is not blocked by
