@@ -56,6 +56,8 @@ interface BuildOptions {
   reapedError?: string;
   /** When set, the run row cannot be read back after the markFailed conflict. */
   rowLookupFails?: boolean;
+  /** When set, assertActive throws — the runner must stop writing on a dead run. */
+  assertActiveFailure?: { kind: "stale" | "restarted" };
 }
 
 function buildRunner(options: BuildOptions = {}) {
@@ -108,7 +110,14 @@ function buildRunner(options: BuildOptions = {}) {
 
   const runs = {
     touch: async () => undefined,
-    assertActive: async () => undefined,
+    assertActive: async () => {
+      if (options.assertActiveFailure?.kind === "stale") {
+        throw new Error("Evaluation run run-1 is no longer active (status FAILED) — superseded or reaped as stale");
+      }
+      if (options.assertActiveFailure?.kind === "restarted") {
+        throw new Error("Evaluation run run-1 was restarted while this execution was in flight");
+      }
+    },
     markSucceeded: async () => {
       terminal.push({ status: "SUCCEEDED" });
     },
@@ -279,4 +288,40 @@ test("when the row cannot be read back, the event falls back to the execution's 
   assert.equal(terminal.length, 0);
   assert.equal(emitted.length, 1);
   assert.deepEqual(emitted[0].payload, { ...EXPECTED_IDENTITY, status: "FAILED", error: formatRunError(failure) });
+});
+
+// --- assertActive fencing (ADR-032) ---------------------------------------
+
+test("assertActive stops a run that was reaped mid-execution; the reap's error is what every channel carries", async () => {
+  const reapError = "Run abandoned: no progress within the timeout window (process restart?)";
+  const { runner, running, terminal, emitted, observed } = buildRunner({
+    assertActiveFailure: { kind: "stale" },
+    reapedError: reapError,
+  });
+
+  await assert.rejects(() => runner.execute(running), /is no longer active|stale/);
+
+  assert.equal(terminal.length, 0, "the reap already closed the row; markFailed must not double-write");
+  assert.equal(emitted.length, 1);
+  assert.equal(emitted[0].key, EVALUATION_RUN_FAILED_EVENT);
+  assert.deepEqual(emitted[0].payload, { ...EXPECTED_IDENTITY, status: "FAILED", error: reapError });
+  assert.equal(observed.length, 1);
+  assert.equal(observed[0].error, reapError);
+});
+
+test("assertActive stops a run that was restarted mid-flight; the restart's fencing error becomes the failure", async () => {
+  const { runner, running, terminal, emitted, observed } = buildRunner({
+    assertActiveFailure: { kind: "restarted" },
+  });
+
+  await assert.rejects(() => runner.execute(running), /restarted while this execution was in flight/);
+
+  assert.equal(terminal.length, 1);
+  assert.equal(terminal[0].status, "FAILED");
+  assert.match(terminal[0].error ?? "", /restarted while this execution was in flight/);
+  assert.equal(emitted.length, 1);
+  assert.equal(emitted[0].key, EVALUATION_RUN_FAILED_EVENT);
+  assert.deepEqual(emitted[0].payload, { ...EXPECTED_IDENTITY, status: "FAILED", error: terminal[0].error });
+  assert.equal(observed.length, 1);
+  assert.equal(observed[0].error, terminal[0].error);
 });

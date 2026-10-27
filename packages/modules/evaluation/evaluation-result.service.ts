@@ -43,6 +43,8 @@ export interface CreateEvaluationResultInput {
 export interface ListEvaluationResultsInput {
   subjectId: string;
   criteriaVersionId?: string;
+  /** When present, only results whose subject matches this kind are returned. */
+  kind?: string;
   page?: number;
   pageSize?: number;
 }
@@ -111,9 +113,15 @@ export class EvaluationResultService {
     }
   }
 
-  async getResult(id: string) {
-    const result = await this.prisma.evaluationResult.findUnique({ where: { id }, select: RESULT_SELECT });
+  async getResult(id: string, kind?: string) {
+    const result = await this.prisma.evaluationResult.findUnique({
+      where: { id },
+      select: { ...RESULT_SELECT, subject: { select: { kind: true } } },
+    });
     if (!result) throw new NotFoundException(`Evaluation result ${id} not found`);
+    if (kind && result.subject.kind !== kind) {
+      throw new NotFoundException(`Evaluation result ${id} not found for kind "${kind}"`);
+    }
     return result;
   }
 
@@ -127,9 +135,15 @@ export class EvaluationResultService {
     return result;
   }
 
-  async getResultForRun(runId: string) {
-    const result = await this.prisma.evaluationResult.findUnique({ where: { runId }, select: RESULT_SELECT });
+  async getResultForRun(runId: string, kind?: string) {
+    const result = await this.prisma.evaluationResult.findUnique({
+      where: { runId },
+      select: { ...RESULT_SELECT, subject: { select: { kind: true } } },
+    });
     if (!result) throw new NotFoundException(`Evaluation run ${runId} has no result`);
+    if (kind && result.subject.kind !== kind) {
+      throw new NotFoundException(`Evaluation run ${runId} has no result for kind "${kind}"`);
+    }
     return result;
   }
 
@@ -141,6 +155,7 @@ export class EvaluationResultService {
         where: {
           subjectId: query.subjectId,
           ...(query.criteriaVersionId ? { criteriaVersionId: query.criteriaVersionId } : {}),
+          ...(query.kind ? { subject: { kind: query.kind } } : {}),
         },
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
         select: RESULT_SELECT,

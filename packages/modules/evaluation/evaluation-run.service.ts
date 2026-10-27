@@ -77,6 +77,8 @@ export interface StartEvaluationRunInput {
 export interface ListEvaluationRunsInput {
   subjectId: string;
   criteriaVersionId?: string;
+  /** When present, only runs whose subject matches this kind are returned. */
+  kind?: string;
   page?: number;
   pageSize?: number;
 }
@@ -212,9 +214,15 @@ export class EvaluationRunService {
     }
   }
 
-  async findById(id: string): Promise<EvaluationRun> {
-    const run = await this.prisma.evaluationRun.findUnique({ where: { id } });
+  async findById(id: string, kind?: string): Promise<EvaluationRun> {
+    const run = await this.prisma.evaluationRun.findUnique({
+      where: { id },
+      include: { subject: { select: { kind: true } } },
+    });
     if (!run) throw new NotFoundException(`Evaluation run ${id} not found`);
+    if (kind && run.subject.kind !== kind) {
+      throw new NotFoundException(`Evaluation run ${id} not found for kind "${kind}"`);
+    }
     return run;
   }
 
@@ -226,6 +234,7 @@ export class EvaluationRunService {
         where: {
           subjectId: query.subjectId,
           ...(query.criteriaVersionId ? { criteriaVersionId: query.criteriaVersionId } : {}),
+          ...(query.kind ? { subject: { kind: query.kind } } : {}),
         },
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       },

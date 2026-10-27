@@ -7,18 +7,6 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 
 ## 待办
 
-### #1 读方法缺 kind guard（下一个）
-
-- 问题：`work-evaluation-run.service.ts:99-117` 五个读方法裸透传 skeleton run id，不校验该 run 属于本 feature 的 subject kind；骨架 `listRuns`（`evaluation-run.service.ts:207-219`）同样不校验 kind（对比 `listSubjects:120-122` 有 pin）。
-- 决策点（待拍板）：guard 加在**骨架层**（listRuns/findById 增 kind 参数）还是 **façade 层**（work-evaluation 自己的读方法 pin kind）。
-- 预测（按用户画像：框架通用性优先、不变量内建骨架）：倾向骨架层加约束。
-
-### #6 骨架测试补齐
-
-- 剩 `assertActive` fencing 行为测试（reaped/restarted 两行路径）。
-- 已随 #2 交付：stale reaper 6 个测试（`evaluation-stale-reaper.test.ts`）。
-- 已随 #3 交付：markFailed 冲突路径 2 个测试（row-wins、fallback，`evaluation-runner-events.test.ts`）。
-
 ### #10 REJECTED 强制 note（择机捎带）
 
 - `evaluation-decision.dto.ts:38-41`：decision=REJECTED 时 note 必填；同步 `evaluation-result-review.test.ts`。
@@ -28,6 +16,27 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 - `work-evaluation.controller.ts:235`：现返回 `{accepted:true}`，改为带 `runId` 便于调用方追踪。
 
 ## 已完成
+
+### #6 assertActive fencing 行为测试补齐（2026-10-27 交付）
+
+- 补 `evaluation-runner-events.test.ts` 2 个新用例：**reaped mid-execution**（assertActive 抛 stale Conflict → persistFailure 读回 reap 文本 → event+observer 同字）、**restarted mid-flight**（assertActive 抛 restarted Conflict → markFailed 写 row → event+observer 带 fencing 错误）。
+- 原 8 测试 → 现 10 测试，覆盖 ADR-032 断言 4 次 call 中间任一时刻被 fencing 打断的路径。
+- 提交：registry `(待提交)`，backend `(待提交)`。
+
+### #1 读方法 kind guard（2026-10-27 交付）
+
+- 决策（用户拍板）：B——guard 加在**骨架层**，5 方法增可选 `kind?: string` 参数，façade 层统一传 `WORK_EVALUATION_SUBJECT_KIND`。
+- 骨架层改动：
+  - `EvaluationRunService.findById(id, kind?)`——统一 include subject.kind（Prisma 禁止 select+include 同时用，include 零成本额外字段）
+  - `EvaluationRunService.listRuns({ kind? })`——where 加 `subject: { kind }` nested filter
+  - `EvaluationResultService.getResult(id, kind?)`——select 合并 subject.kind
+  - `EvaluationResultService.getResultForRun(runId, kind?)`——同上
+  - `EvaluationResultService.listResults({ kind? })`——同上
+- 内部调用（runner.open、runner.persistFailure 里的 findById）不传 kind，零额外成本。
+- 行为：传 kind 不匹配 → NotFoundException（语义"这个 kind 下没有这个 id"），而非 ConflictException。
+- façade 层 `WorkEvaluationRunService` 5 个读方法统一 pin `WORK_EVALUATION_SUBJECT_KIND`。
+- 测试：消费仓 96/96 集成测试全绿（原 94 + #6 新 2）。
+- 提交：registry `(待提交)`，backend `(待提交)`。
 
 ### #4 username token 脱敏（2026-10-27 交付）
 

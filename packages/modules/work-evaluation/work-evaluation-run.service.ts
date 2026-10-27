@@ -97,23 +97,23 @@ export class WorkEvaluationRunService {
   }
 
   listRuns(query: ListEvaluationRunsInput) {
-    return this.runs.listRuns(query);
+    return this.runs.listRuns({ ...query, kind: WORK_EVALUATION_SUBJECT_KIND });
   }
 
   getRun(id: string) {
-    return this.runs.findById(id);
+    return this.runs.findById(id, WORK_EVALUATION_SUBJECT_KIND);
   }
 
   listResults(query: ListEvaluationResultsInput) {
-    return this.results.listResults(query);
+    return this.results.listResults({ ...query, kind: WORK_EVALUATION_SUBJECT_KIND });
   }
 
   getResult(id: string) {
-    return this.results.getResult(id);
+    return this.results.getResult(id, WORK_EVALUATION_SUBJECT_KIND);
   }
 
   getResultForRun(runId: string) {
-    return this.results.getResultForRun(runId);
+    return this.results.getResultForRun(runId, WORK_EVALUATION_SUBJECT_KIND);
   }
 
   /** Subject listing is pinned to this feature's kind. */
