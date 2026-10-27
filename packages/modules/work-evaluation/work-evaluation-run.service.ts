@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, HttpException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { WorkEvaluationPeriodStatus, WorkEvaluationPeriodType } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationResultService, ListEvaluationResultsInput } from "@modules/evaluation/evaluation-result.service";
@@ -90,9 +90,15 @@ export class WorkEvaluationRunService {
     // surfacing as an unhandled rejection.
     const run = await this.runner.open(built);
     void this.runner.execute(run).catch((error: unknown) => {
-      this.logger.error(
-        `Evaluation run ${run.id} for subject ${subject.id} failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      // HttpException responses (e.g. skeleton invariant problem lists) hide in
+      // getResponse(); message alone collapses them to "Bad Request Exception".
+      const detail =
+        error instanceof HttpException
+          ? JSON.stringify(error.getResponse())
+          : error instanceof Error
+            ? error.message
+            : String(error);
+      this.logger.error(`Evaluation run ${run.id} for subject ${subject.id} failed: ${detail}`);
     });
     return run.id;
   }
