@@ -13,6 +13,7 @@ import { EvaluationRunService } from "./evaluation-run.service";
  */
 
 const SUBJECT_ID = "11111111-1111-4111-8111-111111111111";
+const SUBJECT_KIND = "repository";
 const VERSION_ID = "33333333-3333-4333-8333-333333333333";
 
 interface FakeRunRow {
@@ -33,7 +34,7 @@ function fakePrisma() {
         where.id === SUBJECT_ID
           ? {
               id: SUBJECT_ID,
-              kind: "repository",
+              kind: SUBJECT_KIND,
               scopeType: "project",
               scopeId: "scope",
               subjectKey: "repo",
@@ -44,7 +45,7 @@ function fakePrisma() {
     evaluationCriteriaVersion: {
       findUnique: async ({ where }: { where: { id: string } }) =>
         where.id === VERSION_ID
-          ? { id: VERSION_ID, kind: "repository", evaluationKey: "dependency-osv", publishedAt: new Date() }
+          ? { id: VERSION_ID, kind: SUBJECT_KIND, evaluationKey: "dependency-osv", publishedAt: new Date() }
           : null,
     },
     evaluationRun: {
@@ -68,7 +69,20 @@ function fakePrisma() {
         runs.push(row);
         return row;
       },
-      findUnique: async ({ where }: { where: { id: string } }) => runs.find((run) => run.id === where.id) ?? null,
+      findUnique: async ({
+        where,
+        include,
+      }: {
+        where: { id: string };
+        include?: { subject: { select: { kind: boolean } } };
+      }) => {
+        const row = runs.find((run) => run.id === where.id) ?? null;
+        if (!row) return null;
+        if (include?.subject?.select?.kind) {
+          return { ...row, subject: { kind: SUBJECT_KIND } };
+        }
+        return row;
+      },
     },
   };
 
@@ -103,4 +117,38 @@ test("a second run for the same subject and version is rejected while the first 
   await service.startRun({ subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID });
   assert.equal(runs.length, 2);
   assert.equal(first.subjectId, SUBJECT_ID);
+});
+
+// --- kind guard ----------------------------------------------------------
+
+test("findById without a kind returns the run regardless of subject kind", async () => {
+  const { prisma } = fakePrisma();
+  const service = serviceFor(prisma);
+
+  await prisma.evaluationRun.create({
+    data: { subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID, status: "RUNNING" },
+  });
+  const found = await service.findById("run-1");
+  assert.equal(found.id, "run-1");
+});
+
+test("findById with a matching kind returns the run", async () => {
+  const { prisma } = fakePrisma();
+  const service = serviceFor(prisma);
+
+  await prisma.evaluationRun.create({
+    data: { subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID, status: "RUNNING" },
+  });
+  const found = await service.findById("run-1", SUBJECT_KIND);
+  assert.equal(found.id, "run-1");
+});
+
+test("findById with a mismatched kind throws NotFoundException — cross-feature read blocked", async () => {
+  const { prisma } = fakePrisma();
+  const service = serviceFor(prisma);
+
+  await prisma.evaluationRun.create({
+    data: { subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID, status: "RUNNING" },
+  });
+  await assert.rejects(() => service.findById("run-1", "people"), /not found for kind "people"/);
 });
