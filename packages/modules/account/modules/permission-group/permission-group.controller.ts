@@ -160,7 +160,7 @@ export class PermissionGroupController {
         detail: {
           action: "permission_group_permission_added",
           permissionGroupId: id,
-          action: body.action,
+          permissionAction: body.action,
           resource: body.resource,
         },
       });
