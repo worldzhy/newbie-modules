@@ -17,6 +17,7 @@ import {
 } from "class-validator";
 import {
   EvaluationCriterionKind,
+  EvaluationResultReviewStatus,
   EvaluationRunStatus,
   WorkEvaluationPeriodStatus,
   WorkEvaluationPeriodType,
@@ -635,6 +636,16 @@ export class WorkEvaluationResultResponseDto {
     description: "Judgment execution facts: model, scope, promptVersion, tokenUsage",
   })
   metadata?: object | null;
+  @ApiPropertyOptional({
+    enum: EvaluationResultReviewStatus,
+    description: "Supervisor verdict on the archived conclusion (ADR-031)",
+  })
+  reviewStatus?: EvaluationResultReviewStatus | null;
+  @ApiPropertyOptional({ type: String, description: "Host actor reference who recorded the review" })
+  reviewedByRef?: string | null;
+  @ApiPropertyOptional({ type: Date }) reviewedAt?: Date | null;
+  @ApiPropertyOptional({ type: String, description: "Reviewer's note; cleared when a re-review omits it" })
+  reviewNote?: string | null;
   @ApiProperty() createdAt!: Date;
 }
 
