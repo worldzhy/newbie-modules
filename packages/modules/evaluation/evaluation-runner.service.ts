@@ -1,4 +1,12 @@
-import { BadRequestException, Inject, Injectable, Logger, Optional } from "@nestjs/common";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import type { EvaluationRun } from "@generated/prisma/client";
 
@@ -19,6 +27,7 @@ import {
   EvaluationRunService,
   evaluationRunOptionsToken,
   formatRunError,
+  STALE_RUN_ERROR,
   StartEvaluationRunInput,
 } from "./evaluation-run.service";
 import { EvaluationSubjectService, toSubjectRef } from "./evaluation-subject.service";
@@ -46,10 +55,17 @@ export interface EvaluationRunOutcome {
  * works, so the stale-run reaper never fails a living run; and a fencing check
  * before every write stops this execution if the row was nevertheless closed
  * or reaped — writing on behalf of a dead run would corrupt the lifecycle.
+ *
+ * The reaper itself is built in (ADR-038): an unref'd interval started at
+ * module init sweeps abandoned active rows globally, fails them and publishes
+ * their terminal events — a run whose process died mid-flight can no longer
+ * sit RUNNING forever, and the notification channels hear about it.
  */
 @Injectable()
-export class EvaluationRunnerService {
+export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EvaluationRunnerService.name);
+  private reaper: NodeJS.Timeout | undefined;
+  private reapInFlight = false;
 
   constructor(
     private readonly providers: EvaluationProviderRegistry,
@@ -63,6 +79,54 @@ export class EvaluationRunnerService {
     @Inject(evaluationRunOptionsToken)
     private readonly options: EvaluationRunOptions = {},
   ) {}
+
+  /**
+   * The skeleton's stale-run reaper (ADR-038): a plain unref'd interval, so the
+   * host assembles nothing and the timer never keeps a process alive.
+   */
+  onModuleInit(): void {
+    const intervalMs = this.options.reapIntervalMs ?? DEFAULT_EVALUATION_RUN_OPTIONS.reapIntervalMs;
+    this.reaper = setInterval(() => {
+      void this.reapStaleRuns();
+    }, intervalMs);
+    this.reaper.unref();
+  }
+
+  onModuleDestroy(): void {
+    if (this.reaper) clearInterval(this.reaper);
+  }
+
+  /**
+   * One stale-run sweep (ADR-038): fail every abandoned active row, then give
+   * each row the same terminal treatment an executed run gets — the
+   * `evaluation.run-failed` event and the observer notification both carry the
+   * error text the row persists. Public so a host can trigger an out-of-band
+   * sweep; the module's own interval calls this too. A failed sweep is logged
+   * and the interval keeps going; a sweep still in flight makes the next tick
+   * a no-op, since reaping is idempotent and overlap buys nothing.
+   */
+  async reapStaleRuns(): Promise<void> {
+    if (this.reapInFlight) return;
+    this.reapInFlight = true;
+    try {
+      const reaped = await this.runs.reapStaleRuns();
+      for (const row of reaped) {
+        const error = row.error ?? STALE_RUN_ERROR;
+        await this.publishRunTerminal(row, undefined, { status: "FAILED", error });
+        await this.notifyRunFinished({
+          runId: row.id,
+          subjectId: row.subjectId,
+          criteriaVersionId: row.criteriaVersionId,
+          status: "FAILED",
+          error,
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`Stale-run sweep failed; the next interval tick retries: ${describe(error)}`);
+    } finally {
+      this.reapInFlight = false;
+    }
+  }
 
   /**
    * Open the run synchronously and return the RUNNING row.

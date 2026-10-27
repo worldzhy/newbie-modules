@@ -99,8 +99,12 @@ sense, and tracking a problem inside a JSON blob makes it untrackable.
    if the row was closed or reaped underneath it. The terminal transitions
    themselves are conditional writes whose matched-row count is checked, so a
    transition that lost the race conflicts instead of reporting a state the
-   row never reached. The reaper timeout and the heartbeat interval are
-   host-tunable via `evaluationRunOptionsToken`.
+   row never reached. The reaper is built in (ADR-038): an unref'd interval
+   started at module init sweeps abandoned active rows globally, fails them
+   with a shared error text and publishes their terminal events — an abandoned
+   run can no longer sit `RUNNING` forever, and admission never double-duties
+   as the sweeper. The reaper timeout, the sweep interval and the heartbeat
+   interval are host-tunable via `evaluationRunOptionsToken`.
 
 5. **Published criteria are read-only.** Version updates are conditional writes
    (`WHERE publishedAt IS NULL`); criterion adds, updates and removals lock the

@@ -29,15 +29,28 @@ export interface EvaluationRunOptions {
   staleRunTimeoutMs?: number;
   /** Ms between runner heartbeats that keep a judging run fresh. Default 60 seconds. */
   heartbeatIntervalMs?: number;
+  /**
+   * Ms between stale-run sweeps (ADR-038). Only affects how quickly an
+   * abandoned row is discovered, never correctness. Default 60 seconds.
+   */
+  reapIntervalMs?: number;
 }
 
 export const DEFAULT_EVALUATION_RUN_OPTIONS: Required<EvaluationRunOptions> = {
   staleRunTimeoutMs: 30 * 60 * 1000,
   heartbeatIntervalMs: 60 * 1000,
+  reapIntervalMs: 60 * 1000,
 };
 
 /** Failure text is stored for the caller, not for a bug report: cap it. */
 const MAX_ERROR_LENGTH = 1000;
+
+/**
+ * The error the stale-run reaper persists on every row it closes (ADR-038).
+ * The reaper writes this same text to the row, the terminal event and the
+ * observer notification, so the channels can never drift (ADR-032 D5).
+ */
+export const STALE_RUN_ERROR = "Run abandoned: no progress within the timeout window (process restart?)";
 
 /**
  * The single failure text the run row and the `evaluation.run-failed` event
@@ -93,7 +106,9 @@ export class EvaluationRunService {
   /**
    * Open a run against a published criteria version. Rejects with 409 when an
    * active run already exists for the same subject and version — that is the
-   * database saying so, not a cached flag.
+   * database saying so, not a cached flag. Stale rows are closed by the
+   * skeleton's interval reaper (ADR-038), never by admission: a dead row may
+   * keep this subject and version 409ing for at most one reap interval.
    */
   async startRun(input: StartEvaluationRunInput): Promise<EvaluationRun> {
     const subject = await this.prisma.evaluationSubject.findUnique({ where: { id: input.subjectId } });
@@ -108,7 +123,6 @@ export class EvaluationRunService {
       );
     }
 
-    await this.expireStaleRuns(input.subjectId, criteriaVersionId);
     try {
       return await this.prisma.evaluationRun.create({
         data: {
@@ -254,21 +268,32 @@ export class EvaluationRunService {
     return version;
   }
 
-  /** Flip abandoned active rows to FAILED so they stop blocking new runs. */
-  private async expireStaleRuns(subjectId: string, criteriaVersionId: string): Promise<void> {
-    await this.prisma.evaluationRun.updateMany({
-      where: {
-        subjectId,
-        criteriaVersionId,
-        status: { in: ACTIVE_STATUSES },
-        updatedAt: { lt: new Date(Date.now() - this.staleRunTimeoutMs) },
-      },
-      data: {
-        status: EvaluationRunStatus.FAILED,
-        error: "Run abandoned: no progress within the timeout window (process restart?)",
-        finishedAt: new Date(),
-      },
+  /**
+   * Global stale-run sweep (ADR-038): fail every active row untouched past the
+   * timeout and return exactly the rows this call closed. Each flip is a
+   * conditional write on the id, the active statuses and the `updatedAt` the
+   * row was selected with — a heartbeat landing in between, or a peer instance
+   * racing the same row, makes the update match nothing. Only the caller that
+   * closed a row reports it, so terminal events fire exactly once even with
+   * several replicas sweeping.
+   */
+  async reapStaleRuns(): Promise<EvaluationRun[]> {
+    const cutoff = new Date(Date.now() - this.staleRunTimeoutMs);
+    const candidates = await this.prisma.evaluationRun.findMany({
+      where: { status: { in: ACTIVE_STATUSES }, updatedAt: { lt: cutoff } },
     });
+    const reaped: EvaluationRun[] = [];
+    for (const candidate of candidates) {
+      const finishedAt = new Date();
+      const updated = await this.prisma.evaluationRun.updateMany({
+        where: { id: candidate.id, status: { in: ACTIVE_STATUSES }, updatedAt: candidate.updatedAt },
+        data: { status: EvaluationRunStatus.FAILED, error: STALE_RUN_ERROR, finishedAt },
+      });
+      if (updated.count === 1) {
+        reaped.push({ ...candidate, status: EvaluationRunStatus.FAILED, error: STALE_RUN_ERROR, finishedAt });
+      }
+    }
+    return reaped;
   }
 }
 
