@@ -8,7 +8,7 @@
 
 ADR-008 确立了 ClickHouse 双轨设计：**静态轨**（部署时刻已确定的基建表，如 backend-monitor 的 request_logs/error_logs、work-evaluation 的 session_messages）由 migration runner 前向迁移管理；**动态轨**（运行期才创建、表名带运行时参数的多租户表）不在 runner 管辖范围内。
 
-web-monitor 是唯一已知走动态轨的模块，其三张目标表按 appId 动态生成（`web_monitor_requests_<appId>`、`web_monitor_errors_<appId>`），加上一张不带 appId 的全局表（`web_monitor_sdk_errors`）。ADR-008 仅一笔带过"动态轨 = createDatabase + createModel"，未记录动态轨的完整契约、触发时机、生命周期约束。本 ADR 补齐这部分设计。
+web-monitor 是唯一已知走动态轨的模块，其三张目标表按 appId 动态生成（`web_monitor_requests_<appId>`、`web_monitor_errors_<appId>`），加上一张不带 appId 的全局表（`web_monitor_sdk_errors`）。ADR-014 已定命名（web_monitor_* 前缀），ADR-015 已定共享库（web-monitor 不得有独立 ClickHouse 库覆盖键）。ADR-008 仅一笔带过"动态轨 = createDatabase + createModel"，未记录动态轨的完整契约、触发时机、生命周期约束。本 ADR 补齐这部分设计，与 ADR-008（双轨框架）、ADR-014（表命名）、ADR-015（共享库）共同构成 web-monitor ClickHouse 设计的完整闭环。
 
 ## 决策
 
