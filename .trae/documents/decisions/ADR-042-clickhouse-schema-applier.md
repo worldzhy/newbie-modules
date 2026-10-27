@@ -1,10 +1,27 @@
 # ADR-042: ClickHouse 静态轨简化为 schema applier（退役 V*.sql 版本化迁移引擎）
 
-状态：已采纳
+状态：**已撤回（Withdrawn，2026-10-27 同日）**
 日期：2026-10-27
 归属注记：本决策治理 newbie-modules 模块 ClickHouse 静态表定义形态与 runner 契约，单一源存放于本仓。
 
-Supersedes: **ADR-008** 的"registry 持有 `clickhouse/migrations/V*.sql` + 版本化前向迁移引擎"决策（退役 migrate-cli/planMigrations/checksum/历史表/discoverMigrations/splitStatements）。保留 ADR-008 的双轨框架概念和 ADR-041 的动态轨（createModel autoCreate/autoSync），不受本决策影响。
+## 撤回理由（2026-10-27 同日撤回）
+
+本文档在采纳后经复核被撤回，理由：
+
+1. **本 ADR 推翻的是已验证的代码，不是设计债**。ADR-008 的 V*.sql 迁移引擎已完成 17/17 单元测试全绿、build clean、dist 验证正确、三仓同步推送。Pre-launch 下每个模块只有 V001__init.sql，该文件**同时是当前 schema 定义和初始迁移历史**，不存在"registry 应只提供最新定义"的语义冲突——单文件即完整真相。
+2. **"pre-launch 和 post-launch 同一条路径"是 illusory 优势**：ADR-008 的 V*.sql 引擎同样是同一条路径（按版本顺序执行，无切换点）。
+3. **本 ADR 引入的真实新增风险大于其解决的问题**：schema.sql 列解析器对 Nested/Map/Tuple 复合类型断裂（本文档自己承认）；DESCRIBE TABLE 返回类型格式与 DDL 不一致可能导致 false diff；需重写已验证的 17/17 测试套件；失去 ClickHouse 侧 `_clickhouse_schema_migrations` 审计轨迹；runner 从"部署时一次性迁移"（ch-migrate one-shot 容器）降级为"backend 进程启动时运行时 ALTER"（部署和业务进程耦合）。
+4. **原始设计债已在同会话全部修复**：work-evaluation 用 schema.sql 而非 V*.sql（已转为 V*.sql）、目录命名不对称（已统一为 clickhouse/migrations/）、git mv 未生效的双真源（已清理）、10-23 baseline 双轨未记录（已加 ADR-008 Errata）。没有遗留问题需要本 ADR 解决。
+
+**当前正确状态**：维持 ADR-008（含 2026-10-27 Errata）+ `clickhouse/migrations/V*.sql` 目录形态 + 现有 runner 迁移引擎，不做改动。
+
+若未来上线后 registry 侧持 V*.sql 的归属问题（registry 是"最新定义"，migrations/ 是历史）真的成为问题，**单独调整 migrations/ 从 registry 移到 consumer**（与 prisma 完全对齐），不需要 runner 架构变更。
+
+以下为原 ADR 正文，保留作为时点快照（不再生效）：
+
+---
+
+Supersedes: ~~ADR-008 的"registry 持有 `clickhouse/migrations/V*.sql` + 版本化前向迁移引擎"决策~~（撤回，本 supersedes 关系不生效）
 
 ## 背景
 
