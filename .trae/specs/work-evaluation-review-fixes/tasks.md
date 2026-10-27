@@ -66,3 +66,9 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 - #5：by-design（LWW），关闭——reviewResult LWW（supervisor 最后一次为准，同 result 双并发是产品层可观测异常而非数据损坏）、updateFinding 回退路径只覆写 observation 元数据不覆写生命周期决策、resolveAbsentFindings 已做 CAS；维持关闭，如需审计轨迹应新增 `EvaluationReviewHistory` append-only 表而非改 optimistic lock。
 - #7：关闭。
 - #8、#9：挂起（本队列不处理）。
+
+## 新发现（2026-10-27 专家复审）
+
+- **N1（已固化）**：DTO class-validator + Service 手动守卫的条件校验双保险模式——原评审建议"建议固化为规范"，2026-10-27 用户拍板 B（写进 devbie-standards-lint），已作为 **B-18 条件校验必须 DTO 层 + Service 层双保险** 落地 `worldzhy-knowledge/skills/devbie-standards-lint/references/standards.md`，commit `b98b7ea`（推 dev）。evaluation 骨架 #10 的 `@ValidateIf` + `input.note?.trim()` 守卫成为第一条先例。
+- **N2（确认不改）**：listRuns/listResults 的 `{ subjectId, subject: { kind } }` nested filter 在 subjectId 已唯一确定 subject.kind 的前提下存在冗余 join——但语义更清晰（多一层显式校验）、Prisma 优化成本可忽略；维持现状。
+- **N3（确认不改）**：startRun 返回 runId 后消费方可直接轮询 `/runs/:runId`——属 nightwatch-frontend 消费方改动，不在本仓交付范围。
