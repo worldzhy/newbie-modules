@@ -127,14 +127,14 @@ describe("discoverMigrations", () => {
 
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "ch-migrations-"));
     try {
-      await fs.mkdir(path.join(root, "module-b", "clickhouse-migrations"), { recursive: true });
-      await fs.mkdir(path.join(root, "module-a", "clickhouse-migrations"), { recursive: true });
+      await fs.mkdir(path.join(root, "module-b", "clickhouse/migrations"), { recursive: true });
+      await fs.mkdir(path.join(root, "module-a", "clickhouse/migrations"), { recursive: true });
       await fs.writeFile(
-        path.join(root, "module-b", "clickhouse-migrations", "V20261017000000__second.sql"),
+        path.join(root, "module-b", "clickhouse/migrations", "V20261017000000__second.sql"),
         "SELECT 2",
       );
       await fs.writeFile(
-        path.join(root, "module-a", "clickhouse-migrations", "V20261016000000__first.sql"),
+        path.join(root, "module-a", "clickhouse/migrations", "V20261016000000__first.sql"),
         "SELECT 1",
       );
 
@@ -158,7 +158,7 @@ describe("discoverMigrations", () => {
 
     const root = await fs.mkdtemp(path.join(os.tmpdir(), "ch-migrations-bad-"));
     try {
-      const dir = path.join(root, "module-x", "clickhouse-migrations");
+      const dir = path.join(root, "module-x", "clickhouse/migrations");
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(path.join(dir, "bad-name.sql"), "SELECT 1");
       await assert.rejects(discoverMigrations([root]), /Invalid migration filename/);
