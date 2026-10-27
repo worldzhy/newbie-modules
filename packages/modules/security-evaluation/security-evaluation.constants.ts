@@ -29,6 +29,10 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_FAMILIES = [
 export const SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION = "v1";
 export const SECURITY_EVALUATION_DEPENDENCY_CRITERION_KEY = "dependency-vulnerability";
 
+/** INTEL criteria (ADR-039). */
+export const SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION = "v1";
+export const SECURITY_EVALUATION_INTELLIGENCE_CRITERION_KEY = "threat-exposure";
+
 /** The first CIS criteria version this build ships (ADR-027 D3). */
 export const SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION = "v1";
 /** The first aws-custom criteria version this build ships (ADR-033/ADR-037). */

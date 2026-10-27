@@ -1,11 +1,11 @@
-import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
+import { SourceKnowledgeItem, SecurityEvaluationKnowledgeSourceAdapter } from "./source-adapter.port";
 import { fetchJson } from "./http.util";
 import {
-  THREAT_INTELLIGENCE_CATEGORY,
-  THREAT_INTELLIGENCE_SEVERITY,
-  THREAT_INTELLIGENCE_SIGNAL_TAG,
-  THREAT_INTELLIGENCE_SOURCE,
-} from "../threat-intelligence.constants";
+  SECURITY_EVALUATION_KNOWLEDGE_CATEGORY,
+  SECURITY_EVALUATION_KNOWLEDGE_SEVERITY,
+  SECURITY_EVALUATION_KNOWLEDGE_SIGNAL_TAG,
+  SECURITY_EVALUATION_KNOWLEDGE_SOURCE,
+} from "../security-evaluation-knowledge.constants";
 
 interface CisaKevVulnerability {
   cveID: string;
@@ -41,10 +41,10 @@ const CATALOG_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploi
  * The full catalog is fetched each run (currently ~1000 entries, ~500KB)
  * and the service deduplicates by CVE id.
  */
-export class CisaKevAdapter implements ThreatIntelligenceSourceAdapter {
-  readonly source = THREAT_INTELLIGENCE_SOURCE.CISA_KEV;
+export class CisaKevAdapter implements SecurityEvaluationKnowledgeSourceAdapter {
+  readonly source = SECURITY_EVALUATION_KNOWLEDGE_SOURCE.CISA_KEV;
 
-  async fetchLatest(_since?: Date): Promise<SourceIntelItem[]> {
+  async fetchLatest(_since?: Date): Promise<SourceKnowledgeItem[]> {
     // The catalog does not support date-range filtering; we always fetch
     // the full list and rely on service-level deduplication.
     const catalog = await fetchJson<CisaKevCatalog>(this.source, CATALOG_URL, {
@@ -53,17 +53,20 @@ export class CisaKevAdapter implements ThreatIntelligenceSourceAdapter {
     return catalog.vulnerabilities.map((vuln) => this.mapItem(vuln));
   }
 
-  private mapItem(vuln: CisaKevVulnerability): SourceIntelItem {
+  private mapItem(vuln: CisaKevVulnerability): SourceKnowledgeItem {
     return {
       source: this.source,
-      category: THREAT_INTELLIGENCE_CATEGORY.CVE,
+      category: SECURITY_EVALUATION_KNOWLEDGE_CATEGORY.CVE,
       externalId: vuln.cveID,
       title: vuln.vulnerabilityName.slice(0, 500),
       summary: this.buildSummary(vuln),
       url: `https://www.cisa.gov/known-exploited-vulnerabilities-catalog`,
       publishedAt: new Date(vuln.dateAdded),
-      severity: THREAT_INTELLIGENCE_SEVERITY.HIGH,
-      signalTags: [THREAT_INTELLIGENCE_SIGNAL_TAG.KEV, THREAT_INTELLIGENCE_SIGNAL_TAG.EXPLOITED_IN_WILD],
+      severity: SECURITY_EVALUATION_KNOWLEDGE_SEVERITY.HIGH,
+      signalTags: [
+        SECURITY_EVALUATION_KNOWLEDGE_SIGNAL_TAG.KEV,
+        SECURITY_EVALUATION_KNOWLEDGE_SIGNAL_TAG.EXPLOITED_IN_WILD,
+      ],
       rawPayload: vuln,
     };
   }

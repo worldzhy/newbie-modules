@@ -10,9 +10,21 @@ import { SecurityEvaluationCriteriaProvider } from "./criteria/security-evaluati
 import { SecurityEvaluationCriteriaSeed } from "./criteria/security-evaluation-criteria.seed";
 import { SecurityEvaluationCloudConfigEvidenceProvider } from "./evidence/security-evaluation-cloud-config-evidence.provider";
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
+import { AwsSecurityBulletinsAdapter } from "./knowledge/adapters/aws-security-bulletins.adapter";
+import { BleepingComputerAdapter } from "./knowledge/adapters/bleeping-computer.adapter";
+import { CisaKevAdapter } from "./knowledge/adapters/cisa-kev.adapter";
+import { FreeBufAdapter } from "./knowledge/adapters/freebuf.adapter";
+import { GitHubSecurityAdvisoryAdapter } from "./knowledge/adapters/github-security-advisory.adapter";
+import { GitHubSecurityBlogAdapter } from "./knowledge/adapters/github-security-blog.adapter";
+import { TheHackerNewsAdapter } from "./knowledge/adapters/the-hacker-news.adapter";
+import { SECURITY_EVALUATION_KNOWLEDGE_SOURCE_ADAPTERS } from "./knowledge/adapters/source-adapter.port";
+import { SecurityEvaluationKnowledgeService } from "./knowledge/security-evaluation-knowledge.service";
 import { SecurityEvaluationCloudConfigJudgment } from "./judgment/cloud-config/security-evaluation-cloud-config.judgment";
 import { SecurityEvaluationDependencyJudgment } from "./judgment/dependency/security-evaluation-dependency.judgment";
 import { SecurityEvaluationOsvClient } from "./judgment/dependency/security-evaluation-osv.client";
+import { SecurityEvaluationIntelJudgment } from "./judgment/intel/security-evaluation-intel.judgment";
+import { SecurityEvaluationIntelMatchService } from "./judgment/intel/security-evaluation-intel-match.service";
+import { SecurityEvaluationIntelReRanker } from "./judgment/intel/security-evaluation-intel-re-ranker";
 import { SecurityEvaluationJudgmentService } from "./judgment/security-evaluation-judgment.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationController } from "./security-evaluation.controller";
@@ -58,9 +70,42 @@ import {
     SecurityEvaluationOsvClient,
     SecurityEvaluationDependencyJudgment,
     SecurityEvaluationCloudConfigJudgment,
+    SecurityEvaluationIntelReRanker,
+    SecurityEvaluationIntelMatchService,
+    SecurityEvaluationIntelJudgment,
     SecurityEvaluationJudgmentService,
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,
+    SecurityEvaluationKnowledgeService,
+    // Knowledge source adapters (ADR-039): ported from threat-intelligence.
+    GitHubSecurityAdvisoryAdapter,
+    CisaKevAdapter,
+    AwsSecurityBulletinsAdapter,
+    GitHubSecurityBlogAdapter,
+    FreeBufAdapter,
+    TheHackerNewsAdapter,
+    BleepingComputerAdapter,
+    {
+      provide: SECURITY_EVALUATION_KNOWLEDGE_SOURCE_ADAPTERS,
+      useFactory: (
+        ghsa: GitHubSecurityAdvisoryAdapter,
+        cisa: CisaKevAdapter,
+        aws: AwsSecurityBulletinsAdapter,
+        ghblog: GitHubSecurityBlogAdapter,
+        freebuf: FreeBufAdapter,
+        thn: TheHackerNewsAdapter,
+        bleeping: BleepingComputerAdapter,
+      ) => [ghsa, cisa, aws, ghblog, freebuf, thn, bleeping],
+      inject: [
+        GitHubSecurityAdvisoryAdapter,
+        CisaKevAdapter,
+        AwsSecurityBulletinsAdapter,
+        GitHubSecurityBlogAdapter,
+        FreeBufAdapter,
+        TheHackerNewsAdapter,
+        BleepingComputerAdapter,
+      ],
+    },
     // Kind-scoped skeleton ports (ADR-020 D4). One judgment dispatcher serves
     // both kinds; the evaluationKey on the criteria version routes the mechanism.
     {
@@ -93,6 +138,7 @@ import {
     SecurityEvaluationAssetSyncService,
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,
+    SecurityEvaluationKnowledgeService,
     criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
     criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
     evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),

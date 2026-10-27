@@ -132,3 +132,4 @@ security-evaluation/
 
 - **D7 的 `Rule` 表由 `EvaluationCriterion.metadata` 承载**（2026-10-26，切片 1 实施回订）：不新建独立 `Rule` 表，CIS 规则落为 `family=cis-aws-1.5` 的 ASSERTION 准则——`ruleId` 即 `criterionKey`，`controlId` / `severity` / `factRequirements` / 修复指引随 `metadata` 携带。理由与本 ADR 背景第 4 条一致：独立 Rule 表会让准则清单与规则清单重新成为两份需要同步的真源。判定逻辑仍按 D7 留在代码里。
 - **D1/D2 的 subject kind 字面值以小写 kebab 落地**：`repository` / `cloud-account`（正文的 `REPOSITORY` / `CLOUD_RESOURCE` 视为概念名）。沿用骨架 `work` 的先例；`cloud-account` 对应正文的云资源主体，切片 2 由 CLOUD_CONFIG 判定器消费。
+- **「并存与切换边界」中"两套相关性匹配是预期成本"条款撤销**（2026-10-27，ADR-039）：security-evaluation 已验证可行（DEPENDENCY + CLOUD_CONFIG 交付），并存成本不再正当。threat-intelligence 的采集+匹配能力整体迁入 security-evaluation 的 `knowledge/` + `judgment/intel/`，独立模块下线。详见 ADR-039。

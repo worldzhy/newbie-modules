@@ -1,7 +1,10 @@
-import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
+import { SourceKnowledgeItem, SecurityEvaluationKnowledgeSourceAdapter } from "./source-adapter.port";
 import { fetchText } from "./http.util";
 import { inferNewsSeverity, parseRssItems, RssItem, stripHtml } from "./rss.util";
-import { THREAT_INTELLIGENCE_CATEGORY, THREAT_INTELLIGENCE_SOURCE } from "../threat-intelligence.constants";
+import {
+  SECURITY_EVALUATION_KNOWLEDGE_CATEGORY,
+  SECURITY_EVALUATION_KNOWLEDGE_SOURCE,
+} from "../security-evaluation-knowledge.constants";
 
 const FEED_URL = "https://github.blog/category/security/feed/";
 
@@ -13,22 +16,22 @@ const FEED_URL = "https://github.blog/category/security/feed/";
  * GitHub Actions vulnerabilities, supply-chain incidents). externalId is
  * the post URL.
  */
-export class GitHubSecurityBlogAdapter implements ThreatIntelligenceSourceAdapter {
-  readonly source = THREAT_INTELLIGENCE_SOURCE.GITHUB_SECURITY_BLOG;
+export class GitHubSecurityBlogAdapter implements SecurityEvaluationKnowledgeSourceAdapter {
+  readonly source = SECURITY_EVALUATION_KNOWLEDGE_SOURCE.GITHUB_SECURITY_BLOG;
 
-  async fetchLatest(_since?: Date): Promise<SourceIntelItem[]> {
+  async fetchLatest(_since?: Date): Promise<SourceKnowledgeItem[]> {
     const xml = await fetchText(this.source, FEED_URL, { timeoutMs: 20000 });
     return parseRssItems(xml).map((item) => this.mapItem(item));
   }
 
-  private mapItem(item: RssItem): SourceIntelItem {
+  private mapItem(item: RssItem): SourceKnowledgeItem {
     const severity = inferNewsSeverity(item.title, {
       high: ["critical", "cve"],
       medium: ["vulnerability", "security advisory"],
     });
     return {
       source: this.source,
-      category: THREAT_INTELLIGENCE_CATEGORY.PLATFORM_EVENT,
+      category: SECURITY_EVALUATION_KNOWLEDGE_CATEGORY.PLATFORM_EVENT,
       externalId: item.link || item.guid,
       title: item.title.slice(0, 500),
       summary: item.description ? stripHtml(item.description).slice(0, 1000) : undefined,

@@ -5,9 +5,11 @@ import {
   SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
   SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
   SECURITY_EVALUATION_FAMILY_DEPENDENCY,
+  SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
 } from "../security-evaluation.constants";
 import { SecurityEvaluationCloudConfigJudgment } from "./cloud-config/security-evaluation-cloud-config.judgment";
 import { SecurityEvaluationDependencyJudgment } from "./dependency/security-evaluation-dependency.judgment";
+import { SecurityEvaluationIntelJudgment } from "./intel/security-evaluation-intel.judgment";
 
 /**
  * SecurityEvaluationJudgmentService — the single JudgmentPort binding for this
@@ -22,6 +24,7 @@ export class SecurityEvaluationJudgmentService implements JudgmentPort {
   constructor(
     private readonly dependency: SecurityEvaluationDependencyJudgment,
     private readonly cloudConfig: SecurityEvaluationCloudConfigJudgment,
+    private readonly intel: SecurityEvaluationIntelJudgment,
   ) {}
 
   judge(input: JudgmentInput): Promise<EvaluationJudgment> {
@@ -31,6 +34,8 @@ export class SecurityEvaluationJudgmentService implements JudgmentPort {
       case SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION:
       case SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM:
         return this.cloudConfig.judge(input);
+      case SECURITY_EVALUATION_FAMILY_INTELLIGENCE:
+        return this.intel.judge(input);
       default:
         throw new BadRequestException(
           `No security-evaluation judgment is implemented for criteria evaluationKey "${input.criteriaVersion.evaluationKey}".`,

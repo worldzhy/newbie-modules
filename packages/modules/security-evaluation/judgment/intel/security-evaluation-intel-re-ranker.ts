@@ -1,13 +1,13 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ChatModelResolver } from "@modules/llm/chat-model.resolver";
 import { ChatModelPort } from "@modules/llm/chat-model.port";
-import { ScopeEntity } from "./scope-entities.port";
+import { SecurityEvaluationScopeEntity } from "./security-evaluation-scope-entities.port";
 
-/** LLM scope bound to the threat-intelligence match connection. */
-export const THREAT_INTELLIGENCE_LLM_SCOPE = "threat-intelligence";
+/** LLM scope bound to the security-evaluation INTEL match connection. */
+export const SECURITY_EVALUATION_INTEL_LLM_SCOPE = "security-evaluation-intel";
 
 /** Per-entity match result emitted by the LLM re-ranker. */
-export interface EntityMatchResult {
+export interface SecurityEvaluationEntityMatchResult {
   entity: string;
   matched: boolean;
   evidence: string | null;
@@ -19,16 +19,16 @@ export interface EntityMatchResult {
  * all (scope unbound, call failed, malformed output) and the pair must be
  * retried on a later run instead of being cached as a negative.
  */
-export type ReRankVerdictKind = "relevant" | "not-relevant" | "unavailable";
+export type SecurityEvaluationReRankVerdictKind = "relevant" | "not-relevant" | "unavailable";
 
 /**
  * Structured verdict from the LLM re-ranker. The system enforces the
  * hard constraint: finalRelevant === true requires at least one
  * entityMatches[i].matched === true. semanticMatch alone never passes.
  */
-export interface ReRankVerdict {
-  kind: ReRankVerdictKind;
-  entityMatches: EntityMatchResult[];
+export interface SecurityEvaluationReRankVerdict {
+  kind: SecurityEvaluationReRankVerdictKind;
+  entityMatches: SecurityEvaluationEntityMatchResult[];
   semanticMatch: boolean;
   finalRelevant: boolean;
   reason: string;
@@ -53,20 +53,22 @@ Rules:
 - Output strict JSON matching the requested schema. No markdown.`;
 
 /**
- * LLM-backed re-ranker for candidates that survived hard rule recall.
+ * LLM-backed re-ranker for INTEL candidates that survived hard rule recall.
  *
- * Implements the B3 matching protocol: the LLM never decides freely; it
- * must emit per-entity match verdicts, and the caller enforces the
- * finalRelevant hard constraint. This prevents the "LLM generalizes and
- * waves through unrelated news" failure (experience 1342209).
+ * Implements the B3 matching protocol (ADR-018): the LLM never decides
+ * freely; it must emit per-entity match verdicts, and the caller enforces
+ * the finalRelevant hard constraint.
  */
 @Injectable()
-export class ThreatIntelligenceReRanker {
-  private readonly logger = new Logger(ThreatIntelligenceReRanker.name);
+export class SecurityEvaluationIntelReRanker {
+  private readonly logger = new Logger(SecurityEvaluationIntelReRanker.name);
 
   constructor(private readonly resolver: ChatModelResolver) {}
 
-  async reRank(item: { title: string; summary?: string }, entities: ScopeEntity[]): Promise<ReRankVerdict> {
+  async reRank(
+    item: { title: string; summary?: string },
+    entities: SecurityEvaluationScopeEntity[],
+  ): Promise<SecurityEvaluationReRankVerdict> {
     if (entities.length === 0) {
       return {
         kind: "not-relevant",
@@ -84,17 +86,19 @@ export class ThreatIntelligenceReRanker {
 
     let chatModel: ChatModelPort;
     try {
-      chatModel = await this.resolver.resolve(THREAT_INTELLIGENCE_LLM_SCOPE);
+      chatModel = await this.resolver.resolve(SECURITY_EVALUATION_INTEL_LLM_SCOPE);
     } catch (error) {
       this.logger.warn(
-        `Cannot resolve LLM scope "${THREAT_INTELLIGENCE_LLM_SCOPE}": ${error instanceof Error ? error.message : String(error)}. Falling back to not-relevant.`,
+        `Cannot resolve LLM scope "${SECURITY_EVALUATION_INTEL_LLM_SCOPE}": ${
+          error instanceof Error ? error.message : String(error)
+        }.`,
       );
       return {
         kind: "unavailable",
         entityMatches: entities.map((e) => ({ entity: e.value, matched: false, evidence: null })),
         semanticMatch: false,
         finalRelevant: false,
-        reason: "LLM scope not bound; defaulted to not relevant.",
+        reason: "LLM scope not bound.",
       };
     }
 
@@ -111,20 +115,18 @@ export class ThreatIntelligenceReRanker {
       const verdict = this.parseVerdict(result.text);
       return this.enforceHardConstraint(verdict, entities);
     } catch (error) {
-      this.logger.warn(
-        `LLM re-rank failed, falling back to not-relevant: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.warn(`LLM re-rank failed: ${error instanceof Error ? error.message : String(error)}`);
       return {
         kind: "unavailable",
         entityMatches: entities.map((e) => ({ entity: e.value, matched: false, evidence: null })),
         semanticMatch: false,
         finalRelevant: false,
-        reason: "LLM re-rank failed; defaulted to not relevant.",
+        reason: "LLM re-rank failed.",
       };
     }
   }
 
-  private parseVerdict(text: string): ReRankVerdict {
+  private parseVerdict(text: string): SecurityEvaluationReRankVerdict {
     const parsed = JSON.parse(text);
     if (
       !parsed ||
@@ -136,7 +138,6 @@ export class ThreatIntelligenceReRanker {
       throw new Error("LLM re-rank output does not match the verdict schema.");
     }
     return {
-      // Provisional; enforceHardConstraint re-derives the final kind.
       kind: parsed.finalRelevant === true ? "relevant" : "not-relevant",
       entityMatches: parsed.entityMatches.map((m: { entity: string; matched: boolean; evidence: string | null }) => ({
         entity: String(m.entity),
@@ -153,14 +154,14 @@ export class ThreatIntelligenceReRanker {
    * Enforce the B3 hard constraint: finalRelevant requires at least one
    * entity match. We do not trust the LLM's own finalRelevant flag alone.
    */
-  private enforceHardConstraint(verdict: ReRankVerdict, entities: ScopeEntity[]): ReRankVerdict {
+  private enforceHardConstraint(
+    verdict: SecurityEvaluationReRankVerdict,
+    entities: SecurityEvaluationScopeEntity[],
+  ): SecurityEvaluationReRankVerdict {
     const hasEntityMatch = verdict.entityMatches.some((m) => m.matched);
     if (!hasEntityMatch) {
       return { ...verdict, kind: "not-relevant", finalRelevant: false };
     }
-    // Defensive: if the LLM returned entityMatches with different entity
-    // labels than we sent, fall back to not relevant to avoid silent
-    // mismatches. This is a deliberate rejection (cacheable), not an outage.
     const sentLabels = new Set(entities.map((e) => e.value));
     const returnedLabels = new Set(verdict.entityMatches.map((m) => m.entity));
     for (const label of returnedLabels) {

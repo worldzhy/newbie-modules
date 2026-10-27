@@ -6,7 +6,10 @@
  * structure and regex extraction is sufficient.
  */
 
-import { THREAT_INTELLIGENCE_SEVERITY, ThreatIntelligenceSeverity } from "../threat-intelligence.constants";
+import {
+  SECURITY_EVALUATION_KNOWLEDGE_SEVERITY,
+  SecurityEvaluationKnowledgeSeverity,
+} from "../security-evaluation-knowledge.constants";
 
 export interface RssItem {
   title: string;
@@ -66,11 +69,11 @@ export function stripHtml(html: string): string {
 export function inferNewsSeverity(
   title: string,
   overrides?: { high?: string[]; medium?: string[] },
-): ThreatIntelligenceSeverity {
+): SecurityEvaluationKnowledgeSeverity {
   const high = overrides?.high ?? ["critical", "cve", "zero-day"];
   const medium = overrides?.medium ?? ["vulnerability", "exploit", "ransomware"];
   const lower = title.toLowerCase();
-  if (high.some((keyword) => lower.includes(keyword))) return THREAT_INTELLIGENCE_SEVERITY.HIGH;
-  if (medium.some((keyword) => lower.includes(keyword))) return THREAT_INTELLIGENCE_SEVERITY.MEDIUM;
-  return THREAT_INTELLIGENCE_SEVERITY.INFO;
+  if (high.some((keyword) => lower.includes(keyword))) return SECURITY_EVALUATION_KNOWLEDGE_SEVERITY.HIGH;
+  if (medium.some((keyword) => lower.includes(keyword))) return SECURITY_EVALUATION_KNOWLEDGE_SEVERITY.MEDIUM;
+  return SECURITY_EVALUATION_KNOWLEDGE_SEVERITY.INFO;
 }

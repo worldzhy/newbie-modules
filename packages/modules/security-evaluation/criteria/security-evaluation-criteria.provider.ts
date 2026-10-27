@@ -7,6 +7,8 @@ import {
   SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
   SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
   SECURITY_EVALUATION_FAMILY_DEPENDENCY,
+  SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+  SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
   SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
 } from "../security-evaluation.constants";
@@ -16,14 +18,28 @@ import { SecurityEvaluationCriteriaSeed } from "./security-evaluation-criteria.s
  * SecurityEvaluationCriteriaProvider — the CriteriaProvider for the subject
  * kinds this feature owns. The applicable version is the one this build ships;
  * the seed guarantees it is published before any run can reference it.
+ *
+ * For the repository kind the runConfig may request the INTEL family via
+ * `evaluationKey: "threat-intel-relevance"` (ADR-039); otherwise the
+ * dependency family is selected by default.
  */
 @Injectable()
 export class SecurityEvaluationCriteriaProvider implements CriteriaProvider {
   constructor(private readonly seed: SecurityEvaluationCriteriaSeed) {}
 
-  async selectVersion(subject: EvaluationSubjectRef): Promise<CriteriaSelection | null> {
+  async selectVersion(
+    subject: EvaluationSubjectRef,
+    runConfig?: Record<string, unknown> | null,
+  ): Promise<CriteriaSelection | null> {
     switch (subject.kind) {
       case SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY:
+        if (runConfig?.evaluationKey === SECURITY_EVALUATION_FAMILY_INTELLIGENCE) {
+          await this.seed.ensureIntelligenceBaseline();
+          return {
+            evaluationKey: SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+            version: SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
+          };
+        }
         await this.seed.ensureDependencyBaseline();
         return {
           evaluationKey: SECURITY_EVALUATION_FAMILY_DEPENDENCY,

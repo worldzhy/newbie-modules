@@ -52,3 +52,51 @@ model SecurityEvaluationAssetFact {
   @@index([assetId, factType])
   @@schema("module/security-evaluation")
 }
+
+// !! ----------------------------------------------------------- //
+// !!            [Module] Security Evaluation Knowledge          //
+// !! ----------------------------------------------------------- //
+// * SecurityEvaluationKnowledgeItem                            //
+// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+/// One piece of external threat intelligence, deduplicated by
+/// (source, externalId). One row per unique intel item; re-fetching the
+/// same item refreshes rawPayload and bumps lastSeenAt. fetchedAt stays at
+/// the first-seen time on purpose: the match pipeline walks it oldest-first
+/// so every collection batch eventually gets evaluated.
+///
+/// Ported from the former threat-intelligence module (ADR-039); fields and
+/// indexes are unchanged.
+model SecurityEvaluationKnowledgeItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  source      String   @db.VarChar(50)
+  category    String   @db.VarChar(30)
+  // Stable identifier within the source: CVE ID, ecosystem+package,
+  // vendor+event-id, or a title fingerprint. Together with `source` it
+  // forms the deduplication key.
+  externalId  String   @db.VarChar(512)
+  title       String   @db.VarChar(1024)
+  summary     String?  @db.Text
+  url         String?  @db.VarChar(1024)
+  publishedAt DateTime?
+  severity    String   @default("info") @db.VarChar(15)
+  // Signal tags: kev, has-exploit, exploited-in-wild.
+  signalTags  String[]
+  rawPayload  Json?
+  // Negative cache for INTEL matching: { "scopeType:scopeId": reason }.
+  // An LLM "not-relevant" verdict is cached here so subsequent runs skip
+  // the pair; "unavailable" verdicts are never cached (ADR-018).
+  negativeCache Json?
+  fetchedAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([category])
+  @@index([severity])
+  @@index([publishedAt])
+  // Match-pipeline keyset scan: WHERE fetchedAt >= since ORDER BY fetchedAt, id.
+  @@index([fetchedAt])
+  @@schema("module/security-evaluation")
+}

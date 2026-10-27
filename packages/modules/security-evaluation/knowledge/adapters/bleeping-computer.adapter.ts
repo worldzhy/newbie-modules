@@ -1,22 +1,25 @@
-import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
+import { SourceKnowledgeItem, SecurityEvaluationKnowledgeSourceAdapter } from "./source-adapter.port";
 import { fetchText } from "./http.util";
 import { inferNewsSeverity, parseRssItems, RssItem, stripHtml } from "./rss.util";
-import { THREAT_INTELLIGENCE_CATEGORY, THREAT_INTELLIGENCE_SOURCE } from "../threat-intelligence.constants";
+import {
+  SECURITY_EVALUATION_KNOWLEDGE_CATEGORY,
+  SECURITY_EVALUATION_KNOWLEDGE_SOURCE,
+} from "../security-evaluation-knowledge.constants";
 
-const FEED_URL = "https://feeds.feedburner.com/TheHackersNews";
+const FEED_URL = "https://www.bleepingcomputer.com/feed/";
 const DEFAULT_USER_AGENT = "threat-intelligence-collector (+https://github.com/worldzhy)";
 
 /**
- * The Hacker News adapter (RSS) — English security news.
+ * BleepingComputer adapter (RSS) — English security news.
  *
- * The Hacker News is a major English-language security news outlet. Items
+ * BleepingComputer is a major English-language security news outlet. Items
  * are news articles; externalId is the article URL. Severity is inferred
  * from title keywords because news items carry no severity rating.
  */
-export class TheHackerNewsAdapter implements ThreatIntelligenceSourceAdapter {
-  readonly source = THREAT_INTELLIGENCE_SOURCE.THE_HACKER_NEWS;
+export class BleepingComputerAdapter implements SecurityEvaluationKnowledgeSourceAdapter {
+  readonly source = SECURITY_EVALUATION_KNOWLEDGE_SOURCE.BLEEPING_COMPUTER;
 
-  async fetchLatest(_since?: Date): Promise<SourceIntelItem[]> {
+  async fetchLatest(_since?: Date): Promise<SourceKnowledgeItem[]> {
     const xml = await fetchText(this.source, FEED_URL, {
       headers: { "User-Agent": DEFAULT_USER_AGENT },
       timeoutMs: 20000,
@@ -24,10 +27,10 @@ export class TheHackerNewsAdapter implements ThreatIntelligenceSourceAdapter {
     return parseRssItems(xml).map((item) => this.mapItem(item));
   }
 
-  private mapItem(item: RssItem): SourceIntelItem {
+  private mapItem(item: RssItem): SourceKnowledgeItem {
     return {
       source: this.source,
-      category: THREAT_INTELLIGENCE_CATEGORY.EN_NEWS,
+      category: SECURITY_EVALUATION_KNOWLEDGE_CATEGORY.EN_NEWS,
       externalId: item.link || item.guid,
       title: item.title.slice(0, 500),
       summary: item.description ? stripHtml(item.description).slice(0, 1000) : undefined,

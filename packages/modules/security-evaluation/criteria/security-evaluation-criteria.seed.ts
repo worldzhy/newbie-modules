@@ -10,6 +10,9 @@ import {
   SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
   SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
   SECURITY_EVALUATION_FAMILY_DEPENDENCY,
+  SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+  SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
+  SECURITY_EVALUATION_INTELLIGENCE_CRITERION_KEY,
   SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
 } from "../security-evaluation.constants";
@@ -128,10 +131,32 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     });
   }
 
+  /** INTEL criteria: recent threat-intel items matched to the subject's scope (ADR-039). */
+  async ensureIntelligenceBaseline(): Promise<void> {
+    await this.ensureBaseline({
+      kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+      evaluationKey: SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+      version: SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
+      description:
+        "Threat-intel relevance: recently collected threat-intelligence items are matched against the subject's scope entity set (hard entity recall + LLM structured re-rank).",
+      metadata: { matchProtocol: "b3-hard-recall-plus-llm-rerank", negativeCache: "per-item-per-scope" },
+      criteria: [
+        {
+          criterionKey: SECURITY_EVALUATION_INTELLIGENCE_CRITERION_KEY,
+          name: "Threat exposure",
+          description:
+            "A recently collected threat-intel item affects the subject's scope (matched entity or LLM-confirmed relevance).",
+          metadata: { verdictSources: ["hard-recall", "llm"] },
+        },
+      ],
+    });
+  }
+
   private async ensureAllBaselines(): Promise<void> {
     await this.ensureDependencyBaseline();
     await this.ensureCloudConfigBaseline();
     await this.ensureCloudCustomBaseline();
+    await this.ensureIntelligenceBaseline();
   }
 
   private async ensureBaseline(baseline: BaselineSeed): Promise<void> {

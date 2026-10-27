@@ -1,10 +1,10 @@
-import { SourceIntelItem, ThreatIntelligenceSourceAdapter } from "./source-adapter.port";
+import { SourceKnowledgeItem, SecurityEvaluationKnowledgeSourceAdapter } from "./source-adapter.port";
 import { fetchJson } from "./http.util";
 import {
-  THREAT_INTELLIGENCE_CATEGORY,
-  THREAT_INTELLIGENCE_SEVERITY,
-  THREAT_INTELLIGENCE_SOURCE,
-} from "../threat-intelligence.constants";
+  SECURITY_EVALUATION_KNOWLEDGE_CATEGORY,
+  SECURITY_EVALUATION_KNOWLEDGE_SEVERITY,
+  SECURITY_EVALUATION_KNOWLEDGE_SOURCE,
+} from "../security-evaluation-knowledge.constants";
 
 interface GitHubAdvisory {
   ghsa_id: string;
@@ -29,17 +29,17 @@ const API_URL = "https://api.github.com/advisories";
  *
  * Covers both CVE-class (component vulnerabilities) and malicious-package
  * advisories across ecosystems (npm, PyPI, Maven, Go, Rust, etc.). GitHub
- * publishes a unified advisory feed that we normalize into SourceIntelItem.
+ * publishes a unified advisory feed that we normalize into SourceKnowledgeItem.
  *
  * The public endpoint is rate-limited (60 req/hour unauthenticated); the
  * daily job fetches at most 100 items per run which fits comfortably.
  */
-export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAdapter {
-  readonly source = THREAT_INTELLIGENCE_SOURCE.GITHUB_SECURITY_ADVISORY;
+export class GitHubSecurityAdvisoryAdapter implements SecurityEvaluationKnowledgeSourceAdapter {
+  readonly source = SECURITY_EVALUATION_KNOWLEDGE_SOURCE.GITHUB_SECURITY_ADVISORY;
 
   private readonly perPage = 100;
 
-  async fetchLatest(since?: Date): Promise<SourceIntelItem[]> {
+  async fetchLatest(since?: Date): Promise<SourceKnowledgeItem[]> {
     const params = new URLSearchParams({
       per_page: String(this.perPage),
       sort: "published",
@@ -55,10 +55,10 @@ export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAd
     });
     return advisories
       .map((advisory) => this.mapItem(advisory))
-      .filter((item): item is SourceIntelItem => item !== null);
+      .filter((item): item is SourceKnowledgeItem => item !== null);
   }
 
-  private mapItem(advisory: GitHubAdvisory): SourceIntelItem | null {
+  private mapItem(advisory: GitHubAdvisory): SourceKnowledgeItem | null {
     const ghsaId = advisory.ghsa_id;
     if (!ghsaId) return null;
     const title = advisory.summary?.trim() || `Security advisory ${ghsaId}`;
@@ -69,7 +69,7 @@ export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAd
     // Everything maps to CVE: advisories with a package ecosystem are either
     // component CVEs or malicious-package reports, and we cannot reliably
     // tell the two apart without parsing description text.
-    const category = THREAT_INTELLIGENCE_CATEGORY.CVE;
+    const category = SECURITY_EVALUATION_KNOWLEDGE_CATEGORY.CVE;
     return {
       source: this.source,
       category,
@@ -94,19 +94,19 @@ export class GitHubSecurityAdvisoryAdapter implements ThreatIntelligenceSourceAd
 
   private mapSeverity(
     severity: string | null | undefined,
-  ): (typeof THREAT_INTELLIGENCE_SEVERITY)[keyof typeof THREAT_INTELLIGENCE_SEVERITY] {
+  ): (typeof SECURITY_EVALUATION_KNOWLEDGE_SEVERITY)[keyof typeof SECURITY_EVALUATION_KNOWLEDGE_SEVERITY] {
     switch ((severity ?? "").toLowerCase()) {
       case "critical":
-        return THREAT_INTELLIGENCE_SEVERITY.CRITICAL;
+        return SECURITY_EVALUATION_KNOWLEDGE_SEVERITY.CRITICAL;
       case "high":
-        return THREAT_INTELLIGENCE_SEVERITY.HIGH;
+        return SECURITY_EVALUATION_KNOWLEDGE_SEVERITY.HIGH;
       case "moderate":
       case "medium":
-        return THREAT_INTELLIGENCE_SEVERITY.MEDIUM;
+        return SECURITY_EVALUATION_KNOWLEDGE_SEVERITY.MEDIUM;
       case "low":
-        return THREAT_INTELLIGENCE_SEVERITY.LOW;
+        return SECURITY_EVALUATION_KNOWLEDGE_SEVERITY.LOW;
       default:
-        return THREAT_INTELLIGENCE_SEVERITY.INFO;
+        return SECURITY_EVALUATION_KNOWLEDGE_SEVERITY.INFO;
     }
   }
 }

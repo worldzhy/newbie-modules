@@ -1,56 +1,46 @@
-import { Inject, Injectable, Logger, NotFoundException, Optional } from "@nestjs/common";
+import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
-  SourceIntelItem,
-  ThreatIntelligenceSourceAdapter,
-  THREAT_INTELLIGENCE_SOURCE_ADAPTERS,
+  SECURITY_EVALUATION_KNOWLEDGE_SOURCE_ADAPTERS,
+  SecurityEvaluationKnowledgeSourceAdapter,
+  SourceKnowledgeItem,
 } from "./adapters/source-adapter.port";
-import { DEFAULT_MAX_ITEMS_PER_SOURCE, DEFAULT_RETENTION_DAYS } from "./threat-intelligence.constants";
-import { ListThreatIntelligenceItemsQuery } from "./threat-intelligence.dto";
-
-/** Fields returned by read APIs; rawPayload stays internal to the store. */
-const ITEM_SELECT = {
-  id: true,
-  source: true,
-  category: true,
-  externalId: true,
-  title: true,
-  summary: true,
-  url: true,
-  publishedAt: true,
-  severity: true,
-  signalTags: true,
-  fetchedAt: true,
-  lastSeenAt: true,
-} satisfies Prisma.ThreatIntelligenceItemSelect;
+import { DEFAULT_MAX_ITEMS_PER_SOURCE, DEFAULT_RETENTION_DAYS } from "./security-evaluation-knowledge.constants";
 
 /** How many upserts run in parallel per batch. */
 const UPSERT_BATCH_SIZE = 20;
 
+/**
+ * Knowledge collection service for the security-evaluation module (ADR-039).
+ *
+ * Runs the collection pipeline: fetch from every registered source adapter,
+ * then deduplicate and persist by (source, externalId). Ported from the
+ * former threat-intelligence module; the item store is now
+ * `SecurityEvaluationKnowledgeItem`.
+ *
+ * Matching against scope entities lives in the INTEL judgment
+ * (`judgment/intel/`), not here.
+ */
 @Injectable()
-export class ThreatIntelligenceService {
-  private readonly logger = new Logger(ThreatIntelligenceService.name);
+export class SecurityEvaluationKnowledgeService {
+  private readonly logger = new Logger(SecurityEvaluationKnowledgeService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     @Optional()
-    @Inject(THREAT_INTELLIGENCE_SOURCE_ADAPTERS)
-    private readonly adapters: ThreatIntelligenceSourceAdapter[] = [],
+    @Inject(SECURITY_EVALUATION_KNOWLEDGE_SOURCE_ADAPTERS)
+    private readonly adapters: SecurityEvaluationKnowledgeSourceAdapter[] = [],
   ) {}
 
   /**
    * Run the collection pipeline: fetch from every registered source adapter,
-   * then deduplicate and persist by (source, externalId). Called by the daily
-   * scheduled job and the manual trigger endpoint.
-   *
-   * Matching against projects is a host concern and intentionally lives
-   * outside this module.
+   * then deduplicate and persist by (source, externalId).
    */
   async collect(since?: Date): Promise<{ collected: number }> {
     const items = await this.fetchAllSources(since);
     if (items.length === 0) {
-      this.logger.log("No new threat intel items collected.");
+      this.logger.log("No new knowledge items collected.");
       return { collected: 0 };
     }
 
@@ -59,8 +49,8 @@ export class ThreatIntelligenceService {
     return { collected: upserted };
   }
 
-  private async fetchAllSources(since?: Date): Promise<SourceIntelItem[]> {
-    const all: SourceIntelItem[] = [];
+  private async fetchAllSources(since?: Date): Promise<SourceKnowledgeItem[]> {
+    const all: SourceKnowledgeItem[] = [];
     for (const adapter of this.adapters) {
       try {
         const items = await adapter.fetchLatest(since);
@@ -79,7 +69,7 @@ export class ThreatIntelligenceService {
    * touched (new + updated). Runs in small concurrent batches; a single
    * malformed row is logged and skipped instead of aborting the run.
    */
-  async upsertItems(items: SourceIntelItem[]): Promise<number> {
+  async upsertItems(items: SourceKnowledgeItem[]): Promise<number> {
     let touched = 0;
     for (let i = 0; i < items.length; i += UPSERT_BATCH_SIZE) {
       const batch = items.slice(i, i + UPSERT_BATCH_SIZE);
@@ -99,19 +89,15 @@ export class ThreatIntelligenceService {
     return touched;
   }
 
-  private async upsertOne(item: SourceIntelItem): Promise<void> {
-    // Feeds occasionally carry unparsable dates; an Invalid Date would make
-    // Prisma throw, so fall back to null instead of poisoning the batch.
+  private async upsertOne(item: SourceKnowledgeItem): Promise<void> {
     const publishedAt =
       item.publishedAt instanceof Date && !Number.isNaN(item.publishedAt.getTime()) ? item.publishedAt : null;
-    await this.prisma.threatIntelligenceItem.upsert({
+    await this.prisma.securityEvaluationKnowledgeItem.upsert({
       where: { source_externalId: { source: item.source, externalId: item.externalId } },
       update: {
         title: item.title,
         summary: item.summary ?? null,
         url: item.url ?? null,
-        // On update, a transient parse failure must not erase a previously
-        // stored publishedAt — only overwrite when the new value is valid.
         ...(publishedAt ? { publishedAt } : {}),
         severity: item.severity,
         signalTags: item.signalTags,
@@ -136,63 +122,36 @@ export class ThreatIntelligenceService {
   /**
    * Single retention cleanup point. Prunes items older than
    * `retentionDays` and enforces `maxItemsPerSource` per source.
-   * This is the ONLY place that deletes threat intel data.
+   * This is the ONLY place that deletes knowledge data.
    */
   async pruneExpired(
     retentionDays = DEFAULT_RETENTION_DAYS,
     maxItemsPerSource = DEFAULT_MAX_ITEMS_PER_SOURCE,
   ): Promise<{ deleted: number }> {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-    const deletedByAge = await this.prisma.threatIntelligenceItem.deleteMany({
+    const deletedByAge = await this.prisma.securityEvaluationKnowledgeItem.deleteMany({
       where: { lastSeenAt: { lt: cutoff } },
     });
 
     let deletedByCap = 0;
-    const sources = await this.prisma.threatIntelligenceItem.groupBy({ by: ["source"], _count: true });
+    const sources = await this.prisma.securityEvaluationKnowledgeItem.groupBy({ by: ["source"], _count: true });
     for (const group of sources) {
       if (group._count <= maxItemsPerSource) continue;
       const overflow = group._count - maxItemsPerSource;
-      const toDelete = await this.prisma.threatIntelligenceItem.findMany({
+      const toDelete = await this.prisma.securityEvaluationKnowledgeItem.findMany({
         where: { source: group.source },
         orderBy: { lastSeenAt: "asc" },
         take: overflow,
         select: { id: true },
       });
       if (toDelete.length > 0) {
-        await this.prisma.threatIntelligenceItem.deleteMany({ where: { id: { in: toDelete.map((i) => i.id) } } });
+        await this.prisma.securityEvaluationKnowledgeItem.deleteMany({
+          where: { id: { in: toDelete.map((i) => i.id) } },
+        });
         deletedByCap += toDelete.length;
       }
     }
 
     return { deleted: deletedByAge.count + deletedByCap };
-  }
-
-  // ----- Read API -----
-
-  async listItems(query: ListThreatIntelligenceItemsQuery) {
-    const where: Prisma.ThreatIntelligenceItemWhereInput = {};
-    if (query.category) where.category = query.category;
-    if (query.severity) where.severity = query.severity;
-    if (query.source) where.source = query.source;
-
-    const [items, total] = await Promise.all([
-      this.prisma.threatIntelligenceItem.findMany({
-        where,
-        // publishedAt is nullable and many items share the same second (KEV
-        // dateAdded, same-day news); id keeps offset pagination stable.
-        orderBy: [{ publishedAt: "desc" }, { id: "desc" }],
-        take: query.limit ?? 20,
-        skip: query.offset ?? 0,
-        select: ITEM_SELECT,
-      }),
-      this.prisma.threatIntelligenceItem.count({ where }),
-    ]);
-    return { items, total };
-  }
-
-  async getItem(id: string) {
-    const item = await this.prisma.threatIntelligenceItem.findUnique({ where: { id }, select: ITEM_SELECT });
-    if (!item) throw new NotFoundException(`Threat intel item ${id} not found.`);
-    return item;
   }
 }
