@@ -104,7 +104,15 @@ export class RoleController {
         rolePermissionGroups: {
           include: {
             permissionGroup: {
-              select: { id: true, name: true, routePath: true, navGroup: true, navLabel: true, navIcon: true },
+              select: {
+                id: true,
+                name: true,
+                routePath: true,
+                navPlacement: true,
+                navOrder: true,
+                navLabel: true,
+                navIcon: true,
+              },
             },
           },
         },

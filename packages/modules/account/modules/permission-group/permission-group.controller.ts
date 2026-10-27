@@ -14,7 +14,7 @@ import {
   Query,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { NavPlacement, PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
@@ -26,6 +26,7 @@ import {
   PermissionGroupDetailResponseDto,
   PermissionGroupPermissionResponseDto,
   PermissionGroupResponseDto,
+  ReorderPermissionGroupsNavOrderDto,
   ReplacePermissionGroupPermissionsDto,
   UpdatePermissionGroupDto,
 } from "./permission-group.dto";
@@ -49,7 +50,7 @@ export class PermissionGroupController {
       throw new BadRequestException(`Permission group "${body.name}" already exists.`);
     }
 
-    const group = await this.prisma.permissionGroup.create({ data: body });
+    const group = await this.prisma.permissionGroup.create({ data: await this.withCreateNavOrder(body) });
 
     await this.auditLogService.record(AuditEvent.ROLES_CHANGED, {
       detail: { action: "permission_group_created", permissionGroupId: group.id, name: group.name },
@@ -70,7 +71,7 @@ export class PermissionGroupController {
       pagination: { page, pageSize },
       findManyArgs: {
         where: name ? { name: { contains: name, mode: "insensitive" } } : undefined,
-        orderBy: { id: "asc" },
+        orderBy: [{ navOrder: "asc" }, { id: "asc" }],
       },
     });
 
@@ -96,6 +97,43 @@ export class PermissionGroupController {
     };
   }
 
+  /**
+   * Declared before the ":id" routes on purpose: Nest matches in declaration
+   * order, so a later "nav-order" would be captured as an id segment.
+   */
+  @Patch("nav-order")
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @ApiOperation({ summary: "Replace the header nav ordering (transactional, position becomes navOrder)" })
+  @ApiResponse({ type: PermissionGroupResponseDto, isArray: true })
+  async reorderNav(@Body() body: ReorderPermissionGroupsNavOrderDto): Promise<PermissionGroupResponseDto[]> {
+    if (new Set(body.ids).size !== body.ids.length) {
+      throw new BadRequestException("Duplicate permission group ids in the nav order payload.");
+    }
+
+    const found = await this.prisma.permissionGroup.findMany({
+      where: { id: { in: body.ids } },
+      select: { id: true },
+    });
+    if (found.length !== body.ids.length) {
+      throw new BadRequestException("Some permission groups in the nav order payload do not exist.");
+    }
+
+    await this.prisma.$transaction(
+      body.ids.map((id, index) => this.prisma.permissionGroup.update({ where: { id }, data: { navOrder: index + 1 } })),
+    );
+
+    await this.auditLogService.record(AuditEvent.ROLES_CHANGED, {
+      detail: { action: "permission_group_nav_order_changed", ids: body.ids },
+    });
+
+    const groups = await this.prisma.permissionGroup.findMany({
+      where: { id: { in: body.ids } },
+      orderBy: [{ navOrder: "asc" }, { id: "asc" }],
+    });
+
+    return groups.map((group) => this.toResponseDto(group));
+  }
+
   @Patch(":id")
   @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Update a permission group (builtin groups cannot be renamed)" })
@@ -114,7 +152,7 @@ export class PermissionGroupController {
       }
     }
 
-    const updated = await this.prisma.permissionGroup.update({ where: { id }, data: body });
+    const updated = await this.prisma.permissionGroup.update({ where: { id }, data: this.withUpdateNavOrder(body) });
 
     await this.auditLogService.record(AuditEvent.ROLES_CHANGED, {
       detail: { action: "permission_group_updated", permissionGroupId: id, name: updated.name },
@@ -245,12 +283,41 @@ export class PermissionGroupController {
     };
   }
 
+  private async withCreateNavOrder(body: CreatePermissionGroupDto): Promise<Prisma.PermissionGroupCreateInput> {
+    if (body.navPlacement !== NavPlacement.HEADER_NAVIGATION) {
+      return { ...body, navOrder: 0 };
+    }
+    if (body.navOrder !== undefined) {
+      return { ...body };
+    }
+    // Append after the current last header entry so a new group never jumps
+    // ahead of an existing one.
+    const last = await this.prisma.permissionGroup.findFirst({
+      where: { navPlacement: NavPlacement.HEADER_NAVIGATION },
+      orderBy: { navOrder: "desc" },
+      select: { navOrder: true },
+    });
+    return { ...body, navOrder: (last?.navOrder ?? 0) + 1 };
+  }
+
+  /**
+   * navOrder carries no meaning outside the header nav, so moving a group out
+   * of the header clears it instead of leaving a stale position behind.
+   */
+  private withUpdateNavOrder(body: UpdatePermissionGroupDto): Prisma.PermissionGroupUpdateInput {
+    if (body.navPlacement === NavPlacement.NONE && body.navOrder === undefined) {
+      return { ...body, navOrder: 0 };
+    }
+    return { ...body };
+  }
+
   private toResponseDto(group: {
     id: number;
     name: string;
     description: string | null;
     routePath: string;
-    navGroup: string;
+    navPlacement: NavPlacement;
+    navOrder: number;
     navLabel: string;
     navIcon: string | null;
     isBuiltin: boolean;
@@ -262,7 +329,8 @@ export class PermissionGroupController {
       name: group.name,
       description: group.description,
       routePath: group.routePath,
-      navGroup: group.navGroup,
+      navPlacement: group.navPlacement,
+      navOrder: group.navOrder,
       navLabel: group.navLabel,
       navIcon: group.navIcon,
       isBuiltin: group.isBuiltin,

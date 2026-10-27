@@ -1,7 +1,19 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { PermissionAction } from "@generated/prisma/client";
+import { NavPlacement, PermissionAction } from "@generated/prisma/client";
 import { CommonListRequestDto } from "@devbie/newbie/common.dto";
-import { IsArray, IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, Length, ValidateNested } from "class-validator";
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+  ValidateNested,
+} from "class-validator";
 import { Type } from "class-transformer";
 
 export class CreatePermissionGroupDto {
@@ -22,11 +34,20 @@ export class CreatePermissionGroupDto {
   @Length(1, 128)
   routePath!: string;
 
-  @ApiProperty({ type: String, description: "Navigation group: top-nav | platform | hidden" })
-  @IsString()
-  @IsNotEmpty()
-  @Length(1, 64)
-  navGroup!: string;
+  // eslint-disable-next-line @darraghor/nestjs-typed/all-properties-have-explicit-defined -- false positive on pure-required DTO
+  @ApiProperty({ enum: NavPlacement, description: "Where the group surfaces in the application chrome." })
+  @IsEnum(NavPlacement)
+  navPlacement!: NavPlacement;
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    description: "Header nav position (1-based). Omit to append after the current last header entry.",
+  })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  navOrder?: number;
 
   @ApiProperty({ type: String })
   @IsString()
@@ -65,12 +86,16 @@ export class UpdatePermissionGroupDto {
   @IsOptional()
   routePath?: string;
 
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsNotEmpty()
-  @Length(1, 64)
+  @ApiPropertyOptional({ enum: NavPlacement })
+  @IsEnum(NavPlacement)
   @IsOptional()
-  navGroup?: string;
+  navPlacement?: NavPlacement;
+
+  @ApiPropertyOptional({ type: Number, minimum: 1 })
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  navOrder?: number;
 
   @ApiPropertyOptional({ type: String })
   @IsString()
@@ -98,8 +123,11 @@ export class PermissionGroupResponseDto {
   @ApiProperty({ type: String })
   routePath!: string;
 
-  @ApiProperty({ type: String })
-  navGroup!: string;
+  @ApiProperty({ enum: NavPlacement })
+  navPlacement!: NavPlacement;
+
+  @ApiProperty({ type: Number })
+  navOrder!: number;
 
   @ApiProperty({ type: String })
   navLabel!: string;
@@ -164,6 +192,22 @@ export class ReplacePermissionGroupPermissionsDto {
   @ValidateNested({ each: true })
   @Type(() => AddPermissionGroupPermissionDto)
   permissions!: AddPermissionGroupPermissionDto[];
+}
+
+/**
+ * Full replacement of header nav ordering: the array position becomes
+ * navOrder (1-based) for every listed group, inside one transaction.
+ */
+export class ReorderPermissionGroupsNavOrderDto {
+  @ApiProperty({
+    type: Number,
+    isArray: true,
+    description: "PermissionGroup ids in the desired order (index 0 becomes navOrder 1).",
+  })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsInt({ each: true })
+  ids!: number[];
 }
 
 export class ListPermissionGroupsRequestDto extends CommonListRequestDto {

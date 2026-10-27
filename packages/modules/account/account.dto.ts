@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { MfaMethod, UserGender } from "@generated/prisma/client";
+import { MfaMethod, NavPlacement, UserGender } from "@generated/prisma/client";
 import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 
@@ -56,8 +56,11 @@ export class UserPermissionGroupSummary {
   @ApiProperty({ type: String })
   routePath!: string;
 
-  @ApiProperty({ type: String })
-  navGroup!: string;
+  @ApiProperty({ enum: NavPlacement })
+  navPlacement!: NavPlacement;
+
+  @ApiProperty({ type: Number, description: "Header nav position (1-based)." })
+  navOrder!: number;
 
   @ApiProperty({ type: String })
   navLabel!: string;

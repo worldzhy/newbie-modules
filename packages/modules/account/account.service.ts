@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { Prisma } from "@generated/prisma/client";
+import type { NavPlacement, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { UpdateMeDto } from "./account.dto";
 import { UserRequest } from "@modules/security/security.interface";
@@ -34,7 +34,15 @@ export class AccountService {
                 rolePermissionGroups: {
                   include: {
                     permissionGroup: {
-                      select: { id: true, name: true, routePath: true, navGroup: true, navLabel: true, navIcon: true },
+                      select: {
+                        id: true,
+                        name: true,
+                        routePath: true,
+                        navPlacement: true,
+                        navOrder: true,
+                        navLabel: true,
+                        navIcon: true,
+                      },
                     },
                   },
                 },
@@ -47,34 +55,48 @@ export class AccountService {
 
     const roles = user.roles.map((ur) => ur.role.name);
 
-    // Union of all PermissionGroups across every held role, deduplicated by id.
-    // ADMIN seed intentionally binds no PermissionGroup (the wildcard *:Manage
-    // covers everything); frontend detects ADMIN in roles and renders every
-    // nav entry regardless of this list.
-    const seenGroupIds = new Set<number>();
-    const permissionGroups: {
+    // Union of all PermissionGroups across every held role, deduplicated by id
+    // and ordered for the header nav. ADMIN binds no PermissionGroup rows on
+    // purpose (the wildcard *:Manage covers every resource), so their visible
+    // set is resolved here instead of being guessed by the frontend.
+    type PermissionGroupSummary = {
       id: number;
       name: string;
       routePath: string;
-      navGroup: string;
+      navPlacement: NavPlacement;
+      navOrder: number;
       navLabel: string;
       navIcon: string | null;
-    }[] = [];
-    for (const ur of user.roles) {
-      for (const rpg of ur.role.rolePermissionGroups) {
-        const pg = rpg.permissionGroup;
-        if (!seenGroupIds.has(pg.id)) {
-          seenGroupIds.add(pg.id);
-          permissionGroups.push({
-            id: pg.id,
-            name: pg.name,
-            routePath: pg.routePath,
-            navGroup: pg.navGroup,
-            navLabel: pg.navLabel,
-            navIcon: pg.navIcon,
-          });
+    };
+    const permissionGroupSelect = {
+      id: true,
+      name: true,
+      routePath: true,
+      navPlacement: true,
+      navOrder: true,
+      navLabel: true,
+      navIcon: true,
+    } as const;
+
+    let permissionGroups: PermissionGroupSummary[];
+    if (roles.includes("ADMIN")) {
+      permissionGroups = await this.prisma.permissionGroup.findMany({
+        select: permissionGroupSelect,
+        orderBy: [{ navOrder: "asc" }, { id: "asc" }],
+      });
+    } else {
+      const groupsById = new Map<number, PermissionGroupSummary>();
+      for (const ur of user.roles) {
+        for (const rpg of ur.role.rolePermissionGroups) {
+          const pg = rpg.permissionGroup;
+          if (!groupsById.has(pg.id)) {
+            groupsById.set(pg.id, pg);
+          }
         }
       }
+      permissionGroups = [...groupsById.values()].sort(
+        (left, right) => left.navOrder - right.navOrder || left.id - right.id,
+      );
     }
 
     return {

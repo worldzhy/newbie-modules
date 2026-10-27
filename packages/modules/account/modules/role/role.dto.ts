@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { NavPlacement } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { PermissionResponseDto } from "../permission/permission.dto";
 import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Length } from "class-validator";
@@ -82,8 +83,11 @@ export class RolePermissionGroupSummaryDto {
   @ApiProperty({ type: String })
   routePath!: string;
 
-  @ApiProperty({ type: String })
-  navGroup!: string;
+  @ApiProperty({ enum: NavPlacement })
+  navPlacement!: NavPlacement;
+
+  @ApiProperty({ type: Number })
+  navOrder!: number;
 
   @ApiProperty({ type: String })
   navLabel!: string;

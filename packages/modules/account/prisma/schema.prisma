@@ -119,7 +119,13 @@ model PermissionGroup {
   name          String                 @unique
   description   String?
   routePath     String
-  navGroup      String
+  // Where the group surfaces in the application chrome. Every header entry has
+  // the same standing; placement only decides whether it is rendered there.
+  navPlacement  NavPlacement           @default(NONE)
+  // Position among header entries (1-based, ascending). Gaps are allowed; the
+  // frontend renders the lowest N directly and folds the rest into one overflow
+  // menu. The threshold itself is a presentation constant, not stored here.
+  navOrder      Int                    @default(0)
   navLabel      String
   navIcon       String?
   isBuiltin     Boolean                @default(true)
@@ -282,6 +288,13 @@ enum MfaMethod {
   SMS
   TOTP
   EMAIL
+
+  @@schema("module/account")
+}
+
+enum NavPlacement {
+  HEADER_NAVIGATION
+  NONE
 
   @@schema("module/account")
 }
