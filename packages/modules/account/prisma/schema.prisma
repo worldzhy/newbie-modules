@@ -222,6 +222,7 @@ model AccountExternalIdentity {
 enum UserStatus {
   ACTIVE
   INACTIVE
+  PENDING_APPROVAL
 
   @@schema("module/account")
 }
