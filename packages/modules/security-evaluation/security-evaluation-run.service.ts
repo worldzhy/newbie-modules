@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import type { EvaluationRun } from "@generated/prisma/client";
 import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
 import { EvaluationResultService, ListEvaluationResultsInput } from "@modules/evaluation/evaluation-result.service";
 import { EvaluationRunService, ListEvaluationRunsInput } from "@modules/evaluation/evaluation-run.service";
@@ -48,13 +49,14 @@ export class SecurityEvaluationRunService {
    */
   async listRuns(query: ListEvaluationRunsInput) {
     const page = await this.runs.listRuns(query);
-    const versionIds = [...new Set(page.records.map((run) => run.criteriaVersionId))];
+    const records = page.records as EvaluationRun[];
+    const versionIds = [...new Set(records.map((run) => run.criteriaVersionId))];
     const versions = new Map(
       (await Promise.all(versionIds.map((id) => this.criteria.getVersion(id)))).map((version) => [version.id, version]),
     );
     return {
       ...page,
-      records: page.records.map((run) => {
+      records: records.map((run) => {
         const version = versions.get(run.criteriaVersionId);
         return { ...run, evaluationKey: version?.evaluationKey ?? "", criteriaVersion: version?.version ?? "" };
       }),
