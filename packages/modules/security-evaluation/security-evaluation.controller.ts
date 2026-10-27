@@ -118,10 +118,12 @@ export class SecurityEvaluationController {
 
   @Get("runs")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationRun)
-  @ApiOperation({ summary: "List runs for a subject (newest first)" })
+  @ApiOperation({ summary: "List runs under a host scope, optionally narrowed to one subject (newest first)" })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationRunsResponseDto })
   listRuns(@Query() query: ListSecurityEvaluationRunsRequestDto) {
     return this.runs.listRuns({
+      scopeType: query.scopeType,
+      scopeId: query.scopeId,
       subjectId: query.subjectId,
       criteriaVersionId: query.criteriaVersionId,
       page: query.page,
@@ -148,11 +150,16 @@ export class SecurityEvaluationController {
 
   @Get("findings")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationFinding)
-  @ApiOperation({ summary: "List findings for a subject, optionally filtered by evaluationKey, status and severity" })
+  @ApiOperation({
+    summary: "List findings under a host scope, optionally filtered by subject, run, evaluationKey, status, severity",
+  })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationFindingsResponseDto })
   listFindings(@Query() query: ListSecurityEvaluationFindingsRequestDto) {
     return this.findings.listFindings({
+      scopeType: query.scopeType,
+      scopeId: query.scopeId,
       subjectId: query.subjectId,
+      runId: query.runId,
       evaluationKey: query.evaluationKey,
       status: query.status,
       severity: query.severity,

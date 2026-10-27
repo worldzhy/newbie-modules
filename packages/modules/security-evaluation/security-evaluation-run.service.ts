@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
 import { EvaluationResultService, ListEvaluationResultsInput } from "@modules/evaluation/evaluation-result.service";
 import { EvaluationRunService, ListEvaluationRunsInput } from "@modules/evaluation/evaluation-run.service";
 import { EvaluationRunnerService } from "@modules/evaluation/evaluation-runner.service";
@@ -25,6 +26,7 @@ export class SecurityEvaluationRunService {
     private readonly runner: EvaluationRunnerService,
     private readonly runs: EvaluationRunService,
     private readonly results: EvaluationResultService,
+    private readonly criteria: EvaluationCriteriaService,
   ) {}
 
   async startRun(input: StartSecurityEvaluationRunInput): Promise<void> {
@@ -39,8 +41,24 @@ export class SecurityEvaluationRunService {
     });
   }
 
-  listRuns(query: ListEvaluationRunsInput) {
-    return this.runs.listRuns(query);
+  /**
+   * Runs decorated with their criteria family labels: the skeleton row only
+   * carries criteriaVersionId, while the API consumer displays the
+   * evaluationKey and version of what the run was judged against.
+   */
+  async listRuns(query: ListEvaluationRunsInput) {
+    const page = await this.runs.listRuns(query);
+    const versionIds = [...new Set(page.records.map((run) => run.criteriaVersionId))];
+    const versions = new Map(
+      (await Promise.all(versionIds.map((id) => this.criteria.getVersion(id)))).map((version) => [version.id, version]),
+    );
+    return {
+      ...page,
+      records: page.records.map((run) => {
+        const version = versions.get(run.criteriaVersionId);
+        return { ...run, evaluationKey: version?.evaluationKey ?? "", criteriaVersion: version?.version ?? "" };
+      }),
+    };
   }
 
   getRun(id: string) {

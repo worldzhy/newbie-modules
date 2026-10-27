@@ -45,10 +45,11 @@ export class ListSecurityEvaluationAssetsRequestDto extends CommonListRequestDto
   scopeId!: string;
 }
 
-/** Mirrors the SecurityEvaluationAsset row. */
+/** Mirrors the SecurityEvaluationAsset row, decorated with the subject kind. */
 export class SecurityEvaluationAssetResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
+  @ApiProperty({ description: 'Subject kind behind this asset, e.g. "repository" or "cloud-account"' }) kind!: string;
   @ApiProperty({ description: "Stable identity inside the scope: repository full name or cloud account id" })
   naturalKey!: string;
   @ApiProperty() displayName!: string;
@@ -115,9 +116,20 @@ export class SecurityEvaluationRunAcceptedResponseDto {
 }
 
 export class ListSecurityEvaluationRunsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Subject whose runs are listed (newest first)" })
+  @ApiProperty({ description: "Host-assigned scope type the runs are listed under" })
+  @IsString()
+  @IsNotEmpty()
+  scopeType!: string;
+
+  @ApiProperty({ description: "Host-assigned scope id the runs are listed under" })
+  @IsString()
+  @IsNotEmpty()
+  scopeId!: string;
+
+  @ApiPropertyOptional({ description: "Restrict to one subject" })
+  @IsOptional()
   @IsUUID()
-  subjectId!: string;
+  subjectId?: string;
 
   @ApiPropertyOptional({ description: "Restrict to one criteria version" })
   @IsOptional()
@@ -125,11 +137,13 @@ export class ListSecurityEvaluationRunsRequestDto extends CommonListRequestDto {
   criteriaVersionId?: string;
 }
 
-/** Mirrors the skeleton's EvaluationRun row. */
+/** Mirrors the skeleton's EvaluationRun row, decorated with the criteria family labels. */
 export class SecurityEvaluationRunResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
   @ApiProperty() criteriaVersionId!: string;
+  @ApiProperty({ description: 'Criteria family of the run, e.g. "dependency-osv"' }) evaluationKey!: string;
+  @ApiProperty({ description: 'Criteria version label of the run, e.g. "v1"' }) criteriaVersion!: string;
   @ApiProperty({ enum: EvaluationRunStatus }) status!: EvaluationRunStatus;
   @ApiPropertyOptional({ type: String }) requestedByRef?: string | null;
   @ApiPropertyOptional({ type: Object }) config?: object | null;
@@ -178,9 +192,25 @@ export class ListSecurityEvaluationResultsResponseDto extends CommonListResponse
 // --- Findings ------------------------------------------------------------
 
 export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Subject whose findings are listed" })
+  @ApiProperty({ description: "Host-assigned scope type the findings are listed under" })
+  @IsString()
+  @IsNotEmpty()
+  scopeType!: string;
+
+  @ApiProperty({ description: "Host-assigned scope id the findings are listed under" })
+  @IsString()
+  @IsNotEmpty()
+  scopeId!: string;
+
+  @ApiPropertyOptional({ description: "Restrict to one subject" })
+  @IsOptional()
   @IsUUID()
-  subjectId!: string;
+  subjectId?: string;
+
+  @ApiPropertyOptional({ description: "Restrict to findings last observed by this run" })
+  @IsOptional()
+  @IsUUID()
+  runId?: string;
 
   @ApiPropertyOptional({ description: 'Restrict to one criteria evaluationKey, e.g. "dependency-osv"' })
   @IsOptional()

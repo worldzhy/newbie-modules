@@ -80,6 +80,9 @@ export interface ListEvaluationRunsInput {
   criteriaVersionId?: string;
   /** When present, only runs whose subject matches this kind are returned. */
   kind?: string;
+  /** Host scope coordinate on the subject; narrows the list to one scope. */
+  scopeType?: string;
+  scopeId?: string;
   page?: number;
   pageSize?: number;
 }
@@ -235,7 +238,15 @@ export class EvaluationRunService {
         where: {
           subjectId: query.subjectId,
           ...(query.criteriaVersionId ? { criteriaVersionId: query.criteriaVersionId } : {}),
-          ...(query.kind ? { subject: { kind: query.kind } } : {}),
+          ...(query.kind || query.scopeType || query.scopeId
+            ? {
+                subject: {
+                  ...(query.kind ? { kind: query.kind } : {}),
+                  ...(query.scopeType ? { scopeType: query.scopeType } : {}),
+                  ...(query.scopeId ? { scopeId: query.scopeId } : {}),
+                },
+              }
+            : {}),
         },
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       },

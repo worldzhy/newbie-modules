@@ -109,9 +109,10 @@ export class SecurityEvaluationAssetService {
   async listAssets(query: ListSecurityEvaluationAssetsInput) {
     const subjects = await this.prisma.evaluationSubject.findMany({
       where: { kind: { in: [...query.kinds] }, scopeType: query.scopeType, scopeId: query.scopeId },
-      select: { id: true },
+      select: { id: true, kind: true },
     });
-    return this.prisma.findManyInManyPages({
+    const kindBySubject = new Map(subjects.map((subject) => [subject.id, subject.kind]));
+    const page = await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.SecurityEvaluationAsset,
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
@@ -119,6 +120,10 @@ export class SecurityEvaluationAssetService {
         orderBy: [{ displayName: "asc" }, { id: "asc" }],
       },
     });
+    return {
+      ...page,
+      records: page.records.map((asset) => ({ ...asset, kind: kindBySubject.get(asset.subjectId) ?? "" })),
+    };
   }
 
   async listFacts(query: ListSecurityEvaluationAssetFactsInput) {

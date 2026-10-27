@@ -15,7 +15,13 @@ import { EvaluationFindingChangedEvent } from "./ports/observer.port";
 import { validateJudgment } from "./evaluation-invariants";
 
 export interface ListEvaluationFindingsInput {
-  subjectId: string;
+  /** Omitted lists findings across subjects (narrowed by scope or run when given). */
+  subjectId?: string;
+  /** Host scope coordinate on the subject; narrows the list to one scope. */
+  scopeType?: string;
+  scopeId?: string;
+  /** Only findings last observed by this run. */
+  runId?: string;
   evaluationKey?: string;
   status?: EvaluationFindingStatus;
   severity?: EvaluationFindingSeverity;
@@ -186,10 +192,19 @@ export class EvaluationFindingService {
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
         where: {
-          subjectId: query.subjectId,
+          ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+          ...(query.runId ? { lastSeenRunId: query.runId } : {}),
           ...(query.evaluationKey ? { evaluationKey: query.evaluationKey } : {}),
           ...(query.status ? { status: query.status } : {}),
           ...(query.severity ? { severity: query.severity } : {}),
+          ...(query.scopeType || query.scopeId
+            ? {
+                subject: {
+                  ...(query.scopeType ? { scopeType: query.scopeType } : {}),
+                  ...(query.scopeId ? { scopeId: query.scopeId } : {}),
+                },
+              }
+            : {}),
         },
         orderBy: [{ status: "asc" }, { severity: "desc" }, { lastSeenAt: "desc" }],
       },
