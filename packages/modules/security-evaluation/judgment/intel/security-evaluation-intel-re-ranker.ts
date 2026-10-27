@@ -50,7 +50,13 @@ Rules:
   domain, but NOT necessarily that this specific entity is affected.
 - finalRelevant MUST be true only if at least one entity has matched=true.
   semanticMatch alone is NOT enough to set finalRelevant=true.
-- Output strict JSON matching the requested schema. No markdown.`;
+- Output strict JSON matching exactly this schema. No markdown, no extra keys:
+  {
+    "entityMatches": [{ "entity": string, "matched": boolean, "evidence": string | null }],
+    "semanticMatch": boolean,
+    "finalRelevant": boolean,
+    "reason": string
+  }`;
 
 /**
  * LLM-backed re-ranker for INTEL candidates that survived hard rule recall.
