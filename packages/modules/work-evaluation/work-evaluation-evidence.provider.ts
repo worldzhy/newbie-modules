@@ -24,8 +24,11 @@ import { WorkEvaluationSessionStore } from "./work-evaluation-session.store";
  * drills in through its read-only tools (skeleton evidence-payload rule).
  *
  * The manifest is part of what the model sees under a blind subject id, so
- * member-supplied paths (workspace rootPath, document refPath) never enter
- * summaries, refs or payloads — ids and workspace keys only.
+ * workspace rootPath and document refPath never enter summaries, refs or
+ * payloads — ids and workspace keys only. Session touchedFiles are the one
+ * member-supplied path that does enter a payload, because which files a session
+ * touched is evidence; the judgment redactor masks their home-directory login
+ * segments by shape (ADR-024).
  */
 @Injectable()
 export class WorkEvaluationEvidenceProvider implements EvidenceProvider {

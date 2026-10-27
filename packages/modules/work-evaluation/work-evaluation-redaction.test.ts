@@ -112,6 +112,59 @@ describe("identity tokens", () => {
   });
 });
 
+describe("home-directory paths", () => {
+  const redact = createDrillRedactor(NO_IDENTITY);
+
+  it("masks the macOS login segment of an absolute path", () => {
+    assert.equal(
+      redact("/Users/henry/src/devbie/packages/app.ts"),
+      `/Users/${SUBJECT_MASK}/src/devbie/packages/app.ts`,
+    );
+  });
+
+  it("masks the Linux login segment of an absolute path", () => {
+    assert.equal(redact("/home/henry/project/src/main.ts"), `/home/${SUBJECT_MASK}/project/src/main.ts`);
+  });
+
+  it("masks the Windows login segment of an absolute path", () => {
+    assert.equal(redact("C:\\Users\\henry\\src\\app.ts"), `C:\\Users\\${SUBJECT_MASK}\\src\\app.ts`);
+    // Windows paths are case-insensitive, and profile folders can contain spaces.
+    assert.equal(redact("c:\\users\\John Doe\\Documents\\notes.md"), `c:\\users\\${SUBJECT_MASK}\\Documents\\notes.md`);
+  });
+
+  it("masks login names containing dots, dashes and underscores", () => {
+    assert.equal(redact("/Users/john.doe_2-app/src/x.ts"), `/Users/${SUBJECT_MASK}/src/x.ts`);
+  });
+
+  it("masks a path embedded in prose, in a quoted value, or ending the string", () => {
+    assert.equal(
+      redact("opened /Users/henry/.claude/settings.json and continued"),
+      `opened /Users/${SUBJECT_MASK}/.claude/settings.json and continued`,
+    );
+    assert.equal(redact('{"path":"/Users/henry/x.ts"}'), `{"path":"/Users/${SUBJECT_MASK}/x.ts"}`);
+    assert.equal(redact("cwd /Users/henry"), `cwd /Users/${SUBJECT_MASK}`);
+  });
+
+  it("leaves URL path segments, relative paths and name-less prefixes alone", () => {
+    const cases = [
+      "https://example.com/home/henry/index.html",
+      "https://api.example.com/Users/123/profile",
+      "src/home/page.ts",
+      "/Users/",
+      "the home directory and the user profile",
+    ];
+    for (const text of cases) {
+      assert.equal(redact(text), text);
+    }
+  });
+
+  it("runs before identity tokens so a name token never partly eats a path segment", () => {
+    const tokenRedact = createDrillRedactor(new Set(["alice"]));
+
+    assert.equal(tokenRedact("/Users/alice-2/project and alice"), `/Users/${SUBJECT_MASK}/project and ${SUBJECT_MASK}`);
+  });
+});
+
 describe("redactDeep", () => {
   const redact = createDrillRedactor(new Set(["Alice Smith"]));
 

@@ -25,11 +25,35 @@ export const REDACTED = "[REDACTED]";
 export const SUBJECT_MASK = "[subject]";
 
 /**
+ * Home-directory prefixes embed the operating system's login name, which no
+ * account field carries: external identities hold platform accounts and the
+ * profile has display fields only. The prefix shape is a structural OS fact,
+ * so the login segment is masked by form rather than by an inferred token —
+ * an inferred name cannot be proven correct, and a short or generic one
+ * ("admin", "root") would destroy ordinary text. Runs before the identity
+ * tokens so a path segment is never partly consumed by a name token.
+ */
+const HOME_PATH_PATTERNS: { pattern: RegExp; replacement: string }[] = [
+  // POSIX: /Users/<login>/... (macOS) and /home/<login>/... (Linux).
+  {
+    pattern: /(?<![A-Za-z0-9._~%-])(\/(?:Users|home)\/)([A-Za-z0-9._-]+)(?=[/\\]|["'`\s,;:)\]}]|$)/gi,
+    replacement: `$1${SUBJECT_MASK}`,
+  },
+  // Windows: C:\Users\<login>\... (the separator after the login is required
+  // so a prose sentence is never mistaken for a profile path).
+  {
+    pattern: /(?<![A-Za-z0-9._-])([A-Za-z]:\\Users\\)([^\\/:*?"<>|\r\n]+)(?=[\\/])/gi,
+    replacement: `$1${SUBJECT_MASK}`,
+  },
+];
+
+/**
  * Builds a scrubber for one evaluatee's drill-down output. Identity tokens are
  * the member's registered emails, linked-account display names and profile
  * name; each occurrence is replaced with a stable mask so the text stays
- * readable without revealing who the subject is. Secret patterns then apply
- * regardless of whose secret they are.
+ * readable without revealing who the subject is. Home-directory path segments
+ * are masked by shape, and secret patterns then apply regardless of whose
+ * secret they are.
  */
 export function createDrillRedactor(identityTokens: Set<string>): (text: string) => string {
   const emailTokens: string[] = [];
@@ -46,6 +70,9 @@ export function createDrillRedactor(identityTokens: Set<string>): (text: string)
 
   return (text: string): string => {
     let output = text;
+    for (const { pattern, replacement } of HOME_PATH_PATTERNS) {
+      output = output.replace(pattern, replacement);
+    }
     for (const token of literalTokens) {
       output = output.split(token).join(SUBJECT_MASK);
     }

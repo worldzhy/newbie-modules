@@ -321,6 +321,11 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
    * Resolved live from the account (ADR-026 D3) so renames never require
    * subject re-registration. Tokens shorter than four characters are dropped —
    * masking on "Al" would destroy more signal than it protects.
+   *
+   * The operating-system login name is deliberately absent: no account field
+   * carries it, and it reaches the model inside home-directory paths. The
+   * redactor masks those path segments by shape instead (see
+   * `createDrillRedactor`).
    */
   private async loadIdentityTokens(userId: string): Promise<Set<string>> {
     const [emails, identities, user] = await Promise.all([
