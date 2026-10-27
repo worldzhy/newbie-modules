@@ -583,9 +583,10 @@ export class WorkEvaluationRunAcceptedResponseDto {
 }
 
 export class ListWorkEvaluationRunsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Subject whose runs are listed (newest first)" })
+  @ApiPropertyOptional({ description: "Restrict to one subject; omitted lists every run of the kind (newest first)" })
+  @IsOptional()
   @IsUUID()
-  subjectId!: string;
+  subjectId?: string;
 
   @ApiPropertyOptional({ description: "Restrict to one criteria version" })
   @IsOptional()
@@ -660,10 +661,12 @@ export class ListWorkEvaluationSubjectsRequestDto extends CommonListRequestDto {
   @IsNotEmpty()
   scopeType!: string;
 
-  @ApiProperty({ description: "Host-assigned scope id the subjects are listed under" })
+  @ApiPropertyOptional({
+    description: "Restrict to one scope coordinate; omitted lists every subject under the scope type",
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  scopeId!: string;
+  scopeId?: string;
 }
 
 /** Mirrors the skeleton's EvaluationSubject row (kind is always "work" here). */

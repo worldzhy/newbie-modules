@@ -75,7 +75,8 @@ export interface StartEvaluationRunInput {
 }
 
 export interface ListEvaluationRunsInput {
-  subjectId: string;
+  /** Omitted lists every run (of `kind`, when given) newest first. */
+  subjectId?: string;
   criteriaVersionId?: string;
   /** When present, only runs whose subject matches this kind are returned. */
   kind?: string;
