@@ -36,8 +36,11 @@ export default [
     // is not installed here) resolves to `any` and makes a required property look nullable.
     // Assembled hosts resolve the real types and keep the rule enabled.
     files: [
+      "packages/modules/account/account.dto.ts",
       "packages/modules/account/auth/auth.dto.ts",
       "packages/modules/account/modules/permission/permission.dto.ts",
+      "packages/modules/account/modules/permission-group/permission-group.dto.ts",
+      "packages/modules/account/modules/role/role.dto.ts",
       "packages/modules/aws-ses/suppression-list/suppression-list.dto.ts",
       "packages/modules/membership/subscription/subscription.dto.ts",
       "packages/modules/membership/subscription/wechat-subscription/wechat-subscription.dto.ts",

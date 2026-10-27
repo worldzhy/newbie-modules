@@ -34,7 +34,6 @@ export class CreatePermissionGroupDto {
   @Length(1, 128)
   routePath!: string;
 
-  // eslint-disable-next-line @darraghor/nestjs-typed/all-properties-have-explicit-defined -- false positive on pure-required DTO
   @ApiProperty({ enum: NavPlacement, description: "Where the group surfaces in the application chrome." })
   @IsEnum(NavPlacement)
   navPlacement!: NavPlacement;
@@ -171,7 +170,6 @@ export class PermissionGroupDetailResponseDto extends PermissionGroupResponseDto
 }
 
 export class AddPermissionGroupPermissionDto {
-  // eslint-disable-next-line @darraghor/nestjs-typed/all-properties-have-explicit-defined -- false positive on pure-required DTO
   @ApiProperty({ enum: PermissionAction })
   @IsEnum(PermissionAction)
   action!: PermissionAction;
