@@ -35,8 +35,8 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 - 内部调用（runner.open、runner.persistFailure 里的 findById）不传 kind，零额外成本。
 - 行为：传 kind 不匹配 → NotFoundException（语义"这个 kind 下没有这个 id"），而非 ConflictException。
 - façade 层 `WorkEvaluationRunService` 5 个读方法统一 pin `WORK_EVALUATION_SUBJECT_KIND`。
-- 测试：消费仓 96/96 集成测试全绿（原 94 + #6 新 2）。
-- 提交：registry `1374773`，backend `a0a8f2c`（均推 dev）。
+- 测试：骨架层 3 个 kind guard 行为测试（findById 无 kind / 匹配 kind / 不匹配 kind → NotFound）；消费仓 99/99 集成测试全绿（原 94 + #6 fencing 2 + kind guard 3）。
+- 提交：registry `1374773`，backend `a0a8f2c`；测试补：registry `c50b549`，backend `b452721`（均推 dev）。
 
 ### #4 username token 脱敏（2026-10-27 交付）
 
