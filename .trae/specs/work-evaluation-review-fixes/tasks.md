@@ -7,16 +7,7 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 
 ## 待办
 
-### #4 username token 脱敏（下一个）
-
-- 问题：`loadIdentityTokens`（`work-evaluation-judgment.service.ts:325-342`）只收集 email / displayName / name / firstName / lastName；session touchedFiles 的绝对路径（`/Users/<username>/...`）携带系统登录用户名，绕过 `redactDeep`（`work-evaluation-redaction.ts`）直达 LLM——盲评破功 + PII 出边界。
-- 决策点（待拍板）：**username token 来源**。候选：
-  - A. 外部身份表（`AccountExternalIdentity`）增取 username 字段——随账号体系登记，rename 安全；
-  - B. 从 session 元数据（cwd/home/touchedFiles 路径）运行时推断——零登记成本，但推断口径要钉死（`/Users/<u>/`、`/home/<u>/`）；
-  - C. subject 注册时显式登记 username——多一次装配动作。
-- 完成标准：路径中的用户名被 `[subject]` 掩码；行为测试钉住 `/Users/<name>/` 形态。
-
-### #1 读方法缺 kind guard
+### #1 读方法缺 kind guard（下一个）
 
 - 问题：`work-evaluation-run.service.ts:99-117` 五个读方法裸透传 skeleton run id，不校验该 run 属于本 feature 的 subject kind；骨架 `listRuns`（`evaluation-run.service.ts:207-219`）同样不校验 kind（对比 `listSubjects:120-122` 有 pin）。
 - 决策点（待拍板）：guard 加在**骨架层**（listRuns/findById 增 kind 参数）还是 **façade 层**（work-evaluation 自己的读方法 pin kind）。
@@ -37,6 +28,13 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 - `work-evaluation.controller.ts:235`：现返回 `{accepted:true}`，改为带 `runId` 便于调用方追踪。
 
 ## 已完成
+
+### #4 username token 脱敏（2026-10-27 交付）
+
+- 决策（用户拍板）：B + B2——不登记、不推断 token，redactor 内建 home 路径形态规则；覆盖 macOS/Linux/Windows。
+- 修复：`createDrillRedactor` 在 identity token 掩码**之前**执行 `HOME_PATH_PATTERNS`，把 `/Users/<u>/`、`/home/<u>/`、`C:\Users\<u>\` 的登录名段替换为 `[subject]`（保留 home 前缀）；`loadIdentityTokens` 注释说明 OS 登录名不属于账号事实；evidence provider 注释订正为"touchedFiles 是唯一进入 payload 的成员路径，由 redactor 按形态脱敏"。
+- 测试：`work-evaluation-redaction.test.ts` 新增 7 个用例（三形态、含 `.`/`-`/`_` 登录名、prose/quoted/串尾、URL/相对路径/无登录名反向、规则先于 token）。
+- 提交：registry `6b95007`，backend `3c44454`（均推 dev）。
 
 ### #3 execute catch 中 markFailed 失败被吞（2026-10-27 交付）
 
