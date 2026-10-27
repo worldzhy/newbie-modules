@@ -26,13 +26,61 @@ export class AccountService {
         middleName: true,
         lastName: true,
         avatarFileId: true,
-        roles: { select: { role: { select: { name: true } } } },
+        roles: {
+          select: {
+            role: {
+              select: {
+                name: true,
+                rolePermissionGroups: {
+                  include: {
+                    permissionGroup: {
+                      select: { id: true, name: true, routePath: true, navGroup: true, navLabel: true, navIcon: true },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
+    const roles = user.roles.map((ur) => ur.role.name);
+
+    // Union of all PermissionGroups across every held role, deduplicated by id.
+    // ADMIN seed intentionally binds no PermissionGroup (the wildcard *:Manage
+    // covers everything); frontend detects ADMIN in roles and renders every
+    // nav entry regardless of this list.
+    const seenGroupIds = new Set<number>();
+    const permissionGroups: {
+      id: number;
+      name: string;
+      routePath: string;
+      navGroup: string;
+      navLabel: string;
+      navIcon: string | null;
+    }[] = [];
+    for (const ur of user.roles) {
+      for (const rpg of ur.role.rolePermissionGroups) {
+        const pg = rpg.permissionGroup;
+        if (!seenGroupIds.has(pg.id)) {
+          seenGroupIds.add(pg.id);
+          permissionGroups.push({
+            id: pg.id,
+            name: pg.name,
+            routePath: pg.routePath,
+            navGroup: pg.navGroup,
+            navLabel: pg.navLabel,
+            navIcon: pg.navIcon,
+          });
+        }
+      }
+    }
+
     return {
       ...user,
-      roles: user.roles.map((ur) => ur.role.name),
+      roles,
+      permissionGroups,
     };
   }
 

@@ -16,6 +16,13 @@ export class GetCurrentUserResponseDto {
   @ApiProperty({ type: String, isArray: true })
   roles!: string[];
 
+  @ApiProperty({
+    type: () => UserPermissionGroupSummary,
+    isArray: true,
+    description: "Union of permission groups across all held roles. ADMIN holders get every group implicitly.",
+  })
+  permissionGroups!: UserPermissionGroupSummary[];
+
   @ApiPropertyOptional({ enum: MfaMethod })
   twoFactorMethod?: MfaMethod;
 
@@ -33,6 +40,30 @@ export class GetCurrentUserResponseDto {
 
   @ApiPropertyOptional({ type: String })
   avatarFileId?: string | null;
+}
+
+/**
+ * Trimmed PermissionGroup projection returned by /account/me. Frontend uses
+ * this to decide which nav entries to render — no permissions or description.
+ */
+export class UserPermissionGroupSummary {
+  @ApiProperty({ type: Number })
+  id!: number;
+
+  @ApiProperty({ type: String })
+  name!: string;
+
+  @ApiProperty({ type: String })
+  routePath!: string;
+
+  @ApiProperty({ type: String })
+  navGroup!: string;
+
+  @ApiProperty({ type: String })
+  navLabel!: string;
+
+  @ApiPropertyOptional({ type: String })
+  navIcon?: string | null;
 }
 
 /**
