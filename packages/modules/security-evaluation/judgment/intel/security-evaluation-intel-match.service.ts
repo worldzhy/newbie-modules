@@ -33,7 +33,7 @@ interface MatchableItem {
   summary: string | null;
   severity: string;
   signalTags: string[];
-  negativeCache: Record<string, string> | null;
+  negativeCache: Prisma.JsonValue | null;
 }
 
 export interface IntelMatchResult {
