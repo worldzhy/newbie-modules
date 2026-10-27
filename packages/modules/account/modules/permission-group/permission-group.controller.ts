@@ -71,7 +71,9 @@ export class PermissionGroupController {
       pagination: { page, pageSize },
       findManyArgs: {
         where: name ? { name: { contains: name, mode: "insensitive" } } : undefined,
-        orderBy: [{ navOrder: "asc" }, { id: "asc" }],
+        // Header entries first (in nav order), then groups that live outside
+        // the header, so the list mirrors what the drag list reorders.
+        orderBy: [{ navPlacement: "asc" }, { navOrder: "asc" }, { id: "asc" }],
       },
     });
 
