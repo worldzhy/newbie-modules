@@ -21,13 +21,13 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 
 - 补 `evaluation-runner-events.test.ts` 2 个新用例：**reaped mid-execution**（assertActive 抛 stale Conflict → persistFailure 读回 reap 文本 → event+observer 同字）、**restarted mid-flight**（assertActive 抛 restarted Conflict → markFailed 写 row → event+observer 带 fencing 错误）。
 - 原 8 测试 → 现 10 测试，覆盖 ADR-032 断言 4 次 call 中间任一时刻被 fencing 打断的路径。
-- 提交：registry `(待提交)`，backend `(待提交)`。
+- 提交：registry `1374773`，backend `a0a8f2c`（均推 dev）。
 
 ### #1 读方法 kind guard（2026-10-27 交付）
 
 - 决策（用户拍板）：B——guard 加在**骨架层**，5 方法增可选 `kind?: string` 参数，façade 层统一传 `WORK_EVALUATION_SUBJECT_KIND`。
 - 骨架层改动：
-  - `EvaluationRunService.findById(id, kind?)`——统一 include subject.kind（Prisma 禁止 select+include 同时用，include 零成本额外字段）
+  - `EvaluationRunService.findById(id, kind?)`——统一 include subject.kind（零成本额外字段）
   - `EvaluationRunService.listRuns({ kind? })`——where 加 `subject: { kind }` nested filter
   - `EvaluationResultService.getResult(id, kind?)`——select 合并 subject.kind
   - `EvaluationResultService.getResultForRun(runId, kind?)`——同上
@@ -36,7 +36,7 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 - 行为：传 kind 不匹配 → NotFoundException（语义"这个 kind 下没有这个 id"），而非 ConflictException。
 - façade 层 `WorkEvaluationRunService` 5 个读方法统一 pin `WORK_EVALUATION_SUBJECT_KIND`。
 - 测试：消费仓 96/96 集成测试全绿（原 94 + #6 新 2）。
-- 提交：registry `(待提交)`，backend `(待提交)`。
+- 提交：registry `1374773`，backend `a0a8f2c`（均推 dev）。
 
 ### #4 username token 脱敏（2026-10-27 交付）
 
@@ -58,6 +58,6 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 
 ## 已关闭 / 挂起
 
-- #5：by-design（LWW），关闭。
+- #5：by-design（LWW），关闭——reviewResult LWW（supervisor 最后一次为准，同 result 双并发是产品层可观测异常而非数据损坏）、updateFinding 回退路径只覆写 observation 元数据不覆写生命周期决策、resolveAbsentFindings 已做 CAS；维持关闭，如需审计轨迹应新增 `EvaluationReviewHistory` append-only 表而非改 optimistic lock。
 - #7：关闭。
 - #8、#9：挂起（本队列不处理）。
