@@ -52,7 +52,7 @@ export class WorkEvaluationRunService {
    * so the caller gets 400/404/409 before the 202; everything past admission
    * is observed through the run row.
    */
-  async startRun(input: StartWorkEvaluationRunInput): Promise<void> {
+  async startRun(input: StartWorkEvaluationRunInput): Promise<string> {
     const period = await this.periods.getPeriodById(input.periodId);
     if (period.type !== WorkEvaluationPeriodType.COLLECTION) {
       throw new BadRequestException(
@@ -94,6 +94,7 @@ export class WorkEvaluationRunService {
         `Evaluation run ${run.id} for subject ${subject.id} failed: ${error instanceof Error ? error.message : String(error)}`,
       );
     });
+    return run.id;
   }
 
   listRuns(query: ListEvaluationRunsInput) {

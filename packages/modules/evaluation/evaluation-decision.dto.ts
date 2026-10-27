@@ -1,5 +1,15 @@
 import { Type } from "class-transformer";
-import { IsArray, IsDate, IsEnum, IsOptional, IsString, IsUUID, ValidateNested } from "class-validator";
+import {
+  IsArray,
+  IsDate,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsUUID,
+  ValidateIf,
+  ValidateNested,
+} from "class-validator";
 import {
   EvaluationFindingSeverity,
   EvaluationFindingStatus,
@@ -35,9 +45,12 @@ export class ReviewEvaluationResultRequestDto {
   @IsEnum(EvaluationResultReviewStatus)
   reviewStatus!: EvaluationResultReviewStatus;
 
-  @ApiPropertyOptional({ description: "Why the supervisor endorsed or overruled the conclusion" })
-  @IsOptional()
+  @ApiPropertyOptional({
+    description: "Why the supervisor endorsed or overruled the conclusion — mandatory when REJECTED",
+  })
+  @ValidateIf((o) => o.reviewStatus === EvaluationResultReviewStatus.REJECTED)
   @IsString()
+  @IsNotEmpty({ message: "note is required when reviewStatus is REJECTED" })
   note?: string;
 }
 

@@ -171,6 +171,9 @@ export class EvaluationResultService {
    * latest say, never a blend of two.
    */
   async reviewResult(input: ReviewEvaluationResultInput) {
+    if (input.reviewStatus === EvaluationResultReviewStatus.REJECTED && !input.note?.trim()) {
+      throw new BadRequestException("review.note is required when reviewStatus is REJECTED");
+    }
     const result = await this.prisma.evaluationResult.findUnique({
       where: { id: input.id },
       select: { id: true },

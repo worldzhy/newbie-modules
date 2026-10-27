@@ -228,11 +228,11 @@ export class WorkEvaluationController {
     @Body() body: StartWorkEvaluationRunRequestDto,
     @Req() request: UserRequest,
   ): Promise<WorkEvaluationRunAcceptedResponseDto> {
-    await this.runs.startRun({
+    const runId = await this.runs.startRun({
       ...body,
       requestedByRef: request.user.userId,
     });
-    return { accepted: true };
+    return { accepted: true, runId };
   }
 
   @Get("runs")

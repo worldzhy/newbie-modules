@@ -577,6 +577,9 @@ export class StartWorkEvaluationRunRequestDto {
 export class WorkEvaluationRunAcceptedResponseDto {
   @ApiProperty({ description: "The run was dispatched; poll the run list for its row" })
   accepted!: boolean;
+
+  @ApiProperty({ description: "The run id for direct polling" })
+  runId!: string;
 }
 
 export class ListWorkEvaluationRunsRequestDto extends CommonListRequestDto {

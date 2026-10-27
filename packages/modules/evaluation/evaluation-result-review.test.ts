@@ -117,22 +117,54 @@ test("a re-review overwrites the whole review state; an omitted note clears the 
 
   await service.reviewResult({
     id: RESULT_ID,
-    reviewStatus: EvaluationResultReviewStatus.APPROVED,
-    reviewedByRef: "user-1",
-    note: "Endorsed after spot check",
-  });
-  const rejected = await service.reviewResult({
-    id: RESULT_ID,
     reviewStatus: EvaluationResultReviewStatus.REJECTED,
+    reviewedByRef: "user-1",
+    note: "Not trustworthy — checksum mismatch with the transcript",
+  });
+  const endorsed = await service.reviewResult({
+    id: RESULT_ID,
+    reviewStatus: EvaluationResultReviewStatus.APPROVED,
     reviewedByRef: "user-2",
   });
 
-  assert.equal(rejected.reviewStatus, "REJECTED");
-  assert.equal(rejected.reviewedByRef, "user-2");
-  assert.ok(rejected.reviewedAt instanceof Date);
-  assert.equal(rejected.reviewNote, null);
-  assert.equal(row.reviewStatus, "REJECTED");
+  assert.equal(endorsed.reviewStatus, "APPROVED");
+  assert.equal(endorsed.reviewedByRef, "user-2");
+  assert.ok(endorsed.reviewedAt instanceof Date);
+  assert.equal(endorsed.reviewNote, null);
+  assert.equal(row.reviewStatus, "APPROVED");
   assert.equal(row.reviewNote, null);
+});
+
+test("REJECTED without a note is a BadRequest — supervisors must justify an override", async () => {
+  const { prisma, lastWrite } = fakePrisma();
+  const service = serviceFor(prisma);
+
+  await assert.rejects(
+    service.reviewResult({
+      id: RESULT_ID,
+      reviewStatus: EvaluationResultReviewStatus.REJECTED,
+      reviewedByRef: "user-1",
+    }),
+    (error: unknown) =>
+      error instanceof Error && error.message.includes("note is required when reviewStatus is REJECTED"),
+  );
+  assert.equal(lastWrite(), undefined, "no write happens when the validation gates reject");
+});
+
+test("REJECTED with a whitespace-only note is also a BadRequest", async () => {
+  const { prisma, lastWrite } = fakePrisma();
+  const service = serviceFor(prisma);
+
+  await assert.rejects(
+    service.reviewResult({
+      id: RESULT_ID,
+      reviewStatus: EvaluationResultReviewStatus.REJECTED,
+      reviewedByRef: "user-1",
+      note: "   ",
+    }),
+    (error: unknown) => error instanceof Error && error.message.includes("note is required"),
+  );
+  assert.equal(lastWrite(), undefined);
 });
 
 test("reviewing an unknown result is a NotFound, not a write", async () => {
@@ -144,6 +176,7 @@ test("reviewing an unknown result is a NotFound, not a write", async () => {
       id: "99999999-9999-4999-8999-999999999999",
       reviewStatus: EvaluationResultReviewStatus.REJECTED,
       reviewedByRef: "user-1",
+      note: "Not trustworthy",
     }),
     (error: unknown) => error instanceof Error && error.message.includes("not found"),
   );
