@@ -7,15 +7,20 @@ Status: 进行中（2026-10-27 起）。本文档是评审 #1–#11 处置的唯
 
 ## 待办
 
-### #10 REJECTED 强制 note（择机捎带）
-
-- `evaluation-decision.dto.ts:38-41`：decision=REJECTED 时 note 必填；同步 `evaluation-result-review.test.ts`。
-
-### #11 startRun 202 返回 runId（择机捎带）
-
-- `work-evaluation.controller.ts:235`：现返回 `{accepted:true}`，改为带 `runId` 便于调用方追踪。
+（无剩余项——#1/#2/#3/#4/#6/#10/#11 全部交付；#5/#7 已关闭；#8/#9 挂起不处理。）
 
 ## 已完成
+
+### #11 startRun 202 返回 runId（2026-10-27 交付）
+
+- `WorkEvaluationRunService.startRun` 改返回 `Promise<string>`（runner.open 返回的 run.id）；`WorkEvaluationRunAcceptedResponseDto` 加 `runId` 字段；controller `startRun` 透传。
+- 提交：registry `bcd35bb`，backend `a4e7d70`（均推 dev）。
+
+### #10 REJECTED 强制 note（2026-10-27 交付）
+
+- 双保险：`ReviewEvaluationResultRequestDto` 用 `@ValidateIf` + `@IsNotEmpty` 在 class-validator 层强制（空字符串也拦）；`EvaluationResultService.reviewResult` 入口加 `input.note?.trim()` 守卫，确保 service 直接调用也遵守。
+- 测试：`evaluation-result-review.test.ts` 新增 2 个拒绝路径（REJECTED 无 note、REJECTED 纯空白 note）；重写旧的 "re-review overwrites" 测试——原测试 bug：用 REJECTED 不带 note 来测 APPROVED 的 "omit to clear note" 语义，现改为正确形状 + 新拒绝测试。消费仓 101/101 集成测试全绿（99 + #10 新 2）。
+- 提交：registry `bcd35bb`，backend `a4e7d70`（均推 dev）。
 
 ### #6 assertActive fencing 行为测试补齐（2026-10-27 交付）
 
