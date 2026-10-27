@@ -11,7 +11,7 @@ import { SCOPE_PERMISSION_CHECKER, ScopePermissionChecker } from "@modules/secur
  * - action "Manage" matches any action
  */
 function matches(
-  required: { action: PermissionAction; resource: string },
+  required: { action: string; resource: string },
   grant: { action: PermissionAction | string; resource: string },
 ): boolean {
   const resourceOk = grant.resource === required.resource || grant.resource === "*";
