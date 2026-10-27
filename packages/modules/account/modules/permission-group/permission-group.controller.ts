@@ -10,6 +10,7 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
@@ -25,6 +26,7 @@ import {
   PermissionGroupDetailResponseDto,
   PermissionGroupPermissionResponseDto,
   PermissionGroupResponseDto,
+  ReplacePermissionGroupPermissionsDto,
   UpdatePermissionGroupDto,
 } from "./permission-group.dto";
 
@@ -38,7 +40,7 @@ export class PermissionGroupController {
   ) {}
 
   @Post("")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.Role)
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Create a permission group" })
   @ApiResponse({ type: PermissionGroupResponseDto })
   async create(@Body() body: CreatePermissionGroupDto): Promise<PermissionGroupResponseDto> {
@@ -57,7 +59,7 @@ export class PermissionGroupController {
   }
 
   @Get("")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.Role)
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "List permission groups with pagination and optional name filter" })
   @ApiResponse({ type: ListPermissionGroupsResponseDto })
   async list(@Query() query: ListPermissionGroupsRequestDto): Promise<ListPermissionGroupsResponseDto> {
@@ -79,7 +81,7 @@ export class PermissionGroupController {
   }
 
   @Get(":id")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.Role)
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Get a permission group with its permissions" })
   @ApiResponse({ type: PermissionGroupDetailResponseDto })
   async get(@Param("id") id: number): Promise<PermissionGroupDetailResponseDto> {
@@ -95,7 +97,7 @@ export class PermissionGroupController {
   }
 
   @Patch(":id")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.Role)
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Update a permission group (builtin groups cannot be renamed)" })
   @ApiResponse({ type: PermissionGroupResponseDto })
   async update(@Param("id") id: number, @Body() body: UpdatePermissionGroupDto): Promise<PermissionGroupResponseDto> {
@@ -122,7 +124,7 @@ export class PermissionGroupController {
   }
 
   @Delete(":id")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.Role)
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Delete a permission group (builtin groups cannot be deleted)" })
   @ApiResponse({ type: PermissionGroupResponseDto })
   async delete(@Param("id") id: number): Promise<PermissionGroupResponseDto> {
@@ -142,7 +144,7 @@ export class PermissionGroupController {
   }
 
   @Post(":id/permissions")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.Role)
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Add a permission to a permission group" })
   @ApiResponse({ type: PermissionGroupPermissionResponseDto })
   async addPermission(
@@ -177,7 +179,7 @@ export class PermissionGroupController {
   }
 
   @Delete(":id/permissions/:permissionId")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.Role)
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Remove a permission from a permission group" })
   @ApiResponse({ status: 204, description: "Removed successfully." })
   async removePermission(@Param("id") id: number, @Param("permissionId") permissionId: number): Promise<void> {
@@ -198,6 +200,49 @@ export class PermissionGroupController {
         permissionId,
       },
     });
+  }
+
+  @Put(":id/permissions")
+  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @ApiOperation({ summary: "Replace all permissions in a permission group (transactional)" })
+  @ApiResponse({ type: PermissionGroupDetailResponseDto })
+  async replacePermissions(
+    @Param("id") id: number,
+    @Body() body: ReplacePermissionGroupPermissionsDto,
+  ): Promise<PermissionGroupDetailResponseDto> {
+    await this.prisma.permissionGroup.findUniqueOrThrow({ where: { id } });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.permissionGroupPermission.deleteMany({ where: { permissionGroupId: id } });
+      if (body.permissions.length > 0) {
+        await tx.permissionGroupPermission.createMany({
+          data: body.permissions.map((p) => ({
+            permissionGroupId: id,
+            action: p.action,
+            resource: p.resource,
+          })),
+          skipDuplicates: true,
+        });
+      }
+    });
+
+    await this.auditLogService.record(AuditEvent.ROLES_CHANGED, {
+      detail: {
+        action: "permission_group_permissions_replaced",
+        permissionGroupId: id,
+        count: body.permissions.length,
+      },
+    });
+
+    const group = await this.prisma.permissionGroup.findUniqueOrThrow({
+      where: { id },
+      include: { permissions: { orderBy: [{ resource: "asc" }, { action: "asc" }] } },
+    });
+
+    return {
+      ...this.toResponseDto(group),
+      permissions: group.permissions.map((p) => this.toPermissionDto(p)),
+    };
   }
 
   private toResponseDto(group: {

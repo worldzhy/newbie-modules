@@ -1,7 +1,8 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { PermissionAction } from "@generated/prisma/client";
 import { CommonListRequestDto } from "@devbie/newbie/common.dto";
-import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, Length } from "class-validator";
+import { IsArray, IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, Length, ValidateNested } from "class-validator";
+import { Type } from "class-transformer";
 
 export class CreatePermissionGroupDto {
   @ApiProperty({ type: String, minLength: 1, maxLength: 128 })
@@ -151,6 +152,18 @@ export class AddPermissionGroupPermissionDto {
   @IsString()
   @IsNotEmpty()
   resource!: string;
+}
+
+export class ReplacePermissionGroupPermissionsDto {
+  @ApiProperty({
+    type: AddPermissionGroupPermissionDto,
+    isArray: true,
+    description: "Full replacement set (transactional).",
+  })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AddPermissionGroupPermissionDto)
+  permissions!: AddPermissionGroupPermissionDto[];
 }
 
 export class ListPermissionGroupsRequestDto extends CommonListRequestDto {

@@ -195,6 +195,9 @@ export class RoleController {
     @Body() body: ReplaceRolePermissionGroupsDto,
   ): Promise<RoleDetailResponseDto> {
     const role = await this.prisma.role.findUniqueOrThrow({ where: { id: roleId } });
+    if (role.isBuiltin) {
+      throw new BadRequestException(`Builtin role "${role.name}" cannot have its permission group bindings replaced.`);
+    }
 
     // Validate all permission group IDs exist
     if (body.permissionGroupIds.length > 0) {

@@ -22,10 +22,9 @@ function matches(
 /**
  * Account-side binding of security's PermissionAuthorizer port.
  *
- * System-level grants come from three UNION paths (all are legitimate sources):
- * 1. Role → Permission (direct grants — ADMIN wildcard `*:Manage` + admin fine-grained tweaks)
- * 2. Role → RolePermissionGroup → PermissionGroup → PermissionGroupPermission (main path, admin checks PermissionGroup checkboxes in UI)
- * 3. trustedUserId → Permission (temporary individual grants)
+ * System-level grants come from two UNION paths (all are legitimate sources):
+ * 1. Role → Permission OR trustedUserId → Permission (merged, both hit Permission table, 1 findMany)
+ * 2. Role → RolePermissionGroup → PermissionGroup → PermissionGroupPermission (main path, 1 findMany)
  *
  * Superuser status is expressed as the ADMIN role holding `{ resource: "*", action: "Manage" }`
  * via path 1 — there is no hardcoded admin bypass.
@@ -50,14 +49,15 @@ export class AccountPermissionAuthorizer implements PermissionAuthorizer {
       return true;
     }
 
-    // UNION path 1: Role → Permission (direct grants, includes ADMIN wildcard)
-    const rolePermissions = await this.prisma.permission.findMany({
+    // UNION path 1 (merged): Role → Permission OR trustedUserId → Permission
+    // Both hit the same Prisma model — single findMany with OR is cheaper.
+    const directPermissions = await this.prisma.permission.findMany({
       where: {
-        role: { users: { some: { userId } } },
+        OR: [{ role: { users: { some: { userId } } } }, { trustedUserId: userId }],
       },
     });
 
-    for (const p of rolePermissions) {
+    for (const p of directPermissions) {
       if (matches({ resource, action }, p)) {
         return true;
       }
@@ -73,17 +73,6 @@ export class AccountPermissionAuthorizer implements PermissionAuthorizer {
     });
 
     for (const p of groupPermissions) {
-      if (matches({ resource, action }, p)) {
-        return true;
-      }
-    }
-
-    // UNION path 3: trustedUserId → Permission (individual grants)
-    const userPermissions = await this.prisma.permission.findMany({
-      where: { trustedUserId: userId },
-    });
-
-    for (const p of userPermissions) {
       if (matches({ resource, action }, p)) {
         return true;
       }
