@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Inject,
   Injectable,
   NotFoundException,
@@ -330,6 +331,18 @@ function isUniqueViolation(error: unknown): boolean {
   return typeof message === "string" && message.includes("EvaluationRun_one_active_per_subject_version");
 }
 
+/**
+ * Failure text derivation. An HttpException keeps its diagnostic payload in
+ * `getResponse()`, not in `message`: Nest turns an array payload into the status
+ * text in `message` ("Bad Request") and leaves the array in the response, so
+ * reading `message` alone would drop exactly the invariant problem lists this
+ * text exists to report. Serialize the response payload instead; plain errors
+ * keep their message.
+ */
 function describeError(error: unknown): string {
+  if (error instanceof HttpException) {
+    const response = error.getResponse();
+    return typeof response === "string" ? response : JSON.stringify(response);
+  }
   return error instanceof Error ? error.message : String(error);
 }

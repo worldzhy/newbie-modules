@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { BadRequestException } from "@nestjs/common";
 import type { EventEmitter2 } from "@nestjs/event-emitter";
 import type { EvaluationRun } from "@generated/prisma/client";
 
@@ -252,6 +253,27 @@ test("a run that fails before its identity is resolved is still failed, with no 
   assert.equal(terminal.length, 1);
   assert.equal(terminal[0].status, "FAILED");
   assert.equal(emitted.length, 0);
+});
+
+test("an invariant problem list reaches the row, the event and the observer verbatim", async () => {
+  const problems = [
+    "coverageStats.skipped requires a note explaining the cut-off",
+    "verdict quality references unknown evidence pkg:npm:ghost@0.0.0",
+  ];
+  const { runner, running, terminal, emitted, observed } = buildRunner({
+    collect: async () => {
+      throw new BadRequestException(problems);
+    },
+  });
+
+  await assert.rejects(() => runner.execute(running));
+
+  const persisted = terminal[0].error ?? "";
+  for (const problem of problems) {
+    assert.ok(persisted.includes(problem), `run row error must carry "${problem}"`);
+  }
+  assert.equal(emitted[0].payload.error, persisted);
+  assert.equal(observed[0].error, persisted);
 });
 
 test("when the row was failed underneath, the event and the observer carry the row's error", async () => {
