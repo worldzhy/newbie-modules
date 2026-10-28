@@ -5,10 +5,11 @@ import {
   Injectable,
   InternalServerErrorException,
   Optional,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { PERMISSION_KEY } from "./require-permission.decorator";
-import { TokenService } from "../token/token.service";
+import { AccessTokenParsed } from "../security.interface";
 import {
   PERMISSION_AUTHORIZER,
   PermissionAuthorizer,
@@ -30,7 +31,6 @@ interface PermissionMetadata extends PermissionRequirement {
 export class AuthorizationGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    private readonly tokenService: TokenService,
     @Optional()
     @Inject(PERMISSION_AUTHORIZER)
     private readonly permissionAuthorizer?: PermissionAuthorizer,
@@ -53,13 +53,19 @@ export class AuthorizationGuard implements CanActivate {
       return true;
     }
 
-    // [step 2] Parse JWT.
-    const req = context.switchToHttp().getRequest();
-    const accessToken = this.tokenService.getTokenFromHttpRequest(req);
-    if (accessToken === undefined) {
-      return false;
+    // [step 2] Read the identity established by AuthenticationGuard. Verifying
+    // the token again here would duplicate revocation/session logic and would
+    // reject non-Bearer strategies before they are even considered.
+    const req = context.switchToHttp().getRequest<{
+      user?: AccessTokenParsed;
+      params?: Record<string, unknown>;
+      query?: Record<string, unknown>;
+      body?: Record<string, unknown>;
+    }>();
+    const currentUser = req.user;
+    if (!currentUser) {
+      throw new UnauthorizedException("Authentication is required.");
     }
-    const payload = this.tokenService.verifyUserAccessToken(accessToken);
 
     // [step 3] Delegate the permission decision to the identity provider.
     if (!this.permissionAuthorizer) {
@@ -72,6 +78,12 @@ export class AuthorizationGuard implements CanActivate {
     let scope: Scope | undefined;
     const { resource, action } = metadata;
 
+    if (metadata.scope === "self") {
+      // Explicit opt-out: the handler scopes the data by the caller's own
+      // identity (e.g. "my monitoring systems"), so authorization is atom-only.
+      return this.permissionAuthorizer.authorize(currentUser.userId, { resource, action });
+    }
+
     if (metadata.scope) {
       // Legacy track: decorator carries resolver key directly.
       const resolver =
@@ -82,21 +94,58 @@ export class AuthorizationGuard implements CanActivate {
       }
       scope = await resolver.resolve(context);
     } else if (this.hostScopedResources?.includes(resource)) {
-      // New track: host declares the resource is scope-sensitive via HOST_SCOPED_RESOURCES.
-      // Iterate resolvers in host-controlled priority order — first non-none wins.
-      const resolverEntries = Object.entries(this.scopeResolvers ?? {});
-      // SCOPE_RESOLVERS is a plain object; insertion order determines priority.
-      // The host is responsible for putting specific resolvers (task, task-space, application,
-      // url-check-target) before the final defaultProjectScopeResolver fallback.
-      for (const [, resolver] of resolverEntries) {
-        const resolved = await resolver.resolve(context);
-        if (resolved.type !== "none") {
-          scope = resolved;
-          break;
-        }
+      // New track: host declares the resource is scope-sensitive. Only
+      // resolvers whose declared request key is actually present run, all
+      // present keys must agree on one project, and no key at all means deny.
+      const resolved = await this.resolveHostScope(context, req);
+      if (resolved === null) {
+        return false;
       }
+      scope = resolved;
     }
 
-    return this.permissionAuthorizer.authorize(payload.userId, { resource, action }, scope);
+    return this.permissionAuthorizer.authorize(currentUser.userId, { resource, action }, scope);
   }
+
+  /**
+   * Fail-closed resolution: a scope-sensitive resource is never downgraded to a
+   * system-level check because a resolver happened to return `none`, and an
+   * ambiguous request (two identifier params naming different projects) is
+   * denied rather than silently trusting resolver registration order.
+   */
+  private async resolveHostScope(context: ExecutionContext, req: RequestShape): Promise<Scope | null> {
+    const resolvers = Object.values(this.scopeResolvers ?? {}).filter((resolver) =>
+      hasKey(req, resolver.param),
+    );
+    if (resolvers.length === 0) {
+      return null;
+    }
+
+    const resolved = await Promise.all(resolvers.map((resolver) => resolver.resolve(context)));
+    const candidates = resolved.filter((scope): scope is { type: "project"; id: string } => scope.type !== "none");
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    const projectIds = new Set(candidates.map((scope) => scope.id));
+    if (projectIds.size !== 1) {
+      return null;
+    }
+
+    return candidates[0];
+  }
+}
+
+interface RequestShape {
+  params?: Record<string, unknown>;
+  query?: Record<string, unknown>;
+  body?: Record<string, unknown>;
+}
+
+function hasKey(req: RequestShape, key: string): boolean {
+  return (
+    typeof req.params?.[key] === "string" ||
+    typeof req.query?.[key] === "string" ||
+    typeof req.body?.[key] === "string"
+  );
 }

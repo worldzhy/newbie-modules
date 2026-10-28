@@ -41,11 +41,11 @@ export class Ec2InstanceController {
     return await this.ec2InstanceService.syncEC2InstancesWatch(body);
   }
 
-  @Patch("watch/:id")
+  @Patch("watch/:ec2InstanceId")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.Ec2Instance)
   @ApiOperation({ summary: "Watch an EC2 instance" })
   @ApiResponse({ type: Ec2InstanceResponseDto })
-  async watchEC2Instance(@Param("id") id: string) {
-    return await this.ec2InstanceService.watchEC2Instance(id);
+  async watchEC2Instance(@Param("ec2InstanceId") ec2InstanceId: string) {
+    return await this.ec2InstanceService.watchEC2Instance(ec2InstanceId);
   }
 }

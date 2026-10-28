@@ -6,25 +6,11 @@ import { PermissionAuthorizer, PermissionRequirement, Scope } from "@modules/sec
 import { SCOPE_PERMISSION_CHECKER, ScopePermissionChecker } from "@modules/security/ports/scope-permission.authorizer";
 
 /**
- * Authorization = membership of an atomic (resource, action) pair.
- *
- * There is no wildcard on either axis: a grant covers exactly one resource and
- * exactly one action (ADR-044). "All permissions" is expressed as the full set
- * of atomic rows, never as a single catch-all row.
- */
-function matches(
-  required: { action: string; resource: string },
-  grant: { action: PermissionAction | string; resource: string },
-): boolean {
-  return grant.resource === required.resource && grant.action === required.action;
-}
-
-/**
  * Account-side binding of security's PermissionAuthorizer port.
  *
  * System-level grants come from two UNION paths (all are legitimate sources):
- * 1. Role → Permission OR trustedUserId → Permission (merged, both hit Permission table, 1 findMany)
- * 2. Role → RolePermissionGroup → PermissionGroup → PermissionGroupPermission (main path, 1 findMany)
+ * 1. Role → Permission OR trustedUserId → Permission (merged, both hit Permission table, 1 findFirst)
+ * 2. Role → RolePermissionGroup → PermissionGroup → PermissionGroupPermission (main path, 1 findFirst)
  *
  * Superuser status is not a special case here: it is the union of every atomic
  * grant (the derived host-side "All" permission group bound to the admin role).
@@ -51,32 +37,35 @@ export class AccountPermissionAuthorizer implements PermissionAuthorizer {
     }
 
     // UNION path 1 (merged): Role → Permission OR trustedUserId → Permission
-    // Both hit the same Prisma model — single findMany with OR is cheaper.
-    const directPermissions = await this.prisma.permission.findMany({
+    // Both hit the same Prisma model — one query, pushed down to the exact
+    // (resource, action) atom so a superuser's full grant set is never loaded.
+    const directGrant = await this.prisma.permission.findFirst({
       where: {
+        resource,
+        action: action as PermissionAction,
         OR: [{ role: { users: { some: { userId } } } }, { trustedUserId: userId }],
       },
+      select: { id: true },
     });
 
-    for (const p of directPermissions) {
-      if (matches({ resource, action }, p)) {
-        return true;
-      }
+    if (directGrant) {
+      return true;
     }
 
     // UNION path 2: Role → RolePermissionGroup → PermissionGroup → PermissionGroupPermission
-    const groupPermissions = await this.prisma.permissionGroupPermission.findMany({
+    const groupGrant = await this.prisma.permissionGroupPermission.findFirst({
       where: {
+        resource,
+        action: action as PermissionAction,
         permissionGroup: {
           roles: { some: { role: { users: { some: { userId } } } } },
         },
       },
+      select: { id: true },
     });
 
-    for (const p of groupPermissions) {
-      if (matches({ resource, action }, p)) {
-        return true;
-      }
+    if (groupGrant) {
+      return true;
     }
 
     // No system-level grant; defer to the host's scope checker if present.

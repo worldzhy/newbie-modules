@@ -31,7 +31,7 @@ export class SiteController {
   }
 
   @Get("/getSysForUserId")
-  @RequirePermission(PermissionAction.List, "WebMonitorSite")
+  @RequirePermission(PermissionAction.List, "WebMonitorSite", { scope: "self" })
   @ApiOperation({ summary: "Get systems for a user" })
   @ApiResponse({ type: WebMonitorSiteResponseDto, isArray: true })
   async getSitesForUserId(@Query() query: Record<string, unknown>, @Req() req: UserRequest) {
@@ -49,7 +49,7 @@ export class SiteController {
   }
 
   @Get("/list")
-  @RequirePermission(PermissionAction.List, "WebMonitorSite")
+  @RequirePermission(PermissionAction.List, "WebMonitorSite", { scope: "self" })
   @ApiOperation({ summary: "Get web system list" })
   @ApiResponse({ type: WebMonitorSiteResponseDto, isArray: true })
   async getWebSiteList(@Req() req: UserRequest) {
