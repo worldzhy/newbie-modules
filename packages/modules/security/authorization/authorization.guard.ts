@@ -114,9 +114,7 @@ export class AuthorizationGuard implements CanActivate {
    * denied rather than silently trusting resolver registration order.
    */
   private async resolveHostScope(context: ExecutionContext, req: RequestShape): Promise<Scope | null> {
-    const resolvers = Object.values(this.scopeResolvers ?? {}).filter((resolver) =>
-      hasKey(req, resolver.param),
-    );
+    const resolvers = Object.values(this.scopeResolvers ?? {}).filter((resolver) => hasKey(req, resolver.param));
     if (resolvers.length === 0) {
       return null;
     }
@@ -144,8 +142,6 @@ interface RequestShape {
 
 function hasKey(req: RequestShape, key: string): boolean {
   return (
-    typeof req.params?.[key] === "string" ||
-    typeof req.query?.[key] === "string" ||
-    typeof req.body?.[key] === "string"
+    typeof req.params?.[key] === "string" || typeof req.query?.[key] === "string" || typeof req.body?.[key] === "string"
   );
 }
