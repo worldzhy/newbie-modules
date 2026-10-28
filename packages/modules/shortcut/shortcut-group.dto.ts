@@ -14,7 +14,12 @@ export class ListShortcutGroupsRequestDto extends CommonListRequestDto {
   @IsNumber()
   @Type(() => Number)
   id?: number;
+
+  @ApiProperty({ type: String })
+  @IsString()
+  projectId!: string;
 }
+
 export class ListShortcutGroupsResponseDto extends CommonListResponseDto {
   @ApiProperty({ type: ShortcutGroupEntity, isArray: true })
   declare records: ShortcutGroupEntity[];
@@ -24,6 +29,10 @@ export class CreateShortcutGroupRequestDto {
   @ApiProperty({ type: String })
   @IsString()
   name!: string;
+
+  @ApiProperty({ type: String })
+  @IsString()
+  projectId!: string;
 
   @ApiPropertyOptional({ type: String })
   @IsString()

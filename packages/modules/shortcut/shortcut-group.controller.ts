@@ -22,11 +22,11 @@ export class ShortcutGroupController {
   @RequirePermission(PermissionAction.List, Prisma.ModelName.ShortcutGroup)
   @ApiResponse({ type: ListShortcutGroupsResponseDto })
   async list(@Query() query: ListShortcutGroupsRequestDto) {
-    const { page, pageSize, id } = query;
+    const { page, pageSize, id, projectId } = query;
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.ShortcutGroup,
       pagination: { page, pageSize },
-      findManyArgs: { where: { id }, orderBy: { sort: "desc" } },
+      findManyArgs: { where: { id, projectId }, orderBy: { sort: "desc" } },
     });
   }
 
@@ -34,7 +34,10 @@ export class ShortcutGroupController {
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.ShortcutGroup)
   @ApiResponse({ type: ShortcutGroupEntity })
   async create(@Body() body: CreateShortcutGroupRequestDto) {
-    return await this.prisma.shortcutGroup.create({ data: body });
+    const { projectId, ...data } = body;
+    return await this.prisma.shortcutGroup.create({
+      data: { ...data, project: { connect: { id: projectId } } },
+    });
   }
 
   @Patch(":id")

@@ -25,6 +25,7 @@ export class ShortcutItemController {
   @ApiResponse({ type: ShortcutTreeResDto, isArray: true })
   async tree(@Query() query: ShortcutTreeRequestDto) {
     const groups = await this.prisma.shortcutGroup.findMany({
+      where: { projectId: query.projectId },
       orderBy: { sort: "desc" },
     });
     const items = await this.prisma.shortcutItem.findMany({
@@ -64,11 +65,14 @@ export class ShortcutItemController {
   @RequirePermission(PermissionAction.List, Prisma.ModelName.ShortcutItem)
   @ApiResponse({ type: ListShortcutItemsResponseDto })
   async list(@Query() query: ListShortcutItemsRequestDto) {
-    const { page, pageSize, id, ...rest } = query;
+    const { page, pageSize, id, projectId, ...rest } = query;
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.ShortcutItem,
       pagination: { page, pageSize },
-      findManyArgs: { where: { id, ...rest }, orderBy: { sort: "desc" } },
+      findManyArgs: {
+        where: { id, group: { projectId }, ...rest },
+        orderBy: { sort: "desc" },
+      },
     });
   }
 
