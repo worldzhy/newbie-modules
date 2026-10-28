@@ -12,7 +12,7 @@ lands in a later slice on the same run and finding lifecycle.
 
 | Term     | Meaning                                                                                                                                                                                                          |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subject  | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; `scopeType` / `scopeId` are host-assigned (nightwatch uses `project`).                                                        |
+| Subject  | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; `scopeType` / `scopeId` are host-assigned (nightwatch uses `project`).                                                          |
 | Asset    | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state facts.                                                                               |
 | Fact     | `SecurityEvaluationAssetFact`: something observed about an asset right now (`factType`, `factKey`, small intrinsic `value`). Facts are upserted, never deleted here; history lives in the archived run manifest. |
 | Criteria | Code-defined and published idempotently as `EvaluationCriteriaVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                     |
@@ -46,12 +46,12 @@ open decision (ADR-022).
 
 ## Evaluation keys
 
-| Evaluation key   | Kind            | Version | Content                                                                                 |
-| ---------------- | --------------- | ------- | --------------------------------------------------------------------------------------- |
-| `npm-osv`        | `repository`    | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                    |
-| `aws-cis-1.5`    | `aws-account`   | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027). |
-| `aws-custom`     | `aws-account`   | `v1`    | Custom hardening criteria inherited from the predecessor aws-audit module (ADR-033/037). |
-| `threat-intel`   | `repository`    | `v1`    | Threat-intelligence relevance criteria (ADR-039).                                       |
+| Evaluation key | Kind          | Version | Content                                                                                  |
+| -------------- | ------------- | ------- | ---------------------------------------------------------------------------------------- |
+| `npm-osv`      | `repository`  | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                     |
+| `aws-cis-1.5`  | `aws-account` | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027).  |
+| `aws-custom`   | `aws-account` | `v1`    | Custom hardening criteria inherited from the predecessor aws-audit module (ADR-033/037). |
+| `threat-intel` | `repository`  | `v1`    | Threat-intelligence relevance criteria (ADR-039).                                        |
 
 Each CIS criterion carries `controlId`, `severity`, `remediation` and
 `factRequirements` in its metadata; the judgment reads severity from there, and

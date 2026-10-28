@@ -32,7 +32,7 @@ const SUBJECT = {
 const VERSION = {
   id: VERSION_ID,
   kind: "repository",
-  evaluationKey: "dependency-osv",
+  evaluationKey: "npm-osv",
   version: "1.0.0",
   publishedAt: new Date(),
 };
@@ -181,7 +181,7 @@ test("a reaped row publishes evaluation.run-failed with the row's persisted erro
     subjectId: SUBJECT_ID,
     subjectKind: "repository",
     criteriaVersionId: VERSION_ID,
-    evaluationKey: "dependency-osv",
+    evaluationKey: "npm-osv",
     status: "FAILED",
     error: STALE_RUN_ERROR,
   });

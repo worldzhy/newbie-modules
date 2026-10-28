@@ -60,7 +60,7 @@ export interface EvaluationEvidenceItem {
   id: string;
   /** Evidence layer, e.g. "fact" | "declared" — feature-defined. */
   layer: string;
-  /** Feature-defined origin, e.g. "workspace" | "lockfile" | "cloud-account". */
+  /** Feature-defined origin, e.g. "workspace" | "lockfile" | "aws-account". */
   source: string;
   summary: string;
   observedAt: Date;

@@ -80,7 +80,7 @@ enum EvaluationResultReviewStatus {
 /// A frozen set of criteria a run is judged against (ADR-020 D5.5). A draft is
 /// editable; publishing is one-way, after which every write is rejected and
 /// changes require a new version. `kind` is the subject kind these criteria
-/// apply to; `evaluationKey` is the feature-defined group (rubric, cis-aws-1.5, ...).
+/// apply to; `evaluationKey` is the feature-defined group (rubric, aws-cis-1.5, ...).
 model EvaluationCriteriaVersion {
   id     String @id @default(uuid()) @db.Uuid
   kind   String @db.VarChar(64)

@@ -137,7 +137,7 @@ function fakePrisma() {
 function serviceFor(prisma: PrismaService) {
   const criteria = {
     listCriteria: async () => [{ criterionKey: CRITERION_KEY, kind: "ASSERTION", name: "Known vulnerability" }],
-    getVersion: async () => ({ id: VERSION_ID, kind: "repository", evaluationKey: "dependency-osv", version: "1" }),
+    getVersion: async () => ({ id: VERSION_ID, kind: "repository", evaluationKey: "npm-osv", version: "1" }),
   };
   const providers = { getObserver: () => undefined };
   return new EvaluationFindingService(prisma, criteria as never, providers as never);

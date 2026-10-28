@@ -45,7 +45,7 @@ function fakePrisma() {
     evaluationCriteriaVersion: {
       findUnique: async ({ where }: { where: { id: string } }) =>
         where.id === VERSION_ID
-          ? { id: VERSION_ID, kind: SUBJECT_KIND, evaluationKey: "dependency-osv", publishedAt: new Date() }
+          ? { id: VERSION_ID, kind: SUBJECT_KIND, evaluationKey: "npm-osv", publishedAt: new Date() }
           : null,
     },
     evaluationRun: {

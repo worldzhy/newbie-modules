@@ -34,7 +34,7 @@ const EVALUATION_RUN_SUCCEEDED = defineEvent<EvaluationRunSucceededEvent>({
     subjectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
     subjectKind: "repository",
     criteriaVersionId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-    evaluationKey: "dependency-osv",
+    evaluationKey: "npm-osv",
     status: "SUCCEEDED",
   },
 });
@@ -48,7 +48,7 @@ const EVALUATION_RUN_FAILED = defineEvent<EvaluationRunFailedEvent>({
     subjectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
     subjectKind: "repository",
     criteriaVersionId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
-    evaluationKey: "dependency-osv",
+    evaluationKey: "npm-osv",
     status: "FAILED",
     error: "OSV API request timed out after 30000ms",
   },

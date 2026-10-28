@@ -15,12 +15,6 @@ export const SECURITY_EVALUATION_KEY_AWS_CIS_1_5 = "aws-cis-1.5";
 export const SECURITY_EVALUATION_KEY_AWS_CUSTOM = "aws-custom";
 export const SECURITY_EVALUATION_KEY_THREAT_INTEL = "threat-intel";
 
-/** AWS configuration evaluation keys share one collection + judgment mechanism. */
-export const SECURITY_EVALUATION_AWS_CONFIG_KEYS = [
-  SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-  SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-] as const;
-
 /**
  * The criteria versions this build ships. Criteria are code-defined and
  * published idempotently; a rule change is a new version, never an in-place
