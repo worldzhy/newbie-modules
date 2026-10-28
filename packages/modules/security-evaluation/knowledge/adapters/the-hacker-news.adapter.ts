@@ -7,7 +7,7 @@ import {
 } from "../security-evaluation-knowledge.constants";
 
 const FEED_URL = "https://feeds.feedburner.com/TheHackersNews";
-const DEFAULT_USER_AGENT = "threat-intelligence-collector (+https://github.com/worldzhy)";
+const DEFAULT_USER_AGENT = "security-evaluation-knowledge-collector (+https://github.com/worldzhy)";
 
 /**
  * The Hacker News adapter (RSS) — English security news.

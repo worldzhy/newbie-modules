@@ -8,7 +8,7 @@ import {
 } from "../security-evaluation-knowledge.constants";
 
 const FEED_URL = "https://aws.amazon.com/security/security-bulletins/feed/";
-const DEFAULT_USER_AGENT = "threat-intelligence-collector (+https://github.com/worldzhy)";
+const DEFAULT_USER_AGENT = "security-evaluation-knowledge-collector (+https://github.com/worldzhy)";
 
 /**
  * AWS Security Bulletins adapter (RSS).

@@ -51,7 +51,7 @@ export class GitHubSecurityAdvisoryAdapter implements SecurityEvaluationKnowledg
       params.set("published", `>=${since.toISOString().replace(/\.\d+Z$/, "Z")}`);
     }
     const advisories = await fetchJson<GitHubAdvisory[]>(this.source, `${API_URL}?${params.toString()}`, {
-      headers: { Accept: "application/vnd.github+json", "User-Agent": "threat-intelligence-collector" },
+      headers: { Accept: "application/vnd.github+json", "User-Agent": "security-evaluation-knowledge-collector" },
     });
     return advisories
       .map((advisory) => this.mapItem(advisory))

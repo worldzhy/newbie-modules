@@ -7,7 +7,7 @@ import {
 } from "../security-evaluation-knowledge.constants";
 
 const FEED_URL = "https://www.bleepingcomputer.com/feed/";
-const DEFAULT_USER_AGENT = "threat-intelligence-collector (+https://github.com/worldzhy)";
+const DEFAULT_USER_AGENT = "security-evaluation-knowledge-collector (+https://github.com/worldzhy)";
 
 /**
  * BleepingComputer adapter (RSS) — English security news.
