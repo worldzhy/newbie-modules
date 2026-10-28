@@ -21,8 +21,17 @@ export class PermissionController {
   @RequirePermission(PermissionAction.List, Prisma.ModelName.Permission)
   @ApiOperation({ summary: "List all permission resource names" })
   @ApiResponse({ type: String, isArray: true })
-  listPermissionResources() {
-    return Object.values(Prisma.ModelName);
+  async listPermissionResources(): Promise<string[]> {
+    // Prisma model names plus every resource already granted somewhere. The
+    // latter covers resources without a model (aggregates, external systems)
+    // so the permission-group editor can see and edit the atoms it holds.
+    const granted = await this.prisma.permissionGroupPermission.findMany({
+      distinct: ["resource"],
+      select: { resource: true },
+    });
+    const resources = new Set<string>(Object.values(Prisma.ModelName));
+    for (const row of granted) resources.add(row.resource);
+    return [...resources].sort();
   }
 
   @Get("actions")
