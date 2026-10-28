@@ -125,7 +125,7 @@ export class NotificationCenterController {
   }
 
   @Post("notification-center-setting/test-push")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.NotificationCenterSetting)
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.NotificationCenterSetting)
   @ApiOperation({ summary: "Send a test message to the host-configured system chats" })
   @ApiResponse({ status: 200, type: TestPushResultDto })
   testPush(): Promise<TestPushResultDto> {

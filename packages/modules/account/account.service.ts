@@ -56,9 +56,9 @@ export class AccountService {
     const roles = user.roles.map((ur) => ur.role.name);
 
     // Union of all PermissionGroups across every held role, deduplicated by id
-    // and ordered for the header nav. ADMIN binds no PermissionGroup rows on
-    // purpose (the wildcard *:Manage covers every resource), so their visible
-    // set is resolved here instead of being guessed by the frontend.
+    // and ordered for the header nav. Navigation is derived purely from the
+    // bound groups — there is no role-name special case (ADR-044): the admin
+    // role is bound to the derived "All" group plus every builtin group by seed.
     type PermissionGroupSummary = {
       id: number;
       name: string;
@@ -68,36 +68,18 @@ export class AccountService {
       navLabel: string;
       navIcon: string | null;
     };
-    const permissionGroupSelect = {
-      id: true,
-      name: true,
-      routePath: true,
-      navPlacement: true,
-      navOrder: true,
-      navLabel: true,
-      navIcon: true,
-    } as const;
-
-    let permissionGroups: PermissionGroupSummary[];
-    if (roles.includes("ADMIN")) {
-      permissionGroups = await this.prisma.permissionGroup.findMany({
-        select: permissionGroupSelect,
-        orderBy: [{ navOrder: "asc" }, { id: "asc" }],
-      });
-    } else {
-      const groupsById = new Map<number, PermissionGroupSummary>();
-      for (const ur of user.roles) {
-        for (const rpg of ur.role.rolePermissionGroups) {
-          const pg = rpg.permissionGroup;
-          if (!groupsById.has(pg.id)) {
-            groupsById.set(pg.id, pg);
-          }
+    const groupsById = new Map<number, PermissionGroupSummary>();
+    for (const ur of user.roles) {
+      for (const rpg of ur.role.rolePermissionGroups) {
+        const pg = rpg.permissionGroup;
+        if (!groupsById.has(pg.id)) {
+          groupsById.set(pg.id, pg);
         }
       }
-      permissionGroups = [...groupsById.values()].sort(
-        (left, right) => left.navOrder - right.navOrder || left.id - right.id,
-      );
     }
+    const permissionGroups = [...groupsById.values()].sort(
+      (left, right) => left.navOrder - right.navOrder || left.id - right.id,
+    );
 
     return {
       ...user,

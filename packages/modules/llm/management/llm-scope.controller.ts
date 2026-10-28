@@ -27,7 +27,7 @@ export class LlmScopeController {
   }
 
   @Patch(":scope")
-  @RequirePermission(PermissionAction.Manage, "LlmScopeAssignment")
+  @RequirePermission(PermissionAction.Update, "LlmScopeAssignment")
   @ApiOperation({ summary: "Bind a consumer scope to an LLM connection (upsert)" })
   @ApiParam({ name: "scope", description: "Scope registered by a consumer", example: "copilot" })
   @ApiBody({ type: BindLlmScopeDto })
@@ -39,7 +39,7 @@ export class LlmScopeController {
   }
 
   @Delete(":scope")
-  @RequirePermission(PermissionAction.Manage, "LlmScopeAssignment")
+  @RequirePermission(PermissionAction.Delete, "LlmScopeAssignment")
   @ApiOperation({ summary: "Remove the binding for a consumer scope (the scope's consumer will stop working)" })
   @ApiResponse({ status: 200, type: LlmScopeBindingResponseDto })
   async unbind(@Param("scope") scope: string): Promise<LlmScopeBindingResponseDto> {

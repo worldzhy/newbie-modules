@@ -41,7 +41,7 @@ export class PermissionGroupController {
   ) {}
 
   @Post("")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Create a permission group" })
   @ApiResponse({ type: PermissionGroupResponseDto })
   async create(@Body() body: CreatePermissionGroupDto): Promise<PermissionGroupResponseDto> {
@@ -60,7 +60,7 @@ export class PermissionGroupController {
   }
 
   @Get("")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "List permission groups with pagination and optional name filter" })
   @ApiResponse({ type: ListPermissionGroupsResponseDto })
   async list(@Query() query: ListPermissionGroupsRequestDto): Promise<ListPermissionGroupsResponseDto> {
@@ -84,7 +84,7 @@ export class PermissionGroupController {
   }
 
   @Get(":id")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Get a permission group with its permissions" })
   @ApiResponse({ type: PermissionGroupDetailResponseDto })
   async get(@Param("id") id: number): Promise<PermissionGroupDetailResponseDto> {
@@ -104,7 +104,7 @@ export class PermissionGroupController {
    * order, so a later "nav-order" would be captured as an id segment.
    */
   @Patch("nav-order")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Replace the header nav ordering (transactional, position becomes navOrder)" })
   @ApiResponse({ type: PermissionGroupResponseDto, isArray: true })
   async reorderNav(@Body() body: ReorderPermissionGroupsNavOrderDto): Promise<PermissionGroupResponseDto[]> {
@@ -137,7 +137,7 @@ export class PermissionGroupController {
   }
 
   @Patch(":id")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Update a permission group (builtin groups cannot be renamed)" })
   @ApiResponse({ type: PermissionGroupResponseDto })
   async update(@Param("id") id: number, @Body() body: UpdatePermissionGroupDto): Promise<PermissionGroupResponseDto> {
@@ -164,7 +164,7 @@ export class PermissionGroupController {
   }
 
   @Delete(":id")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Delete a permission group (builtin groups cannot be deleted)" })
   @ApiResponse({ type: PermissionGroupResponseDto })
   async delete(@Param("id") id: number): Promise<PermissionGroupResponseDto> {
@@ -184,7 +184,7 @@ export class PermissionGroupController {
   }
 
   @Post(":id/permissions")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Add a permission to a permission group" })
   @ApiResponse({ type: PermissionGroupPermissionResponseDto })
   async addPermission(
@@ -219,7 +219,7 @@ export class PermissionGroupController {
   }
 
   @Delete(":id/permissions/:permissionId")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Remove a permission from a permission group" })
   @ApiResponse({ status: 204, description: "Removed successfully." })
   async removePermission(@Param("id") id: number, @Param("permissionId") permissionId: number): Promise<void> {
@@ -243,7 +243,7 @@ export class PermissionGroupController {
   }
 
   @Put(":id/permissions")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.PermissionGroup)
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.PermissionGroup)
   @ApiOperation({ summary: "Replace all permissions in a permission group (transactional)" })
   @ApiResponse({ type: PermissionGroupDetailResponseDto })
   async replacePermissions(

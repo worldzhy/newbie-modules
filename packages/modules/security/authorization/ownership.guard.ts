@@ -14,10 +14,10 @@ import { AccessTokenParsed } from "../security.interface";
 
 /**
  * Enforces the `@RequireOwner` constraint: the route's `:userId` param must
- * match the authenticated user. Non-owners are denied unless they hold the
- * system-level superuser permission (`{ resource: "*", action: "Manage" }`),
- * which is resolved through the bound PermissionAuthorizer (no hardcoded
- * admin role).
+ * match the authenticated user. Non-owners are denied unless they are an
+ * account administrator — expressed as holding `Update` on `User` (the IAM
+ * permission group), resolved through the bound PermissionAuthorizer. There is
+ * no wildcard grant and no hardcoded admin role (ADR-044).
  *
  * Registered as a global APP_GUARD; only routes carrying @RequireOwner are
  * affected (returns true otherwise).
@@ -62,14 +62,14 @@ export class OwnershipGuard implements CanActivate {
       return true;
     }
 
-    // Superuser override: resolved through the RBAC authorizer rather than a
-    // hardcoded admin role, so superuser status is auditable and revocable.
+    // Administrator override: resolved through the RBAC authorizer rather than
+    // a hardcoded admin role, so the capability is auditable and revocable.
     if (this.permissionAuthorizer) {
-      const isSuperuser = await this.permissionAuthorizer.authorize(currentUser.userId, {
-        resource: "*",
-        action: "Manage",
+      const isAdministrator = await this.permissionAuthorizer.authorize(currentUser.userId, {
+        resource: "User",
+        action: "Update",
       });
-      if (isSuperuser) {
+      if (isAdministrator) {
         return true;
       }
     }

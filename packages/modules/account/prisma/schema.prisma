@@ -300,7 +300,6 @@ enum NavPlacement {
 }
 
 enum PermissionAction {
-  Manage
   List
   Get
   Create

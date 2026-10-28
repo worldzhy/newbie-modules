@@ -66,7 +66,7 @@ export class LlmConnectionController {
   }
 
   @Post("test")
-  @RequirePermission(PermissionAction.Manage, "LlmConnection")
+  @RequirePermission(PermissionAction.Create, "LlmConnection")
   @ApiOperation({
     summary: "Test a connection configuration with a minimal chat completion request (nothing is persisted)",
   })

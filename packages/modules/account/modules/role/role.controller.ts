@@ -195,7 +195,7 @@ export class RoleController {
   }
 
   @Post(":roleId/permission-groups")
-  @RequirePermission(PermissionAction.Manage, Prisma.ModelName.Role)
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Role)
   @ApiOperation({ summary: "Replace a role's permission group bindings (transactional)" })
   @ApiResponse({ type: RoleDetailResponseDto })
   async replaceRolePermissionGroups(

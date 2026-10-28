@@ -6,17 +6,17 @@ import { PermissionAuthorizer, PermissionRequirement, Scope } from "@modules/sec
 import { SCOPE_PERMISSION_CHECKER, ScopePermissionChecker } from "@modules/security/ports/scope-permission.authorizer";
 
 /**
- * Checks whether a grant matches a required permission, with wildcard support.
- * - resource "*" matches any resource
- * - action "Manage" matches any action
+ * Authorization = membership of an atomic (resource, action) pair.
+ *
+ * There is no wildcard on either axis: a grant covers exactly one resource and
+ * exactly one action (ADR-044). "All permissions" is expressed as the full set
+ * of atomic rows, never as a single catch-all row.
  */
 function matches(
   required: { action: string; resource: string },
   grant: { action: PermissionAction | string; resource: string },
 ): boolean {
-  const resourceOk = grant.resource === required.resource || grant.resource === "*";
-  const actionOk = grant.action === required.action || grant.action === PermissionAction.Manage;
-  return resourceOk && actionOk;
+  return grant.resource === required.resource && grant.action === required.action;
 }
 
 /**
@@ -26,8 +26,9 @@ function matches(
  * 1. Role → Permission OR trustedUserId → Permission (merged, both hit Permission table, 1 findMany)
  * 2. Role → RolePermissionGroup → PermissionGroup → PermissionGroupPermission (main path, 1 findMany)
  *
- * Superuser status is expressed as the ADMIN role holding `{ resource: "*", action: "Manage" }`
- * via path 1 — there is no hardcoded admin bypass.
+ * Superuser status is not a special case here: it is the union of every atomic
+ * grant (the derived host-side "All" permission group bound to the admin role).
+ * There is no hardcoded admin bypass and no wildcard matching.
  *
  * Scoped (project) decisions are delegated to the host-bound
  * SCOPE_PERMISSION_CHECKER, since membership data is host-owned.
