@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { CreateLlmConnectionDto, LlmConnectionResponseDto, UpdateLlmConnectionDto } from "./llm-connection.dto";
 
@@ -175,6 +175,24 @@ export class LlmConnectionService {
   /** Every connection; drives the periodic status probe. */
   async listAll(): Promise<LlmConnectionRecord[]> {
     return (await this.prisma.llmConnection.findMany()) as LlmConnectionRecord[];
+  }
+
+  /**
+   * Resolves the API key a connection test should use. The edit form echoes
+   * the masked value while the stored key is unchanged; such an echo resolves
+   * to the stored key of the referenced connection instead of the placeholder
+   * itself.
+   */
+  async resolveTestApiKey(id: string | undefined, submittedApiKey: string): Promise<string> {
+    if (!submittedApiKey.includes("****")) {
+      return submittedApiKey;
+    }
+    if (!id) {
+      throw new BadRequestException(
+        "A masked API key can only be tested against an existing connection (id required).",
+      );
+    }
+    return (await this.requireConnection(id)).apiKey;
   }
 
   private async requireConnection(id: string): Promise<LlmConnectionRecord> {

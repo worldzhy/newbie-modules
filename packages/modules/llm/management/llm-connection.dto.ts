@@ -89,6 +89,51 @@ export class UpdateLlmConnectionDto {
   apiKey?: string;
 }
 
+export class TestLlmConnectionDto {
+  @ApiPropertyOptional({
+    description:
+      "Stored connection id. Only needed when apiKey echoes the masked value, so the stored key is used for the probe.",
+  })
+  @IsString()
+  @IsOptional()
+  id?: string;
+
+  @ApiPropertyOptional({
+    enum: LLM_PROVIDERS,
+    default: "openai-compatible",
+    description: "Wire protocol of the configuration being tested",
+  })
+  @IsString()
+  @IsOptional()
+  @IsIn(LLM_PROVIDERS)
+  provider?: string;
+
+  @ApiProperty({ description: "Upstream model identifier, e.g. deepseek-chat, qwen-plus" })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  model!: string;
+
+  @ApiPropertyOptional({
+    description:
+      "Required for openai-compatible (without the /chat/completions suffix). " +
+      "Optional for anthropic; leave empty to use https://api.anthropic.com.",
+  })
+  @IsString()
+  @ValidateIf((dto) => dto.provider !== ANTHROPIC_PROVIDER)
+  @IsNotEmpty()
+  @IsUrl({ require_tld: false, protocols: ["http", "https"], require_protocol: true })
+  baseUrl?: string;
+
+  @ApiProperty({
+    description: "Upstream API key. Echo the masked value together with id to test the stored key instead.",
+  })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(500)
+  apiKey!: string;
+}
+
 export class LlmConnectionResponseDto {
   @ApiProperty()
   id!: string;
