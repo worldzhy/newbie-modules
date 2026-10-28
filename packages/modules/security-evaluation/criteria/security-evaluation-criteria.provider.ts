@@ -4,8 +4,10 @@ import type { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.
 
 import {
   SECURITY_EVALUATION_AWS_CIS_CRITERIA_VERSION,
+  SECURITY_EVALUATION_AWS_CUSTOM_CRITERIA_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
   SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+  SECURITY_EVALUATION_KEY_AWS_CUSTOM,
   SECURITY_EVALUATION_KEY_NPM_OSV,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
@@ -19,9 +21,11 @@ import { SecurityEvaluationCriteriaSeed } from "./security-evaluation-criteria.s
  * kinds this feature owns. The applicable version is the one this build ships;
  * the seed guarantees it is published before any run can reference it.
  *
- * For the repository kind the runConfig may request the INTEL family via
- * `evaluationKey: "threat-intel"` (ADR-039); otherwise the
- * dependency family is selected by default.
+ * For the repository kind the runConfig may request the INTEL evaluationKey
+ * via `evaluationKey: "threat-intel"` (ADR-039); otherwise the npm/OSV
+ * evaluationKey is selected by default. For the aws-account kind the runConfig
+ * may request `evaluationKey: "aws-custom"` (custom hardening rules) and falls
+ * back to the CIS benchmark otherwise.
  */
 @Injectable()
 export class SecurityEvaluationCriteriaProvider implements CriteriaProvider {
@@ -46,6 +50,13 @@ export class SecurityEvaluationCriteriaProvider implements CriteriaProvider {
           version: SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
         };
       case SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT:
+        if (runConfig?.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM) {
+          await this.seed.ensureCloudCustomBaseline();
+          return {
+            evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+            version: SECURITY_EVALUATION_AWS_CUSTOM_CRITERIA_VERSION,
+          };
+        }
         await this.seed.ensureCloudConfigBaseline();
         return {
           evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
