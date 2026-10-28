@@ -17,6 +17,7 @@ import { WorkEvaluationCriteriaProvider } from "./work-evaluation-criteria.provi
 import { WorkEvaluationEvidenceProvider } from "./work-evaluation-evidence.provider";
 import { WorkEvaluationJudgmentService } from "./work-evaluation-judgment.service";
 import { WorkEvaluationJudgmentTools } from "./work-evaluation-judgment.tools";
+import { WorkEvaluationModelScopeRegistration } from "./work-evaluation-model-scope";
 import { WorkEvaluationRunService } from "./work-evaluation-run.service";
 import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
 
@@ -55,6 +56,7 @@ import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
     WorkEvaluationJudgmentTools,
     WorkEvaluationJudgmentService,
     WorkEvaluationRunService,
+    WorkEvaluationModelScopeRegistration,
     // Bind the installation token resolver to security's SPI port (ADR-016).
     {
       provide: installationResolverToken("work-evaluation"),

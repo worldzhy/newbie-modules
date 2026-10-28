@@ -24,6 +24,7 @@ import { SecurityEvaluationDependencyJudgment } from "./judgment/dependency/secu
 import { SecurityEvaluationOsvClient } from "./judgment/dependency/security-evaluation-osv.client";
 import { SecurityEvaluationIntelJudgment } from "./judgment/intel/security-evaluation-intel.judgment";
 import { SecurityEvaluationIntelMatchService } from "./judgment/intel/security-evaluation-intel-match.service";
+import { SecurityEvaluationIntelModelScopeRegistration } from "./judgment/intel/security-evaluation-intel-model-scope";
 import { SecurityEvaluationIntelReRanker } from "./judgment/intel/security-evaluation-intel-re-ranker";
 import { SecurityEvaluationJudgmentService } from "./judgment/security-evaluation-judgment.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
@@ -70,6 +71,7 @@ import {
     SecurityEvaluationOsvClient,
     SecurityEvaluationDependencyJudgment,
     SecurityEvaluationCloudConfigJudgment,
+    SecurityEvaluationIntelModelScopeRegistration,
     SecurityEvaluationIntelReRanker,
     SecurityEvaluationIntelMatchService,
     SecurityEvaluationIntelJudgment,

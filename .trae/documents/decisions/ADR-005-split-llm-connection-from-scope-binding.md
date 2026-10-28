@@ -1,6 +1,6 @@
 # ADR-005: LLM 连接配置与 scope 绑定分离——两表模型取代 per-scope 记录
 
-状态：已采纳（2026-10-13 用户批准方案 B：两表分离）
+状态：已采纳（2026-10-13 用户批准方案 B：两表分离）；其中「GET 只返回已绑定 scope」与「PATCH 以自由 body 传 connectionId」由 ADR-043 取代（2026-10-28）
 日期：2026-10-13
 归属注记：本决策治理 newbie-modules 模块代码，单一源存放于本仓（nightwatch-backend 侧编号 ADR-006，该处现为同编号重定向存根）。2026-10-19 起按单一源规则执行。
 Supersedes：ADR-004 的决策 2（scope 作为记录固有属性、per-scope 唯一 active 记录）与决策 7 中的 activate 语义（编号订正说明见文末 Errata）
