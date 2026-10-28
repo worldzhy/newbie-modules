@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { CreateLlmConnectionDto, LlmConnectionResponseDto, UpdateLlmConnectionDto } from "./llm-connection.dto";
 
@@ -37,9 +38,10 @@ const PG_UNIQUE_VIOLATION = "P2002";
 const DUPLICATE_ENDPOINT_MESSAGE = "A connection with this API key already exists for the given endpoint.";
 
 /**
- * LLM connection configuration (ADR-006). One row = one callable AI endpoint
- * (provider + model + baseUrl + apiKey + health snapshot). Multiple consumer
- * scopes can bind to the same connection via LlmScopeAssignment.
+ * LLM connection configuration (ADR-006). One row = one upstream credential
+ * (provider + baseUrl + apiKey) plus the model it currently serves. The
+ * credential tuple is a uniqueness invariant, not the row identity: the id is
+ * stable, so scopes keep their binding while the key or model is edited.
  */
 @Injectable()
 export class LlmConnectionService {
@@ -118,20 +120,39 @@ export class LlmConnectionService {
 
     // The masked placeholder from a GET response must never overwrite the
     // stored secret. Clients keep the key unchanged by echoing it back.
-    const data: Record<string, string> = {};
-    if (dto.name !== undefined) data.name = dto.name;
-    if (dto.provider !== undefined) data.provider = dto.provider;
-    if (dto.model !== undefined) data.model = dto.model;
-    if (dto.baseUrl !== undefined) data.baseUrl = normalizeBaseUrl(dto.baseUrl);
+    const changes: { name?: string; provider?: string; model?: string; baseUrl?: string; apiKey?: string } = {};
+    if (dto.name !== undefined) changes.name = dto.name;
+    if (dto.provider !== undefined) changes.provider = dto.provider;
+    if (dto.model !== undefined) changes.model = dto.model;
+    if (dto.baseUrl !== undefined) changes.baseUrl = normalizeBaseUrl(dto.baseUrl);
     if (dto.apiKey !== undefined && !dto.apiKey.includes("****")) {
-      data.apiKey = dto.apiKey;
+      changes.apiKey = dto.apiKey;
     }
 
     // Changing the baseUrl while keeping the stored key can collide with
     // another row just as much as changing the key itself.
-    const effectiveBaseUrl = data.baseUrl ?? existing.baseUrl;
-    const effectiveApiKey = data.apiKey ?? existing.apiKey;
+    const effectiveBaseUrl = changes.baseUrl ?? existing.baseUrl;
+    const effectiveApiKey = changes.apiKey ?? existing.apiKey;
     await this.requireEndpointAvailable(effectiveBaseUrl, effectiveApiKey, id);
+
+    // The health snapshot describes the endpoint that produced it. Once any
+    // endpoint-defining field changes, the snapshot belongs to a configuration
+    // that no longer exists, so reset it to "never called" instead of letting
+    // the status dot attribute the old outcome to the new endpoint. A rename
+    // alone keeps the snapshot.
+    const endpointChanged =
+      (changes.provider !== undefined && changes.provider !== existing.provider) ||
+      (changes.model !== undefined && changes.model !== existing.model) ||
+      (changes.baseUrl !== undefined && changes.baseUrl !== existing.baseUrl) ||
+      (changes.apiKey !== undefined && changes.apiKey !== existing.apiKey);
+
+    const data: Prisma.LlmConnectionUpdateInput = { ...changes };
+    if (endpointChanged) {
+      data.lastCallAt = null;
+      data.lastCallSuccess = null;
+      data.lastFailureCategory = null;
+      data.lastFailureMessage = null;
+    }
 
     let record: LlmConnectionRecord & { scopes: Array<{ scope: string }> };
     try {

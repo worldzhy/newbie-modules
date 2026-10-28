@@ -1,13 +1,15 @@
 // !! ------------------------------------------------------------ //
 // !!            [Module] LLM models                               //
 // !! ------------------------------------------------------------ //
-// * LlmConnection (provider + model + baseUrl + apiKey —— one AI endpoint) //
+// * LlmConnection (provider + baseUrl + apiKey + current model — one credential endpoint) //
 // * LlmScopeAssignment (scope → connectionId —— consumer-to-connection binding) //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// LLM connection configuration (ADR-006). One row = one callable AI endpoint
-// (provider + model + baseUrl + apiKey + health snapshot). Multiple consumer
-// scopes can bind to the same connection via LlmScopeAssignment.
+// LLM connection configuration (ADR-006). One row = one upstream credential
+// (provider + baseUrl + apiKey) plus the model it currently serves. The
+// (baseUrl, apiKey) pair is a uniqueness invariant, not the row identity, so
+// the key or model can be edited in place while scope bindings stay attached.
+// Multiple consumer scopes can bind to the same connection via LlmScopeAssignment.
 model LlmConnection {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String   @db.VarChar(255)
@@ -31,8 +33,9 @@ model LlmConnection {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // One credential against one upstream endpoint exists at most once. The
-  // same key may back different models, but never a duplicate endpoint row.
+  // One credential against one upstream endpoint exists at most once: a
+  // duplicated (baseUrl, apiKey) pair never yields a second row, which keeps
+  // key rotation a single-row update for every scope bound to it.
   @@unique([baseUrl, apiKey])
   @@schema("module/llm")
 }
