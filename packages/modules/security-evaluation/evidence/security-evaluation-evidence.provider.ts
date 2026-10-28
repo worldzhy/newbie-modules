@@ -10,7 +10,7 @@ import { SecurityEvaluationAssetService } from "../assets/security-evaluation-as
 import {
   SECURITY_EVALUATION_ECOSYSTEM_NPM,
   SECURITY_EVALUATION_FACT_TYPE_PACKAGE,
-  SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+  SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_LOCKFILE_CANDIDATES,
 } from "../security-evaluation.constants";
 import {
@@ -53,7 +53,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
   ): Promise<EvidenceCollection> {
     // INTEL judgment does not consume lockfile evidence; it matches knowledge
     // items against the subject's scope entity set directly (ADR-039).
-    if (criteriaVersion.evaluationKey === SECURITY_EVALUATION_FAMILY_INTELLIGENCE) {
+    if (criteriaVersion.evaluationKey === SECURITY_EVALUATION_KEY_THREAT_INTEL) {
       return { items: [], declaredUnlinked: { total: 0 }, skipped: { total: 0 } };
     }
 

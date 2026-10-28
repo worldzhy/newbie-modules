@@ -3,23 +3,23 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
 
 import {
-  SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION,
-  SECURITY_EVALUATION_CLOUD_CUSTOM_CRITERIA_VERSION,
+  SECURITY_EVALUATION_AWS_CIS_CRITERIA_VERSION,
+  SECURITY_EVALUATION_AWS_CUSTOM_CRITERIA_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_CRITERION_KEY,
-  SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
-  SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
-  SECURITY_EVALUATION_FAMILY_DEPENDENCY,
-  SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+  SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+  SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+  SECURITY_EVALUATION_KEY_NPM_OSV,
+  SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
   SECURITY_EVALUATION_INTELLIGENCE_CRITERION_KEY,
-  SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
+  SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
 } from "../security-evaluation.constants";
 import {
-  SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK,
-  SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK,
-} from "../judgment/cloud-config/security-evaluation-cloud-config.rulebook";
+  SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
+  SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK,
+} from "../judgment/aws-config/security-evaluation-cloud-config.rulebook";
 
 interface CriterionSeed {
   criterionKey: string;
@@ -65,7 +65,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   async ensureDependencyBaseline(): Promise<void> {
     await this.ensureBaseline({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
-      evaluationKey: SECURITY_EVALUATION_FAMILY_DEPENDENCY,
+      evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV,
       version: SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
       description: "Dependency vulnerability baseline: installed npm packages are matched against OSV.",
       metadata: { ecosystem: "npm", dataSource: "https://osv.dev" },
@@ -82,25 +82,25 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
 
   /** CIS AWS Foundations Benchmark v1.5 initial set (ADR-027 D3). */
   async ensureCloudConfigBaseline(): Promise<void> {
-    const entries = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter(
-      (entry) => entry.evaluationKey === SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
+      (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     );
     await this.ensureBaseline({
-      kind: SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
-      evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
-      version: SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION,
-      description: `${SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK}: collected account configuration facts are asserted per control.`,
-      metadata: { benchmark: SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK },
+      kind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
+      evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+      version: SECURITY_EVALUATION_AWS_CIS_CRITERIA_VERSION,
+      description: `${SECURITY_EVALUATION_AWS_CIS_BENCHMARK}: collected account configuration facts are asserted per control.`,
+      metadata: { benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK },
       criteria: entries.map((entry) => ({
         criterionKey: entry.criterionKey,
         name: entry.name,
-        description: `${SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK} control ${entry.controlId}.`,
+        description: `${SECURITY_EVALUATION_AWS_CIS_BENCHMARK} control ${entry.controlId}.`,
         metadata: {
           controlId: entry.controlId,
           severity: entry.severity,
           remediation: entry.remediation,
           factRequirements: [...entry.requiredFactTypes],
-          benchmark: SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK,
+          benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
         },
       })),
     });
@@ -108,13 +108,13 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
 
   /** aws-custom rules inherited from the predecessor aws-audit module (ADR-033/ADR-037). */
   async ensureCloudCustomBaseline(): Promise<void> {
-    const entries = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter(
-      (entry) => entry.evaluationKey === SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
+      (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     );
     await this.ensureBaseline({
-      kind: SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
-      evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
-      version: SECURITY_EVALUATION_CLOUD_CUSTOM_CRITERIA_VERSION,
+      kind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
+      evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+      version: SECURITY_EVALUATION_AWS_CUSTOM_CRITERIA_VERSION,
       description:
         "aws-custom: non-benchmark cloud configuration checks (access keys, IAM policies, RDS/S3/EC2 hardening) inherited from the predecessor aws-audit module.",
       metadata: { benchmark: null },
@@ -135,7 +135,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   async ensureIntelligenceBaseline(): Promise<void> {
     await this.ensureBaseline({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
-      evaluationKey: SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+      evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
       version: SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
       description:
         "Threat-intel relevance: recently collected threat-intelligence items are matched against the subject's scope entity set (hard entity recall + LLM structured re-rank).",

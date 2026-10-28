@@ -6,8 +6,8 @@ import type { SecurityEvaluationFindingSeverity } from "../security-evaluation-s
 import { deriveUrgency } from "../security-evaluation-urgency";
 import { cloudConfigFingerprint } from "./security-evaluation-cloud-config.identity";
 import {
-  SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK,
-  SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK,
+  SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
+  SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK,
   rebuildCloudConfigFacts,
 } from "./security-evaluation-cloud-config.rulebook";
 
@@ -18,7 +18,7 @@ const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 /**
  * CLOUD_CONFIG judgment — collected account configuration facts against the
  * rulebook (ADR-027, ADR-037). One mechanism serves both cloud families
- * (`cis-aws-1.5` and `aws-custom`); the run's criteria evaluationKey selects
+ * (`aws-cis-1.5` and `aws-custom`); the run's criteria evaluationKey selects
  * which entries apply. Deterministic by construction: every FAIL of a
  * rulebook entry becomes one finding per non-compliant resource; PASS emits
  * nothing. Collection failures never reach this class as fake facts — the
@@ -30,7 +30,7 @@ export class SecurityEvaluationCloudConfigJudgment {
     const facts = rebuildCloudConfigFacts(input.evidence);
     const evaluationKey = input.criteriaVersion.evaluationKey;
 
-    const entries = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
+    const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
 
     const severityByKey = new Map(
       input.criteria.map((criterion) => [criterion.criterionKey, readSeverity(criterion.metadata)]),
@@ -72,14 +72,14 @@ export class SecurityEvaluationCloudConfigJudgment {
       .filter((item) => !requiredFactTypes.has(String(item.payload?.factType)))
       .map((item) => item.id);
 
-    const isCis = evaluationKey === "cis-aws-1.5";
+    const isCis = evaluationKey === "aws-cis-1.5";
     return Promise.resolve({
       verdicts: [],
       findings,
       evaluatedRefs,
       summary: `Judged ${entries.length} ${isCis ? "CIS controls" : "custom rules"} over ${input.evidence.length} configuration facts: ${findings.length} findings.`,
       metadata: {
-        ...(isCis ? { benchmark: SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK } : {}),
+        ...(isCis ? { benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK } : {}),
         evaluationKey,
         rulesEvaluated: entries.length,
         findingsEmitted: findings.length,

@@ -6,7 +6,7 @@ import type {
 import type { EvaluationJudgment, JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
 import {
-  SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+  SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_INTELLIGENCE_CRITERION_KEY,
 } from "../../security-evaluation.constants";
 import { SecurityEvaluationKnowledgeSeverity } from "../../knowledge/security-evaluation-knowledge.constants";
@@ -46,7 +46,7 @@ export class SecurityEvaluationIntelJudgment {
   ) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    if (input.criteriaVersion.evaluationKey !== SECURITY_EVALUATION_FAMILY_INTELLIGENCE) {
+    if (input.criteriaVersion.evaluationKey !== SECURITY_EVALUATION_KEY_THREAT_INTEL) {
       return { verdicts: [], findings: [], evaluatedRefs: [] };
     }
 

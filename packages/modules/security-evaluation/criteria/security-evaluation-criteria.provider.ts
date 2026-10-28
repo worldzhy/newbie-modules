@@ -3,13 +3,13 @@ import { CriteriaProvider, CriteriaSelection } from "@modules/evaluation/ports/c
 import type { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
 import {
-  SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION,
+  SECURITY_EVALUATION_AWS_CIS_CRITERIA_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
-  SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
-  SECURITY_EVALUATION_FAMILY_DEPENDENCY,
-  SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+  SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+  SECURITY_EVALUATION_KEY_NPM_OSV,
+  SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
-  SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
+  SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
 } from "../security-evaluation.constants";
 import { SecurityEvaluationCriteriaSeed } from "./security-evaluation-criteria.seed";
@@ -20,7 +20,7 @@ import { SecurityEvaluationCriteriaSeed } from "./security-evaluation-criteria.s
  * the seed guarantees it is published before any run can reference it.
  *
  * For the repository kind the runConfig may request the INTEL family via
- * `evaluationKey: "threat-intel-relevance"` (ADR-039); otherwise the
+ * `evaluationKey: "threat-intel"` (ADR-039); otherwise the
  * dependency family is selected by default.
  */
 @Injectable()
@@ -33,23 +33,23 @@ export class SecurityEvaluationCriteriaProvider implements CriteriaProvider {
   ): Promise<CriteriaSelection | null> {
     switch (subject.kind) {
       case SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY:
-        if (runConfig?.evaluationKey === SECURITY_EVALUATION_FAMILY_INTELLIGENCE) {
+        if (runConfig?.evaluationKey === SECURITY_EVALUATION_KEY_THREAT_INTEL) {
           await this.seed.ensureIntelligenceBaseline();
           return {
-            evaluationKey: SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+            evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
             version: SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
           };
         }
         await this.seed.ensureDependencyBaseline();
         return {
-          evaluationKey: SECURITY_EVALUATION_FAMILY_DEPENDENCY,
+          evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV,
           version: SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
         };
-      case SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT:
+      case SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT:
         await this.seed.ensureCloudConfigBaseline();
         return {
-          evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
-          version: SECURITY_EVALUATION_CLOUD_CONFIG_CRITERIA_VERSION,
+          evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+          version: SECURITY_EVALUATION_AWS_CIS_CRITERIA_VERSION,
         };
       default:
         return null;

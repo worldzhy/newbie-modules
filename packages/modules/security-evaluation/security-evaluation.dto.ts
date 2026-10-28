@@ -49,7 +49,7 @@ export class ListSecurityEvaluationAssetsRequestDto extends CommonListRequestDto
 export class SecurityEvaluationAssetResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty({ description: 'Subject kind behind this asset, e.g. "repository" or "cloud-account"' }) kind!: string;
+  @ApiProperty({ description: 'Subject kind behind this asset, e.g. "repository" or "aws-account"' }) kind!: string;
   @ApiProperty({ description: "Stable identity inside the scope: repository full name or cloud account id" })
   naturalKey!: string;
   @ApiProperty() displayName!: string;
@@ -142,7 +142,7 @@ export class SecurityEvaluationRunResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
   @ApiProperty() criteriaVersionId!: string;
-  @ApiProperty({ description: 'Criteria family of the run, e.g. "dependency-osv"' }) evaluationKey!: string;
+  @ApiProperty({ description: 'Criteria family of the run, e.g. "npm-osv"' }) evaluationKey!: string;
   @ApiProperty({ description: 'Criteria version label of the run, e.g. "v1"' }) criteriaVersion!: string;
   @ApiProperty({ enum: EvaluationRunStatus }) status!: EvaluationRunStatus;
   @ApiPropertyOptional({ type: String }) requestedByRef?: string | null;
@@ -212,7 +212,7 @@ export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestD
   @IsUUID()
   runId?: string;
 
-  @ApiPropertyOptional({ description: 'Restrict to one criteria evaluationKey, e.g. "dependency-osv"' })
+  @ApiPropertyOptional({ description: 'Restrict to one criteria evaluationKey, e.g. "npm-osv"' })
   @IsOptional()
   @IsString()
   evaluationKey?: string;

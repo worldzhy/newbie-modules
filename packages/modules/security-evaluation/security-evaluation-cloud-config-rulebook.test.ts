@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK,
+  SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK,
   type CloudConfigFactSet,
-} from "./judgment/cloud-config/security-evaluation-cloud-config.rulebook";
+} from "./judgment/aws-config/security-evaluation-cloud-config.rulebook";
 import {
-  SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
-  SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+  SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+  SECURITY_EVALUATION_KEY_AWS_CUSTOM,
 } from "./security-evaluation.constants";
 
 /**
@@ -32,7 +32,7 @@ function emptyFacts(): CloudConfigFactSet {
 }
 
 function judge(criterionKey: string, facts: CloudConfigFactSet) {
-  const entry = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.find((item) => item.criterionKey === criterionKey);
+  const entry = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.find((item) => item.criterionKey === criterionKey);
   assert.ok(entry, `rulebook entry ${criterionKey} exists`);
   return entry.judge(facts);
 }
@@ -64,11 +64,11 @@ const CUSTOM_KEYS = [
 ] as const;
 
 test("rulebook ships ten CIS controls and ten aws-custom rules, each tagged to its family", () => {
-  const cis = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter(
-    (entry) => entry.evaluationKey === SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+  const cis = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
+    (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
   );
-  const custom = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter(
-    (entry) => entry.evaluationKey === SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+  const custom = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
+    (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM,
   );
   assert.deepEqual(
     cis.map((entry) => entry.criterionKey),

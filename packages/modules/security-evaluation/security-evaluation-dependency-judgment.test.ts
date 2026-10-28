@@ -41,7 +41,7 @@ function inputFor(items: EvaluationEvidenceItem[]): JudgmentInput {
     criteriaVersion: {
       id: "33333333-3333-4333-8333-333333333333",
       kind: "repository",
-      evaluationKey: "dependency-osv",
+      evaluationKey: "npm-osv",
       version: "1",
     },
     criteria: [],

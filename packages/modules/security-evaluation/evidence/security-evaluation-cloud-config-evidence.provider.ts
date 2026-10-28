@@ -13,12 +13,12 @@ import {
   CloudConfigurationFailure,
   securityEvaluationCloudConfigurationAccessToken,
 } from "../ports/cloud-configuration-access.port";
-import { cloudConfigEvidenceId } from "../judgment/cloud-config/security-evaluation-cloud-config.identity";
-import { SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK } from "../judgment/cloud-config/security-evaluation-cloud-config.rulebook";
+import { cloudConfigEvidenceId } from "../judgment/aws-config/security-evaluation-cloud-config.identity";
+import { SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK } from "../judgment/aws-config/security-evaluation-cloud-config.rulebook";
 
 /**
  * SecurityEvaluationCloudConfigEvidenceProvider — evidence collection for
- * subject kind "cloud-account" (ADR-027 D1/D6).
+ * subject kind "aws-account" (ADR-027 D1/D6).
  *
  * The host port yields raw facts plus per-fact-type failures. Facts become
  * asset-fact rows and manifest items verbatim; failures become skipped-bucket
@@ -41,7 +41,7 @@ export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidencePr
     const access = this.cloudConfigurationAccess;
     if (!access) {
       throw new Error(
-        "No CloudConfigurationAccess is bound to SECURITY_EVALUATION_CLOUD_CONFIGURATION_ACCESS; the host must bind the port before running cloud-account evaluations.",
+        "No CloudConfigurationAccess is bound to SECURITY_EVALUATION_CLOUD_CONFIGURATION_ACCESS; the host must bind the port before running aws-account evaluations.",
       );
     }
 
@@ -69,7 +69,7 @@ export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidencePr
       return {
         id: cloudConfigEvidenceId(fact.factType, fact.factKey),
         layer: "fact",
-        source: "cloud-account",
+        source: "aws-account",
         summary: `${fact.factType} ${fact.factKey}${region ? ` (${region})` : ""}`,
         observedAt,
         payload: { factType: fact.factType, ...fact.value },
@@ -95,7 +95,7 @@ export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidencePr
   ): EvaluationCoverageBucket {
     const items = new Set<string>();
     const notes: string[] = [];
-    const entries = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
+    const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
     for (const failure of failures) {
       const affected = entries.filter((entry) => entry.requiredFactTypes.includes(failure.factType));
       for (const entry of affected) {

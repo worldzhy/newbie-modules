@@ -2,7 +2,7 @@ import type { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.
 
 /**
  * CloudConfigurationAccess — the host-provided read-only view of a
- * cloud-account asset (ADR-027 D1).
+ * aws-account asset (ADR-027 D1).
  *
  * The port yields raw configuration facts, never judged results: whether a
  * password policy or a bucket is compliant is the module's decision, made by

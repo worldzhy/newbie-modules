@@ -12,7 +12,7 @@ lands in a later slice on the same run and finding lifecycle.
 
 | Term     | Meaning                                                                                                                                                                                                          |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subject  | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `cloud-account`; `scopeType` / `scopeId` are host-assigned (nightwatch uses `project`).                                                        |
+| Subject  | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; `scopeType` / `scopeId` are host-assigned (nightwatch uses `project`).                                                        |
 | Asset    | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state facts.                                                                               |
 | Fact     | `SecurityEvaluationAssetFact`: something observed about an asset right now (`factType`, `factKey`, small intrinsic `value`). Facts are upserted, never deleted here; history lives in the archived run manifest. |
 | Criteria | Code-defined and published idempotently as `EvaluationCriteriaVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                     |
@@ -22,7 +22,7 @@ lands in a later slice on the same run and finding lifecycle.
 ## Subject kinds and scopes
 
 - `repository` — evidence is the repository's `package-lock.json`.
-- `cloud-account` — evidence is the account's configuration facts, collected
+- `aws-account` — evidence is the account's configuration facts, collected
   through the host-bound `CloudConfigurationAccess` port. Nightwatch maps one
   configured `awsCrossAccountBinding` to one subject.
 
@@ -48,8 +48,8 @@ open decision (ADR-022).
 
 | Family           | Kind            | Version | Content                                                                                 |
 | ---------------- | --------------- | ------- | --------------------------------------------------------------------------------------- |
-| `dependency-osv` | `repository`    | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                    |
-| `cis-aws-1.5`    | `cloud-account` | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027). |
+| `npm-osv` | `repository`    | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                    |
+| `aws-cis-1.5`    | `aws-account` | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027). |
 
 Each CIS criterion carries `controlId`, `severity`, `remediation` and
 `factRequirements` in its metadata; the judgment reads severity from there, and
@@ -60,11 +60,11 @@ version of the evaluationKey, never an in-place edit.
 
 The module implements the skeleton's kind-scoped ports for both kinds:
 
-- `EVALUATION_CRITERIA:{repository|cloud-account}` → `SecurityEvaluationCriteriaProvider`
+- `EVALUATION_CRITERIA:{repository|aws-account}` → `SecurityEvaluationCriteriaProvider`
 - `EVALUATION_EVIDENCE:repository` → `SecurityEvaluationEvidenceProvider`
-- `EVALUATION_EVIDENCE:cloud-account` → `SecurityEvaluationCloudConfigEvidenceProvider`
-- `EVALUATION_JUDGMENT:{repository|cloud-account}` → `SecurityEvaluationJudgmentService`
-  (dispatches on `criteriaVersion.evaluationKey`: `dependency-osv`, `cis-aws-1.5`)
+- `EVALUATION_EVIDENCE:aws-account` → `SecurityEvaluationCloudConfigEvidenceProvider`
+- `EVALUATION_JUDGMENT:{repository|aws-account}` → `SecurityEvaluationJudgmentService`
+  (dispatches on `criteriaVersion.evaluationKey`: `npm-osv`, `aws-cis-1.5`)
 
 The host must bind two more ports, owned by this module:
 
@@ -86,7 +86,7 @@ Every run records the skeleton's three buckets:
 
 - `evaluated` — evidence items the judgment actually examined.
 - `declaredUnlinked` — dependencies declared in `package.json` but absent from
-  the lockfile. The cloud-account mechanism has no such concept and always
+  the lockfile. The aws-account mechanism has no such concept and always
   reports an empty bucket.
 - `skipped` — packages whose OSV batch query failed, or cloud criteria whose
   facts could not be collected. Cloud entries name the control
@@ -104,9 +104,9 @@ trigger conditions:
 
 ```ts
 SECURITY_EVALUATION_SCHEDULES = [
-  { evaluationKey: "dependency-osv", subjectKind: "repository", recommendedInterval: "daily" },
-  { evaluationKey: "cis-aws-1.5", subjectKind: "cloud-account", recommendedInterval: "daily" },
-  { evaluationKey: "threat-intel-relevance", subjectKind: "repository", recommendedInterval: "hourly" },
+  { evaluationKey: "npm-osv", subjectKind: "repository", recommendedInterval: "daily" },
+  { evaluationKey: "aws-cis-1.5", subjectKind: "aws-account", recommendedInterval: "daily" },
+  { evaluationKey: "threat-intel", subjectKind: "repository", recommendedInterval: "hourly" },
 ];
 ```
 

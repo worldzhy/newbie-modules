@@ -15,7 +15,7 @@
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 /// One evaluated asset, one-to-one with an EvaluationSubject row of this
-/// feature's kinds ("repository" / "cloud-account"). The skeleton owns the
+/// feature's kinds ("repository" / "aws-account"). The skeleton owns the
 /// subject coordinate; this table owns the asset's inventory lifecycle.
 /// `naturalKey` is the feature's stable identity inside its scope — a
 /// repository full name or a cloud account id.

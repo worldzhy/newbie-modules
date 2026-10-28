@@ -3,8 +3,8 @@ import { test } from "node:test";
 import type { EvaluationCriterionRef, EvaluationEvidenceItem } from "@modules/evaluation/ports/evaluation.contracts";
 import type { JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
-import { SecurityEvaluationCloudConfigJudgment } from "./judgment/cloud-config/security-evaluation-cloud-config.judgment";
-import { SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK } from "./judgment/cloud-config/security-evaluation-cloud-config.rulebook";
+import { SecurityEvaluationCloudConfigJudgment } from "./judgment/aws-config/security-evaluation-cloud-config.judgment";
+import { SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK } from "./judgment/aws-config/security-evaluation-cloud-config.rulebook";
 
 /**
  * Behavior-level tests for the CLOUD_CONFIG judgment assembly (ADR-027 D6):
@@ -17,14 +17,14 @@ function evidenceItem(factType: string, factKey: string, value: Record<string, u
   return {
     id: `cloud:${factType}:${factKey}`,
     layer: "fact",
-    source: "cloud-account",
+    source: "aws-account",
     summary: `${factType} ${factKey}`,
     observedAt: new Date("2026-01-01T00:00:00.000Z"),
     payload: { factType, ...value },
   };
 }
 
-const CRITERIA: EvaluationCriterionRef[] = SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.map((entry) => ({
+const CRITERIA: EvaluationCriterionRef[] = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.map((entry) => ({
   criterionKey: entry.criterionKey,
   kind: "ASSERTION",
   name: entry.name,
@@ -35,7 +35,7 @@ function inputFor(items: EvaluationEvidenceItem[], criteria = CRITERIA): Judgmen
   return {
     subject: {
       id: "11111111-1111-4111-8111-111111111111",
-      kind: "cloud-account",
+      kind: "aws-account",
       scopeType: "project",
       scopeId: "22222222-2222-4222-8222-222222222222",
       subjectKey: "binding-1",
@@ -43,8 +43,8 @@ function inputFor(items: EvaluationEvidenceItem[], criteria = CRITERIA): Judgmen
     },
     criteriaVersion: {
       id: "33333333-3333-4333-8333-333333333333",
-      kind: "cloud-account",
-      evaluationKey: "cis-aws-1.5",
+      kind: "aws-account",
+      evaluationKey: "aws-cis-1.5",
       version: "v1",
     },
     criteria,

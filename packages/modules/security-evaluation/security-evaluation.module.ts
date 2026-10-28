@@ -19,7 +19,7 @@ import { GitHubSecurityBlogAdapter } from "./knowledge/adapters/github-security-
 import { TheHackerNewsAdapter } from "./knowledge/adapters/the-hacker-news.adapter";
 import { SECURITY_EVALUATION_KNOWLEDGE_SOURCE_ADAPTERS } from "./knowledge/adapters/source-adapter.port";
 import { SecurityEvaluationKnowledgeService } from "./knowledge/security-evaluation-knowledge.service";
-import { SecurityEvaluationCloudConfigJudgment } from "./judgment/cloud-config/security-evaluation-cloud-config.judgment";
+import { SecurityEvaluationCloudConfigJudgment } from "./judgment/aws-config/security-evaluation-cloud-config.judgment";
 import { SecurityEvaluationDependencyJudgment } from "./judgment/dependency/security-evaluation-dependency.judgment";
 import { SecurityEvaluationOsvClient } from "./judgment/dependency/security-evaluation-osv.client";
 import { SecurityEvaluationIntelJudgment } from "./judgment/intel/security-evaluation-intel.judgment";
@@ -31,7 +31,7 @@ import { SecurityEvaluationReportService } from "./reporting/security-evaluation
 import { SecurityEvaluationController } from "./security-evaluation.controller";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
 import {
-  SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT,
+  SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
 } from "./security-evaluation.constants";
 
@@ -41,7 +41,7 @@ import {
  *
  * Slice 1 owns the asset inventory, the dependency criteria and the DEPENDENCY
  * judgment; slice 2 (ADR-027) adds the CLOUD_CONFIG mechanism: the CIS AWS
- * Foundations criteria for subject kind "cloud-account", its evidence provider
+ * Foundations criteria for subject kind "aws-account", its evidence provider
  * and its rulebook judgment, dispatched by evaluationKey through the same judgment
  * service. INTEL arrives in a later slice with its own evaluationKey dispatch.
  *
@@ -115,7 +115,7 @@ import {
       useExisting: SecurityEvaluationCriteriaProvider,
     },
     {
-      provide: criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
+      provide: criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
       useExisting: SecurityEvaluationCriteriaProvider,
     },
     {
@@ -123,7 +123,7 @@ import {
       useExisting: SecurityEvaluationEvidenceProvider,
     },
     {
-      provide: evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
+      provide: evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
       useExisting: SecurityEvaluationCloudConfigEvidenceProvider,
     },
     {
@@ -131,7 +131,7 @@ import {
       useExisting: SecurityEvaluationJudgmentService,
     },
     {
-      provide: judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
+      provide: judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
       useExisting: SecurityEvaluationJudgmentService,
     },
   ],
@@ -142,11 +142,11 @@ import {
     SecurityEvaluationReportService,
     SecurityEvaluationKnowledgeService,
     criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
-    criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
+    criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
     evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
-    evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
+    evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
     judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
-    judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_CLOUD_ACCOUNT),
+    judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
   ],
 })
 export class SecurityEvaluationModule {}

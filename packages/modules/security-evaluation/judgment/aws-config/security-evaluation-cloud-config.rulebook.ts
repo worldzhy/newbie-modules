@@ -9,8 +9,8 @@ import {
   SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL,
   SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY,
   SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY,
-  SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
-  SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+  SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+  SECURITY_EVALUATION_KEY_AWS_CUSTOM,
 } from "../../security-evaluation.constants";
 import { cloudConfigEvidenceId } from "./security-evaluation-cloud-config.identity";
 
@@ -18,7 +18,7 @@ import { cloudConfigEvidenceId } from "./security-evaluation-cloud-config.identi
  * The cloud configuration rulebook (ADR-027 D3, ADR-037). Two evaluationKeys
  * share one mechanism and one collected fact inventory:
  *
- * - `cis-aws-1.5`: CIS AWS Foundations Benchmark v1.5 controls, each one
+ * - `aws-cis-1.5`: CIS AWS Foundations Benchmark v1.5 controls, each one
  *   ASSERTION criterion; PASS emits nothing, FAIL emits one finding draft per
  *   non-compliant resource.
  * - `aws-custom`: non-benchmark checks inherited from the predecessor
@@ -160,7 +160,7 @@ export interface CloudConfigRulebookEntry {
   severity: SecurityEvaluationFindingSeverity;
   remediation: string;
   requiredFactTypes: readonly string[];
-  /** Which evaluationKey this entry belongs to (cis-aws-1.5 or aws-custom). */
+  /** Which evaluationKey this entry belongs to (aws-cis-1.5 or aws-custom). */
   evaluationKey: string;
   judge(facts: CloudConfigFactSet): CloudConfigFindingDraft[];
 }
@@ -185,7 +185,7 @@ function rootCredentialEntry(
 ): CloudConfigRulebookEntry {
   return {
     ...partial,
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ROOT_CREDENTIAL],
     judge(facts) {
       const fact = facts.rootCredential;
@@ -211,7 +211,7 @@ function passwordPolicyEntry(
 ): CloudConfigRulebookEntry {
   return {
     ...partial,
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY],
     judge(facts) {
       const fact = facts.passwordPolicy;
@@ -283,7 +283,7 @@ function daysBetween(now: Date, iso: string): number | null {
   return Math.floor((now.getTime() - created) / 86_400_000);
 }
 
-export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRulebookEntry[] = [
+export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebookEntry[] = [
   // ── CIS AWS Foundations Benchmark v1.5 ─────────────────────────────────
   rootCredentialEntry(
     {
@@ -315,7 +315,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "IAM console users have MFA enabled",
     severity: "MEDIUM",
     remediation: "Require MFA for every console-capable IAM user.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL],
     judge(facts) {
       return facts.userCredentials
@@ -353,7 +353,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "IAM password policy expires passwords and console passwords rotate",
     severity: "MEDIUM",
     remediation: "Set maxPasswordAge so console passwords expire; ensure every console user's password rotates.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredFactTypes: [
       SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
       SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL,
@@ -413,7 +413,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "S3 buckets have default encryption enabled",
     severity: "MEDIUM",
     remediation: "Enable SSE-S3 or SSE-KMS for default bucket encryption.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY],
     judge(facts) {
       return facts.buckets
@@ -437,7 +437,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "S3 buckets block public access",
     severity: "HIGH",
     remediation: "Enable every Public Access Block flag and remove public bucket policies or ACL grants.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY],
     judge(facts) {
       const drafts: CloudConfigFindingDraft[] = [];
@@ -502,7 +502,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "RDS instances are private and encrypted",
     severity: "HIGH",
     remediation: "Move databases to private subnets and enable storage encryption.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY],
     judge(facts) {
       const drafts: CloudConfigFindingDraft[] = [];
@@ -530,7 +530,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "Security groups do not expose management ports to the internet",
     severity: "HIGH",
     remediation: "Restrict SSH/RDP/database ports to trusted internal CIDRs or VPN ingress.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS],
     judge(facts) {
       const drafts: CloudConfigFindingDraft[] = [];
@@ -556,7 +556,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "Security groups have no public ingress",
     severity: "MEDIUM",
     remediation: "Review whether each public ingress rule is required.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS],
     judge(facts) {
       return facts.securityGroups
@@ -580,7 +580,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "Active IAM access keys have been used",
     severity: "LOW",
     remediation: "Remove active access keys that have never been used.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY],
     judge(facts) {
       return facts.accessKeys
@@ -599,7 +599,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "Active IAM access keys are younger than 90 days",
     severity: "MEDIUM",
     remediation: "Rotate access keys older than 90 days.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY],
     judge(facts) {
       const now = new Date();
@@ -626,7 +626,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "IAM users have at most one active access key",
     severity: "MEDIUM",
     remediation: "Reduce each user to at most one active access key.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY],
     judge(facts) {
       const activeByUser = new Map<string, CloudConfigFact<AccessKeyFactPayload>[]>();
@@ -657,7 +657,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "IAM policies do not use Allow with NotAction",
     severity: "MEDIUM",
     remediation: "Rewrite Allow+NotAction statements as explicit Allow lists.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(facts) {
       const drafts: CloudConfigFindingDraft[] = [];
@@ -684,7 +684,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "IAM policies do not grant Action * on Resource *",
     severity: "HIGH",
     remediation: "Scope broad Allow statements to specific actions and resources.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(facts) {
       const drafts: CloudConfigFindingDraft[] = [];
@@ -713,7 +713,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "IAM policies do not grant service-wide actions on all resources",
     severity: "MEDIUM",
     remediation: "Replace service-wide wildcards with the specific actions required.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(facts) {
       const drafts: CloudConfigFindingDraft[] = [];
@@ -753,7 +753,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "IAM policies do not grant sensitive actions on all resources",
     severity: "HIGH",
     remediation: "Restrict PassRole/AssumeRole/Decrypt/GetSecretValue to specific resources.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(facts) {
       const drafts: CloudConfigFindingDraft[] = [];
@@ -784,7 +784,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "RDS instances manage the master user password in Secrets Manager",
     severity: "MEDIUM",
     remediation: "Enable RDS managed master user credentials in AWS Secrets Manager.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY],
     judge(facts) {
       return facts.rdsInstances
@@ -804,7 +804,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "S3 buckets have versioning enabled",
     severity: "LOW",
     remediation: "Enable versioning on S3 buckets to protect against accidental deletion.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY],
     judge(facts) {
       return facts.buckets
@@ -824,7 +824,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
     name: "EC2 instances with a public IP do not expose public ingress",
     severity: "HIGH",
     remediation: "Remove the public IP or restrict the instance's security groups to non-public ingress.",
-    evaluationKey: SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
+    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredFactTypes: [
       SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_INSTANCE_NETWORK,
       SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,
@@ -858,7 +858,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK: readonly CloudConfigRule
   },
 ];
 
-export const SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK = "CIS AWS Foundations Benchmark v1.5";
+export const SECURITY_EVALUATION_AWS_CIS_BENCHMARK = "CIS AWS Foundations Benchmark v1.5";
 
 /**
  * All fact types the cloud configuration rulebook consumes, across both
@@ -866,7 +866,7 @@ export const SECURITY_EVALUATION_CLOUD_CONFIG_BENCHMARK = "CIS AWS Foundations B
  * shared collector.
  */
 export const SECURITY_EVALUATION_CLOUD_CONFIG_REQUIRED_FACT_TYPES: readonly string[] = Array.from(
-  new Set(SECURITY_EVALUATION_CLOUD_CONFIG_RULEBOOK.flatMap((entry) => [...entry.requiredFactTypes])),
+  new Set(SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.flatMap((entry) => [...entry.requiredFactTypes])),
 );
 
 /** Rebuild the typed fact set from manifest items (payloads cross the port as JSON). */

@@ -10,7 +10,7 @@ import type { CloudConfigurationAccess } from "./ports/cloud-configuration-acces
 import type { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
 
 /**
- * Behavior-level tests for the cloud-account evidence provider (ADR-027 D6):
+ * Behavior-level tests for the aws-account evidence provider (ADR-027 D6):
  * collection failures land in the skipped bucket keyed by the affected
  * criteria, a fully uncollectable subject fails the run, and partial failure
  * never masquerades as a clean pass.
@@ -18,7 +18,7 @@ import type { SecurityEvaluationAssetService } from "./assets/security-evaluatio
 
 const SUBJECT: EvaluationSubjectRef = {
   id: "11111111-1111-4111-8111-111111111111",
-  kind: "cloud-account",
+  kind: "aws-account",
   scopeType: "project",
   scopeId: "22222222-2222-4222-8222-222222222222",
   subjectKey: "binding-1",
@@ -27,8 +27,8 @@ const SUBJECT: EvaluationSubjectRef = {
 
 const VERSION: EvaluationCriteriaVersionRef = {
   id: "33333333-3333-4333-8333-333333333333",
-  kind: "cloud-account",
-  evaluationKey: "cis-aws-1.5",
+  kind: "aws-account",
+  evaluationKey: "aws-cis-1.5",
   version: "v1",
 };
 
@@ -60,7 +60,7 @@ test("facts become manifest items and asset facts; a clean collection skips noth
   const collection = await provider.collect(SUBJECT, VERSION);
   assert.equal(collection.items.length, 1);
   assert.equal(collection.items[0].id, "cloud:aws.iam.account-password-policy:account-password-policy");
-  assert.equal(collection.items[0].source, "cloud-account");
+  assert.equal(collection.items[0].source, "aws-account");
   assert.deepEqual(collection.declaredUnlinked, { total: 0 });
   assert.equal(collection.skipped.total, 0);
 });

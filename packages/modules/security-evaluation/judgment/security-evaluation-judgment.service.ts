@@ -2,12 +2,12 @@ import { BadRequestException, Injectable } from "@nestjs/common";
 import type { EvaluationJudgment, JudgmentInput, JudgmentPort } from "@modules/evaluation/ports/judgment.port";
 
 import {
-  SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION,
-  SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM,
-  SECURITY_EVALUATION_FAMILY_DEPENDENCY,
-  SECURITY_EVALUATION_FAMILY_INTELLIGENCE,
+  SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+  SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+  SECURITY_EVALUATION_KEY_NPM_OSV,
+  SECURITY_EVALUATION_KEY_THREAT_INTEL,
 } from "../security-evaluation.constants";
-import { SecurityEvaluationCloudConfigJudgment } from "./cloud-config/security-evaluation-cloud-config.judgment";
+import { SecurityEvaluationCloudConfigJudgment } from "./aws-config/security-evaluation-cloud-config.judgment";
 import { SecurityEvaluationDependencyJudgment } from "./dependency/security-evaluation-dependency.judgment";
 import { SecurityEvaluationIntelJudgment } from "./intel/security-evaluation-intel.judgment";
 
@@ -29,12 +29,12 @@ export class SecurityEvaluationJudgmentService implements JudgmentPort {
 
   judge(input: JudgmentInput): Promise<EvaluationJudgment> {
     switch (input.criteriaVersion.evaluationKey) {
-      case SECURITY_EVALUATION_FAMILY_DEPENDENCY:
+      case SECURITY_EVALUATION_KEY_NPM_OSV:
         return this.dependency.judge(input);
-      case SECURITY_EVALUATION_FAMILY_CLOUD_CONFIGURATION:
-      case SECURITY_EVALUATION_FAMILY_CLOUD_CUSTOM:
+      case SECURITY_EVALUATION_KEY_AWS_CIS_1_5:
+      case SECURITY_EVALUATION_KEY_AWS_CUSTOM:
         return this.cloudConfig.judge(input);
-      case SECURITY_EVALUATION_FAMILY_INTELLIGENCE:
+      case SECURITY_EVALUATION_KEY_THREAT_INTEL:
         return this.intel.judge(input);
       default:
         throw new BadRequestException(
