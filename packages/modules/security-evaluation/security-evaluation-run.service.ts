@@ -43,7 +43,7 @@ export class SecurityEvaluationRunService {
   }
 
   /**
-   * Runs decorated with their criteria family labels: the skeleton row only
+   * Runs decorated with their evaluationKey labels: the skeleton row only
    * carries criteriaVersionId, while the API consumer displays the
    * evaluationKey and version of what the run was judged against.
    */

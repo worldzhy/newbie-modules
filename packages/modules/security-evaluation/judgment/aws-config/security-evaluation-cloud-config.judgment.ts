@@ -17,7 +17,7 @@ const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 
 /**
  * CLOUD_CONFIG judgment — collected account configuration facts against the
- * rulebook (ADR-027, ADR-037). One mechanism serves both cloud families
+ * rulebook (ADR-027, ADR-037). One mechanism serves both AWS evaluation keys
  * (`aws-cis-1.5` and `aws-custom`); the run's criteria evaluationKey selects
  * which entries apply. Deterministic by construction: every FAIL of a
  * rulebook entry becomes one finding per non-compliant resource; PASS emits
@@ -38,7 +38,7 @@ export class SecurityEvaluationCloudConfigJudgment {
 
     const findings: EvaluationFindingCandidate[] = [];
 
-    // A fact counts as evaluated if any rule in this family declares it as a
+    // A fact counts as evaluated if any rule in this evaluation key declares it as a
     // required fact type — whether or not it produced a finding (ADR-037 D7).
     const requiredFactTypes = new Set(entries.flatMap((entry) => [...entry.requiredFactTypes]));
 

@@ -18,7 +18,7 @@
 /// feature's kinds ("repository" / "aws-account"). The skeleton owns the
 /// subject coordinate; this table owns the asset's inventory lifecycle.
 /// `naturalKey` is the feature's stable identity inside its scope — a
-/// repository full name or a cloud account id.
+/// repository full name or an AWS account id.
 model SecurityEvaluationAsset {
   id          String   @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK

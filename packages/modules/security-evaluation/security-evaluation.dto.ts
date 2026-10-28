@@ -50,7 +50,7 @@ export class SecurityEvaluationAssetResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
   @ApiProperty({ description: 'Subject kind behind this asset, e.g. "repository" or "aws-account"' }) kind!: string;
-  @ApiProperty({ description: "Stable identity inside the scope: repository full name or cloud account id" })
+  @ApiProperty({ description: "Stable identity inside the scope: repository full name or AWS account id" })
   naturalKey!: string;
   @ApiProperty() displayName!: string;
   @ApiProperty() firstSeenAt!: Date;
@@ -137,12 +137,12 @@ export class ListSecurityEvaluationRunsRequestDto extends CommonListRequestDto {
   criteriaVersionId?: string;
 }
 
-/** Mirrors the skeleton's EvaluationRun row, decorated with the criteria family labels. */
+/** Mirrors the skeleton's EvaluationRun row, decorated with the evaluationKey labels. */
 export class SecurityEvaluationRunResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
   @ApiProperty() criteriaVersionId!: string;
-  @ApiProperty({ description: 'Criteria family of the run, e.g. "npm-osv"' }) evaluationKey!: string;
+  @ApiProperty({ description: 'Evaluation key of the run, e.g. "npm-osv"' }) evaluationKey!: string;
   @ApiProperty({ description: 'Criteria version label of the run, e.g. "v1"' }) criteriaVersion!: string;
   @ApiProperty({ enum: EvaluationRunStatus }) status!: EvaluationRunStatus;
   @ApiPropertyOptional({ type: String }) requestedByRef?: string | null;

@@ -44,12 +44,14 @@ open decision (ADR-022).
 | `aws.rds.instance-security`       | `<identifier>`            | `{ identifier, region, publiclyAccessible, storageEncrypted }`                                                            |
 | `aws.ec2.security-group-ingress`  | `<groupId>`               | `{ groupId, region, publicIngress: [{ protocol, fromPort, toPort, cidr }] }` (internet-open rules only; empty means none) |
 
-## Criteria families
+## Evaluation keys
 
-| Family           | Kind            | Version | Content                                                                                 |
+| Evaluation key   | Kind            | Version | Content                                                                                 |
 | ---------------- | --------------- | ------- | --------------------------------------------------------------------------------------- |
-| `npm-osv` | `repository`    | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                    |
-| `aws-cis-1.5`    | `aws-account` | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027). |
+| `npm-osv`        | `repository`    | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                    |
+| `aws-cis-1.5`    | `aws-account`   | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027). |
+| `aws-custom`     | `aws-account`   | `v1`    | Custom hardening criteria inherited from the predecessor aws-audit module (ADR-033/037). |
+| `threat-intel`   | `repository`    | `v1`    | Threat-intelligence relevance criteria (ADR-039).                                       |
 
 Each CIS criterion carries `controlId`, `severity`, `remediation` and
 `factRequirements` in its metadata; the judgment reads severity from there, and
@@ -64,7 +66,8 @@ The module implements the skeleton's kind-scoped ports for both kinds:
 - `EVALUATION_EVIDENCE:repository` → `SecurityEvaluationEvidenceProvider`
 - `EVALUATION_EVIDENCE:aws-account` → `SecurityEvaluationCloudConfigEvidenceProvider`
 - `EVALUATION_JUDGMENT:{repository|aws-account}` → `SecurityEvaluationJudgmentService`
-  (dispatches on `criteriaVersion.evaluationKey`: `npm-osv`, `aws-cis-1.5`)
+  (dispatches on `criteriaVersion.evaluationKey`: `npm-osv`, `aws-cis-1.5`,
+  `aws-custom`, `threat-intel`)
 
 The host must bind two more ports, owned by this module:
 
@@ -106,6 +109,7 @@ trigger conditions:
 SECURITY_EVALUATION_SCHEDULES = [
   { evaluationKey: "npm-osv", subjectKind: "repository", recommendedInterval: "daily" },
   { evaluationKey: "aws-cis-1.5", subjectKind: "aws-account", recommendedInterval: "daily" },
+  { evaluationKey: "aws-custom", subjectKind: "aws-account", recommendedInterval: "daily" },
   { evaluationKey: "threat-intel", subjectKind: "repository", recommendedInterval: "hourly" },
 ];
 ```
