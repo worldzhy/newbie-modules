@@ -1,7 +1,7 @@
 # ADR-037: security-evaluation 评估定义模型与契约修正
 
 状态：已采纳
-日期：2026-10-27（2026-10-29 修订：新增 D9 判定输入材料契约）
+日期：2026-10-27（2026-10-29 修订：新增 D9 判定输入材料契约；2026-10-30 修订：新增 D9.1 knowledge 家族命名定稿）
 归属：框架层（newbie-modules registry，`packages/modules/evaluation` + `packages/modules/security-evaluation`）
 关联：ADR-020（骨架）、ADR-027（CLOUD_CONFIG）、ADR-033（非 CIS 自定义规则族）、ADR-036（宿主切换）
 
@@ -104,6 +104,19 @@ Verdict / Finding（结论）
 
 **落地状态**：第 1–2 条为现状语义确认，无需改代码；第 3–4 条为技术债，由宿主侧 ADR-037 同步登记。
 
+### D9.1. knowledge 家族命名定稿（2026-10-30）
+
+D9 第 1 条登记"AssetFact 归入 knowledge 家族是术语债"。本条目清偿该债，并顺带按 subject kind 拆表：
+
+1. **三表定名。**
+   - `SecurityEvaluationAwsConfigKnowledgeItem` — aws-account 采集表（asset-scoped）。
+   - `SecurityEvaluationNpmPackageKnowledgeItem` — repository 采集表（asset-scoped）。
+   - `SecurityEvaluationThreatKnowledgeItem` — intel 表（world-scoped），由 `SecurityEvaluationKnowledgeItem` 改名，字段不动。
+   - 原 `SecurityEvaluationAssetFact` 拆为前两张表（同构 schema：`id / assetId / type / key / value / observedAt`，唯一键 `assetId+type+key`）；`listKnowledgeItems` 经 `subject.kind` 路由到对应 delegate。不叫 `AwsCis*`：aws-custom 与 aws-cis-1.5 共享同一采集池（D8），命名绑死单一 evaluationKey 会误导；不叫 `NpmOsv*`：OSV 是 judgment 阶段查询的漏洞库，采集物是 lockfile 包清单。
+2. **KnowledgeItem 后缀表家族、不表 schema 同构。** 三张表同属"判定输入池"家族；Threat 为 world-scoped、唯一键 `(source, externalId)`、有清理策略，与 asset-scoped 两表物理隔离的决策（D9 第 1 条）不变。
+3. **fact 词汇全退役。** 字段 `factType/factKey`→`type/key`；常量 `FACT_TYPE_*`→`KNOWLEDGE_TYPE_*`（npm 类型值 `"package"`→`"npm.package"`，AWS 值不变）；`requiredFactTypes`→`requiredKnowledgeTypes`；路由 `assets/:assetId/facts`→`assets/:assetId/knowledge-items`；evidence `layer: "fact"`→`"knowledge"`；port `CloudConfigurationFact/FactCollection/collectFacts`→`CloudConfigurationItem/Collection/collect`；rulebook 内部 `CloudConfigFact*`→`AwsConfigKnowledge*`。本 ADR 的 D6/D7/D8 及 D9 历史行文保留原词汇作考古，不再回改。
+4. **Asset 本体不动。** 资产表与 subject 坐标的关系维持 ADR-022 D2。
+
 ## Cross-host check
 
 | 维度 | 框架层 | 宿主层 |
@@ -114,7 +127,7 @@ Verdict / Finding（结论）
 | 采集契约 | fact 表写进 README | `AwsCloudConfigurationAccess` 实现采集 |
 | coverage | 按 requiredFactTypes | 不干预 |
 | 共享采集 | EvidenceProvider 声明 factType | 采集器实现 freshness 缓存 |
-| 判定输入材料 | knowledge 两类（asset-scoped / world-scoped）分表；evidence 为 run 切片 | 落 AssetFact / KnowledgeItem 表，投影成 evidence item |
+| 判定输入材料 | knowledge 两类（asset-scoped / world-scoped）分表；evidence 为 run 切片 | 落 AwsConfig / NpmPackage / Threat 三张 KnowledgeItem 表（D9.1），投影成 evidence item |
 
 ## Consequences
 

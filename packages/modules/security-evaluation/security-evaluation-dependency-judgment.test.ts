@@ -20,7 +20,7 @@ import type {
 function evidenceItem(name: string, version: string, isDev = false): EvaluationEvidenceItem {
   return {
     id: `pkg:npm:${name}@${version}`,
-    layer: "fact",
+    layer: "knowledge",
     source: "lockfile",
     summary: `${name}@${version}`,
     observedAt: new Date("2026-01-01T00:00:00.000Z"),

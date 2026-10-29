@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import {
   SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK,
-  type CloudConfigFactSet,
+  type AwsConfigKnowledgeSet,
 } from "./judgment/aws-config/security-evaluation-cloud-config.rulebook";
 import {
   SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
@@ -17,7 +17,7 @@ import {
  * AWS or a database.
  */
 
-function emptyFacts(): CloudConfigFactSet {
+function emptyItems(): AwsConfigKnowledgeSet {
   return {
     passwordPolicy: null,
     rootCredential: null,
@@ -31,10 +31,10 @@ function emptyFacts(): CloudConfigFactSet {
   };
 }
 
-function judge(criterionKey: string, facts: CloudConfigFactSet) {
+function judge(criterionKey: string, items: AwsConfigKnowledgeSet) {
   const entry = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.find((item) => item.criterionKey === criterionKey);
   assert.ok(entry, `rulebook entry ${criterionKey} exists`);
-  return entry.judge(facts);
+  return entry.judge(items);
 }
 
 const CIS_KEYS = [
@@ -84,93 +84,93 @@ test("rulebook ships ten CIS controls and ten aws-custom rules, each tagged to i
 });
 
 test("cis-1-4 fails only while the root account holds active access keys", () => {
-  const facts = emptyFacts();
-  facts.rootCredential = {
+  const items = emptyItems();
+  items.rootCredential = {
     evidenceId: "cloud:aws.iam.root-credential:root",
-    factKey: "root",
+    key: "root",
     payload: { passwordEnabled: true, mfaActive: true, activeAccessKeyCount: 1 },
   };
-  assert.equal(judge("cis-1-4", facts).length, 1);
-  facts.rootCredential.payload.activeAccessKeyCount = 0;
-  assert.equal(judge("cis-1-4", facts).length, 0);
+  assert.equal(judge("cis-1-4", items).length, 1);
+  items.rootCredential.payload.activeAccessKeyCount = 0;
+  assert.equal(judge("cis-1-4", items).length, 0);
 });
 
 test("cis-1-5 fails when the root console password is enabled without MFA", () => {
-  const facts = emptyFacts();
-  facts.rootCredential = {
+  const items = emptyItems();
+  items.rootCredential = {
     evidenceId: "cloud:aws.iam.root-credential:root",
-    factKey: "root",
+    key: "root",
     payload: { passwordEnabled: true, mfaActive: false, activeAccessKeyCount: 0 },
   };
-  assert.equal(judge("cis-1-5", facts).length, 1);
-  facts.rootCredential.payload.mfaActive = true;
-  assert.equal(judge("cis-1-5", facts).length, 0);
+  assert.equal(judge("cis-1-5", items).length, 1);
+  items.rootCredential.payload.mfaActive = true;
+  assert.equal(judge("cis-1-5", items).length, 0);
   // A root account without console password cannot fail the MFA control.
-  facts.rootCredential.payload = { passwordEnabled: false, mfaActive: false, activeAccessKeyCount: 0 };
-  assert.equal(judge("cis-1-5", facts).length, 0);
+  items.rootCredential.payload = { passwordEnabled: false, mfaActive: false, activeAccessKeyCount: 0 };
+  assert.equal(judge("cis-1-5", items).length, 0);
 });
 
 test("cis-1-8 fails per console user without MFA and passes programmatic-only users", () => {
-  const facts = emptyFacts();
-  facts.userCredentials = [
+  const items = emptyItems();
+  items.userCredentials = [
     {
       evidenceId: "cloud:aws.iam.user-credential:alice",
-      factKey: "alice",
+      key: "alice",
       payload: { userName: "alice", passwordEnabled: true, mfaActive: false, passwordNextRotation: null },
     },
     {
       evidenceId: "cloud:aws.iam.user-credential:ci-bot",
-      factKey: "ci-bot",
+      key: "ci-bot",
       payload: { userName: "ci-bot", passwordEnabled: false, mfaActive: false, passwordNextRotation: null },
     },
   ];
-  const drafts = judge("cis-1-8", facts);
+  const drafts = judge("cis-1-8", items);
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0].resourceKey, "alice");
 });
 
 test("cis-1-13 fails on a missing policy and on a minimum length below 14", () => {
-  const facts = emptyFacts();
-  facts.passwordPolicy = {
+  const items = emptyItems();
+  items.passwordPolicy = {
     evidenceId: "cloud:aws.iam.account-password-policy:account-password-policy",
-    factKey: "account-password-policy",
+    key: "account-password-policy",
     payload: { exists: false, minimumPasswordLength: null, maxPasswordAgeDays: null, expirePasswords: false },
   };
-  assert.equal(judge("cis-1-13", facts).length, 1);
-  facts.passwordPolicy.payload = {
+  assert.equal(judge("cis-1-13", items).length, 1);
+  items.passwordPolicy.payload = {
     exists: true,
     minimumPasswordLength: 8,
     maxPasswordAgeDays: 90,
     expirePasswords: true,
   };
-  assert.equal(judge("cis-1-13", facts).length, 1);
-  facts.passwordPolicy.payload.minimumPasswordLength = 14;
-  assert.equal(judge("cis-1-13", facts).length, 0);
+  assert.equal(judge("cis-1-13", items).length, 1);
+  items.passwordPolicy.payload.minimumPasswordLength = 14;
+  assert.equal(judge("cis-1-13", items).length, 0);
 });
 
 test("cis-1-15 fails when passwords never expire", () => {
-  const facts = emptyFacts();
-  facts.passwordPolicy = {
+  const items = emptyItems();
+  items.passwordPolicy = {
     evidenceId: "cloud:aws.iam.account-password-policy:account-password-policy",
-    factKey: "account-password-policy",
+    key: "account-password-policy",
     payload: { exists: true, minimumPasswordLength: 14, maxPasswordAgeDays: null, expirePasswords: false },
   };
-  assert.equal(judge("cis-1-15", facts).length, 1);
-  facts.passwordPolicy.payload = {
+  assert.equal(judge("cis-1-15", items).length, 1);
+  items.passwordPolicy.payload = {
     exists: true,
     minimumPasswordLength: 14,
     maxPasswordAgeDays: 90,
     expirePasswords: true,
   };
-  assert.equal(judge("cis-1-15", facts).length, 0);
+  assert.equal(judge("cis-1-15", items).length, 0);
 });
 
 test("cis-2-1-1 fails per bucket without default encryption", () => {
-  const facts = emptyFacts();
-  facts.buckets = [
+  const items = emptyItems();
+  items.buckets = [
     {
       evidenceId: "cloud:aws.s3.bucket-security:plain",
-      factKey: "plain",
+      key: "plain",
       payload: {
         bucketName: "plain",
         region: "us-east-1",
@@ -183,7 +183,7 @@ test("cis-2-1-1 fails per bucket without default encryption", () => {
     },
     {
       evidenceId: "cloud:aws.s3.bucket-security:sealed",
-      factKey: "sealed",
+      key: "sealed",
       payload: {
         bucketName: "sealed",
         region: "us-east-1",
@@ -195,7 +195,7 @@ test("cis-2-1-1 fails per bucket without default encryption", () => {
       },
     },
   ];
-  const drafts = judge("cis-2-1-1", facts);
+  const drafts = judge("cis-2-1-1", items);
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0].resourceKey, "plain");
 });
@@ -203,7 +203,7 @@ test("cis-2-1-1 fails per bucket without default encryption", () => {
 test("cis-2-1-2 fails on a missing or partial PAB, a public policy, or a public ACL", () => {
   const bucket = (overrides: Record<string, unknown>) => ({
     evidenceId: `cloud:aws.s3.bucket-security:${overrides.bucketName as string}`,
-    factKey: overrides.bucketName as string,
+    key: overrides.bucketName as string,
     payload: {
       bucketName: "b",
       region: "us-east-1",
@@ -222,14 +222,14 @@ test("cis-2-1-2 fails on a missing or partial PAB, a public policy, or a public 
     },
   });
 
-  const facts = emptyFacts();
-  facts.buckets = [bucket({ bucketName: "ok" })];
-  assert.equal(judge("cis-2-1-2", facts).length, 0);
+  const items = emptyItems();
+  items.buckets = [bucket({ bucketName: "ok" })];
+  assert.equal(judge("cis-2-1-2", items).length, 0);
 
-  facts.buckets = [bucket({ bucketName: "no-pab", publicAccessBlock: null })];
-  assert.equal(judge("cis-2-1-2", facts).length, 1);
+  items.buckets = [bucket({ bucketName: "no-pab", publicAccessBlock: null })];
+  assert.equal(judge("cis-2-1-2", items).length, 1);
 
-  facts.buckets = [
+  items.buckets = [
     bucket({
       bucketName: "partial",
       publicAccessBlock: {
@@ -241,21 +241,21 @@ test("cis-2-1-2 fails on a missing or partial PAB, a public policy, or a public 
       },
     }),
   ];
-  assert.equal(judge("cis-2-1-2", facts).length, 1);
+  assert.equal(judge("cis-2-1-2", items).length, 1);
 
-  facts.buckets = [bucket({ bucketName: "policy", policyIsPublic: true })];
-  assert.equal(judge("cis-2-1-2", facts).length, 1);
+  items.buckets = [bucket({ bucketName: "policy", policyIsPublic: true })];
+  assert.equal(judge("cis-2-1-2", items).length, 1);
 
-  facts.buckets = [bucket({ bucketName: "acl", aclPublic: true })];
-  assert.equal(judge("cis-2-1-2", facts).length, 1);
+  items.buckets = [bucket({ bucketName: "acl", aclPublic: true })];
+  assert.equal(judge("cis-2-1-2", items).length, 1);
 });
 
 test("cis-2-3-1 fails per publicly accessible or unencrypted instance", () => {
-  const facts = emptyFacts();
-  facts.rdsInstances = [
+  const items = emptyItems();
+  items.rdsInstances = [
     {
       evidenceId: "cloud:aws.rds.instance-security:db1",
-      factKey: "db1",
+      key: "db1",
       payload: {
         identifier: "db1",
         region: "us-east-1",
@@ -266,7 +266,7 @@ test("cis-2-3-1 fails per publicly accessible or unencrypted instance", () => {
     },
     {
       evidenceId: "cloud:aws.rds.instance-security:db2",
-      factKey: "db2",
+      key: "db2",
       payload: {
         identifier: "db2",
         region: "us-east-1",
@@ -276,7 +276,7 @@ test("cis-2-3-1 fails per publicly accessible or unencrypted instance", () => {
       },
     },
   ];
-  const drafts = judge("cis-2-3-1", facts);
+  const drafts = judge("cis-2-3-1", items);
   assert.equal(drafts.length, 1);
   assert.equal(drafts[0].resourceKey, "db1");
 });
@@ -287,32 +287,32 @@ test("cis-4-1 fails on all-traffic or management-port public ingress only", () =
     publicIngress: { protocol: string; fromPort: number | null; toPort: number | null; cidr: string }[],
   ) => ({
     evidenceId: `cloud:aws.ec2.security-group-ingress:${groupId}`,
-    factKey: groupId,
+    key: groupId,
     payload: { groupId, region: "us-east-1", publicIngress },
   });
 
-  const facts = emptyFacts();
-  facts.securityGroups = [group("sg-web", [{ protocol: "tcp", fromPort: 443, toPort: 443, cidr: "0.0.0.0/0" }])];
+  const items = emptyItems();
+  items.securityGroups = [group("sg-web", [{ protocol: "tcp", fromPort: 443, toPort: 443, cidr: "0.0.0.0/0" }])];
   // Public HTTPS is a 4.2 concern, not management exposure.
-  assert.equal(judge("cis-4-1", facts).length, 0);
+  assert.equal(judge("cis-4-1", items).length, 0);
 
-  facts.securityGroups = [group("sg-ssh", [{ protocol: "tcp", fromPort: 22, toPort: 22, cidr: "0.0.0.0/0" }])];
-  assert.equal(judge("cis-4-1", facts).length, 1);
+  items.securityGroups = [group("sg-ssh", [{ protocol: "tcp", fromPort: 22, toPort: 22, cidr: "0.0.0.0/0" }])];
+  assert.equal(judge("cis-4-1", items).length, 1);
 
-  facts.securityGroups = [group("sg-all", [{ protocol: "-1", fromPort: null, toPort: null, cidr: "::/0" }])];
-  assert.equal(judge("cis-4-1", facts).length, 1);
+  items.securityGroups = [group("sg-all", [{ protocol: "-1", fromPort: null, toPort: null, cidr: "::/0" }])];
+  assert.equal(judge("cis-4-1", items).length, 1);
 
   // A wide range that happens to cover a management port counts too.
-  facts.securityGroups = [group("sg-range", [{ protocol: "tcp", fromPort: 1, toPort: 1024, cidr: "0.0.0.0/0" }])];
-  assert.equal(judge("cis-4-1", facts).length, 1);
+  items.securityGroups = [group("sg-range", [{ protocol: "tcp", fromPort: 1, toPort: 1024, cidr: "0.0.0.0/0" }])];
+  assert.equal(judge("cis-4-1", items).length, 1);
 });
 
 test("cis-4-2 fails on any public ingress, including plain HTTPS", () => {
-  const facts = emptyFacts();
-  facts.securityGroups = [
+  const items = emptyItems();
+  items.securityGroups = [
     {
       evidenceId: "cloud:aws.ec2.security-group-ingress:sg-web",
-      factKey: "sg-web",
+      key: "sg-web",
       payload: {
         groupId: "sg-web",
         region: "us-east-1",
@@ -320,7 +320,7 @@ test("cis-4-2 fails on any public ingress, including plain HTTPS", () => {
       },
     },
   ];
-  assert.equal(judge("cis-4-2", facts).length, 1);
-  facts.securityGroups[0].payload.publicIngress = [];
-  assert.equal(judge("cis-4-2", facts).length, 0);
+  assert.equal(judge("cis-4-2", items).length, 1);
+  items.securityGroups[0].payload.publicIngress = [];
+  assert.equal(judge("cis-4-2", items).length, 0);
 });

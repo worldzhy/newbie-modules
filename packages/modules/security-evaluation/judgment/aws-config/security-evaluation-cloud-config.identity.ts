@@ -3,9 +3,9 @@
  * of finding fingerprints is testable without a database (ADR-027 D6).
  */
 
-/** Manifest item id of one configuration fact: `cloud:<factType>:<factKey>`. */
-export function cloudConfigEvidenceId(factType: string, factKey: string): string {
-  return `cloud:${factType}:${factKey}`;
+/** Manifest item id of one configuration knowledge item: `cloud:<type>:<key>`. */
+export function cloudConfigEvidenceId(type: string, key: string): string {
+  return `cloud:${type}:${key}`;
 }
 
 /**

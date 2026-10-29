@@ -13,8 +13,8 @@ lands in a later slice on the same run and finding lifecycle.
 | Term     | Meaning                                                                                                                                                                                                          |
 | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Subject  | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; `scopeType` / `scopeId` are host-assigned (nightwatch uses `project`).                                                          |
-| Asset    | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state facts.                                                                               |
-| Fact     | `SecurityEvaluationAssetFact`: something observed about an asset right now (`factType`, `factKey`, small intrinsic `value`). Facts are upserted, never deleted here; history lives in the archived run manifest. |
+| Asset    | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state knowledge items.                                                                               |
+| Knowledge item | `SecurityEvaluationAwsConfigKnowledgeItem` / `SecurityEvaluationNpmPackageKnowledgeItem`: something observed about an asset right now (`type`, `key`, small intrinsic `value`); `SecurityEvaluationThreatKnowledgeItem` is the world-scoped intel sibling. Items are upserted, never deleted here; history lives in the archived run manifest. |
 | Criteria | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                     |
 | Finding  | Skeleton `EvaluationFinding` with identity `(subjectId, evaluationKey, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                  |
 | Urgency  | Derived band P1–P4 from severity and exposure. Not a stored score and not a composite.                                                                                                                           |
@@ -22,7 +22,7 @@ lands in a later slice on the same run and finding lifecycle.
 ## Subject kinds and scopes
 
 - `repository` — evidence is the repository's `package-lock.json`.
-- `aws-account` — evidence is the account's configuration facts, collected
+- `aws-account` — evidence is the account's configuration knowledge, collected
   through the host-bound `CloudConfigurationAccess` port. Nightwatch maps one
   configured `awsCrossAccountBinding` to one subject.
 
@@ -32,11 +32,11 @@ subject is materialised as an asset. Sync is upsert-only: a subject that
 disappears from the host is not deleted, because removal semantics are still an
 open decision (ADR-022).
 
-## Fact types
+## Knowledge types
 
-| `factType`                        | `factKey`                 | `value`                                                                                                                   |
+| `type`                            | `key`                     | `value`                                                                                                                   |
 | --------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `package`                         | `npm:<name>@<version>`    | `{ version, isDev, ecosystem }`                                                                                           |
+| `npm.package`                     | `npm:<name>@<version>`    | `{ version, isDev, ecosystem }`                                                                                           |
 | `aws.iam.account-password-policy` | `account-password-policy` | `{ exists, minimumPasswordLength, maxPasswordAgeDays, expirePasswords }`                                                  |
 | `aws.iam.root-credential`         | `root`                    | `{ passwordEnabled, mfaActive, activeAccessKeyCount }`                                                                    |
 | `aws.iam.user-credential`         | `<userName>`              | `{ userName, passwordEnabled, mfaActive }`                                                                                |
@@ -54,7 +54,7 @@ open decision (ADR-022).
 | `threat-intel` | `repository`  | `v1`    | Threat-intelligence relevance criteria (ADR-039).                                        |
 
 Each CIS criterion carries `controlId`, `severity`, `remediation` and
-`factRequirements` in its metadata; the judgment reads severity from there, and
+`knowledgeRequirements` in its metadata; the judgment reads severity from there, and
 the seed and the rulebook draw from one source. A rule change ships as a new
 version of the evaluationKey, never an in-place edit.
 
@@ -77,8 +77,8 @@ The host must bind two more ports, owned by this module:
 ```
 
 `RepositoryAccess.getFile(subject, path)` returns a file at the repository root
-or `null`. `CloudConfigurationAccess.collectFacts(subject)` returns raw
-configuration facts plus per-fact-type failures — never judged conclusions.
+or `null`. `CloudConfigurationAccess.collect(subject)` returns raw
+configuration knowledge items plus per-type failures — never judged conclusions.
 Nightwatch implements them with its `github` and `aws-identity` modules. An
 unbound port is a wiring error: the run fails instead of reporting a vacuously
 clean result.
@@ -92,12 +92,12 @@ Every run records the skeleton's three buckets:
   the lockfile. The aws-account mechanism has no such concept and always
   reports an empty bucket.
 - `skipped` — packages whose OSV batch query failed, or cloud criteria whose
-  facts could not be collected. Cloud entries name the control
+  knowledge could not be collected. Cloud entries name the control
   (`cis-1-13`) or the specific resource (`cis-2-1-1:<bucket>`). Skipped always
   carries a note and the item ids, never just a number.
 
 An unreadable lockfile, an unsupported lockfile format, a lockfile resolving
-zero packages, or a cloud account whose facts all failed to collect fails the
+zero packages, or a cloud account whose knowledge all failed to collect fails the
 run. An empty evaluated set must never surface as a clean result.
 
 ## Scheduling
@@ -120,7 +120,7 @@ SECURITY_EVALUATION_SCHEDULES = [
 | ------ | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | POST   | `/security-evaluation/subjects/sync`         | Ask the host provider to sync subjects and assets (idempotent).                                     |
 | GET    | `/security-evaluation/assets`                | Asset inventory under a scope.                                                                      |
-| GET    | `/security-evaluation/assets/:assetId/facts` | Current-state facts of one asset.                                                                   |
+| GET    | `/security-evaluation/assets/:assetId/knowledge-items` | Current-state knowledge items of one asset.                                                   |
 | POST   | `/security-evaluation/runs`                  | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously. |
 | GET    | `/security-evaluation/runs`                  | Run history for a subject.                                                                          |
 | GET    | `/security-evaluation/results`               | Archived results (manifest excluded).                                                               |

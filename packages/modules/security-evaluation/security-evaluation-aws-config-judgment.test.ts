@@ -9,18 +9,18 @@ import { SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK } from "./judgment/aws-config/s
 /**
  * Behavior-level tests for the CLOUD_CONFIG judgment assembly (ADR-027 D6):
  * finding identity is version-free (`aws:<criterionKey>:<resourceKey>`),
- * severity comes from the criterion metadata, and every collected fact counts
+ * severity comes from the criterion metadata, and every collected item counts
  * as evaluated.
  */
 
-function evidenceItem(factType: string, factKey: string, value: Record<string, unknown>): EvaluationEvidenceItem {
+function evidenceItem(type: string, key: string, value: Record<string, unknown>): EvaluationEvidenceItem {
   return {
-    id: `cloud:${factType}:${factKey}`,
-    layer: "fact",
+    id: `cloud:${type}:${key}`,
+    layer: "knowledge",
     source: "aws-account",
-    summary: `${factType} ${factKey}`,
+    summary: `${type} ${key}`,
     observedAt: new Date("2026-01-01T00:00:00.000Z"),
-    payload: { factType, ...value },
+    payload: { type, ...value },
   };
 }
 
@@ -95,7 +95,7 @@ test("severity is read from the criterion metadata, not hard-coded in the judgme
   assert.equal(judgment.findings[0]?.metadata?.urgency, "P4");
 });
 
-test("passing controls produce no findings and every collected fact is evaluated", async () => {
+test("passing controls produce no findings and every collected item is evaluated", async () => {
   const items = [
     evidenceItem("aws.iam.root-credential", "root", {
       passwordEnabled: true,
@@ -155,6 +155,6 @@ test("one failing resource among many yields one finding and full evaluation", a
   const judgment = await new SecurityEvaluationAwsConfigJudgment().judge(inputFor(items));
   const fingerprints = judgment.findings.map((finding) => finding.fingerprint).sort();
   assert.deepEqual(fingerprints, ["aws:cis-2-1-1:plain", "aws:cis-2-1-2:plain:public-access-block"]);
-  // All three facts are required by CIS rules, so all three are evaluated.
+  // All three items are required by CIS rules, so all three are evaluated.
   assert.equal(judgment.evaluatedRefs.length, 3);
 });

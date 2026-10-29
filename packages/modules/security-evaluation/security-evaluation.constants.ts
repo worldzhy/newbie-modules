@@ -32,19 +32,19 @@ export const SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION = "v1";
 /** The first aws-custom criteria version this build ships (ADR-033/ADR-037). */
 export const SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION = "v1";
 
-/** Asset fact vocabulary. */
-export const SECURITY_EVALUATION_FACT_TYPE_PACKAGE = "package";
+/** Asset knowledge vocabulary. */
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE = "npm.package";
 
-/** Cloud configuration fact vocabulary (ADR-027 D2, ADR-037 D6). */
-export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY = "aws.iam.account-password-policy";
-export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ROOT_CREDENTIAL = "aws.iam.root-credential";
-export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL = "aws.iam.user-credential";
-export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY = "aws.iam.access-key";
-export const SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT = "aws.iam.policy-document";
-export const SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY = "aws.s3.bucket-security";
-export const SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY = "aws.rds.instance-security";
-export const SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS = "aws.ec2.security-group-ingress";
-export const SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_INSTANCE_NETWORK = "aws.ec2.instance-network";
+/** AWS configuration knowledge vocabulary (ADR-027 D2, ADR-037 D6). */
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY = "aws.iam.account-password-policy";
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ROOT_CREDENTIAL = "aws.iam.root-credential";
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL = "aws.iam.user-credential";
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY = "aws.iam.access-key";
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT = "aws.iam.policy-document";
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY = "aws.s3.bucket-security";
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY = "aws.rds.instance-security";
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS = "aws.ec2.security-group-ingress";
+export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_INSTANCE_NETWORK = "aws.ec2.instance-network";
 
 /** npm is the only ecosystem parsed in this build, matching the predecessor. */
 export const SECURITY_EVALUATION_ECOSYSTEM_NPM = "npm";

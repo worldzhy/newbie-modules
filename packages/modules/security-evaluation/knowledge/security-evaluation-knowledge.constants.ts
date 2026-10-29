@@ -2,7 +2,7 @@
  * Canonical enums for the security-evaluation knowledge subdomain (ADR-039).
  *
  * Source identifiers are stable keys used by adapters and stored on
- * `SecurityEvaluationKnowledgeItem.source`. Categories partition items so
+ * `SecurityEvaluationThreatKnowledgeItem.source`. Categories partition items so
  * deduplication keys never collide across categories.
  *
  * Ported from the former threat-intelligence module; values are unchanged.

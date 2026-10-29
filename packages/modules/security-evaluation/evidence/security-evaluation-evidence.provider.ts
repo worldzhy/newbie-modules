@@ -9,13 +9,13 @@ import type {
 import { SecurityEvaluationAssetService } from "../assets/security-evaluation-asset.service";
 import {
   SECURITY_EVALUATION_ECOSYSTEM_NPM,
-  SECURITY_EVALUATION_FACT_TYPE_PACKAGE,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_LOCKFILE_CANDIDATES,
 } from "../security-evaluation.constants";
 import {
   dependencyEvidenceId,
-  dependencyFactKey,
+  dependencyKnowledgeKey,
 } from "../judgment/dependency/security-evaluation-dependency.identity";
 import {
   parseDeclaredDependencies,
@@ -33,8 +33,9 @@ interface ResolvedLockfile {
  * SecurityEvaluationEvidenceProvider — evidence collection for subject kind
  * "repository" (ADR-022 D3, DEPENDENCY).
  *
- * The lockfile is the fact layer: every installed package becomes one fact and
- * one manifest item. A repository that cannot be read is a failed run, not a
+ * The lockfile is the knowledge layer: every installed package becomes one
+ * knowledge item and one manifest item. A repository that cannot be read is a
+ * failed run, not a
  * clean one — an empty evaluated set would otherwise claim "nothing found" for
  * material nobody looked at.
  */
@@ -63,11 +64,11 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     const packages = this.readPackages(lockfile);
     const items = this.buildItems(packages, observedAt);
 
-    await this.assets.upsertFacts(
+    await this.assets.upsertNpmPackageKnowledgeItems(
       asset.id,
       packages.map((pkg) => ({
-        factType: SECURITY_EVALUATION_FACT_TYPE_PACKAGE,
-        factKey: dependencyFactKey(pkg.name, pkg.version),
+        type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE,
+        key: dependencyKnowledgeKey(pkg.name, pkg.version),
         value: { version: pkg.version, isDev: pkg.dev, ecosystem: SECURITY_EVALUATION_ECOSYSTEM_NPM },
       })),
       observedAt,
@@ -117,7 +118,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
   private buildItems(packages: readonly LockedPackage[], observedAt: Date): EvaluationEvidenceItem[] {
     return packages.map((pkg) => ({
       id: dependencyEvidenceId(pkg.name, pkg.version),
-      layer: "fact",
+      layer: "knowledge",
       source: "lockfile",
       summary: `${pkg.name}@${pkg.version}`,
       observedAt,
@@ -133,8 +134,8 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
   /**
    * Direct dependencies declared in package.json but absent from the lockfile.
    * This is the "declared but unlinkable" gap of ADR-020 D5.2 — a declared
-   * dependency without an installed fact was not judged, and saying so beats
-   * counting it as clean.
+   * dependency without an installed knowledge item was not judged, and saying
+   * so beats counting it as clean.
    */
   private async computeDeclaredUnlinked(
     subject: EvaluationSubjectRef,

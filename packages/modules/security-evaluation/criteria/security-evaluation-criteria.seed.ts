@@ -89,7 +89,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
       kind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
       evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
       version: SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,
-      description: `${SECURITY_EVALUATION_AWS_CIS_BENCHMARK}: collected account configuration facts are asserted per control.`,
+      description: `${SECURITY_EVALUATION_AWS_CIS_BENCHMARK}: collected account configuration items are asserted per control.`,
       metadata: { benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK },
       criteria: entries.map((entry) => ({
         criterionKey: entry.criterionKey,
@@ -99,7 +99,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
           controlId: entry.controlId,
           severity: entry.severity,
           remediation: entry.remediation,
-          factRequirements: [...entry.requiredFactTypes],
+          knowledgeRequirements: [...entry.requiredKnowledgeTypes],
           benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
         },
       })),
@@ -125,7 +125,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
         metadata: {
           severity: entry.severity,
           remediation: entry.remediation,
-          factRequirements: [...entry.requiredFactTypes],
+          knowledgeRequirements: [...entry.requiredKnowledgeTypes],
         },
       })),
     });

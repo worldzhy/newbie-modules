@@ -110,7 +110,7 @@ export class SecurityEvaluationDependencyJudgment {
   private readPackages(evidence: readonly EvaluationEvidenceItem[]): JudgedPackage[] {
     const packages: JudgedPackage[] = [];
     for (const item of evidence) {
-      if (item.layer !== "fact" || item.source !== "lockfile") continue;
+      if (item.layer !== "knowledge" || item.source !== "lockfile") continue;
       const payload = item.payload ?? {};
       const name = typeof payload.name === "string" ? payload.name : null;
       const version = typeof payload.version === "string" ? payload.version : null;

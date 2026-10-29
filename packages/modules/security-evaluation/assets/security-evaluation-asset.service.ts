@@ -3,9 +3,11 @@ import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import type { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
-export interface SecurityEvaluationAssetFactInput {
-  factType: string;
-  factKey: string;
+import { SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT } from "../security-evaluation.constants";
+
+export interface SecurityEvaluationAssetKnowledgeItemInput {
+  type: string;
+  key: string;
   value: Record<string, unknown> | null;
 }
 
@@ -17,15 +19,15 @@ export interface ListSecurityEvaluationAssetsInput {
   pageSize?: number;
 }
 
-export interface ListSecurityEvaluationAssetFactsInput {
+export interface ListSecurityEvaluationAssetKnowledgeItemsInput {
   assetId: string;
-  factType?: string;
+  type?: string;
   page?: number;
   pageSize?: number;
 }
 
-/** Facts per transaction. A repository can hold a few thousand packages. */
-const FACT_UPSERT_CHUNK_SIZE = 100;
+/** Knowledge items per transaction. A repository can hold a few thousand packages. */
+const KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE = 100;
 
 /**
  * SecurityEvaluationAssetService — the asset inventory (ADR-022 D2).
@@ -33,7 +35,7 @@ const FACT_UPSERT_CHUNK_SIZE = 100;
  * `Asset` is the feature's persistent view of an `EvaluationSubject`: the
  * subject coordinate belongs to the skeleton, while this row owns the
  * inventory lifecycle (`firstSeenAt`, `lastSeenAt`) and the current-state
- * facts hanging off it.
+ * knowledge items hanging off it.
  */
 @Injectable()
 export class SecurityEvaluationAssetService {
@@ -65,25 +67,59 @@ export class SecurityEvaluationAssetService {
   }
 
   /**
-   * Upsert current-state facts. A fact not observed by this run keeps its old
-   * `observedAt`, which is how staleness becomes visible without deleting rows.
+   * Upsert current-state AWS configuration knowledge items. An item not
+   * observed by this run keeps its old `observedAt`, which is how staleness
+   * becomes visible without deleting rows.
    */
-  async upsertFacts(assetId: string, facts: readonly SecurityEvaluationAssetFactInput[], observedAt: Date) {
-    for (let index = 0; index < facts.length; index += FACT_UPSERT_CHUNK_SIZE) {
-      const chunk = facts.slice(index, index + FACT_UPSERT_CHUNK_SIZE);
+  async upsertAwsConfigKnowledgeItems(
+    assetId: string,
+    items: readonly SecurityEvaluationAssetKnowledgeItemInput[],
+    observedAt: Date,
+  ) {
+    for (let index = 0; index < items.length; index += KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE) {
+      const chunk = items.slice(index, index + KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE);
       await this.prisma.$transaction(
-        chunk.map((fact) =>
-          this.prisma.securityEvaluationAssetFact.upsert({
-            where: { assetId_factType_factKey: { assetId, factType: fact.factType, factKey: fact.factKey } },
+        chunk.map((item) =>
+          this.prisma.securityEvaluationAwsConfigKnowledgeItem.upsert({
+            where: { assetId_type_key: { assetId, type: item.type, key: item.key } },
             create: {
               assetId,
-              factType: fact.factType,
-              factKey: fact.factKey,
-              value: (fact.value ?? undefined) as Prisma.InputJsonValue | undefined,
+              type: item.type,
+              key: item.key,
+              value: (item.value ?? undefined) as Prisma.InputJsonValue | undefined,
               observedAt,
             },
             update: {
-              value: (fact.value ?? undefined) as Prisma.InputJsonValue | undefined,
+              value: (item.value ?? undefined) as Prisma.InputJsonValue | undefined,
+              observedAt,
+            },
+          }),
+        ),
+      );
+    }
+  }
+
+  /** Same lifecycle as upsertAwsConfigKnowledgeItems, for npm package knowledge. */
+  async upsertNpmPackageKnowledgeItems(
+    assetId: string,
+    items: readonly SecurityEvaluationAssetKnowledgeItemInput[],
+    observedAt: Date,
+  ) {
+    for (let index = 0; index < items.length; index += KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE) {
+      const chunk = items.slice(index, index + KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE);
+      await this.prisma.$transaction(
+        chunk.map((item) =>
+          this.prisma.securityEvaluationNpmPackageKnowledgeItem.upsert({
+            where: { assetId_type_key: { assetId, type: item.type, key: item.key } },
+            create: {
+              assetId,
+              type: item.type,
+              key: item.key,
+              value: (item.value ?? undefined) as Prisma.InputJsonValue | undefined,
+              observedAt,
+            },
+            update: {
+              value: (item.value ?? undefined) as Prisma.InputJsonValue | undefined,
               observedAt,
             },
           }),
@@ -126,15 +162,29 @@ export class SecurityEvaluationAssetService {
     };
   }
 
-  async listFacts(query: ListSecurityEvaluationAssetFactsInput) {
-    await this.getAsset(query.assetId);
+  /**
+   * Knowledge items are split into one table per asset kind; the subject
+   * coordinate decides which delegate serves this asset.
+   */
+  async listKnowledgeItems(query: ListSecurityEvaluationAssetKnowledgeItemsInput) {
+    const asset = await this.getAsset(query.assetId);
+    const subject = await this.prisma.evaluationSubject.findUnique({
+      where: { id: asset.subjectId },
+      select: { kind: true },
+    });
+    const where = { assetId: query.assetId, ...(query.type ? { type: query.type } : {}) };
+    const orderBy = [{ type: "asc" as const }, { key: "asc" as const }];
+    if (subject?.kind === SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT) {
+      return this.prisma.findManyInManyPages({
+        model: Prisma.ModelName.SecurityEvaluationAwsConfigKnowledgeItem,
+        pagination: { page: query.page, pageSize: query.pageSize },
+        findManyArgs: { where, orderBy },
+      });
+    }
     return this.prisma.findManyInManyPages({
-      model: Prisma.ModelName.SecurityEvaluationAssetFact,
+      model: Prisma.ModelName.SecurityEvaluationNpmPackageKnowledgeItem,
       pagination: { page: query.page, pageSize: query.pageSize },
-      findManyArgs: {
-        where: { assetId: query.assetId, ...(query.factType ? { factType: query.factType } : {}) },
-        orderBy: [{ factType: "asc" }, { factKey: "asc" }],
-      },
+      findManyArgs: { where, orderBy },
     });
   }
 }

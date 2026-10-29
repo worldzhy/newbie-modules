@@ -17,7 +17,7 @@ const UPSERT_BATCH_SIZE = 20;
  * Runs the collection pipeline: fetch from every registered source adapter,
  * then deduplicate and persist by (source, externalId). Ported from the
  * former threat-intelligence module; the item store is now
- * `SecurityEvaluationKnowledgeItem`.
+ * `SecurityEvaluationThreatKnowledgeItem`.
  *
  * Matching against scope entities lives in the INTEL judgment
  * (`judgment/intel/`), not here.
@@ -92,7 +92,7 @@ export class SecurityEvaluationKnowledgeService {
   private async upsertOne(item: SourceKnowledgeItem): Promise<void> {
     const publishedAt =
       item.publishedAt instanceof Date && !Number.isNaN(item.publishedAt.getTime()) ? item.publishedAt : null;
-    await this.prisma.securityEvaluationKnowledgeItem.upsert({
+    await this.prisma.securityEvaluationThreatKnowledgeItem.upsert({
       where: { source_externalId: { source: item.source, externalId: item.externalId } },
       update: {
         title: item.title,
@@ -129,23 +129,23 @@ export class SecurityEvaluationKnowledgeService {
     maxItemsPerSource = DEFAULT_MAX_ITEMS_PER_SOURCE,
   ): Promise<{ deleted: number }> {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
-    const deletedByAge = await this.prisma.securityEvaluationKnowledgeItem.deleteMany({
+    const deletedByAge = await this.prisma.securityEvaluationThreatKnowledgeItem.deleteMany({
       where: { lastSeenAt: { lt: cutoff } },
     });
 
     let deletedByCap = 0;
-    const sources = await this.prisma.securityEvaluationKnowledgeItem.groupBy({ by: ["source"], _count: true });
+    const sources = await this.prisma.securityEvaluationThreatKnowledgeItem.groupBy({ by: ["source"], _count: true });
     for (const group of sources) {
       if (group._count <= maxItemsPerSource) continue;
       const overflow = group._count - maxItemsPerSource;
-      const toDelete = await this.prisma.securityEvaluationKnowledgeItem.findMany({
+      const toDelete = await this.prisma.securityEvaluationThreatKnowledgeItem.findMany({
         where: { source: group.source },
         orderBy: { lastSeenAt: "asc" },
         take: overflow,
         select: { id: true },
       });
       if (toDelete.length > 0) {
-        await this.prisma.securityEvaluationKnowledgeItem.deleteMany({
+        await this.prisma.securityEvaluationThreatKnowledgeItem.deleteMany({
           where: { id: { in: toDelete.map((i) => i.id) } },
         });
         deletedByCap += toDelete.length;

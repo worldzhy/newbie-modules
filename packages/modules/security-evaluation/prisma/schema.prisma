@@ -11,7 +11,8 @@
 // !!            [Module] Security Evaluation models             //
 // !! ----------------------------------------------------------- //
 // * SecurityEvaluationAsset                                   //
-// * SecurityEvaluationAssetFact                               //
+// * SecurityEvaluationAwsConfigKnowledgeItem                  //
+// * SecurityEvaluationNpmPackageKnowledgeItem                 //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 /// One evaluated asset, one-to-one with an EvaluationSubject row of this
@@ -28,35 +29,60 @@ model SecurityEvaluationAsset {
   firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @default(now())
 
-  facts SecurityEvaluationAssetFact[]
+  awsConfigKnowledgeItems   SecurityEvaluationAwsConfigKnowledgeItem[]
+  npmPackageKnowledgeItems  SecurityEvaluationNpmPackageKnowledgeItem[]
 
   @@index([naturalKey])
   @@schema("module/security-evaluation")
 }
 
-/// A current-state fact about an asset: the package installed at a version,
-/// or a cloud resource with its intrinsic attributes. Facts are upserted on
-/// collection and never deleted here; history lives in the archived run
-/// manifest, and a stale `observedAt` is what "not observed recently" means.
-model SecurityEvaluationAssetFact {
+/// A current-state AWS configuration knowledge item collected from an asset:
+/// a password policy, an access key, a bucket's security posture… Items are
+/// upserted on collection and never deleted here; history lives in the
+/// archived run manifest, and a stale `observedAt` is what "not observed
+/// recently" means.
+///
+/// The KnowledgeItem suffix marks the knowledge family — collected/external
+/// knowledge consumed by judgment — not schema isomorphism across the
+/// family: this table is asset-scoped while SecurityEvaluationThreatKnowledgeItem
+/// is world-scoped (ADR-037 D9.1).
+model SecurityEvaluationAwsConfigKnowledgeItem {
   id         String   @id @default(uuid()) @db.Uuid
   assetId    String   @db.Uuid
-  factType   String   @db.VarChar(64) // "package" | "resource" | ...
-  factKey    String   @db.VarChar(512) // "npm:lodash@4.17.20" / resource arn
-  value      Json?    @db.JsonB // small intrinsic values: version, isDev, region…
+  type       String   @db.VarChar(64) // "aws.iam.account-password-policy" | ...
+  key        String   @db.VarChar(512) // stable identity within the type
+  value      Json?    @db.JsonB // small intrinsic values: region, mfaEnabled…
   observedAt DateTime
 
   asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
-  @@unique([assetId, factType, factKey])
-  @@index([assetId, factType])
+  @@unique([assetId, type, key])
+  @@index([assetId, type])
+  @@schema("module/security-evaluation")
+}
+
+/// A current-state npm package knowledge item collected from a repository
+/// asset: the package installed at a version. Same lifecycle and family
+/// semantics as SecurityEvaluationAwsConfigKnowledgeItem.
+model SecurityEvaluationNpmPackageKnowledgeItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  assetId    String   @db.Uuid
+  type       String   @db.VarChar(64) // "npm.package"
+  key        String   @db.VarChar(512) // "npm:lodash@4.17.20"
+  value      Json?    @db.JsonB // small intrinsic values: version, isDev, ecosystem…
+  observedAt DateTime
+
+  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, type, key])
+  @@index([assetId, type])
   @@schema("module/security-evaluation")
 }
 
 // !! ----------------------------------------------------------- //
 // !!            [Module] Security Evaluation Knowledge          //
 // !! ----------------------------------------------------------- //
-// * SecurityEvaluationKnowledgeItem                            //
+// * SecurityEvaluationThreatKnowledgeItem                      //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 /// One piece of external threat intelligence, deduplicated by
@@ -67,7 +93,11 @@ model SecurityEvaluationAssetFact {
 ///
 /// Ported from the former threat-intelligence module (ADR-039); fields and
 /// indexes are unchanged.
-model SecurityEvaluationKnowledgeItem {
+///
+/// World-scoped: unlike the asset-scoped knowledge tables above, a threat
+/// item belongs to no asset — it exists once per source and is matched
+/// against every asset's knowledge during judgment.
+model SecurityEvaluationThreatKnowledgeItem {
   id          String   @id @default(uuid()) @db.Uuid
   source      String   @db.VarChar(50)
   category    String   @db.VarChar(30)

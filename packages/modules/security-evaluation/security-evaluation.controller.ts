@@ -13,8 +13,8 @@ import { SECURITY_EVALUATION_SUBJECT_KINDS } from "./security-evaluation.constan
 import {
   GetSecurityEvaluationAssetRequestDto,
   GetSecurityEvaluationReportRequestDto,
-  ListSecurityEvaluationAssetFactsRequestDto,
-  ListSecurityEvaluationAssetFactsResponseDto,
+  ListSecurityEvaluationAssetKnowledgeItemsRequestDto,
+  ListSecurityEvaluationAssetKnowledgeItemsResponseDto,
   ListSecurityEvaluationAssetsRequestDto,
   ListSecurityEvaluationAssetsResponseDto,
   ListSecurityEvaluationFindingsRequestDto,
@@ -80,17 +80,17 @@ export class SecurityEvaluationController {
     });
   }
 
-  @Get("assets/:assetId/facts")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.SecurityEvaluationAssetFact)
-  @ApiOperation({ summary: "List the current-state facts of one asset" })
-  @ApiResponse({ status: 200, type: ListSecurityEvaluationAssetFactsResponseDto })
-  listAssetFacts(
+  @Get("assets/:assetId/knowledge-items")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.SecurityEvaluationAsset)
+  @ApiOperation({ summary: "List the current-state knowledge items of one asset" })
+  @ApiResponse({ status: 200, type: ListSecurityEvaluationAssetKnowledgeItemsResponseDto })
+  listAssetKnowledgeItems(
     @Param() params: GetSecurityEvaluationAssetRequestDto,
-    @Query() query: ListSecurityEvaluationAssetFactsRequestDto,
+    @Query() query: ListSecurityEvaluationAssetKnowledgeItemsRequestDto,
   ) {
-    return this.assets.listFacts({
+    return this.assets.listKnowledgeItems({
       assetId: params.assetId,
-      factType: query.factType,
+      type: query.type,
       page: query.page,
       pageSize: query.pageSize,
     });

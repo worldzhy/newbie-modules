@@ -67,7 +67,7 @@ function entityAppearsIn(haystack: string, entity: string): boolean {
  *
  * Unlike the former threat-intelligence module's global match pipeline,
  * this service is invoked per evaluation run for one subject's scope.
- * Negative cache is stored on `SecurityEvaluationKnowledgeItem.negativeCache`
+ * Negative cache is stored on `SecurityEvaluationThreatKnowledgeItem.negativeCache`
  * keyed by "scopeType:scopeId"; "unavailable" verdicts are never cached.
  */
 @Injectable()
@@ -97,7 +97,7 @@ export class SecurityEvaluationIntelMatchService {
     const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
     const scopeKey = `${scope.scopeType}:${scope.scopeId}`;
 
-    const items = await this.prisma.securityEvaluationKnowledgeItem.findMany({
+    const items = await this.prisma.securityEvaluationThreatKnowledgeItem.findMany({
       where: { fetchedAt: { gte: since } },
       orderBy: [{ fetchedAt: "asc" }, { id: "asc" }],
       select: {
@@ -174,14 +174,14 @@ export class SecurityEvaluationIntelMatchService {
   }
 
   private async cacheNotRelevant(itemId: string, scopeKey: string, reason: string): Promise<void> {
-    const item = await this.prisma.securityEvaluationKnowledgeItem.findUnique({
+    const item = await this.prisma.securityEvaluationThreatKnowledgeItem.findUnique({
       where: { id: itemId },
       select: { negativeCache: true },
     });
     if (!item) return;
     const cache = (item.negativeCache as Record<string, string> | null) ?? {};
     cache[scopeKey] = reason;
-    await this.prisma.securityEvaluationKnowledgeItem.update({
+    await this.prisma.securityEvaluationThreatKnowledgeItem.update({
       where: { id: itemId },
       data: { negativeCache: cache as Prisma.InputJsonValue },
     });

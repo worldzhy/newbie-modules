@@ -32,27 +32,25 @@ const VERSION: EvaluationRuleSetVersionRef = {
 function stubAssets(): SecurityEvaluationAssetService {
   return {
     ensureAsset: async () => ({ id: "asset-1" }),
-    upsertFacts: async () => undefined,
+    upsertAwsConfigKnowledgeItems: async () => undefined,
     touchObserved: async () => undefined,
   } as unknown as SecurityEvaluationAssetService;
 }
 
-function stubAccess(
-  collection: Awaited<ReturnType<CloudConfigurationAccess["collectFacts"]>>,
-): CloudConfigurationAccess {
-  return { collectFacts: async () => collection };
+function stubAccess(collection: Awaited<ReturnType<CloudConfigurationAccess["collect"]>>): CloudConfigurationAccess {
+  return { collect: async () => collection };
 }
 
 const PASSWORD_POLICY_FACT = {
-  factType: "aws.iam.account-password-policy",
-  factKey: "account-password-policy",
+  type: "aws.iam.account-password-policy",
+  key: "account-password-policy",
   value: { exists: true, minimumPasswordLength: 14, maxPasswordAgeDays: 90, expirePasswords: true },
 };
 
-test("facts become manifest items and asset facts; a clean collection skips nothing", async () => {
+test("items become manifest items and asset items; a clean collection skips nothing", async () => {
   const provider = new SecurityEvaluationCloudConfigEvidenceProvider(
     stubAssets(),
-    stubAccess({ facts: [PASSWORD_POLICY_FACT], failures: [] }),
+    stubAccess({ items: [PASSWORD_POLICY_FACT], failures: [] }),
   );
   const collection = await provider.collect(SUBJECT, VERSION);
   assert.equal(collection.items.length, 1);
@@ -62,12 +60,12 @@ test("facts become manifest items and asset facts; a clean collection skips noth
   assert.equal(collection.skipped.total, 0);
 });
 
-test("an account-level failure skips exactly the criteria that needed the fact type", async () => {
+test("an account-level failure skips exactly the criteria that needed the item type", async () => {
   const provider = new SecurityEvaluationCloudConfigEvidenceProvider(
     stubAssets(),
     stubAccess({
-      facts: [PASSWORD_POLICY_FACT],
-      failures: [{ factType: "aws.ec2.security-group-ingress", reason: "AccessDenied: ec2:DescribeSecurityGroups" }],
+      items: [PASSWORD_POLICY_FACT],
+      failures: [{ type: "aws.ec2.security-group-ingress", reason: "AccessDenied: ec2:DescribeSecurityGroups" }],
     }),
   );
   const collection = await provider.collect(SUBJECT, VERSION);
@@ -81,8 +79,8 @@ test("a resource-level failure skips one resource of the affected criteria", asy
   const provider = new SecurityEvaluationCloudConfigEvidenceProvider(
     stubAssets(),
     stubAccess({
-      facts: [PASSWORD_POLICY_FACT],
-      failures: [{ factType: "aws.s3.bucket-security", factKey: "broken-bucket", reason: "AccessDenied" }],
+      items: [PASSWORD_POLICY_FACT],
+      failures: [{ type: "aws.s3.bucket-security", key: "broken-bucket", reason: "AccessDenied" }],
     }),
   );
   const collection = await provider.collect(SUBJECT, VERSION);
@@ -93,15 +91,15 @@ test("a resource-level failure skips one resource of the affected criteria", asy
   ]);
 });
 
-test("a subject whose facts all failed to collect is a failed run, not a clean one", async () => {
+test("a subject whose items all failed to collect is a failed run, not a clean one", async () => {
   const provider = new SecurityEvaluationCloudConfigEvidenceProvider(
     stubAssets(),
     stubAccess({
-      facts: [],
-      failures: [{ factType: "aws.iam.root-credential", reason: "AccessDenied" }],
+      items: [],
+      failures: [{ type: "aws.iam.root-credential", reason: "AccessDenied" }],
     }),
   );
-  await assert.rejects(provider.collect(SUBJECT, VERSION), /No cloud configuration facts could be collected/);
+  await assert.rejects(provider.collect(SUBJECT, VERSION), /No cloud configuration knowledge could be collected/);
 });
 
 test("an unbound CloudConfigurationAccess is a wiring error", async () => {

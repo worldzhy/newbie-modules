@@ -60,30 +60,30 @@ export class SecurityEvaluationAssetResponseDto {
 
 export class ListSecurityEvaluationAssetsResponseDto extends CommonListResponseDto<SecurityEvaluationAssetResponseDto> {}
 
-// --- Asset facts ---------------------------------------------------------
+// --- Asset knowledge items -----------------------------------------------
 
-export class ListSecurityEvaluationAssetFactsRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({ description: 'Restrict to one fact type, e.g. "package"' })
+export class ListSecurityEvaluationAssetKnowledgeItemsRequestDto extends CommonListRequestDto {
+  @ApiPropertyOptional({ description: 'Restrict to one knowledge type, e.g. "npm.package"' })
   @IsOptional()
   @IsString()
-  factType?: string;
+  type?: string;
 }
 
-/** Mirrors the SecurityEvaluationAssetFact row. */
-export class SecurityEvaluationAssetFactResponseDto {
+/** Mirrors one asset-scoped knowledge item row (AWS config or npm package). */
+export class SecurityEvaluationAssetKnowledgeItemResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() assetId!: string;
-  @ApiProperty({ description: 'Fact vocabulary type, e.g. "package"' }) factType!: string;
-  @ApiProperty({ description: 'Fact identity, e.g. "npm:lodash@4.17.20"' }) factKey!: string;
+  @ApiProperty({ description: 'Knowledge vocabulary type, e.g. "npm.package"' }) type!: string;
+  @ApiProperty({ description: 'Knowledge identity, e.g. "npm:lodash@4.17.20"' }) key!: string;
   @ApiPropertyOptional({
     type: Object,
     description: "Small intrinsic values: version, isDev, ecosystem, region…",
   })
   value?: object | null;
-  @ApiProperty({ description: "When this fact was last observed" }) observedAt!: Date;
+  @ApiProperty({ description: "When this item was last observed" }) observedAt!: Date;
 }
 
-export class ListSecurityEvaluationAssetFactsResponseDto extends CommonListResponseDto<SecurityEvaluationAssetFactResponseDto> {}
+export class ListSecurityEvaluationAssetKnowledgeItemsResponseDto extends CommonListResponseDto<SecurityEvaluationAssetKnowledgeItemResponseDto> {}
 
 // --- Runs ----------------------------------------------------------------
 
@@ -182,7 +182,7 @@ export class SecurityEvaluationResultResponseDto {
   @ApiProperty({ type: Object, isArray: true, description: "Scored verdicts by criterionKey" })
   verdicts!: object[];
   @ApiPropertyOptional() summary?: string | null;
-  @ApiPropertyOptional({ type: Object, description: "Judgment execution facts" })
+  @ApiPropertyOptional({ type: Object, description: "Judgment execution details" })
   metadata?: object | null;
   @ApiProperty() createdAt!: Date;
 }

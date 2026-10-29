@@ -9,7 +9,7 @@ import { cloudConfigFingerprint } from "./security-evaluation-cloud-config.ident
 import {
   SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
   SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK,
-  rebuildCloudConfigFacts,
+  rebuildAwsConfigKnowledge,
 } from "./security-evaluation-cloud-config.rulebook";
 
 const MAX_TITLE_LENGTH = 500;
@@ -17,18 +17,18 @@ const MAX_DETAIL_LENGTH = 4000;
 const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 
 /**
- * CLOUD_CONFIG judgment — collected account configuration facts against the
+ * CLOUD_CONFIG judgment — collected account configuration items against the
  * rulebook (ADR-027, ADR-037). One mechanism serves both AWS evaluation keys
  * (`aws-cis-1.5` and `aws-custom`); the run's criteria evaluationKey selects
  * which entries apply. Deterministic by construction: every FAIL of a
  * rulebook entry becomes one finding per non-compliant resource; PASS emits
- * nothing. Collection failures never reach this class as fake facts — the
+ * nothing. Collection failures never reach this class as fake items — the
  * evidence provider already recorded them in the skipped bucket.
  */
 @Injectable()
 export class SecurityEvaluationAwsConfigJudgment {
   judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    const facts = rebuildCloudConfigFacts(input.evidence);
+    const items = rebuildAwsConfigKnowledge(input.evidence);
     const evaluationKey = input.ruleSetVersion.evaluationKey;
 
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
@@ -39,13 +39,13 @@ export class SecurityEvaluationAwsConfigJudgment {
 
     const findings: EvaluationFindingCandidate[] = [];
 
-    // A fact counts as evaluated if any rule in this evaluation key declares it as a
-    // required fact type — whether or not it produced a finding (ADR-037 D7).
-    const requiredFactTypes = new Set(entries.flatMap((entry) => [...entry.requiredFactTypes]));
+    // A knowledge item counts as evaluated if any rule in this evaluation key
+    // declares its type as required — whether or not it produced a finding (ADR-037 D7).
+    const requiredKnowledgeTypes = new Set(entries.flatMap((entry) => [...entry.requiredKnowledgeTypes]));
 
     for (const entry of entries) {
       const criterionSeverity = severityByKey.get(entry.criterionKey) ?? entry.severity;
-      for (const draft of entry.judge(facts)) {
+      for (const draft of entry.judge(items)) {
         const severity = draft.severity ?? criterionSeverity;
         findings.push({
           criterionKey: entry.criterionKey,
@@ -56,7 +56,7 @@ export class SecurityEvaluationAwsConfigJudgment {
           evidenceRefs: draft.evidenceRefs,
           metadata: {
             resourceKey: draft.resourceKey,
-            factType: draft.factType,
+            type: draft.type,
             ...(entry.controlId ? { controlId: entry.controlId } : {}),
             ...(draft.region ? { region: draft.region } : {}),
             ...(draft.attachments ? { attachments: draft.attachments } : {}),
@@ -66,10 +66,10 @@ export class SecurityEvaluationAwsConfigJudgment {
       }
     }
 
-    // Facts this evaluation key's rules did not need stay out of evaluatedRefs
+    // Knowledge items this evaluation key's rules did not need stay out of evaluatedRefs
     // (ADR-037 D7); the skeleton buckets them as coverageStats.unconsumed.
     const evaluatedRefs = input.evidence
-      .filter((item) => requiredFactTypes.has(String(item.payload?.factType)))
+      .filter((item) => requiredKnowledgeTypes.has(String(item.payload?.type)))
       .map((item) => item.id);
 
     const isCis = evaluationKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5;
@@ -77,7 +77,7 @@ export class SecurityEvaluationAwsConfigJudgment {
       verdicts: [],
       findings,
       evaluatedRefs,
-      summary: `Judged ${entries.length} ${isCis ? "CIS controls" : "custom rules"} over ${input.evidence.length} configuration facts: ${findings.length} findings.`,
+      summary: `Judged ${entries.length} ${isCis ? "CIS controls" : "custom rules"} over ${input.evidence.length} configuration items: ${findings.length} findings.`,
       metadata: {
         ...(isCis ? { benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK } : {}),
         evaluationKey,

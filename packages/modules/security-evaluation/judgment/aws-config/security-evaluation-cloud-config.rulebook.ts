@@ -1,14 +1,14 @@
 import type { SecurityEvaluationFindingSeverity } from "../security-evaluation-severity";
 import {
-  SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_INSTANCE_NETWORK,
-  SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,
-  SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY,
-  SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
-  SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT,
-  SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ROOT_CREDENTIAL,
-  SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL,
-  SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY,
-  SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_INSTANCE_NETWORK,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ROOT_CREDENTIAL,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY,
+  SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY,
   SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
   SECURITY_EVALUATION_KEY_AWS_CUSTOM,
 } from "../../security-evaluation.constants";
@@ -16,7 +16,7 @@ import { cloudConfigEvidenceId } from "./security-evaluation-cloud-config.identi
 
 /**
  * The cloud configuration rulebook (ADR-027 D3, ADR-037). Two evaluationKeys
- * share one mechanism and one collected fact inventory:
+ * share one mechanism and one collected item inventory:
  *
  * - `aws-cis-1.5`: CIS AWS Foundations Benchmark v1.5 controls, each one
  *   ASSERTION criterion; PASS emits nothing, FAIL emits one finding draft per
@@ -29,21 +29,21 @@ import { cloudConfigEvidenceId } from "./security-evaluation-cloud-config.identi
  * agree while they coexist (ADR-022 coexistence boundary).
  */
 
-/** Typed fact payloads, reconstructed from evidence item payloads. */
-export interface PasswordPolicyFactPayload {
+/** Typed item payloads, reconstructed from evidence item payloads. */
+export interface PasswordPolicyKnowledgePayload {
   exists: boolean;
   minimumPasswordLength: number | null;
   maxPasswordAgeDays: number | null;
   expirePasswords: boolean;
 }
 
-export interface RootCredentialFactPayload {
+export interface RootCredentialKnowledgePayload {
   passwordEnabled: boolean;
   mfaActive: boolean;
   activeAccessKeyCount: number;
 }
 
-export interface UserCredentialFactPayload {
+export interface UserCredentialKnowledgePayload {
   userName: string;
   passwordEnabled: boolean;
   mfaActive: boolean;
@@ -51,7 +51,7 @@ export interface UserCredentialFactPayload {
   passwordNextRotation: string | null;
 }
 
-export interface AccessKeyFactPayload {
+export interface AccessKeyKnowledgePayload {
   userName: string;
   accessKeyId: string;
   status: "Active" | "Inactive";
@@ -64,7 +64,7 @@ export interface PolicyAttachment {
   principalName: string;
 }
 
-export interface PolicyDocumentFactPayload {
+export interface PolicyDocumentKnowledgePayload {
   kind: "managed" | "inline";
   /** Managed = ARN; inline = `inline:<principalKind>:<principalName>:<policyName>`. */
   identity: string;
@@ -73,7 +73,7 @@ export interface PolicyDocumentFactPayload {
   attachments: PolicyAttachment[];
 }
 
-export interface BucketSecurityFactPayload {
+export interface BucketSecurityKnowledgePayload {
   bucketName: string;
   region: string;
   publicAccessBlock: {
@@ -90,7 +90,7 @@ export interface BucketSecurityFactPayload {
   versioningEnabled: boolean;
 }
 
-export interface RdsInstanceSecurityFactPayload {
+export interface RdsInstanceSecurityKnowledgePayload {
   identifier: string;
   region: string;
   publiclyAccessible: boolean;
@@ -106,42 +106,42 @@ export interface SecurityGroupPublicIngressRule {
   cidr: string;
 }
 
-export interface SecurityGroupIngressFactPayload {
+export interface SecurityGroupIngressKnowledgePayload {
   groupId: string;
   region: string;
   /** Only internet-open rules (0.0.0.0/0 or ::/0); empty means none. */
   publicIngress: SecurityGroupPublicIngressRule[];
 }
 
-export interface Ec2InstanceNetworkFactPayload {
+export interface Ec2InstanceNetworkKnowledgePayload {
   instanceId: string;
   region: string;
   publicIpAddress: string | null;
   securityGroupIds: string[];
 }
 
-/** A fact as the judges see it: typed payload plus its manifest identity. */
-export interface CloudConfigFact<T> {
+/** A knowledge item as the judges see it: typed payload plus its manifest identity. */
+export interface AwsConfigKnowledge<T> {
   evidenceId: string;
-  factKey: string;
+  key: string;
   payload: T;
 }
 
-export interface CloudConfigFactSet {
-  passwordPolicy: CloudConfigFact<PasswordPolicyFactPayload> | null;
-  rootCredential: CloudConfigFact<RootCredentialFactPayload> | null;
-  userCredentials: CloudConfigFact<UserCredentialFactPayload>[];
-  accessKeys: CloudConfigFact<AccessKeyFactPayload>[];
-  policies: CloudConfigFact<PolicyDocumentFactPayload>[];
-  buckets: CloudConfigFact<BucketSecurityFactPayload>[];
-  rdsInstances: CloudConfigFact<RdsInstanceSecurityFactPayload>[];
-  securityGroups: CloudConfigFact<SecurityGroupIngressFactPayload>[];
-  instanceNetworks: CloudConfigFact<Ec2InstanceNetworkFactPayload>[];
+export interface AwsConfigKnowledgeSet {
+  passwordPolicy: AwsConfigKnowledge<PasswordPolicyKnowledgePayload> | null;
+  rootCredential: AwsConfigKnowledge<RootCredentialKnowledgePayload> | null;
+  userCredentials: AwsConfigKnowledge<UserCredentialKnowledgePayload>[];
+  accessKeys: AwsConfigKnowledge<AccessKeyKnowledgePayload>[];
+  policies: AwsConfigKnowledge<PolicyDocumentKnowledgePayload>[];
+  buckets: AwsConfigKnowledge<BucketSecurityKnowledgePayload>[];
+  rdsInstances: AwsConfigKnowledge<RdsInstanceSecurityKnowledgePayload>[];
+  securityGroups: AwsConfigKnowledge<SecurityGroupIngressKnowledgePayload>[];
+  instanceNetworks: AwsConfigKnowledge<Ec2InstanceNetworkKnowledgePayload>[];
 }
 
 export interface CloudConfigFindingDraft {
   resourceKey: string;
-  factType: string;
+  type: string;
   region?: string;
   title: string;
   detail: string;
@@ -159,10 +159,10 @@ export interface CloudConfigRulebookEntry {
   name: string;
   severity: SecurityEvaluationFindingSeverity;
   remediation: string;
-  requiredFactTypes: readonly string[];
+  requiredKnowledgeTypes: readonly string[];
   /** Which evaluationKey this entry belongs to (aws-cis-1.5 or aws-custom). */
   evaluationKey: string;
-  judge(facts: CloudConfigFactSet): CloudConfigFindingDraft[];
+  judge(items: AwsConfigKnowledgeSet): CloudConfigFindingDraft[];
 }
 
 /** Ports whose internet-open ingress CIS treats as management exposure. */
@@ -180,25 +180,25 @@ const HIGH_SEVERITY_WILDCARD_SERVICES = new Set(["iam", "sts", "kms", "organizat
 const PASSWORD_MIN_LENGTH = 14;
 
 function rootCredentialEntry(
-  partial: Omit<CloudConfigRulebookEntry, "requiredFactTypes" | "judge" | "evaluationKey">,
-  fail: (fact: RootCredentialFactPayload) => string | null,
+  partial: Omit<CloudConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "evaluationKey">,
+  fail: (item: RootCredentialKnowledgePayload) => string | null,
 ): CloudConfigRulebookEntry {
   return {
     ...partial,
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ROOT_CREDENTIAL],
-    judge(facts) {
-      const fact = facts.rootCredential;
-      if (!fact) return [];
-      const reason = fail(fact.payload);
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ROOT_CREDENTIAL],
+    judge(items) {
+      const item = items.rootCredential;
+      if (!item) return [];
+      const reason = fail(item.payload);
       if (!reason) return [];
       return [
         {
           resourceKey: "root",
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ROOT_CREDENTIAL,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ROOT_CREDENTIAL,
           title: partial.name,
           detail: reason,
-          evidenceRefs: [fact.evidenceId],
+          evidenceRefs: [item.evidenceId],
         },
       ];
     },
@@ -206,25 +206,25 @@ function rootCredentialEntry(
 }
 
 function passwordPolicyEntry(
-  partial: Omit<CloudConfigRulebookEntry, "requiredFactTypes" | "judge" | "evaluationKey">,
-  fail: (fact: PasswordPolicyFactPayload) => string | null,
+  partial: Omit<CloudConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "evaluationKey">,
+  fail: (item: PasswordPolicyKnowledgePayload) => string | null,
 ): CloudConfigRulebookEntry {
   return {
     ...partial,
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY],
-    judge(facts) {
-      const fact = facts.passwordPolicy;
-      if (!fact) return [];
-      const reason = fail(fact.payload);
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY],
+    judge(items) {
+      const item = items.passwordPolicy;
+      if (!item) return [];
+      const reason = fail(item.payload);
       if (!reason) return [];
       return [
         {
           resourceKey: "account-password-policy",
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
           title: partial.name,
           detail: reason,
-          evidenceRefs: [fact.evidenceId],
+          evidenceRefs: [item.evidenceId],
         },
       ];
     },
@@ -293,9 +293,9 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
       severity: "HIGH",
       remediation: "Remove root access keys and use IAM roles or IAM users instead.",
     },
-    (fact) =>
-      fact.activeAccessKeyCount > 0
-        ? `The root account still has ${fact.activeAccessKeyCount} active access key(s).`
+    (item) =>
+      item.activeAccessKeyCount > 0
+        ? `The root account still has ${item.activeAccessKeyCount} active access key(s).`
         : null,
   ),
   rootCredentialEntry(
@@ -306,8 +306,8 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
       severity: "HIGH",
       remediation: "Enable MFA on the root account immediately.",
     },
-    (fact) =>
-      fact.passwordEnabled && !fact.mfaActive ? "Root console access is enabled but MFA is not active." : null,
+    (item) =>
+      item.passwordEnabled && !item.mfaActive ? "Root console access is enabled but MFA is not active." : null,
   ),
   {
     criterionKey: "cis-1-8",
@@ -316,16 +316,16 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "MEDIUM",
     remediation: "Require MFA for every console-capable IAM user.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL],
-    judge(facts) {
-      return facts.userCredentials
-        .filter((fact) => fact.payload.passwordEnabled && !fact.payload.mfaActive)
-        .map((fact) => ({
-          resourceKey: fact.payload.userName,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL,
-          title: `IAM console user ${fact.payload.userName} does not have MFA enabled`,
-          detail: `User ${fact.payload.userName} has console password access without MFA.`,
-          evidenceRefs: [fact.evidenceId],
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL],
+    judge(items) {
+      return items.userCredentials
+        .filter((item) => item.payload.passwordEnabled && !item.payload.mfaActive)
+        .map((item) => ({
+          resourceKey: item.payload.userName,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL,
+          title: `IAM console user ${item.payload.userName} does not have MFA enabled`,
+          detail: `User ${item.payload.userName} has console password access without MFA.`,
+          evidenceRefs: [item.evidenceId],
         }));
     },
   },
@@ -337,11 +337,11 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
       severity: "MEDIUM",
       remediation: "Configure an account password policy with a minimum length of at least 14 characters.",
     },
-    (fact) =>
-      !fact.exists
+    (item) =>
+      !item.exists
         ? "No account password policy is configured."
-        : (fact.minimumPasswordLength ?? 0) < PASSWORD_MIN_LENGTH
-          ? `The minimum password length is ${fact.minimumPasswordLength ?? 0}, below ${PASSWORD_MIN_LENGTH}.`
+        : (item.minimumPasswordLength ?? 0) < PASSWORD_MIN_LENGTH
+          ? `The minimum password length is ${item.minimumPasswordLength ?? 0}, below ${PASSWORD_MIN_LENGTH}.`
           : null,
   ),
   {
@@ -354,17 +354,17 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "MEDIUM",
     remediation: "Set maxPasswordAge so console passwords expire; ensure every console user's password rotates.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-    requiredFactTypes: [
-      SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
-      SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL,
+    requiredKnowledgeTypes: [
+      SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
+      SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL,
     ],
-    judge(facts) {
+    judge(items) {
       const drafts: CloudConfigFindingDraft[] = [];
-      const policy = facts.passwordPolicy;
+      const policy = items.passwordPolicy;
       if (!policy?.payload.exists) {
         drafts.push({
           resourceKey: "account-password-policy",
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
           title: "IAM password policy does not expire passwords",
           detail: "No account password policy is configured.",
           evidenceRefs: policy ? [policy.evidenceId] : [],
@@ -372,22 +372,22 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
       } else if (!policy.payload.expirePasswords || !policy.payload.maxPasswordAgeDays) {
         drafts.push({
           resourceKey: "account-password-policy",
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
           title: "IAM password policy does not expire passwords",
           detail: "The account password policy does not enforce password expiration.",
           evidenceRefs: [policy.evidenceId],
         });
       }
-      for (const fact of facts.userCredentials) {
-        const user = fact.payload;
+      for (const item of items.userCredentials) {
+        const user = item.payload;
         if (!user.passwordEnabled) continue;
         if (user.passwordNextRotation === null) {
           drafts.push({
             resourceKey: `${user.userName}:rotation-unclear`,
-            factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL,
+            type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL,
             title: `IAM user ${user.userName} password rotation is unclear`,
             detail: `User ${user.userName} has a console password but no password_next_rotation recorded.`,
-            evidenceRefs: [fact.evidenceId],
+            evidenceRefs: [item.evidenceId],
             severity: "MEDIUM",
           });
         } else {
@@ -395,10 +395,10 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
           if (Number.isFinite(nextRotation) && nextRotation < Date.now()) {
             drafts.push({
               resourceKey: `${user.userName}:password-expired`,
-              factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL,
+              type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL,
               title: `IAM user ${user.userName} password is expired`,
               detail: `User ${user.userName} password next rotation (${user.passwordNextRotation}) is in the past.`,
-              evidenceRefs: [fact.evidenceId],
+              evidenceRefs: [item.evidenceId],
               severity: "HIGH",
             });
           }
@@ -414,17 +414,17 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "MEDIUM",
     remediation: "Enable SSE-S3 or SSE-KMS for default bucket encryption.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY],
-    judge(facts) {
-      return facts.buckets
-        .filter((fact) => !fact.payload.encryptionEnabled)
-        .map((fact) => ({
-          resourceKey: fact.payload.bucketName,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY,
-          region: fact.payload.region,
-          title: `S3 bucket ${fact.payload.bucketName} does not have default encryption enabled`,
-          detail: `Bucket ${fact.payload.bucketName} does not report a default server-side encryption rule.`,
-          evidenceRefs: [fact.evidenceId],
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY],
+    judge(items) {
+      return items.buckets
+        .filter((item) => !item.payload.encryptionEnabled)
+        .map((item) => ({
+          resourceKey: item.payload.bucketName,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY,
+          region: item.payload.region,
+          title: `S3 bucket ${item.payload.bucketName} does not have default encryption enabled`,
+          detail: `Bucket ${item.payload.bucketName} does not report a default server-side encryption rule.`,
+          evidenceRefs: [item.evidenceId],
         }));
     },
   },
@@ -438,20 +438,20 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "HIGH",
     remediation: "Enable every Public Access Block flag and remove public bucket policies or ACL grants.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY],
-    judge(facts) {
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY],
+    judge(items) {
       const drafts: CloudConfigFindingDraft[] = [];
-      for (const fact of facts.buckets) {
-        const bucket = fact.payload;
+      for (const item of items.buckets) {
+        const bucket = item.payload;
         const pab = bucket.publicAccessBlock;
         if (!pab?.configured) {
           drafts.push({
             resourceKey: `${bucket.bucketName}:public-access-block`,
-            factType: SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY,
+            type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY,
             region: bucket.region,
             title: `S3 bucket ${bucket.bucketName} has no Public Access Block configuration`,
             detail: `Bucket ${bucket.bucketName} has no Public Access Block configuration.`,
-            evidenceRefs: [fact.evidenceId],
+            evidenceRefs: [item.evidenceId],
             severity: "MEDIUM",
           });
         } else if (
@@ -462,33 +462,33 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
         ) {
           drafts.push({
             resourceKey: `${bucket.bucketName}:public-access-block`,
-            factType: SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY,
+            type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY,
             region: bucket.region,
             title: `S3 bucket ${bucket.bucketName} Public Access Block is partially disabled`,
             detail: `Bucket ${bucket.bucketName} Public Access Block is partially disabled.`,
-            evidenceRefs: [fact.evidenceId],
+            evidenceRefs: [item.evidenceId],
             severity: "HIGH",
           });
         }
         if (bucket.policyIsPublic) {
           drafts.push({
             resourceKey: `${bucket.bucketName}:policy`,
-            factType: SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY,
+            type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY,
             region: bucket.region,
             title: `S3 bucket ${bucket.bucketName} policy is public`,
             detail: `Bucket ${bucket.bucketName} bucket policy is evaluated by AWS as public.`,
-            evidenceRefs: [fact.evidenceId],
+            evidenceRefs: [item.evidenceId],
             severity: "HIGH",
           });
         }
         if (bucket.aclPublic) {
           drafts.push({
             resourceKey: `${bucket.bucketName}:acl`,
-            factType: SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY,
+            type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY,
             region: bucket.region,
             title: `S3 bucket ${bucket.bucketName} ACL grants public access`,
             detail: `Bucket ${bucket.bucketName} bucket ACL grants public access.`,
-            evidenceRefs: [fact.evidenceId],
+            evidenceRefs: [item.evidenceId],
             severity: "HIGH",
           });
         }
@@ -503,22 +503,22 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "HIGH",
     remediation: "Move databases to private subnets and enable storage encryption.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY],
-    judge(facts) {
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY],
+    judge(items) {
       const drafts: CloudConfigFindingDraft[] = [];
-      for (const fact of facts.rdsInstances) {
-        const instance = fact.payload;
+      for (const item of items.rdsInstances) {
+        const instance = item.payload;
         const gaps: string[] = [];
         if (instance.publiclyAccessible) gaps.push("publicly accessible");
         if (!instance.storageEncrypted) gaps.push("storage encryption disabled");
         if (gaps.length === 0) continue;
         drafts.push({
           resourceKey: instance.identifier,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY,
           region: instance.region,
           title: `RDS instance ${instance.identifier} is ${gaps.join(" and ")}`,
           detail: `RDS instance ${instance.identifier} is ${gaps.join(" and ")}.`,
-          evidenceRefs: [fact.evidenceId],
+          evidenceRefs: [item.evidenceId],
         });
       }
       return drafts;
@@ -531,20 +531,20 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "HIGH",
     remediation: "Restrict SSH/RDP/database ports to trusted internal CIDRs or VPN ingress.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS],
-    judge(facts) {
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS],
+    judge(items) {
       const drafts: CloudConfigFindingDraft[] = [];
-      for (const fact of facts.securityGroups) {
-        const group = fact.payload;
+      for (const item of items.securityGroups) {
+        const group = item.payload;
         const offending = group.publicIngress.filter(securityGroupHasManagementExposure);
         if (offending.length === 0) continue;
         drafts.push({
           resourceKey: group.groupId,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,
           region: group.region,
           title: `Security group ${group.groupId} exposes management access to the internet`,
           detail: `Security group ${group.groupId} allows ${offending.map(describePublicIngress).join("; ")}.`,
-          evidenceRefs: [fact.evidenceId],
+          evidenceRefs: [item.evidenceId],
         });
       }
       return drafts;
@@ -557,19 +557,19 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "MEDIUM",
     remediation: "Review whether each public ingress rule is required.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS],
-    judge(facts) {
-      return facts.securityGroups
-        .filter((fact) => fact.payload.publicIngress.length > 0)
-        .map((fact) => ({
-          resourceKey: fact.payload.groupId,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,
-          region: fact.payload.region,
-          title: `Security group ${fact.payload.groupId} has public ingress`,
-          detail: `Security group ${fact.payload.groupId} allows ${fact.payload.publicIngress
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS],
+    judge(items) {
+      return items.securityGroups
+        .filter((item) => item.payload.publicIngress.length > 0)
+        .map((item) => ({
+          resourceKey: item.payload.groupId,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,
+          region: item.payload.region,
+          title: `Security group ${item.payload.groupId} has public ingress`,
+          detail: `Security group ${item.payload.groupId} allows ${item.payload.publicIngress
             .map(describePublicIngress)
             .join("; ")}.`,
-          evidenceRefs: [fact.evidenceId],
+          evidenceRefs: [item.evidenceId],
         }));
     },
   },
@@ -581,16 +581,16 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "LOW",
     remediation: "Remove active access keys that have never been used.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY],
-    judge(facts) {
-      return facts.accessKeys
-        .filter((fact) => fact.payload.status === "Active" && fact.payload.lastUsedAt === null)
-        .map((fact) => ({
-          resourceKey: fact.payload.accessKeyId,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY,
-          title: `Active access key ${fact.payload.accessKeyId} has never been used`,
-          detail: `User ${fact.payload.userName} access key ${fact.payload.accessKeyId} is active with no recorded usage.`,
-          evidenceRefs: [fact.evidenceId],
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY],
+    judge(items) {
+      return items.accessKeys
+        .filter((item) => item.payload.status === "Active" && item.payload.lastUsedAt === null)
+        .map((item) => ({
+          resourceKey: item.payload.accessKeyId,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY,
+          title: `Active access key ${item.payload.accessKeyId} has never been used`,
+          detail: `User ${item.payload.userName} access key ${item.payload.accessKeyId} is active with no recorded usage.`,
+          evidenceRefs: [item.evidenceId],
         }));
     },
   },
@@ -600,23 +600,23 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "MEDIUM",
     remediation: "Rotate access keys older than 90 days.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY],
-    judge(facts) {
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY],
+    judge(items) {
       const now = new Date();
-      return facts.accessKeys
-        .filter((fact) => {
-          if (fact.payload.status !== "Active") return false;
-          const age = daysBetween(now, fact.payload.createdAt);
+      return items.accessKeys
+        .filter((item) => {
+          if (item.payload.status !== "Active") return false;
+          const age = daysBetween(now, item.payload.createdAt);
           return age !== null && age > SECURITY_EVALUATION_CLOUD_CUSTOM_ACCESS_KEY_MAX_AGE_DAYS;
         })
-        .map((fact) => {
-          const age = daysBetween(now, fact.payload.createdAt) ?? 0;
+        .map((item) => {
+          const age = daysBetween(now, item.payload.createdAt) ?? 0;
           return {
-            resourceKey: fact.payload.accessKeyId,
-            factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY,
-            title: `Active access key ${fact.payload.accessKeyId} is older than 90 days`,
-            detail: `User ${fact.payload.userName} access key ${fact.payload.accessKeyId} is ${age} days old.`,
-            evidenceRefs: [fact.evidenceId],
+            resourceKey: item.payload.accessKeyId,
+            type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY,
+            title: `Active access key ${item.payload.accessKeyId} is older than 90 days`,
+            detail: `User ${item.payload.userName} access key ${item.payload.accessKeyId} is ${age} days old.`,
+            evidenceRefs: [item.evidenceId],
           };
         });
     },
@@ -627,21 +627,21 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "MEDIUM",
     remediation: "Reduce each user to at most one active access key.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY],
-    judge(facts) {
-      const activeByUser = new Map<string, CloudConfigFact<AccessKeyFactPayload>[]>();
-      for (const fact of facts.accessKeys) {
-        if (fact.payload.status !== "Active") continue;
-        const list = activeByUser.get(fact.payload.userName) ?? [];
-        list.push(fact);
-        activeByUser.set(fact.payload.userName, list);
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY],
+    judge(items) {
+      const activeByUser = new Map<string, AwsConfigKnowledge<AccessKeyKnowledgePayload>[]>();
+      for (const item of items.accessKeys) {
+        if (item.payload.status !== "Active") continue;
+        const list = activeByUser.get(item.payload.userName) ?? [];
+        list.push(item);
+        activeByUser.set(item.payload.userName, list);
       }
       const drafts: CloudConfigFindingDraft[] = [];
       for (const [userName, keys] of activeByUser) {
         if (keys.length <= 1) continue;
         drafts.push({
           resourceKey: userName,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY,
           title: `IAM user ${userName} has ${keys.length} active access keys`,
           detail: `User ${userName} has ${keys.length} active access keys (${keys
             .map((k) => k.payload.accessKeyId)
@@ -658,21 +658,21 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "MEDIUM",
     remediation: "Rewrite Allow+NotAction statements as explicit Allow lists.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT],
-    judge(facts) {
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
+    judge(items) {
       const drafts: CloudConfigFindingDraft[] = [];
-      for (const fact of facts.policies) {
-        const policy = fact.payload;
+      for (const item of items.policies) {
+        const policy = item.payload;
         const hasAllowNotAction = parsePolicyStatements(policy.document).some(
           (stmt) => stmt.Effect === "Allow" && asArray(stmt.NotAction).length > 0,
         );
         if (!hasAllowNotAction) continue;
         drafts.push({
           resourceKey: policy.identity,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT,
           title: `Policy ${policy.identity} uses Allow with NotAction`,
           detail: `Policy ${policy.identity} contains an Allow statement with NotAction, which grants all actions except the listed ones.`,
-          evidenceRefs: [fact.evidenceId],
+          evidenceRefs: [item.evidenceId],
           attachments: policy.attachments,
         });
       }
@@ -685,21 +685,21 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "HIGH",
     remediation: "Scope broad Allow statements to specific actions and resources.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT],
-    judge(facts) {
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
+    judge(items) {
       const drafts: CloudConfigFindingDraft[] = [];
-      for (const fact of facts.policies) {
-        const policy = fact.payload;
+      for (const item of items.policies) {
+        const policy = item.payload;
         const offending = parsePolicyStatements(policy.document).filter(
           (stmt) => stmt.Effect === "Allow" && asArray(stmt.Action).includes("*") && statementAllowsAllResources(stmt),
         );
         if (offending.length === 0) continue;
         drafts.push({
           resourceKey: policy.identity,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT,
           title: `Policy ${policy.identity} grants Action * on Resource *`,
           detail: `Policy ${policy.identity} contains ${offending.length} Allow statement(s) granting all actions on all resources.`,
-          evidenceRefs: [fact.evidenceId],
+          evidenceRefs: [item.evidenceId],
           attachments: policy.attachments,
         });
       }
@@ -714,11 +714,11 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "MEDIUM",
     remediation: "Replace service-wide wildcards with the specific actions required.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT],
-    judge(facts) {
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
+    judge(items) {
       const drafts: CloudConfigFindingDraft[] = [];
-      for (const fact of facts.policies) {
-        const policy = fact.payload;
+      for (const item of items.policies) {
+        const policy = item.payload;
         const services = new Set<string>();
         for (const stmt of parsePolicyStatements(policy.document)) {
           if (stmt.Effect !== "Allow" || !statementAllowsAllResources(stmt)) continue;
@@ -737,10 +737,10 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
           : "MEDIUM";
         drafts.push({
           resourceKey: policy.identity,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT,
           title: `Policy ${policy.identity} grants service-wide actions on all resources`,
           detail: `Policy ${policy.identity} grants wildcard actions for services: ${serviceList.join(", ")}.`,
-          evidenceRefs: [fact.evidenceId],
+          evidenceRefs: [item.evidenceId],
           attachments: policy.attachments,
           severity,
         });
@@ -754,11 +754,11 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "HIGH",
     remediation: "Restrict PassRole/AssumeRole/Decrypt/GetSecretValue to specific resources.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT],
-    judge(facts) {
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
+    judge(items) {
       const drafts: CloudConfigFindingDraft[] = [];
-      for (const fact of facts.policies) {
-        const policy = fact.payload;
+      for (const item of items.policies) {
+        const policy = item.payload;
         const matched = new Set<string>();
         for (const stmt of parsePolicyStatements(policy.document)) {
           if (stmt.Effect !== "Allow" || !statementAllowsAllResources(stmt)) continue;
@@ -769,10 +769,10 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
         if (matched.size === 0) continue;
         drafts.push({
           resourceKey: policy.identity,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT,
           title: `Policy ${policy.identity} grants sensitive actions on all resources`,
           detail: `Policy ${policy.identity} grants ${[...matched].sort().join(", ")} on Resource *.`,
-          evidenceRefs: [fact.evidenceId],
+          evidenceRefs: [item.evidenceId],
           attachments: policy.attachments,
         });
       }
@@ -785,17 +785,17 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "MEDIUM",
     remediation: "Enable RDS managed master user credentials in AWS Secrets Manager.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY],
-    judge(facts) {
-      return facts.rdsInstances
-        .filter((fact) => !fact.payload.masterUserSecretManaged)
-        .map((fact) => ({
-          resourceKey: fact.payload.identifier,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY,
-          region: fact.payload.region,
-          title: `RDS instance ${fact.payload.identifier} does not manage the master password in Secrets Manager`,
-          detail: `RDS instance ${fact.payload.identifier} master user password is not managed by AWS Secrets Manager.`,
-          evidenceRefs: [fact.evidenceId],
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY],
+    judge(items) {
+      return items.rdsInstances
+        .filter((item) => !item.payload.masterUserSecretManaged)
+        .map((item) => ({
+          resourceKey: item.payload.identifier,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY,
+          region: item.payload.region,
+          title: `RDS instance ${item.payload.identifier} does not manage the master password in Secrets Manager`,
+          detail: `RDS instance ${item.payload.identifier} master user password is not managed by AWS Secrets Manager.`,
+          evidenceRefs: [item.evidenceId],
         }));
     },
   },
@@ -805,17 +805,17 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "LOW",
     remediation: "Enable versioning on S3 buckets to protect against accidental deletion.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY],
-    judge(facts) {
-      return facts.buckets
-        .filter((fact) => !fact.payload.versioningEnabled)
-        .map((fact) => ({
-          resourceKey: fact.payload.bucketName,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY,
-          region: fact.payload.region,
-          title: `S3 bucket ${fact.payload.bucketName} does not have versioning enabled`,
-          detail: `Bucket ${fact.payload.bucketName} does not have object versioning enabled.`,
-          evidenceRefs: [fact.evidenceId],
+    requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY],
+    judge(items) {
+      return items.buckets
+        .filter((item) => !item.payload.versioningEnabled)
+        .map((item) => ({
+          resourceKey: item.payload.bucketName,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY,
+          region: item.payload.region,
+          title: `S3 bucket ${item.payload.bucketName} does not have versioning enabled`,
+          detail: `Bucket ${item.payload.bucketName} does not have object versioning enabled.`,
+          evidenceRefs: [item.evidenceId],
         }));
     },
   },
@@ -825,30 +825,30 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     severity: "HIGH",
     remediation: "Remove the public IP or restrict the instance's security groups to non-public ingress.",
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-    requiredFactTypes: [
-      SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_INSTANCE_NETWORK,
-      SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,
+    requiredKnowledgeTypes: [
+      SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_INSTANCE_NETWORK,
+      SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,
     ],
-    judge(facts) {
+    judge(items) {
       const publicSgIds = new Set(
-        facts.securityGroups.filter((sg) => sg.payload.publicIngress.length > 0).map((sg) => sg.payload.groupId),
+        items.securityGroups.filter((sg) => sg.payload.publicIngress.length > 0).map((sg) => sg.payload.groupId),
       );
       const drafts: CloudConfigFindingDraft[] = [];
-      for (const fact of facts.instanceNetworks) {
-        const instance = fact.payload;
+      for (const item of items.instanceNetworks) {
+        const instance = item.payload;
         if (!instance.publicIpAddress) continue;
         const exposingSg = instance.securityGroupIds.filter((id) => publicSgIds.has(id));
         if (exposingSg.length === 0) continue;
         drafts.push({
           resourceKey: instance.instanceId,
-          factType: SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_INSTANCE_NETWORK,
+          type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_INSTANCE_NETWORK,
           region: instance.region,
           title: `EC2 instance ${instance.instanceId} has a public IP and public ingress`,
           detail: `Instance ${instance.instanceId} (${instance.publicIpAddress}) is reachable via security groups ${exposingSg.join(", ")}.`,
           evidenceRefs: [
-            fact.evidenceId,
+            item.evidenceId,
             ...exposingSg
-              .map((id) => facts.securityGroups.find((sg) => sg.payload.groupId === id)?.evidenceId)
+              .map((id) => items.securityGroups.find((sg) => sg.payload.groupId === id)?.evidenceId)
               .filter((id): id is string => Boolean(id)),
           ],
         });
@@ -861,19 +861,19 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
 export const SECURITY_EVALUATION_AWS_CIS_BENCHMARK = "CIS AWS Foundations Benchmark v1.5";
 
 /**
- * All fact types the cloud configuration rulebook consumes, across both
+ * All item types the cloud configuration rulebook consumes, across both
  * families. Used by the evidence provider to know what to request from the
  * shared collector.
  */
-export const SECURITY_EVALUATION_CLOUD_CONFIG_REQUIRED_FACT_TYPES: readonly string[] = Array.from(
-  new Set(SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.flatMap((entry) => [...entry.requiredFactTypes])),
+export const SECURITY_EVALUATION_CLOUD_CONFIG_REQUIRED_KNOWLEDGE_TYPES: readonly string[] = Array.from(
+  new Set(SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.flatMap((entry) => [...entry.requiredKnowledgeTypes])),
 );
 
-/** Rebuild the typed fact set from manifest items (payloads cross the port as JSON). */
-export function rebuildCloudConfigFacts(
+/** Rebuild the typed item set from manifest items (payloads cross the port as JSON). */
+export function rebuildAwsConfigKnowledge(
   items: readonly { id: string; payload?: Record<string, unknown> }[],
-): CloudConfigFactSet {
-  const set: CloudConfigFactSet = {
+): AwsConfigKnowledgeSet {
+  const set: AwsConfigKnowledgeSet = {
     passwordPolicy: null,
     rootCredential: null,
     userCredentials: [],
@@ -886,34 +886,34 @@ export function rebuildCloudConfigFacts(
   };
   for (const item of items) {
     const payload = item.payload ?? {};
-    const factKey = cloudFactKeyFromEvidenceId(item.id);
-    switch (payload.factType) {
-      case SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY:
-        set.passwordPolicy = { evidenceId: item.id, factKey, payload: toPasswordPolicy(payload) };
+    const key = cloudConfigKeyFromEvidenceId(item.id);
+    switch (payload.type) {
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY:
+        set.passwordPolicy = { evidenceId: item.id, key, payload: toPasswordPolicy(payload) };
         break;
-      case SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ROOT_CREDENTIAL:
-        set.rootCredential = { evidenceId: item.id, factKey, payload: toRootCredential(payload) };
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ROOT_CREDENTIAL:
+        set.rootCredential = { evidenceId: item.id, key, payload: toRootCredential(payload) };
         break;
-      case SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_USER_CREDENTIAL:
-        set.userCredentials.push({ evidenceId: item.id, factKey, payload: toUserCredential(payload) });
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL:
+        set.userCredentials.push({ evidenceId: item.id, key, payload: toUserCredential(payload) });
         break;
-      case SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_ACCESS_KEY:
-        set.accessKeys.push({ evidenceId: item.id, factKey, payload: toAccessKey(payload) });
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY:
+        set.accessKeys.push({ evidenceId: item.id, key, payload: toAccessKey(payload) });
         break;
-      case SECURITY_EVALUATION_FACT_TYPE_AWS_IAM_POLICY_DOCUMENT:
-        set.policies.push({ evidenceId: item.id, factKey, payload: toPolicyDocument(payload) });
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT:
+        set.policies.push({ evidenceId: item.id, key, payload: toPolicyDocument(payload) });
         break;
-      case SECURITY_EVALUATION_FACT_TYPE_AWS_S3_BUCKET_SECURITY:
-        set.buckets.push({ evidenceId: item.id, factKey, payload: toBucketSecurity(payload) });
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY:
+        set.buckets.push({ evidenceId: item.id, key, payload: toBucketSecurity(payload) });
         break;
-      case SECURITY_EVALUATION_FACT_TYPE_AWS_RDS_INSTANCE_SECURITY:
-        set.rdsInstances.push({ evidenceId: item.id, factKey, payload: toRdsInstanceSecurity(payload) });
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY:
+        set.rdsInstances.push({ evidenceId: item.id, key, payload: toRdsInstanceSecurity(payload) });
         break;
-      case SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS:
-        set.securityGroups.push({ evidenceId: item.id, factKey, payload: toSecurityGroupIngress(payload) });
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS:
+        set.securityGroups.push({ evidenceId: item.id, key, payload: toSecurityGroupIngress(payload) });
         break;
-      case SECURITY_EVALUATION_FACT_TYPE_AWS_EC2_INSTANCE_NETWORK:
-        set.instanceNetworks.push({ evidenceId: item.id, factKey, payload: toEc2InstanceNetwork(payload) });
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_INSTANCE_NETWORK:
+        set.instanceNetworks.push({ evidenceId: item.id, key, payload: toEc2InstanceNetwork(payload) });
         break;
       default:
         break;
@@ -922,7 +922,7 @@ export function rebuildCloudConfigFacts(
   return set;
 }
 
-function cloudFactKeyFromEvidenceId(evidenceId: string): string {
+function cloudConfigKeyFromEvidenceId(evidenceId: string): string {
   const prefix = "cloud:";
   const withoutPrefix = evidenceId.startsWith(prefix) ? evidenceId.slice(prefix.length) : evidenceId;
   const separator = withoutPrefix.indexOf(":");
@@ -945,7 +945,7 @@ function asNullableString(value: unknown): string | null {
   return typeof value === "string" && value ? value : null;
 }
 
-function toPasswordPolicy(payload: Record<string, unknown>): PasswordPolicyFactPayload {
+function toPasswordPolicy(payload: Record<string, unknown>): PasswordPolicyKnowledgePayload {
   return {
     exists: asBoolean(payload.exists),
     minimumPasswordLength: asNullableNumber(payload.minimumPasswordLength),
@@ -954,7 +954,7 @@ function toPasswordPolicy(payload: Record<string, unknown>): PasswordPolicyFactP
   };
 }
 
-function toRootCredential(payload: Record<string, unknown>): RootCredentialFactPayload {
+function toRootCredential(payload: Record<string, unknown>): RootCredentialKnowledgePayload {
   return {
     passwordEnabled: asBoolean(payload.passwordEnabled),
     mfaActive: asBoolean(payload.mfaActive),
@@ -962,7 +962,7 @@ function toRootCredential(payload: Record<string, unknown>): RootCredentialFactP
   };
 }
 
-function toUserCredential(payload: Record<string, unknown>): UserCredentialFactPayload {
+function toUserCredential(payload: Record<string, unknown>): UserCredentialKnowledgePayload {
   return {
     userName: asString(payload.userName, "unknown-user"),
     passwordEnabled: asBoolean(payload.passwordEnabled),
@@ -971,7 +971,7 @@ function toUserCredential(payload: Record<string, unknown>): UserCredentialFactP
   };
 }
 
-function toAccessKey(payload: Record<string, unknown>): AccessKeyFactPayload {
+function toAccessKey(payload: Record<string, unknown>): AccessKeyKnowledgePayload {
   return {
     userName: asString(payload.userName, "unknown-user"),
     accessKeyId: asString(payload.accessKeyId, "unknown-key"),
@@ -981,7 +981,7 @@ function toAccessKey(payload: Record<string, unknown>): AccessKeyFactPayload {
   };
 }
 
-function toPolicyDocument(payload: Record<string, unknown>): PolicyDocumentFactPayload {
+function toPolicyDocument(payload: Record<string, unknown>): PolicyDocumentKnowledgePayload {
   const attachments = Array.isArray(payload.attachments)
     ? payload.attachments
         .filter((a): a is Record<string, unknown> => Boolean(a) && typeof a === "object")
@@ -1000,7 +1000,7 @@ function toPolicyDocument(payload: Record<string, unknown>): PolicyDocumentFactP
   };
 }
 
-function toBucketSecurity(payload: Record<string, unknown>): BucketSecurityFactPayload {
+function toBucketSecurity(payload: Record<string, unknown>): BucketSecurityKnowledgePayload {
   const block = payload.publicAccessBlock;
   const publicAccessBlock =
     block && typeof block === "object"
@@ -1023,7 +1023,7 @@ function toBucketSecurity(payload: Record<string, unknown>): BucketSecurityFactP
   };
 }
 
-function toRdsInstanceSecurity(payload: Record<string, unknown>): RdsInstanceSecurityFactPayload {
+function toRdsInstanceSecurity(payload: Record<string, unknown>): RdsInstanceSecurityKnowledgePayload {
   return {
     identifier: asString(payload.identifier, "unknown-rds"),
     region: asString(payload.region, "unknown-region"),
@@ -1033,7 +1033,7 @@ function toRdsInstanceSecurity(payload: Record<string, unknown>): RdsInstanceSec
   };
 }
 
-function toSecurityGroupIngress(payload: Record<string, unknown>): SecurityGroupIngressFactPayload {
+function toSecurityGroupIngress(payload: Record<string, unknown>): SecurityGroupIngressKnowledgePayload {
   const rules = Array.isArray(payload.publicIngress) ? payload.publicIngress : [];
   return {
     groupId: asString(payload.groupId, "unknown-security-group"),
@@ -1049,7 +1049,7 @@ function toSecurityGroupIngress(payload: Record<string, unknown>): SecurityGroup
   };
 }
 
-function toEc2InstanceNetwork(payload: Record<string, unknown>): Ec2InstanceNetworkFactPayload {
+function toEc2InstanceNetwork(payload: Record<string, unknown>): Ec2InstanceNetworkKnowledgePayload {
   const sgIds = Array.isArray(payload.securityGroupIds)
     ? payload.securityGroupIds.filter((id): id is string => typeof id === "string")
     : [];

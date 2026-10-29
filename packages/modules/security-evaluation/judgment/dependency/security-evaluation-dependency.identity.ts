@@ -5,14 +5,14 @@ import { SECURITY_EVALUATION_ECOSYSTEM_NPM } from "../../security-evaluation.con
  * finding fingerprints is testable without a database.
  */
 
-/** Fact key of an installed package: `npm:<name>@<version>`. */
-export function dependencyFactKey(packageName: string, version: string): string {
+/** Knowledge key of an installed package: `npm:<name>@<version>`. */
+export function dependencyKnowledgeKey(packageName: string, version: string): string {
   return `${SECURITY_EVALUATION_ECOSYSTEM_NPM}:${packageName}@${version}`;
 }
 
 /** Manifest item id of one installed package: `pkg:npm:<name>@<version>`. */
 export function dependencyEvidenceId(packageName: string, version: string): string {
-  return `pkg:${dependencyFactKey(packageName, version)}`;
+  return `pkg:${dependencyKnowledgeKey(packageName, version)}`;
 }
 
 /**

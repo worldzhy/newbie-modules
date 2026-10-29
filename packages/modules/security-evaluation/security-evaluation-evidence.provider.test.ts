@@ -10,7 +10,7 @@ import type { RepositoryAccess } from "./ports/repository-access.port";
  * Behavior-level tests for evidence collection (ADR-022 D3, ADR-020 D5.2):
  * a repository whose lockfile cannot be read is a failed run rather than a
  * clean one, and dependencies declared in package.json without a resolved
- * installed fact are reported as declaredUnlinked instead of being counted
+ * installed item are reported as declaredUnlinked instead of being counted
  * clean.
  */
 
@@ -40,11 +40,11 @@ const LOCKFILE = JSON.stringify({
 });
 
 function fakeAssets() {
-  const writes = { facts: 0, touched: 0 };
+  const writes = { items: 0, touched: 0 };
   const assets = {
     ensureAsset: async () => ({ id: "asset-1" }),
-    upsertFacts: async () => {
-      writes.facts += 1;
+    upsertNpmPackageKnowledgeItems: async () => {
+      writes.items += 1;
     },
     touchObserved: async () => {
       writes.touched += 1;
@@ -65,7 +65,7 @@ test("a repository with no supported lockfile fails the run instead of reporting
 
   await assert.rejects(() => provider.collect(subject, ruleSetVersion), /No supported lockfile/);
   // Nothing was persisted: the asset must not look observed after a failed run.
-  assert.equal(writes.facts, 0);
+  assert.equal(writes.items, 0);
   assert.equal(writes.touched, 0);
 });
 

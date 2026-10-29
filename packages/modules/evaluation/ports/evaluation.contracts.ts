@@ -58,7 +58,7 @@ export interface EvaluationCriterionRef {
 export interface EvaluationEvidenceItem {
   /** Stable inside the run; verdicts and findings reference it. */
   id: string;
-  /** Evidence layer, e.g. "fact" | "declared" — feature-defined. */
+  /** Evidence layer, e.g. "knowledge" | "declared" — feature-defined. */
   layer: string;
   /** Feature-defined origin, e.g. "workspace" | "lockfile" | "aws-account". */
   source: string;

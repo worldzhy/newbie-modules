@@ -3,7 +3,7 @@ import type { SecurityEvaluationFindingSeverity } from "./security-evaluation-se
 /** Derived urgency bands. P1 is act now, P4 is backlog/monitor. */
 export type SecurityEvaluationUrgency = "P1" | "P2" | "P3" | "P4";
 
-/** How exposed the asset fact is in the judgement's eyes. */
+/** How exposed the asset knowledge is in the judgement's eyes. */
 export type SecurityEvaluationExposure = "production" | "development" | "internal" | "unknown";
 
 const BASE_RANK: Record<SecurityEvaluationFindingSeverity, number> = {
@@ -15,7 +15,7 @@ const BASE_RANK: Record<SecurityEvaluationFindingSeverity, number> = {
 };
 
 /**
- * Exposure derived from collected facts. Dependency facts use `isDev`; cloud
+ * Exposure derived from collected knowledge. Dependency items use `isDev`; cloud
  * account findings start at `internal` (ADR-027 D6), which carries no relief
  * until a reachability signal exists. Unknown stays at production weight — an
  * unproven development-only dependency must not be silently downgraded.

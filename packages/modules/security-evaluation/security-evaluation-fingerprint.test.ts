@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 
 import {
   dependencyEvidenceId,
-  dependencyFactKey,
+  dependencyKnowledgeKey,
   dependencyFingerprint,
 } from "./judgment/dependency/security-evaluation-dependency.identity";
 
@@ -34,13 +34,13 @@ describe("dependencyFingerprint", () => {
   });
 });
 
-describe("dependencyFactKey and dependencyEvidenceId", () => {
+describe("dependencyKnowledgeKey and dependencyEvidenceId", () => {
   it("scopes the package identity by ecosystem and version", () => {
-    assert.equal(dependencyFactKey("lodash", "4.17.20"), "npm:lodash@4.17.20");
+    assert.equal(dependencyKnowledgeKey("lodash", "4.17.20"), "npm:lodash@4.17.20");
     assert.equal(dependencyEvidenceId("lodash", "4.17.20"), "pkg:npm:lodash@4.17.20");
   });
 
   it("keeps scoped package names intact", () => {
-    assert.equal(dependencyFactKey("@types/node", "24.0.0"), "npm:@types/node@24.0.0");
+    assert.equal(dependencyKnowledgeKey("@types/node", "24.0.0"), "npm:@types/node@24.0.0");
   });
 });

@@ -47,7 +47,7 @@ export function parsePackageLock(content: string): LockedPackage[] {
 
 /**
  * Dependencies declared in package.json (direct only). Used to report what the
- * lockfile could not link back to an installed fact — declared names without a
+ * lockfile could not link back to an installed knowledge item — declared names without a
  * resolved version are a coverage gap, not a silent omission.
  */
 export function parseDeclaredDependencies(content: string): string[] {
