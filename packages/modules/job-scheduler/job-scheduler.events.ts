@@ -25,8 +25,8 @@ const JOB_RUN_FAILED = defineEvent<JobRunFailedEvent>({
   payloadExample: {
     runId: 42,
     scheduleId: 7,
-    scheduleKey: "dependency-scan.daily",
-    handlerKey: "dependency-scan.run",
+    scheduleKey: "report.daily",
+    handlerKey: "report.run",
     trigger: "schedule",
     startedAt: "2026-01-01T00:00:00.000Z",
     finishedAt: "2026-01-01T00:00:05.000Z",

@@ -7,13 +7,14 @@ import { IsOptional, IsString, MaxLength } from "class-validator";
 // ---------------------------------------------------------------------------
 
 export class CreateMonitorInstallationDto {
-  @ApiProperty({ description: 'Human-readable label, e.g. "nightwatch-prod"' })
+  @ApiProperty({ description: 'Human-readable label, e.g. "api-prod"' })
   @IsString()
   @MaxLength(255)
   label!: string;
 
   @ApiPropertyOptional({
-    description: 'Opaque host tag; convention "projectId/applicationId"',
+    description:
+      "Opaque platform-owned tag; the module never parses it. The host-bound MonitorApplicationRefResolver port maps it to the applicationId stamped on ClickHouse rows.",
   })
   @IsOptional()
   @IsString()

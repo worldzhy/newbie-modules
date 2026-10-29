@@ -28,8 +28,10 @@ The module owns its own token table, `BackendMonitorInstallation`
 `application.Agent` of type `SERVER_MONITOR`:
 
 - token is a random UUID, only its SHA-256 hash is stored (`tokenHash`);
-- `externalRef` is an opaque host tag by convention `projectId/applicationId`;
-  the ingest resolver maps the `applicationId` segment onto every ClickHouse row;
+- `externalRef` is an opaque host tag the module never parses; the host-bound
+  `MonitorApplicationRefResolver` port (`ports/application-ref.resolver.ts`)
+  maps it to the `applicationId` stamped on every ClickHouse row. The module
+  fails to boot when the port is unbound;
 - liveness (`firstSeenAt` / `lastSeenAt`, online threshold 180s) and runtime
   facts (`env` / `appVersion` / `instanceId` / `kind`) are derived/refreshed on
   ingest (PG write throttled to 30s; positive/negative token caches 60s/10s).
