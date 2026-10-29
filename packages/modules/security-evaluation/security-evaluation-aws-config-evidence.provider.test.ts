@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { EvaluationRuleSetVersionRef, EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
-import { SecurityEvaluationCloudConfigEvidenceProvider } from "./evidence/security-evaluation-cloud-config-evidence.provider";
-import type { CloudConfigurationAccess } from "./ports/cloud-configuration-access.port";
+import { SecurityEvaluationAwsConfigEvidenceProvider } from "./evidence/security-evaluation-aws-config-evidence.provider";
+import type { AwsConfigAccess } from "./ports/aws-config-access.port";
 import type { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
 
 /**
@@ -37,7 +37,7 @@ function stubAssets(): SecurityEvaluationAssetService {
   } as unknown as SecurityEvaluationAssetService;
 }
 
-function stubAccess(collection: Awaited<ReturnType<CloudConfigurationAccess["collect"]>>): CloudConfigurationAccess {
+function stubAccess(collection: Awaited<ReturnType<AwsConfigAccess["collect"]>>): AwsConfigAccess {
   return { collect: async () => collection };
 }
 
@@ -48,7 +48,7 @@ const PASSWORD_POLICY_FACT = {
 };
 
 test("items become manifest items and asset items; a clean collection skips nothing", async () => {
-  const provider = new SecurityEvaluationCloudConfigEvidenceProvider(
+  const provider = new SecurityEvaluationAwsConfigEvidenceProvider(
     stubAssets(),
     stubAccess({ items: [PASSWORD_POLICY_FACT], failures: [] }),
   );
@@ -61,7 +61,7 @@ test("items become manifest items and asset items; a clean collection skips noth
 });
 
 test("an account-level failure skips exactly the criteria that needed the item type", async () => {
-  const provider = new SecurityEvaluationCloudConfigEvidenceProvider(
+  const provider = new SecurityEvaluationAwsConfigEvidenceProvider(
     stubAssets(),
     stubAccess({
       items: [PASSWORD_POLICY_FACT],
@@ -76,7 +76,7 @@ test("an account-level failure skips exactly the criteria that needed the item t
 });
 
 test("a resource-level failure skips one resource of the affected criteria", async () => {
-  const provider = new SecurityEvaluationCloudConfigEvidenceProvider(
+  const provider = new SecurityEvaluationAwsConfigEvidenceProvider(
     stubAssets(),
     stubAccess({
       items: [PASSWORD_POLICY_FACT],
@@ -92,7 +92,7 @@ test("a resource-level failure skips one resource of the affected criteria", asy
 });
 
 test("a subject whose items all failed to collect is a failed run, not a clean one", async () => {
-  const provider = new SecurityEvaluationCloudConfigEvidenceProvider(
+  const provider = new SecurityEvaluationAwsConfigEvidenceProvider(
     stubAssets(),
     stubAccess({
       items: [],
@@ -102,7 +102,7 @@ test("a subject whose items all failed to collect is a failed run, not a clean o
   await assert.rejects(provider.collect(SUBJECT, VERSION), /No cloud configuration knowledge could be collected/);
 });
 
-test("an unbound CloudConfigurationAccess is a wiring error", async () => {
-  const provider = new SecurityEvaluationCloudConfigEvidenceProvider(stubAssets());
-  await assert.rejects(provider.collect(SUBJECT, VERSION), /No CloudConfigurationAccess is bound/);
+test("an unbound AwsConfigAccess is a wiring error", async () => {
+  const provider = new SecurityEvaluationAwsConfigEvidenceProvider(stubAssets());
+  await assert.rejects(provider.collect(SUBJECT, VERSION), /No AwsConfigAccess is bound/);
 });

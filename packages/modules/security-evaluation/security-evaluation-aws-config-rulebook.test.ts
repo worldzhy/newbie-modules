@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK,
   type AwsConfigKnowledgeSet,
-} from "./judgment/aws-config/security-evaluation-cloud-config.rulebook";
+} from "./judgment/aws-config/security-evaluation-aws-config.rulebook";
 import {
   SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
   SECURITY_EVALUATION_KEY_AWS_CUSTOM,

@@ -5,25 +5,25 @@ The security feature on the evaluation skeleton (ADR-020), replacing the siloed
 a time (ADR-022). The legacy modules keep running unchanged; this module adds a
 parallel, asset-centred track and never reads or writes their tables.
 
-Shipped slices: **assets + DEPENDENCY** and **CLOUD_CONFIG** (ADR-027). INTEL
+Shipped slices: **assets + DEPENDENCY** and **AWS_CONFIG** (ADR-027). INTEL
 lands in a later slice on the same run and finding lifecycle.
 
 ## Vocabulary
 
-| Term     | Meaning                                                                                                                                                                                                          |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subject  | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; `scopeType` / `scopeId` are host-assigned (nightwatch uses `project`).                                                          |
-| Asset    | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state knowledge items.                                                                               |
+| Term           | Meaning                                                                                                                                                                                                                                                                                                                                        |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subject        | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; `scopeType` / `scopeId` are host-assigned (nightwatch uses `project`).                                                                                                                                                                                        |
+| Asset          | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state knowledge items.                                                                                                                                                                                                   |
 | Knowledge item | `SecurityEvaluationAwsConfigKnowledgeItem` / `SecurityEvaluationNpmPackageKnowledgeItem`: something observed about an asset right now (`type`, `key`, small intrinsic `value`); `SecurityEvaluationThreatKnowledgeItem` is the world-scoped intel sibling. Items are upserted, never deleted here; history lives in the archived run manifest. |
-| Criteria | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                     |
-| Finding  | Skeleton `EvaluationFinding` with identity `(subjectId, evaluationKey, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                  |
-| Urgency  | Derived band P1–P4 from severity and exposure. Not a stored score and not a composite.                                                                                                                           |
+| Criteria       | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                                                                                                                                                    |
+| Finding        | Skeleton `EvaluationFinding` with identity `(subjectId, evaluationKey, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                                                                                                                                                |
+| Urgency        | Derived band P1–P4 from severity and exposure. Not a stored score and not a composite.                                                                                                                                                                                                                                                         |
 
 ## Subject kinds and scopes
 
 - `repository` — evidence is the repository's `package-lock.json`.
 - `aws-account` — evidence is the account's configuration knowledge, collected
-  through the host-bound `CloudConfigurationAccess` port. Nightwatch maps one
+  through the host-bound `AwsConfigAccess` port. Nightwatch maps one
   configured `awsCrossAccountBinding` to one subject.
 
 Hosts declare subjects by calling `POST /security-evaluation/subjects/sync` with
@@ -64,7 +64,7 @@ The module implements the skeleton's kind-scoped ports for both kinds:
 
 - `EVALUATION_CRITERIA:{repository|aws-account}` → `SecurityEvaluationCriteriaProvider`
 - `EVALUATION_EVIDENCE:repository` → `SecurityEvaluationEvidenceProvider`
-- `EVALUATION_EVIDENCE:aws-account` → `SecurityEvaluationCloudConfigEvidenceProvider`
+- `EVALUATION_EVIDENCE:aws-account` → `SecurityEvaluationAwsConfigEvidenceProvider`
 - `EVALUATION_JUDGMENT:{repository|aws-account}` → `SecurityEvaluationJudgmentService`
   (dispatches on `ruleSetVersion.evaluationKey`: `npm-osv`, `aws-cis-1.5`,
   `aws-custom`, `threat-intel`)
@@ -73,11 +73,11 @@ The host must bind two more ports, owned by this module:
 
 ```ts
 { provide: securityEvaluationRepositoryAccessToken, useClass: YourRepositoryAccess }
-{ provide: securityEvaluationCloudConfigurationAccessToken, useClass: YourCloudConfigurationAccess }
+{ provide: securityEvaluationAwsConfigAccessToken, useClass: YourAwsConfigAccess }
 ```
 
 `RepositoryAccess.getFile(subject, path)` returns a file at the repository root
-or `null`. `CloudConfigurationAccess.collect(subject)` returns raw
+or `null`. `AwsConfigAccess.collect(subject)` returns raw
 configuration knowledge items plus per-type failures — never judged conclusions.
 Nightwatch implements them with its `github` and `aws-identity` modules. An
 unbound port is a wiring error: the run fails instead of reporting a vacuously
@@ -116,16 +116,16 @@ SECURITY_EVALUATION_SCHEDULES = [
 
 ## Endpoints
 
-| Method | Path                                         | Purpose                                                                                             |
-| ------ | -------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| POST   | `/security-evaluation/subjects/sync`         | Ask the host provider to sync subjects and assets (idempotent).                                     |
-| GET    | `/security-evaluation/assets`                | Asset inventory under a scope.                                                                      |
-| GET    | `/security-evaluation/assets/:assetId/knowledge-items` | Current-state knowledge items of one asset.                                                   |
-| POST   | `/security-evaluation/runs`                  | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously. |
-| GET    | `/security-evaluation/runs`                  | Run history for a subject.                                                                          |
-| GET    | `/security-evaluation/results`               | Archived results (manifest excluded).                                                               |
-| GET    | `/security-evaluation/findings`              | Findings with evaluationKey / status / severity filters.                                            |
-| GET    | `/security-evaluation/report`                | Single-axis report: assets, coverage, findings, trend, MTTR.                                        |
+| Method | Path                                                   | Purpose                                                                                             |
+| ------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| POST   | `/security-evaluation/subjects/sync`                   | Ask the host provider to sync subjects and assets (idempotent).                                     |
+| GET    | `/security-evaluation/assets`                          | Asset inventory under a scope.                                                                      |
+| GET    | `/security-evaluation/assets/:assetId/knowledge-items` | Current-state knowledge items of one asset.                                                         |
+| POST   | `/security-evaluation/runs`                            | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously. |
+| GET    | `/security-evaluation/runs`                            | Run history for a subject.                                                                          |
+| GET    | `/security-evaluation/results`                         | Archived results (manifest excluded).                                                               |
+| GET    | `/security-evaluation/findings`                        | Findings with evaluationKey / status / severity filters.                                            |
+| GET    | `/security-evaluation/report`                          | Single-axis report: assets, coverage, findings, trend, MTTR.                                        |
 
 ## Limitations
 

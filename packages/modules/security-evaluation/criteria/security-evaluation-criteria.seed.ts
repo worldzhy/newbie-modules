@@ -19,7 +19,7 @@ import {
 import {
   SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
   SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK,
-} from "../judgment/aws-config/security-evaluation-cloud-config.rulebook";
+} from "../judgment/aws-config/security-evaluation-aws-config.rulebook";
 
 interface CriterionSeed {
   criterionKey: string;
@@ -81,7 +81,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   }
 
   /** CIS AWS Foundations Benchmark v1.5 initial set (ADR-027 D3). */
-  async ensureCloudConfigBaseline(): Promise<void> {
+  async ensureAwsConfigBaseline(): Promise<void> {
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
       (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     );
@@ -107,7 +107,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   }
 
   /** aws-custom rules inherited from the predecessor aws-audit module (ADR-033/ADR-037). */
-  async ensureCloudCustomBaseline(): Promise<void> {
+  async ensureAwsCustomBaseline(): Promise<void> {
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
       (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     );
@@ -154,8 +154,8 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
 
   private async ensureAllBaselines(): Promise<void> {
     await this.ensureDependencyBaseline();
-    await this.ensureCloudConfigBaseline();
-    await this.ensureCloudCustomBaseline();
+    await this.ensureAwsConfigBaseline();
+    await this.ensureAwsCustomBaseline();
     await this.ensureIntelligenceBaseline();
   }
 

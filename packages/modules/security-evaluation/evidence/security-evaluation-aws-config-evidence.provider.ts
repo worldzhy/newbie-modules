@@ -9,15 +9,15 @@ import type {
 
 import { SecurityEvaluationAssetService } from "../assets/security-evaluation-asset.service";
 import {
-  CloudConfigurationAccess,
-  CloudConfigurationFailure,
-  securityEvaluationCloudConfigurationAccessToken,
-} from "../ports/cloud-configuration-access.port";
-import { cloudConfigEvidenceId } from "../judgment/aws-config/security-evaluation-cloud-config.identity";
-import { SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK } from "../judgment/aws-config/security-evaluation-cloud-config.rulebook";
+  AwsConfigAccess,
+  AwsConfigFailure,
+  securityEvaluationAwsConfigAccessToken,
+} from "../ports/aws-config-access.port";
+import { awsConfigEvidenceId } from "../judgment/aws-config/security-evaluation-aws-config.identity";
+import { SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK } from "../judgment/aws-config/security-evaluation-aws-config.rulebook";
 
 /**
- * SecurityEvaluationCloudConfigEvidenceProvider — evidence collection for
+ * SecurityEvaluationAwsConfigEvidenceProvider — evidence collection for
  * subject kind "aws-account" (ADR-027 D1/D6).
  *
  * The host port yields raw knowledge items plus per-type failures. Items
@@ -27,22 +27,22 @@ import { SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK } from "../judgment/aws-config/
  * run, not a clean one.
  */
 @Injectable()
-export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidenceProvider {
+export class SecurityEvaluationAwsConfigEvidenceProvider implements EvidenceProvider {
   constructor(
     private readonly assets: SecurityEvaluationAssetService,
     @Optional()
-    @Inject(securityEvaluationCloudConfigurationAccessToken)
-    private readonly cloudConfigurationAccess?: CloudConfigurationAccess,
+    @Inject(securityEvaluationAwsConfigAccessToken)
+    private readonly awsConfigurationAccess?: AwsConfigAccess,
   ) {}
 
   async collect(
     subject: EvaluationSubjectRef,
     ruleSetVersion: EvaluationRuleSetVersionRef,
   ): Promise<EvidenceCollection> {
-    const access = this.cloudConfigurationAccess;
+    const access = this.awsConfigurationAccess;
     if (!access) {
       throw new Error(
-        "No CloudConfigurationAccess is bound to SECURITY_EVALUATION_CLOUD_CONFIGURATION_ACCESS; the host must bind the port before running aws-account evaluations.",
+        "No AwsConfigAccess is bound to SECURITY_EVALUATION_AWS_CONFIG_ACCESS; the host must bind the port before running aws-account evaluations.",
       );
     }
 
@@ -68,7 +68,7 @@ export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidencePr
     const items = collection.items.map((item): EvaluationEvidenceItem => {
       const region = typeof item.value.region === "string" ? item.value.region : null;
       return {
-        id: cloudConfigEvidenceId(item.type, item.key),
+        id: awsConfigEvidenceId(item.type, item.key),
         layer: "knowledge",
         source: "aws-account",
         summary: `${item.type} ${item.key}${region ? ` (${region})` : ""}`,
@@ -90,10 +90,7 @@ export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidencePr
    * (`<criterionKey>`), resource-level failures skip one resource of it
    * (`<criterionKey>:<key>`).
    */
-  private computeSkipped(
-    failures: readonly CloudConfigurationFailure[],
-    evaluationKey: string,
-  ): EvaluationCoverageBucket {
+  private computeSkipped(failures: readonly AwsConfigFailure[], evaluationKey: string): EvaluationCoverageBucket {
     const items = new Set<string>();
     const notes: string[] = [];
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);

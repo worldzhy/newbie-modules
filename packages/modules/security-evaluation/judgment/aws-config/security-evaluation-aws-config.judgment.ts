@@ -5,19 +5,19 @@ import type { EvaluationJudgment, JudgmentInput } from "@modules/evaluation/port
 import type { SecurityEvaluationFindingSeverity } from "../security-evaluation-severity";
 import { deriveUrgency } from "../security-evaluation-urgency";
 import { SECURITY_EVALUATION_KEY_AWS_CIS_1_5 } from "../../security-evaluation.constants";
-import { cloudConfigFingerprint } from "./security-evaluation-cloud-config.identity";
+import { awsConfigFingerprint } from "./security-evaluation-aws-config.identity";
 import {
   SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
   SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK,
   rebuildAwsConfigKnowledge,
-} from "./security-evaluation-cloud-config.rulebook";
+} from "./security-evaluation-aws-config.rulebook";
 
 const MAX_TITLE_LENGTH = 500;
 const MAX_DETAIL_LENGTH = 4000;
 const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 
 /**
- * CLOUD_CONFIG judgment — collected account configuration items against the
+ * aws-config judgment — collected account configuration items against the
  * rulebook (ADR-027, ADR-037). One mechanism serves both AWS evaluation keys
  * (`aws-cis-1.5` and `aws-custom`); the run's criteria evaluationKey selects
  * which entries apply. Deterministic by construction: every FAIL of a
@@ -49,7 +49,7 @@ export class SecurityEvaluationAwsConfigJudgment {
         const severity = draft.severity ?? criterionSeverity;
         findings.push({
           criterionKey: entry.criterionKey,
-          fingerprint: cloudConfigFingerprint(entry.criterionKey, draft.resourceKey),
+          fingerprint: awsConfigFingerprint(entry.criterionKey, draft.resourceKey),
           severity,
           title: draft.title.slice(0, MAX_TITLE_LENGTH),
           detail: draft.detail.slice(0, MAX_DETAIL_LENGTH),

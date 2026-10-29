@@ -116,6 +116,7 @@ D9 第 1 条登记"AssetFact 归入 knowledge 家族是术语债"。本条目清
 2. **KnowledgeItem 后缀表家族、不表 schema 同构。** 三张表同属"判定输入池"家族；Threat 为 world-scoped、唯一键 `(source, externalId)`、有清理策略，与 asset-scoped 两表物理隔离的决策（D9 第 1 条）不变。
 3. **fact 词汇全退役。** 字段 `factType/factKey`→`type/key`；常量 `FACT_TYPE_*`→`KNOWLEDGE_TYPE_*`（npm 类型值 `"package"`→`"npm.package"`，AWS 值不变）；`requiredFactTypes`→`requiredKnowledgeTypes`；路由 `assets/:assetId/facts`→`assets/:assetId/knowledge-items`；evidence `layer: "fact"`→`"knowledge"`；port `CloudConfigurationFact/FactCollection/collectFacts`→`CloudConfigurationItem/Collection/collect`；rulebook 内部 `CloudConfigFact*`→`AwsConfigKnowledge*`。本 ADR 的 D6/D7/D8 及 D9 历史行文保留原词汇作考古，不再回改。
 4. **Asset 本体不动。** 资产表与 subject 坐标的关系维持 ADR-022 D2。
+5. **机制族定名 AwsConfig\*（2026-10-30）。** port 族 `CloudConfigurationAccess/Item/Collection/Failure`→`AwsConfigAccess/AwsConfigItem/AwsConfigCollection/AwsConfigFailure`（token `SECURITY_EVALUATION_AWS_CONFIG_ACCESS`，端口文件 `ports/aws-config-access.port.ts`）；rulebook 族 `CloudConfigRulebookEntry/CloudConfigFindingDraft`→`AwsConfigRulebookEntry/AwsConfigFindingDraft`；identity 助手 `awsConfigEvidenceId/awsConfigFingerprint`；evidence provider `SecurityEvaluationAwsConfigEvidenceProvider`。port 的 `AwsConfigItem`（采集线形状）与 rulebook 的 `AwsConfigKnowledge`（判定视图）共存是刻意的分层，不是重名事故。evidence id 前缀 `cloud:` 与 finding fingerprint 格式不变（历史 manifest/finding 不重写）。宿主适配器定名 `AwsConfigAccess`（`src/application/security-evaluation/aws-config-access.ts`）。
 
 ## Cross-host check
 

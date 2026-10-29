@@ -4,10 +4,10 @@ import type { EvaluationCriterionRef, EvaluationEvidenceItem } from "@modules/ev
 import type { JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
 import { SecurityEvaluationAwsConfigJudgment } from "./judgment/aws-config/security-evaluation-aws-config.judgment";
-import { SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK } from "./judgment/aws-config/security-evaluation-cloud-config.rulebook";
+import { SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK } from "./judgment/aws-config/security-evaluation-aws-config.rulebook";
 
 /**
- * Behavior-level tests for the CLOUD_CONFIG judgment assembly (ADR-027 D6):
+ * Behavior-level tests for the aws-config judgment assembly (ADR-027 D6):
  * finding identity is version-free (`aws:<criterionKey>:<resourceKey>`),
  * severity comes from the criterion metadata, and every collected item counts
  * as evaluated.

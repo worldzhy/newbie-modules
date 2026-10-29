@@ -51,13 +51,13 @@ export class SecurityEvaluationCriteriaProvider implements CriteriaProvider {
         };
       case SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT:
         if (runConfig?.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM) {
-          await this.seed.ensureCloudCustomBaseline();
+          await this.seed.ensureAwsCustomBaseline();
           return {
             evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
             version: SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION,
           };
         }
-        await this.seed.ensureCloudConfigBaseline();
+        await this.seed.ensureAwsConfigBaseline();
         return {
           evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
           version: SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,

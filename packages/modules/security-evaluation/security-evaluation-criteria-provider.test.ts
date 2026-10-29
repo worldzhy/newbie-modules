@@ -40,10 +40,10 @@ function createProvider() {
     ensureDependencyBaseline: async () => {
       calls.push("dependency");
     },
-    ensureCloudConfigBaseline: async () => {
+    ensureAwsConfigBaseline: async () => {
       calls.push("cis");
     },
-    ensureCloudCustomBaseline: async () => {
+    ensureAwsCustomBaseline: async () => {
       calls.push("custom");
     },
     ensureIntelligenceBaseline: async () => {

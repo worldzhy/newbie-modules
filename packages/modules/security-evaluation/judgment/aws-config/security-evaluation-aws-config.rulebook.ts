@@ -12,7 +12,7 @@ import {
   SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
   SECURITY_EVALUATION_KEY_AWS_CUSTOM,
 } from "../../security-evaluation.constants";
-import { cloudConfigEvidenceId } from "./security-evaluation-cloud-config.identity";
+import { awsConfigEvidenceId } from "./security-evaluation-aws-config.identity";
 
 /**
  * The cloud configuration rulebook (ADR-027 D3, ADR-037). Two evaluationKeys
@@ -139,7 +139,7 @@ export interface AwsConfigKnowledgeSet {
   instanceNetworks: AwsConfigKnowledge<Ec2InstanceNetworkKnowledgePayload>[];
 }
 
-export interface CloudConfigFindingDraft {
+export interface AwsConfigFindingDraft {
   resourceKey: string;
   type: string;
   region?: string;
@@ -152,7 +152,7 @@ export interface CloudConfigFindingDraft {
   attachments?: PolicyAttachment[];
 }
 
-export interface CloudConfigRulebookEntry {
+export interface AwsConfigRulebookEntry {
   criterionKey: string;
   /** CIS control id; absent for aws-custom entries. */
   controlId?: string;
@@ -162,14 +162,14 @@ export interface CloudConfigRulebookEntry {
   requiredKnowledgeTypes: readonly string[];
   /** Which evaluationKey this entry belongs to (aws-cis-1.5 or aws-custom). */
   evaluationKey: string;
-  judge(items: AwsConfigKnowledgeSet): CloudConfigFindingDraft[];
+  judge(items: AwsConfigKnowledgeSet): AwsConfigFindingDraft[];
 }
 
 /** Ports whose internet-open ingress CIS treats as management exposure. */
-export const SECURITY_EVALUATION_CLOUD_CONFIG_SENSITIVE_PORTS = [22, 3389, 3306, 5432, 6379, 27017, 9200] as const;
+export const SECURITY_EVALUATION_AWS_CONFIG_SENSITIVE_PORTS = [22, 3389, 3306, 5432, 6379, 27017, 9200] as const;
 
 /** aws-custom access-key age threshold (ADR-037 D6). */
-export const SECURITY_EVALUATION_CLOUD_CUSTOM_ACCESS_KEY_MAX_AGE_DAYS = 90;
+export const SECURITY_EVALUATION_AWS_CUSTOM_ACCESS_KEY_MAX_AGE_DAYS = 90;
 
 /** IAM actions treated as sensitive for `iam.policy-sensitive-action`. */
 const SENSITIVE_ACTIONS = ["iam:PassRole", "sts:AssumeRole", "kms:Decrypt", "secretsmanager:GetSecretValue"];
@@ -180,9 +180,9 @@ const HIGH_SEVERITY_WILDCARD_SERVICES = new Set(["iam", "sts", "kms", "organizat
 const PASSWORD_MIN_LENGTH = 14;
 
 function rootCredentialEntry(
-  partial: Omit<CloudConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "evaluationKey">,
+  partial: Omit<AwsConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "evaluationKey">,
   fail: (item: RootCredentialKnowledgePayload) => string | null,
-): CloudConfigRulebookEntry {
+): AwsConfigRulebookEntry {
   return {
     ...partial,
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
@@ -206,9 +206,9 @@ function rootCredentialEntry(
 }
 
 function passwordPolicyEntry(
-  partial: Omit<CloudConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "evaluationKey">,
+  partial: Omit<AwsConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "evaluationKey">,
   fail: (item: PasswordPolicyKnowledgePayload) => string | null,
-): CloudConfigRulebookEntry {
+): AwsConfigRulebookEntry {
   return {
     ...partial,
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
@@ -235,7 +235,7 @@ function securityGroupHasManagementExposure(rule: SecurityGroupPublicIngressRule
   if (rule.protocol === "-1") return true;
   const fromPort = rule.fromPort ?? -1;
   const toPort = rule.toPort ?? -1;
-  return SECURITY_EVALUATION_CLOUD_CONFIG_SENSITIVE_PORTS.some((port) => port >= fromPort && port <= toPort);
+  return SECURITY_EVALUATION_AWS_CONFIG_SENSITIVE_PORTS.some((port) => port >= fromPort && port <= toPort);
 }
 
 function describePublicIngress(rule: SecurityGroupPublicIngressRule): string {
@@ -283,7 +283,7 @@ function daysBetween(now: Date, iso: string): number | null {
   return Math.floor((now.getTime() - created) / 86_400_000);
 }
 
-export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebookEntry[] = [
+export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebookEntry[] = [
   // ── CIS AWS Foundations Benchmark v1.5 ─────────────────────────────────
   rootCredentialEntry(
     {
@@ -359,7 +359,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
       SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL,
     ],
     judge(items) {
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       const policy = items.passwordPolicy;
       if (!policy?.payload.exists) {
         drafts.push({
@@ -440,7 +440,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY],
     judge(items) {
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       for (const item of items.buckets) {
         const bucket = item.payload;
         const pab = bucket.publicAccessBlock;
@@ -505,7 +505,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY],
     judge(items) {
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       for (const item of items.rdsInstances) {
         const instance = item.payload;
         const gaps: string[] = [];
@@ -533,7 +533,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS],
     judge(items) {
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       for (const item of items.securityGroups) {
         const group = item.payload;
         const offending = group.publicIngress.filter(securityGroupHasManagementExposure);
@@ -607,7 +607,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
         .filter((item) => {
           if (item.payload.status !== "Active") return false;
           const age = daysBetween(now, item.payload.createdAt);
-          return age !== null && age > SECURITY_EVALUATION_CLOUD_CUSTOM_ACCESS_KEY_MAX_AGE_DAYS;
+          return age !== null && age > SECURITY_EVALUATION_AWS_CUSTOM_ACCESS_KEY_MAX_AGE_DAYS;
         })
         .map((item) => {
           const age = daysBetween(now, item.payload.createdAt) ?? 0;
@@ -636,7 +636,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
         list.push(item);
         activeByUser.set(item.payload.userName, list);
       }
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       for (const [userName, keys] of activeByUser) {
         if (keys.length <= 1) continue;
         drafts.push({
@@ -660,7 +660,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(items) {
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       for (const item of items.policies) {
         const policy = item.payload;
         const hasAllowNotAction = parsePolicyStatements(policy.document).some(
@@ -687,7 +687,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(items) {
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       for (const item of items.policies) {
         const policy = item.payload;
         const offending = parsePolicyStatements(policy.document).filter(
@@ -716,7 +716,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(items) {
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       for (const item of items.policies) {
         const policy = item.payload;
         const services = new Set<string>();
@@ -756,7 +756,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
     evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(items) {
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       for (const item of items.policies) {
         const policy = item.payload;
         const matched = new Set<string>();
@@ -833,7 +833,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly CloudConfigRulebo
       const publicSgIds = new Set(
         items.securityGroups.filter((sg) => sg.payload.publicIngress.length > 0).map((sg) => sg.payload.groupId),
       );
-      const drafts: CloudConfigFindingDraft[] = [];
+      const drafts: AwsConfigFindingDraft[] = [];
       for (const item of items.instanceNetworks) {
         const instance = item.payload;
         if (!instance.publicIpAddress) continue;
@@ -865,7 +865,7 @@ export const SECURITY_EVALUATION_AWS_CIS_BENCHMARK = "CIS AWS Foundations Benchm
  * families. Used by the evidence provider to know what to request from the
  * shared collector.
  */
-export const SECURITY_EVALUATION_CLOUD_CONFIG_REQUIRED_KNOWLEDGE_TYPES: readonly string[] = Array.from(
+export const SECURITY_EVALUATION_AWS_CONFIG_REQUIRED_KNOWLEDGE_TYPES: readonly string[] = Array.from(
   new Set(SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.flatMap((entry) => [...entry.requiredKnowledgeTypes])),
 );
 
@@ -886,7 +886,7 @@ export function rebuildAwsConfigKnowledge(
   };
   for (const item of items) {
     const payload = item.payload ?? {};
-    const key = cloudConfigKeyFromEvidenceId(item.id);
+    const key = awsConfigKeyFromEvidenceId(item.id);
     switch (payload.type) {
       case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY:
         set.passwordPolicy = { evidenceId: item.id, key, payload: toPasswordPolicy(payload) };
@@ -922,7 +922,7 @@ export function rebuildAwsConfigKnowledge(
   return set;
 }
 
-function cloudConfigKeyFromEvidenceId(evidenceId: string): string {
+function awsConfigKeyFromEvidenceId(evidenceId: string): string {
   const prefix = "cloud:";
   const withoutPrefix = evidenceId.startsWith(prefix) ? evidenceId.slice(prefix.length) : evidenceId;
   const separator = withoutPrefix.indexOf(":");
@@ -1061,4 +1061,4 @@ function toEc2InstanceNetwork(payload: Record<string, unknown>): Ec2InstanceNetw
   };
 }
 
-export { cloudConfigEvidenceId };
+export { awsConfigEvidenceId };

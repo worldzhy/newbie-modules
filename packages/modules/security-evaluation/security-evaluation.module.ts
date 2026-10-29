@@ -8,7 +8,7 @@ import { SecurityEvaluationAssetService } from "./assets/security-evaluation-ass
 import { SecurityEvaluationAssetSyncService } from "./assets/security-evaluation-asset-sync.service";
 import { SecurityEvaluationCriteriaProvider } from "./criteria/security-evaluation-criteria.provider";
 import { SecurityEvaluationCriteriaSeed } from "./criteria/security-evaluation-criteria.seed";
-import { SecurityEvaluationCloudConfigEvidenceProvider } from "./evidence/security-evaluation-cloud-config-evidence.provider";
+import { SecurityEvaluationAwsConfigEvidenceProvider } from "./evidence/security-evaluation-aws-config-evidence.provider";
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
 import { AwsSecurityBulletinsAdapter } from "./knowledge/adapters/aws-security-bulletins.adapter";
 import { BleepingComputerAdapter } from "./knowledge/adapters/bleeping-computer.adapter";
@@ -40,7 +40,7 @@ import {
  * skeleton (ADR-020), shipped as the second feature after work-evaluation.
  *
  * Slice 1 owns the asset inventory, the dependency criteria and the DEPENDENCY
- * judgment; slice 2 (ADR-027) adds the CLOUD_CONFIG mechanism: the CIS AWS
+ * judgment; slice 2 (ADR-027) adds the AWS_CONFIG mechanism: the CIS AWS
  * Foundations criteria for subject kind "aws-account", its evidence provider
  * and its rulebook judgment, dispatched by evaluationKey through the same judgment
  * service. INTEL arrives in a later slice with its own evaluationKey dispatch.
@@ -52,7 +52,7 @@ import {
  * container).
  *
  * `SECURITY_EVALUATION_REPOSITORY_ACCESS` and
- * `SECURITY_EVALUATION_CLOUD_CONFIGURATION_ACCESS` are intentionally not bound
+ * `SECURITY_EVALUATION_AWS_CONFIG_ACCESS` are intentionally not bound
  * here: the host binds them (nightwatch uses its github and aws-identity
  * modules). An unbound port fails the run with a wiring error rather than
  * silently reporting a clean result.
@@ -67,7 +67,7 @@ import {
     SecurityEvaluationCriteriaSeed,
     SecurityEvaluationCriteriaProvider,
     SecurityEvaluationEvidenceProvider,
-    SecurityEvaluationCloudConfigEvidenceProvider,
+    SecurityEvaluationAwsConfigEvidenceProvider,
     SecurityEvaluationOsvClient,
     SecurityEvaluationDependencyJudgment,
     SecurityEvaluationAwsConfigJudgment,
@@ -124,7 +124,7 @@ import {
     },
     {
       provide: evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
-      useExisting: SecurityEvaluationCloudConfigEvidenceProvider,
+      useExisting: SecurityEvaluationAwsConfigEvidenceProvider,
     },
     {
       provide: judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
