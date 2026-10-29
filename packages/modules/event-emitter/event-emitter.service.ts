@@ -90,7 +90,7 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
       model: Prisma.ModelName.EventEmission,
       pagination: { page, pageSize },
       findManyArgs: {
-        where: eventKey ? { eventKey } : {},
+        where: eventKey ? { eventKey: { contains: eventKey } } : {},
         orderBy: { emittedAt: "desc" },
       },
     });

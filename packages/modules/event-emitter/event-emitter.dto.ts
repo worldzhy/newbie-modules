@@ -46,7 +46,7 @@ export class EventEmissionDto {
 }
 
 export class ListEventEmissionsRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({ description: "Filter by exact event key" })
+  @ApiPropertyOptional({ description: "Filter by event key substring" })
   @IsOptional()
   @IsString()
   eventKey?: string;
