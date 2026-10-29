@@ -69,7 +69,7 @@ function buildRunner(options: BuildOptions = {}) {
   const running = {
     id: "run-1",
     subjectId: SUBJECT_ID,
-    criteriaVersionId: VERSION_ID,
+    ruleSetVersionId: VERSION_ID,
     config: null,
     startedAt: new Date(),
     status: "RUNNING",
@@ -169,7 +169,7 @@ const EXPECTED_IDENTITY = {
   runId: "run-1",
   subjectId: SUBJECT_ID,
   subjectKind: "repository",
-  criteriaVersionId: VERSION_ID,
+  ruleSetVersionId: VERSION_ID,
   evaluationKey: "npm-osv",
 };
 

@@ -15,7 +15,7 @@ lands in a later slice on the same run and finding lifecycle.
 | Subject  | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; `scopeType` / `scopeId` are host-assigned (nightwatch uses `project`).                                                          |
 | Asset    | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state facts.                                                                               |
 | Fact     | `SecurityEvaluationAssetFact`: something observed about an asset right now (`factType`, `factKey`, small intrinsic `value`). Facts are upserted, never deleted here; history lives in the archived run manifest. |
-| Criteria | Code-defined and published idempotently as `EvaluationCriteriaVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                     |
+| Criteria | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                     |
 | Finding  | Skeleton `EvaluationFinding` with identity `(subjectId, evaluationKey, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                  |
 | Urgency  | Derived band P1–P4 from severity and exposure. Not a stored score and not a composite.                                                                                                                           |
 
@@ -66,7 +66,7 @@ The module implements the skeleton's kind-scoped ports for both kinds:
 - `EVALUATION_EVIDENCE:repository` → `SecurityEvaluationEvidenceProvider`
 - `EVALUATION_EVIDENCE:aws-account` → `SecurityEvaluationCloudConfigEvidenceProvider`
 - `EVALUATION_JUDGMENT:{repository|aws-account}` → `SecurityEvaluationJudgmentService`
-  (dispatches on `criteriaVersion.evaluationKey`: `npm-osv`, `aws-cis-1.5`,
+  (dispatches on `ruleSetVersion.evaluationKey`: `npm-osv`, `aws-cis-1.5`,
   `aws-custom`, `threat-intel`)
 
 The host must bind two more ports, owned by this module:

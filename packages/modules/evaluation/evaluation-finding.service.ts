@@ -63,7 +63,7 @@ export class EvaluationFindingService {
   ) {
     if (candidates.length === 0) return [];
 
-    const criteria = await this.criteria.listCriteria(run.criteriaVersionId);
+    const criteria = await this.criteria.listCriteria(run.ruleSetVersionId);
     const problems = validateJudgment({
       criteria,
       verdicts: [],
@@ -72,7 +72,7 @@ export class EvaluationFindingService {
     });
     if (problems.length > 0) throw new BadRequestException(problems);
 
-    const { evaluationKey } = await this.criteria.getVersion(run.criteriaVersionId);
+    const { evaluationKey } = await this.criteria.getVersion(run.ruleSetVersionId);
     const observedAt = run.startedAt ?? run.createdAt;
     const recorded: EvaluationFinding[] = [];
     for (const candidate of candidates) {
@@ -92,7 +92,7 @@ export class EvaluationFindingService {
    */
   async resolveAbsentFindings(run: EvaluationRun): Promise<number> {
     const cutoff = run.startedAt ?? run.createdAt;
-    const { evaluationKey } = await this.criteria.getVersion(run.criteriaVersionId);
+    const { evaluationKey } = await this.criteria.getVersion(run.ruleSetVersionId);
     const absent = await this.prisma.evaluationFinding.findMany({
       where: {
         subjectId: run.subjectId,

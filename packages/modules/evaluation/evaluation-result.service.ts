@@ -16,7 +16,7 @@ const RESULT_SELECT = {
   id: true,
   runId: true,
   subjectId: true,
-  criteriaVersionId: true,
+  ruleSetVersionId: true,
   contentHash: true,
   coverageStats: true,
   verdicts: true,
@@ -42,7 +42,7 @@ export interface CreateEvaluationResultInput {
 
 export interface ListEvaluationResultsInput {
   subjectId: string;
-  criteriaVersionId?: string;
+  ruleSetVersionId?: string;
   /** When present, only results whose subject matches this kind are returned. */
   kind?: string;
   page?: number;
@@ -81,7 +81,7 @@ export class EvaluationResultService {
     const coverageProblems = validateCoverageStats(input.coverageStats, manifestIds);
     if (coverageProblems.length > 0) throw new BadRequestException(coverageProblems);
 
-    const criteria = await this.criteria.listCriteria(run.criteriaVersionId);
+    const criteria = await this.criteria.listCriteria(run.ruleSetVersionId);
     const judgmentProblems = validateJudgment({
       criteria,
       verdicts: input.verdicts,
@@ -95,7 +95,7 @@ export class EvaluationResultService {
         data: {
           runId: input.runId,
           subjectId: run.subjectId,
-          criteriaVersionId: run.criteriaVersionId,
+          ruleSetVersionId: run.ruleSetVersionId,
           manifest: input.manifest as unknown as Prisma.InputJsonValue,
           contentHash: hashManifest(input.manifest),
           coverageStats: input.coverageStats as unknown as Prisma.InputJsonValue,
@@ -154,7 +154,7 @@ export class EvaluationResultService {
       findManyArgs: {
         where: {
           subjectId: query.subjectId,
-          ...(query.criteriaVersionId ? { criteriaVersionId: query.criteriaVersionId } : {}),
+          ...(query.ruleSetVersionId ? { ruleSetVersionId: query.ruleSetVersionId } : {}),
           ...(query.kind ? { subject: { kind: query.kind } } : {}),
         },
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],

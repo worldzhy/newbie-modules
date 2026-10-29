@@ -2,7 +2,7 @@ import { BadRequestException, Inject, Injectable, Optional } from "@nestjs/commo
 import type { EvidenceCollection, EvidenceProvider } from "@modules/evaluation/ports/evidence.provider";
 import type {
   EvaluationCoverageBucket,
-  EvaluationCriteriaVersionRef,
+  EvaluationRuleSetVersionRef,
   EvaluationEvidenceItem,
   EvaluationSubjectRef,
 } from "@modules/evaluation/ports/evaluation.contracts";
@@ -36,7 +36,7 @@ export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidencePr
 
   async collect(
     subject: EvaluationSubjectRef,
-    criteriaVersion: EvaluationCriteriaVersionRef,
+    ruleSetVersion: EvaluationRuleSetVersionRef,
   ): Promise<EvidenceCollection> {
     const access = this.cloudConfigurationAccess;
     if (!access) {
@@ -79,7 +79,7 @@ export class SecurityEvaluationCloudConfigEvidenceProvider implements EvidencePr
     return {
       items,
       declaredUnlinked: { total: 0 },
-      skipped: this.computeSkipped(collection.failures, criteriaVersion.evaluationKey),
+      skipped: this.computeSkipped(collection.failures, ruleSetVersion.evaluationKey),
     };
   }
 

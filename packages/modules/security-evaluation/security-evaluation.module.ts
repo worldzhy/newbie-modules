@@ -19,7 +19,7 @@ import { GitHubSecurityBlogAdapter } from "./knowledge/adapters/github-security-
 import { TheHackerNewsAdapter } from "./knowledge/adapters/the-hacker-news.adapter";
 import { SECURITY_EVALUATION_KNOWLEDGE_SOURCE_ADAPTERS } from "./knowledge/adapters/source-adapter.port";
 import { SecurityEvaluationKnowledgeService } from "./knowledge/security-evaluation-knowledge.service";
-import { SecurityEvaluationCloudConfigJudgment } from "./judgment/aws-config/security-evaluation-cloud-config.judgment";
+import { SecurityEvaluationAwsConfigJudgment } from "./judgment/aws-config/security-evaluation-aws-config.judgment";
 import { SecurityEvaluationDependencyJudgment } from "./judgment/dependency/security-evaluation-dependency.judgment";
 import { SecurityEvaluationOsvClient } from "./judgment/dependency/security-evaluation-osv.client";
 import { SecurityEvaluationIntelJudgment } from "./judgment/intel/security-evaluation-intel.judgment";
@@ -70,7 +70,7 @@ import {
     SecurityEvaluationCloudConfigEvidenceProvider,
     SecurityEvaluationOsvClient,
     SecurityEvaluationDependencyJudgment,
-    SecurityEvaluationCloudConfigJudgment,
+    SecurityEvaluationAwsConfigJudgment,
     SecurityEvaluationIntelModelScopeRegistration,
     SecurityEvaluationIntelReRanker,
     SecurityEvaluationIntelMatchService,

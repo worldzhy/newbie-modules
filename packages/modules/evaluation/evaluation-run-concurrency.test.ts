@@ -19,7 +19,7 @@ const VERSION_ID = "33333333-3333-4333-8333-333333333333";
 interface FakeRunRow {
   id: string;
   subjectId: string;
-  criteriaVersionId: string;
+  ruleSetVersionId: string;
   status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
   updatedAt: Date;
 }
@@ -42,7 +42,7 @@ function fakePrisma() {
             }
           : null,
     },
-    evaluationCriteriaVersion: {
+    evaluationRuleSetVersion: {
       findUnique: async ({ where }: { where: { id: string } }) =>
         where.id === VERSION_ID
           ? { id: VERSION_ID, kind: SUBJECT_KIND, evaluationKey: "npm-osv", publishedAt: new Date() }
@@ -55,7 +55,7 @@ function fakePrisma() {
         const active = runs.some(
           (run) =>
             run.subjectId === data.subjectId &&
-            run.criteriaVersionId === data.criteriaVersionId &&
+            run.ruleSetVersionId === data.ruleSetVersionId &&
             (run.status === "QUEUED" || run.status === "RUNNING"),
         );
         if (active) {
@@ -97,24 +97,24 @@ test("a second run for the same subject and version is rejected while the first 
   const { prisma, runs } = fakePrisma();
   const service = serviceFor(prisma);
 
-  const first = await service.startRun({ subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID });
+  const first = await service.startRun({ subjectId: SUBJECT_ID, ruleSetVersionId: VERSION_ID });
   assert.equal(runs.length, 1);
 
   await assert.rejects(
-    () => service.startRun({ subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID }),
+    () => service.startRun({ subjectId: SUBJECT_ID, ruleSetVersionId: VERSION_ID }),
     /already running for subject/,
   );
   assert.equal(runs.length, 1, "the rejected request must not leave a second run row behind");
 
   runs[0].status = "RUNNING";
   await assert.rejects(
-    () => service.startRun({ subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID }),
+    () => service.startRun({ subjectId: SUBJECT_ID, ruleSetVersionId: VERSION_ID }),
     /already running for subject/,
   );
 
   // Once the active run is terminal the same subject and version run again.
   runs[0].status = "SUCCEEDED";
-  await service.startRun({ subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID });
+  await service.startRun({ subjectId: SUBJECT_ID, ruleSetVersionId: VERSION_ID });
   assert.equal(runs.length, 2);
   assert.equal(first.subjectId, SUBJECT_ID);
 });
@@ -126,7 +126,7 @@ test("findById without a kind returns the run regardless of subject kind", async
   const service = serviceFor(prisma);
 
   await prisma.evaluationRun.create({
-    data: { subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID, status: "RUNNING" },
+    data: { subjectId: SUBJECT_ID, ruleSetVersionId: VERSION_ID, status: "RUNNING" },
   });
   const found = await service.findById("run-1");
   assert.equal(found.id, "run-1");
@@ -137,7 +137,7 @@ test("findById with a matching kind returns the run", async () => {
   const service = serviceFor(prisma);
 
   await prisma.evaluationRun.create({
-    data: { subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID, status: "RUNNING" },
+    data: { subjectId: SUBJECT_ID, ruleSetVersionId: VERSION_ID, status: "RUNNING" },
   });
   const found = await service.findById("run-1", SUBJECT_KIND);
   assert.equal(found.id, "run-1");
@@ -148,7 +148,7 @@ test("findById with a mismatched kind throws NotFoundException — cross-feature
   const service = serviceFor(prisma);
 
   await prisma.evaluationRun.create({
-    data: { subjectId: SUBJECT_ID, criteriaVersionId: VERSION_ID, status: "RUNNING" },
+    data: { subjectId: SUBJECT_ID, ruleSetVersionId: VERSION_ID, status: "RUNNING" },
   });
   await assert.rejects(() => service.findById("run-1", "people"), /not found for kind "people"/);
 });

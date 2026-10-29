@@ -22,13 +22,13 @@ import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 import { WorkEvaluationRunService } from "./work-evaluation-run.service";
 import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
 import {
-  CreateWorkEvaluationCriteriaVersionRequestDto,
+  CreateWorkEvaluationRuleSetVersionRequestDto,
   CreateWorkEvaluationCriterionRequestDto,
   CreateWorkEvaluationPeriodRequestDto,
   GetWorkEvaluationByIdRequestDto,
   GetWorkEvaluationHomeGroundRequestDto,
-  ListWorkEvaluationCriteriaVersionsRequestDto,
-  ListWorkEvaluationCriteriaVersionsResponseDto,
+  ListWorkEvaluationRuleSetVersionsRequestDto,
+  ListWorkEvaluationRuleSetVersionsResponseDto,
   ListWorkEvaluationPeriodsRequestDto,
   ListWorkEvaluationPeriodsResponseDto,
   ListWorkEvaluationResultsRequestDto,
@@ -41,7 +41,7 @@ import {
   UpdateWorkEvaluationHomeGroundRequestDto,
   UpdateWorkEvaluationPeriodStatusRequestDto,
   WorkEvaluationCriterionResponseDto,
-  WorkEvaluationCriteriaVersionResponseDto,
+  WorkEvaluationRuleSetVersionResponseDto,
   WorkEvaluationHomeGroundResponseDto,
   WorkEvaluationPeriodResponseDto,
   WorkEvaluationResultResponseDto,
@@ -71,19 +71,19 @@ export class WorkEvaluationController {
 
   // --- Criteria versions -------------------------------------------------
 
-  @Get("criteria-versions")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationCriteriaVersion)
+  @Get("rule-set-versions")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationRuleSetVersion)
   @ApiOperation({ summary: 'List criteria versions for kind "work"' })
-  @ApiResponse({ status: 200, type: ListWorkEvaluationCriteriaVersionsResponseDto })
-  async listCriteriaVersions(@Query() query: ListWorkEvaluationCriteriaVersionsRequestDto) {
+  @ApiResponse({ status: 200, type: ListWorkEvaluationRuleSetVersionsResponseDto })
+  async listRuleSetVersions(@Query() query: ListWorkEvaluationRuleSetVersionsRequestDto) {
     return this.criteria.listVersions({ kind: WORK_EVALUATION_SUBJECT_KIND, ...query });
   }
 
-  @Post("criteria-versions")
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.EvaluationCriteriaVersion)
+  @Post("rule-set-versions")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.EvaluationRuleSetVersion)
   @ApiOperation({ summary: 'Create a new criteria version (draft) for kind "work"' })
-  @ApiResponse({ status: 201, type: WorkEvaluationCriteriaVersionResponseDto })
-  async createCriteriaVersion(@Body() body: CreateWorkEvaluationCriteriaVersionRequestDto) {
+  @ApiResponse({ status: 201, type: WorkEvaluationRuleSetVersionResponseDto })
+  async createRuleSetVersion(@Body() body: CreateWorkEvaluationRuleSetVersionRequestDto) {
     return this.criteria.createVersion({
       kind: WORK_EVALUATION_SUBJECT_KIND,
       evaluationKey: body.evaluationKey,
@@ -93,11 +93,11 @@ export class WorkEvaluationController {
     });
   }
 
-  @Get("criteria-versions/:id")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.EvaluationCriteriaVersion)
+  @Get("rule-set-versions/:id")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.EvaluationRuleSetVersion)
   @ApiOperation({ summary: "Get one criteria version (kind guard enforced)" })
-  @ApiResponse({ status: 200, type: WorkEvaluationCriteriaVersionResponseDto })
-  async getCriteriaVersion(@Param() params: GetWorkEvaluationByIdRequestDto) {
+  @ApiResponse({ status: 200, type: WorkEvaluationRuleSetVersionResponseDto })
+  async getRuleSetVersion(@Param() params: GetWorkEvaluationByIdRequestDto) {
     const version = await this.criteria.getVersion(params.id);
     if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new NotFoundException(`Criteria version ${params.id} is not of kind "${WORK_EVALUATION_SUBJECT_KIND}"`);
@@ -105,11 +105,11 @@ export class WorkEvaluationController {
     return version;
   }
 
-  @Post("criteria-versions/:id/publish")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationCriteriaVersion)
+  @Post("rule-set-versions/:id/publish")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationRuleSetVersion)
   @ApiOperation({ summary: "Publish a criteria version (one-way, requires at least one criterion)" })
-  @ApiResponse({ status: 200, type: WorkEvaluationCriteriaVersionResponseDto })
-  async publishCriteriaVersion(@Param() params: GetWorkEvaluationByIdRequestDto) {
+  @ApiResponse({ status: 200, type: WorkEvaluationRuleSetVersionResponseDto })
+  async publishRuleSetVersion(@Param() params: GetWorkEvaluationByIdRequestDto) {
     const version = await this.criteria.getVersion(params.id);
     if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new NotFoundException(`Criteria version ${params.id} is not of kind "${WORK_EVALUATION_SUBJECT_KIND}"`);
@@ -117,7 +117,7 @@ export class WorkEvaluationController {
     return this.criteria.publishVersion(params.id);
   }
 
-  @Get("criteria-versions/:id/criteria")
+  @Get("rule-set-versions/:id/criteria")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationCriterion)
   @ApiOperation({ summary: "List criteria of one version" })
   @ApiResponse({ type: WorkEvaluationCriterionResponseDto, isArray: true })
@@ -129,7 +129,7 @@ export class WorkEvaluationController {
     return this.criteria.listCriteria(params.id);
   }
 
-  @Post("criteria-versions/:id/criteria")
+  @Post("rule-set-versions/:id/criteria")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.EvaluationCriterion)
   @ApiOperation({ summary: "Add a criterion to a draft version" })
   @ApiResponse({ status: 201, type: WorkEvaluationCriterionResponseDto })

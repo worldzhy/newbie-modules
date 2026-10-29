@@ -125,7 +125,7 @@ export class SecurityEvaluationController {
       scopeType: query.scopeType,
       scopeId: query.scopeId,
       subjectId: query.subjectId,
-      criteriaVersionId: query.criteriaVersionId,
+      ruleSetVersionId: query.ruleSetVersionId,
       page: query.page,
       pageSize: query.pageSize,
     });
@@ -140,7 +140,7 @@ export class SecurityEvaluationController {
   listResults(@Query() query: ListSecurityEvaluationResultsRequestDto) {
     return this.runs.listResults({
       subjectId: query.subjectId,
-      criteriaVersionId: query.criteriaVersionId,
+      ruleSetVersionId: query.ruleSetVersionId,
       page: query.page,
       pageSize: query.pageSize,
     });

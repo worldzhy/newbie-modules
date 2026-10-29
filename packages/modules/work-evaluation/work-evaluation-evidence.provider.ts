@@ -3,7 +3,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvidenceCollection, EvidenceProvider } from "@modules/evaluation/ports/evidence.provider";
 import {
   EvaluationCoverageBucket,
-  EvaluationCriteriaVersionRef,
+  EvaluationRuleSetVersionRef,
   EvaluationEvidenceItem,
   EvaluationSubjectRef,
 } from "@modules/evaluation/ports/evaluation.contracts";
@@ -42,7 +42,7 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
 
   async collect(
     subject: EvaluationSubjectRef,
-    _criteriaVersion: EvaluationCriteriaVersionRef,
+    _ruleSetVersion: EvaluationRuleSetVersionRef,
     runConfig?: Record<string, unknown> | null,
   ): Promise<EvidenceCollection> {
     // The period is a run-level parameter (ADR-026): runConfig.periodId picks

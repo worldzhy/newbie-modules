@@ -46,7 +46,7 @@ export class SecurityEvaluationIntelJudgment {
   ) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    if (input.criteriaVersion.evaluationKey !== SECURITY_EVALUATION_KEY_THREAT_INTEL) {
+    if (input.ruleSetVersion.evaluationKey !== SECURITY_EVALUATION_KEY_THREAT_INTEL) {
       return { verdicts: [], findings: [], evaluatedRefs: [] };
     }
 

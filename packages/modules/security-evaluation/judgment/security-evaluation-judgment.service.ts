@@ -7,7 +7,7 @@ import {
   SECURITY_EVALUATION_KEY_NPM_OSV,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
 } from "../security-evaluation.constants";
-import { SecurityEvaluationCloudConfigJudgment } from "./aws-config/security-evaluation-cloud-config.judgment";
+import { SecurityEvaluationAwsConfigJudgment } from "./aws-config/security-evaluation-aws-config.judgment";
 import { SecurityEvaluationDependencyJudgment } from "./dependency/security-evaluation-dependency.judgment";
 import { SecurityEvaluationIntelJudgment } from "./intel/security-evaluation-intel.judgment";
 
@@ -23,22 +23,22 @@ import { SecurityEvaluationIntelJudgment } from "./intel/security-evaluation-int
 export class SecurityEvaluationJudgmentService implements JudgmentPort {
   constructor(
     private readonly dependency: SecurityEvaluationDependencyJudgment,
-    private readonly cloudConfig: SecurityEvaluationCloudConfigJudgment,
+    private readonly awsConfig: SecurityEvaluationAwsConfigJudgment,
     private readonly intel: SecurityEvaluationIntelJudgment,
   ) {}
 
   judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    switch (input.criteriaVersion.evaluationKey) {
+    switch (input.ruleSetVersion.evaluationKey) {
       case SECURITY_EVALUATION_KEY_NPM_OSV:
         return this.dependency.judge(input);
       case SECURITY_EVALUATION_KEY_AWS_CIS_1_5:
       case SECURITY_EVALUATION_KEY_AWS_CUSTOM:
-        return this.cloudConfig.judge(input);
+        return this.awsConfig.judge(input);
       case SECURITY_EVALUATION_KEY_THREAT_INTEL:
         return this.intel.judge(input);
       default:
         throw new BadRequestException(
-          `No security-evaluation judgment is implemented for criteria evaluationKey "${input.criteriaVersion.evaluationKey}".`,
+          `No security-evaluation judgment is implemented for criteria evaluationKey "${input.ruleSetVersion.evaluationKey}".`,
         );
     }
   }

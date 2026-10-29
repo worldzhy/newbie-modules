@@ -4,7 +4,7 @@
 //
 // The run/result/criteria tables belong to the evaluation skeleton
 // (`module/evaluation`, ADR-020); this feature only owns the collection-side
-// tables. `criteriaVersionId` is a plain scalar with no relation — foreign
+// tables. `ruleSetVersionId` is a plain scalar with no relation — foreign
 // keys never cross schema boundaries.
 
 // !! ----------------------------------------------------------- //
@@ -42,8 +42,8 @@ enum WorkEvaluationPeriodStatus {
 /// plain scalar — no cross-schema relation by design.
 model WorkEvaluationPeriod {
   id                String @id @default(uuid()) @db.Uuid
-  // EvaluationCriteriaVersion.id in "module/evaluation"; scalar, no FK
-  criteriaVersionId String @db.Uuid
+  // EvaluationRuleSetVersion.id in "module/evaluation"; scalar, no FK
+  ruleSetVersionId String @db.Uuid
   type              WorkEvaluationPeriodType
   periodStart       DateTime
   periodEnd         DateTime
@@ -52,7 +52,7 @@ model WorkEvaluationPeriod {
   homeGrounds WorkEvaluationHomeGround[]
   sessions    WorkEvaluationSession[]
 
-  @@index([criteriaVersionId])
+  @@index([ruleSetVersionId])
   @@index([type, periodStart])
   @@schema("module/work-evaluation")
 }

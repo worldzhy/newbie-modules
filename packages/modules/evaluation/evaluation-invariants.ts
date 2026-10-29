@@ -47,7 +47,7 @@ export function hashManifest(manifest: readonly EvaluationEvidenceItem[]): strin
 }
 
 /** A version is editable only while it is a draft (ADR-020 D5.5). */
-export function isCriteriaVersionMutable(publishedAt: Date | null | undefined): boolean {
+export function isRuleSetVersionMutable(publishedAt: Date | null | undefined): boolean {
   return publishedAt === null || publishedAt === undefined;
 }
 

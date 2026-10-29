@@ -50,7 +50,7 @@ export class WorkEvaluationPeriodService {
   async createPeriod(input: CreateWorkEvaluationPeriodRequestDto): Promise<WorkEvaluationPeriod> {
     // The pinned criteria version must exist, judge kind "work", and be
     // published — a period can never anchor on a draft.
-    const version = await this.criteria.getVersion(input.criteriaVersionId);
+    const version = await this.criteria.getVersion(input.ruleSetVersionId);
     if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new BadRequestException(
         `Criteria version ${version.evaluationKey}/${version.version} judges kind "${version.kind}", not "${WORK_EVALUATION_SUBJECT_KIND}"`,
@@ -93,7 +93,7 @@ export class WorkEvaluationPeriodService {
           }
           return tx.workEvaluationPeriod.create({
             data: {
-              criteriaVersionId: input.criteriaVersionId,
+              ruleSetVersionId: input.ruleSetVersionId,
               type: input.type,
               periodStart: input.periodStart,
               periodEnd: input.periodEnd,
@@ -150,12 +150,12 @@ export class WorkEvaluationPeriodService {
     if (period.type !== WorkEvaluationPeriodType.COLLECTION) {
       throw new BadRequestException("Home ground can only be declared on COLLECTION periods");
     }
-    const criteria = await this.criteria.listCriteria(period.criteriaVersionId);
+    const criteria = await this.criteria.listCriteria(period.ruleSetVersionId);
     const knownKeys = new Set(criteria.map((criterion) => criterion.criterionKey));
     const unknown = input.homeCriteria.filter((key) => !knownKeys.has(key));
     if (unknown.length > 0) {
       throw new BadRequestException(
-        `homeCriteria must reference criterion keys of criteria version ${period.criteriaVersionId}: ${unknown.join(", ")}`,
+        `homeCriteria must reference criterion keys of criteria version ${period.ruleSetVersionId}: ${unknown.join(", ")}`,
       );
     }
     return this.prisma.workEvaluationHomeGround.upsert({

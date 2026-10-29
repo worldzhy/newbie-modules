@@ -9,7 +9,7 @@
 // !! ----------------------------------------------------------- //
 // !!                [Module] Evaluation models                   //
 // !! ----------------------------------------------------------- //
-// * EvaluationCriteriaVersion                                    //
+// * EvaluationRuleSetVersion                                    //
 // * EvaluationCriterion                                          //
 // * EvaluationSubject                                            //
 // * EvaluationRun                                                //
@@ -81,7 +81,7 @@ enum EvaluationResultReviewStatus {
 /// editable; publishing is one-way, after which every write is rejected and
 /// changes require a new version. `kind` is the subject kind these criteria
 /// apply to; `evaluationKey` is the feature-defined group (rubric, aws-cis-1.5, ...).
-model EvaluationCriteriaVersion {
+model EvaluationRuleSetVersion {
   id     String @id @default(uuid()) @db.Uuid
   kind   String @db.VarChar(64)
   evaluationKey String @db.VarChar(64)
@@ -111,7 +111,7 @@ model EvaluationCriteriaVersion {
 /// result stays interpretable after the version is superseded.
 model EvaluationCriterion {
   id                String @id @default(uuid()) @db.Uuid
-  criteriaVersionId String @db.Uuid
+  ruleSetVersionId String @db.Uuid
 
   criterionKey String                  @db.VarChar(64)
   kind         EvaluationCriterionKind
@@ -124,10 +124,10 @@ model EvaluationCriterion {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  criteriaVersion EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Cascade)
+  ruleSetVersion EvaluationRuleSetVersion @relation(fields: [ruleSetVersionId], references: [id], onDelete: Cascade)
 
-  @@unique([criteriaVersionId, criterionKey])
-  @@index([criteriaVersionId])
+  @@unique([ruleSetVersionId, criterionKey])
+  @@index([ruleSetVersionId])
   @@schema("module/evaluation")
 }
 
@@ -160,16 +160,16 @@ model EvaluationSubject {
 
 /// One evaluation attempt. Concurrency is enforced in the database, not in
 /// process memory: a partial unique index over the active statuses on
-/// (subjectId, criteriaVersionId) — the consumer migration must declare it in
+/// (subjectId, ruleSetVersionId) — the consumer migration must declare it in
 /// raw SQL, Prisma cannot express partial indexes:
 ///
 ///   CREATE UNIQUE INDEX "EvaluationRun_one_active_per_subject_version"
-///     ON "module/evaluation"."EvaluationRun" ("subjectId", "criteriaVersionId")
+///     ON "module/evaluation"."EvaluationRun" ("subjectId", "ruleSetVersionId")
 ///     WHERE "status" IN ('QUEUED', 'RUNNING');
 model EvaluationRun {
   id                String @id @default(uuid()) @db.Uuid
   subjectId         String @db.Uuid
-  criteriaVersionId String @db.Uuid
+  ruleSetVersionId String @db.Uuid
 
   status EvaluationRunStatus @default(QUEUED)
   // Opaque host-side actor id; no foreign key by design
@@ -186,12 +186,12 @@ model EvaluationRun {
   updatedAt  DateTime  @updatedAt
 
   subject         EvaluationSubject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  criteriaVersion EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Restrict)
+  ruleSetVersion EvaluationRuleSetVersion @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
 
   // At most one result per run.
   result EvaluationResult?
 
-  @@index([subjectId, criteriaVersionId])
+  @@index([subjectId, ruleSetVersionId])
   @@index([status])
   @@schema("module/evaluation")
 }
@@ -206,7 +206,7 @@ model EvaluationResult {
   id                String @id @default(uuid()) @db.Uuid
   runId             String @unique @db.Uuid
   subjectId         String @db.Uuid
-  criteriaVersionId String @db.Uuid
+  ruleSetVersionId String @db.Uuid
 
   // Archived evidence snapshot: [{ id, layer, source, summary, observedAt, refs }]
   manifest      Json    @db.JsonB
@@ -233,10 +233,10 @@ model EvaluationResult {
 
   run             EvaluationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   subject         EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  criteriaVersion EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Restrict)
+  ruleSetVersion EvaluationRuleSetVersion @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
 
   @@index([subjectId, createdAt])
-  @@index([criteriaVersionId])
+  @@index([ruleSetVersionId])
   @@schema("module/evaluation")
 }
 

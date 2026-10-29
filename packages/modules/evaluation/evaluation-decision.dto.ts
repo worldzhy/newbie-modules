@@ -201,7 +201,7 @@ export class EvaluationResultResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() runId!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty() criteriaVersionId!: string;
+  @ApiProperty() ruleSetVersionId!: string;
   @ApiProperty({ description: "SHA-256 over the canonical manifest, computed by the skeleton" })
   contentHash!: string;
   @ApiProperty({

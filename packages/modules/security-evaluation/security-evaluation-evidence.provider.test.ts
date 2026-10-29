@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type {
-  EvaluationCriteriaVersionRef,
-  EvaluationSubjectRef,
-} from "@modules/evaluation/ports/evaluation.contracts";
+import type { EvaluationRuleSetVersionRef, EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
 import type { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
@@ -26,7 +23,7 @@ const subject: EvaluationSubjectRef = {
   displayName: "nightwatch-backend",
 };
 
-const criteriaVersion: EvaluationCriteriaVersionRef = {
+const ruleSetVersion: EvaluationRuleSetVersionRef = {
   id: "33333333-3333-4333-8333-333333333333",
   kind: "repository",
   evaluationKey: "npm-osv",
@@ -66,7 +63,7 @@ test("a repository with no supported lockfile fails the run instead of reporting
   const { assets, writes } = fakeAssets();
   const provider = new SecurityEvaluationEvidenceProvider(assets, fakeRepositoryAccess({}));
 
-  await assert.rejects(() => provider.collect(subject, criteriaVersion), /No supported lockfile/);
+  await assert.rejects(() => provider.collect(subject, ruleSetVersion), /No supported lockfile/);
   // Nothing was persisted: the asset must not look observed after a failed run.
   assert.equal(writes.facts, 0);
   assert.equal(writes.touched, 0);
@@ -79,7 +76,7 @@ test("a legacy lockfile without a packages map fails the run with its own reason
     fakeRepositoryAccess({ "package-lock.json": JSON.stringify({ lockfileVersion: 1, dependencies: {} }) }),
   );
 
-  await assert.rejects(() => provider.collect(subject, criteriaVersion), /missing packages map/);
+  await assert.rejects(() => provider.collect(subject, ruleSetVersion), /missing packages map/);
 });
 
 test("a lockfile that resolves no packages fails the run instead of reporting a vacuous clean result", async () => {
@@ -89,7 +86,7 @@ test("a lockfile that resolves no packages fails the run instead of reporting a 
     fakeRepositoryAccess({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }) }),
   );
 
-  await assert.rejects(() => provider.collect(subject, criteriaVersion), /resolved no packages/);
+  await assert.rejects(() => provider.collect(subject, ruleSetVersion), /resolved no packages/);
 });
 
 test("declared dependencies absent from the lockfile are reported as declaredUnlinked", async () => {
@@ -102,7 +99,7 @@ test("declared dependencies absent from the lockfile are reported as declaredUnl
     }),
   );
 
-  const collection = await provider.collect(subject, criteriaVersion);
+  const collection = await provider.collect(subject, ruleSetVersion);
 
   assert.deepEqual(
     collection.items.map((item) => item.id),
@@ -119,5 +116,5 @@ test("a host that forgot to bind RepositoryAccess fails loudly instead of collec
   const { assets } = fakeAssets();
   const provider = new SecurityEvaluationEvidenceProvider(assets, undefined);
 
-  await assert.rejects(() => provider.collect(subject, criteriaVersion), /No RepositoryAccess is bound/);
+  await assert.rejects(() => provider.collect(subject, ruleSetVersion), /No RepositoryAccess is bound/);
 });

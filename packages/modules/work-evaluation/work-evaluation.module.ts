@@ -26,7 +26,7 @@ import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
  * skeleton (ADR-020), replacing the frozen predecessor module.
  *
  * The module owns:
- * - period / home-ground administration and criteria-version administration
+ * - period / home-ground administration and rule-set-version administration
  *   for subject kind "work",
  * - installation enrollment (one token per evaluatee installation, soft
  *   revocation) and the token-authenticated ingest endpoints

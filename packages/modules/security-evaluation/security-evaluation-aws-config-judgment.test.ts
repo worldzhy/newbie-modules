@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { EvaluationCriterionRef, EvaluationEvidenceItem } from "@modules/evaluation/ports/evaluation.contracts";
 import type { JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
-import { SecurityEvaluationCloudConfigJudgment } from "./judgment/aws-config/security-evaluation-cloud-config.judgment";
+import { SecurityEvaluationAwsConfigJudgment } from "./judgment/aws-config/security-evaluation-aws-config.judgment";
 import { SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK } from "./judgment/aws-config/security-evaluation-cloud-config.rulebook";
 
 /**
@@ -41,7 +41,7 @@ function inputFor(items: EvaluationEvidenceItem[], criteria = CRITERIA): Judgmen
       subjectKey: "binding-1",
       displayName: "123456789012",
     },
-    criteriaVersion: {
+    ruleSetVersion: {
       id: "33333333-3333-4333-8333-333333333333",
       kind: "aws-account",
       evaluationKey: "aws-cis-1.5",
@@ -68,7 +68,7 @@ const COMPLIANT_PASSWORD_POLICY = evidenceItem("aws.iam.account-password-policy"
 });
 
 test("a failing control produces a version-free fingerprint keyed by the resource", async () => {
-  const judgment = await new SecurityEvaluationCloudConfigJudgment().judge(
+  const judgment = await new SecurityEvaluationAwsConfigJudgment().judge(
     inputFor([COMPLIANT_PASSWORD_POLICY, evidenceItem("aws.iam.root-credential", "root", ROOT_WITH_KEYS)]),
   );
   assert.equal(judgment.findings.length, 1);
@@ -87,7 +87,7 @@ test("severity is read from the criterion metadata, not hard-coded in the judgme
       ? { ...criterion, metadata: { ...criterion.metadata, severity: "LOW" } }
       : criterion,
   );
-  const judgment = await new SecurityEvaluationCloudConfigJudgment().judge(
+  const judgment = await new SecurityEvaluationAwsConfigJudgment().judge(
     inputFor([COMPLIANT_PASSWORD_POLICY, evidenceItem("aws.iam.root-credential", "root", ROOT_WITH_KEYS)], criteria),
   );
   assert.equal(judgment.findings[0]?.severity, "LOW");
@@ -114,7 +114,7 @@ test("passing controls produce no findings and every collected fact is evaluated
       publicIngress: [],
     }),
   ];
-  const judgment = await new SecurityEvaluationCloudConfigJudgment().judge(inputFor(items));
+  const judgment = await new SecurityEvaluationAwsConfigJudgment().judge(inputFor(items));
   assert.equal(judgment.findings.length, 0);
   assert.deepEqual([...judgment.evaluatedRefs].sort(), items.map((item) => item.id).sort());
 });
@@ -152,7 +152,7 @@ test("one failing resource among many yields one finding and full evaluation", a
       versioningEnabled: true,
     }),
   ];
-  const judgment = await new SecurityEvaluationCloudConfigJudgment().judge(inputFor(items));
+  const judgment = await new SecurityEvaluationAwsConfigJudgment().judge(inputFor(items));
   const fingerprints = judgment.findings.map((finding) => finding.fingerprint).sort();
   assert.deepEqual(fingerprints, ["aws:cis-2-1-1:plain", "aws:cis-2-1-2:plain:public-access-block"]);
   // All three facts are required by CIS rules, so all three are evaluated.

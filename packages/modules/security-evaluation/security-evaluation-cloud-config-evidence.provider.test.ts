@@ -1,9 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type {
-  EvaluationCriteriaVersionRef,
-  EvaluationSubjectRef,
-} from "@modules/evaluation/ports/evaluation.contracts";
+import type { EvaluationRuleSetVersionRef, EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
 import { SecurityEvaluationCloudConfigEvidenceProvider } from "./evidence/security-evaluation-cloud-config-evidence.provider";
 import type { CloudConfigurationAccess } from "./ports/cloud-configuration-access.port";
@@ -25,7 +22,7 @@ const SUBJECT: EvaluationSubjectRef = {
   displayName: "123456789012",
 };
 
-const VERSION: EvaluationCriteriaVersionRef = {
+const VERSION: EvaluationRuleSetVersionRef = {
   id: "33333333-3333-4333-8333-333333333333",
   kind: "aws-account",
   evaluationKey: "aws-cis-1.5",

@@ -1,6 +1,6 @@
 import type {
   EvaluationCoverageBucket,
-  EvaluationCriteriaVersionRef,
+  EvaluationRuleSetVersionRef,
   EvaluationEvidenceItem,
   EvaluationSubjectRef,
 } from "./evaluation.contracts";
@@ -31,7 +31,7 @@ export interface EvidenceProvider {
    */
   collect(
     subject: EvaluationSubjectRef,
-    criteriaVersion: EvaluationCriteriaVersionRef,
+    ruleSetVersion: EvaluationRuleSetVersionRef,
     runConfig?: Record<string, unknown> | null,
   ): Promise<EvidenceCollection>;
 }

@@ -11,7 +11,7 @@ export interface EvaluationRunEventIdentity {
   runId: string;
   subjectId: string;
   subjectKind: string;
-  criteriaVersionId: string;
+  ruleSetVersionId: string;
   evaluationKey: string;
 }
 
@@ -33,7 +33,7 @@ const EVALUATION_RUN_SUCCEEDED = defineEvent<EvaluationRunSucceededEvent>({
     runId: "3f0f2a8e-2c47-4b3e-9f61-0a1b2c3d4e5f",
     subjectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
     subjectKind: "repository",
-    criteriaVersionId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    ruleSetVersionId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
     evaluationKey: "npm-osv",
     status: "SUCCEEDED",
   },
@@ -47,7 +47,7 @@ const EVALUATION_RUN_FAILED = defineEvent<EvaluationRunFailedEvent>({
     runId: "3f0f2a8e-2c47-4b3e-9f61-0a1b2c3d4e5f",
     subjectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
     subjectKind: "repository",
-    criteriaVersionId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
+    ruleSetVersionId: "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d",
     evaluationKey: "npm-osv",
     status: "FAILED",
     error: "OSV API request timed out after 30000ms",

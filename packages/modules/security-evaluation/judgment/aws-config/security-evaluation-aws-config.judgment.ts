@@ -25,10 +25,10 @@ const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
  * evidence provider already recorded them in the skipped bucket.
  */
 @Injectable()
-export class SecurityEvaluationCloudConfigJudgment {
+export class SecurityEvaluationAwsConfigJudgment {
   judge(input: JudgmentInput): Promise<EvaluationJudgment> {
     const facts = rebuildCloudConfigFacts(input.evidence);
-    const evaluationKey = input.criteriaVersion.evaluationKey;
+    const evaluationKey = input.ruleSetVersion.evaluationKey;
 
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
 

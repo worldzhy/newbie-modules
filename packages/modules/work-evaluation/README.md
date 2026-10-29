@@ -69,7 +69,7 @@ ClickHouse table for transcripts:
 | `WorkEvaluationInstallation`                    | agent enrollment: token hash, evaluatee binding, soft revocation     |
 | `work_evaluation_session_messages` (ClickHouse) | session transcripts the judgment drills into on demand               |
 
-`WorkEvaluationPeriod.criteriaVersionId` pins each period to exactly one
+`WorkEvaluationPeriod.ruleSetVersionId` pins each period to exactly one
 published criteria version of kind `"work"`. It is a plain scalar with no
 relation — foreign keys never cross schema boundaries.
 
@@ -162,7 +162,7 @@ The authoritative route list is the module spec
 | ------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------ |
 | `/work-evaluation/evidence/{workspaces,sessions,documents}` (POST)  | installation token (`kind` = `work-evaluation`) | Ingest reported workspaces, sessions, documents; answers 204 |
 | `/work-evaluation/installations`                                    | platform JWT                                    | Enroll, list, rotate and revoke installation agents          |
-| `/work-evaluation/{criteria-versions,periods,home-ground,subjects}` | platform JWT                                    | Evaluation administration                                    |
+| `/work-evaluation/{rule-set-versions,periods,home-ground,subjects}` | platform JWT                                    | Evaluation administration                                    |
 | `/work-evaluation/runs`                                             | platform JWT                                    | Trigger and list runs                                        |
 | `/work-evaluation/results`                                          | platform JWT                                    | Read archived results                                        |
 

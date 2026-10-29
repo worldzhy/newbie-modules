@@ -147,7 +147,7 @@ function runRow(id: string, startedAt: Date): EvaluationRun {
   return {
     id,
     subjectId: SUBJECT_ID,
-    criteriaVersionId: VERSION_ID,
+    ruleSetVersionId: VERSION_ID,
     status: "RUNNING",
     requestedByRef: null,
     config: null,

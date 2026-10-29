@@ -13,7 +13,7 @@ One concept, one word.
   feature-defined (`work`, `repository`, `cloud-resource`), `subjectKey` is the
   feature's stable natural identity inside the host's `scopeType` / `scopeId`
   coordinate. The coordinate is a plain scalar with no foreign key.
-- **criteria version** (`EvaluationCriteriaVersion`) — a frozen set of
+- **criteria version** (`EvaluationRuleSetVersion`) — a frozen set of
   criteria. Drafts are editable; publishing is one-way. Runs only reference
   published versions.
 - **criterion** (`EvaluationCriterion`) — one entry of a version, `SCORED` or
@@ -52,7 +52,7 @@ sense, and tracking a problem inside a JSON blob makes it untrackable.
 
 | Table                       | Owns                                                        |
 | --------------------------- | ----------------------------------------------------------- |
-| `EvaluationCriteriaVersion` | kind / evaluationKey / version, publication state           |
+| `EvaluationRuleSetVersion` | kind / evaluationKey / version, publication state           |
 | `EvaluationCriterion`       | criterion key, kind, name, feature-defined metadata         |
 | `EvaluationSubject`         | kind, scope coordinate, subject key, display name           |
 | `EvaluationRun`             | state machine, failure reason, actor reference              |
@@ -85,7 +85,7 @@ sense, and tracking a problem inside a JSON blob makes it untrackable.
 
    ```sql
    CREATE UNIQUE INDEX "EvaluationRun_one_active_per_subject_version"
-     ON "module/evaluation"."EvaluationRun" ("subjectId", "criteriaVersionId")
+     ON "module/evaluation"."EvaluationRun" ("subjectId", "ruleSetVersionId")
      WHERE "status" IN ('QUEUED', 'RUNNING');
    ```
 
@@ -139,7 +139,7 @@ compile-time dependency on any feature.
 
 `EvaluationRunnerService` is the only write entry of the run lifecycle, in two
 halves: `open` takes the admission decision synchronously (subject existence,
-criteria-version applicability, and the one-active-run conflict decided by the
+rule-set-version applicability, and the one-active-run conflict decided by the
 database — so a trigger can still answer 400/404/409 before accepting the
 request), and `execute` runs the opened row — collect evidence, judge, compose
 coverage, persist the immutable result, upsert findings, resolve absent
@@ -152,7 +152,7 @@ A run may carry an opaque per-run `config` (ADR-023): the trigger passes it to
 `startRun`, it is stored on the run row and threaded symmetrically to all three
 feature ports (ADR-026) — `CriteriaProvider.selectVersion(subject, runConfig?)`
 receives it when the feature picks the applicable version,
-`EvidenceProvider.collect(subject, criteriaVersion, runConfig?)` receives it at
+`EvidenceProvider.collect(subject, ruleSetVersion, runConfig?)` receives it at
 collection time, and the judgment port reads it as `JudgmentInput.runConfig`.
 The skeleton never reads a key from it — model selection, period windows,
 budget overrides and similar knobs are feature-defined. The
@@ -177,7 +177,7 @@ terminal row is written (ADR-032):
 | `evaluation.run-failed`    | the run is FAILED and its failure reason is persisted |
 
 The payload carries identity and terminal state only — `runId`, `subjectId`,
-`subjectKind`, `criteriaVersionId`, `evaluationKey`, `status` and, on failure, `error`
+`subjectKind`, `ruleSetVersionId`, `evaluationKey`, `status` and, on failure, `error`
 with the same text and truncation as the run row. Findings and coverage are
 deliberately absent: they are mutable read models, so a consumer queries the
 existing endpoints by `runId` / `subjectId` when it needs detail.

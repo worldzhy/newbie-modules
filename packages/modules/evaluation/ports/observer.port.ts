@@ -15,7 +15,7 @@ export const evaluationObserverToken = "EVALUATION_OBSERVER";
 export interface EvaluationRunFinishedEvent {
   runId: string;
   subjectId: string;
-  criteriaVersionId: string;
+  ruleSetVersionId: string;
   status: "SUCCEEDED" | "FAILED";
   /** Failure text when status is FAILED. */
   error?: string;

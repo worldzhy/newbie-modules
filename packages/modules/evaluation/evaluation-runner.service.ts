@@ -31,7 +31,7 @@ import {
   StartEvaluationRunInput,
 } from "./evaluation-run.service";
 import { EvaluationSubjectService, toSubjectRef } from "./evaluation-subject.service";
-import { EvaluationCriteriaVersionRef } from "./ports/evaluation.contracts";
+import { EvaluationRuleSetVersionRef } from "./ports/evaluation.contracts";
 import { EvaluationRunFinishedEvent } from "./ports/observer.port";
 import { composeCoverageStats } from "./evaluation-invariants";
 
@@ -116,7 +116,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
         await this.notifyRunFinished({
           runId: row.id,
           subjectId: row.subjectId,
-          criteriaVersionId: row.criteriaVersionId,
+          ruleSetVersionId: row.ruleSetVersionId,
           status: "FAILED",
           error,
         });
@@ -132,7 +132,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
    * Open the run synchronously and return the RUNNING row.
    *
    * Admission is the part that belongs to the request path: subject existence,
-   * criteria-version applicability and the one-active-run-per-subject-version
+   * rule-set-version applicability and the one-active-run-per-subject-version
    * conflict are all decided by the database here, so a caller dispatching a
    * fire-and-forget run can still answer 400/404/409 before accepting it.
    */
@@ -161,8 +161,8 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
 
     try {
       const subject = toSubjectRef(await this.subjects.getSubject(running.subjectId));
-      const version = await this.criteria.getVersion(running.criteriaVersionId);
-      const criteriaVersion: EvaluationCriteriaVersionRef = {
+      const version = await this.criteria.getVersion(running.ruleSetVersionId);
+      const ruleSetVersion: EvaluationRuleSetVersionRef = {
         id: version.id,
         kind: version.kind,
         evaluationKey: version.evaluationKey,
@@ -172,18 +172,18 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
         runId: running.id,
         subjectId: running.subjectId,
         subjectKind: subject.kind,
-        criteriaVersionId: running.criteriaVersionId,
+        ruleSetVersionId: running.ruleSetVersionId,
         evaluationKey: version.evaluationKey,
       };
 
       const runConfig = (running.config as Record<string, unknown> | null) ?? null;
       const evidence = await this.providers
         .getEvidenceProvider(subject.kind)
-        .collect(subject, criteriaVersion, runConfig);
-      const criteria = await this.criteria.listCriteria(criteriaVersion.id);
+        .collect(subject, ruleSetVersion, runConfig);
+      const criteria = await this.criteria.listCriteria(ruleSetVersion.id);
       const judgment = await this.providers.getJudgmentPort(subject.kind).judge({
         subject,
-        criteriaVersion,
+        ruleSetVersion,
         criteria,
         evidence: evidence.items,
         runConfig,
@@ -223,7 +223,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
       await this.notifyRunFinished({
         runId: running.id,
         subjectId: running.subjectId,
-        criteriaVersionId: running.criteriaVersionId,
+        ruleSetVersionId: running.ruleSetVersionId,
         status: "SUCCEEDED",
       });
       return {
@@ -238,7 +238,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
       await this.notifyRunFinished({
         runId: running.id,
         subjectId: running.subjectId,
-        criteriaVersionId: running.criteriaVersionId,
+        ruleSetVersionId: running.ruleSetVersionId,
         status: "FAILED",
         error: persistedError,
       });
@@ -316,12 +316,12 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
    */
   private async resolveRunIdentity(running: EvaluationRun): Promise<EvaluationRunEventIdentity> {
     const subject = await this.subjects.getSubject(running.subjectId);
-    const version = await this.criteria.getVersion(running.criteriaVersionId);
+    const version = await this.criteria.getVersion(running.ruleSetVersionId);
     return {
       runId: running.id,
       subjectId: running.subjectId,
       subjectKind: subject.kind,
-      criteriaVersionId: running.criteriaVersionId,
+      ruleSetVersionId: running.ruleSetVersionId,
       evaluationKey: version.evaluationKey,
     };
   }

@@ -44,21 +44,21 @@ export class SecurityEvaluationRunService {
 
   /**
    * Runs decorated with their evaluationKey labels: the skeleton row only
-   * carries criteriaVersionId, while the API consumer displays the
+   * carries ruleSetVersionId, while the API consumer displays the
    * evaluationKey and version of what the run was judged against.
    */
   async listRuns(query: ListEvaluationRunsInput) {
     const page = await this.runs.listRuns(query);
     const records = page.records as EvaluationRun[];
-    const versionIds = [...new Set(records.map((run) => run.criteriaVersionId))];
+    const versionIds = [...new Set(records.map((run) => run.ruleSetVersionId))];
     const versions = new Map(
       (await Promise.all(versionIds.map((id) => this.criteria.getVersion(id)))).map((version) => [version.id, version]),
     );
     return {
       ...page,
       records: records.map((run) => {
-        const version = versions.get(run.criteriaVersionId);
-        return { ...run, evaluationKey: version?.evaluationKey ?? "", criteriaVersion: version?.version ?? "" };
+        const version = versions.get(run.ruleSetVersionId);
+        return { ...run, evaluationKey: version?.evaluationKey ?? "", ruleSetVersion: version?.version ?? "" };
       }),
     };
   }

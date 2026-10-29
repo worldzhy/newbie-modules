@@ -1,7 +1,7 @@
 import { BadRequestException, Inject, Injectable, Optional } from "@nestjs/common";
 import type { EvidenceCollection, EvidenceProvider } from "@modules/evaluation/ports/evidence.provider";
 import type {
-  EvaluationCriteriaVersionRef,
+  EvaluationRuleSetVersionRef,
   EvaluationEvidenceItem,
   EvaluationSubjectRef,
 } from "@modules/evaluation/ports/evaluation.contracts";
@@ -49,11 +49,11 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
 
   async collect(
     subject: EvaluationSubjectRef,
-    criteriaVersion: EvaluationCriteriaVersionRef,
+    ruleSetVersion: EvaluationRuleSetVersionRef,
   ): Promise<EvidenceCollection> {
     // INTEL judgment does not consume lockfile evidence; it matches knowledge
     // items against the subject's scope entity set directly (ADR-039).
-    if (criteriaVersion.evaluationKey === SECURITY_EVALUATION_KEY_THREAT_INTEL) {
+    if (ruleSetVersion.evaluationKey === SECURITY_EVALUATION_KEY_THREAT_INTEL) {
       return { items: [], declaredUnlinked: { total: 0 }, skipped: { total: 0 } };
     }
 

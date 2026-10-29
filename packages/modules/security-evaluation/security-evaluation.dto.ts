@@ -101,7 +101,7 @@ export class StartSecurityEvaluationRunRequestDto {
   @ApiPropertyOptional({ description: "Override criteria version — defaults to the version this build ships" })
   @IsOptional()
   @IsUUID()
-  criteriaVersionId?: string;
+  ruleSetVersionId?: string;
 
   @ApiPropertyOptional({ type: Object, description: "Opaque per-run config (ADR-023)" })
   @IsOptional()
@@ -134,16 +134,16 @@ export class ListSecurityEvaluationRunsRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({ description: "Restrict to one criteria version" })
   @IsOptional()
   @IsUUID()
-  criteriaVersionId?: string;
+  ruleSetVersionId?: string;
 }
 
 /** Mirrors the skeleton's EvaluationRun row, decorated with the evaluationKey labels. */
 export class SecurityEvaluationRunResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty() criteriaVersionId!: string;
+  @ApiProperty() ruleSetVersionId!: string;
   @ApiProperty({ description: 'Evaluation key of the run, e.g. "npm-osv"' }) evaluationKey!: string;
-  @ApiProperty({ description: 'Criteria version label of the run, e.g. "v1"' }) criteriaVersion!: string;
+  @ApiProperty({ description: 'Criteria version label of the run, e.g. "v1"' }) ruleSetVersion!: string;
   @ApiProperty({ enum: EvaluationRunStatus }) status!: EvaluationRunStatus;
   @ApiPropertyOptional({ type: String }) requestedByRef?: string | null;
   @ApiPropertyOptional({ type: Object }) config?: object | null;
@@ -167,7 +167,7 @@ export class ListSecurityEvaluationResultsRequestDto extends CommonListRequestDt
   @ApiPropertyOptional({ description: "Restrict to one criteria version" })
   @IsOptional()
   @IsUUID()
-  criteriaVersionId?: string;
+  ruleSetVersionId?: string;
 }
 
 /** Mirrors the skeleton's EvaluationResult read shape (manifest excluded). */
@@ -175,7 +175,7 @@ export class SecurityEvaluationResultResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() runId!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty() criteriaVersionId!: string;
+  @ApiProperty() ruleSetVersionId!: string;
   @ApiProperty({ description: "SHA-256 over the archived manifest" }) contentHash!: string;
   @ApiProperty({ type: Object, description: "{ evaluated, declaredUnlinked, skipped } coverage buckets" })
   coverageStats!: object;

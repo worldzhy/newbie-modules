@@ -66,7 +66,7 @@ const ACTIVE_STATUSES: EvaluationRunStatus[] = [EvaluationRunStatus.QUEUED, Eval
 export interface StartEvaluationRunInput {
   subjectId: string;
   /** Omit to let the feature's CriteriaProvider pick the applicable version. */
-  criteriaVersionId?: string;
+  ruleSetVersionId?: string;
   requestedByRef?: string;
   /**
    * Opaque per-run feature config (ADR-023), stored on the row and threaded to
@@ -78,7 +78,7 @@ export interface StartEvaluationRunInput {
 export interface ListEvaluationRunsInput {
   /** Omitted lists every run (of `kind`, when given) newest first. */
   subjectId?: string;
-  criteriaVersionId?: string;
+  ruleSetVersionId?: string;
   /** When present, only runs whose subject matches this kind are returned. */
   kind?: string;
   /** Host scope coordinate on the subject; narrows the list to one scope. */
@@ -92,7 +92,7 @@ export interface ListEvaluationRunsInput {
  * EvaluationRunService — the run state machine (ADR-020 D1, D5.4).
  *
  * Concurrency is delegated to the database: the partial unique index on
- * (subjectId, criteriaVersionId) covering the active statuses means a second
+ * (subjectId, ruleSetVersionId) covering the active statuses means a second
  * concurrent request fails at insert on any replica, not just within the
  * process that received it.
  */
@@ -121,9 +121,9 @@ export class EvaluationRunService {
     const subject = await this.prisma.evaluationSubject.findUnique({ where: { id: input.subjectId } });
     if (!subject) throw new NotFoundException(`Evaluation subject ${input.subjectId} not found`);
 
-    const criteriaVersionId =
-      input.criteriaVersionId ?? (await this.resolveVersionId(toSubjectRef(subject), input.config ?? null));
-    const version = await this.requirePublishedVersion(criteriaVersionId);
+    const ruleSetVersionId =
+      input.ruleSetVersionId ?? (await this.resolveVersionId(toSubjectRef(subject), input.config ?? null));
+    const version = await this.requirePublishedVersion(ruleSetVersionId);
     if (version.kind !== subject.kind) {
       throw new BadRequestException(
         `Criteria version ${version.evaluationKey}/${version.version} judges kind "${version.kind}", not "${subject.kind}"`,
@@ -134,7 +134,7 @@ export class EvaluationRunService {
       return await this.prisma.evaluationRun.create({
         data: {
           subjectId: input.subjectId,
-          criteriaVersionId,
+          ruleSetVersionId,
           requestedByRef: input.requestedByRef,
           config: input.config as Prisma.InputJsonValue | undefined,
           status: EvaluationRunStatus.QUEUED,
@@ -143,7 +143,7 @@ export class EvaluationRunService {
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException(
-          `An evaluation is already running for subject ${input.subjectId} against criteria version ${criteriaVersionId}.`,
+          `An evaluation is already running for subject ${input.subjectId} against criteria version ${ruleSetVersionId}.`,
         );
       }
       throw error;
@@ -238,7 +238,7 @@ export class EvaluationRunService {
       findManyArgs: {
         where: {
           subjectId: query.subjectId,
-          ...(query.criteriaVersionId ? { criteriaVersionId: query.criteriaVersionId } : {}),
+          ...(query.ruleSetVersionId ? { ruleSetVersionId: query.ruleSetVersionId } : {}),
           ...(query.kind || query.scopeType || query.scopeId
             ? {
                 subject: {
@@ -265,7 +265,7 @@ export class EvaluationRunService {
         `No criteria version is applicable to subject ${subject.id} (kind "${subject.kind}")`,
       );
     }
-    const version = await this.prisma.evaluationCriteriaVersion.findFirst({
+    const version = await this.prisma.evaluationRuleSetVersion.findFirst({
       where: {
         kind: subject.kind,
         evaluationKey: selection.evaluationKey,
@@ -282,7 +282,7 @@ export class EvaluationRunService {
   }
 
   private async requirePublishedVersion(id: string) {
-    const version = await this.prisma.evaluationCriteriaVersion.findUnique({ where: { id } });
+    const version = await this.prisma.evaluationRuleSetVersion.findUnique({ where: { id } });
     if (!version) throw new NotFoundException(`Evaluation criteria version ${id} not found`);
     if (!version.publishedAt) {
       throw new ConflictException(`Evaluation criteria version ${id} is a draft and cannot be run against`);

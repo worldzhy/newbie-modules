@@ -40,7 +40,7 @@ export class GetWorkEvaluationByIdRequestDto {
  * Structured feature metadata of a criteria version (spec §5): the floor rules
  * and the company direction statement the judgment prompt anchors on.
  */
-export class WorkEvaluationCriteriaVersionMetadataDto {
+export class WorkEvaluationRuleSetVersionMetadataDto {
   @ApiPropertyOptional({ description: "Floor rule thresholds JSON — reported as risks, never applied mechanically" })
   @IsOptional()
   @IsObject()
@@ -80,7 +80,7 @@ export class WorkEvaluationCriterionMetadataDto {
   calibrationExamples?: object[];
 }
 
-export class CreateWorkEvaluationCriteriaVersionRequestDto {
+export class CreateWorkEvaluationRuleSetVersionRequestDto {
   @ApiProperty({ description: 'Feature-defined criteria evaluationKey, e.g. "rubric"' })
   @IsString()
   @IsNotEmpty()
@@ -96,14 +96,14 @@ export class CreateWorkEvaluationCriteriaVersionRequestDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ type: WorkEvaluationCriteriaVersionMetadataDto })
+  @ApiPropertyOptional({ type: WorkEvaluationRuleSetVersionMetadataDto })
   @IsOptional()
   @ValidateNested()
-  @Type(() => WorkEvaluationCriteriaVersionMetadataDto)
-  metadata?: WorkEvaluationCriteriaVersionMetadataDto;
+  @Type(() => WorkEvaluationRuleSetVersionMetadataDto)
+  metadata?: WorkEvaluationRuleSetVersionMetadataDto;
 }
 
-export class ListWorkEvaluationCriteriaVersionsRequestDto extends CommonListRequestDto {
+export class ListWorkEvaluationRuleSetVersionsRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({ description: "Filter by criteria evaluationKey" })
   @IsOptional()
   @IsString()
@@ -147,20 +147,20 @@ export class CreateWorkEvaluationCriterionRequestDto {
   metadata?: WorkEvaluationCriterionMetadataDto;
 }
 
-export class WorkEvaluationCriteriaVersionResponseDto {
+export class WorkEvaluationRuleSetVersionResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() kind!: string;
   @ApiProperty() evaluationKey!: string;
   @ApiProperty() version!: string;
   @ApiPropertyOptional() description?: string | null;
-  @ApiPropertyOptional({ type: WorkEvaluationCriteriaVersionMetadataDto })
-  metadata?: WorkEvaluationCriteriaVersionMetadataDto | null;
+  @ApiPropertyOptional({ type: WorkEvaluationRuleSetVersionMetadataDto })
+  metadata?: WorkEvaluationRuleSetVersionMetadataDto | null;
   @ApiPropertyOptional({ description: "Null while the version is a draft", type: Date })
   publishedAt?: Date | null;
   @ApiProperty() createdAt!: Date;
 }
 
-export class ListWorkEvaluationCriteriaVersionsResponseDto extends CommonListResponseDto<WorkEvaluationCriteriaVersionResponseDto> {}
+export class ListWorkEvaluationRuleSetVersionsResponseDto extends CommonListResponseDto<WorkEvaluationRuleSetVersionResponseDto> {}
 
 export class WorkEvaluationCriterionResponseDto {
   @ApiPropertyOptional({ description: "Row id — present on freshly created criteria" })
@@ -180,7 +180,7 @@ export class CreateWorkEvaluationPeriodRequestDto {
   @ApiProperty({ description: 'Published criteria version (kind "work") this period is judged against' })
   @IsUUID()
   @IsNotEmpty()
-  criteriaVersionId!: string;
+  ruleSetVersionId!: string;
 
   @ApiProperty({ type: String, enum: WorkEvaluationPeriodType })
   @IsEnum(WorkEvaluationPeriodType)
@@ -212,7 +212,7 @@ export class ListWorkEvaluationPeriodsRequestDto extends CommonListRequestDto {
 
 export class WorkEvaluationPeriodResponseDto {
   @ApiProperty() id!: string;
-  @ApiProperty() criteriaVersionId!: string;
+  @ApiProperty() ruleSetVersionId!: string;
   @ApiProperty() type!: WorkEvaluationPeriodType;
   @ApiProperty() periodStart!: Date;
   @ApiProperty() periodEnd!: Date;
@@ -591,14 +591,14 @@ export class ListWorkEvaluationRunsRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({ description: "Restrict to one criteria version" })
   @IsOptional()
   @IsUUID()
-  criteriaVersionId?: string;
+  ruleSetVersionId?: string;
 }
 
 /** Mirrors the skeleton's EvaluationRun row. */
 export class WorkEvaluationRunResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty() criteriaVersionId!: string;
+  @ApiProperty() ruleSetVersionId!: string;
   @ApiProperty({ enum: EvaluationRunStatus }) status!: EvaluationRunStatus;
   @ApiPropertyOptional({ type: String }) requestedByRef?: string | null;
   @ApiPropertyOptional({ type: Object }) config?: object | null;
@@ -620,7 +620,7 @@ export class ListWorkEvaluationResultsRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({ description: "Restrict to one criteria version" })
   @IsOptional()
   @IsUUID()
-  criteriaVersionId?: string;
+  ruleSetVersionId?: string;
 }
 
 /** Mirrors the skeleton's EvaluationResult read shape (manifest excluded). */
@@ -628,7 +628,7 @@ export class WorkEvaluationResultResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() runId!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty() criteriaVersionId!: string;
+  @ApiProperty() ruleSetVersionId!: string;
   @ApiProperty({ description: "SHA-256 over the canonical manifest" }) contentHash!: string;
   @ApiProperty({ type: Object, description: "{ evaluated, declaredUnlinked, skipped } coverage buckets" })
   coverageStats!: object;

@@ -3,15 +3,15 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
 
 import {
-  SECURITY_EVALUATION_AWS_CIS_CRITERIA_VERSION,
-  SECURITY_EVALUATION_AWS_CUSTOM_CRITERIA_VERSION,
-  SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
+  SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,
+  SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION,
+  SECURITY_EVALUATION_DEPENDENCY_RULE_SET_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_CRITERION_KEY,
   SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
   SECURITY_EVALUATION_KEY_AWS_CUSTOM,
   SECURITY_EVALUATION_KEY_NPM_OSV,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
-  SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
+  SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
   SECURITY_EVALUATION_INTELLIGENCE_CRITERION_KEY,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
@@ -66,7 +66,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     await this.ensureBaseline({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
       evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV,
-      version: SECURITY_EVALUATION_DEPENDENCY_CRITERIA_VERSION,
+      version: SECURITY_EVALUATION_DEPENDENCY_RULE_SET_VERSION,
       description: "Dependency vulnerability baseline: installed npm packages are matched against OSV.",
       metadata: { ecosystem: "npm", dataSource: "https://osv.dev" },
       criteria: [
@@ -88,7 +88,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     await this.ensureBaseline({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
       evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
-      version: SECURITY_EVALUATION_AWS_CIS_CRITERIA_VERSION,
+      version: SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,
       description: `${SECURITY_EVALUATION_AWS_CIS_BENCHMARK}: collected account configuration facts are asserted per control.`,
       metadata: { benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK },
       criteria: entries.map((entry) => ({
@@ -114,7 +114,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     await this.ensureBaseline({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
       evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
-      version: SECURITY_EVALUATION_AWS_CUSTOM_CRITERIA_VERSION,
+      version: SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION,
       description:
         "aws-custom: non-benchmark cloud configuration checks (access keys, IAM policies, RDS/S3/EC2 hardening) inherited from the predecessor aws-audit module.",
       metadata: { benchmark: null },
@@ -136,7 +136,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     await this.ensureBaseline({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
       evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
-      version: SECURITY_EVALUATION_INTELLIGENCE_CRITERIA_VERSION,
+      version: SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
       description:
         "Threat-intel relevance: recently collected threat-intelligence items are matched against the subject's scope entity set (hard entity recall + LLM structured re-rank).",
       metadata: { matchProtocol: "b3-hard-recall-plus-llm-rerank", negativeCache: "per-item-per-scope" },
@@ -181,7 +181,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     }
 
     const criterionCount = await this.prisma.evaluationCriterion.count({
-      where: { criteriaVersionId: row.id },
+      where: { ruleSetVersionId: row.id },
     });
     if (criterionCount === 0) {
       for (const criterion of baseline.criteria) {
@@ -212,7 +212,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   }
 
   private findVersion(kind: string, evaluationKey: string, version: string) {
-    return this.prisma.evaluationCriteriaVersion.findFirst({ where: { kind, evaluationKey, version } });
+    return this.prisma.evaluationRuleSetVersion.findFirst({ where: { kind, evaluationKey, version } });
   }
 }
 

@@ -66,7 +66,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
     const scope = readScopeOverride(input.runConfig) ?? DEFAULT_WORK_EVALUATION_SCOPE;
     const port = await this.resolver.resolve(scope);
 
-    const version = await this.criteriaService.getVersion(input.criteriaVersion.id);
+    const version = await this.criteriaService.getVersion(input.ruleSetVersion.id);
     const versionMetadata = (version.metadata ?? {}) as WorkEvaluationVersionPromptMetadata;
 
     // Only SCORED criteria produce verdicts; ASSERTION criteria belong to a

@@ -5,7 +5,7 @@ import {
   canonicalJson,
   composeCoverageStats,
   hashManifest,
-  isCriteriaVersionMutable,
+  isRuleSetVersionMutable,
   validateCoverageStats,
   validateJudgment,
 } from "./evaluation-invariants";
@@ -79,9 +79,9 @@ describe("manifest content hash (ADR-020 D5.1)", () => {
 
 describe("criteria version publication (ADR-020 D5.5)", () => {
   it("keeps drafts editable and freezes published versions", () => {
-    assert.equal(isCriteriaVersionMutable(null), true);
-    assert.equal(isCriteriaVersionMutable(undefined), true);
-    assert.equal(isCriteriaVersionMutable(new Date("2026-10-01T00:00:00Z")), false);
+    assert.equal(isRuleSetVersionMutable(null), true);
+    assert.equal(isRuleSetVersionMutable(undefined), true);
+    assert.equal(isRuleSetVersionMutable(new Date("2026-10-01T00:00:00Z")), false);
   });
 });
 

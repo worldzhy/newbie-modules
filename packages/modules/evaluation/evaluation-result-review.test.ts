@@ -24,7 +24,7 @@ interface FakeResultRow {
   id: string;
   runId: string;
   subjectId: string;
-  criteriaVersionId: string;
+  ruleSetVersionId: string;
   contentHash: string;
   coverageStats: object;
   verdicts: object;
@@ -42,7 +42,7 @@ function fakePrisma() {
     id: RESULT_ID,
     runId: "run-1",
     subjectId: SUBJECT_ID,
-    criteriaVersionId: VERSION_ID,
+    ruleSetVersionId: VERSION_ID,
     contentHash: "hash-1",
     coverageStats: {},
     verdicts: {},

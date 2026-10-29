@@ -41,7 +41,7 @@ function staleRun(id: string, updatedAt: Date): EvaluationRun {
   return {
     id,
     subjectId: SUBJECT_ID,
-    criteriaVersionId: VERSION_ID,
+    ruleSetVersionId: VERSION_ID,
     requestedByRef: null,
     config: null,
     status: "RUNNING",
@@ -180,7 +180,7 @@ test("a reaped row publishes evaluation.run-failed with the row's persisted erro
     runId: "run-stale",
     subjectId: SUBJECT_ID,
     subjectKind: "repository",
-    criteriaVersionId: VERSION_ID,
+    ruleSetVersionId: VERSION_ID,
     evaluationKey: "npm-osv",
     status: "FAILED",
     error: STALE_RUN_ERROR,
@@ -189,7 +189,7 @@ test("a reaped row publishes evaluation.run-failed with the row's persisted erro
   assert.deepEqual(observed[0], {
     runId: "run-stale",
     subjectId: SUBJECT_ID,
-    criteriaVersionId: VERSION_ID,
+    ruleSetVersionId: VERSION_ID,
     status: "FAILED",
     error: STALE_RUN_ERROR,
   });

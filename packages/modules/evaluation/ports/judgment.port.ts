@@ -1,7 +1,7 @@
 import type {
   EvaluationCoverageBucket,
   EvaluationCriterionRef,
-  EvaluationCriteriaVersionRef,
+  EvaluationRuleSetVersionRef,
   EvaluationEvidenceItem,
   EvaluationFindingCandidate,
   EvaluationSubjectRef,
@@ -20,7 +20,7 @@ export const judgmentPortToken = (kind: string): string => `EVALUATION_JUDGMENT:
 
 export interface JudgmentInput {
   subject: EvaluationSubjectRef;
-  criteriaVersion: EvaluationCriteriaVersionRef;
+  ruleSetVersion: EvaluationRuleSetVersionRef;
   criteria: EvaluationCriterionRef[];
   evidence: EvaluationEvidenceItem[];
   /**
