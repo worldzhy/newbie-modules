@@ -4,6 +4,7 @@ import type { EvaluationJudgment, JudgmentInput } from "@modules/evaluation/port
 
 import type { SecurityEvaluationFindingSeverity } from "../security-evaluation-severity";
 import { deriveUrgency } from "../security-evaluation-urgency";
+import { SECURITY_EVALUATION_KEY_AWS_CIS_1_5 } from "../../security-evaluation.constants";
 import { cloudConfigFingerprint } from "./security-evaluation-cloud-config.identity";
 import {
   SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
@@ -65,14 +66,13 @@ export class SecurityEvaluationAwsConfigJudgment {
       }
     }
 
+    // Facts this evaluation key's rules did not need stay out of evaluatedRefs
+    // (ADR-037 D7); the skeleton buckets them as coverageStats.unconsumed.
     const evaluatedRefs = input.evidence
       .filter((item) => requiredFactTypes.has(String(item.payload?.factType)))
       .map((item) => item.id);
-    const unconsumedRefs = input.evidence
-      .filter((item) => !requiredFactTypes.has(String(item.payload?.factType)))
-      .map((item) => item.id);
 
-    const isCis = evaluationKey === "aws-cis-1.5";
+    const isCis = evaluationKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5;
     return Promise.resolve({
       verdicts: [],
       findings,
@@ -83,9 +83,6 @@ export class SecurityEvaluationAwsConfigJudgment {
         evaluationKey,
         rulesEvaluated: entries.length,
         findingsEmitted: findings.length,
-        // Facts this family's rules did not need (ADR-037 D7). Kept out of
-        // evaluatedRefs so coverage is not inflated; surfaced here for reports.
-        ...(unconsumedRefs.length > 0 ? { unconsumed: { total: unconsumedRefs.length, items: unconsumedRefs } } : {}),
       },
     });
   }

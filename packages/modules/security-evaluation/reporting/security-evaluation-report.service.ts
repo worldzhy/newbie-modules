@@ -26,6 +26,7 @@ export interface SecurityEvaluationReport {
     evaluated: number;
     declaredUnlinked: number;
     skipped: number;
+    unconsumed: number;
     assetsWithResult: number;
   };
   findings: {
@@ -82,12 +83,14 @@ export class SecurityEvaluationReportService {
       evaluated: 0,
       declaredUnlinked: 0,
       skipped: 0,
+      unconsumed: 0,
       assetsWithResult: latestResults.size,
     };
     for (const stats of latestResults.values()) {
       coverage.evaluated += stats.evaluated?.total ?? 0;
       coverage.declaredUnlinked += stats.declaredUnlinked?.total ?? 0;
       coverage.skipped += stats.skipped?.total ?? 0;
+      coverage.unconsumed += stats.unconsumed?.total ?? 0;
     }
 
     const findings = await this.findingSummary(subjectIds);
@@ -111,7 +114,12 @@ export class SecurityEvaluationReportService {
   private async latestResultsBySubject(subjectIds: readonly string[]) {
     const latest = new Map<
       string,
-      { evaluated?: { total?: number }; declaredUnlinked?: { total?: number }; skipped?: { total?: number } }
+      {
+        evaluated?: { total?: number };
+        declaredUnlinked?: { total?: number };
+        skipped?: { total?: number };
+        unconsumed?: { total?: number };
+      }
     >();
     if (subjectIds.length === 0) return latest;
     const results = await this.prisma.evaluationResult.findMany({

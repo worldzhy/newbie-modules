@@ -278,6 +278,8 @@ export class SecurityEvaluationReportCoverageDto {
   @ApiProperty() evaluated!: number;
   @ApiProperty() declaredUnlinked!: number;
   @ApiProperty() skipped!: number;
+  @ApiProperty({ description: "Manifest material no rule of this evaluationKey consumed (ADR-037 D7)" })
+  unconsumed!: number;
   @ApiProperty({ description: "Assets that have at least one archived result" }) assetsWithResult!: number;
 }
 

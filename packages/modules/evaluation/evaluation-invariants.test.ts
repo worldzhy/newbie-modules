@@ -54,6 +54,7 @@ const BASE_COVERAGE: EvaluationCoverageStats = {
   evaluated: { total: 0 },
   declaredUnlinked: { total: 0 },
   skipped: { total: 0 },
+  unconsumed: { total: 0 },
 };
 
 describe("manifest content hash (ADR-020 D5.1)", () => {
@@ -99,6 +100,24 @@ describe("coverage composition (ADR-020 D5.2)", () => {
     assert.deepEqual(stats.evaluated.bySource, { lockfile: 2 });
     assert.deepEqual(stats.evaluated.items, ["e1", "e2"]);
     assert.equal(stats.skipped.total, 0);
+    // e3 was registered but consumed by nothing — it is not evaluated, not skipped.
+    assert.equal(stats.unconsumed.total, 1);
+    assert.deepEqual(stats.unconsumed.bySource, { document: 1 });
+    assert.deepEqual(stats.unconsumed.items, ["e3"]);
+  });
+
+  it("buckets manifest material a judgment did not consume as unconsumed (ADR-037 D7)", () => {
+    const { stats, problems } = composeCoverageStats({
+      items: EVIDENCE,
+      evaluatedRefs: ["e1"],
+      declaredUnlinked: { total: 0 },
+      skippedBuckets: [{ total: 1, note: "registry unreachable", items: ["e2"] }],
+    });
+
+    assert.deepEqual(problems, []);
+    // e3 is in the manifest, neither evaluated nor skipped: it lands in the
+    // unconsumed bucket, which is how "registered but unneeded" stays visible.
+    assert.deepEqual(stats.unconsumed, { total: 1, bySource: { document: 1 }, items: ["e3"] });
   });
 
   it("reports an evaluated ref that names no collected item instead of bucketing it as unknown", () => {
@@ -161,6 +180,7 @@ describe("coverage composition (ADR-020 D5.2)", () => {
       evaluated: { total: 2, bySource: { lockfile: 1 } },
       declaredUnlinked: { total: 1 },
       skipped: { total: 0 },
+      unconsumed: { total: 0 },
     };
     const problems = validateCoverageStats(bad);
 

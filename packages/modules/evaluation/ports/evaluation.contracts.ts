@@ -82,12 +82,19 @@ export interface EvaluationCoverageBucket {
 
 /**
  * The coverage contract of a result: what was judged, what was declared but
- * could not be linked to fact-layer material, and what a budget cut off.
+ * could not be linked to fact-layer material, what a budget cut off, and what
+ * no rule in this evaluation key consumed (ADR-020 D5.2, ADR-037 D7).
  */
 export type EvaluationCoverageStats = {
   evaluated: EvaluationCoverageBucket;
   declaredUnlinked: EvaluationCoverageBucket;
   skipped: EvaluationCoverageBucket;
+  /**
+   * Manifest items the judgment did not consume — derived by the skeleton as
+   * manifest minus evaluated minus skipped, so "registered but no rule needed
+   * it" is distinguishable from "cut off" and "judged".
+   */
+  unconsumed: EvaluationCoverageBucket;
 };
 
 export type EvaluationConfidence = "high" | "medium" | "low";

@@ -7,7 +7,7 @@
 
 ## Background
 
-ADR-033 决定了 `cis-aws-1.5` 与 `aws-custom` 两个 family，并把合规归属放进 `family` 维度。在评审 4.6 方案时，对旧 `aws-audit` 28 条规则逐条对账，发现：
+ADR-033 决定了 `aws-cis-1.5` 与 `aws-custom` 两个 Evaluation，并把合规归属放进 `evaluationKey` 维度。在评审 4.6 方案时，对旧 `aws-audit` 28 条规则逐条对账，发现：
 
 1. **`family` 词义不清**：骨架 schema 注释写 "feature-defined group"，但实际承担的是"一次独立评估"的身份（criteria 版本、finding 生命周期、run 边界都以 `family` 为界）。词不达意。
 2. **归并准则的 severity 失真**：`cis-2-1-2` 归并了 `pab-missing`(medium)、`pab-partial`(high)、`policy-public`(high)、`acl-public`(high)；`cis-1-15` 归并了 `user-password-expired`(high) 与 `rotation-unclear`(medium)。当前判定器 severity 只按 criterion 元数据取单值，被归并的旧规则 severity 无法表达。自定义侧 `iam.policy-service-wildcard` 旧实现按服务动态定级（iam/sts/kms/organizations=high，其余 medium），固定 criterion severity 同样无法镜像。
@@ -22,13 +22,13 @@ ADR-033 决定了 `cis-aws-1.5` 与 `aws-custom` 两个 family，并把合规归
 
 ### D1. `family` → `evaluationKey`（骨架契约改名）
 
-骨架把 `family` 改为 `evaluationKey`，覆盖：Prisma 字段 `EvaluationCriteriaVersion.evaluationKey`、`EvaluationFinding.evaluationKey`；DTO 字段 `EvaluationCriteriaVersionRef.evaluationKey`；服务层所有 `family` 变量；唯一键 `(subjectId, evaluationKey, fingerprint)`。
+骨架把 `family` 改为 `evaluationKey`，覆盖：Prisma 字段 `EvaluationRuleSetVersion.evaluationKey`、`EvaluationFinding.evaluationKey`；DTO 字段 `EvaluationRuleSetVersionRef.evaluationKey`；服务层所有 `family` 变量；唯一键 `(subjectId, evaluationKey, fingerprint)`。
 
-语义：一个 `evaluationKey` = 一次独立评估的规则集血缘（如 `cis-aws-1.5`、`aws-custom`、`dependency-osv`）。版本化、finding 生命周期、run 边界都以此为界。系统未上线，直接 `prisma db push` 对齐，不写迁移。
+语义：一个 `evaluationKey` = 一次独立评估的规则集血缘（如 `aws-cis-1.5`、`aws-custom`、`npm-osv`、`threat-intel`）。版本化、finding 生命周期、run 边界都以此为界。系统未上线，直接 `prisma db push` 对齐，不写迁移。
 
 ### D2. 两个 Evaluation 模型确认（ADR-033 D1/D6 维持）
 
-`cis-aws-1.5` 与 `aws-custom` 是两个独立 Evaluation：证据契约不同（custom 新增 access key / policy 文档 / 实例网络）、版本血缘独立、合规语义不同。一个 cloud-account subject 产生两次 run，各自的 coverage、manifest、finding 生命周期独立。合规轴 = `evaluationKey = 'cis-aws-1.5'` 过滤。
+`aws-cis-1.5` 与 `aws-custom` 是两个独立 Evaluation：证据契约不同（custom 新增 access key / policy 文档 / 实例网络）、版本血缘独立、合规语义不同。一个 aws-account subject 产生两次 run，各自的 coverage、manifest、finding 生命周期独立。合规轴 = `evaluationKey = 'aws-cis-1.5'` 过滤。
 
 ### D3. 类目归属由模块表达
 
@@ -40,7 +40,7 @@ ADR-033 决定了 `cis-aws-1.5` 与 `aws-custom` 两个 family，并把合规归
 
 ### D5. policy-as-finding-unit
 
-发现单元是策略本身，不是挂载点。finding 身份 `aws:<criterionKey>:<policyIdentity>`，`metadata.attachments` 携带挂载主体列表作为上下文。policy 事实契约扩展：
+发现单元是策略本身，不是挂载点。finding 身份 `aws:<criterionKey>:<resourceKey>`（策略规则的 resourceKey = policy identity，其余规则为桶名/实例 id 等资源标识），`metadata.attachments` 携带挂载主体列表作为上下文。policy 事实契约扩展：
 
 | 字段 | 说明 |
 | --- | --- |
@@ -108,7 +108,7 @@ Verdict / Finding（结论）
 
 | 维度 | 框架层 | 宿主层 |
 | --- | --- | --- |
-| 评估身份 | `evaluationKey` 字段，两个 family 各自版本化 | 不定义；run API 传 `criteriaVersionId` |
+| 评估身份 | `evaluationKey` 字段，两个 Evaluation 各自版本化 | 不定义；run API 传 `ruleSetVersionId` |
 | severity | per-draft 覆盖 | 不判定 |
 | 发现单元 | policy 身份 + attachments metadata | 采集器提供 attachments |
 | 采集契约 | fact 表写进 README | `AwsCloudConfigurationAccess` 实现采集 |
@@ -122,4 +122,4 @@ Verdict / Finding（结论）
 - 18 条 CIS 旧规则归并为 10 条准则，每条归并点的 severity 通过 per-draft 保留。
 - 政策风险按策略去重，不再按挂载点复制；挂载关系降级为 finding 上下文。
 - 10 条自定义规则 + 5 项采集扩展补齐规则等价闸门。
-- 一个 cloud-account 两次 run，合规轴只取 CIS run。
+- 一个 aws-account 两次 run，合规轴只取 CIS run。
