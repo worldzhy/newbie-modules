@@ -1,7 +1,7 @@
 # ADR-037: security-evaluation 评估定义模型与契约修正
 
 状态：已采纳
-日期：2026-10-27
+日期：2026-10-27（2026-10-29 修订：新增 D9 判定输入材料契约）
 归属：框架层（newbie-modules registry，`packages/modules/evaluation` + `packages/modules/security-evaluation`）
 关联：ADR-020（骨架）、ADR-027（CLOUD_CONFIG）、ADR-033（非 CIS 自定义规则族）、ADR-036（宿主切换）
 
@@ -83,6 +83,27 @@ ADR-033 决定了 `cis-aws-1.5` 与 `aws-custom` 两个 family，并把合规归
 
 事实是资产当前态（spec §4），由 `AwsCloudConfigurationAccess` 一次性采集并 upsert。两个 Evaluation 的 EvidenceProvider 各自声明所需 factType，共享采集器；采集按 freshness 策略（同窗口内复用已采集事实，避免重复 AWS 调用）。
 
+### D9. 判定输入材料契约（knowledge / evidence / 结论）
+
+D8 只定义了资产事实库存，未回答"三个 evaluationKey 的输入材料是否同一概念"。定稿如下：
+
+```
+Knowledge（判定输入池，跨 run 复用，落表）
+  ├── asset-scoped knowledge   ← SecurityEvaluationAssetFact（D8）
+  └── world-scoped knowledge   ← SecurityEvaluationKnowledgeItem（intel）
+            ↓ 每次 run 选取/采集本次涉及的子集
+Evidence（本次 run 的输入切片，EvaluationResult.manifest）
+            ↓ judge()
+Verdict / Finding（结论）
+```
+
+1. **两类 knowledge 同族、物理分表。** 唯一键语义（`assetId + factType + factKey` vs `source + externalId`）、保留策略（不主动删除、仅随资产级联清理，靠 `observedAt` 判陈旧 vs 90 天 / 每源 1000 条清理）、是否绑定 asset 三项约束互斥，不合并为一张表。`AssetFact` 概念上归入 knowledge 家族（改名如 `AssetKnowledgeItem`）是术语债，不改表结构。
+2. **evidence 是本次 run 的登记全量输入切片，与是否命中无关。** npm 每个包、AWS 每条配置各产一条 evidence，无论是否产生 finding。"全量"指**登记全量**：每条候选材料必须落到 `evaluated` 或 `skipped`，不要求每条都实际参与比对（预算截断允许但必须记账）。若只有命中才登记 evidence，coverage 的 `evaluated` 桶失去意义（"没命中"与"没评估"不可区分），并违反 ADR-020 D5 第 2 项（被截断的内容不得静默丢弃）。命中产出的是 finding。
+3. **`JudgmentInput` 契约收紧。** 判定器只吃 `input.evidence`，不得旁路读库——包括直接查 knowledge 表、注入 provider 读项目画像等任意库外输入；`subject.kind` 已由 `judgmentPortToken(kind)` 路由，入参应收窄为 `Omit<EvaluationSubjectRef, "kind">`（未落地），禁止同一 evaluationKey 在不同 kind 下分支——那会使同一 key 的 finding 不可比，R1 的静态声明失真。
+4. **intel 补账方向（未落地）。** 把窗口内候选情报条目投影成 `EvaluationEvidenceItem`（`layer: "knowledge"`，`layer` 为开放 string，无需改骨架类型），因预算未比对条目进 `skipped` 桶并登记数量（登记全量，见第 2 条）；使 coverage 可区分"没命中"与"没评估"，finding 的 `evidenceRefs` 可回指情报条目。intel 当前的第二处旁路（注入 provider 读 `project` 表构造匹配实体）同样要收敛：实体应经 `input.subject` / `input.evidence` 传入或显式登记为外部来源。
+
+**落地状态**：第 1–2 条为现状语义确认，无需改代码；第 3–4 条为技术债，由宿主侧 ADR-037 同步登记。
+
 ## Cross-host check
 
 | 维度 | 框架层 | 宿主层 |
@@ -93,6 +114,7 @@ ADR-033 决定了 `cis-aws-1.5` 与 `aws-custom` 两个 family，并把合规归
 | 采集契约 | fact 表写进 README | `AwsCloudConfigurationAccess` 实现采集 |
 | coverage | 按 requiredFactTypes | 不干预 |
 | 共享采集 | EvidenceProvider 声明 factType | 采集器实现 freshness 缓存 |
+| 判定输入材料 | knowledge 两类（asset-scoped / world-scoped）分表；evidence 为 run 切片 | 落 AssetFact / KnowledgeItem 表，投影成 evidence item |
 
 ## Consequences
 
