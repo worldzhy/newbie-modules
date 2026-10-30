@@ -296,7 +296,17 @@ export class AgentRunner {
         return;
       }
       if (error instanceof ModelCallError) {
-        yield failedEvent(context.requestId, modelErrorToCode(error.category), error.message);
+        // Provider SDK text can carry endpoint/credential fragments. Keep the
+        // raw message in the server log and send a stable, category-specific
+        // sentence over the SSE frame.
+        this.registry.logError("Copilot model call failed", {
+          requestId: context.requestId,
+          conversationId: context.conversationId,
+          category: error.category,
+          statusCode: error.statusCode,
+          error: error.message,
+        });
+        yield failedEvent(context.requestId, modelErrorToCode(error.category), modelErrorMessage(error.category));
         return;
       }
       // Internal details stay server-side; the client only gets a generic
@@ -410,6 +420,26 @@ function modelErrorToCode(category: ModelCallError["category"]): AgentFailureCod
       return "model_bad_request";
     default:
       return "model_upstream";
+  }
+}
+
+/** Client-facing sentence per category; never includes provider SDK text. */
+function modelErrorMessage(category: ModelCallError["category"]): string {
+  switch (category) {
+    case "timeout":
+      return "The model request timed out. Please try again.";
+    case "aborted":
+      return "The run was cancelled.";
+    case "auth":
+      return "The model provider rejected the configured credentials. Ask an administrator to check the model connection.";
+    case "rate-limit":
+      return "The model provider is rate limiting requests. Please retry shortly.";
+    case "bad-request":
+      return "The model provider rejected this request. Please adjust the prompt and retry.";
+    case "payment":
+      return "The model provider reports a billing or quota problem. Ask an administrator to check the model account.";
+    default:
+      return "The model provider failed to complete the request. Please try again.";
   }
 }
 
