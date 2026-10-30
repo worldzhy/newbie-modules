@@ -1,7 +1,9 @@
 import { Injectable, StreamableFile } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Express } from "express";
 import { createReadStream } from "fs";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { assertSafeFileName, resolveStoragePath } from "./storage-path";
 
 /**
  * Note: In this service, assume "files" means both files and folders.
@@ -9,9 +11,14 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
  */
 @Injectable()
 export class LocalStorageService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   async createFolder(params: { name: string; parentId?: string }) {
+    // A folder name is a single path segment; reject separators/traversal.
+    assertSafeFileName(params.name);
     return await this.prisma.localFile.create({
       data: {
         name: params.name,
@@ -22,6 +29,7 @@ export class LocalStorageService {
   }
 
   async uploadFile(params: { file: Express.Multer.File; parentId?: string }) {
+    assertSafeFileName(params.file.filename);
     return await this.prisma.localFile.create({
       data: {
         name: params.file.filename,
@@ -52,6 +60,7 @@ export class LocalStorageService {
   }
 
   async renameFile(params: { fileId: string; name: string }) {
+    assertSafeFileName(params.name);
     return await this.prisma.localFile.update({
       where: { id: params.fileId },
       data: { name: params.name },
@@ -59,19 +68,21 @@ export class LocalStorageService {
   }
 
   async downloadFile(fileId: string) {
-    // [step 1] Get the file information.
-    const file = await this.prisma.localFile.findUniqueOrThrow({
+    // [step 1] Ensure the file exists (throws 404-equivalent when missing).
+    await this.prisma.localFile.findUniqueOrThrow({
       where: { id: fileId },
+      select: { id: true },
     });
 
-    // [step 2] Return file.
-    try {
-      const path = (await this.getFilePathString(fileId)) + "/" + file.name;
-      const stream = createReadStream(path);
-      return new StreamableFile(stream);
-    } catch (error) {
-      throw error;
-    }
+    // [step 2] Resolve the on-disk path. The segment list already contains the
+    // file's own name, so it must not be appended a second time; every segment
+    // is validated and the result is confined to the storage root.
+    const segments = await this.getFilePathSegments(fileId);
+    const storageRoot = this.config.getOrThrow<string>("storage.local.path");
+    const filePath = resolveStoragePath(storageRoot, segments);
+
+    const stream = createReadStream(filePath);
+    return new StreamableFile(stream);
   }
 
   async getFilePath(fileId: string) {
@@ -94,24 +105,14 @@ export class LocalStorageService {
     return path;
   }
 
-  private async getFilePathString(fileId: string) {
-    let path = "";
-
-    // [step 1] Get current file.
+  /** Full name chain from the storage root down to the file itself. */
+  private async getFilePathSegments(fileId: string): Promise<string[]> {
     const file = await this.prisma.localFile.findFirstOrThrow({
       where: { id: fileId },
       select: { id: true, name: true, type: true, parentId: true },
     });
-    path = file.name;
-
-    // [step 2] Get parent file.
-    if (file.parentId) {
-      path = (await this.getFilePathString(file.parentId)) + "/" + path;
-    } else {
-      // Do nothing.
-    }
-
-    return path;
+    const parentSegments = file.parentId ? await this.getFilePathSegments(file.parentId) : [];
+    return [...parentSegments, file.name];
   }
 
   /* End */
