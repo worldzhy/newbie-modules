@@ -5,7 +5,14 @@ export function expose<T>(item: T): Expose<T> {
   const record = item as unknown as Record<string, unknown>;
   if (record.password) record.hasPassword = true;
   delete record.password;
+  // Session rows carry live credentials: the access token, the current and
+  // previous refresh-token hashes, and the plaintext of the freshest refresh
+  // token held for the idempotency window. None may be serialized to clients.
+  delete record.accessToken;
   delete record.refreshToken;
+  delete record.refreshTokenHash;
+  delete record.previousRefreshTokenHash;
+  delete record.refreshTokenNext;
   // API key secrets are stored hashed and must never be serialized to clients.
   delete record.secret;
 
@@ -13,6 +20,16 @@ export function expose<T>(item: T): Expose<T> {
 }
 
 export type Expose<T> = Omit<
-  Omit<Omit<Omit<Omit<Omit<T, "password">, "twoFactorSecret">, "token">, "emailSafe">, "subnet">,
-  "secret"
+  T,
+  | "password"
+  | "twoFactorSecret"
+  | "token"
+  | "emailSafe"
+  | "subnet"
+  | "secret"
+  | "accessToken"
+  | "refreshToken"
+  | "refreshTokenHash"
+  | "previousRefreshTokenHash"
+  | "refreshTokenNext"
 >;
