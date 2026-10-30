@@ -52,7 +52,7 @@ sense, and tracking a problem inside a JSON blob makes it untrackable.
 
 | Table                       | Owns                                                        |
 | --------------------------- | ----------------------------------------------------------- |
-| `EvaluationRuleSetVersion` | kind / evaluationKey / version, publication state           |
+| `EvaluationRuleSetVersion`  | kind / evaluationKey / version, publication state           |
 | `EvaluationCriterion`       | criterion key, kind, name, feature-defined metadata         |
 | `EvaluationSubject`         | kind, scope coordinate, subject key, display name           |
 | `EvaluationRun`             | state machine, failure reason, actor reference              |
