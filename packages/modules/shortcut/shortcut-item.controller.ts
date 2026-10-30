@@ -2,7 +2,6 @@ import { Controller, Post, Body, Get, Query, Patch, Delete, Param } from "@nestj
 import { ApiTags, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { CommonGetByNumberIdRequestDto } from "@devbie/newbie/common.dto";
 import {
   ListShortcutItemsRequestDto,
   ListShortcutItemsResponseDto,
@@ -86,17 +85,17 @@ export class ShortcutItemController {
     return await this.prisma.shortcutItem.create({ data: body });
   }
 
-  @Patch(":id")
+  @Patch(":shortcutItemId")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.ShortcutItem)
   @ApiResponse({ type: ShortcutItemEntity })
-  async update(@Param() params: CommonGetByNumberIdRequestDto, @Body() body: UpdateShortcutItemRequestDto) {
-    return await this.prisma.shortcutItem.update({ where: { id: Number(params.id) }, data: body });
+  async update(@Param("shortcutItemId") shortcutItemId: string, @Body() body: UpdateShortcutItemRequestDto) {
+    return await this.prisma.shortcutItem.update({ where: { id: Number(shortcutItemId) }, data: body });
   }
 
-  @Delete(":id")
+  @Delete(":shortcutItemId")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.ShortcutItem)
   @ApiResponse({ type: ShortcutItemEntity })
-  async delete(@Param() params: CommonGetByNumberIdRequestDto) {
-    return await this.prisma.shortcutItem.delete({ where: { id: Number(params.id) } });
+  async delete(@Param("shortcutItemId") shortcutItemId: string) {
+    return await this.prisma.shortcutItem.delete({ where: { id: Number(shortcutItemId) } });
   }
 }

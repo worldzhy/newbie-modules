@@ -81,6 +81,7 @@ export class AwsS3FileController {
   }
 
   @Post("folders")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @ApiOperation({
     summary: "Create a folder in AWS S3",
     description: "Create a folder in AWS S3",
