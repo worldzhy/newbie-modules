@@ -75,33 +75,34 @@ export class EvaluationCriteriaService {
   }
 
   /**
-   * Publish exactly once. The conditional update is what makes two concurrent
-   * publications safe: only the request that flips `publishedAt` from null
-   * wins, the other sees the row already published. A version with no criteria
-   * is refused — publishing an empty rubric would make every run vacuous.
+   * Publish exactly once. The whole check-then-write runs inside one
+   * transaction holding the version row lock: a concurrent criterion write
+   * (which locks the same row) cannot insert a criterion between the count and
+   * the flip, and a second publication blocks until the first commits and then
+   * sees the row already published. A version with no criteria is refused —
+   * publishing an empty rubric would make every run vacuous.
    */
   async publishVersion(id: string) {
-    const version = await this.requireVersion(id);
-    if (version.publishedAt) {
-      throw new ConflictException(
-        `Evaluation criteria version ${version.kind}/${version.evaluationKey}/${version.version} is already published`,
-      );
-    }
-    const criteriaCount = await this.prisma.evaluationCriterion.count({ where: { ruleSetVersionId: id } });
-    if (criteriaCount === 0) {
-      throw new BadRequestException(
-        `Cannot publish evaluation criteria version ${version.kind}/${version.evaluationKey}/${version.version}: it has no criteria`,
-      );
-    }
-    const published = await this.prisma.evaluationRuleSetVersion.updateMany({
-      where: { id, publishedAt: null },
-      data: { publishedAt: new Date() },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "id" FROM "module/evaluation"."EvaluationRuleSetVersion" WHERE "id" = ${id}::uuid FOR UPDATE`;
+      const version = await tx.evaluationRuleSetVersion.findUnique({ where: { id } });
+      if (!version) throw new NotFoundException(`Evaluation criteria version ${id} not found`);
+      if (version.publishedAt) {
+        throw new ConflictException(
+          `Evaluation criteria version ${version.kind}/${version.evaluationKey}/${version.version} is already published`,
+        );
+      }
+      const criteriaCount = await tx.evaluationCriterion.count({ where: { ruleSetVersionId: id } });
+      if (criteriaCount === 0) {
+        throw new BadRequestException(
+          `Cannot publish evaluation criteria version ${version.kind}/${version.evaluationKey}/${version.version}: it has no criteria`,
+        );
+      }
+      await tx.evaluationRuleSetVersion.update({
+        where: { id },
+        data: { publishedAt: new Date() },
+      });
     });
-    if (published.count === 0) {
-      throw new ConflictException(
-        `Evaluation criteria version ${version.kind}/${version.evaluationKey}/${version.version} is already published`,
-      );
-    }
     return this.requireVersion(id);
   }
 

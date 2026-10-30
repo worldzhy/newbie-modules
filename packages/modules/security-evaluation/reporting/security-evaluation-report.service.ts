@@ -12,8 +12,22 @@ import { deriveUrgencyRank, type SecurityEvaluationUrgency } from "../judgment/s
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const TOP_OPEN_LIMIT = 20;
+/** Bounded page size for reading OPEN findings whose urgency is JSON metadata. */
+const FINDING_SUMMARY_PAGE_SIZE = 500;
 const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
 const URGENCIES: readonly SecurityEvaluationUrgency[] = ["P1", "P2", "P3", "P4"];
+
+/** Ranked top-open ordering: highest urgency first, then oldest finding, then id for stability. */
+function compareTopOpen(
+  left: { urgency: SecurityEvaluationUrgency; firstSeenAt: Date; id: string },
+  right: { urgency: SecurityEvaluationUrgency; firstSeenAt: Date; id: string },
+): number {
+  return (
+    deriveUrgencyRank(right.urgency) - deriveUrgencyRank(left.urgency) ||
+    left.firstSeenAt.getTime() - right.firstSeenAt.getTime() ||
+    (left.id < right.id ? -1 : left.id > right.id ? 1 : 0)
+  );
+}
 
 /** The coverage buckets an archived result carries, per evaluation axis. */
 type CoverageStatsSummary = {
@@ -167,30 +181,43 @@ export class SecurityEvaluationReportService {
       if (row.severity in bySeverity) bySeverity[row.severity as (typeof SEVERITIES)[number]] += row._count._all;
     }
 
-    const openFindings = await this.prisma.evaluationFinding.findMany({
-      where: { subjectId: { in: [...subjectIds] }, status: EvaluationFindingStatus.OPEN },
-      select: { id: true, subjectId: true, title: true, severity: true, metadata: true, firstSeenAt: true },
-      orderBy: [{ severity: "desc" }, { firstSeenAt: "asc" }],
-    });
-    for (const finding of openFindings) {
-      const urgency = readUrgency(finding.metadata);
-      byUrgency[urgency] += 1;
+    // Urgency lives in the JSON metadata column, so it cannot be aggregated by
+    // Prisma. Iterate the OPEN findings in bounded pages and keep only the
+    // ranked top-N in memory instead of loading every row at once.
+    const topOpen: Array<{
+      id: string;
+      subjectId: string;
+      title: string;
+      severity: string;
+      urgency: SecurityEvaluationUrgency;
+      firstSeenAt: Date;
+    }> = [];
+    let cursor: { id: string } | undefined;
+    for (;;) {
+      const batch = await this.prisma.evaluationFinding.findMany({
+        where: { subjectId: { in: [...subjectIds] }, status: EvaluationFindingStatus.OPEN },
+        select: { id: true, subjectId: true, title: true, severity: true, metadata: true, firstSeenAt: true },
+        orderBy: { id: "asc" },
+        take: FINDING_SUMMARY_PAGE_SIZE,
+        ...(cursor ? { cursor, skip: 1 } : {}),
+      });
+      for (const finding of batch) {
+        const urgency = readUrgency(finding.metadata);
+        byUrgency[urgency] += 1;
+        topOpen.push({
+          id: finding.id,
+          subjectId: finding.subjectId,
+          title: finding.title,
+          severity: finding.severity,
+          urgency,
+          firstSeenAt: finding.firstSeenAt,
+        });
+      }
+      topOpen.sort(compareTopOpen);
+      topOpen.length = Math.min(topOpen.length, TOP_OPEN_LIMIT);
+      if (batch.length < FINDING_SUMMARY_PAGE_SIZE) break;
+      cursor = { id: batch[batch.length - 1].id };
     }
-    const topOpen = [...openFindings]
-      .sort(
-        (left, right) =>
-          deriveUrgencyRank(readUrgency(right.metadata)) - deriveUrgencyRank(readUrgency(left.metadata)) ||
-          left.firstSeenAt.getTime() - right.firstSeenAt.getTime(),
-      )
-      .slice(0, TOP_OPEN_LIMIT)
-      .map((finding) => ({
-        id: finding.id,
-        subjectId: finding.subjectId,
-        title: finding.title,
-        severity: finding.severity,
-        urgency: readUrgency(finding.metadata),
-        firstSeenAt: finding.firstSeenAt,
-      }));
 
     return { open, bySeverity, byUrgency, topOpen };
   }

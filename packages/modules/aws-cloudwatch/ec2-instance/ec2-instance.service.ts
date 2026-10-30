@@ -60,7 +60,7 @@ export class Ec2InstanceService {
           .filter((item) => !ec2InstanceRemoteIds.includes(item.instanceId))
           .map((item) => item.instanceId);
         if (deleteIds.length) {
-          await tx.ec2Instance.deleteMany({ where: { instanceId: { in: deleteIds } } });
+          await tx.ec2Instance.deleteMany({ where: { projectId, instanceId: { in: deleteIds } } });
         }
         for (const ec2Instance of ec2InstanceCreateManyInputs) {
           await tx.ec2Instance.upsert({

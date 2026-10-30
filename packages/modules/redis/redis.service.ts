@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 
@@ -16,7 +16,7 @@ import Redis from "ioredis";
  * ioredis itself opens the socket asynchronously regardless.
  */
 @Injectable()
-export class RedisService {
+export class RedisService implements OnModuleDestroy {
   private client?: Redis;
   private readonly logger = new Logger(RedisService.name);
 
@@ -32,6 +32,21 @@ export class RedisService {
     this.client.on("error", (err: Error) => {
       this.logger.error("Redis error:", err.message);
     });
+  }
+
+  /**
+   * Close the shared connection on shutdown. ioredis keeps the socket (and the
+   * process's event loop) alive otherwise, so a forgotten client turns into a
+   * leaked connection per restart and blocks graceful termination.
+   */
+  async onModuleDestroy(): Promise<void> {
+    if (!this.client) return;
+    try {
+      await this.client.quit();
+    } catch (error) {
+      this.logger.warn(`Redis quit failed, forcing disconnect: ${(error as Error).message}`);
+      this.client.disconnect();
+    }
   }
 
   isConfigured(): boolean {

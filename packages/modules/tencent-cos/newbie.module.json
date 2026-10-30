@@ -8,10 +8,10 @@
   "schema": "prisma/schema.prisma",
   "config-service": {
     "tencent-cos": {
-      "secretId": "process.env.TENCENT_COS_SECRET_ID || 'cos_secret_id'",
-      "secretKey": "process.env.TENCENT_COS_SECRET_KEY || 'cos_secret_key'",
+      "secretId": "process.env.TENCENT_COS_SECRET_ID",
+      "secretKey": "process.env.TENCENT_COS_SECRET_KEY",
       "region": "process.env.TENCENT_COS_REGION || 'us-east-1'",
-      "bucket": "process.env.TENCENT_COS_BUCKET || 'your-bucket-name'"
+      "bucket": "process.env.TENCENT_COS_BUCKET"
     }
   },
   "env": {

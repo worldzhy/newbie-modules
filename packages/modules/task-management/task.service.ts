@@ -171,8 +171,15 @@ export class TaskService {
       }
     }
 
-    const updated = await this.prisma.task.update({
-      where: { id: taskId },
+    // The status guard is part of the UPDATE, not just a prior read: two
+    // concurrent transitions from the same source status would both pass the
+    // check above and the later write would silently overwrite the first.
+    // Matching `status: previousStatus` makes the loser match no row.
+    const result = await this.prisma.task.updateMany({
+      where: {
+        id: taskId,
+        ...(previousStatus !== undefined ? { status: previousStatus, deletedAt: null } : {}),
+      },
       data: {
         title: dto.title,
         description: dto.description,
@@ -183,6 +190,14 @@ export class TaskService {
         lastOperatorName: operator.name,
       },
     });
+    if (result.count === 0) {
+      // Distinguish "never existed" from "lost the concurrent-update race".
+      if ((await this.prisma.task.count({ where: { id: taskId, deletedAt: null } })) === 0) {
+        throw new NotFoundException("Task not found");
+      }
+      throw new ConflictException("The task was modified concurrently; reload it and retry.");
+    }
+    const updated = await this.prisma.task.findUniqueOrThrow({ where: { id: taskId } });
 
     if (previousStatus !== undefined && nextStatus !== undefined && nextStatus !== previousStatus) {
       this.eventEmitter.emit(TASK_STATUS_CHANGED_EVENT, {

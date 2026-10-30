@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Client } from "@elastic/elasticsearch";
 import { Index } from "@elastic/elasticsearch/api/requestParams";
@@ -6,7 +6,7 @@ import PQueue from "p-queue";
 import pRetry from "p-retry";
 
 @Injectable()
-export class ElasticsearchService extends Client {
+export class ElasticsearchService extends Client implements OnModuleDestroy {
   private logger = new Logger("Elasticsearch");
   private queue = new PQueue({ concurrency: 1 });
 
@@ -17,6 +17,12 @@ export class ElasticsearchService extends Client {
       node: config.node,
       auth: { username: config.username, password: config.password },
     });
+  }
+
+  /** Release the transport and pending retries on shutdown. */
+  async onModuleDestroy(): Promise<void> {
+    this.queue.clear();
+    await this.close();
   }
 
   async indexWithRetry(index: string, record: Record<string, any>, params?: Index) {

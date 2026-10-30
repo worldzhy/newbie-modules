@@ -49,15 +49,19 @@ export class GoogleDrivePermissionService {
   }
 
   async deletePermission(id: number) {
-    const permission = await this.prisma.googleDrivePermission.delete({
+    const permission = await this.prisma.googleDrivePermission.findUniqueOrThrow({
       where: { id },
     });
 
+    // Revoke upstream first: if the local row went first, a failed Drive call
+    // would leave a live grant with no record pointing at it.
     await this.drive.permissions.delete({
       fileId: permission.fileId,
       permissionId: permission.permissionId,
       supportsAllDrives: true,
     });
+
+    await this.prisma.googleDrivePermission.delete({ where: { id } });
   }
 
   async listPermissions(params: { fileId: string }) {
