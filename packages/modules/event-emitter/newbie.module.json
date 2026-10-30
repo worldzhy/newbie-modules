@@ -1,0 +1,13 @@
+{
+  "key": "event-emitter",
+  "layer": "capability",
+  "module": {
+    "file": "event-emitter.module",
+    "className": "EventEmitterModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["security"],
+  "dependencies": {
+    "@nestjs/event-emitter": "latest"
+  }
+}

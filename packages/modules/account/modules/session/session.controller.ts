@@ -1,13 +1,36 @@
 import { Controller, Delete, Get, NotFoundException, Param, ParseIntPipe, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { Prisma, Session } from "@generated/prisma/client";
+import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { Expose, expose } from "../../helpers/expose";
 import { ListSessionsRequestDto, ListSessionsResponseDto, SessionResponseDto } from "./session.dto";
 import { SESSION_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { UserRequest } from "@modules/security/security.interface";
 import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
+
+/**
+ * Columns a session API may return. A Session row also holds the live access
+ * token, the current and previous refresh-token hashes, and the plaintext
+ * `refreshTokenNext` retained for the idempotency window; selecting the row
+ * wholesale would hand those credentials to the caller. Every endpoint below
+ * projects through this select so token material never leaves the database.
+ */
+const SESSION_PUBLIC_SELECT = {
+  id: true,
+  ipAddress: true,
+  userAgent: true,
+  city: true,
+  region: true,
+  timezone: true,
+  countryCode: true,
+  browser: true,
+  operatingSystem: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+} satisfies Prisma.SessionSelect;
+
+type SessionPublic = Prisma.SessionGetPayload<{ select: typeof SESSION_PUBLIC_SELECT }>;
 
 @ApiTags("Account / Session")
 @ApiBearerAuth()
@@ -36,15 +59,14 @@ export class SessionController {
       findManyArgs: {
         where: { userId },
         orderBy: { id: "desc" },
+        select: SESSION_PUBLIC_SELECT,
       },
     });
 
-    result.records = result.records
-      .map((session) => expose<Session>(session))
-      .map((session) => ({
-        ...session,
-        isCurrentSession: sessionId === session.id,
-      }));
+    result.records = (result.records as SessionPublic[]).map((session) => ({
+      ...session,
+      isCurrentSession: sessionId === session.id,
+    }));
     return result;
   }
 
@@ -56,16 +78,19 @@ export class SessionController {
     @Req() req: UserRequest,
     @Param("userId") userId: string,
     @Param("id") id: number,
-  ): Promise<Expose<Session & { isCurrentSession: boolean }>> {
+  ): Promise<SessionPublic & { isCurrentSession: boolean }> {
     const { sessionId } = req.user;
     // The where clause already scopes the row to the path user; SelfOnlyGuard
     // has verified the caller may act as that user.
-    const session = await this.prisma.session.findUnique({ where: { id, userId } });
+    const session = await this.prisma.session.findUnique({
+      where: { id, userId },
+      select: SESSION_PUBLIC_SELECT,
+    });
     if (!session) throw new NotFoundException(SESSION_NOT_FOUND);
 
     return {
-      ...expose<Session>(session),
-      isCurrentSession: sessionId === session.id,
+      ...session,
+      isCurrentSession: sessionId === id,
     };
   }
 
@@ -77,13 +102,14 @@ export class SessionController {
     @Req() req: UserRequest,
     @Param("userId") userId: string,
     @Param("id", ParseIntPipe) id: number,
-  ): Promise<Expose<Session>> {
+  ): Promise<SessionPublic> {
     // Guard already verified ownership; keep the lookup so a missing id
     // returns 404 instead of a Prisma delete error.
-    const testSession = await this.prisma.session.findUnique({ where: { id, userId } });
-    if (!testSession) throw new NotFoundException(SESSION_NOT_FOUND);
+    const existing = await this.prisma.session.findUnique({ where: { id, userId }, select: { id: true } });
+    if (!existing) throw new NotFoundException(SESSION_NOT_FOUND);
     const session = await this.prisma.session.delete({
       where: { id },
+      select: SESSION_PUBLIC_SELECT,
     });
 
     await this.auditLogService.record(AuditEvent.SESSION_REVOKED, {
@@ -96,6 +122,6 @@ export class SessionController {
       userAgent: req.headers["user-agent"],
     });
 
-    return expose<Session>(session);
+    return session;
   }
 }

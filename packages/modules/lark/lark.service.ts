@@ -1,3 +1,5 @@
+import { timingSafeEqual } from "node:crypto";
+
 import { Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
@@ -170,7 +172,8 @@ export class LarkService {
     }
 
     // 2. Verification-token check for plain callbacks, aligned with the
-    //    module-hub webhook standard: missing configuration fails closed.
+    //    module-hub webhook standard: missing configuration fails closed and
+    //    the comparison is constant-time (timingSafeEqual).
     const expectedToken = this.configService.get<string>("modules.lark.verificationToken");
     if (!expectedToken) {
       throw new ServiceUnavailableException(
@@ -178,7 +181,7 @@ export class LarkService {
       );
     }
     const providedToken = body.header?.token ?? body.token;
-    if (providedToken !== expectedToken) {
+    if (!providedToken || !tokensEqual(providedToken, expectedToken)) {
       this.logger.warn("Rejected a Lark webhook callback with an invalid verification token");
       throw new UnauthorizedException("Lark webhook verification token mismatch.");
     }
@@ -711,4 +714,11 @@ export class LarkService {
       this.logger.warn(`Error adding reaction to message ${messageId}: ${(error as Error)?.message}`);
     }
   }
+}
+
+/** Constant-time token comparison; false on length mismatch (timingSafeEqual throws). */
+function tokensEqual(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
 }

@@ -1,17 +1,15 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
+import { MonitorApplicationRefResolver, monitorApplicationRefResolverToken } from "./ports/application-ref.resolver";
 import { MonitorInstallationService } from "./services/monitor-installation.service";
 
 /** Minimum interval between liveness/fact UPDATEs for one installation. */
 const TOUCH_THROTTLE_MS = 30_000;
 
-/** externalRef host-mapping convention: "projectId/applicationId". */
-const EXTERNAL_REF_PATTERN = /^([0-9a-f-]{36})\/([0-9a-f-]{36})$/i;
-
 export interface ResolvedMonitorToken {
   installationId: string;
-  /** Mapped from externalRef; stamped as application_id on ClickHouse rows. */
+  /** Resolved via the host-bound MonitorApplicationRefResolver; stamped as application_id on ClickHouse rows. */
   applicationId: string;
 }
 
@@ -44,16 +42,22 @@ export class MonitorTokenResolver implements InstallationResolver {
 
   private readonly lastTouchAt = new Map<string, number>();
 
-  constructor(private readonly installations: MonitorInstallationService) {}
+  constructor(
+    private readonly installations: MonitorInstallationService,
+    @Inject(monitorApplicationRefResolverToken)
+    private readonly applicationRefs: MonitorApplicationRefResolver,
+  ) {}
 
   /**
-   * Validates the token and returns installationId plus the mapped
+   * Validates the token and returns installationId plus the resolved
    * applicationId. Throws UnauthorizedException when malformed, unknown,
-   * revoked, or when the installation has no parseable application mapping.
+   * revoked, or when the installation has no mappable application identity.
    */
   async resolve(token: string): Promise<ResolvedMonitorToken> {
     const installation = await this.installations.resolveByToken(token);
-    const applicationId = installation?.externalRef ? this.parseApplicationId(installation.externalRef) : null;
+    const applicationId = installation?.externalRef
+      ? this.applicationRefs.resolveApplicationId(installation.externalRef)
+      : null;
     if (!installation || !applicationId) {
       throw new UnauthorizedException("Invalid backend monitor report token.");
     }
@@ -67,11 +71,5 @@ export class MonitorTokenResolver implements InstallationResolver {
     if (nowMs - last < TOUCH_THROTTLE_MS) return;
     await this.installations.touchOnIngest(installationId, facts);
     this.lastTouchAt.set(installationId, nowMs);
-  }
-
-  /** Extracts the applicationId segment of a "projectId/applicationId" ref. */
-  private parseApplicationId(externalRef: string): string | null {
-    const match = EXTERNAL_REF_PATTERN.exec(externalRef);
-    return match ? match[2] : null;
   }
 }

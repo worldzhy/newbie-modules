@@ -1,13 +1,13 @@
-export const SEVERITIES = ["critical", "high", "medium", "low", "unknown"] as const;
+export const SEVERITIES = ["critical", "high", "medium", "low", "info"] as const;
 
-// Severity ranking for threshold comparisons; unknown is treated as the
+// Severity ranking for threshold comparisons; info is treated as the
 // weakest signal so it never pushes an alert on its own.
 export const SEVERITY_LEVEL: Record<string, number> = {
   critical: 4,
   high: 3,
   medium: 2,
   low: 1,
-  unknown: 0,
+  info: 0,
 };
 
 export const CENTER_SETTING_SINGLETON_ID = 1;

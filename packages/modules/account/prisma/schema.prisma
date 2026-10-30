@@ -90,14 +90,15 @@ model Permission {
 }
 
 model Role {
-  id          Int         @id @default(autoincrement())
-  name        String      @unique
-  isBuiltin   Boolean     @default(false)
-  description String?
-  permissions Permission[]
-  users       UserRole[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id                      Int                    @id @default(autoincrement())
+  name                    String                 @unique
+  isBuiltin               Boolean                @default(false)
+  description             String?
+  permissions             Permission[]
+  users                   UserRole[]
+  rolePermissionGroups    RolePermissionGroup[]
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
 
   @@schema("module/account")
 }
@@ -110,6 +111,52 @@ model UserRole {
 
   @@id([userId, roleId])
   @@index([roleId])
+  @@schema("module/account")
+}
+
+model PermissionGroup {
+  id            Int                    @id @default(autoincrement())
+  name          String                 @unique
+  description   String?
+  routePath     String
+  // Where the group surfaces in the application chrome. Every header entry has
+  // the same standing; placement only decides whether it is rendered there.
+  navPlacement  NavPlacement           @default(NONE)
+  // Position among header entries (1-based, ascending). Gaps are allowed; the
+  // frontend renders the lowest N directly and folds the rest into one overflow
+  // menu. The threshold itself is a presentation constant, not stored here.
+  navOrder      Int                    @default(0)
+  navLabel      String
+  navIcon       String?
+  isBuiltin     Boolean                @default(true)
+  permissions   PermissionGroupPermission[]
+  roles         RolePermissionGroup[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@schema("module/account")
+}
+
+model PermissionGroupPermission {
+  id                 Int             @id @default(autoincrement())
+  permissionGroupId  Int
+  permissionGroup    PermissionGroup @relation(fields: [permissionGroupId], references: [id], onDelete: Cascade)
+  action             PermissionAction
+  resource           String
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@unique([permissionGroupId, action, resource])
+  @@schema("module/account")
+}
+
+model RolePermissionGroup {
+  roleId             Int
+  permissionGroupId  Int
+  role               Role            @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionGroup    PermissionGroup @relation(fields: [permissionGroupId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionGroupId])
   @@schema("module/account")
 }
 
@@ -222,6 +269,7 @@ model AccountExternalIdentity {
 enum UserStatus {
   ACTIVE
   INACTIVE
+  PENDING_APPROVAL
 
   @@schema("module/account")
 }
@@ -244,8 +292,14 @@ enum MfaMethod {
   @@schema("module/account")
 }
 
+enum NavPlacement {
+  HEADER_NAVIGATION
+  NONE
+
+  @@schema("module/account")
+}
+
 enum PermissionAction {
-  Manage
   List
   Get
   Create

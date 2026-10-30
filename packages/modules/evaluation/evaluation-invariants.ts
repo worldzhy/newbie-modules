@@ -47,7 +47,7 @@ export function hashManifest(manifest: readonly EvaluationEvidenceItem[]): strin
 }
 
 /** A version is editable only while it is a draft (ADR-020 D5.5). */
-export function isCriteriaVersionMutable(publishedAt: Date | null | undefined): boolean {
+export function isRuleSetVersionMutable(publishedAt: Date | null | undefined): boolean {
   return publishedAt === null || publishedAt === undefined;
 }
 
@@ -57,7 +57,12 @@ export interface ComposeCoverageInput {
   /** Evidence ids the judgment examined. */
   evaluatedRefs: readonly string[];
   declaredUnlinked: EvaluationCoverageBucket;
-  /** Skipped buckets of the run: collector first, then judgment budget. */
+  /**
+   * Skipped buckets of the run: collector first, then judgment budget. A
+   * bucket that references manifest material MUST carry `items` — ids left
+   * out fall into `unconsumed`, double-counting the material as both
+   * "cut off" and "needed by no rule".
+   */
   skippedBuckets: readonly (EvaluationCoverageBucket | undefined)[];
 }
 
@@ -72,14 +77,17 @@ export interface ComposeCoverageResult {
 }
 
 /**
- * Compose the three coverage buckets of a result (ADR-020 D5.2). The evaluated
- * bucket is derived from what the judgment actually examined, never asserted by
- * the caller; skipped buckets are merged so no source of dropped material can
- * disappear. An evaluated ref unknown to the manifest is reported as a problem
- * instead of being silently bucketed under an "unknown" source.
+ * Compose the four coverage buckets of a result (ADR-020 D5.2, ADR-037 D7).
+ * The evaluated bucket is derived from what the judgment actually examined,
+ * never asserted by the caller; skipped buckets are merged so no source of
+ * dropped material can disappear; unconsumed is the manifest minus evaluated
+ * minus skipped — material registered but needed by no rule of this
+ * evaluationKey. An evaluated ref unknown to the manifest is reported as a
+ * problem instead of being silently bucketed under an "unknown" source.
  */
 export function composeCoverageStats(input: ComposeCoverageInput): ComposeCoverageResult {
   const evaluatedRefs = [...new Set(input.evaluatedRefs)];
+  const evaluatedSet = new Set(evaluatedRefs);
   const byId = new Map(input.items.map((item) => [item.id, item]));
   const bySource: Record<string, number> = {};
   const problems: string[] = [];
@@ -91,11 +99,30 @@ export function composeCoverageStats(input: ComposeCoverageInput): ComposeCovera
     }
     bySource[item.source] = (bySource[item.source] ?? 0) + 1;
   }
+
+  const skippedIds = new Set<string>();
+  for (const bucket of input.skippedBuckets) {
+    for (const id of bucket?.items ?? []) skippedIds.add(id);
+  }
+  const unconsumedItems: string[] = [];
+  const unconsumedBySource: Record<string, number> = {};
+  for (const item of input.items) {
+    if (evaluatedSet.has(item.id) || skippedIds.has(item.id)) continue;
+    unconsumedItems.push(item.id);
+    unconsumedBySource[item.source] = (unconsumedBySource[item.source] ?? 0) + 1;
+  }
+  const unconsumed: EvaluationCoverageBucket = { total: unconsumedItems.length };
+  if (unconsumedItems.length > 0) {
+    unconsumed.bySource = unconsumedBySource;
+    unconsumed.items = unconsumedItems;
+  }
+
   return {
     stats: {
       evaluated: { total: evaluatedRefs.length, bySource, items: evaluatedRefs },
       declaredUnlinked: normalizeBucket(input.declaredUnlinked),
       skipped: mergeBuckets(input.skippedBuckets),
+      unconsumed,
     },
     problems,
   };
@@ -139,7 +166,7 @@ function mergeBuckets(buckets: readonly (EvaluationCoverageBucket | undefined)[]
  */
 export function validateCoverageStats(stats: EvaluationCoverageStats, manifestIds?: ReadonlySet<string>): string[] {
   const problems: string[] = [];
-  for (const name of ["evaluated", "declaredUnlinked", "skipped"] as const) {
+  for (const name of ["evaluated", "declaredUnlinked", "skipped", "unconsumed"] as const) {
     const bucket = stats?.[name];
     if (!bucket) {
       problems.push(`coverageStats.${name} is required`);

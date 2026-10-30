@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Inject,
   Injectable,
   NotFoundException,
@@ -29,28 +30,60 @@ export interface EvaluationRunOptions {
   staleRunTimeoutMs?: number;
   /** Ms between runner heartbeats that keep a judging run fresh. Default 60 seconds. */
   heartbeatIntervalMs?: number;
+  /**
+   * Ms between stale-run sweeps (ADR-038). Only affects how quickly an
+   * abandoned row is discovered, never correctness. Default 60 seconds.
+   */
+  reapIntervalMs?: number;
 }
 
 export const DEFAULT_EVALUATION_RUN_OPTIONS: Required<EvaluationRunOptions> = {
   staleRunTimeoutMs: 30 * 60 * 1000,
   heartbeatIntervalMs: 60 * 1000,
+  reapIntervalMs: 60 * 1000,
 };
 
 /** Failure text is stored for the caller, not for a bug report: cap it. */
 const MAX_ERROR_LENGTH = 1000;
+
+/**
+ * The error the stale-run reaper persists on every row it closes (ADR-038).
+ * The reaper writes this same text to the row, the terminal event and the
+ * observer notification, so the channels can never drift (ADR-032 D5).
+ */
+export const STALE_RUN_ERROR = "Run abandoned: no progress within the timeout window (process restart?)";
+
+/**
+ * The single failure text the run row and the `evaluation.run-failed` event
+ * share (ADR-032 D5): one source, one truncation, so the two can never drift.
+ */
+export function formatRunError(error: unknown): string {
+  return describeError(error).slice(0, MAX_ERROR_LENGTH);
+}
 
 const ACTIVE_STATUSES: EvaluationRunStatus[] = [EvaluationRunStatus.QUEUED, EvaluationRunStatus.RUNNING];
 
 export interface StartEvaluationRunInput {
   subjectId: string;
   /** Omit to let the feature's CriteriaProvider pick the applicable version. */
-  criteriaVersionId?: string;
+  ruleSetVersionId?: string;
   requestedByRef?: string;
+  /**
+   * Opaque per-run feature config (ADR-023), stored on the row and threaded to
+   * the judgment port verbatim. Small knobs only — the skeleton never reads it.
+   */
+  config?: Record<string, unknown>;
 }
 
 export interface ListEvaluationRunsInput {
-  subjectId: string;
-  criteriaVersionId?: string;
+  /** Omitted lists every run (of `kind`, when given) newest first. */
+  subjectId?: string;
+  ruleSetVersionId?: string;
+  /** When present, only runs whose subject matches this kind are returned. */
+  kind?: string;
+  /** Host scope coordinate on the subject; narrows the list to one scope. */
+  scopeType?: string;
+  scopeId?: string;
   page?: number;
   pageSize?: number;
 }
@@ -59,7 +92,7 @@ export interface ListEvaluationRunsInput {
  * EvaluationRunService — the run state machine (ADR-020 D1, D5.4).
  *
  * Concurrency is delegated to the database: the partial unique index on
- * (subjectId, criteriaVersionId) covering the active statuses means a second
+ * (subjectId, ruleSetVersionId) covering the active statuses means a second
  * concurrent request fails at insert on any replica, not just within the
  * process that received it.
  */
@@ -80,34 +113,37 @@ export class EvaluationRunService {
   /**
    * Open a run against a published criteria version. Rejects with 409 when an
    * active run already exists for the same subject and version — that is the
-   * database saying so, not a cached flag.
+   * database saying so, not a cached flag. Stale rows are closed by the
+   * skeleton's interval reaper (ADR-038), never by admission: a dead row may
+   * keep this subject and version 409ing for at most one reap interval.
    */
   async startRun(input: StartEvaluationRunInput): Promise<EvaluationRun> {
     const subject = await this.prisma.evaluationSubject.findUnique({ where: { id: input.subjectId } });
     if (!subject) throw new NotFoundException(`Evaluation subject ${input.subjectId} not found`);
 
-    const criteriaVersionId = input.criteriaVersionId ?? (await this.resolveVersionId(toSubjectRef(subject)));
-    const version = await this.requirePublishedVersion(criteriaVersionId);
+    const ruleSetVersionId =
+      input.ruleSetVersionId ?? (await this.resolveVersionId(toSubjectRef(subject), input.config ?? null));
+    const version = await this.requirePublishedVersion(ruleSetVersionId);
     if (version.kind !== subject.kind) {
       throw new BadRequestException(
-        `Criteria version ${version.family}/${version.version} judges kind "${version.kind}", not "${subject.kind}"`,
+        `Criteria version ${version.evaluationKey}/${version.version} judges kind "${version.kind}", not "${subject.kind}"`,
       );
     }
 
-    await this.expireStaleRuns(input.subjectId, criteriaVersionId);
     try {
       return await this.prisma.evaluationRun.create({
         data: {
           subjectId: input.subjectId,
-          criteriaVersionId,
+          ruleSetVersionId,
           requestedByRef: input.requestedByRef,
+          config: input.config as Prisma.InputJsonValue | undefined,
           status: EvaluationRunStatus.QUEUED,
         },
       });
     } catch (error) {
       if (isUniqueViolation(error)) {
         throw new ConflictException(
-          `An evaluation is already running for subject ${input.subjectId} against criteria version ${criteriaVersionId}.`,
+          `An evaluation is already running for subject ${input.subjectId} against criteria version ${ruleSetVersionId}.`,
         );
       }
       throw error;
@@ -137,7 +173,7 @@ export class EvaluationRunService {
       where: { id, status: { in: ACTIVE_STATUSES } },
       data: {
         status: EvaluationRunStatus.FAILED,
-        error: describeError(error).slice(0, MAX_ERROR_LENGTH),
+        error: formatRunError(error),
         finishedAt: new Date(),
       },
     });
@@ -183,9 +219,15 @@ export class EvaluationRunService {
     }
   }
 
-  async findById(id: string): Promise<EvaluationRun> {
-    const run = await this.prisma.evaluationRun.findUnique({ where: { id } });
+  async findById(id: string, kind?: string): Promise<EvaluationRun> {
+    const run = await this.prisma.evaluationRun.findUnique({
+      where: { id },
+      include: { subject: { select: { kind: true } } },
+    });
     if (!run) throw new NotFoundException(`Evaluation run ${id} not found`);
+    if (kind && run.subject.kind !== kind) {
+      throw new NotFoundException(`Evaluation run ${id} not found for kind "${kind}"`);
+    }
     return run;
   }
 
@@ -196,7 +238,16 @@ export class EvaluationRunService {
       findManyArgs: {
         where: {
           subjectId: query.subjectId,
-          ...(query.criteriaVersionId ? { criteriaVersionId: query.criteriaVersionId } : {}),
+          ...(query.ruleSetVersionId ? { ruleSetVersionId: query.ruleSetVersionId } : {}),
+          ...(query.kind || query.scopeType || query.scopeId
+            ? {
+                subject: {
+                  ...(query.kind ? { kind: query.kind } : {}),
+                  ...(query.scopeType ? { scopeType: query.scopeType } : {}),
+                  ...(query.scopeId ? { scopeId: query.scopeId } : {}),
+                },
+              }
+            : {}),
         },
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       },
@@ -204,26 +255,34 @@ export class EvaluationRunService {
   }
 
   /** Ask the feature which version applies, then resolve the published row. */
-  private async resolveVersionId(subject: EvaluationSubjectRef): Promise<string> {
-    const selection = await this.providers.getCriteriaProvider(subject.kind).selectVersion(subject);
+  private async resolveVersionId(
+    subject: EvaluationSubjectRef,
+    runConfig: Record<string, unknown> | null,
+  ): Promise<string> {
+    const selection = await this.providers.getCriteriaProvider(subject.kind).selectVersion(subject, runConfig);
     if (!selection) {
       throw new ConflictException(
         `No criteria version is applicable to subject ${subject.id} (kind "${subject.kind}")`,
       );
     }
-    const version = await this.prisma.evaluationCriteriaVersion.findFirst({
-      where: { kind: subject.kind, family: selection.family, version: selection.version, publishedAt: { not: null } },
+    const version = await this.prisma.evaluationRuleSetVersion.findFirst({
+      where: {
+        kind: subject.kind,
+        evaluationKey: selection.evaluationKey,
+        version: selection.version,
+        publishedAt: { not: null },
+      },
     });
     if (!version) {
       throw new NotFoundException(
-        `Criteria version ${selection.family}/${selection.version} is not published for kind "${subject.kind}"`,
+        `Criteria version ${selection.evaluationKey}/${selection.version} is not published for kind "${subject.kind}"`,
       );
     }
     return version.id;
   }
 
   private async requirePublishedVersion(id: string) {
-    const version = await this.prisma.evaluationCriteriaVersion.findUnique({ where: { id } });
+    const version = await this.prisma.evaluationRuleSetVersion.findUnique({ where: { id } });
     if (!version) throw new NotFoundException(`Evaluation criteria version ${id} not found`);
     if (!version.publishedAt) {
       throw new ConflictException(`Evaluation criteria version ${id} is a draft and cannot be run against`);
@@ -231,21 +290,32 @@ export class EvaluationRunService {
     return version;
   }
 
-  /** Flip abandoned active rows to FAILED so they stop blocking new runs. */
-  private async expireStaleRuns(subjectId: string, criteriaVersionId: string): Promise<void> {
-    await this.prisma.evaluationRun.updateMany({
-      where: {
-        subjectId,
-        criteriaVersionId,
-        status: { in: ACTIVE_STATUSES },
-        updatedAt: { lt: new Date(Date.now() - this.staleRunTimeoutMs) },
-      },
-      data: {
-        status: EvaluationRunStatus.FAILED,
-        error: "Run abandoned: no progress within the timeout window (process restart?)",
-        finishedAt: new Date(),
-      },
+  /**
+   * Global stale-run sweep (ADR-038): fail every active row untouched past the
+   * timeout and return exactly the rows this call closed. Each flip is a
+   * conditional write on the id, the active statuses and the `updatedAt` the
+   * row was selected with — a heartbeat landing in between, or a peer instance
+   * racing the same row, makes the update match nothing. Only the caller that
+   * closed a row reports it, so terminal events fire exactly once even with
+   * several replicas sweeping.
+   */
+  async reapStaleRuns(): Promise<EvaluationRun[]> {
+    const cutoff = new Date(Date.now() - this.staleRunTimeoutMs);
+    const candidates = await this.prisma.evaluationRun.findMany({
+      where: { status: { in: ACTIVE_STATUSES }, updatedAt: { lt: cutoff } },
     });
+    const reaped: EvaluationRun[] = [];
+    for (const candidate of candidates) {
+      const finishedAt = new Date();
+      const updated = await this.prisma.evaluationRun.updateMany({
+        where: { id: candidate.id, status: { in: ACTIVE_STATUSES }, updatedAt: candidate.updatedAt },
+        data: { status: EvaluationRunStatus.FAILED, error: STALE_RUN_ERROR, finishedAt },
+      });
+      if (updated.count === 1) {
+        reaped.push({ ...candidate, status: EvaluationRunStatus.FAILED, error: STALE_RUN_ERROR, finishedAt });
+      }
+    }
+    return reaped;
   }
 }
 
@@ -261,6 +331,18 @@ function isUniqueViolation(error: unknown): boolean {
   return typeof message === "string" && message.includes("EvaluationRun_one_active_per_subject_version");
 }
 
+/**
+ * Failure text derivation. An HttpException keeps its diagnostic payload in
+ * `getResponse()`, not in `message`: Nest turns an array payload into the status
+ * text in `message` ("Bad Request") and leaves the array in the response, so
+ * reading `message` alone would drop exactly the invariant problem lists this
+ * text exists to report. Serialize the response payload instead; plain errors
+ * keep their message.
+ */
 function describeError(error: unknown): string {
+  if (error instanceof HttpException) {
+    const response = error.getResponse();
+    return typeof response === "string" ? response : JSON.stringify(response);
+  }
   return error instanceof Error ? error.message : String(error);
 }

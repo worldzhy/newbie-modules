@@ -1,6 +1,6 @@
 import type {
   EvaluationCoverageBucket,
-  EvaluationCriteriaVersionRef,
+  EvaluationRuleSetVersionRef,
   EvaluationEvidenceItem,
   EvaluationSubjectRef,
 } from "./evaluation.contracts";
@@ -24,5 +24,14 @@ export interface EvidenceCollection {
 }
 
 export interface EvidenceProvider {
-  collect(subject: EvaluationSubjectRef, criteriaVersion: EvaluationCriteriaVersionRef): Promise<EvidenceCollection>;
+  /**
+   * `runConfig` is the opaque per-run feature config stored on the run row
+   * (ADR-023/ADR-026), passed verbatim. Features that do not need it simply
+   * omit the parameter.
+   */
+  collect(
+    subject: EvaluationSubjectRef,
+    ruleSetVersion: EvaluationRuleSetVersionRef,
+    runConfig?: Record<string, unknown> | null,
+  ): Promise<EvidenceCollection>;
 }

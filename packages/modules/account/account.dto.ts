@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { MfaMethod, UserGender } from "@generated/prisma/client";
+import { MfaMethod, NavPlacement, UserGender } from "@generated/prisma/client";
 import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 
@@ -15,6 +15,13 @@ export class GetCurrentUserResponseDto {
 
   @ApiProperty({ type: String, isArray: true })
   roles!: string[];
+
+  @ApiProperty({
+    type: () => UserPermissionGroupSummary,
+    isArray: true,
+    description: "Union of permission groups across all held roles. ADMIN holders get every group implicitly.",
+  })
+  permissionGroups!: UserPermissionGroupSummary[];
 
   @ApiPropertyOptional({ enum: MfaMethod })
   twoFactorMethod?: MfaMethod;
@@ -33,6 +40,33 @@ export class GetCurrentUserResponseDto {
 
   @ApiPropertyOptional({ type: String })
   avatarFileId?: string | null;
+}
+
+/**
+ * Trimmed PermissionGroup projection returned by /account/me. Frontend uses
+ * this to decide which nav entries to render — no permissions or description.
+ */
+export class UserPermissionGroupSummary {
+  @ApiProperty({ type: Number })
+  id!: number;
+
+  @ApiProperty({ type: String })
+  name!: string;
+
+  @ApiProperty({ type: String })
+  routePath!: string;
+
+  @ApiProperty({ enum: NavPlacement })
+  navPlacement!: NavPlacement;
+
+  @ApiProperty({ type: Number, description: "Header nav position (1-based)." })
+  navOrder!: number;
+
+  @ApiProperty({ type: String })
+  navLabel!: string;
+
+  @ApiPropertyOptional({ type: String })
+  navIcon?: string | null;
 }
 
 /**

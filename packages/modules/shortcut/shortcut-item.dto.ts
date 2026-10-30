@@ -10,6 +10,10 @@ export class ShortcutReqBaseDto {
 }
 
 export class ShortcutTreeRequestDto {
+  @ApiProperty({ type: String })
+  @IsString()
+  projectId!: string;
+
   @ApiPropertyOptional({ type: Number })
   @Type(() => Number)
   @IsOptional()
@@ -36,6 +40,10 @@ export class ListShortcutItemsRequestDto extends CommonListRequestDto {
   @IsNumber()
   @Type(() => Number)
   groupId?: number;
+
+  @ApiProperty({ type: String })
+  @IsString()
+  projectId!: string;
 }
 
 export class ListShortcutItemsResponseDto extends CommonListResponseDto {

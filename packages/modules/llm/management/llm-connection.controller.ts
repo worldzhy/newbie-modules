@@ -7,6 +7,7 @@ import { ModelCallError } from "../chat-model.port";
 import {
   CreateLlmConnectionDto,
   LlmConnectionResponseDto,
+  TestLlmConnectionDto,
   TestLlmConnectionResponseDto,
   UpdateLlmConnectionDto,
 } from "./llm-connection.dto";
@@ -64,17 +65,25 @@ export class LlmConnectionController {
     return await this.connections.remove(id);
   }
 
-  @Post(":id/test")
-  @RequirePermission(PermissionAction.Manage, "LlmConnection")
-  @ApiOperation({ summary: "Test connection with a minimal chat completion request (shared adapter path)" })
+  @Post("test")
+  @RequirePermission(PermissionAction.Create, "LlmConnection")
+  @ApiOperation({
+    summary: "Test a connection configuration with a minimal chat completion request (nothing is persisted)",
+  })
+  @ApiBody({ type: TestLlmConnectionDto })
   @ApiResponse({ status: 200, type: TestLlmConnectionResponseDto })
-  async test(@Param("id") id: string): Promise<TestLlmConnectionResponseDto> {
-    // Orchestrated here (not in LlmConnectionService) to keep the dependency
-    // graph acyclic: the service is a dependency of ChatModelResolver, while
-    // the test path needs the resolver. resolveById throws NotFound for an
-    // unknown id; the resolver's health decorator records the outcome, so a
-    // failed test updates the health snapshot immediately.
-    const port = await this.resolver.resolveById(id);
+  async test(@Body() dto: TestLlmConnectionDto): Promise<TestLlmConnectionResponseDto> {
+    // The admin dialog uses this for both the create and edit forms, so the
+    // probe runs against exactly the values on screen rather than the stored
+    // row. A masked apiKey echo (edit form left untouched) is resolved to the
+    // stored key via `id`.
+    const apiKey = await this.connections.resolveTestApiKey(dto.id, dto.apiKey);
+    const port = this.resolver.createDraftPort({
+      provider: dto.provider,
+      model: dto.model,
+      baseUrl: dto.baseUrl ?? "",
+      apiKey,
+    });
     try {
       await port.complete({
         messages: [{ role: "user", content: "Hi" }],

@@ -53,7 +53,7 @@ interface CachedClient {
  * Stateless read-through proxy over AWS Secrets Manager. AWS is the single
  * source of truth: no local table mirrors secret metadata. Project scoping
  * comes from the per-project AWS credential (each project points at its own
- * account), and managed secrets carry `nightwatch:managed` / `nightwatch:secret-type` tags.
+ * account), and managed secrets carry `devbie:managed` / `devbie:secret-type` tags.
  */
 @Injectable()
 export class AwsSecretsManagerService {

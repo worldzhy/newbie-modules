@@ -12,30 +12,14 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { JobHandlerRegistryService, JobHandler } from "./handler-registry.service";
+import { JOB_RUN_FAILED_EVENT, type JobRunFailedEvent } from "../job-scheduler.events";
 
 const RECONCILE_INTERVAL_MS = 30_000;
 const CRON_JOB_NAME_PREFIX = "job-scheduler:";
 export const DEFAULT_TIMEZONE = "Asia/Shanghai";
 const PG_UNIQUE_VIOLATION = "P2002";
 
-/// Emitted after a job run is persisted with status "failed". The scheduler
-/// stays decoupled from notification-center; application-layer listeners turn
-/// this event into notifications.
-export const JOB_RUN_FAILED_EVENT = "job-scheduler.run-failed";
-
 export type JobTrigger = "schedule" | "manual";
-
-export interface JobRunFailedEvent {
-  runId: number;
-  scheduleId: number;
-  scheduleKey: string;
-  handlerKey: string;
-  trigger: JobTrigger;
-  startedAt: string;
-  finishedAt: string;
-  durationMs: number;
-  error: string;
-}
 
 export interface JobScheduleDeclaration {
   key: string;

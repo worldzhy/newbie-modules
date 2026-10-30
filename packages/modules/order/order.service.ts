@@ -1,7 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { PaymentMethod } from "@generated/prisma/client";
 import { OrderItemRequestEntity } from "./order.entity";
+import { resolveOrderItems, UnknownSkuError } from "./order-pricing";
 
 @Injectable()
 export class OrderService {
@@ -13,24 +14,32 @@ export class OrderService {
     note?: string;
     userId: string;
   }) {
-    let totalInCents = 0;
-    for (const item of params.items) {
-      totalInCents += item.priceInCents * (item.quantity || 1);
+    // Price and product name are authoritative from the catalog. Client fields
+    // cannot influence the amount charged.
+    const products = await this.prisma.product.findMany({
+      where: { skuId: { in: params.items.map((item) => item.skuId) } },
+      select: { skuId: true, name: true, priceInCents: true, priceInCentsDiscounted: true },
+    });
+
+    let resolved: ReturnType<typeof resolveOrderItems>;
+    try {
+      resolved = resolveOrderItems(products, params.items);
+    } catch (error) {
+      if (error instanceof UnknownSkuError) throw new BadRequestException(error.message);
+      throw new BadRequestException((error as Error).message);
     }
 
-    const orderItems = params.items.map((item) => {
-      return {
-        skuId: item.skuId,
-        name: item.name,
-        priceInCents: item.priceInCents,
-        quantity: item.quantity || 1,
-        subTotalInCents: item.priceInCents * (item.quantity || 1),
-      };
-    });
+    const orderItems = resolved.items.map((item) => ({
+      skuId: item.skuId,
+      name: item.name,
+      priceInCents: item.priceInCents,
+      quantity: item.quantity,
+      subTotalInCents: item.subTotalInCents,
+    }));
 
     return await this.prisma.order.create({
       data: {
-        totalInCents: totalInCents,
+        totalInCents: resolved.totalInCents,
         paymentMethod: params.paymentMethod,
         items: { createMany: { data: orderItems } },
         note: params.note,

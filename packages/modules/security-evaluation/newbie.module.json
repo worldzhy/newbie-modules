@@ -1,0 +1,13 @@
+{
+  "key": "security-evaluation",
+  "layer": "feature",
+  "module": {
+    "file": "security-evaluation.module",
+    "className": "SecurityEvaluationModule"
+  },
+  "schema": "prisma/schema.prisma",
+  "moduleDependencies": ["evaluation", "security"],
+  "config-service": {},
+  "env": {},
+  "dependencies": {}
+}

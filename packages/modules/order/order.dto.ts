@@ -42,12 +42,7 @@ export class CreateOrderResponseDto {
   userId!: string;
 }
 
-export class ListOrdersRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({ type: String })
-  @IsString()
-  @IsOptional()
-  userId?: string;
-}
+export class ListOrdersRequestDto extends CommonListRequestDto {}
 
 export class ListOrdersResponseDto extends CommonListResponseDto {
   @ApiProperty({ type: OrderEntity, isArray: true })

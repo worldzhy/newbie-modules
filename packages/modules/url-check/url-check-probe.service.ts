@@ -4,6 +4,12 @@ import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { assertPublicHttpUrl, assertPubliclyResolvable } from "./public-url";
+import {
+  URL_CHECK_DOWN_EVENT,
+  URL_CHECK_RECOVERED_EVENT,
+  type UrlCheckDownEvent,
+  type UrlCheckRecoveredEvent,
+} from "./url-check.events";
 
 // Global check parameters: 60s cadence is owned by the host's scheduled job;
 // the remaining defaults live here so consumers can tweak them without a new
@@ -21,28 +27,6 @@ const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 /** A target is up when the final response (redirects followed) is < 400. */
 const UP_STATUS_CEILING = 400;
-
-/** Fired when a target crosses into an alert-open state. */
-export interface UrlCheckDownEvent {
-  targetId: string;
-  projectId: string;
-  name: string;
-  url: string;
-  error: string;
-  consecutiveFailures: number;
-  downSince: string; // ISO timestamp
-}
-
-/** Fired when a target recovers from an open alert. */
-export interface UrlCheckRecoveredEvent {
-  targetId: string;
-  projectId: string;
-  name: string;
-  url: string;
-  downSince: string; // ISO timestamp, empty when the alert's openAt is null
-  recoveredAt: string;
-  downtimeMinutes: number;
-}
 
 interface ProbeOutcome {
   isUp: boolean;
@@ -274,7 +258,7 @@ export class UrlCheckProbeService {
         consecutiveFailures,
         downSince: openedAt.toISOString(),
       };
-      this.eventEmitter.emit("url-check.down", event);
+      this.eventEmitter.emit(URL_CHECK_DOWN_EVENT, event);
     } catch (error) {
       this.logger.error(
         `Failed to emit url-check.down for target ${target.id}: ${
@@ -296,7 +280,7 @@ export class UrlCheckProbeService {
         recoveredAt: recoveredAt.toISOString(),
         downtimeMinutes: openedAt ? Math.max(0, Math.round((recoveredAt.getTime() - openedAt.getTime()) / 60000)) : 0,
       };
-      this.eventEmitter.emit("url-check.recovered", event);
+      this.eventEmitter.emit(URL_CHECK_RECOVERED_EVENT, event);
     } catch (error) {
       this.logger.error(
         `Failed to emit url-check.recovered for target ${target.id}: ${

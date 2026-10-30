@@ -1,8 +1,9 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
-import { AwsResourceStack, AwsResourceStackState, Prisma } from "@generated/prisma/client";
+import { AwsResourceStack, AwsResourceStackState, PermissionAction, Prisma } from "@generated/prisma/client";
 import { CloudFormationStackType } from "@modules/aws-cloudformation/stack/stack.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { AwsCloudformationService } from "@modules/aws-cloudformation/aws-cloudformation.service";
 import { ListStacksRequestDto } from "./stack.dto";
 
@@ -16,18 +17,21 @@ export class AwsCloudformationStackController {
   ) {}
 
   @Get("types")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse({ type: String, isArray: true })
   listStackTypes() {
     return this.cloudformationService.listStackTypes();
   }
 
   @Get("params")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse({ type: Object })
   async getStackParams(@Query("type") type: string, @Query("manager") manager: string) {
     return this.cloudformationService.getStackParams({ manager, type });
   }
 
   @Post("")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.AwsResourceStack)
   @ApiCreatedResponse()
   @ApiBody({
     description: "Create infrastructure stack.",
@@ -58,6 +62,7 @@ export class AwsCloudformationStackController {
   }
 
   @Get("")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse()
   async list(@Query() query: ListStacksRequestDto) {
     const { environmentId } = query;
@@ -68,6 +73,7 @@ export class AwsCloudformationStackController {
   }
 
   @Get(":stackId")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse()
   async getStack(@Param("stackId") stackId: string): Promise<AwsResourceStack> {
     return await this.prisma.awsResourceStack.findUniqueOrThrow({
@@ -76,6 +82,7 @@ export class AwsCloudformationStackController {
   }
 
   @Patch(":stackId")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse()
   @ApiBody({
     description: "Update infrastructure stack.",
@@ -112,6 +119,7 @@ export class AwsCloudformationStackController {
   }
 
   @Delete(":stackId")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse()
   async deleteStack(
     @Param("stackId")
@@ -134,6 +142,7 @@ export class AwsCloudformationStackController {
 
   //* Create resources
   @Post(":stackId/create-resources")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.AwsResourceStack)
   @ApiCreatedResponse()
   async createResources(
     @Param("stackId")
@@ -144,6 +153,7 @@ export class AwsCloudformationStackController {
 
   //* Destroy resources
   @Post(":stackId/destroy-resources")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse()
   async destroyResources(
     @Param("stackId")

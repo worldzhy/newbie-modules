@@ -8,7 +8,7 @@ import { UrlCheckService } from "./url-check.service";
  * Active external URL availability checks (formerly url-monitor, ADR-022).
  *
  * Every active target in Postgres is probed on the host's 60s cadence; raw
- * results land in ClickHouse (schema in clickhouse-migrations/) and the
+ * results land in ClickHouse (schema in clickhouse/migrations/) and the
  * per-target alert state machine advances in the same Prisma transaction as
  * the rolling columns (consecutiveFailures / consecutiveSuccesses /
  * isAlertOpen / incident rows).

@@ -6,10 +6,10 @@ export class JobScheduleDto {
   @ApiProperty()
   id!: number;
 
-  @ApiProperty({ description: "Unique schedule key, e.g. aws-audit" })
+  @ApiProperty({ description: "Unique schedule key, e.g. report-daily" })
   key!: string;
 
-  @ApiProperty({ description: "Human-readable display name declared by the job", example: "AWS Audit Scan" })
+  @ApiProperty({ description: "Human-readable display name declared by the job", example: "Daily Report" })
   name!: string;
 
   @ApiProperty({ description: "Key of the in-process job handler that executes the schedule" })

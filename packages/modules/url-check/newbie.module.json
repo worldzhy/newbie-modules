@@ -7,8 +7,10 @@
     "className": "UrlCheckModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["clickhouse", "security"],
+  "moduleDependencies": ["clickhouse", "event-emitter", "security"],
   "config-service": {},
   "env": {},
-  "dependencies": {}
+  "dependencies": {
+    "@nestjs/event-emitter": "latest"
+  }
 }

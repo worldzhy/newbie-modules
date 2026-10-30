@@ -15,7 +15,7 @@ export const evaluationObserverToken = "EVALUATION_OBSERVER";
 export interface EvaluationRunFinishedEvent {
   runId: string;
   subjectId: string;
-  criteriaVersionId: string;
+  ruleSetVersionId: string;
   status: "SUCCEEDED" | "FAILED";
   /** Failure text when status is FAILED. */
   error?: string;
@@ -26,7 +26,7 @@ export type EvaluationFindingChange = "created" | "reopened" | "resolved" | "sup
 export interface EvaluationFindingChangedEvent {
   findingId: string;
   subjectId: string;
-  family: string;
+  evaluationKey: string;
   fingerprint: string;
   severity: EvaluationFindingSeverity;
   change: EvaluationFindingChange;

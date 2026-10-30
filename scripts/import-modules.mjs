@@ -13,7 +13,7 @@
  *
  * Usage:
  *   node scripts/import-modules.mjs            # clone every module
- *   node scripts/import-modules.mjs account saas
+ *   node scripts/import-modules.mjs account aws-audit
  *   node scripts/import-modules.mjs --refresh  # overwrite existing module dirs
  *
  * Requires git and network access. Node 18+ (no third-party dependencies).
@@ -37,7 +37,6 @@ const MODULES_DIR = path.join(REGISTRY_ROOT, "packages", "modules");
  * `<key>.schema` / `<key>.settings.json`.
  */
 const MODULES = [
-  { key: "saas", file: "saas", className: "SaasModule" },
   { key: "account", file: "account", className: "AccountModule" },
   { key: "aws-audit", file: "aws-audit", className: "AwsAuditModule" },
   {
@@ -89,12 +88,6 @@ const MODULES = [
     file: "elasticsearch",
     className: "ElasticsearchModule",
     schema: false,
-  },
-  {
-    key: "engined",
-    file: "engined",
-    className: "EnginedModule",
-    settings: false,
   },
   {
     key: "event-scheduling",

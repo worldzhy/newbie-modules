@@ -1,0 +1,132 @@
+// Prisma schema fragment for the security-evaluation module (ADR-022).
+// This file is managed by @devbie/newbie-cli — assembled into the
+// consumer prisma tree on `newbie modules apply`.
+//
+// The run / result / criteria / finding tables belong to the evaluation
+// skeleton (`module/evaluation`, ADR-020). This feature only owns the asset
+// inventory: `subjectId` is a plain scalar with no relation — foreign keys
+// never cross schema boundaries.
+
+// !! ----------------------------------------------------------- //
+// !!            [Module] Security Evaluation models             //
+// !! ----------------------------------------------------------- //
+// * SecurityEvaluationAsset                                   //
+// * SecurityEvaluationAwsConfigKnowledgeItem                  //
+// * SecurityEvaluationNpmPackageKnowledgeItem                 //
+// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+/// One evaluated asset, one-to-one with an EvaluationSubject row of this
+/// feature's kinds ("repository" / "aws-account"). The skeleton owns the
+/// subject coordinate; this table owns the asset's inventory lifecycle.
+/// `naturalKey` is the feature's stable identity inside its scope — a
+/// repository full name or an AWS account id.
+model SecurityEvaluationAsset {
+  id          String   @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId   String   @unique @db.Uuid
+  naturalKey  String   @db.VarChar(512)
+  displayName String   @db.VarChar(255)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  awsConfigKnowledgeItems   SecurityEvaluationAwsConfigKnowledgeItem[]
+  npmPackageKnowledgeItems  SecurityEvaluationNpmPackageKnowledgeItem[]
+
+  @@index([naturalKey])
+  @@schema("module/security-evaluation")
+}
+
+/// A current-state AWS configuration knowledge item collected from an asset:
+/// a password policy, an access key, a bucket's security posture… Items are
+/// upserted on collection and never deleted here; history lives in the
+/// archived run manifest, and a stale `observedAt` is what "not observed
+/// recently" means.
+///
+/// The KnowledgeItem suffix marks the knowledge family — collected/external
+/// knowledge consumed by judgment — not schema isomorphism across the
+/// family: this table is asset-scoped while SecurityEvaluationThreatKnowledgeItem
+/// is world-scoped (ADR-037 D9.1).
+model SecurityEvaluationAwsConfigKnowledgeItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  assetId    String   @db.Uuid
+  type       String   @db.VarChar(64) // "aws.iam.account-password-policy" | ...
+  key        String   @db.VarChar(512) // stable identity within the type
+  value      Json?    @db.JsonB // small intrinsic values: region, mfaEnabled…
+  observedAt DateTime
+
+  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, type, key])
+  @@index([assetId, type])
+  @@schema("module/security-evaluation")
+}
+
+/// A current-state npm package knowledge item collected from a repository
+/// asset: the package installed at a version. Same lifecycle and family
+/// semantics as SecurityEvaluationAwsConfigKnowledgeItem.
+model SecurityEvaluationNpmPackageKnowledgeItem {
+  id         String   @id @default(uuid()) @db.Uuid
+  assetId    String   @db.Uuid
+  type       String   @db.VarChar(64) // "npm.package"
+  key        String   @db.VarChar(512) // "npm:lodash@4.17.20"
+  value      Json?    @db.JsonB // small intrinsic values: version, isDev, ecosystem…
+  observedAt DateTime
+
+  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, type, key])
+  @@index([assetId, type])
+  @@schema("module/security-evaluation")
+}
+
+// !! ----------------------------------------------------------- //
+// !!            [Module] Security Evaluation Knowledge          //
+// !! ----------------------------------------------------------- //
+// * SecurityEvaluationThreatKnowledgeItem                      //
+// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+/// One piece of external threat intelligence, deduplicated by
+/// (source, externalId). One row per unique intel item; re-fetching the
+/// same item refreshes rawPayload and bumps lastSeenAt. fetchedAt stays at
+/// the first-seen time on purpose: the match pipeline walks it oldest-first
+/// so every collection batch eventually gets evaluated.
+///
+/// Ported from the former threat-intelligence module (ADR-039); fields and
+/// indexes are unchanged.
+///
+/// World-scoped: unlike the asset-scoped knowledge tables above, a threat
+/// item belongs to no asset — it exists once per source and is matched
+/// against every asset's knowledge during judgment.
+model SecurityEvaluationThreatKnowledgeItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  source      String   @db.VarChar(50)
+  category    String   @db.VarChar(30)
+  // Stable identifier within the source: CVE ID, ecosystem+package,
+  // vendor+event-id, or a title fingerprint. Together with `source` it
+  // forms the deduplication key.
+  externalId  String   @db.VarChar(512)
+  title       String   @db.VarChar(1024)
+  summary     String?  @db.Text
+  url         String?  @db.VarChar(1024)
+  publishedAt DateTime?
+  severity    String   @default("info") @db.VarChar(15)
+  // Signal tags: kev, has-exploit, exploited-in-wild.
+  signalTags  String[]
+  rawPayload  Json?
+  // Negative cache for INTEL matching: { "scopeType:scopeId": reason }.
+  // An LLM "not-relevant" verdict is cached here so subsequent runs skip
+  // the pair; "unavailable" verdicts are never cached (ADR-018).
+  negativeCache Json?
+  fetchedAt   DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([source, externalId])
+  @@index([category])
+  @@index([severity])
+  @@index([publishedAt])
+  // Match-pipeline keyset scan: WHERE fetchedAt >= since ORDER BY fetchedAt, id.
+  @@index([fetchedAt])
+  @@schema("module/security-evaluation")
+}

@@ -1,6 +1,6 @@
 import { Controller, Post, Body, Get, Query, Patch, Delete, Param } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
-import { Prisma } from "@generated/prisma/client";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { CommonGetByNumberIdRequestDto } from "@devbie/newbie/common.dto";
 import {
@@ -12,19 +12,20 @@ import {
   ShortcutTreeRequestDto,
 } from "./shortcut-item.dto";
 import { ShortcutItemEntity } from "./shortcut.entity";
-import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 @ApiTags("Shortcut")
 @ApiBearerAuth()
-@RequireOwner()
 @Controller("shortcut-items")
 export class ShortcutItemController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get("tree")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.ShortcutItem)
   @ApiResponse({ type: ShortcutTreeResDto, isArray: true })
   async tree(@Query() query: ShortcutTreeRequestDto) {
     const groups = await this.prisma.shortcutGroup.findMany({
+      where: { projectId: query.projectId },
       orderBy: { sort: "desc" },
     });
     const items = await this.prisma.shortcutItem.findMany({
@@ -61,29 +62,36 @@ export class ShortcutItemController {
   }
 
   @Get()
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.ShortcutItem)
   @ApiResponse({ type: ListShortcutItemsResponseDto })
   async list(@Query() query: ListShortcutItemsRequestDto) {
-    const { page, pageSize, id, ...rest } = query;
+    const { page, pageSize, id, projectId, ...rest } = query;
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.ShortcutItem,
       pagination: { page, pageSize },
-      findManyArgs: { where: { id, ...rest }, orderBy: { sort: "desc" } },
+      findManyArgs: {
+        where: { id, group: { projectId }, ...rest },
+        orderBy: { sort: "desc" },
+      },
     });
   }
 
   @Post()
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.ShortcutItem)
   @ApiResponse({ type: ShortcutItemEntity })
   async create(@Body() body: CreateShortcutItemRequestDto) {
     return await this.prisma.shortcutItem.create({ data: body });
   }
 
   @Patch(":id")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.ShortcutItem)
   @ApiResponse({ type: ShortcutItemEntity })
   async update(@Param() params: CommonGetByNumberIdRequestDto, @Body() body: UpdateShortcutItemRequestDto) {
     return await this.prisma.shortcutItem.update({ where: { id: Number(params.id) }, data: body });
   }
 
   @Delete(":id")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.ShortcutItem)
   @ApiResponse({ type: ShortcutItemEntity })
   async delete(@Param() params: CommonGetByNumberIdRequestDto) {
     return await this.prisma.shortcutItem.delete({ where: { id: Number(params.id) } });

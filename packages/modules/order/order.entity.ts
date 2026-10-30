@@ -2,18 +2,14 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { OrderStatus, PaymentMethod } from "@generated/prisma/client";
 import { IsNumber, IsOptional, IsString } from "class-validator";
 
+/**
+ * What a client may send for an order line: only *what* (skuId) and *how many*.
+ * Price and product name are resolved server-side from the Product catalog.
+ */
 export class OrderItemRequestEntity {
   @ApiProperty({ type: String })
   @IsString()
   skuId!: string;
-
-  @ApiProperty({ type: String })
-  @IsString()
-  name!: string;
-
-  @ApiProperty({ type: Number })
-  @IsNumber()
-  priceInCents!: number;
 
   @ApiPropertyOptional({ type: Number })
   @IsOptional()

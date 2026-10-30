@@ -1,11 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { NavPlacement } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { PermissionResponseDto } from "../permission/permission.dto";
-import { IsNotEmpty, IsOptional, IsString, Length } from "class-validator";
+import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Length } from "class-validator";
 
 /**
  * Request DTO for creating a role. Roles created through the API are never
- * builtin; builtin roles (ADMIN, USER) are seeded by migrations only.
+ * builtin; builtin roles (ADMIN, OPERATOR, MEMBER) are seeded by migrations only.
  */
 export class CreateRoleDto {
   @ApiProperty({ type: String, description: "Unique role name.", minLength: 1, maxLength: 64 })
@@ -72,12 +73,50 @@ export class ListRolesResponseDto extends CommonListResponseDto {
   declare records: RoleResponseDto[];
 }
 
+export class RolePermissionGroupSummaryDto {
+  @ApiProperty({ type: Number })
+  id!: number;
+
+  @ApiProperty({ type: String })
+  name!: string;
+
+  @ApiProperty({ type: String })
+  routePath!: string;
+
+  @ApiProperty({ enum: NavPlacement })
+  navPlacement!: NavPlacement;
+
+  @ApiProperty({ type: Number })
+  navOrder!: number;
+
+  @ApiProperty({ type: String })
+  navLabel!: string;
+
+  @ApiPropertyOptional({ type: String })
+  navIcon?: string | null;
+}
+
 /**
- * Response DTO for a role with its permissions.
+ * Response DTO for a role with its permissions AND permission groups.
  */
 export class RoleDetailResponseDto extends RoleResponseDto {
   @ApiProperty({ type: PermissionResponseDto, isArray: true })
   permissions!: PermissionResponseDto[];
+
+  @ApiProperty({ type: RolePermissionGroupSummaryDto, isArray: true })
+  permissionGroups!: RolePermissionGroupSummaryDto[];
+}
+
+/**
+ * Request DTO for replacing a role's permission group bindings in a single
+ * transaction. All existing bindings are removed and replaced with the given
+ * set. Pass an empty array to remove all bindings.
+ */
+export class ReplaceRolePermissionGroupsDto {
+  @ApiProperty({ type: Number, isArray: true, description: "Permission group IDs to bind to this role." })
+  @IsArray()
+  @IsInt({ each: true })
+  permissionGroupIds!: number[];
 }
 
 /**

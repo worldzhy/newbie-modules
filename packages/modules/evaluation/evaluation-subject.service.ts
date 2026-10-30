@@ -8,7 +8,8 @@ import { EvaluationScope, EvaluationSubjectDescriptor, EvaluationSubjectRef } fr
 export interface ListEvaluationSubjectsInput {
   kind: string;
   scopeType: string;
-  scopeId: string;
+  /** Omitted lists every subject of the kind under the scope type. */
+  scopeId?: string;
   page?: number;
   pageSize?: number;
 }

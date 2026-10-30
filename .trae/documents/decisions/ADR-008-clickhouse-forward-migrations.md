@@ -61,3 +61,15 @@ backend-monitor 的两张 ClickHouse 基建表（`application_request_logs` / `a
 - 更容易：新环境/实例重建后 ClickHouse schema 自动就绪；新迁移只需在属主模块加一个 SQL 文件；迁移漂移在部署期被 checksum 拦截；fewbie 可直接复用引擎。
 - 变更点：newbie-modules 的 clickhouse 模块（引擎 + 两个前端 + manifest cli 字段）、backend-monitor 模块（迁入初始 SQL）；nightwatch-backend（nest assets、compose.prod.yml ch-migrate 服务、deploy.sh 参数联动、package.json script、删除宿主 clickhouse/migrations）。
 - 后续：dev 清 volume 验证；prod 在主线发布窗口清空 `/opt/nightwatch/data/clickhouse` 后由 ch-migrate 自动建表；backup.sh 的 clickhouse 分支将首次面对"有表"状态，发布后手动验证一次备份。
+
+## Errata（2026-10-27）
+
+### 目录名统一为 `<module>/clickhouse/migrations/`（supersedes `clickhouse-migrations/` 扁平目录）
+
+正文决策使用 `clickhouse-migrations/V*.sql` 扁平目录。与已有的 `prisma/schema.prisma` + `prisma/migrations/` 范式对齐，改为 `clickhouse/migrations/V*.sql`（`clickhouse/` 父目录与 `prisma/` 对称，为未来可能的 `clickhouse/schema.sql` 人类可读快照留出自然位置）。runner 常量 `MIGRATION_DIR_NAME` 与 nest-cli.json assets glob 同步更新。
+
+### 10-23 baseline + incremental 双轨方案 superseded
+
+10-23 topic #15 曾设计 baseline snapshot + incremental forward 双轨机制：模块保留 `clickhouse/schema.sql`（当前完整 DDL 基线）+ `clickhouse/migrations/`（仅保留基线以上增量），runner 新增基线语义分支、历史表增加 owner 列。
+
+本方案 superseded，理由：项目未上线，无生产数据、无已应用的迁移历史，pre-launch 不考虑存量数据迁移（user profile 硬规则）。单一前向迁移模型（ADR-008 原始设计）已足够覆盖当前与可预见的未来需求，双轨增加 runner 复杂度零收益。work-evaluation 模块的孤立 `clickhouse/schema.sql` 转为标准 `clickhouse/migrations/V20261026120000__init_work_evaluation_tables.sql`。

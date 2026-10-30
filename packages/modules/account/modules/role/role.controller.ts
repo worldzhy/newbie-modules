@@ -1,4 +1,15 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -9,6 +20,7 @@ import {
   CreateRoleDto,
   ListRolesRequestDto,
   ListRolesResponseDto,
+  ReplaceRolePermissionGroupsDto,
   RoleDetailResponseDto,
   RoleResponseDto,
   UpdateRoleDto,
@@ -81,15 +93,37 @@ export class RoleController {
 
   @Get(":roleId")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.Role)
-  @ApiOperation({ summary: "Get a role with its permissions" })
+  @ApiOperation({ summary: "Get a role with its permissions and permission groups" })
   @ApiResponse({ type: RoleDetailResponseDto })
   async getRole(@Param("roleId") roleId: number): Promise<RoleDetailResponseDto> {
     const role = await this.prisma.role.findUniqueOrThrow({
       where: { id: roleId },
-      include: { _count: { select: { users: true } }, permissions: true },
+      include: {
+        _count: { select: { users: true } },
+        permissions: true,
+        rolePermissionGroups: {
+          include: {
+            permissionGroup: {
+              select: {
+                id: true,
+                name: true,
+                routePath: true,
+                navPlacement: true,
+                navOrder: true,
+                navLabel: true,
+                navIcon: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    return { ...this.toResponseDto(role, role._count.users), permissions: role.permissions };
+    return {
+      ...this.toResponseDto(role, role._count.users),
+      permissions: role.permissions,
+      permissionGroups: role.rolePermissionGroups.map((rpg) => rpg.permissionGroup),
+    };
   }
 
   @Patch(":roleId")
@@ -149,7 +183,7 @@ export class RoleController {
 
   @Get(":roleId/permissions")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.Role)
-  @ApiOperation({ summary: "List the permissions granted to a role" })
+  @ApiOperation({ summary: "List the direct permissions granted to a role" })
   @ApiResponse({ type: PermissionResponseDto, isArray: true })
   async listRolePermissions(@Param("roleId") roleId: number): Promise<PermissionResponseDto[]> {
     await this.prisma.role.findUniqueOrThrow({ where: { id: roleId } });
@@ -158,6 +192,55 @@ export class RoleController {
       where: { roleId },
       orderBy: [{ resource: "asc" }, { action: "asc" }],
     });
+  }
+
+  @Post(":roleId/permission-groups")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Role)
+  @ApiOperation({ summary: "Replace a role's permission group bindings (transactional)" })
+  @ApiResponse({ type: RoleDetailResponseDto })
+  async replaceRolePermissionGroups(
+    @Param("roleId") roleId: number,
+    @Body() body: ReplaceRolePermissionGroupsDto,
+  ): Promise<RoleDetailResponseDto> {
+    const role = await this.prisma.role.findUniqueOrThrow({ where: { id: roleId } });
+    if (role.isBuiltin) {
+      throw new BadRequestException(`Builtin role "${role.name}" cannot have its permission group bindings replaced.`);
+    }
+
+    // Validate all permission group IDs exist
+    if (body.permissionGroupIds.length > 0) {
+      const groups = await this.prisma.permissionGroup.findMany({
+        where: { id: { in: body.permissionGroupIds } },
+        select: { id: true },
+      });
+      const foundIds = new Set(groups.map((g) => g.id));
+      const missing = body.permissionGroupIds.filter((id) => !foundIds.has(id));
+      if (missing.length > 0) {
+        throw new NotFoundException(`Permission group(s) not found: ${missing.join(", ")}`);
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.rolePermissionGroup.deleteMany({ where: { roleId } });
+
+      if (body.permissionGroupIds.length > 0) {
+        await tx.rolePermissionGroup.createMany({
+          data: body.permissionGroupIds.map((pgId) => ({ roleId, permissionGroupId: pgId })),
+        });
+      }
+    });
+
+    await this.auditLogService.record(AuditEvent.ROLES_CHANGED, {
+      detail: {
+        action: "role_permission_groups_replaced",
+        roleId,
+        roleName: role.name,
+        permissionGroupIds: body.permissionGroupIds,
+      },
+    });
+
+    // Return updated role detail
+    return this.getRole(roleId);
   }
 
   private toResponseDto(

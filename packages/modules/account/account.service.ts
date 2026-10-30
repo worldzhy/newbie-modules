@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { Prisma } from "@generated/prisma/client";
+import type { NavPlacement, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { UpdateMeDto } from "./account.dto";
 import { UserRequest } from "@modules/security/security.interface";
@@ -26,13 +26,65 @@ export class AccountService {
         middleName: true,
         lastName: true,
         avatarFileId: true,
-        roles: { select: { role: { select: { name: true } } } },
+        roles: {
+          select: {
+            role: {
+              select: {
+                name: true,
+                rolePermissionGroups: {
+                  include: {
+                    permissionGroup: {
+                      select: {
+                        id: true,
+                        name: true,
+                        routePath: true,
+                        navPlacement: true,
+                        navOrder: true,
+                        navLabel: true,
+                        navIcon: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     });
 
+    const roles = user.roles.map((ur) => ur.role.name);
+
+    // Union of all PermissionGroups across every held role, deduplicated by id
+    // and ordered for the header nav. Navigation is derived purely from the
+    // bound groups — there is no role-name special case (ADR-044): the admin
+    // role is bound to the derived "All" group plus every builtin group by seed.
+    type PermissionGroupSummary = {
+      id: number;
+      name: string;
+      routePath: string;
+      navPlacement: NavPlacement;
+      navOrder: number;
+      navLabel: string;
+      navIcon: string | null;
+    };
+    const groupsById = new Map<number, PermissionGroupSummary>();
+    for (const ur of user.roles) {
+      for (const rpg of ur.role.rolePermissionGroups) {
+        const pg = rpg.permissionGroup;
+        if (!groupsById.has(pg.id)) {
+          groupsById.set(pg.id, pg);
+        }
+      }
+    }
+    const permissionGroups = [...groupsById.values()].sort(
+      (left, right) => left.navOrder - right.navOrder || left.id - right.id,
+    );
+
     return {
       ...user,
-      roles: user.roles.map((ur) => ur.role.name),
+      roles,
+      permissionGroups,
     };
   }
 

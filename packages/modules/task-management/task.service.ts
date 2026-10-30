@@ -1,8 +1,10 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Prisma } from "@generated/prisma/client";
 import { TaskStatus } from "@generated/prisma/enums";
 import { CreateTaskItemDto, UpdateTaskRequestDto } from "./task.dto";
+import { TASK_STATUS_CHANGED_EVENT, type TaskStatusChangedEvent } from "./task-management.events";
 
 export { TaskStatus };
 
@@ -40,7 +42,12 @@ export interface ListTasksFilter {
 const TASK_STATUS_TRANSITIONS: Readonly<Record<TaskStatus, ReadonlySet<TaskStatus>>> = {
   [TaskStatus.PENDING]: new Set([TaskStatus.DEVELOPING, TaskStatus.CANCELLED]),
   [TaskStatus.DEVELOPING]: new Set([TaskStatus.TESTING, TaskStatus.CANCELLED]),
-  [TaskStatus.TESTING]: new Set([TaskStatus.DEVELOPING, TaskStatus.DEPLOYED, TaskStatus.CANCELLED]),
+  [TaskStatus.TESTING]: new Set([
+    TaskStatus.DEVELOPING,
+    TaskStatus.DEPLOYED,
+    TaskStatus.COMPLETED,
+    TaskStatus.CANCELLED,
+  ]),
   [TaskStatus.DEPLOYED]: new Set([TaskStatus.DEVELOPING, TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
   [TaskStatus.COMPLETED]: new Set<TaskStatus>(),
   [TaskStatus.CANCELLED]: new Set<TaskStatus>(),
@@ -50,7 +57,10 @@ const TASK_STATUS_TRANSITIONS: Readonly<Record<TaskStatus, ReadonlySet<TaskStatu
 export class TaskService {
   private readonly logger = new Logger(TaskService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   async createTask(data: CreateTaskInput) {
     return await this.prisma.task.create({
@@ -135,6 +145,7 @@ export class TaskService {
   }
 
   async updateTask(taskId: string, dto: UpdateTaskRequestDto, operator: Operator) {
+    let previousStatus: TaskStatus | undefined;
     let nextStatus: TaskStatus | undefined;
 
     if (dto.status !== undefined) {
@@ -150,6 +161,7 @@ export class TaskService {
         throw new ConflictException("Cannot update a deleted task");
       }
 
+      previousStatus = current.status;
       if (current.status === dto.status) {
         nextStatus = current.status;
       } else if (!TASK_STATUS_TRANSITIONS[current.status].has(dto.status)) {
@@ -159,7 +171,7 @@ export class TaskService {
       }
     }
 
-    return await this.prisma.task.update({
+    const updated = await this.prisma.task.update({
       where: { id: taskId },
       data: {
         title: dto.title,
@@ -171,6 +183,19 @@ export class TaskService {
         lastOperatorName: operator.name,
       },
     });
+
+    if (previousStatus !== undefined && nextStatus !== undefined && nextStatus !== previousStatus) {
+      this.eventEmitter.emit(TASK_STATUS_CHANGED_EVENT, {
+        taskId: updated.id,
+        title: updated.title,
+        spaceId: updated.spaceId,
+        previousStatus,
+        status: nextStatus,
+        operatorName: operator.name,
+      } satisfies TaskStatusChangedEvent);
+    }
+
+    return updated;
   }
 
   async deleteTask(taskId: string, operator: Operator) {

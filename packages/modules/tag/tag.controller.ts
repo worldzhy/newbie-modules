@@ -4,6 +4,13 @@ import { Tag, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ListTagsRequestDto } from "./tag.dto";
 
+/**
+ * Sentinel id of the synthetic group holding groupless tags in the
+ * `GET /tags/grouped` response. Part of the API contract: it never collides
+ * with real TagGroup ids (autoincrement, always positive).
+ */
+export const UNGROUPED_TAG_GROUP_ID = -1;
+
 @ApiTags("Tag")
 @ApiBearerAuth()
 @Controller("tags")
@@ -27,8 +34,8 @@ export class TagController {
     });
 
     tagGroups.push({
-      id: -1, // Use -1 to indicate no group
-      name: "未分组",
+      id: UNGROUPED_TAG_GROUP_ID,
+      name: "Ungrouped",
       tags: tagsWithoutGroup,
     });
 

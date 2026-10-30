@@ -12,6 +12,14 @@ import {
   NoActiveScopeError,
 } from "./chat-model.port";
 
+/** Provider-neutral connection settings needed to build a port. */
+export interface ChatModelConfig {
+  provider?: string;
+  model: string;
+  baseUrl: string;
+  apiKey: string;
+}
+
 /**
  * Builds a ChatModelPort for the connection bound to a consumer scope (ADR-006).
  * The scope→connection binding is read on every resolution so admin-side changes
@@ -50,19 +58,32 @@ export class ChatModelResolver {
   }
 
   private buildPort(connection: LlmConnectionRecord): ChatModelPort {
-    const port =
-      connection.provider === ANTHROPIC_PROVIDER
-        ? createAnthropicChatModel({
-            model: connection.model,
-            apiKey: connection.apiKey,
-            baseUrl: connection.baseUrl || undefined,
-          })
-        : createOpenAiCompatibleChatModel({
-            model: connection.model,
-            baseUrl: connection.baseUrl,
-            apiKey: connection.apiKey,
-          });
-    return withHealthTracking(port, connection.id, (outcome) => this.connections.recordModelCallOutcome(outcome));
+    return withHealthTracking(this.createPort(connection), connection.id, (outcome) =>
+      this.connections.recordModelCallOutcome(outcome),
+    );
+  }
+
+  /**
+   * Builds a port for a configuration that is not persisted yet (the admin
+   * create/test dialog). No health tracking: there is no connection row to
+   * fold the outcome into.
+   */
+  createDraftPort(config: ChatModelConfig): ChatModelPort {
+    return this.createPort(config);
+  }
+
+  private createPort(config: ChatModelConfig): ChatModelPort {
+    return config.provider === ANTHROPIC_PROVIDER
+      ? createAnthropicChatModel({
+          model: config.model,
+          apiKey: config.apiKey,
+          baseUrl: config.baseUrl || undefined,
+        })
+      : createOpenAiCompatibleChatModel({
+          model: config.model,
+          baseUrl: config.baseUrl,
+          apiKey: config.apiKey,
+        });
   }
 }
 

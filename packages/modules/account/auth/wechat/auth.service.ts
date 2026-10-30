@@ -33,11 +33,6 @@ export class WechatAuthService {
         data: {
           phone,
           wechatOpenId: openId,
-          roles: {
-            create: {
-              role: { connectOrCreate: { where: { name: "USER" }, create: { name: "USER", isBuiltin: true } } },
-            },
-          },
         },
       });
     }

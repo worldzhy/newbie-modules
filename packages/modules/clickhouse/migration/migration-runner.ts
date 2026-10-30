@@ -7,7 +7,7 @@ import path from "node:path";
  * Forward-only ClickHouse migration engine (minimal Flyway semantics).
  *
  * - Migration files live in every assembled module under
- *   `clickhouse-migrations/V<version>__<description>.sql`; the roots are
+ *   `clickhouse/migrations/V<version>__<description>.sql`; the roots are
  *   self-located by callers (src/modules under tsx, dist/src/modules when
  *   compiled), so the engine is host-agnostic. Hosts with application-layer
  *   tables (e.g. url-monitor, nightwatch ADR-022) pass additional roots; all
@@ -59,7 +59,7 @@ interface MigrationLogger {
 }
 
 const HISTORY_TABLE = "_clickhouse_schema_migrations";
-const MIGRATION_DIR_NAME = "clickhouse-migrations";
+const MIGRATION_DIR_NAME = "clickhouse/migrations";
 // V20261016000000__init_backend_monitor_tables.sql (14 digit timestamp)
 const MIGRATION_FILE_PATTERN = /^V(\d{14})__([a-z0-9_]+)\.sql$/;
 // Database/table identifiers we generate ourselves must stay injection-safe;
@@ -173,7 +173,7 @@ function isLineCommentStart(sql: string, index: number): boolean {
 
 /**
  * Discover migration files across every scanned root:
- * `<root>/<moduleKey>/clickhouse-migrations/V*.sql`. Multiple roots
+ * `<root>/<moduleKey>/clickhouse/migrations/V*.sql`. Multiple roots
  * (e.g. the assembled module tree plus a host application tree) are scanned
  * in order and merged. Versions must be globally unique across all roots;
  * results are ordered by version.

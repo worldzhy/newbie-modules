@@ -6,8 +6,8 @@ A stateless read-through proxy over AWS Secrets Manager. AWS is the single sourc
 
 - **Read-through proxy**: every endpoint resolves the project's cross-account binding (via the `aws-identity` module) and calls AWS Secrets Manager directly. Project isolation comes from the credential itself — each project points at its own AWS account.
 - **Tag-based contract**: managed secrets carry two tags, written atomically at creation time:
-  - `nightwatch:managed=true` — marks the secret as visible to this management plane
-  - `nightwatch:secret-type=<TYPE>` — one of `RDS_CREDENTIALS`, `DOCUMENTDB_CREDENTIALS`, `AWS_API_KEY`, `GENERIC_SECRET`; consumed by the rotation Lambda to pick a strategy
+  - `devbie:managed=true` — marks the secret as visible to this management plane
+  - `devbie:secret-type=<TYPE>` — one of `RDS_CREDENTIALS`, `DOCUMENTDB_CREDENTIALS`, `AWS_API_KEY`, `GENERIC_SECRET`; consumed by the rotation Lambda to pick a strategy
 - **No infrastructure deployment in the API process**: the rotation Lambda is deployed by the `newbie secrets deploy-rotation` CLI command, which prints the Lambda ARN to paste into Project Settings (`awsSecretsManagerRotationLambdaArn`).
 
 ## API Endpoints
@@ -66,7 +66,7 @@ The mutating and value-read routes emit their own business audit events for ever
 
 - Enabling rotation calls `RotateSecret` with the Lambda ARN from Project Settings and a day interval (default 30); AWS both configures the schedule and starts the first rotation.
 - Disabling calls `CancelRotateSecret`, which turns off automatic rotation and cancels any in-progress one.
-- The rotation Lambda source ships inside the `@devbie/aws-secrets-cli` package (deployed via `newbie secrets deploy-rotation`) and routes strategies by reading the `nightwatch:secret-type` tag via `DescribeSecret`.
+- The rotation Lambda source ships inside the `@devbie/aws-secrets-cli` package (deployed via `newbie secrets deploy-rotation`) and routes strategies by reading the `devbie:secret-type` tag via `DescribeSecret`.
 
 ## Error mapping
 

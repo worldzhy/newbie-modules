@@ -1,6 +1,23 @@
-import { BadRequestException, Inject, Injectable, Logger, Optional } from "@nestjs/common";
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import type { EvaluationRun } from "@generated/prisma/client";
 
 import { EvaluationCriteriaService } from "./evaluation-criteria.service";
+import {
+  EVALUATION_RUN_FAILED_EVENT,
+  EVALUATION_RUN_SUCCEEDED_EVENT,
+  EvaluationRunEventIdentity,
+  EvaluationRunFailedEvent,
+  EvaluationRunSucceededEvent,
+} from "./evaluation.events";
 import { EvaluationFindingService } from "./evaluation-finding.service";
 import { EvaluationProviderRegistry } from "./evaluation-provider.registry";
 import { EvaluationResultService } from "./evaluation-result.service";
@@ -9,10 +26,12 @@ import {
   EvaluationRunOptions,
   EvaluationRunService,
   evaluationRunOptionsToken,
+  formatRunError,
+  STALE_RUN_ERROR,
   StartEvaluationRunInput,
 } from "./evaluation-run.service";
 import { EvaluationSubjectService, toSubjectRef } from "./evaluation-subject.service";
-import { EvaluationCriteriaVersionRef } from "./ports/evaluation.contracts";
+import { EvaluationRuleSetVersionRef } from "./ports/evaluation.contracts";
 import { EvaluationRunFinishedEvent } from "./ports/observer.port";
 import { composeCoverageStats } from "./evaluation-invariants";
 
@@ -36,10 +55,17 @@ export interface EvaluationRunOutcome {
  * works, so the stale-run reaper never fails a living run; and a fencing check
  * before every write stops this execution if the row was nevertheless closed
  * or reaped — writing on behalf of a dead run would corrupt the lifecycle.
+ *
+ * The reaper itself is built in (ADR-038): an unref'd interval started at
+ * module init sweeps abandoned active rows globally, fails them and publishes
+ * their terminal events — a run whose process died mid-flight can no longer
+ * sit RUNNING forever, and the notification channels hear about it.
  */
 @Injectable()
-export class EvaluationRunnerService {
+export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EvaluationRunnerService.name);
+  private reaper: NodeJS.Timeout | undefined;
+  private reapInFlight = false;
 
   constructor(
     private readonly providers: EvaluationProviderRegistry,
@@ -48,16 +74,83 @@ export class EvaluationRunnerService {
     private readonly runs: EvaluationRunService,
     private readonly results: EvaluationResultService,
     private readonly findings: EvaluationFindingService,
+    private readonly events: EventEmitter2,
     @Optional()
     @Inject(evaluationRunOptionsToken)
     private readonly options: EvaluationRunOptions = {},
   ) {}
 
-  async run(input: StartEvaluationRunInput): Promise<EvaluationRunOutcome> {
+  /**
+   * The skeleton's stale-run reaper (ADR-038): a plain unref'd interval, so the
+   * host assembles nothing and the timer never keeps a process alive.
+   */
+  onModuleInit(): void {
+    const intervalMs = this.options.reapIntervalMs ?? DEFAULT_EVALUATION_RUN_OPTIONS.reapIntervalMs;
+    this.reaper = setInterval(() => {
+      void this.reapStaleRuns();
+    }, intervalMs);
+    this.reaper.unref();
+  }
+
+  onModuleDestroy(): void {
+    if (this.reaper) clearInterval(this.reaper);
+  }
+
+  /**
+   * One stale-run sweep (ADR-038): fail every abandoned active row, then give
+   * each row the same terminal treatment an executed run gets — the
+   * `evaluation.run-failed` event and the observer notification both carry the
+   * error text the row persists. Public so a host can trigger an out-of-band
+   * sweep; the module's own interval calls this too. A failed sweep is logged
+   * and the interval keeps going; a sweep still in flight makes the next tick
+   * a no-op, since reaping is idempotent and overlap buys nothing.
+   */
+  async reapStaleRuns(): Promise<void> {
+    if (this.reapInFlight) return;
+    this.reapInFlight = true;
+    try {
+      const reaped = await this.runs.reapStaleRuns();
+      for (const row of reaped) {
+        const error = row.error ?? STALE_RUN_ERROR;
+        await this.publishRunTerminal(row, undefined, { status: "FAILED", error });
+        await this.notifyRunFinished({
+          runId: row.id,
+          subjectId: row.subjectId,
+          ruleSetVersionId: row.ruleSetVersionId,
+          status: "FAILED",
+          error,
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`Stale-run sweep failed; the next interval tick retries: ${describe(error)}`);
+    } finally {
+      this.reapInFlight = false;
+    }
+  }
+
+  /**
+   * Open the run synchronously and return the RUNNING row.
+   *
+   * Admission is the part that belongs to the request path: subject existence,
+   * rule-set-version applicability and the one-active-run-per-subject-version
+   * conflict are all decided by the database here, so a caller dispatching a
+   * fire-and-forget run can still answer 400/404/409 before accepting it.
+   */
+  async open(input: StartEvaluationRunInput): Promise<EvaluationRun> {
     const run = await this.runs.startRun(input);
     await this.runs.markRunning(run.id);
-    const running = await this.runs.findById(run.id);
+    return this.runs.findById(run.id);
+  }
+
+  /** Open then execute in one call — for callers that can await the whole run. */
+  async run(input: StartEvaluationRunInput): Promise<EvaluationRunOutcome> {
+    return this.execute(await this.open(input));
+  }
+
+  /** Execute an already-open run. Errors are the execution's own, never admission's. */
+  async execute(running: EvaluationRun): Promise<EvaluationRunOutcome> {
     const startedAt = running.startedAt;
+    let identity: EvaluationRunEventIdentity | undefined;
 
     const heartbeat = setInterval(() => {
       this.runs.touch(running.id).catch((error: unknown) => {
@@ -68,21 +161,32 @@ export class EvaluationRunnerService {
 
     try {
       const subject = toSubjectRef(await this.subjects.getSubject(running.subjectId));
-      const version = await this.criteria.getVersion(running.criteriaVersionId);
-      const criteriaVersion: EvaluationCriteriaVersionRef = {
+      const version = await this.criteria.getVersion(running.ruleSetVersionId);
+      const ruleSetVersion: EvaluationRuleSetVersionRef = {
         id: version.id,
         kind: version.kind,
-        family: version.family,
+        evaluationKey: version.evaluationKey,
         version: version.version,
       };
+      identity = {
+        runId: running.id,
+        subjectId: running.subjectId,
+        subjectKind: subject.kind,
+        ruleSetVersionId: running.ruleSetVersionId,
+        evaluationKey: version.evaluationKey,
+      };
 
-      const evidence = await this.providers.getEvidenceProvider(subject.kind).collect(subject, criteriaVersion);
-      const criteria = await this.criteria.listCriteria(criteriaVersion.id);
+      const runConfig = (running.config as Record<string, unknown> | null) ?? null;
+      const evidence = await this.providers
+        .getEvidenceProvider(subject.kind)
+        .collect(subject, ruleSetVersion, runConfig);
+      const criteria = await this.criteria.listCriteria(ruleSetVersion.id);
       const judgment = await this.providers.getJudgmentPort(subject.kind).judge({
         subject,
-        criteriaVersion,
+        ruleSetVersion,
         criteria,
         evidence: evidence.items,
+        runConfig,
       });
 
       const coverage = composeCoverageStats({
@@ -100,6 +204,7 @@ export class EvaluationRunnerService {
         coverageStats: coverage.stats,
         verdicts: judgment.verdicts,
         summary: judgment.summary,
+        metadata: judgment.metadata,
       });
 
       await this.runs.assertActive(running.id, startedAt);
@@ -114,10 +219,11 @@ export class EvaluationRunnerService {
 
       await this.runs.assertActive(running.id, startedAt);
       await this.runs.markSucceeded(running.id);
+      await this.publishRunTerminal(running, identity, { status: "SUCCEEDED" });
       await this.notifyRunFinished({
         runId: running.id,
         subjectId: running.subjectId,
-        criteriaVersionId: running.criteriaVersionId,
+        ruleSetVersionId: running.ruleSetVersionId,
         status: "SUCCEEDED",
       });
       return {
@@ -127,20 +233,37 @@ export class EvaluationRunnerService {
         resolvedFindingCount,
       };
     } catch (error) {
-      // The row may already be terminal (reaped as stale underneath us):
-      // failing it again conflicts, and that secondary failure must not mask
-      // the original error.
-      await this.runs.markFailed(running.id, error).catch(() => undefined);
+      const persistedError = await this.persistFailure(running.id, error);
+      await this.publishRunTerminal(running, identity, { status: "FAILED", error: persistedError });
       await this.notifyRunFinished({
         runId: running.id,
         subjectId: running.subjectId,
-        criteriaVersionId: running.criteriaVersionId,
+        ruleSetVersionId: running.ruleSetVersionId,
         status: "FAILED",
-        error: describe(error),
+        error: persistedError,
       });
       throw error;
     } finally {
       clearInterval(heartbeat);
+    }
+  }
+
+  /**
+   * Fail the run and return the failure text every channel must report
+   * (ADR-032 D5): what the row actually persists. When the terminal write
+   * conflicts — the stale-run reaper already closed the row with its own
+   * reason — the row's text wins, so the event, the observer and the stored
+   * state can never drift apart. The original error is the fallback only when
+   * the row itself is unreadable; either way the caller rethrows it, and this
+   * secondary path never masks it.
+   */
+  private async persistFailure(id: string, error: unknown): Promise<string> {
+    try {
+      await this.runs.markFailed(id, error);
+      return formatRunError(error);
+    } catch {
+      const run = await this.runs.findById(id).catch(() => null);
+      return run?.error ?? formatRunError(error);
     }
   }
 
@@ -153,6 +276,54 @@ export class EvaluationRunnerService {
     } catch (error) {
       this.logger.warn(`EvaluationObserver.onRunFinished failed for run ${event.runId}: ${describe(error)}`);
     }
+  }
+
+  /**
+   * Publish the run's terminal event (ADR-032). This is the only emit site of
+   * `evaluation.run-*`; features must not emit their own. The row is already
+   * terminal when this runs, and a publish failure is logged, never promoted —
+   * an event channel problem must not change what the run concluded.
+   */
+  private async publishRunTerminal(
+    running: EvaluationRun,
+    identity: EvaluationRunEventIdentity | undefined,
+    outcome: { status: "SUCCEEDED" } | { status: "FAILED"; error: string },
+  ): Promise<void> {
+    try {
+      const resolved = identity ?? (await this.resolveRunIdentity(running));
+      if (outcome.status === "FAILED") {
+        this.events.emit(EVALUATION_RUN_FAILED_EVENT, {
+          ...resolved,
+          status: "FAILED",
+          error: outcome.error,
+        } satisfies EvaluationRunFailedEvent);
+        return;
+      }
+      this.events.emit(EVALUATION_RUN_SUCCEEDED_EVENT, {
+        ...resolved,
+        status: "SUCCEEDED",
+      } satisfies EvaluationRunSucceededEvent);
+    } catch (error) {
+      this.logger.warn(`Terminal event for evaluation run ${running.id} could not be published: ${describe(error)}`);
+    }
+  }
+
+  /**
+   * Best-effort identity for a run that failed before subject and version were
+   * read. Both rows were verified at admission and the run row references them,
+   * so this only fails in a pathological deleted-row state — in which case the
+   * failure is logged and the event skipped, never emitted with blanks.
+   */
+  private async resolveRunIdentity(running: EvaluationRun): Promise<EvaluationRunEventIdentity> {
+    const subject = await this.subjects.getSubject(running.subjectId);
+    const version = await this.criteria.getVersion(running.ruleSetVersionId);
+    return {
+      runId: running.id,
+      subjectId: running.subjectId,
+      subjectKind: subject.kind,
+      ruleSetVersionId: running.ruleSetVersionId,
+      evaluationKey: version.evaluationKey,
+    };
   }
 }
 

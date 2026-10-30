@@ -1,0 +1,181 @@
+// Prisma schema fragment for the work-evaluation module (ADR-021, ADR-024).
+// This file is managed by @devbie/newbie-cli — assembled into the
+// consumer prisma tree on `newbie modules apply`.
+//
+// The run/result/criteria tables belong to the evaluation skeleton
+// (`module/evaluation`, ADR-020); this feature only owns the collection-side
+// tables. `ruleSetVersionId` is a plain scalar with no relation — foreign
+// keys never cross schema boundaries.
+
+// !! ----------------------------------------------------------- //
+// !!             [Module] Work Evaluation models                 //
+// !! ----------------------------------------------------------- //
+// * WorkEvaluationPeriod                                         //
+// * WorkEvaluationHomeGround                                     //
+// * WorkEvaluationWorkspace                                      //
+// * WorkEvaluationSession                                        //
+// * WorkEvaluationDeclaredDocument                               //
+// * WorkEvaluationInstallation                                   //
+// * WorkEvaluationPeriodType (enum)                              //
+// * WorkEvaluationPeriodStatus (enum)                            //
+// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+enum WorkEvaluationPeriodType {
+  COLLECTION
+  REVIEW
+
+  @@schema("module/work-evaluation")
+}
+
+enum WorkEvaluationPeriodStatus {
+  UPCOMING
+  ACTIVE
+  CLOSED
+
+  @@schema("module/work-evaluation")
+}
+
+/// An evaluation period: COLLECTION (monthly, evidence gathering) or
+/// REVIEW (quarterly, decision-making). Each period pins to exactly one
+/// published criteria version of the evaluation skeleton (kind "work") so
+/// all members inside it are judged against the same rules. The pin is a
+/// plain scalar — no cross-schema relation by design.
+model WorkEvaluationPeriod {
+  id                String @id @default(uuid()) @db.Uuid
+  // EvaluationRuleSetVersion.id in "module/evaluation"; scalar, no FK
+  ruleSetVersionId String @db.Uuid
+  type              WorkEvaluationPeriodType
+  periodStart       DateTime
+  periodEnd         DateTime
+  status            WorkEvaluationPeriodStatus @default(UPCOMING)
+
+  homeGrounds WorkEvaluationHomeGround[]
+  sessions    WorkEvaluationSession[]
+
+  @@index([ruleSetVersionId])
+  @@index([type, periodStart])
+  @@schema("module/work-evaluation")
+}
+
+/// One evaluatee's home-ground declaration for a period. Dual-circle model:
+/// criteria in `homeCriteria` are the specialty circle. No weights — the
+/// declaration is context for the evaluation agent, never a scoring input.
+model WorkEvaluationHomeGround {
+  id                 String @id @default(uuid()) @db.Uuid
+  evaluateeUserId    String @db.Uuid
+  collectionPeriodId String @db.Uuid
+
+  homeCriteria Json @db.JsonB // criterionKey[]
+  declaredAt   DateTime @default(now())
+
+  period WorkEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluateeUserId, collectionPeriodId])
+  @@index([evaluateeUserId])
+  @@schema("module/work-evaluation")
+}
+
+/// A workspace declared by the member and reported by the installation agent.
+/// The declared set is an allowlist: a workspace either is declared (and in
+/// scope) or does not exist here at all — there is no company/personal field,
+/// because undeclared paths are never reported.
+model WorkEvaluationWorkspace {
+  id              String @id @default(uuid()) @db.Uuid
+  evaluateeUserId String @db.Uuid
+
+  // IDE-side workspace identifier (stable across reports)
+  workspaceKey String @db.VarChar(128)
+  rootPath     String @db.VarChar(512)
+
+  installationId String? @db.Uuid
+  reportedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  installation   WorkEvaluationInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
+
+  @@unique([evaluateeUserId, workspaceKey])
+  @@index([evaluateeUserId])
+  @@schema("module/work-evaluation")
+}
+
+/// Index row for one AI-agent coding session collected from a company
+/// workspace. The transcript itself lives in ClickHouse
+/// (`work_evaluation_session_messages`); this row carries everything the
+/// evaluation agent needs to decide whether to drill into the transcript.
+model WorkEvaluationSession {
+  id                 String  @id @default(uuid()) @db.Uuid
+  evaluateeUserId    String  @db.Uuid
+  collectionPeriodId String? @db.Uuid
+
+  // Installation-side session identifier (stable, e.g. the IDE transcript id)
+  externalSessionId String @db.VarChar(128)
+  workspaceKey      String @db.VarChar(128)
+  model             String @default("") @db.VarChar(128)
+  // Transcript origin: "claude" / "codex" (raw transcripts) or "trae-memory"
+  // (the IDE's own session summaries — lower fidelity, never mixed up with raw).
+  source            String @default("claude") @db.VarChar(32)
+
+  turnCount     Int @default(0)
+  messageCount  Int @default(0)
+  toolCallCount Int @default(0)
+  toolNames     Json? @db.JsonB
+  touchedFiles  Json? @db.JsonB
+  durationMs    Int?
+
+  startedAt  DateTime
+  endedAt    DateTime
+  ingestedAt DateTime @default(now())
+
+  collectionPeriod WorkEvaluationPeriod? @relation(fields: [collectionPeriodId], references: [id], onDelete: SetNull)
+
+  @@unique([evaluateeUserId, externalSessionId])
+  @@index([evaluateeUserId, startedAt])
+  @@index([collectionPeriodId])
+  @@schema("module/work-evaluation")
+}
+
+/// A work artifact declared by the member's installation agent (design notes,
+/// research, prototypes that live in the company workspace but never reach a
+/// commit). Declared layer only: it is context that must be corroborated by
+/// fact-layer evidence before it can support a strong conclusion.
+model WorkEvaluationDeclaredDocument {
+  id              String @id @default(uuid()) @db.Uuid
+  evaluateeUserId String @db.Uuid
+  workspaceKey    String @db.VarChar(128)
+
+  title       String  @db.VarChar(255)
+  refPath     String  @db.VarChar(512)
+  description String? @db.Text
+  content     String  @db.Text
+
+  capturedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([evaluateeUserId, workspaceKey, refPath])
+  @@index([evaluateeUserId])
+  @@schema("module/work-evaluation")
+}
+
+/// Enrollment for the member-side installation agent. Same shape as the
+/// backend-monitor installation: random UUID token, SHA-256 hash at rest,
+/// plaintext returned once, soft revocation. The row carries the evaluatee the
+/// token may report for, so an installation agent can never write sessions for
+/// someone else.
+model WorkEvaluationInstallation {
+  id               String  @id @default(uuid()) @db.Uuid
+  label            String  @db.VarChar(128)
+  evaluateeUserId  String  @db.Uuid
+  tokenHash        String  @unique @db.VarChar(64)
+  hostname         String? @db.VarChar(255)
+  firstSeenAt      DateTime?
+  lastSeenAt       DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspaces WorkEvaluationWorkspace[]
+
+  @@index([evaluateeUserId])
+  @@schema("module/work-evaluation")
+}

@@ -10,8 +10,9 @@ export { Scope };
  * SCOPE_RESOLVERS token. Two ways a resolver gets selected:
  *
  * 1. Preferred (ADR-017): the resource is listed in the host's
- *    HOST_SCOPED_RESOURCES; the Guard iterates resolvers in registration order
- *    and takes the first non-{type:"none"} result.
+ *    HOST_SCOPED_RESOURCES; the Guard runs every resolver whose declared key is
+ *    present in the request and requires a single, unambiguous project. No
+ *    matching key at all denies the request (fail closed).
  * 2. Legacy: a `@RequirePermission` decorator still carries
  *    `{ scope: "<key>" }`; the Guard looks that key up directly. Deprecated for
  *    modules — decorators must not name host vocabulary.
@@ -27,17 +28,24 @@ export const SCOPE_RESOLVERS = Symbol("SCOPE_RESOLVERS");
  * SPI port that hosts bind to declare which resources need scope resolution.
  *
  * When the AuthorizationGuard sees a resource in this list and the route
- * metadata carries no legacy `scope` key, it iterates all registered
- * ScopeResolvers in SCOPE_RESOLVERS priority order — the first one that
- * returns a non-{type:"none"} Scope wins.
+ * metadata carries no legacy `scope` key, it runs every registered
+ * ScopeResolver whose declared request key is present, and accepts the result
+ * only when exactly one project is named. Absent keys (or conflicting projects)
+ * deny the request.
  *
- * Type is flat string[] (resource names). The host controls resolver
- * priority via the key insertion order in SCOPE_RESOLVERS (specific
- * resolvers first, defaultProjectScopeResolver last).
+ * Type is flat string[] (resource names); resolver selection is by `param`, not
+ * by registration order.
  */
 export const HOST_SCOPED_RESOURCES = Symbol("HOST_SCOPED_RESOURCES");
 
 export interface ScopeResolver {
+  /**
+   * Request key owned by this resolver: read from route params, then query,
+   * then body. The Guard only invokes resolvers whose key is present, so
+   * unrelated resolvers never run and registration order cannot decide the
+   * authorization scope.
+   */
+  param: string;
   resolve(context: ExecutionContext): Promise<Scope>;
 }
 
@@ -49,6 +57,7 @@ export interface ScopeResolver {
  * whose projectId lives elsewhere must register a dedicated resolver.
  */
 export const defaultProjectScopeResolver: ScopeResolver = {
+  param: "projectId",
   resolve: async (context) => {
     const req = context.switchToHttp().getRequest<{
       params?: Record<string, unknown>;

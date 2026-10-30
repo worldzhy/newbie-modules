@@ -15,8 +15,14 @@ import { EvaluationFindingChangedEvent } from "./ports/observer.port";
 import { validateJudgment } from "./evaluation-invariants";
 
 export interface ListEvaluationFindingsInput {
-  subjectId: string;
-  family?: string;
+  /** Omitted lists findings across subjects (narrowed by scope or run when given). */
+  subjectId?: string;
+  /** Host scope coordinate on the subject; narrows the list to one scope. */
+  scopeType?: string;
+  scopeId?: string;
+  /** Only findings last observed by this run. */
+  runId?: string;
+  evaluationKey?: string;
   status?: EvaluationFindingStatus;
   severity?: EvaluationFindingSeverity;
   page?: number;
@@ -26,12 +32,12 @@ export interface ListEvaluationFindingsInput {
 /**
  * EvaluationFindingService — the assertion lifecycle (ADR-020 D2).
  *
- * A finding outlives the run that produced it: `(subjectId, family,
+ * A finding outlives the run that produced it: `(subjectId, evaluationKey,
  * fingerprint)` is its identity, `firstSeenAt` is never rewritten, and it is
- * resolved when a later run of the same family no longer observes it. The
- * family comes from the run's criteria version, so a rerun under a new version
- * of the same family keeps the identity, and one family's run never resolves
- * another family's findings. A suppressed finding keeps its suppression across
+ * resolved when a later run of the same evaluationKey no longer observes it. The
+ * evaluationKey comes from the run's criteria version, so a rerun under a new version
+ * of the same evaluationKey keeps the identity, and one evaluationKey's run never resolves
+ * another evaluationKey's findings. A suppressed finding keeps its suppression across
  * runs — reappearance must not resurrect it.
  */
 @Injectable()
@@ -57,7 +63,7 @@ export class EvaluationFindingService {
   ) {
     if (candidates.length === 0) return [];
 
-    const criteria = await this.criteria.listCriteria(run.criteriaVersionId);
+    const criteria = await this.criteria.listCriteria(run.ruleSetVersionId);
     const problems = validateJudgment({
       criteria,
       verdicts: [],
@@ -66,31 +72,31 @@ export class EvaluationFindingService {
     });
     if (problems.length > 0) throw new BadRequestException(problems);
 
-    const { family } = await this.criteria.getVersion(run.criteriaVersionId);
+    const { evaluationKey } = await this.criteria.getVersion(run.ruleSetVersionId);
     const observedAt = run.startedAt ?? run.createdAt;
     const recorded: EvaluationFinding[] = [];
     for (const candidate of candidates) {
-      recorded.push(await this.observe(run, family, candidate, observedAt));
+      recorded.push(await this.observe(run, evaluationKey, candidate, observedAt));
     }
     return recorded;
   }
 
   /**
-   * Close findings the run did not observe, scoped to the run's family: a run
-   * of one family must never resolve another family's findings. The cutoff is
+   * Close findings the run did not observe, scoped to the run's evaluationKey: a run
+   * of one evaluationKey must never resolve another evaluationKey's findings. The cutoff is
    * the run's start time: anything last seen before it was absent from this
    * pass. Runs of one subject and version are serialized by the database, but
-   * two versions of the same family may legitimately run concurrently — so the
+   * two versions of the same evaluationKey may legitimately run concurrently — so the
    * close is a compare-and-set on the listed `lastSeenAt`, and a finding that
    * was re-observed or suppressed after the listing is left untouched.
    */
   async resolveAbsentFindings(run: EvaluationRun): Promise<number> {
     const cutoff = run.startedAt ?? run.createdAt;
-    const { family } = await this.criteria.getVersion(run.criteriaVersionId);
+    const { evaluationKey } = await this.criteria.getVersion(run.ruleSetVersionId);
     const absent = await this.prisma.evaluationFinding.findMany({
       where: {
         subjectId: run.subjectId,
-        family,
+        evaluationKey,
         status: EvaluationFindingStatus.OPEN,
         lastSeenAt: { lt: cutoff },
         NOT: { lastSeenRunId: run.id },
@@ -102,7 +108,7 @@ export class EvaluationFindingService {
     for (const finding of absent) {
       // Compare-and-set per row: resolve only if nothing touched the row since
       // the listing. A human suppression wins (status changed); a concurrent
-      // run of another version in the same family that re-observed the finding
+      // run of another version in the same evaluationKey that re-observed the finding
       // also wins (lastSeenAt moved) — both leave the row untouched here.
       const resolved = await this.prisma.evaluationFinding.updateMany({
         where: { id: finding.id, status: EvaluationFindingStatus.OPEN, lastSeenAt: finding.lastSeenAt },
@@ -113,7 +119,7 @@ export class EvaluationFindingService {
       await this.notifyFindingChanged({
         findingId: finding.id,
         subjectId: run.subjectId,
-        family,
+        evaluationKey,
         fingerprint: finding.fingerprint,
         severity: finding.severity,
         change: "resolved",
@@ -144,7 +150,7 @@ export class EvaluationFindingService {
     await this.notifyFindingChanged({
       findingId: finding.id,
       subjectId: finding.subjectId,
-      family: finding.family,
+      evaluationKey: finding.evaluationKey,
       fingerprint: finding.fingerprint,
       severity: finding.severity,
       change: "suppressed",
@@ -168,7 +174,7 @@ export class EvaluationFindingService {
     await this.notifyFindingChanged({
       findingId: finding.id,
       subjectId: finding.subjectId,
-      family: finding.family,
+      evaluationKey: finding.evaluationKey,
       fingerprint: finding.fingerprint,
       severity: finding.severity,
       change: "reopened",
@@ -186,10 +192,19 @@ export class EvaluationFindingService {
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
         where: {
-          subjectId: query.subjectId,
-          ...(query.family ? { family: query.family } : {}),
+          ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+          ...(query.runId ? { lastSeenRunId: query.runId } : {}),
+          ...(query.evaluationKey ? { evaluationKey: query.evaluationKey } : {}),
           ...(query.status ? { status: query.status } : {}),
           ...(query.severity ? { severity: query.severity } : {}),
+          ...(query.scopeType || query.scopeId
+            ? {
+                subject: {
+                  ...(query.scopeType ? { scopeType: query.scopeType } : {}),
+                  ...(query.scopeId ? { scopeId: query.scopeId } : {}),
+                },
+              }
+            : {}),
         },
         orderBy: [{ status: "asc" }, { severity: "desc" }, { lastSeenAt: "desc" }],
       },
@@ -198,18 +213,18 @@ export class EvaluationFindingService {
 
   private async observe(
     run: EvaluationRun,
-    family: string,
+    evaluationKey: string,
     candidate: EvaluationFindingCandidate,
     observedAt: Date,
   ): Promise<EvaluationFinding> {
-    const existing = await this.findByFingerprint(run.subjectId, family, candidate.fingerprint);
-    if (!existing) return this.createFinding(run, family, candidate, observedAt);
+    const existing = await this.findByFingerprint(run.subjectId, evaluationKey, candidate.fingerprint);
+    if (!existing) return this.createFinding(run, evaluationKey, candidate, observedAt);
     return this.updateFinding(run, existing, candidate, observedAt);
   }
 
   private async createFinding(
     run: EvaluationRun,
-    family: string,
+    evaluationKey: string,
     candidate: EvaluationFindingCandidate,
     observedAt: Date,
   ): Promise<EvaluationFinding> {
@@ -217,7 +232,7 @@ export class EvaluationFindingService {
       const created = await this.prisma.evaluationFinding.create({
         data: {
           subjectId: run.subjectId,
-          family,
+          evaluationKey,
           fingerprint: candidate.fingerprint,
           criterionKey: candidate.criterionKey,
           severity: candidate.severity,
@@ -234,7 +249,7 @@ export class EvaluationFindingService {
       await this.notifyFindingChanged({
         findingId: created.id,
         subjectId: created.subjectId,
-        family: created.family,
+        evaluationKey: created.evaluationKey,
         fingerprint: created.fingerprint,
         severity: created.severity,
         change: "created",
@@ -244,7 +259,7 @@ export class EvaluationFindingService {
       // A concurrent writer created the same fingerprint first; fall through to
       // the update path rather than failing the whole run.
       if (!isUniqueViolation(error)) throw error;
-      const existing = await this.findByFingerprint(run.subjectId, family, candidate.fingerprint);
+      const existing = await this.findByFingerprint(run.subjectId, evaluationKey, candidate.fingerprint);
       if (!existing) throw error;
       return this.updateFinding(run, existing, candidate, observedAt);
     }
@@ -259,7 +274,7 @@ export class EvaluationFindingService {
     // A suppressed finding stays suppressed: the suppression is a human
     // decision about a known problem, not a cache to be invalidated. The write
     // is a compare-and-set on the status we read, so a suppression (or a
-    // concurrent run of the same family) landing between the read and the
+    // concurrent run of the same evaluationKey) landing between the read and the
     // write is never stomped.
     const reopened = existing.status === EvaluationFindingStatus.RESOLVED;
     const observation = {
@@ -294,7 +309,7 @@ export class EvaluationFindingService {
       await this.notifyFindingChanged({
         findingId: updated.id,
         subjectId: updated.subjectId,
-        family: updated.family,
+        evaluationKey: updated.evaluationKey,
         fingerprint: updated.fingerprint,
         severity: updated.severity,
         change: "reopened",
@@ -303,9 +318,9 @@ export class EvaluationFindingService {
     return updated;
   }
 
-  private async findByFingerprint(subjectId: string, family: string, fingerprint: string) {
+  private async findByFingerprint(subjectId: string, evaluationKey: string, fingerprint: string) {
     return this.prisma.evaluationFinding.findUnique({
-      where: { subjectId_family_fingerprint: { subjectId, family, fingerprint } },
+      where: { subjectId_evaluationKey_fingerprint: { subjectId, evaluationKey, fingerprint } },
     });
   }
 
@@ -333,7 +348,7 @@ function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const { code, message } = error as { code?: unknown; message?: unknown };
   if (code === "P2002") return true;
-  return typeof message === "string" && message.includes("EvaluationFinding_subjectId_family_fingerprint_key");
+  return typeof message === "string" && message.includes("EvaluationFinding_subjectId_evaluationKey_fingerprint_key");
 }
 
 function describeError(error: unknown): string {

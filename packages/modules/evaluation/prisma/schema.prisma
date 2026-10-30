@@ -9,7 +9,7 @@
 // !! ----------------------------------------------------------- //
 // !!                [Module] Evaluation models                   //
 // !! ----------------------------------------------------------- //
-// * EvaluationCriteriaVersion                                    //
+// * EvaluationRuleSetVersion                                    //
 // * EvaluationCriterion                                          //
 // * EvaluationSubject                                            //
 // * EvaluationRun                                                //
@@ -21,6 +21,7 @@
 // * EvaluationFindingStatus (enum)                               //
 // * EvaluationFindingSeverity (enum)                             //
 // * EvaluationRemediationStatus (enum)                           //
+// * EvaluationResultReviewStatus (enum)                          //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 enum EvaluationCriterionKind {
@@ -67,14 +68,23 @@ enum EvaluationRemediationStatus {
   @@schema("module/evaluation")
 }
 
+enum EvaluationResultReviewStatus {
+  // Supervisor endorses the archived AI conclusion (ADR-031).
+  APPROVED
+  // Supervisor overrules the archived AI conclusion (ADR-031).
+  REJECTED
+
+  @@schema("module/evaluation")
+}
+
 /// A frozen set of criteria a run is judged against (ADR-020 D5.5). A draft is
 /// editable; publishing is one-way, after which every write is rejected and
 /// changes require a new version. `kind` is the subject kind these criteria
-/// apply to; `family` is the feature-defined group (rubric, cis-aws-1.5, ...).
-model EvaluationCriteriaVersion {
+/// apply to; `evaluationKey` is the feature-defined group (rubric, aws-cis-1.5, ...).
+model EvaluationRuleSetVersion {
   id     String @id @default(uuid()) @db.Uuid
   kind   String @db.VarChar(64)
-  family String @db.VarChar(64)
+  evaluationKey String @db.VarChar(64)
 
   version     String  @db.VarChar(64)
   description String? @db.Text
@@ -91,8 +101,8 @@ model EvaluationCriteriaVersion {
   runs     EvaluationRun[]
   results  EvaluationResult[]
 
-  @@unique([kind, family, version])
-  @@index([kind, family, publishedAt])
+  @@unique([kind, evaluationKey, version])
+  @@index([kind, evaluationKey, publishedAt])
   @@schema("module/evaluation")
 }
 
@@ -101,7 +111,7 @@ model EvaluationCriteriaVersion {
 /// result stays interpretable after the version is superseded.
 model EvaluationCriterion {
   id                String @id @default(uuid()) @db.Uuid
-  criteriaVersionId String @db.Uuid
+  ruleSetVersionId String @db.Uuid
 
   criterionKey String                  @db.VarChar(64)
   kind         EvaluationCriterionKind
@@ -114,10 +124,10 @@ model EvaluationCriterion {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  criteriaVersion EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Cascade)
+  ruleSetVersion EvaluationRuleSetVersion @relation(fields: [ruleSetVersionId], references: [id], onDelete: Cascade)
 
-  @@unique([criteriaVersionId, criterionKey])
-  @@index([criteriaVersionId])
+  @@unique([ruleSetVersionId, criterionKey])
+  @@index([ruleSetVersionId])
   @@schema("module/evaluation")
 }
 
@@ -150,20 +160,23 @@ model EvaluationSubject {
 
 /// One evaluation attempt. Concurrency is enforced in the database, not in
 /// process memory: a partial unique index over the active statuses on
-/// (subjectId, criteriaVersionId) — the consumer migration must declare it in
+/// (subjectId, ruleSetVersionId) — the consumer migration must declare it in
 /// raw SQL, Prisma cannot express partial indexes:
 ///
 ///   CREATE UNIQUE INDEX "EvaluationRun_one_active_per_subject_version"
-///     ON "module/evaluation"."EvaluationRun" ("subjectId", "criteriaVersionId")
+///     ON "module/evaluation"."EvaluationRun" ("subjectId", "ruleSetVersionId")
 ///     WHERE "status" IN ('QUEUED', 'RUNNING');
 model EvaluationRun {
   id                String @id @default(uuid()) @db.Uuid
   subjectId         String @db.Uuid
-  criteriaVersionId String @db.Uuid
+  ruleSetVersionId String @db.Uuid
 
   status EvaluationRunStatus @default(QUEUED)
   // Opaque host-side actor id; no foreign key by design
   requestedByRef String? @db.VarChar(128)
+  // Opaque per-run feature config, threaded to the judgment port verbatim
+  // (ADR-023). The skeleton never reads a key from it.
+  config Json? @db.JsonB
   // Failure reason when status = FAILED. Message only, never a stack trace.
   error String? @db.Text
 
@@ -173,26 +186,27 @@ model EvaluationRun {
   updatedAt  DateTime  @updatedAt
 
   subject         EvaluationSubject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  criteriaVersion EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Restrict)
+  ruleSetVersion EvaluationRuleSetVersion @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
 
   // At most one result per run.
   result EvaluationResult?
 
-  @@index([subjectId, criteriaVersionId])
+  @@index([subjectId, ruleSetVersionId])
   @@index([status])
   @@schema("module/evaluation")
 }
 
 /// The archived conclusion of one run (ADR-020 D5.1): `manifest`,
 /// `contentHash` and `coverageStats` describe the material it was judged from
-/// and are never rewritten — a rerun writes a new row. There is deliberately no
-/// composite score field (D5.3); multi-axis scores belong to the feature's read
-/// model.
+/// and are never rewritten — a rerun writes a new row. The supervisor review
+/// columns (ADR-031) are the one lifecycle layer above the snapshot and never
+/// touch it. There is deliberately no composite score field (D5.3); multi-axis
+/// scores belong to the feature's read model.
 model EvaluationResult {
   id                String @id @default(uuid()) @db.Uuid
   runId             String @unique @db.Uuid
   subjectId         String @db.Uuid
-  criteriaVersionId String @db.Uuid
+  ruleSetVersionId String @db.Uuid
 
   // Archived evidence snapshot: [{ id, layer, source, summary, observedAt, refs }]
   manifest      Json    @db.JsonB
@@ -206,31 +220,40 @@ model EvaluationResult {
   summary  String? @db.Text
   metadata Json?   @db.JsonB
 
+  // Supervisor review of the archived conclusion (ADR-031). Every review is a
+  // full-state write: a re-review overwrites reviewer, time and note, so the
+  // row always reflects exactly the latest say.
+  reviewStatus  EvaluationResultReviewStatus?
+  // Opaque host-side actor id; no foreign key by design
+  reviewedByRef String?                       @db.VarChar(128)
+  reviewedAt    DateTime?
+  reviewNote    String?                       @db.Text
+
   createdAt DateTime @default(now())
 
   run             EvaluationRun @relation(fields: [runId], references: [id], onDelete: Cascade)
   subject         EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  criteriaVersion EvaluationCriteriaVersion @relation(fields: [criteriaVersionId], references: [id], onDelete: Restrict)
+  ruleSetVersion EvaluationRuleSetVersion @relation(fields: [ruleSetVersionId], references: [id], onDelete: Restrict)
 
   @@index([subjectId, createdAt])
-  @@index([criteriaVersionId])
+  @@index([ruleSetVersionId])
   @@schema("module/evaluation")
 }
 
 /// An assertion-type conclusion (ADR-020 D2). Unlike a verdict it has an
-/// identity — `(subjectId, family, fingerprint)` — and a lifecycle that spans
+/// identity — `(subjectId, evaluationKey, fingerprint)` — and a lifecycle that spans
 /// runs: first seen once, last seen by whichever run still observed it,
-/// resolved when it stops appearing. `family` is copied from the run's
-/// criteria version, so a rerun under a new version of the same family keeps
-/// the finding's identity, and one family never resolves another family's
+/// resolved when it stops appearing. `evaluationKey` is copied from the run's
+/// criteria version, so a rerun under a new version of the same evaluationKey keeps
+/// the finding's identity, and one evaluationKey never resolves another evaluationKey's
 /// findings. `firstSeenAt` is never rewritten.
 model EvaluationFinding {
   id        String @id @default(uuid()) @db.Uuid
   subjectId String @db.Uuid
 
-  // Criteria family of the run that owns this finding's lifecycle
-  family       String                    @db.VarChar(64)
-  // Stable identity of the assertion within the subject and family
+  // Criteria evaluationKey of the run that owns this finding's lifecycle
+  evaluationKey       String                    @db.VarChar(64)
+  // Stable identity of the assertion within the subject and evaluationKey
   fingerprint  String                    @db.VarChar(128)
   criterionKey String                    @db.VarChar(64)
   severity     EvaluationFindingSeverity
@@ -257,7 +280,7 @@ model EvaluationFinding {
 
   subject EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
 
-  @@unique([subjectId, family, fingerprint])
+  @@unique([subjectId, evaluationKey, fingerprint])
   @@index([subjectId, status])
   @@index([status, severity])
   @@schema("module/evaluation")
