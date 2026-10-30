@@ -4,12 +4,9 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 来源标记：`[安全评审 round2 2026-10-30]` 指 devbie 仓 `.trae/documents/expert-review-2026-10-30-round2.md`（未跟踪文件）。
 
-## P0（未修复，4 条）
+## P0（未修复，1 条）
 
 - [ ] `[安全评审 round2 #6]` **account 微信登录无服务端校验**：`packages/modules/account/auth/wechat/auth.service.ts` L17-38，`phone`/`openId` 取自请求体，无 code2session/getPhoneNumber 服务端校验；且漏 `UserStatus.INACTIVE` 检查。修复：改收 `code` 服务端换 openId、服务端解密手机号，补 INACTIVE 拒绝。
-- [ ] `[安全评审 round2 #10]` **engined DDL 注入**：`datasource/postgresql/table/table.service.ts` L39/43 把 body `name` 直拼 `$executeRawUnsafe`；`postgresql-datasource.service.ts` L66 `"${table}"` 二阶注入。修复：标识符白名单 + 引号转义，DDL 不应对 HTTP 开放。
-- [ ] `[安全评审 round2 #12]` **saas 忘记密码 origin 客户端可控**：`packages/modules/saas/modules/auth/auth.service.ts` L456-463，`origin=https://evil.com` 拼进重置链接；resend-verification/register/approve-subnet 同模式。修复：忽略客户端 origin，用服务端配置 frontendUrl。
-- [ ] `[安全评审 round2 #13]` **saas expose() 不递归**：`packages/modules/saas/helpers/expose.ts` L5-14，嵌套 `user.password`/`twoFactorSecret` 原样返回普通成员。修复：Prisma select 显式剔除。
 
 ## P1（安全评审 round2，registry 分组）
 
@@ -25,10 +22,8 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 - `aws-s3 controller`：listFiles/getFilePath/uploadFile/uploadPart 无权限装饰器；`overwrite` 字符串 `"false"` 为真值。修复：补权限、`overwrite==="true"` 显式比较。
 - `tencent-cos`：整 controller 无授权；delete 把 COS key 传给按 DB id 查的 service（永远 500）；文件夹 cosKey 缺尾 `/` 导致递归删除误伤同前缀目录。修复：补权限、按 fileId、统一带 `/`。
 - `security/rate-limiter.guard.ts` L29：取裸 socket 地址而非 `req.ip`，反代后全站共享一桶。修复：`req.ip` + trust proxy。
-- engined：全部 controller 无权限装饰器；ES datasource 名存实亡（search 走宿主全局集群、body.index 任意 DSL）；index 删除端点调的是 createIndex；PG 约束查询缺 datasourceId 过滤。
-- copilot kernel：`agent-runner.ts` L302-306 内部 `error.message` 进 SSE failed 帧；`consume-agent-run.ts` L23-35 `onEvent` 抛错跳过 `handle.fail()`；`conversation-store.ts` 会话/消息/replay 三处无上限；skill pages 过滤只在 prompt 层生效、tools 列表未过滤。
+- `copilot kernel`：`agent-runner.ts` L302-306 内部 `error.message` 进 SSE failed 帧；`consume-agent-run.ts` L23-35 `onEvent` 抛错跳过 `handle.fail()`；`conversation-store.ts` 会话/消息/replay 三处无上限；skill pages 过滤只在 prompt 层生效、tools 列表未过滤。
 - `shortcut/shortcut-item.controller.ts` L46-49：parentId 悬空/跨项目导致 tree 端点 500。修复：写入校验 parentId 同项目。
-- saas：`PATCH /users/:userId` 可改写 twoFactorMethod（静默关 MFA）；Google 登录按邮箱绑定不查 isVerified；账户合并把被合并方 role 拷给存活方；API key LRU 无 TTL 且撤销后不失效；pwned 密码检查被硬编码跳过；Google 回调 token 放 URL query + 无 OAuth state；github.service 写/删不约束 owner===配置 org。
 - event-scheduling：`event-issue.service.ts` L42 host 存在即 return，冲突检查永不执行；`event-host.service.ts` L100 读未 select 的 profile，永远返回空数组。
 - `webhook/webhook.service.ts` L153：存了 secret 从不签名（无 HMAC），SSRF 无防护。
 - `audit/http-access.interceptor.ts` L196：无条件信任客户端 XFF 首跳，审计 IP 可伪造。
