@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { createHmac } from "node:crypto";
 import { Prisma, Webhook } from "@generated/prisma/client";
 import pQueue from "p-queue";
 import pRetry from "p-retry";
@@ -151,11 +152,69 @@ export class WebhookService {
   }
 
   private async callWebhook(webhook: Webhook, event: string) {
-    if (webhook.contentType === "application/json") await axios.post(webhook.url, { event });
-    else await axios.post(webhook.url, event);
+    if (!this.isSafeUrl(webhook.url)) {
+      throw new Error(`Refusing to call unsafe webhook url: ${webhook.id}`);
+    }
+
+    const isJson = webhook.contentType === "application/json";
+    const body = isJson ? { event } : event;
+    const headers: Record<string, string> = {};
+    if (webhook.secret) {
+      const payload = isJson ? JSON.stringify(body) : String(body);
+      headers["X-Webhook-Signature"] = `sha256=${createHmac("sha256", webhook.secret).update(payload).digest("hex")}`;
+    }
+
+    await axios.post(webhook.url, body, { headers });
     await this.prisma.webhook.update({
       where: { id: webhook.id },
       data: { lastFiredAt: new Date() },
     });
+  }
+
+  /**
+   * Webhook targets are user-supplied, so only allow http(s) and reject
+   * loopback / private / link-local hosts to avoid SSRF against the host.
+   */
+  private isSafeUrl(rawUrl: string): boolean {
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      return false;
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return false;
+    }
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal")
+    ) {
+      return false;
+    }
+    const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipv4) {
+      const a = Number(ipv4[1]);
+      const b = Number(ipv4[2]);
+      return !(
+        a === 0 ||
+        a === 10 ||
+        a === 127 ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168)
+      );
+    }
+    if (!hostname.includes(":")) {
+      return true;
+    }
+    return !(
+      hostname === "::1" ||
+      hostname.startsWith("fe80:") ||
+      hostname.startsWith("fc") ||
+      hostname.startsWith("fd")
+    );
   }
 }

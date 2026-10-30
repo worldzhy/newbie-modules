@@ -3,6 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { SignUpDto } from "@modules/account/auth/auth.dto";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
+import { LimitAccessByIp } from "@modules/security/rate-limiter/rate-limiter.decorator";
 
 @ApiTags("Account / Auth")
 @Controller("auth")
@@ -17,6 +18,7 @@ export class SignupController {
    * [Constraint] 'password' is required if neither email nor phone is provided.
    */
   @NoGuard()
+  @LimitAccessByIp()
   @Post("signup")
   @ApiOperation({ summary: "Sign up a new user" })
   @ApiResponse({ status: 201, description: "User signed up successfully." })

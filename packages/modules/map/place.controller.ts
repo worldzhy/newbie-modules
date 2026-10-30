@@ -1,8 +1,8 @@
-import { Controller, Delete, Get, Patch, Post, Body, Param, Query } from "@nestjs/common";
+import { Controller, Delete, Get, Patch, Post, Body, Param, ParseIntPipe, Query } from "@nestjs/common";
 import { ApiCreatedResponse, ApiOkResponse, ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
 import { Prisma, Place } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { ListPlacesRequestDto } from "./place.dto";
+import { CreatePlaceRequestDto, ListPlacesRequestDto, UpdatePlaceRequestDto } from "./place.dto";
 
 @ApiTags("Place")
 @ApiBearerAuth()
@@ -37,7 +37,7 @@ export class PlaceController {
       },
     },
   })
-  async createPlace(@Body() body: Prisma.PlaceUncheckedCreateInput): Promise<Place> {
+  async createPlace(@Body() body: CreatePlaceRequestDto): Promise<Place> {
     return await this.prisma.place.create({ data: body });
   }
 
@@ -53,7 +53,7 @@ export class PlaceController {
 
   @Get(":placeId")
   @ApiOkResponse()
-  async getPlace(@Param("placeId") placeId: number): Promise<Place> {
+  async getPlace(@Param("placeId", ParseIntPipe) placeId: number): Promise<Place> {
     return await this.prisma.place.findUniqueOrThrow({ where: { id: placeId } });
   }
 
@@ -84,7 +84,10 @@ export class PlaceController {
       },
     },
   })
-  async updatePlace(@Param("placeId") placeId: number, @Body() body: Prisma.PlaceUpdateInput): Promise<Place> {
+  async updatePlace(
+    @Param("placeId", ParseIntPipe) placeId: number,
+    @Body() body: UpdatePlaceRequestDto,
+  ): Promise<Place> {
     return await this.prisma.place.update({
       where: { id: placeId },
       data: body,
@@ -93,7 +96,7 @@ export class PlaceController {
 
   @Delete(":placeId")
   @ApiOkResponse()
-  async deletePlace(@Param("placeId") placeId: number): Promise<Place> {
+  async deletePlace(@Param("placeId", ParseIntPipe) placeId: number): Promise<Place> {
     return await this.prisma.place.delete({
       where: { id: placeId },
     });

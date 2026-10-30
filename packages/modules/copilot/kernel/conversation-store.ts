@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { COMPLETED_RUN_RETENTION_MS, CONVERSATION_TTL_MS } from "./agent-config";
+import {
+  COMPLETED_RUN_RETENTION_MS,
+  CONVERSATION_TTL_MS,
+  MAX_CONVERSATIONS_PER_USER,
+  MAX_MESSAGES_PER_CONVERSATION,
+  MAX_REPLAY_EVENTS,
+} from "./agent-config";
 import type { AgentEvent } from "./agent-events";
 import type { ChatHistoryMessage } from "./agent-execution-context";
 
@@ -155,8 +161,10 @@ export class InMemoryConversationStore implements ConversationStore {
 
     const history: ChatHistoryMessage[] = record.messages.map(({ role, content }) => ({ role, content }));
     record.messages.push({ role: "user", content: command.userMessage, at: now });
+    this.trimMessages(record);
     record.updatedAt = now;
     record.running = { requestId: command.requestId, startedAt: now };
+    this.evictConversations(command.userId);
 
     const owner = record;
     const events: AgentEvent[] = [];
@@ -165,10 +173,14 @@ export class InMemoryConversationStore implements ConversationStore {
       history,
       noteEvent: (event) => {
         events.push(event);
+        if (events.length > MAX_REPLAY_EVENTS) {
+          events.splice(0, events.length - MAX_REPLAY_EVENTS);
+        }
       },
       succeed: (assistantText) => {
         if (owner.running?.requestId !== command.requestId) return;
         owner.messages.push({ role: "assistant", content: assistantText, at: this.clock.now() });
+        this.trimMessages(owner);
         this.finish(owner, command, events);
       },
       fail: () => {
@@ -190,6 +202,31 @@ export class InMemoryConversationStore implements ConversationStore {
       events,
       finishedAt,
     });
+  }
+
+  /** Drops the oldest messages so a conversation stays bounded in memory. */
+  private trimMessages(record: ConversationRecord): void {
+    if (record.messages.length > MAX_MESSAGES_PER_CONVERSATION) {
+      record.messages.splice(0, record.messages.length - MAX_MESSAGES_PER_CONVERSATION);
+    }
+  }
+
+  /**
+   * Caps conversations per user, evicting the least recently updated idle
+   * records first. A running conversation is never evicted (its in-flight
+   * run keeps the lock valid).
+   */
+  private evictConversations(userId: string): void {
+    const owned = [...this.conversations.values()].filter((record) => record.userId === userId);
+    let excess = owned.length - MAX_CONVERSATIONS_PER_USER;
+    if (excess <= 0) return;
+    owned.sort((a, b) => a.updatedAt - b.updatedAt);
+    for (const record of owned) {
+      if (excess <= 0) break;
+      if (record.running) continue;
+      this.conversations.delete(record.conversationId);
+      excess -= 1;
+    }
   }
 
   private prune(now: number): void {

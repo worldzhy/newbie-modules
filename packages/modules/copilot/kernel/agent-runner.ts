@@ -43,7 +43,7 @@ export class AgentRunner {
 
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
     const { model, context } = input;
-    const tools = this.registry.toolSpecificationsFor(context.transport);
+    const tools = this.registry.toolSpecificationsFor(context.transport, context.pageContext?.route);
     const offeredSkills = this.registry.listFor(context.transport, context.pageContext?.route).map((s) => s.name);
 
     yield {
@@ -299,11 +299,14 @@ export class AgentRunner {
         yield failedEvent(context.requestId, modelErrorToCode(error.category), error.message);
         return;
       }
-      yield failedEvent(
-        context.requestId,
-        "internal",
-        error instanceof Error ? error.message : "Unexpected agent failure.",
-      );
+      // Internal details stay server-side; the client only gets a generic
+      // failure message for the SSE frame.
+      this.registry.logError("Copilot run failed with an internal error", {
+        requestId: context.requestId,
+        conversationId: context.conversationId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      yield failedEvent(context.requestId, "internal", "The agent failed unexpectedly. Please try again.");
     }
   }
 

@@ -44,8 +44,11 @@ export class ShortcutItemController {
     });
 
     Object.keys(groupMap).forEach((groupId) => {
-      if (groupMap[groupId].parentId !== 0) {
-        groupMap[groupMap[groupId].parentId].child.push(groupMap[groupId]);
+      const parent = groupMap[groupMap[groupId].parentId];
+      // A dangling parentId (group deleted or belonging to another project)
+      // must not crash the tree endpoint.
+      if (groupMap[groupId].parentId !== 0 && parent) {
+        parent.child.push(groupMap[groupId]);
       }
     });
 

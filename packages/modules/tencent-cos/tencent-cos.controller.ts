@@ -13,6 +13,8 @@ import { TencentCosService } from "./tencent-cos.service";
 import { Express } from "express";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { ApiBody, ApiConsumes, ApiCreatedResponse, ApiOkResponse, ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 
 @ApiTags("Tencent COS")
 @ApiBearerAuth()
@@ -21,6 +23,7 @@ export class TencentCosController {
   constructor(private readonly cos: TencentCosService) {}
 
   @Post("")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.CosFile)
   @ApiConsumes("multipart/form-data")
   @ApiCreatedResponse({ type: Object })
   @ApiBody({
@@ -54,24 +57,28 @@ export class TencentCosController {
   }
 
   @Get("")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.CosFile)
   @ApiOkResponse({ type: Object })
   async getFile(@Query("key") key: string) {
     return await this.cos.getObject(key);
   }
 
   @Post("getSignedDownloadUrl")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.CosFile)
   @ApiOkResponse({ type: Object })
   async getFilePreview(@Body() body: { key: string }) {
     return await this.cos.getSignedDownloadUrl({ key: body.key });
   }
 
   @Post("delete")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.CosFile)
   @ApiOkResponse({ type: Object })
-  async deleteFile(@Body() { key }: { key: string }): Promise<any> {
-    return await this.cos.deleteFile(key);
+  async deleteFile(@Body() { fileId }: { fileId: string }): Promise<any> {
+    return await this.cos.deleteFile(fileId);
   }
 
   @Post("initMultipartUpload")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.CosFile)
   @ApiCreatedResponse({ type: Object })
   async initMultipartUpload(@Body() body: { fileName: string }) {
     const path = process.env.STORE_PATH as string;
@@ -85,6 +92,7 @@ export class TencentCosController {
   }
 
   @Post("uploadPart")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.CosFile)
   @ApiConsumes("multipart/form-data")
   @ApiCreatedResponse({ type: Object })
   @ApiBody({
@@ -118,6 +126,7 @@ export class TencentCosController {
   }
 
   @Post("completeMultipartUpload")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.CosFile)
   @ApiCreatedResponse({ type: Object })
   async completeMultipartUpload(
     @Body()

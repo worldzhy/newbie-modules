@@ -108,16 +108,13 @@ export class UserController {
       },
     });
 
-    // [step 3] Return users without password; map roles to name strings.
-    result.records = result.records.map((user) => {
-      const {
-        password: _password,
-        roles,
-        ...rest
-      } = user as User & {
+    // [step 3] Return users through the response allowlist (password and
+    // secret columns stripped); map roles to name strings.
+    result.records = result.records.map((record) => {
+      const { roles, ...user } = record as User & {
         roles: { role: { name: string } }[];
       };
-      return { ...rest, roles: roles.map((r) => r.role.name) };
+      return { ...this.userService.withoutPassword(user), roles: roles.map((r) => r.role.name) };
     });
 
     return result;
@@ -133,8 +130,8 @@ export class UserController {
       include: { roles: { include: { role: { select: { name: true } } } } },
     });
 
-    const { password: _password, roles, ...rest } = user;
-    return { ...rest, roles: roles.map((r) => r.role.name) };
+    const { roles, ...scalars } = user;
+    return { ...this.userService.withoutPassword(scalars), roles: roles.map((r) => r.role.name) };
   }
 
   @Patch(":userId")
@@ -191,15 +188,18 @@ export class UserController {
       });
     }
 
-    const { password: _password, roles: userRoles, ...rest } = user;
-    return { ...rest, roles: userRoles.map((r) => r.role.name) };
+    const { roles: userRoles, ...scalars } = user;
+    return { ...this.userService.withoutPassword(scalars), roles: userRoles.map((r) => r.role.name) };
   }
 
   @Delete(":userId")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.User)
   @ApiOperation({ summary: "Delete a user" })
   @ApiResponse({ type: UserResponseDto })
-  async deleteUser(@Param("userId") userId: string, @Req() req: Request): Promise<Omit<User, "password">> {
+  async deleteUser(
+    @Param("userId") userId: string,
+    @Req() req: Request,
+  ): Promise<Omit<User, "password" | "twoFactorSecret" | "pendingTwoFactorSecret" | "wechatSessionKey">> {
     // Prevent users from deleting their own account.
     const token = this.tokenService.getTokenFromHttpRequest(req);
     if (token) {

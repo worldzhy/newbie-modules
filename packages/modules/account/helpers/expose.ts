@@ -15,6 +15,11 @@ export function expose<T>(item: T): Expose<T> {
   delete record.refreshTokenNext;
   // API key secrets are stored hashed and must never be serialized to clients.
   delete record.secret;
+  // User secret columns: the active and pending TOTP secrets plus the WeChat
+  // session key. Auth flows read them internally before expose() is called.
+  delete record.twoFactorSecret;
+  delete record.pendingTwoFactorSecret;
+  delete record.wechatSessionKey;
 
   return item;
 }
@@ -23,6 +28,8 @@ export type Expose<T> = Omit<
   T,
   | "password"
   | "twoFactorSecret"
+  | "pendingTwoFactorSecret"
+  | "wechatSessionKey"
   | "token"
   | "emailSafe"
   | "subnet"

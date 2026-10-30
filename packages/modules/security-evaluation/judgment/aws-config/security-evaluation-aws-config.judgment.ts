@@ -28,7 +28,7 @@ const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 @Injectable()
 export class SecurityEvaluationAwsConfigJudgment {
   judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    const items = rebuildAwsConfigKnowledge(input.evidence);
+    const { items, skippedRefs } = rebuildAwsConfigKnowledge(input.evidence);
     const evaluationKey = input.ruleSetVersion.evaluationKey;
 
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
@@ -77,6 +77,15 @@ export class SecurityEvaluationAwsConfigJudgment {
       verdicts: [],
       findings,
       evaluatedRefs,
+      ...(skippedRefs.length > 0
+        ? {
+            skipped: {
+              total: skippedRefs.length,
+              items: skippedRefs,
+              note: `${skippedRefs.length} access-key item(s) lacked a valid status or createdAt and could not be judged.`,
+            },
+          }
+        : {}),
       summary: `Judged ${entries.length} ${isCis ? "CIS controls" : "custom rules"} over ${input.evidence.length} configuration items: ${findings.length} findings.`,
       metadata: {
         ...(isCis ? { benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK } : {}),

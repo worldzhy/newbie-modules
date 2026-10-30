@@ -24,6 +24,7 @@ export class AwsCredentialsController {
   }
 
   @Post(":projectId/bootstrap")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding)
   @ApiOperation({
     summary: "Generate the per-project external ID used by the customer role trust policy",
   })

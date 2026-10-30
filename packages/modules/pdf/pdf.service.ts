@@ -14,7 +14,8 @@ export class PdfService {
     pdfPage: number;
     texts: { text: string; options: PDFPageDrawTextOptions }[];
   }) {
-    const pdfBytes = readFileSync(params.pdfPath, "utf8");
+    // PDFs are binary; reading with the default encoding corrupts the bytes.
+    const pdfBytes = readFileSync(params.pdfPath);
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const page = pdfDoc.getPage(params.pdfPage - 1);
 

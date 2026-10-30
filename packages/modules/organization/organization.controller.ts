@@ -3,7 +3,11 @@ import { ApiTags, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse } fr
 import { Organization, PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { ListOrganizationsRequestDto } from "./organization.dto";
+import {
+  CreateOrganizationRequestDto,
+  ListOrganizationsRequestDto,
+  UpdateOrganizationRequestDto,
+} from "./organization.dto";
 
 @ApiTags("Organization")
 @ApiBearerAuth()
@@ -25,7 +29,7 @@ export class OrganizationController {
       },
     },
   })
-  async createOrganization(@Body() body: Prisma.OrganizationCreateInput): Promise<Organization> {
+  async createOrganization(@Body() body: CreateOrganizationRequestDto): Promise<Organization> {
     return await this.prisma.organization.create({
       data: body,
     });
@@ -89,7 +93,7 @@ export class OrganizationController {
   async updateOrganization(
     @Param("organizationId") organizationId: string,
     @Body()
-    body: Prisma.OrganizationUpdateInput,
+    body: UpdateOrganizationRequestDto,
   ): Promise<Organization> {
     return await this.prisma.organization.update({
       where: { id: organizationId },

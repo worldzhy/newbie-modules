@@ -75,6 +75,8 @@ describe("secret patterns", () => {
     // outside the value character class and stays.
     assert.equal(redact('Password: "sup3rsecret"'), `Password=${REDACTED}"`);
     assert.equal(redact("api_key: abcdef123456"), `api_key=${REDACTED}`);
+    // JSON-shaped assignments must be caught too, not just key=value text.
+    assert.equal(redact('{"password": "hunter2xyz"}'), `{"password=${REDACTED}"}`);
   });
 
   it("leaves ordinary text untouched", () => {

@@ -15,6 +15,14 @@ const TOP_OPEN_LIMIT = 20;
 const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
 const URGENCIES: readonly SecurityEvaluationUrgency[] = ["P1", "P2", "P3", "P4"];
 
+/** The coverage buckets an archived result carries, per evaluation axis. */
+type CoverageStatsSummary = {
+  evaluated?: { total?: number };
+  declaredUnlinked?: { total?: number };
+  skipped?: { total?: number };
+  unconsumed?: { total?: number };
+};
+
 export interface SecurityEvaluationReport {
   generatedAt: Date;
   assets: {
@@ -47,10 +55,10 @@ export interface SecurityEvaluationReport {
 }
 
 /**
- * SecurityEvaluationReportService — the single-axis read model of the first
- * slice (ADR-022 D6): assets, coverage, findings, trend and MTTR. There is no
- * composite score and no cross-evaluationKey weighting; adding a second axis is a
- * later milestone, not a field to sneak in here.
+ * SecurityEvaluationReportService — the read model of the first slice
+ * (ADR-022 D6): assets, coverage, findings, trend and MTTR. Coverage reflects
+ * the latest result per subject per evaluation axis (ADR-020 D5.2). There is no
+ * composite score and no cross-evaluationKey weighting.
  */
 @Injectable()
 export class SecurityEvaluationReportService {
@@ -86,11 +94,13 @@ export class SecurityEvaluationReportService {
       unconsumed: 0,
       assetsWithResult: latestResults.size,
     };
-    for (const stats of latestResults.values()) {
-      coverage.evaluated += stats.evaluated?.total ?? 0;
-      coverage.declaredUnlinked += stats.declaredUnlinked?.total ?? 0;
-      coverage.skipped += stats.skipped?.total ?? 0;
-      coverage.unconsumed += stats.unconsumed?.total ?? 0;
+    for (const byAxis of latestResults.values()) {
+      for (const stats of byAxis.values()) {
+        coverage.evaluated += stats.evaluated?.total ?? 0;
+        coverage.declaredUnlinked += stats.declaredUnlinked?.total ?? 0;
+        coverage.skipped += stats.skipped?.total ?? 0;
+        coverage.unconsumed += stats.unconsumed?.total ?? 0;
+      }
     }
 
     const findings = await this.findingSummary(subjectIds);
@@ -112,24 +122,23 @@ export class SecurityEvaluationReportService {
   }
 
   private async latestResultsBySubject(subjectIds: readonly string[]) {
-    const latest = new Map<
-      string,
-      {
-        evaluated?: { total?: number };
-        declaredUnlinked?: { total?: number };
-        skipped?: { total?: number };
-        unconsumed?: { total?: number };
-      }
-    >();
+    const latest = new Map<string, Map<string, CoverageStatsSummary>>();
     if (subjectIds.length === 0) return latest;
     const results = await this.prisma.evaluationResult.findMany({
       where: { subjectId: { in: [...subjectIds] } },
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
-      select: { subjectId: true, coverageStats: true },
+      select: {
+        subjectId: true,
+        coverageStats: true,
+        ruleSetVersion: { select: { evaluationKey: true } },
+      },
     });
     for (const result of results) {
-      if (latest.has(result.subjectId)) continue;
-      latest.set(result.subjectId, (result.coverageStats ?? {}) as Record<string, { total?: number }>);
+      const byAxis = latest.get(result.subjectId) ?? new Map<string, CoverageStatsSummary>();
+      const evaluationKey = result.ruleSetVersion.evaluationKey;
+      if (byAxis.has(evaluationKey)) continue;
+      byAxis.set(evaluationKey, (result.coverageStats ?? {}) as CoverageStatsSummary);
+      latest.set(result.subjectId, byAxis);
     }
     return latest;
   }
