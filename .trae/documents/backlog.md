@@ -4,10 +4,9 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 来源标记：`[安全评审 round2 2026-10-30]` 指 devbie 仓 `.trae/documents/expert-review-2026-10-30-round2.md`（未跟踪文件）。
 
-## P0（未修复，9 条）
+## P0（未修复，8 条）
 
 - [ ] `[安全评审 round2 #6]` **account 微信登录无服务端校验**：`packages/modules/account/auth/wechat/auth.service.ts` L17-38，`phone`/`openId` 取自请求体，无 code2session/getPhoneNumber 服务端校验；且漏 `UserStatus.INACTIVE` 检查。修复：改收 `code` 服务端换 openId、服务端解密手机号，补 INACTIVE 拒绝。
-- [ ] `[安全评审 round2 #7]` **account Session 泄露明文 accessToken 与 refreshTokenNext**：`packages/modules/account/helpers/expose.ts` L2-13 + `modules/session/session.controller.ts` L42-47，expose 删的是不存在的 `refreshToken`，实际下发明文访问令牌与刷新令牌。修复：查询显式 select 只回展示字段（id/createdAt/ipAddress/userAgent 等），token 类字段不出库层。
 - [ ] `[安全评审 round2 #8]` **organization membership 整类无授权**：`packages/modules/organization/membership/membership.controller.ts` L23-31，任意登录用户可向任意组织加 OWNER / 改角色 / 删成员。修复：补 `@RequirePermission` + 组织内角色校验。
 - [ ] `[安全评审 round2 #9]` **aws-cloudformation 全模块无授权 + JWT 假加密**：`environment/environment.controller.ts` L45-51 返回整行含 AWS 密钥；`token/secretkey-token.service.ts` L8-15 用 `jwtService.sign/decode` 当加密；`stack.controller.ts` 可用环境凭证 CreateStack（CAPABILITY_IAM）/DeleteStack。修复：补权限、改 AES-256-GCM 或按 ADR 收敛 AssumeRole。
 - [ ] `[安全评审 round2 #10]` **engined DDL 注入**：`datasource/postgresql/table/table.service.ts` L39/43 把 body `name` 直拼 `$executeRawUnsafe`；`postgresql-datasource.service.ts` L66 `"${table}"` 二阶注入。修复：标识符白名单 + 引号转义，DDL 不应对 HTTP 开放。
