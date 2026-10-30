@@ -8,10 +8,6 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 - [ ] `[安全评审 round2 #6]` **account 微信登录无服务端校验**：`packages/modules/account/auth/wechat/auth.service.ts` L17-38，`phone`/`openId` 取自请求体，无 code2session/getPhoneNumber 服务端校验；且漏 `UserStatus.INACTIVE` 检查。修复：改收 `code` 服务端换 openId、服务端解密手机号，补 INACTIVE 拒绝。
 
-## P2（2026-10-30 补审，1 条）
-
-- [ ] `packages/modules/llm/adapters/ai-sdk.bridge.ts` L320-331：`classifyError` 把上游 `APICallError` / `Error` 的原始 `error.message` 塞进 `ModelCallError`；`packages/modules/copilot/kernel/agent-runner.ts` L299 用 `failedEvent(..., error.message)` 下发，客户端经 SSE 可读到上游原始报错（含内部地址/凭证片段风险）。修复：按 category 映射固定文案，原始 message 只进日志。
-
 ## 技术债（已在 ADR 登记，未落地）
 
 - [ ] ADR-037 契约 3：`JudgmentInput.subject` 收窄为 `Omit<EvaluationSubjectRef, "kind">`。
