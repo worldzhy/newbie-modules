@@ -36,6 +36,7 @@ describe("stack status mapping", () => {
     const snapshot = toStackSnapshot({
       StackName: "project-prod",
       StackStatus: "CREATE_COMPLETE",
+      CreationTime: new Date(0),
       StackStatusReason: undefined,
       Outputs: [
         { OutputKey: "InstanceId", OutputValue: "i-123" },
