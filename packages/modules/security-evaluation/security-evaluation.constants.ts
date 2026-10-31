@@ -27,6 +27,24 @@ export const SECURITY_EVALUATION_DEPENDENCY_CRITERION_KEY = "dependency-vulnerab
 export const SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION = "v1";
 export const SECURITY_EVALUATION_INTELLIGENCE_CRITERION_KEY = "threat-exposure";
 
+/**
+ * How far back the INTEL run registers threat-knowledge candidates as evidence
+ * (ADR-037 D9.4).
+ */
+export const SECURITY_EVALUATION_INTEL_EVIDENCE_WINDOW_DAYS = 7;
+
+/**
+ * Maximum number of knowledge candidates a run registers as evidence items.
+ * Candidates beyond this cap are accounted in the skipped bucket instead.
+ */
+export const SECURITY_EVALUATION_INTEL_EVIDENCE_BUDGET = 200;
+
+/**
+ * Maximum number of LLM re-rank calls a single INTEL run may spend. Candidates
+ * that would need more are not judged and land in the judgment's skipped bucket.
+ */
+export const SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET = 100;
+
 /** The first CIS criteria version this build ships (ADR-027 D3). */
 export const SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION = "v1";
 /** The first aws-custom criteria version this build ships (ADR-033/ADR-037). */
