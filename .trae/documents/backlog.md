@@ -16,7 +16,3 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 （暂无）
 
-## 清理项
-
-- [ ] GitHub 模块同名死方法未清：`packages/modules/github/github.service.ts` 的 `listAccessibleRepositories` / `listCommits` / `getCommitDetail` / `listPullRequests` / `listPullRequestReviews` 及 `GitHubCommitEvidence` / `GitHubCommitDetail` / `GitHubPullRequestEvidence` / `GitHubReviewEvidence`、`MAX_EVIDENCE_PAGES` 在 nightwatch-backend 已无任何调用方（ADR-029 证据采集改为走 security-evaluation 端口）。bitbucket 模块 2026-10-31 落地时已裁掉同组方法，GitHub 侧对照裁剪作为独立清理项。
-
