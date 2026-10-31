@@ -2,7 +2,7 @@
 
 Unfinished engineering tasks. Completed items are deleted (git history is the archive).
 
-来源标记：`[安全评审 round2 2026-10-30]` 指 devbie 仓 `.trae/documents/expert-review-2026-10-30-round2.md`（未跟踪文件）。
+来源标记：`[安全评审 round2 2026-10-30]` 指 devbie 仓 `.trae/documents/expert-review-2026-10-30-round2.md`（已入库）。
 
 ## P0（未修复，1 条）
 
