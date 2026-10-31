@@ -1,5 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { CommonListResponseDto } from "@devbie/newbie/common.dto";
 import {
   S3Client,
   GetObjectCommand,
@@ -16,6 +17,35 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+
+/** Pagination defaults mirroring @devbie/newbie's Prisma list extension. */
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 1000;
+
+/**
+ * Hard ceiling on how many objects listObjectsByPage will enumerate. Offset
+ * pagination over a prefix is only safe while the prefix stays bounded; past
+ * this limit callers must narrow the prefix, switch to cursor pagination, or
+ * persist an object index instead.
+ */
+const DEFAULT_MAX_OBJECTS = 500;
+
+export interface S3ObjectSummary {
+  s3Key: string;
+  size?: number;
+}
+
+export interface S3ObjectPage {
+  records: S3ObjectSummary[];
+  pagination: CommonListResponseDto["pagination"];
+}
+
+export interface S3ObjectCursorPage {
+  records: S3ObjectSummary[];
+  nextToken: string | null;
+}
+
+export type S3PageOrder = "asc" | "desc";
 
 @Injectable()
 export class AwsS3Service {
@@ -146,8 +176,20 @@ export class AwsS3Service {
     }
   }
 
-  async getObjectsRecursively(params: { bucket?: string; prefix?: string }) {
-    const allKeys: { s3Key: string; size?: number }[] = [];
+  /**
+   * List every object beneath a prefix.
+   *
+   * `limit` stops the continuation loop as soon as that many objects are
+   * collected, letting callers bound a full scan; `filter` drops keys the
+   * caller is not interested in before they count towards the limit.
+   */
+  async getObjectsRecursively(params: {
+    bucket?: string;
+    prefix?: string;
+    limit?: number;
+    filter?: (s3Key: string) => boolean;
+  }) {
+    const allKeys: S3ObjectSummary[] = [];
     let continuationToken: string | undefined;
 
     // https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
@@ -162,18 +204,116 @@ export class AwsS3Service {
         }),
       );
 
-      if (listResponse.Contents) {
-        allKeys.push(
-          ...listResponse.Contents.map((content) => {
-            return { s3Key: content.Key!, size: content.Size };
-          }),
-        );
+      for (const content of listResponse.Contents ?? []) {
+        const s3Key = content.Key!;
+        if (params.filter && !params.filter(s3Key)) {
+          continue;
+        }
+        allKeys.push({ s3Key, size: content.Size });
+        if (params.limit !== undefined && allKeys.length >= params.limit) {
+          break;
+        }
+      }
+
+      if (params.limit !== undefined && allKeys.length >= params.limit) {
+        break;
       }
 
       continuationToken = listResponse.IsTruncated ? listResponse.NextContinuationToken : undefined;
     } while (continuationToken);
 
     return allKeys;
+  }
+
+  /**
+   * Offset pagination over the objects beneath a bounded prefix.
+   *
+   * S3 lists keys lexicographically, so `order: "desc"` reverses that order —
+   * which still requires enumerating the whole prefix before slicing. The
+   * `maxObjects` guard therefore applies to both orders: a prefix holding more
+   * objects than the guard throws BadRequestException instead of silently
+   * downloading the entire bucket.
+   */
+  async listObjectsByPage(params: {
+    bucket?: string;
+    prefix?: string;
+    page?: number;
+    pageSize?: number;
+    defaultPageSize?: number;
+    maxObjects?: number;
+    order?: S3PageOrder;
+    filter?: (s3Key: string) => boolean;
+  }): Promise<S3ObjectPage> {
+    const page = this.normalizePage(params.page);
+    const pageSize = this.normalizePageSize(params.pageSize, params.defaultPageSize ?? DEFAULT_PAGE_SIZE);
+    const maxObjects = this.normalizeMaxObjects(params.maxObjects);
+    const order = params.order ?? "asc";
+
+    const objects = await this.getObjectsRecursively({
+      bucket: params.bucket,
+      prefix: params.prefix,
+      limit: maxObjects + 1,
+      filter: params.filter,
+    });
+
+    if (objects.length > maxObjects) {
+      throw new BadRequestException(
+        `Refusing to page over more than ${maxObjects} objects beneath this prefix. ` +
+          `Narrow the prefix, use cursor pagination, or persist an object index instead.`,
+      );
+    }
+
+    const ordered = order === "desc" ? objects.slice().reverse() : objects;
+    const records = ordered.slice(page * pageSize, (page + 1) * pageSize);
+
+    return {
+      records,
+      pagination: {
+        page,
+        pageSize,
+        countOfCurrentPage: records.length,
+        countOfTotal: ordered.length,
+      },
+    };
+  }
+
+  /**
+   * Native S3 cursor pagination: one ListObjectsV2 page per call, so there is no
+   * full enumeration and no maxObjects guard. Return `nextToken` unchanged to
+   * the caller; it is null on the last page.
+   */
+  async listObjectsByCursor(params: {
+    bucket?: string;
+    prefix?: string;
+    pageSize?: number;
+    defaultPageSize?: number;
+    nextToken?: string;
+    filter?: (s3Key: string) => boolean;
+  }): Promise<S3ObjectCursorPage> {
+    const pageSize = this.normalizePageSize(params.pageSize, params.defaultPageSize ?? DEFAULT_PAGE_SIZE);
+
+    const listResponse = await this.client.send(
+      new ListObjectsV2Command({
+        Bucket: params.bucket ?? this.bucket,
+        Prefix: params.prefix,
+        MaxKeys: pageSize,
+        ContinuationToken: params.nextToken,
+      }),
+    );
+
+    const records: S3ObjectSummary[] = [];
+    for (const content of listResponse.Contents ?? []) {
+      const s3Key = content.Key!;
+      if (params.filter && !params.filter(s3Key)) {
+        continue;
+      }
+      records.push({ s3Key, size: content.Size });
+    }
+
+    return {
+      records,
+      nextToken: listResponse.IsTruncated ? (listResponse.NextContinuationToken ?? null) : null,
+    };
   }
 
   //*******************************/
@@ -284,6 +424,34 @@ export class AwsS3Service {
     return getSignedUrl(this.client, command, {
       expiresIn: this.signedUrlExpiresIn,
     });
+  }
+
+  //*********************/
+  //* Private functions */
+  //*********************/
+
+  private normalizePage(page?: number): number {
+    const normalized = Math.trunc(page ?? 0);
+    if (!Number.isInteger(normalized) || normalized < 0) {
+      throw new BadRequestException("The minimum page is 0.");
+    }
+    return normalized;
+  }
+
+  private normalizePageSize(pageSize?: number, defaultPageSize = DEFAULT_PAGE_SIZE): number {
+    const normalized = Math.trunc(pageSize ?? defaultPageSize);
+    if (!Number.isInteger(normalized) || normalized <= 0) {
+      throw new BadRequestException("pageSize must be a positive integer.");
+    }
+    return Math.min(normalized, MAX_PAGE_SIZE);
+  }
+
+  private normalizeMaxObjects(maxObjects?: number): number {
+    const normalized = Math.trunc(maxObjects ?? DEFAULT_MAX_OBJECTS);
+    if (!Number.isInteger(normalized) || normalized <= 0) {
+      throw new BadRequestException("maxObjects must be a positive integer.");
+    }
+    return normalized;
   }
 
   /**
