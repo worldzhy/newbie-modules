@@ -65,6 +65,7 @@ export class AwsS3FileController {
   }
 
   @Get("")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.S3File)
   @ApiResponse({
     type: ListFilesResponseDto,
   })
@@ -80,6 +81,7 @@ export class AwsS3FileController {
   }
 
   @Post("folders")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @ApiOperation({
     summary: "Create a folder in AWS S3",
     description: "Create a folder in AWS S3",
@@ -93,6 +95,7 @@ export class AwsS3FileController {
   }
 
   @Get(":fileId/path")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.S3File)
   @ApiResponse({
     type: ListFilePathsResponseDto,
     isArray: true,
@@ -160,6 +163,7 @@ export class AwsS3FileController {
   //**********************/
 
   @Post("upload")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @UseInterceptors(FileInterceptor("file")) // Receive file
   @ApiConsumes("multipart/form-data")
   @ApiBody({
@@ -189,6 +193,8 @@ export class AwsS3FileController {
       type: file.mimetype,
       size: file.size,
       ...body,
+      // Multipart form fields arrive as strings, so "false" must not be truthy.
+      overwrite: String(body.overwrite) === "true",
     });
   }
 
@@ -211,6 +217,7 @@ export class AwsS3FileController {
   }
 
   @Post("upload-part")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @ApiResponse({ type: UploadPartResponseDto })
   @UseInterceptors(FileInterceptor("chunk", { limits: { fileSize: 6 * 1024 * 1024 } }))
   @ApiConsumes("multipart/form-data")

@@ -26,7 +26,7 @@ export class RateLimiterGuard {
       context.getClass(),
     ]);
     if (limitAccessByIp) {
-      const ipAddress = context.switchToHttp().getRequest().socket.remoteAddress;
+      const ipAddress = this.resolveIpAddress(context);
       const isAllowed = await this.limitAccessByIpService.isAllowed(ipAddress);
 
       if (isAllowed) {
@@ -42,7 +42,7 @@ export class RateLimiterGuard {
       context.getClass(),
     ]);
     if (limitLoginByIp) {
-      const ipAddress = context.switchToHttp().getRequest().socket.remoteAddress;
+      const ipAddress = this.resolveIpAddress(context);
       const isAllowed = await this.limitLoginByIpService.isAllowed(ipAddress);
 
       if (isAllowed) {
@@ -78,5 +78,15 @@ export class RateLimiterGuard {
     }
 
     return true;
+  }
+
+  /**
+   * Prefer Express's `req.ip`, which honours the host's `trust proxy` setting,
+   * so clients behind a reverse proxy are bucketed separately instead of all
+   * sharing the proxy's socket address.
+   */
+  private resolveIpAddress(context: ExecutionContext): string {
+    const request = context.switchToHttp().getRequest<{ ip?: string; socket?: { remoteAddress?: string } }>();
+    return request.ip ?? request.socket?.remoteAddress ?? "unknown";
   }
 }

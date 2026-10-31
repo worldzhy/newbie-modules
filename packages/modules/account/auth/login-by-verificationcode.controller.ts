@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, Ip, NotFoundException, Post, Req, Res } from "@nestjs/common";
+import { Body, Controller, Headers, Ip, Post, Req, Res } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { VerificationCodeUse, UserStatus } from "@generated/prisma/client";
 import { Response } from "express";
@@ -68,55 +68,46 @@ export class LoginByVerificationCodeController {
   })
   async sendVerificationCode(@Body() body: SendVerificationCodeRequestDto): Promise<{ secondsOfCountdown: number }> {
     if (body.email && verifyEmail(body.email)) {
-      // [step 1] Check if the account exists. An inactive account must not
-      // receive codes: it can neither log in nor reset its password.
+      // [step 1] Only an active account receives a code. Unknown or inactive
+      // accounts are skipped silently: the uniform response below must not
+      // reveal whether an email address is registered.
       const user = await this.userService.findByAccount(body.email);
-      if (!user) {
-        throw new NotFoundException("Your account is not registered.");
-      }
-      if (user.status === UserStatus.INACTIVE) {
-        throw new NewbieException(NewbieExceptionType.Login_InactiveUser);
-      }
+      if (user && user.status !== UserStatus.INACTIVE) {
+        // [step 2] Generate verification code.
+        const verificationCode = await this.verificationCodeService.generateForEmail(body.email, body.use);
 
-      // [step 2] Generate verification code.
-      const verificationCode = await this.verificationCodeService.generateForEmail(body.email, body.use);
-
-      // [step 3] Send verification code.
-      await this.ses.sendEmailWithTemplate({
-        toAddress: body.email,
-        template: {
-          "auth/verification-code": {
-            userName: "Dear",
-            code: verificationCode.code,
-            // Follow the configured validity so the email never claims a wrong window.
-            codeValidMinutes: this.verificationCodeService.timeoutMinutes,
+        // [step 3] Send verification code.
+        await this.ses.sendEmailWithTemplate({
+          toAddress: body.email,
+          template: {
+            "auth/verification-code": {
+              userName: "Dear",
+              code: verificationCode.code,
+              // Follow the configured validity so the email never claims a wrong window.
+              codeValidMinutes: this.verificationCodeService.timeoutMinutes,
+            },
           },
-        },
-      });
+        });
+      }
     } else if (body.phone && verifyPhone(body.phone)) {
-      // [step 1] Check if the account exists. An inactive account must not
-      // receive codes: it can neither log in nor reset its password.
+      // [step 1] Same account-enumeration guard as the email branch.
       const user = await this.userService.findByAccount(body.phone);
-      if (!user) {
-        throw new NotFoundException("Your account is not registered.");
-      }
-      if (user.status === UserStatus.INACTIVE) {
-        throw new NewbieException(NewbieExceptionType.Login_InactiveUser);
-      }
+      if (user && user.status !== UserStatus.INACTIVE) {
+        // [step 2] Generate verification code.
+        const verificationCode = await this.verificationCodeService.generateForPhone(body.phone, body.use);
 
-      // [step 2] Generate verification code.
-      const verificationCode = await this.verificationCodeService.generateForPhone(body.phone, body.use);
-
-      // [step 3] Send verification code.
-      await this.sms.sendText({
-        phoneNumber: body.phone,
-        text: verificationCode.code,
-      });
+        // [step 3] Send verification code.
+        await this.sms.sendText({
+          phoneNumber: body.phone,
+          text: verificationCode.code,
+        });
+      }
     } else {
       throw new NewbieException(NewbieExceptionType.ResetPassword_WrongInput);
     }
 
-    // Countdown before the user can request a new code (the resend cooldown window).
+    // One uniform response for every identifier: the countdown is identical
+    // whether or not the account exists, so callers cannot probe registrations.
     return {
       secondsOfCountdown: this.verificationCodeService.resendMinutes * 60,
     };

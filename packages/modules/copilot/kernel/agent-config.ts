@@ -23,3 +23,12 @@ export const CONVERSATION_TTL_MS = 30 * 60_000;
 
 /** How long a finished run's event sequence stays available for idempotent replay. */
 export const COMPLETED_RUN_RETENTION_MS = 5 * 60_000;
+
+/** Upper bound on in-memory conversations retained per user. */
+export const MAX_CONVERSATIONS_PER_USER = 20;
+
+/** Upper bound on retained messages per conversation; oldest are dropped first. */
+export const MAX_MESSAGES_PER_CONVERSATION = 50;
+
+/** Upper bound on events buffered per run for idempotent replay. */
+export const MAX_REPLAY_EVENTS = 500;

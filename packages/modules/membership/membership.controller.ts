@@ -1,7 +1,9 @@
 import { Body, Controller, Delete, Get, Param, Patch, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { Prisma, SubscriptionStatus } from "@generated/prisma/client";
+import { PermissionAction, Prisma, SubscriptionStatus } from "@generated/prisma/client";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { UserRequest } from "@modules/security/security.interface";
 import {
   GetMembershipRequestDto,
   ListMembershipLevelsRequestDto,
@@ -19,10 +21,10 @@ export class MembershipController {
   @Get("me")
   @ApiOperation({ summary: "Get membership information for the current user" })
   @ApiOkResponse({ type: MembershipResponseDto })
-  async getMembership(@Req() req) {
+  async getMembership(@Req() req: UserRequest) {
     // [step 1] Find membership by userId
     const membership = await this.prisma.membership.findUnique({
-      where: { userId: req.user.id },
+      where: { userId: req.user.userId },
       select: { id: true },
     });
     if (!membership) {
@@ -47,6 +49,7 @@ export class MembershipController {
   }
 
   @Get()
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Membership)
   @ApiOperation({ summary: "List all memberships" })
   @ApiOkResponse({ type: ListMembershipsResponseDto })
   async listMemberships(@Query() query: ListMembershipLevelsRequestDto) {
@@ -57,6 +60,7 @@ export class MembershipController {
   }
 
   @Patch(":id")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Membership)
   @ApiOperation({ summary: "Update an existing membership" })
   @ApiOkResponse({ type: MembershipResponseDto })
   async updateMembership(@Param() params: GetMembershipRequestDto, @Body() body: UpdateMembershipRequestDto) {
@@ -67,6 +71,7 @@ export class MembershipController {
   }
 
   @Delete(":id")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Membership)
   @ApiOperation({ summary: "Delete a membership" })
   @ApiOkResponse({ type: MembershipResponseDto })
   async deleteMembership(@Param() params: GetMembershipRequestDto) {

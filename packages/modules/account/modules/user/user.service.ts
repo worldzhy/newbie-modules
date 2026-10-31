@@ -27,8 +27,19 @@ export class UserService {
     }
   }
 
+  /**
+   * Response allowlist for user rows: strips the password hash and every
+   * secret column (TOTP active/pending secrets and the WeChat session key)
+   * so none of them can be serialized to a client.
+   */
   withoutPassword(user: User) {
-    const { password: _password, ...others } = user;
+    const {
+      password: _password,
+      twoFactorSecret: _twoFactorSecret,
+      pendingTwoFactorSecret: _pendingTwoFactorSecret,
+      wechatSessionKey: _wechatSessionKey,
+      ...others
+    } = user;
     return others;
   }
 

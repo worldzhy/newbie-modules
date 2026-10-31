@@ -6,6 +6,8 @@ import {
   DEFAULT_MINIMUM_SEVERITY,
   DEFAULT_PUSH_ENABLED,
   NOTIFICATION_PUSH_PORT,
+  NOTIFICATION_VISIBILITY_PORT,
+  NotificationVisibilityPort,
   PG_UNIQUE_VIOLATION,
   SEVERITIES,
   SEVERITY_LEVEL,
@@ -97,6 +99,9 @@ export class NotificationCenterService {
     @Optional()
     @Inject(NOTIFICATION_PUSH_PORT)
     private readonly pushPort?: NotificationPushPort,
+    @Optional()
+    @Inject(NOTIFICATION_VISIBILITY_PORT)
+    private readonly visibilityPort?: NotificationVisibilityPort,
   ) {}
 
   // --- Delivery ------------------------------------------------------------
@@ -303,6 +308,7 @@ export class NotificationCenterService {
 
   async list(userId: string, query: ListNotificationsRequestDto): Promise<ListNotificationsResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
+    const projectVisibility = await this.buildProjectVisibilityWhere(userId);
     const unreadOnly = query.unreadOnly === "true";
     const notificationKeys = query.notificationKeys
       ?.split(",")
@@ -315,6 +321,7 @@ export class NotificationCenterService {
       findManyArgs: {
         where: {
           createdAt: { gte: visibleSince },
+          ...projectVisibility,
           ...(unreadOnly ? { receipts: { none: { userId } } } : {}),
           ...(query.severity ? { severity: query.severity } : {}),
           ...(notificationKeys && notificationKeys.length > 0 ? { notificationKey: { in: notificationKeys } } : {}),
@@ -338,7 +345,11 @@ export class NotificationCenterService {
   async unreadCount(userId: string): Promise<UnreadCountResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
     const count = await this.prisma.notificationRecord.count({
-      where: { createdAt: { gte: visibleSince }, receipts: { none: { userId } } },
+      where: {
+        createdAt: { gte: visibleSince },
+        ...(await this.buildProjectVisibilityWhere(userId)),
+        receipts: { none: { userId } },
+      },
     });
     return { count };
   }
@@ -359,7 +370,11 @@ export class NotificationCenterService {
   async markAllRead(userId: string): Promise<MarkAllNotificationsReadResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
     const unread = await this.prisma.notificationRecord.findMany({
-      where: { createdAt: { gte: visibleSince }, receipts: { none: { userId } } },
+      where: {
+        createdAt: { gte: visibleSince },
+        ...(await this.buildProjectVisibilityWhere(userId)),
+        receipts: { none: { userId } },
+      },
       select: { id: true },
     });
     if (unread.length > 0) {
@@ -419,6 +434,23 @@ export class NotificationCenterService {
   }
 
   // --- Internal helpers ----------------------------------------------------
+
+  /**
+   * Project-scoped rows are visible only to members of that project. System
+   * rows (projectId = null) stay platform-wide. When the host supplies no
+   * visibility port, records remain platform-wide (legacy behavior for hosts
+   * that do not scope notifications by project).
+   */
+  private async buildProjectVisibilityWhere(userId: string): Promise<Prisma.NotificationRecordWhereInput | undefined> {
+    if (!this.visibilityPort) {
+      return undefined;
+    }
+    const visible = await this.visibilityPort.visibleProjectIds(userId);
+    if (visible === "all") {
+      return undefined;
+    }
+    return { OR: [{ projectId: null }, { projectId: { in: visible } }] };
+  }
 
   // Notifications created before the user account existed stay invisible,
   // otherwise newly created users would inherit the whole backlog as unread.

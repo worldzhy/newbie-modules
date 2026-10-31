@@ -165,17 +165,25 @@ export class SkillRegistry {
     });
   }
 
-  toolSpecificationsFor(transport: AgentExecutionContext["transport"]): ToolSpecification[] {
-    return this.list()
-      .filter((entry) => this.skills.get(entry.name)?.definition.transports.includes(transport))
-      .map((entry) => ({
-        type: "function",
-        function: {
-          name: entry.name,
-          description: entry.description,
-          parameters: entry.parameters,
-        },
-      }));
+  /**
+   * Tool definitions passed to the model. Applies the same fail-closed page
+   * scoping as listFor, so a page-restricted skill cannot invoke tools
+   * outside the pages it declares.
+   */
+  toolSpecificationsFor(transport: AgentExecutionContext["transport"], route?: string): ToolSpecification[] {
+    return this.listFor(transport, route).map((entry) => ({
+      type: "function",
+      function: {
+        name: entry.name,
+        description: entry.description,
+        parameters: entry.parameters,
+      },
+    }));
+  }
+
+  /** Emits a server-side error through the host-provided kernel logger. */
+  logError(message: string, meta?: Record<string, unknown>): void {
+    this.logger.error(message, meta);
   }
 
   has(name: string): boolean {
@@ -354,11 +362,15 @@ export class SkillRegistry {
         requestId: context.requestId,
         error: error instanceof Error ? error.message : String(error),
       });
+      // The raw message (Prisma/ClickHouse/Lark SDK text) stays in the server
+      // log. Feeding it back would hand the model internals it cannot act on
+      // and leak connection details into the transcript.
       return this.auditAndFinish(context, name, data, startedAt, {
         ok: false,
         error: {
           code: "skill_failed",
-          message: `The skill failed while executing: ${error instanceof Error ? error.message : String(error)}`,
+          message:
+            "The skill failed while executing. Retry with different arguments or ask an administrator to check the logs.",
         },
       });
     } finally {

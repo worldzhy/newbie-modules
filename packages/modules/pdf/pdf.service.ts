@@ -14,7 +14,8 @@ export class PdfService {
     pdfPage: number;
     texts: { text: string; options: PDFPageDrawTextOptions }[];
   }) {
-    const pdfBytes = readFileSync(params.pdfPath, "utf8");
+    // PDFs are binary; reading with the default encoding corrupts the bytes.
+    const pdfBytes = readFileSync(params.pdfPath);
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const page = pdfDoc.getPage(params.pdfPage - 1);
 
@@ -73,12 +74,11 @@ export class PdfService {
   // Get PDF page count
   private async getPdfPageCount(buffer: Buffer): Promise<number> {
     try {
-      // Get the page count via pdf2pic
-      // Note: pdf2pic does not provide a direct page-count API; this is a simplified implementation
-      // In a real project, another PDF library such as pdf-lib or pdf.js may be needed to get the page count
-      const convert = fromBuffer(buffer, { density: 100, format: "jpg" });
-      const info = await convert.bulk(-1, { responseType: "buffer" });
-      return info.length || 1; // Fall back to 1 page when the count cannot be obtained
+      // Read the document tree only: pdf-lib parses the page objects without
+      // rasterizing them, so a large workbook cannot exhaust memory the way
+      // pdf2pic's full-page rendering (bulk) does.
+      const document = await PDFDocument.load(buffer, { updateMetadata: false });
+      return document.getPageCount();
     } catch (error) {
       this.logger.error("Failed to get PDF page count:", error instanceof Error ? error.message : String(error));
       return 1; // Fall back to 1 page on error

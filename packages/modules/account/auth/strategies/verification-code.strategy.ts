@@ -72,15 +72,16 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
       throw new BadRequestException("Invalid account.");
     }
 
-    // [step 4] Validate verification code.
-    // Only a code issued for the login purpose can complete the login.
+    // [step 4] Validate and consume the code in one atomic update. Only a code
+    // issued for the login purpose can complete the login, and the conditional
+    // update guarantees a single concurrent request can redeem it.
     const isCodeValid = verifyEmail(account)
-      ? await this.verificationCodeService.validateForEmail(
+      ? await this.verificationCodeService.consumeForEmail(
           verificationCode,
           account,
           VerificationCodeUse.LOGIN_BY_EMAIL,
         )
-      : await this.verificationCodeService.validateForPhone(
+      : await this.verificationCodeService.consumeForPhone(
           verificationCode,
           account,
           VerificationCodeUse.LOGIN_BY_PHONE,
@@ -94,14 +95,7 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
       throw new BadRequestException("Invalid code.");
     }
 
-    // [step 5] Inactivate the used code to prevent replay attacks.
-    if (verifyEmail(account)) {
-      await this.verificationCodeService.inactivateForEmail(account, VerificationCodeUse.LOGIN_BY_EMAIL);
-    } else {
-      await this.verificationCodeService.inactivateForPhone(account, VerificationCodeUse.LOGIN_BY_PHONE);
-    }
-
-    // [step 6] OK.
+    // [step 5] OK.
     return { userId: user.id };
   }
 }

@@ -5,11 +5,13 @@ import {
   Res,
   Ip,
   Headers,
+  UnauthorizedException,
   UnprocessableEntityException,
   NotFoundException,
 } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Response } from "express";
+import anonymize from "ip-anonymize";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { NO_TOKEN_PROVIDED, USER_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { AuthService } from "@modules/account/auth/auth.service";
@@ -46,8 +48,9 @@ export class LoginByApprovedSubnetController {
     const { token } = body;
     if (!token) throw new UnprocessableEntityException(NO_TOKEN_PROVIDED);
     let userId: string;
+    let subnet: string | undefined;
     try {
-      ({ userId } = this.tokenService.verify<{ userId: string }>({
+      ({ userId, subnet } = this.tokenService.verify<{ userId: string; subnet?: string }>({
         token,
         options: {
           subject: TokenSubject.APPROVE_SUBNET_TOKEN,
@@ -76,10 +79,24 @@ export class LoginByApprovedSubnetController {
       throw new NotFoundException(USER_NOT_FOUND);
     }
 
-    // [step 2] Approve new subnet
+    // [step 2] The token is bound to the denied subnet. Approving it must come
+    // from that same subnet, otherwise a leaked link would let an attacker
+    // approve their own network instead.
+    const currentSubnet = anonymize(ipAddress);
+    if (!currentSubnet || subnet !== currentSubnet) {
+      await recordLoginFailure(this.auditLogService, {
+        actorId: userId,
+        ipAddress,
+        userAgent,
+        detail: { reason: "approve_subnet_mismatch" },
+      });
+      throw new UnauthorizedException("The approval link was issued for a different network.");
+    }
+
+    // [step 3] Approve new subnet
     await this.approvedSubnetService.approveNewSubnet(userId, ipAddress);
 
-    // [step 3] Log in
+    // [step 4] Log in
     return await this.authService.login({
       ipAddress,
       userAgent,

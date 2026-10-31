@@ -4,13 +4,15 @@ import { Injectable } from "@nestjs/common";
 export class ProductMessageTracker_Stack {
   static getStackParams() {
     return {
-      DatabaseHost: "postgres-1.cmkxbdo0yf63.rds.cn-northwest-1.amazonaws.com.cn",
+      // Empty credential placeholders: the caller must supply the real
+      // endpoint and secret, nothing is pre-filled with a usable default.
+      DatabaseHost: "",
       DatabasePort: "5432",
-      DatabaseMasterUsername: "postgres",
-      DatabaseMasterUserPassword: "postgres",
+      DatabaseMasterUsername: "",
+      DatabaseMasterUserPassword: "",
       DatabaseName: "postgres",
       SESIdentityARN: "",
-      FromAddress: "henry@inceptionpad.com",
+      FromAddress: "",
     };
   }
 

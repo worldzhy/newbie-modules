@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsString, IsOptional, IsArray, IsBoolean, ValidateNested } from "class-validator";
+import { IsString, IsOptional, IsArray, IsBoolean, IsUrl, ValidateNested } from "class-validator";
 import { Type } from "class-transformer";
 
 export class ContactSearchPeopleBase {
@@ -109,7 +109,7 @@ export class CreateContactSearchTaskBatchReqDto {
   @ApiPropertyOptional({
     type: String,
   })
-  @IsString()
+  @IsUrl({ protocols: ["http", "https"], require_protocol: true })
   @IsOptional()
   callbackUrl?: string;
 }

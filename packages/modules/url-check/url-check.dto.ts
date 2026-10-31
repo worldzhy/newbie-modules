@@ -1,5 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, IsUUID, Matches, MaxLength } from "class-validator";
+
+// The target URL is rendered as a clickable anchor in the host UI, so the
+// protocol must be restricted at the boundary: a stored `javascript:` value
+// would execute in a member's session.
+const HTTP_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
 
 // --- Request DTOs ---
 
@@ -23,6 +28,7 @@ export class CreateUrlCheckTargetDto {
   @ApiProperty({ description: "URL to probe; http(s) only, redirects are followed" })
   @IsNotEmpty()
   @IsString()
+  @Matches(HTTP_URL_PATTERN, { message: "url must be an absolute http(s) URL" })
   @MaxLength(2048)
   url!: string;
 }
@@ -49,6 +55,7 @@ export class UpdateUrlCheckTargetDto {
   @IsOptional()
   @IsNotEmpty()
   @IsString()
+  @Matches(HTTP_URL_PATTERN, { message: "url must be an absolute http(s) URL" })
   @MaxLength(2048)
   url?: string;
 

@@ -64,6 +64,19 @@ export class VerificationCodeService {
     await this.inactivate({ phone }, use);
   }
 
+  /**
+   * Atomically burn a code that is still ACTIVE and unexpired. Returns false
+   * when another request already consumed it (or it expired), which is what
+   * makes a one-time code usable exactly once under concurrency.
+   */
+  async consumeForEmail(code: string, email: string, use: VerificationCodeUse): Promise<boolean> {
+    return await this.consume(code, { email }, use);
+  }
+
+  async consumeForPhone(code: string, phone: string, use: VerificationCodeUse): Promise<boolean> {
+    return await this.consume(code, { phone }, use);
+  }
+
   private async generate(target: VerificationCodeTarget, use: VerificationCodeUse): Promise<VerificationCode> {
     // [step 1] Return the verification code of the same purpose generated within the resend window.
     // Codes are scoped by 'use', so a login code and a reset-password code never collide.
@@ -102,14 +115,7 @@ export class VerificationCodeService {
   }
 
   private async validate(code: string, target: VerificationCodeTarget, use: VerificationCodeUse): Promise<boolean> {
-    const targetAttemptKey = this.attemptKey(target, use);
-
-    // Once the wrong-attempt budget is spent, fail closed before any lookup.
-    const previousAttempts = await this.attemptLimiter.get(targetAttemptKey);
-    if (previousAttempts !== null && previousAttempts.remainingPoints <= 0) {
-      await this.inactivate(target, use);
-      throw this.codeAttemptsExhaustedException();
-    }
+    await this.assertAttemptBudget(target, use);
 
     const existedCode = await this.prisma.verificationCode.findFirst({
       where: {
@@ -124,18 +130,11 @@ export class VerificationCodeService {
     });
 
     if (existedCode) {
-      await this.attemptLimiter.delete(targetAttemptKey);
+      await this.attemptLimiter.delete(this.attemptKey(target, use));
       return true;
     }
 
-    // Wrong code: spend one attempt. Unlike consume(), penalty() records the
-    // failure without rejecting at the threshold, so the caller still gets a
-    // normal "invalid code" answer on the fifth miss; the next request is what
-    // fails closed via the get() check above.
-    const attemptRecord = await this.attemptLimiter.penalty(targetAttemptKey);
-    if (attemptRecord.remainingPoints <= 0) {
-      await this.inactivate(target, use);
-    }
+    await this.recordFailedAttempt(target, use);
     return false;
   }
 
@@ -145,6 +144,53 @@ export class VerificationCodeService {
       "Too many incorrect verification attempts. The code has been invalidated; please request a new one.",
       HttpStatus.TOO_MANY_REQUESTS,
     );
+  }
+
+  private async consume(code: string, target: VerificationCodeTarget, use: VerificationCodeUse): Promise<boolean> {
+    // Consumption goes through the same wrong-attempt budget as validation,
+    // otherwise a reset/login route could be brute forced without limit.
+    await this.assertAttemptBudget(target, use);
+
+    const consumed = await this.prisma.verificationCode.updateMany({
+      where: {
+        ...this.targetWhere(target),
+        code: code,
+        use: use,
+        status: VerificationCodeStatus.ACTIVE,
+        expiredAt: {
+          gte: new Date(),
+        },
+      },
+      data: { status: VerificationCodeStatus.INACTIVE },
+    });
+    if (consumed.count > 0) {
+      await this.attemptLimiter.delete(this.attemptKey(target, use));
+      return true;
+    }
+
+    await this.recordFailedAttempt(target, use);
+    return false;
+  }
+
+  /** Reject before any lookup once the wrong-attempt budget for this target is spent. */
+  private async assertAttemptBudget(target: VerificationCodeTarget, use: VerificationCodeUse): Promise<void> {
+    const previousAttempts = await this.attemptLimiter.get(this.attemptKey(target, use));
+    if (previousAttempts !== null && previousAttempts.remainingPoints <= 0) {
+      await this.inactivate(target, use);
+      throw this.codeAttemptsExhaustedException();
+    }
+  }
+
+  /**
+   * Spend one wrong-attempt. penalty() records the failure without rejecting
+   * at the threshold, so the caller still gets a normal "invalid code" answer
+   * on the fifth miss; the next request is what fails closed via get().
+   */
+  private async recordFailedAttempt(target: VerificationCodeTarget, use: VerificationCodeUse): Promise<void> {
+    const attemptRecord = await this.attemptLimiter.penalty(this.attemptKey(target, use));
+    if (attemptRecord.remainingPoints <= 0) {
+      await this.inactivate(target, use);
+    }
   }
 
   private async inactivate(target: VerificationCodeTarget, use: VerificationCodeUse): Promise<void> {

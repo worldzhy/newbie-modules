@@ -119,13 +119,15 @@ export class LlmConnectionService {
     const existing = await this.requireConnection(id);
 
     // The masked placeholder from a GET response must never overwrite the
-    // stored secret. Clients keep the key unchanged by echoing it back.
+    // stored secret. Match against the exact mask derived from the stored key
+    // rather than a substring heuristic: a genuine key that happens to contain
+    // "****" is then still accepted instead of being silently discarded.
     const changes: { name?: string; provider?: string; model?: string; baseUrl?: string; apiKey?: string } = {};
     if (dto.name !== undefined) changes.name = dto.name;
     if (dto.provider !== undefined) changes.provider = dto.provider;
     if (dto.model !== undefined) changes.model = dto.model;
     if (dto.baseUrl !== undefined) changes.baseUrl = normalizeBaseUrl(dto.baseUrl);
-    if (dto.apiKey !== undefined && !dto.apiKey.includes("****")) {
+    if (dto.apiKey !== undefined && dto.apiKey !== maskApiKey(existing.apiKey)) {
       changes.apiKey = dto.apiKey;
     }
 
@@ -202,18 +204,20 @@ export class LlmConnectionService {
    * Resolves the API key a connection test should use. The edit form echoes
    * the masked value while the stored key is unchanged; such an echo resolves
    * to the stored key of the referenced connection instead of the placeholder
-   * itself.
+   * itself. The comparison is exact against the mask derived from the stored
+   * key, so a real key containing "****" is never mistaken for an echo.
    */
   async resolveTestApiKey(id: string | undefined, submittedApiKey: string): Promise<string> {
-    if (!submittedApiKey.includes("****")) {
+    if (!id) {
+      if (submittedApiKey.includes("****")) {
+        throw new BadRequestException(
+          "A masked API key can only be tested against an existing connection (id required).",
+        );
+      }
       return submittedApiKey;
     }
-    if (!id) {
-      throw new BadRequestException(
-        "A masked API key can only be tested against an existing connection (id required).",
-      );
-    }
-    return (await this.requireConnection(id)).apiKey;
+    const connection = await this.requireConnection(id);
+    return submittedApiKey === maskApiKey(connection.apiKey) ? connection.apiKey : submittedApiKey;
   }
 
   private async requireConnection(id: string): Promise<LlmConnectionRecord> {

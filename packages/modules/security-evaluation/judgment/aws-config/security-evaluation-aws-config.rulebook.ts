@@ -171,8 +171,12 @@ export const SECURITY_EVALUATION_AWS_CONFIG_SENSITIVE_PORTS = [22, 3389, 3306, 5
 /** aws-custom access-key age threshold (ADR-037 D6). */
 export const SECURITY_EVALUATION_AWS_CUSTOM_ACCESS_KEY_MAX_AGE_DAYS = 90;
 
-/** IAM actions treated as sensitive for `iam.policy-sensitive-action`. */
-const SENSITIVE_ACTIONS = ["iam:PassRole", "sts:AssumeRole", "kms:Decrypt", "secretsmanager:GetSecretValue"];
+/** IAM actions treated as sensitive for `iam.policy-sensitive-action` (case-insensitive). */
+const SENSITIVE_ACTIONS = new Set(
+  ["iam:PassRole", "sts:AssumeRole", "kms:Decrypt", "secretsmanager:GetSecretValue"].map((action) =>
+    action.toLowerCase(),
+  ),
+);
 
 /** Services whose `service:*` wildcard is HIGH; everything else is MEDIUM. */
 const HIGH_SEVERITY_WILDCARD_SERVICES = new Set(["iam", "sts", "kms", "organizations"]);
@@ -725,7 +729,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
           for (const action of asArray(stmt.Action)) {
             if (!action.endsWith(":*")) continue;
             const service = policyServiceOf(action);
-            if (service) services.add(service);
+            if (service) services.add(service.toLowerCase());
           }
         }
         if (services.size === 0) continue;
@@ -763,7 +767,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
         for (const stmt of parsePolicyStatements(policy.document)) {
           if (stmt.Effect !== "Allow" || !statementAllowsAllResources(stmt)) continue;
           for (const action of asArray(stmt.Action)) {
-            if (SENSITIVE_ACTIONS.includes(action)) matched.add(action);
+            if (SENSITIVE_ACTIONS.has(action.toLowerCase())) matched.add(action);
           }
         }
         if (matched.size === 0) continue;
@@ -869,10 +873,16 @@ export const SECURITY_EVALUATION_AWS_CONFIG_REQUIRED_KNOWLEDGE_TYPES: readonly s
   new Set(SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.flatMap((entry) => [...entry.requiredKnowledgeTypes])),
 );
 
+export interface AwsConfigKnowledgeRebuild {
+  items: AwsConfigKnowledgeSet;
+  /** Evidence ids dropped because their payload lacked required fields. */
+  skippedRefs: string[];
+}
+
 /** Rebuild the typed item set from manifest items (payloads cross the port as JSON). */
 export function rebuildAwsConfigKnowledge(
   items: readonly { id: string; payload?: Record<string, unknown> }[],
-): AwsConfigKnowledgeSet {
+): AwsConfigKnowledgeRebuild {
   const set: AwsConfigKnowledgeSet = {
     passwordPolicy: null,
     rootCredential: null,
@@ -884,6 +894,7 @@ export function rebuildAwsConfigKnowledge(
     securityGroups: [],
     instanceNetworks: [],
   };
+  const skippedRefs: string[] = [];
   for (const item of items) {
     const payload = item.payload ?? {};
     const key = awsConfigKeyFromEvidenceId(item.id);
@@ -897,9 +908,12 @@ export function rebuildAwsConfigKnowledge(
       case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL:
         set.userCredentials.push({ evidenceId: item.id, key, payload: toUserCredential(payload) });
         break;
-      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY:
-        set.accessKeys.push({ evidenceId: item.id, key, payload: toAccessKey(payload) });
+      case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY: {
+        const accessKey = toAccessKey(payload);
+        if (accessKey) set.accessKeys.push({ evidenceId: item.id, key, payload: accessKey });
+        else skippedRefs.push(item.id);
         break;
+      }
       case SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT:
         set.policies.push({ evidenceId: item.id, key, payload: toPolicyDocument(payload) });
         break;
@@ -919,7 +933,7 @@ export function rebuildAwsConfigKnowledge(
         break;
     }
   }
-  return set;
+  return { items: set, skippedRefs };
 }
 
 function awsConfigKeyFromEvidenceId(evidenceId: string): string {
@@ -971,12 +985,19 @@ function toUserCredential(payload: Record<string, unknown>): UserCredentialKnowl
   };
 }
 
-function toAccessKey(payload: Record<string, unknown>): AccessKeyKnowledgePayload {
+function toAccessKey(payload: Record<string, unknown>): AccessKeyKnowledgePayload | null {
+  const status = payload.status;
+  const createdAt = payload.createdAt;
+  // A key without its real status/creation time cannot be judged honestly: a
+  // default would resurrect it as an active, epoch-aged key. Drop it instead.
+  if ((status !== "Active" && status !== "Inactive") || typeof createdAt !== "string" || !createdAt) {
+    return null;
+  }
   return {
     userName: asString(payload.userName, "unknown-user"),
     accessKeyId: asString(payload.accessKeyId, "unknown-key"),
-    status: payload.status === "Inactive" ? "Inactive" : "Active",
-    createdAt: asString(payload.createdAt, new Date(0).toISOString()),
+    status,
+    createdAt,
     lastUsedAt: asNullableString(payload.lastUsedAt),
   };
 }

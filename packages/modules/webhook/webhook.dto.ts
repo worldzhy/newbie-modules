@@ -1,7 +1,7 @@
-import { IsBoolean, IsNotEmpty, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, IsUrl } from "class-validator";
 
 export class CreateWebhookDto {
-  @IsString()
+  @IsUrl({ protocols: ["http", "https"], require_protocol: true })
   @IsNotEmpty()
   url!: string;
 
@@ -23,7 +23,7 @@ export class CreateWebhookDto {
 }
 
 export class UpdateWebhookDto {
-  @IsString()
+  @IsUrl({ protocols: ["http", "https"], require_protocol: true })
   @IsOptional()
   url?: string;
 
@@ -45,7 +45,7 @@ export class UpdateWebhookDto {
 }
 
 export class ReplaceWebhookDto {
-  @IsString()
+  @IsUrl({ protocols: ["http", "https"], require_protocol: true })
   @IsNotEmpty()
   url!: string;
 

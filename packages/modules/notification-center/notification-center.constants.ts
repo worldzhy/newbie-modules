@@ -28,6 +28,16 @@ export const DEFAULT_NOTIFICATION_SCOPE: NotificationScope = "project";
 // push is supplied by the host application, which knows its chat platform.
 export const NOTIFICATION_PUSH_PORT = "NOTIFICATION_PUSH_PORT";
 
+// Injection token for the host-provided visibility adapter. Notification records
+// are platform-wide rows; the host knows which projects a user belongs to, so it
+// supplies this port to keep project-scoped rows scoped to their members.
+export const NOTIFICATION_VISIBILITY_PORT = "NOTIFICATION_VISIBILITY_PORT";
+
+export interface NotificationVisibilityPort {
+  /** Return "all" when the user may see notifications of every project. */
+  visibleProjectIds(userId: string): Promise<string[] | "all">;
+}
+
 // Postgres unique violation code, used to treat concurrent declaration of the
 // same notification as a no-op.
 export const PG_UNIQUE_VIOLATION = "P2002";

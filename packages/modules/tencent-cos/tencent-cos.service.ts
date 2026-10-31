@@ -70,7 +70,9 @@ export class TencentCosService {
         name: params.name,
         type: "Folder",
         cosBucket: params.bucket ?? this.bucket,
-        cosKey: key,
+        // Keep the trailing slash so a recursive delete only matches children
+        // of this folder, not sibling objects sharing the same prefix.
+        cosKey: `${key}/`,
         cosResponse: output as object,
         parentId: params.parentId,
       },

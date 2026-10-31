@@ -97,20 +97,24 @@ export class EventHostService {
         });
 
         // ! A coach can not be dispatched more classes than his/her max preference.
-        const coachProfile = coach["profile"];
-        if (coachProfile?.quotaOfWeekMax !== undefined && coachProfile.quotaOfWeekMax - countOfEvents > 0) {
+        // Quota fields live on the selected EventHost row; there is no profile relation.
+        if (
+          coach.quotaOfWeekMin !== null &&
+          coach.quotaOfWeekMax !== null &&
+          coach.quotaOfWeekMax - countOfEvents > 0
+        ) {
           sortedAvailableCoaches.push({
             hostId: coach.id,
-            remainingQuota: coachProfile.quotaOfWeekMin! - countOfEvents,
-            remainingQuotaOfMin: coachProfile.quotaOfWeekMin! - countOfEvents,
-            remainingQuotaOfMax: coachProfile.quotaOfWeekMax! - countOfEvents,
-            quotaOfWeek: coachProfile.quotaOfWeekMin!,
-            quotaOfWeekMin: coachProfile.quotaOfWeekMin!,
-            quotaOfWeekMax: coachProfile.quotaOfWeekMax!,
+            remainingQuota: coach.quotaOfWeekMin - countOfEvents,
+            remainingQuotaOfMin: coach.quotaOfWeekMin - countOfEvents,
+            remainingQuotaOfMax: coach.quotaOfWeekMax - countOfEvents,
+            quotaOfWeek: coach.quotaOfWeekMin,
+            quotaOfWeekMin: coach.quotaOfWeekMin,
+            quotaOfWeekMax: coach.quotaOfWeekMax,
           });
 
           // Count of coach's events in all locations.
-          coachProfile["quotaOfUsed"] = countOfEvents;
+          coach["quotaOfUsed"] = countOfEvents;
           availableCoaches.push(coach);
         }
       }

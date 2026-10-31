@@ -141,7 +141,8 @@ interface RequestShape {
 }
 
 function hasKey(req: RequestShape, key: string): boolean {
-  return (
-    typeof req.params?.[key] === "string" || typeof req.query?.[key] === "string" || typeof req.body?.[key] === "string"
-  );
+  const value = req.params?.[key] ?? req.query?.[key] ?? req.body?.[key];
+  // Numeric ids arrive as JSON numbers in request bodies, so presence detection
+  // must accept both shapes; resolvers validate the value themselves.
+  return typeof value === "string" || typeof value === "number";
 }

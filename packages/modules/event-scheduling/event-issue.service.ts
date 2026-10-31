@@ -39,16 +39,6 @@ export class EventIssueService {
       return;
     }
 
-    if (event.hostId) {
-      if (
-        (await this.prisma.eventHost.count({
-          where: { id: event.hostId },
-        })) > 0
-      ) {
-        return;
-      }
-    }
-
     // [step 0] Delete old unrepaired issues.
     await this.prisma.eventIssue.deleteMany({
       where: { eventId: event.id, status: EventIssueStatus.UNREPAIRED },

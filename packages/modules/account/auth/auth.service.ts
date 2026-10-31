@@ -33,6 +33,7 @@ import { TokenSubject } from "@modules/security/token/token.constants";
 import { LimitLoginByUserService } from "@modules/security/rate-limiter/rate-limiter.service";
 import { AwsSesService } from "@modules/aws-ses/aws-ses.service";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
+import anonymize from "ip-anonymize";
 
 @Injectable()
 export class AuthService {
@@ -281,7 +282,10 @@ export class AuthService {
               userName: user.name ?? "friend",
               locationName,
               link: `${this.appFrontendUrl}/auth/link/approve-subnet?token=${this.tokenService.sign({
-                payload: { userId: params.userId },
+                // Bind the token to the subnet that was just denied. Without
+                // this, a token lifted from the email could be replayed from
+                // any network and would approve the attacker's subnet instead.
+                payload: { userId: params.userId, subnet: anonymize(params.ipAddress) },
                 options: {
                   subject: TokenSubject.APPROVE_SUBNET_TOKEN,
                   expiresIn: "30m",

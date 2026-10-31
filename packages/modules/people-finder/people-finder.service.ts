@@ -72,6 +72,52 @@ export class PeopleFinderService {
     return null;
   }
 
+  /**
+   * Reject callback URLs that could reach internal services: only http(s),
+   * and no loopback / private / link-local hosts.
+   */
+  private isSafeCallbackUrl(rawUrl: string): boolean {
+    let parsed: URL;
+    try {
+      parsed = new URL(rawUrl);
+    } catch {
+      return false;
+    }
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return false;
+    }
+    const hostname = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    if (
+      hostname === "localhost" ||
+      hostname.endsWith(".localhost") ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal")
+    ) {
+      return false;
+    }
+    return !this.isPrivateIp(hostname);
+  }
+
+  private isPrivateIp(hostname: string): boolean {
+    const ipv4 = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (ipv4) {
+      const a = Number(ipv4[1]);
+      const b = Number(ipv4[2]);
+      return (
+        a === 0 ||
+        a === 10 ||
+        a === 127 ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168)
+      );
+    }
+    if (!hostname.includes(":")) {
+      return false;
+    }
+    return hostname === "::1" || hostname.startsWith("fe80:") || hostname.startsWith("fc") || hostname.startsWith("fd");
+  }
+
   async createTaskBatch({
     batchId,
     peoples,
@@ -84,6 +130,9 @@ export class PeopleFinderService {
     });
     if (taskBatch) {
       throw new BadRequestException("BatchId already exists.");
+    }
+    if (callbackUrl && !this.isSafeCallbackUrl(callbackUrl)) {
+      throw new BadRequestException("Invalid callbackUrl.");
     }
     const newTaskBatch = await this.prisma.peopleFinderTaskBatch.create({
       data: {
@@ -213,6 +262,10 @@ export class PeopleFinderService {
     });
 
     if (taskBatch?.callbackUrl && taskBatch.callbackStatus !== PeopleFinderBatchTaskCallBackStatus.completed) {
+      if (!this.isSafeCallbackUrl(taskBatch.callbackUrl)) {
+        this.logger.warn(`Blocked unsafe callback: ${taskBatch.batchId}`, this.loggerContext);
+        return;
+      }
       this.httpService.axiosRef
         .post<{ batchId: string }, { status: number; data: string }>(taskBatch?.callbackUrl, {
           batchId: taskBatch.batchId,
@@ -230,7 +283,7 @@ export class PeopleFinderService {
               message: `[callback error] url:${taskBatch?.callbackUrl}, batchId:${taskBatch.batchId}`,
             });
           }
-          this.logger.log("checkAndExecuteTaskBatchCallback: " + JSON.stringify(res.data), this.loggerContext);
+          this.logger.log(`checkAndExecuteTaskBatchCallback: ${res.status} ${taskBatch.batchId}`, this.loggerContext);
         })
         .catch(async (e) => {
           this.peopleFinderNotification.send({

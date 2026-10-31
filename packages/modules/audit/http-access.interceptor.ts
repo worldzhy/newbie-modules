@@ -193,11 +193,9 @@ export class HttpAccessInterceptor implements NestInterceptor {
   }
 
   private resolveIpAddress(request: Request): string | undefined {
-    const forwardedFor = request.headers["x-forwarded-for"];
-    if (typeof forwardedFor === "string" && forwardedFor.length > 0) {
-      return forwardedFor.split(",")[0].trim();
-    }
-    return request.socket.remoteAddress ?? undefined;
+    // `req.ip` already honours the host's `trust proxy` setting. Reading the
+    // raw X-Forwarded-For header here would let any client forge the audited IP.
+    return request.ip ?? request.socket.remoteAddress ?? undefined;
   }
 
   private resolveRoutePath(request: Request): string | undefined {

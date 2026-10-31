@@ -15,7 +15,9 @@ const SECRET_PATTERNS: { name: string; pattern: RegExp; keepKeyName?: boolean }[
   { name: "private-key-block", pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g },
   {
     name: "assigned-secret",
-    pattern: /\b(password|passwd|secret|token|api[_-]?key)\b\s*[:=]\s*["']?[^\s"',}]{6,}/gi,
+    // The optional quote after the key name covers JSON payloads such as
+    // `"password": "hunter2"`, not just `password=hunter2`.
+    pattern: /\b(password|passwd|secret|token|api[_-]?key)["']?\s*[:=]\s*["']?[^\s"',}]{6,}/gi,
     keepKeyName: true,
   },
   { name: "jwt", pattern: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
@@ -85,7 +87,8 @@ export function createDrillRedactor(identityTokens: Set<string>): (text: string)
         // what was removed; everything else is replaced wholesale.
         if (keepKeyName) {
           const separator = match.search(/[:=]/);
-          return separator > 0 ? `${match.slice(0, separator).trim()}=${REDACTED}` : REDACTED;
+          const keyName = separator > 0 ? match.slice(0, separator).replace(/["']/g, "").trim() : "";
+          return keyName.length > 0 ? `${keyName}=${REDACTED}` : REDACTED;
         }
         return REDACTED;
       });

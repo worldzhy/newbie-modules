@@ -180,17 +180,21 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
       }
     }
 
-    const criterionCount = await this.prisma.evaluationCriterion.count({
+    // Seed the missing criteria by key rather than only when the version is
+    // empty: a crash between the first criterion write and publication leaves a
+    // partially seeded draft, and a count === 0 gate would publish it as-is.
+    const existing = await this.prisma.evaluationCriterion.findMany({
       where: { ruleSetVersionId: row.id },
+      select: { criterionKey: true },
     });
-    if (criterionCount === 0) {
-      for (const criterion of baseline.criteria) {
-        try {
-          await this.criteria.addCriterion(row.id, { kind: "ASSERTION", ...criterion });
-        } catch (error) {
-          // A concurrent instance added the criterion first; that is the goal.
-          if (!isUniqueViolation(error)) throw error;
-        }
+    const existingKeys = new Set(existing.map((criterion) => criterion.criterionKey));
+    for (const criterion of baseline.criteria) {
+      if (existingKeys.has(criterion.criterionKey)) continue;
+      try {
+        await this.criteria.addCriterion(row.id, { kind: "ASSERTION", ...criterion });
+      } catch (error) {
+        // A concurrent instance added the criterion first; that is the goal.
+        if (!isUniqueViolation(error)) throw error;
       }
     }
 

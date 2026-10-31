@@ -143,9 +143,11 @@ export class AccountController {
     @Headers("user-agent") userAgent: string,
   ) {
     if (body.email && verifyEmail(body.email)) {
-      // Only a code issued for resetting password can complete the reset.
+      // Only a code issued for resetting password can complete the reset. The
+      // code is consumed atomically *before* the password write, so a concurrent
+      // request cannot validate the same code and reset twice.
       if (
-        await this.verificationCodeService.validateForEmail(
+        await this.verificationCodeService.consumeForEmail(
           body.verificationCode,
           body.email,
           VerificationCodeUse.RESET_PASSWORD,
@@ -156,8 +158,6 @@ export class AccountController {
           data: { password: body.newPassword },
           select: { id: true, email: true, phone: true },
         });
-        // Consume the code so it cannot be replayed for another reset.
-        await this.verificationCodeService.inactivateForEmail(body.email, VerificationCodeUse.RESET_PASSWORD);
         // The reset often happens after account takeover: revoke every session
         // of the user, including any session held by an attacker.
         await this.prisma.session.deleteMany({ where: { userId: updated.id } });
@@ -171,9 +171,10 @@ export class AccountController {
         throw new NewbieException(NewbieExceptionType.ResetPassword_InvalidCode);
       }
     } else if (body.phone && verifyPhone(body.phone)) {
-      // Only a code issued for resetting password can complete the reset.
+      // Same one-time semantics as the email branch: consume the code atomically
+      // before writing the new password.
       if (
-        await this.verificationCodeService.validateForPhone(
+        await this.verificationCodeService.consumeForPhone(
           body.verificationCode,
           body.phone,
           VerificationCodeUse.RESET_PASSWORD,
@@ -184,8 +185,6 @@ export class AccountController {
           data: { password: body.newPassword },
           select: { id: true, email: true, phone: true },
         });
-        // Consume the code so it cannot be replayed for another reset.
-        await this.verificationCodeService.inactivateForPhone(body.phone, VerificationCodeUse.RESET_PASSWORD);
         // Revoke every session of the user after a successful reset.
         await this.prisma.session.deleteMany({ where: { userId: updated.id } });
         await this.auditLogService.record(AuditEvent.PASSWORD_RESET, {
