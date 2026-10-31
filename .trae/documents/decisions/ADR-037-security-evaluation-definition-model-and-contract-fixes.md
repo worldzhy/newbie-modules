@@ -99,10 +99,10 @@ Verdict / Finding（结论）
 
 1. **两类 knowledge 同族、物理分表。** 唯一键语义（`assetId + factType + factKey` vs `source + externalId`）、保留策略（不主动删除、仅随资产级联清理，靠 `observedAt` 判陈旧 vs 90 天 / 每源 1000 条清理）、是否绑定 asset 三项约束互斥，不合并为一张表。`AssetFact` 概念上归入 knowledge 家族（改名如 `AssetKnowledgeItem`）是术语债，不改表结构。
 2. **evidence 是本次 run 的登记全量输入切片，与是否命中无关。** npm 每个包、AWS 每条配置各产一条 evidence，无论是否产生 finding。"全量"指**登记全量**：每条候选材料必须落到 `evaluated` 或 `skipped`，不要求每条都实际参与比对（预算截断允许但必须记账）。若只有命中才登记 evidence，coverage 的 `evaluated` 桶失去意义（"没命中"与"没评估"不可区分），并违反 ADR-020 D5 第 2 项（被截断的内容不得静默丢弃）。命中产出的是 finding。
-3. **`JudgmentInput` 契约收紧。** 判定器只吃 `input.evidence`，不得旁路读库——包括直接查 knowledge 表、注入 provider 读项目画像等任意库外输入；`subject.kind` 已由 `judgmentPortToken(kind)` 路由，入参应收窄为 `Omit<EvaluationSubjectRef, "kind">`（未落地），禁止同一 evaluationKey 在不同 kind 下分支——那会使同一 key 的 finding 不可比，R1 的静态声明失真。
-4. **intel 补账方向（未落地）。** 把窗口内候选情报条目投影成 `EvaluationEvidenceItem`（`layer: "knowledge"`，`layer` 为开放 string，无需改骨架类型），因预算未比对条目进 `skipped` 桶并登记数量（登记全量，见第 2 条）；使 coverage 可区分"没命中"与"没评估"，finding 的 `evidenceRefs` 可回指情报条目。intel 当前的第二处旁路（注入 provider 读 `project` 表构造匹配实体）同样要收敛：实体应经 `input.subject` / `input.evidence` 传入或显式登记为外部来源。
+3. **`JudgmentInput` 契约收紧。** 判定器只吃 `input.evidence`，不得旁路读库——包括直接查 knowledge 表、注入 provider 读项目画像等任意库外输入；`subject.kind` 已由 `judgmentPortToken(kind)` 路由，入参收窄为 `Omit<EvaluationSubjectRef, "kind">`（已落地），禁止同一 evaluationKey 在不同 kind 下分支——那会使同一 key 的 finding 不可比，R1 的静态声明失真。
+4. **intel 补账（已落地）。** 窗口内的候选情报条目由 evidence provider 投影成 `EvaluationEvidenceItem`（`layer: "knowledge"`，`layer` 为开放 string，无需改骨架类型），负缓存命中与预算截断的条目进 `skipped` 桶并登记数量（登记全量，见第 2 条）；coverage 因而可区分"没命中"与"没评估"。intel 的第二处旁路（注入 provider 读 `project` 表构造匹配实体）同样已收敛：实体由 evidence provider 显式登记为 `layer: "declared"`、`source: "project-profile"` 的 manifest 条目，判定器只读 `input.evidence`。
 
-**落地状态**：第 1–2 条为现状语义确认，无需改代码；第 3–4 条为技术债，由宿主侧 ADR-037 同步登记。
+**落地状态**：第 1–2 条为现状语义确认，无需改代码；第 3–4 条已于 2026-10-31 落地（registry 与宿主装配同步）。
 
 ### D9.1. knowledge 家族命名定稿（2026-10-30）
 

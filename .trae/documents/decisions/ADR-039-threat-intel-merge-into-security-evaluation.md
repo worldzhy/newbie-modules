@@ -37,13 +37,13 @@ ADR-022 决定新建 security-evaluation 时，三个旧模块（dependency-scan
 
 7 个适配器（GitHub Security Advisory、CISA KEV、AWS Security Bulletins、GitHub Security Blog、FreeBuf、The Hacker News、BleepingComputer）从 `threat-intelligence/adapters/` 迁入 `security-evaluation/knowledge/adapters/`。采集逻辑不变，仅更新 import 路径与 provider 注册。
 
-### D2. ThreatIntelligenceItem → SecurityEvaluationKnowledgeItem
+### D2. ThreatIntelligenceItem → SecurityEvaluationThreatKnowledgeItem
 
-表迁入 `module/security-evaluation` schema，字段不变（source、category、externalId、title、summary、url、publishedAt、severity、signalTags、rawPayload、fetchedAt、lastSeenAt），去重键 `[source, externalId]`。
+表迁入 `module/security-evaluation` schema，模型名为 `SecurityEvaluationThreatKnowledgeItem`（`Threat` 中缀表明它是 world-scoped 情报条目，与 asset-scoped knowledge 区分），字段为 source、category、externalId、title、summary、url、publishedAt、severity、signalTags、rawPayload、negativeCache、fetchedAt，去重键 `[source, externalId]`。`negativeCache` 承载 ADR-018 的"unavailable 不写负缓存"实现。
 
 ### D3. ThreatIntelligenceMatch 表删除，INTEL 判定直接产出 EvaluationFinding
 
-不保留独立 match 表。INTEL 判定器对每个相关 match 产出一条 EvaluationFinding（family=threat-intel-relevance），metadata 承载 `{ knowledgeItemId, matchedEntity, confidence, evidence, verdictSource }`。非相关 match 不产 finding，记入 evaluatedRefs。
+不保留独立 match 表。INTEL 判定器对每个相关 match 产出一条 EvaluationFinding（`criterionKey=threat-exposure`），metadata 承载 `{ knowledgeItemId, matchedEntity, confidence, verdictSource }`，匹配到的原文摘录写入 finding 的 `detail`。非相关 match 不产 finding，应记入 evaluatedRefs —— 该记账尚未落地，见 ADR-037 D9.4 技术债（当前 INTEL 判定返回空 evaluatedRefs）。
 
 理由：finding 已有完整生命周期（open/resolved/suppressed），match 的状态机是冗余的。匹配中间过程（re-rank 推理）通过日志与事件追踪，不需落库。
 
@@ -57,16 +57,16 @@ port 接口迁入 security-evaluation，契约不变（输入无，输出 `{scop
 
 ### D6. 通知与调度重绑
 
-通知从监听 `threat-intelligence.match-created` 改为监听 evaluation finding 生命周期事件，过滤 family=threat-intel-relevance。采集调度 job 改指向 security-evaluation knowledge collect service。
+通知从监听 `threat-intelligence.match-created` 改为监听 evaluation finding 生命周期事件，按 INTEL 判定 key（`criterionKey=threat-exposure`）过滤。采集调度 job 改指向 security-evaluation knowledge collect service。
 
 ## 跨宿主 / 演进检验
 
 | 维度 | 框架层（registry） | 宿主层 |
 | --- | --- | --- |
-| 情报采集 | knowledge/ 子域内置 7 适配器 + SecurityEvaluationKnowledgeItem 表 | 无（采集是模块内部能力） |
+| 情报采集 | knowledge/ 子域内置 7 适配器 + SecurityEvaluationThreatKnowledgeItem 表 | 无（采集是模块内部能力） |
 | 匹配判定 | judgment/intel/ 内置匹配管线 + re-ranker，产出 EvaluationFinding | 无 |
 | scope 实体来源 | SecurityEvaluationScopeEntitiesProvider port | 宿主实现（ProjectSecurityProfileService） |
-| 通知/调度 | 模块发 finding 生命周期事件 | 宿主监听并过滤 family，装配 cron |
+| 通知/调度 | 模块发 finding 生命周期事件 | 宿主监听并按 INTEL 判定 key 过滤，装配 cron |
 
 无 nightwatch 词汇进入 registry；scopeType/scopeId 保持泛化无 FK。
 

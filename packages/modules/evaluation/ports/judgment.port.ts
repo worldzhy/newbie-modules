@@ -19,7 +19,11 @@ import type {
 export const judgmentPortToken = (kind: string): string => `EVALUATION_JUDGMENT:${kind}`;
 
 export interface JudgmentInput {
-  subject: EvaluationSubjectRef;
+  /**
+   * `kind` is dropped on purpose (ADR-037 contract 3): the port is bound per
+   * kind through `judgmentPortToken(kind)`, so a judgment may not branch on it.
+   */
+  subject: Omit<EvaluationSubjectRef, "kind">;
   ruleSetVersion: EvaluationRuleSetVersionRef;
   criteria: EvaluationCriterionRef[];
   evidence: EvaluationEvidenceItem[];

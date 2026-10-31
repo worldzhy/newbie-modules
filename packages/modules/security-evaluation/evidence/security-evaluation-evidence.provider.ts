@@ -1,6 +1,8 @@
 import { BadRequestException, Inject, Injectable, Optional } from "@nestjs/common";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import type { EvidenceCollection, EvidenceProvider } from "@modules/evaluation/ports/evidence.provider";
 import type {
+  EvaluationCoverageBucket,
   EvaluationRuleSetVersionRef,
   EvaluationEvidenceItem,
   EvaluationSubjectRef,
@@ -9,6 +11,8 @@ import type {
 import { SecurityEvaluationAssetService } from "../assets/security-evaluation-asset.service";
 import {
   SECURITY_EVALUATION_ECOSYSTEM_NPM,
+  SECURITY_EVALUATION_INTEL_EVIDENCE_BUDGET,
+  SECURITY_EVALUATION_INTEL_EVIDENCE_WINDOW_DAYS,
   SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_LOCKFILE_CANDIDATES,
@@ -22,6 +26,10 @@ import {
   parsePackageLock,
   type LockedPackage,
 } from "../judgment/dependency/security-evaluation-lockfile";
+import {
+  SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER,
+  SecurityEvaluationScopeEntitiesProvider,
+} from "../judgment/intel/security-evaluation-scope-entities.port";
 import { RepositoryAccess, securityEvaluationRepositoryAccessToken } from "../ports/repository-access.port";
 
 interface ResolvedLockfile {
@@ -31,31 +39,39 @@ interface ResolvedLockfile {
 
 /**
  * SecurityEvaluationEvidenceProvider — evidence collection for subject kind
- * "repository" (ADR-022 D3, DEPENDENCY).
+ * "repository" (ADR-022 D3, DEPENDENCY) and the run-scoped registration of
+ * INTEL material (ADR-037 D9.4).
  *
- * The lockfile is the knowledge layer: every installed package becomes one
- * knowledge item and one manifest item. A repository that cannot be read is a
- * failed run, not a
- * clean one — an empty evaluated set would otherwise claim "nothing found" for
- * material nobody looked at.
+ * For DEPENDENCY the lockfile is the knowledge layer: every installed package
+ * becomes one knowledge item and one manifest item. A repository that cannot be
+ * read is a failed run, not a clean one — an empty evaluated set would
+ * otherwise claim "nothing found" for material nobody looked at.
+ *
+ * For INTEL the provider reads the world-scoped threat-knowledge store and
+ * registers what the run considered: the subject's scope entities as declared
+ * items and the recent knowledge candidates as knowledge items. Candidates
+ * skipped by the negative cache or the evidence budget are accounted in the
+ * skipped bucket rather than silently dropped.
  */
 @Injectable()
 export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly assets: SecurityEvaluationAssetService,
     @Optional()
     @Inject(securityEvaluationRepositoryAccessToken)
     private readonly repositoryAccess?: RepositoryAccess,
+    @Optional()
+    @Inject(SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER)
+    private readonly scopeEntitiesProvider?: SecurityEvaluationScopeEntitiesProvider,
   ) {}
 
   async collect(
     subject: EvaluationSubjectRef,
     ruleSetVersion: EvaluationRuleSetVersionRef,
   ): Promise<EvidenceCollection> {
-    // INTEL judgment does not consume lockfile evidence; it matches knowledge
-    // items against the subject's scope entity set directly (ADR-039).
     if (ruleSetVersion.evaluationKey === SECURITY_EVALUATION_KEY_THREAT_INTEL) {
-      return { items: [], declaredUnlinked: { total: 0 }, skipped: { total: 0 } };
+      return this.collectIntel(subject);
     }
 
     const asset = await this.assets.ensureAsset(subject);
@@ -80,6 +96,108 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       declaredUnlinked: await this.computeDeclaredUnlinked(subject, lockfile, packages),
       skipped: { total: 0 },
     };
+  }
+
+  private emptyCollection(): EvidenceCollection {
+    return { items: [], declaredUnlinked: { total: 0 }, skipped: { total: 0 } };
+  }
+
+  /**
+   * INTEL evidence: the scope entity set plus the threat-knowledge candidates
+   * in the match window, both registered as manifest items so the judgment has
+   * no reason to read the database itself (ADR-037 D9.4).
+   */
+  private async collectIntel(subject: EvaluationSubjectRef): Promise<EvidenceCollection> {
+    const scopeEntitiesProvider = this.scopeEntitiesProvider;
+    if (!scopeEntitiesProvider) return this.emptyCollection();
+
+    const scopes = await scopeEntitiesProvider.listScopeEntities();
+    const scope = scopes.find(
+      (candidate) => candidate.scopeType === subject.scopeType && candidate.scopeId === subject.scopeId,
+    );
+    if (!scope || scope.entities.length === 0) return this.emptyCollection();
+
+    const observedAt = new Date();
+    const scopeKey = `${subject.scopeType}:${subject.scopeId}`;
+    const declaredItems = scope.entities.map((entity, index): EvaluationEvidenceItem => ({
+      id: `scope-entity:${index}`,
+      layer: "declared",
+      source: "project-profile",
+      summary: entity.value,
+      observedAt,
+      payload: { scopeType: subject.scopeType, scopeId: subject.scopeId, entity: entity.value },
+    }));
+
+    const since = new Date(observedAt.getTime() - SECURITY_EVALUATION_INTEL_EVIDENCE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+    const candidates = await this.prisma.securityEvaluationThreatKnowledgeItem.findMany({
+      where: { fetchedAt: { gte: since } },
+      orderBy: [{ fetchedAt: "asc" }, { id: "asc" }],
+      select: {
+        id: true,
+        source: true,
+        title: true,
+        summary: true,
+        severity: true,
+        signalTags: true,
+        fetchedAt: true,
+        negativeCache: true,
+      },
+    });
+
+    const cachedIds: string[] = [];
+    const eligible: typeof candidates = [];
+    for (const candidate of candidates) {
+      const cache = (candidate.negativeCache as Record<string, string> | null) ?? {};
+      if (cache[scopeKey] !== undefined) cachedIds.push(candidate.id);
+      else eligible.push(candidate);
+    }
+
+    const budget = SECURITY_EVALUATION_INTEL_EVIDENCE_BUDGET;
+    const withinBudget = eligible.slice(0, budget);
+    const overBudgetIds = eligible.slice(budget).map((candidate) => candidate.id);
+
+    const knowledgeItems = withinBudget.map((candidate): EvaluationEvidenceItem => ({
+      id: `threat-knowledge:${candidate.id}`,
+      layer: "knowledge",
+      source: candidate.source,
+      summary: candidate.title,
+      observedAt: candidate.fetchedAt,
+      refs: [candidate.id],
+      payload: {
+        knowledgeItemId: candidate.id,
+        severity: candidate.severity,
+        signalTags: candidate.signalTags,
+      },
+    }));
+
+    return {
+      items: [...declaredItems, ...knowledgeItems],
+      declaredUnlinked: { total: 0 },
+      skipped: this.buildIntelSkippedBucket(cachedIds, overBudgetIds, budget),
+    };
+  }
+
+  /**
+   * The negative-cache and budget cut-offs share the contract's single skipped
+   * bucket: totals summed, ids listed and one note covering both reasons.
+   */
+  private buildIntelSkippedBucket(
+    cachedIds: string[],
+    overBudgetIds: string[],
+    budget: number,
+  ): EvaluationCoverageBucket {
+    const items = [...cachedIds, ...overBudgetIds];
+    if (items.length === 0) return { total: 0 };
+    const notes: string[] = [];
+    if (cachedIds.length > 0) {
+      notes.push(`${cachedIds.length} knowledge item(s) are skipped by the ADR-018 negative cache for this scope.`);
+    }
+    if (overBudgetIds.length > 0) {
+      notes.push(
+        `${overBudgetIds.length} knowledge item(s) exceed the evidence budget of ${budget} and were not registered.`,
+      );
+    }
+    return { total: items.length, items, note: notes.join(" ") };
   }
 
   private async resolveLockfile(subject: EvaluationSubjectRef): Promise<ResolvedLockfile> {

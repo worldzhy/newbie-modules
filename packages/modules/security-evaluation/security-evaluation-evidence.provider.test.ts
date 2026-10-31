@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import type { EvaluationRuleSetVersionRef, EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
 import type { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
@@ -59,9 +60,17 @@ function fakeRepositoryAccess(files: Record<string, string>): RepositoryAccess {
   } as RepositoryAccess;
 }
 
+function stubPrisma(): PrismaService {
+  return {
+    securityEvaluationThreatKnowledgeItem: {
+      findMany: async () => [],
+    },
+  } as unknown as PrismaService;
+}
+
 test("a repository with no supported lockfile fails the run instead of reporting a clean one", async () => {
   const { assets, writes } = fakeAssets();
-  const provider = new SecurityEvaluationEvidenceProvider(assets, fakeRepositoryAccess({}));
+  const provider = new SecurityEvaluationEvidenceProvider(stubPrisma(), assets, fakeRepositoryAccess({}));
 
   await assert.rejects(() => provider.collect(subject, ruleSetVersion), /No supported lockfile/);
   // Nothing was persisted: the asset must not look observed after a failed run.
@@ -72,6 +81,7 @@ test("a repository with no supported lockfile fails the run instead of reporting
 test("a legacy lockfile without a packages map fails the run with its own reason", async () => {
   const { assets } = fakeAssets();
   const provider = new SecurityEvaluationEvidenceProvider(
+    stubPrisma(),
     assets,
     fakeRepositoryAccess({ "package-lock.json": JSON.stringify({ lockfileVersion: 1, dependencies: {} }) }),
   );
@@ -82,6 +92,7 @@ test("a legacy lockfile without a packages map fails the run with its own reason
 test("a lockfile that resolves no packages fails the run instead of reporting a vacuous clean result", async () => {
   const { assets } = fakeAssets();
   const provider = new SecurityEvaluationEvidenceProvider(
+    stubPrisma(),
     assets,
     fakeRepositoryAccess({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }) }),
   );
@@ -92,6 +103,7 @@ test("a lockfile that resolves no packages fails the run instead of reporting a 
 test("declared dependencies absent from the lockfile are reported as declaredUnlinked", async () => {
   const { assets } = fakeAssets();
   const provider = new SecurityEvaluationEvidenceProvider(
+    stubPrisma(),
     assets,
     fakeRepositoryAccess({
       "package-lock.json": LOCKFILE,
@@ -114,7 +126,7 @@ test("declared dependencies absent from the lockfile are reported as declaredUnl
 
 test("a host that forgot to bind RepositoryAccess fails loudly instead of collecting nothing", async () => {
   const { assets } = fakeAssets();
-  const provider = new SecurityEvaluationEvidenceProvider(assets, undefined);
+  const provider = new SecurityEvaluationEvidenceProvider(stubPrisma(), assets, undefined);
 
   await assert.rejects(() => provider.collect(subject, ruleSetVersion), /No RepositoryAccess is bound/);
 });

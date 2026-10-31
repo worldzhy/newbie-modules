@@ -1,5 +1,7 @@
-import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import type {
+  EvaluationCoverageBucket,
+  EvaluationEvidenceItem,
   EvaluationFindingCandidate,
   EvaluationFindingSeverity,
 } from "@modules/evaluation/ports/evaluation.contracts";
@@ -11,10 +13,10 @@ import {
 } from "../../security-evaluation.constants";
 import { SecurityEvaluationKnowledgeSeverity } from "../../knowledge/security-evaluation-knowledge.constants";
 import {
-  SecurityEvaluationScopeEntitiesProvider,
-  SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER,
-} from "./security-evaluation-scope-entities.port";
-import { SecurityEvaluationIntelMatchService } from "./security-evaluation-intel-match.service";
+  SecurityEvaluationIntelMatchService,
+  type IntelEvidenceCandidate,
+} from "./security-evaluation-intel-match.service";
+import type { SecurityEvaluationScopeEntity } from "./security-evaluation-scope-entities.port";
 
 const SEVERITY_TO_FINDING: Record<SecurityEvaluationKnowledgeSeverity, EvaluationFindingSeverity> = {
   critical: "CRITICAL",
@@ -24,9 +26,21 @@ const SEVERITY_TO_FINDING: Record<SecurityEvaluationKnowledgeSeverity, Evaluatio
   info: "INFO",
 };
 
+/** Evidence layer/source pair the collector uses for the scope entity set. */
+const DECLARED_LAYER = "declared";
+const PROJECT_PROFILE_SOURCE = "project-profile";
+const KNOWLEDGE_LAYER = "knowledge";
+
 /**
  * INTEL judgment (ADR-039) — recent threat-intel knowledge items matched
  * against the subject's scope entity set.
+ *
+ * Both inputs are read from `input.evidence` (ADR-037 D9.4): the collector
+ * registers the scope entities as "declared" items and the knowledge
+ * candidates as "knowledge" items, so the judgment no longer reads the
+ * knowledge store or the scope port. Candidates ARE registered as evidence
+ * items; items examined but not matched land in `evaluatedRefs` and
+ * budget-truncated ones in `skipped` (ADR-037 D9.2/D9.4).
  *
  * Hard entity recall fires a finding directly (confidence high, verdictSource
  * "hard-recall"); otherwise the LLM re-ranks candidates that pass the
@@ -36,43 +50,86 @@ const SEVERITY_TO_FINDING: Record<SecurityEvaluationKnowledgeSeverity, Evaluatio
  */
 @Injectable()
 export class SecurityEvaluationIntelJudgment {
-  private readonly logger = new Logger(SecurityEvaluationIntelJudgment.name);
-
-  constructor(
-    private readonly matchService: SecurityEvaluationIntelMatchService,
-    @Optional()
-    @Inject(SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER)
-    private readonly scopeEntitiesProvider: SecurityEvaluationScopeEntitiesProvider | undefined,
-  ) {}
+  constructor(private readonly matchService: SecurityEvaluationIntelMatchService) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
     if (input.ruleSetVersion.evaluationKey !== SECURITY_EVALUATION_KEY_THREAT_INTEL) {
       return { verdicts: [], findings: [], evaluatedRefs: [] };
     }
 
-    if (!this.scopeEntitiesProvider) {
-      this.logger.warn("ScopeEntitiesProvider is not bound; INTEL judgment produces no findings.");
+    const entityItems = this.entityEvidence(input.evidence);
+    const entities = this.entities(entityItems);
+    const projection = this.candidates(input.evidence);
+    if (entities.length === 0 || projection.candidates.length === 0) {
       return { verdicts: [], findings: [], evaluatedRefs: [] };
     }
 
-    const scopes = await this.scopeEntitiesProvider.listScopeEntities();
-    const scope = scopes.find((s) => s.scopeType === input.subject.scopeType && s.scopeId === input.subject.scopeId);
-    if (!scope || scope.entities.length === 0) {
-      return { verdicts: [], findings: [], evaluatedRefs: [] };
-    }
+    const scopeKey = `${input.subject.scopeType}:${input.subject.scopeId}`;
+    const outcome = await this.matchService.match(projection.candidates, entities, scopeKey);
+    const findings: EvaluationFindingCandidate[] = outcome.matches.map((match) => this.toFinding(match));
 
-    const matches = await this.matchService.matchScope(scope);
-    const findings: EvaluationFindingCandidate[] = matches.map((match) => this.toFinding(match));
+    const evaluatedRefs = [
+      ...new Set(
+        outcome.examinedRefs
+          .map((knowledgeItemId) => projection.manifestIdByKnowledgeId.get(knowledgeItemId))
+          .filter((id): id is string => typeof id === "string"),
+      ),
+    ];
+
+    let skipped: EvaluationCoverageBucket | undefined;
+    if (outcome.skippedByBudget) {
+      const items = outcome.skippedByBudget.items
+        .map((knowledgeItemId) => projection.manifestIdByKnowledgeId.get(knowledgeItemId))
+        .filter((id): id is string => typeof id === "string");
+      if (items.length > 0) {
+        skipped = { total: items.length, items, note: outcome.skippedByBudget.note };
+      }
+    }
 
     return {
       verdicts: [],
       findings,
-      // INTEL matching does not consume skeleton evidence items; the
-      // knowledge store is the evidence layer. Returning empty evaluatedRefs
-      // keeps the coverage invariant satisfied (ADR-020).
-      evaluatedRefs: [],
-      metadata: { matchedCount: matches.length, scopeEntities: scope.entities.length },
+      evaluatedRefs,
+      skipped,
+      metadata: { matchedCount: outcome.matches.length, scopeEntities: entityItems.length },
     };
+  }
+
+  private entityEvidence(evidence: readonly EvaluationEvidenceItem[]): EvaluationEvidenceItem[] {
+    return evidence.filter((item) => item.layer === DECLARED_LAYER && item.source === PROJECT_PROFILE_SOURCE);
+  }
+
+  private entities(entityItems: readonly EvaluationEvidenceItem[]): SecurityEvaluationScopeEntity[] {
+    const entities: SecurityEvaluationScopeEntity[] = [];
+    for (const item of entityItems) {
+      const value = item.payload?.entity;
+      if (typeof value === "string" && value.length > 0) entities.push({ value });
+    }
+    return entities;
+  }
+
+  private candidates(evidence: readonly EvaluationEvidenceItem[]): {
+    candidates: IntelEvidenceCandidate[];
+    manifestIdByKnowledgeId: Map<string, string>;
+  } {
+    const candidates: IntelEvidenceCandidate[] = [];
+    const manifestIdByKnowledgeId = new Map<string, string>();
+    for (const item of evidence) {
+      if (item.layer !== KNOWLEDGE_LAYER) continue;
+      const payload = item.payload;
+      const knowledgeItemId = typeof payload?.knowledgeItemId === "string" ? payload.knowledgeItemId : undefined;
+      if (!knowledgeItemId) continue;
+      manifestIdByKnowledgeId.set(knowledgeItemId, item.id);
+      candidates.push({
+        knowledgeItemId,
+        title: item.summary,
+        severity: typeof payload?.severity === "string" ? payload.severity : "info",
+        signalTags: Array.isArray(payload?.signalTags)
+          ? payload.signalTags.filter((tag): tag is string => typeof tag === "string")
+          : [],
+      });
+    }
+    return { candidates, manifestIdByKnowledgeId };
   }
 
   private toFinding(match: {

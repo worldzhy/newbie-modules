@@ -1,12 +1,9 @@
-import { Inject, Injectable, Logger, Optional } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Prisma } from "@generated/prisma/client";
 import { SecurityEvaluationKnowledgeSeverity } from "../../knowledge/security-evaluation-knowledge.constants";
-import {
-  SecurityEvaluationScopeEntities,
-  SecurityEvaluationScopeEntitiesProvider,
-  SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER,
-} from "./security-evaluation-scope-entities.port";
+import { SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET } from "../../security-evaluation.constants";
+import { SecurityEvaluationScopeEntity } from "./security-evaluation-scope-entities.port";
 import { SecurityEvaluationIntelReRanker } from "./security-evaluation-intel-re-ranker";
 import {
   SECURITY_EVALUATION_INTEL_MATCH_CONFIDENCE,
@@ -24,16 +21,13 @@ const SEVERITY_RANK: Record<SecurityEvaluationKnowledgeSeverity, number> = {
 /** Items below this severity reach the LLM re-ranker only when they carry a signal tag. */
 const RE_RANK_MIN_SEVERITY: SecurityEvaluationKnowledgeSeverity = "medium";
 
-/** How far back the INTEL judgment considers items when matching. */
-const DEFAULT_MATCH_WINDOW_DAYS = 7;
-
-interface MatchableItem {
-  id: string;
+/** One knowledge candidate the judgment passed in from the run's evidence items. */
+export interface IntelEvidenceCandidate {
+  knowledgeItemId: string;
   title: string;
-  summary: string | null;
+  summary?: string | null;
   severity: string;
   signalTags: string[];
-  negativeCache: Prisma.JsonValue | null;
 }
 
 export interface IntelMatchResult {
@@ -44,6 +38,22 @@ export interface IntelMatchResult {
   confidence: SecurityEvaluationIntelMatchConfidence;
   evidence: string | null;
   verdictSource: "hard-recall" | "llm";
+}
+
+export interface IntelMatchOutcome {
+  /** Knowledge items judged relevant; each becomes a finding. */
+  matches: IntelMatchResult[];
+  /**
+   * Knowledge item ids of every candidate that was actually examined — a
+   * hard-recall hit or an LLM verdict of relevant/not-relevant. Budget
+   * truncation and unavailable LLM verdicts leave a candidate out.
+   */
+  examinedRefs: string[];
+  /**
+   * Candidates the re-rank budget cut off, with knowledge item ids and a note
+   * naming the budget. Undefined when the budget covered every candidate.
+   */
+  skippedByBudget?: { items: string[]; note: string };
 }
 
 /**
@@ -62,111 +72,100 @@ function entityAppearsIn(haystack: string, entity: string): boolean {
 
 /**
  * INTEL matching service (ADR-018, re-homed under security-evaluation by
- * ADR-039). Per-subject matching: given a scope's entity set, decide which
- * knowledge items affect it via hard entity recall + LLM structured re-rank.
+ * ADR-039). Matching is pure over the candidate and entity lists the caller
+ * passes: candidates are already filtered and projected from the run's
+ * evidence items, so this service reads neither the knowledge store nor the
+ * scope port itself.
  *
- * Unlike the former threat-intelligence module's global match pipeline,
- * this service is invoked per evaluation run for one subject's scope.
- * Negative cache is stored on `SecurityEvaluationThreatKnowledgeItem.negativeCache`
- * keyed by "scopeType:scopeId"; "unavailable" verdicts are never cached.
+ * The LLM re-rank budget bounds how many candidates a single run may spend a
+ * call on; hard-recall hits do not consume it (ADR-037 D9.4). Negative cache
+ * is stored on `SecurityEvaluationThreatKnowledgeItem.negativeCache` keyed by
+ * "scopeType:scopeId"; "unavailable" verdicts are never cached.
  */
 @Injectable()
 export class SecurityEvaluationIntelMatchService {
-  private readonly logger = new Logger(SecurityEvaluationIntelMatchService.name);
-
   constructor(
     private readonly prisma: PrismaService,
-    @Optional()
-    @Inject(SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER)
-    private readonly scopeEntitiesProvider: SecurityEvaluationScopeEntitiesProvider | undefined,
     private readonly reRanker: SecurityEvaluationIntelReRanker,
   ) {}
 
-  /**
-   * Match knowledge items from the last `windowDays` days against the given
-   * scope's entity set. Returns the list of relevant matches (each becomes
-   * a finding). Items with a cached "not-relevant" verdict for this scope
-   * are skipped.
-   */
-  async matchScope(
-    scope: SecurityEvaluationScopeEntities,
-    windowDays = DEFAULT_MATCH_WINDOW_DAYS,
-  ): Promise<IntelMatchResult[]> {
-    if (scope.entities.length === 0) return [];
-
-    const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000);
-    const scopeKey = `${scope.scopeType}:${scope.scopeId}`;
-
-    const items = await this.prisma.securityEvaluationThreatKnowledgeItem.findMany({
-      where: { fetchedAt: { gte: since } },
-      orderBy: [{ fetchedAt: "asc" }, { id: "asc" }],
-      select: {
-        id: true,
-        title: true,
-        summary: true,
-        severity: true,
-        signalTags: true,
-        negativeCache: true,
-      },
-    });
-
-    const results: IntelMatchResult[] = [];
-    for (const item of items) {
-      const cache = (item.negativeCache as Record<string, string> | null) ?? {};
-      if (cache[scopeKey] !== undefined) continue;
-
-      const result = await this.matchItem(item, scope, scopeKey);
-      if (result) results.push(result);
-    }
-    return results;
-  }
-
-  private async matchItem(
-    item: MatchableItem,
-    scope: SecurityEvaluationScopeEntities,
+  async match(
+    candidates: readonly IntelEvidenceCandidate[],
+    entities: readonly SecurityEvaluationScopeEntity[],
     scopeKey: string,
-  ): Promise<IntelMatchResult | null> {
-    const haystack = `${item.title}\n${item.summary ?? ""}`;
-    const hardHits = scope.entities.filter((entity) => entityAppearsIn(haystack, entity.value));
+  ): Promise<IntelMatchOutcome> {
+    if (entities.length === 0 || candidates.length === 0) {
+      return { matches: [], examinedRefs: [] };
+    }
 
-    if (hardHits.length > 0) {
-      return {
-        itemId: item.id,
-        itemTitle: item.title,
-        itemSeverity: item.severity,
-        matchedEntity: hardHits[0].value,
-        confidence: SECURITY_EVALUATION_INTEL_MATCH_CONFIDENCE.HIGH,
-        evidence: hardHits.map((hit) => hit.value).join(", "),
-        verdictSource: "hard-recall",
+    const matches: IntelMatchResult[] = [];
+    const examinedRefs: string[] = [];
+    const skippedByBudget: string[] = [];
+    let reRankCalls = 0;
+
+    for (const candidate of candidates) {
+      const haystack = `${candidate.title}\n${candidate.summary ?? ""}`;
+      const hardHits = entities.filter((entity) => entityAppearsIn(haystack, entity.value));
+
+      if (hardHits.length > 0) {
+        matches.push({
+          itemId: candidate.knowledgeItemId,
+          itemTitle: candidate.title,
+          itemSeverity: candidate.severity,
+          matchedEntity: hardHits[0].value,
+          confidence: SECURITY_EVALUATION_INTEL_MATCH_CONFIDENCE.HIGH,
+          evidence: hardHits.map((hit) => hit.value).join(", "),
+          verdictSource: "hard-recall",
+        });
+        examinedRefs.push(candidate.knowledgeItemId);
+        continue;
+      }
+
+      if (!this.shouldReRank(candidate.severity as SecurityEvaluationKnowledgeSeverity, candidate.signalTags)) {
+        continue;
+      }
+
+      if (reRankCalls >= SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET) {
+        skippedByBudget.push(candidate.knowledgeItemId);
+        continue;
+      }
+      reRankCalls += 1;
+
+      const verdict = await this.reRanker.reRank({ title: candidate.title, summary: candidate.summary ?? undefined }, [
+        ...entities,
+      ]);
+
+      if (verdict.kind === "unavailable") continue;
+
+      examinedRefs.push(candidate.knowledgeItemId);
+
+      if (!verdict.finalRelevant) {
+        if (verdict.kind === "not-relevant") {
+          await this.cacheNotRelevant(candidate.knowledgeItemId, scopeKey, verdict.reason);
+        }
+        continue;
+      }
+
+      const matchedEntity = verdict.entityMatches.find((m) => m.matched)?.entity ?? "";
+      matches.push({
+        itemId: candidate.knowledgeItemId,
+        itemTitle: candidate.title,
+        itemSeverity: candidate.severity,
+        matchedEntity,
+        confidence: SECURITY_EVALUATION_INTEL_MATCH_CONFIDENCE.MEDIUM,
+        evidence: verdict.reason,
+        verdictSource: "llm",
+      });
+    }
+
+    const outcome: IntelMatchOutcome = { matches, examinedRefs };
+    if (skippedByBudget.length > 0) {
+      outcome.skippedByBudget = {
+        items: skippedByBudget,
+        note: `${skippedByBudget.length} candidate(s) were not re-ranked because the run's LLM re-rank budget of ${SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET} was exhausted.`,
       };
     }
-
-    if (!this.shouldReRank(item.severity as SecurityEvaluationKnowledgeSeverity, item.signalTags)) {
-      return null;
-    }
-
-    const verdict = await this.reRanker.reRank(
-      { title: item.title, summary: item.summary ?? undefined },
-      scope.entities,
-    );
-
-    if (!verdict.finalRelevant) {
-      if (verdict.kind === "not-relevant") {
-        await this.cacheNotRelevant(item.id, scopeKey, verdict.reason);
-      }
-      return null;
-    }
-
-    const matchedEntity = verdict.entityMatches.find((m) => m.matched)?.entity ?? "";
-    return {
-      itemId: item.id,
-      itemTitle: item.title,
-      itemSeverity: item.severity,
-      matchedEntity,
-      confidence: SECURITY_EVALUATION_INTEL_MATCH_CONFIDENCE.MEDIUM,
-      evidence: verdict.reason,
-      verdictSource: "llm",
-    };
+    return outcome;
   }
 
   private shouldReRank(severity: SecurityEvaluationKnowledgeSeverity, signalTags: string[]): boolean {
