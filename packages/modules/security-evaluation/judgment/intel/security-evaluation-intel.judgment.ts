@@ -67,9 +67,11 @@ export class SecurityEvaluationIntelJudgment {
     return {
       verdicts: [],
       findings,
-      // INTEL matching does not consume skeleton evidence items; the
-      // knowledge store is the evidence layer. Returning empty evaluatedRefs
-      // keeps the coverage invariant satisfied (ADR-020).
+      // INTEL judges against world-scoped knowledge, not against the evidence
+      // items of this run. The candidates are not projected into
+      // EvaluationEvidenceItem yet, so an empty evaluatedRefs under-reports
+      // coverage (ADR-037 D9.4, tracked debt) — it does not satisfy the
+      // "registered in full" invariant.
       evaluatedRefs: [],
       metadata: { matchedCount: matches.length, scopeEntities: scope.entities.length },
     };
