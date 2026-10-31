@@ -11,6 +11,7 @@ export class ListStacksRequestDto {
 export class RunStackCommandRequestDto {
   @ApiProperty({
     type: [String],
+    isArray: true,
     description: "Shell commands executed by AWS-RunShellScript on the host instance.",
     example: ["cd /opt/app && ./deploy.sh web"],
   })
