@@ -1,0 +1,53 @@
+# Dependabot configuration for the newbie module registry.
+#
+# Module directories under packages/modules/ ship sources plus
+# newbie.module.json, not package manifests: runtime dependencies are resolved
+# in the consumer project after `newbie modules apply`, so the only npm surface
+# here is the root devDependencies (eslint, prettier, @devbie/style-guide).
+# Dependabot watches that plus GitHub Actions so the registry tooling stays
+# current and CVE-clean.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:30"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase
+    labels:
+      - "dependencies"
+    # Group patch-level bumps to reduce PR noise; minor/major stay separate
+    # so breaking changes get individual review.
+    groups:
+      patch-updates:
+        update-types:
+          - "patch"
+    # Policy: no major upgrades by default. Majors are milestone-driven
+    # (CVE / feature need / ecosystem EOL) and executed as verified
+    # milestones on dev, never via automated PRs — CI cannot observe
+    # behavior-level regressions (changed defaults, family lockstep,
+    # cross-repo consumer impact), so a green check is not evidence.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "dev"
+    schedule:
+      interval: "monthly"
+      time: "05:30"
+      timezone: "Asia/Shanghai"
+    labels:
+      - "ci"
+    # Same major policy as the npm ecosystem: actions majors are
+    # milestone-driven, never via automated PRs.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
