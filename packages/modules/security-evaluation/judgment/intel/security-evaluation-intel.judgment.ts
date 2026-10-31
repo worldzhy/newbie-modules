@@ -59,19 +59,19 @@ export class SecurityEvaluationIntelJudgment {
 
     const entityItems = this.entityEvidence(input.evidence);
     const entities = this.entities(entityItems);
-    const candidates = this.candidates(input.evidence);
-    if (entities.length === 0 || candidates.length === 0) {
+    const projection = this.candidates(input.evidence);
+    if (entities.length === 0 || projection.candidates.length === 0) {
       return { verdicts: [], findings: [], evaluatedRefs: [] };
     }
 
     const scopeKey = `${input.subject.scopeType}:${input.subject.scopeId}`;
-    const outcome = await this.matchService.match(candidates.candidates, entities, scopeKey);
+    const outcome = await this.matchService.match(projection.candidates, entities, scopeKey);
     const findings: EvaluationFindingCandidate[] = outcome.matches.map((match) => this.toFinding(match));
 
     const evaluatedRefs = [
       ...new Set(
         outcome.examinedRefs
-          .map((knowledgeItemId) => candidates.manifestIdByKnowledgeId.get(knowledgeItemId))
+          .map((knowledgeItemId) => projection.manifestIdByKnowledgeId.get(knowledgeItemId))
           .filter((id): id is string => typeof id === "string"),
       ),
     ];
@@ -79,7 +79,7 @@ export class SecurityEvaluationIntelJudgment {
     let skipped: EvaluationCoverageBucket | undefined;
     if (outcome.skippedByBudget) {
       const items = outcome.skippedByBudget.items
-        .map((knowledgeItemId) => candidates.manifestIdByKnowledgeId.get(knowledgeItemId))
+        .map((knowledgeItemId) => projection.manifestIdByKnowledgeId.get(knowledgeItemId))
         .filter((id): id is string => typeof id === "string");
       if (items.length > 0) {
         skipped = { total: items.length, items, note: outcome.skippedByBudget.note };
