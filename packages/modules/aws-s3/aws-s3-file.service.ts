@@ -8,6 +8,9 @@ import { AwsS3Service } from "./aws-s3.service";
 
 const SYSTEM_FOLDER_PATH = "_system/";
 
+/** Objects per S3 listing page and database batch during a full-bucket sync. */
+const SYNC_PAGE_SIZE = 500;
+
 @Injectable()
 export class AwsS3FileService {
   private bucket: string;
@@ -39,66 +42,53 @@ export class AwsS3FileService {
       throw new Error("The s3File table is not empty. Please clear the table before syncing.");
     }
 
-    // [step 2] Get all objects from S3 bucket.
-    const objects = await this.s3.getObjectsRecursively({});
+    // [step 2] Mirror the bucket page by page. Materialising every object in
+    // one array would make memory grow with bucket size, so each S3 cursor
+    // page is written and linked before the next page is listed.
+    const fileIdByKey = new Map<string, string>();
+    let nextToken: string | undefined;
 
-    // [step 3] Create records in the s3File table.
-    const createManyInputs: {
-      name: string;
-      type: string;
-      size?: number;
-      s3Bucket: string;
-      s3Key: string;
-    }[] = [];
+    do {
+      const page = await this.s3.listObjectsByCursor({ pageSize: SYNC_PAGE_SIZE, nextToken });
+      nextToken = page.nextToken ?? undefined;
 
-    for (const { s3Key, size } of objects) {
-      const fileSize = size;
-      let fileName = "";
-      let fileType = "";
-
-      if (s3Key.endsWith("/")) {
-        fileName = s3Key.slice(0, -1).split("/").pop() || "";
-        fileType = "folder";
-      } else {
-        fileName = s3Key.split("/").pop() || "";
-        fileType = s3Key.split(".").pop() || "";
+      if (page.records.length === 0) {
+        continue;
       }
 
-      createManyInputs.push({
-        name: fileName,
-        type: fileType,
-        size: fileSize,
-        s3Bucket: this.bucket,
-        s3Key: s3Key,
+      // [step 3] Create records for this page.
+      const files = await this.prisma.s3File.createManyAndReturn({
+        data: page.records.map(({ s3Key, size }) => {
+          const isFolder = s3Key.endsWith("/");
+          const name = isFolder ? s3Key.slice(0, -1).split("/").pop() || "" : s3Key.split("/").pop() || "";
+          const type = isFolder ? "folder" : s3Key.split(".").pop() || "";
+          return { name, type, size, s3Bucket: this.bucket, s3Key };
+        }),
+        select: { id: true, s3Key: true },
       });
-    }
 
-    const files = await this.prisma.s3File.createManyAndReturn({
-      data: createManyInputs,
-      select: { id: true, s3Key: true },
-    });
-
-    // [step 4] Link parent-child relationships.
-    const fileMap = new Map(files.map((file) => [file.s3Key, file.id]));
-
-    for (const { id, s3Key } of files) {
-      let parts: string[];
-      if (s3Key.endsWith("/")) {
-        parts = s3Key.slice(0, -1).split("/");
-      } else {
-        parts = s3Key.split("/");
+      for (const { id, s3Key } of files) {
+        fileIdByKey.set(s3Key, id);
       }
-      if (parts.length > 1) {
-        const parentKey = parts.slice(0, -1).join("/") + "/";
-        const parentId = fileMap.get(parentKey);
-        if (parentId) {
-          await this.prisma.s3File.update({
-            where: { id: id },
-            data: { parentId: parentId },
-          });
+
+      // [step 4] Link parent-child relationships one parent at a time. S3
+      // lists keys lexicographically, so a folder key always precedes its
+      // children and every parent is already present in fileIdByKey.
+      const childIdsByParentId = new Map<string, string[]>();
+      for (const { id, s3Key } of files) {
+        const parentId = this.findParentFolderId(s3Key, fileIdByKey);
+        if (!parentId) {
+          continue;
         }
+        const childIds = childIdsByParentId.get(parentId) ?? [];
+        childIds.push(id);
+        childIdsByParentId.set(parentId, childIds);
       }
-    }
+
+      for (const [parentId, childIds] of childIdsByParentId) {
+        await this.prisma.s3File.updateMany({ where: { id: { in: childIds } }, data: { parentId } });
+      }
+    } while (nextToken);
   }
 
   /** Create a folder in AWS S3, then create a record in the database. */
@@ -533,6 +523,15 @@ export class AwsS3FileService {
   //*********************/
   //* Private functions */
   //*********************/
+
+  /** Resolve a key's parent folder id, seeing only rows written by this sync. */
+  private findParentFolderId(s3Key: string, fileIdByKey: Map<string, string>) {
+    const parts = (s3Key.endsWith("/") ? s3Key.slice(0, -1) : s3Key).split("/");
+    if (parts.length <= 1) {
+      return undefined;
+    }
+    return fileIdByKey.get(parts.slice(0, -1).join("/") + "/");
+  }
 
   private async deleteFileRecursively(fileId: string) {
     // [step 1] Delete file.
