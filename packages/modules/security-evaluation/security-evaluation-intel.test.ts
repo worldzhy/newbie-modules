@@ -101,7 +101,7 @@ const SCOPE_PROVIDER: SecurityEvaluationScopeEntitiesProvider = {
 
 function stubAssets(): SecurityEvaluationAssetService {
   return {
-    ensureAsset: async () => ({ id: "asset-1" }),
+    getOrCreateAsset: async () => ({ id: "asset-1" }),
   } as unknown as SecurityEvaluationAssetService;
 }
 

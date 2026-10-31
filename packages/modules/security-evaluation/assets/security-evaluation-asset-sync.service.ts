@@ -30,7 +30,7 @@ export class SecurityEvaluationAssetSyncService {
     for (const kind of SECURITY_EVALUATION_SUBJECT_KINDS) {
       const synced = await this.subjects.syncSubjects({ ...scope, kind });
       subjectCount += synced.length;
-      await this.assets.ensureAssets(synced.map(toSubjectRef));
+      await this.assets.getOrCreateAssets(synced.map(toSubjectRef));
     }
     return { subjects: subjectCount };
   }

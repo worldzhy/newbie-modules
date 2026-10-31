@@ -44,7 +44,7 @@ const LOCKFILE = JSON.stringify({
 function fakeAssets() {
   const writes = { items: 0, touched: 0 };
   const assets = {
-    ensureAsset: async () => ({ id: "asset-1" }),
+    getOrCreateAsset: async () => ({ id: "asset-1" }),
     upsertNpmPackageKnowledgeItems: async () => {
       writes.items += 1;
     },

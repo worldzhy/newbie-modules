@@ -35,7 +35,7 @@ function buildService(overrides?: {
     {} as never,
     {} as never,
     {
-      ensureSubject: async () => ({ id: "subject-1" }),
+      getOrCreateSubject: async () => ({ id: "subject-1" }),
     } as never,
     { getPeriodById: async () => period } as never,
     { user: { findUnique: async () => user } } as never,

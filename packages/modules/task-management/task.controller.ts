@@ -36,7 +36,7 @@ export class TaskController {
     @Body() dto: UpdateTaskRequestDto,
     @Req() req: UserRequest,
   ): Promise<TaskDto> {
-    const participant = await this.taskParticipantService.ensureHostParticipant({ userId: req.user.userId });
+    const participant = await this.taskParticipantService.getOrCreateHostParticipant({ userId: req.user.userId });
     return await this.taskService.updateTask(taskId, dto, {
       participantId: participant.id,
       name: participant.name ?? undefined,
@@ -48,7 +48,7 @@ export class TaskController {
   @ApiOperation({ summary: "Soft delete a task" })
   @ApiResponse({ status: 200, type: TaskDto })
   async deleteTask(@Param("taskId") taskId: string, @Req() req: UserRequest): Promise<TaskDto> {
-    const participant = await this.taskParticipantService.ensureHostParticipant({ userId: req.user.userId });
+    const participant = await this.taskParticipantService.getOrCreateHostParticipant({ userId: req.user.userId });
     return await this.taskService.deleteTask(taskId, {
       participantId: participant.id,
       name: participant.name ?? undefined,

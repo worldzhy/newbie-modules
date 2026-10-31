@@ -282,7 +282,7 @@ export function planMigrations(discovered: DiscoveredMigration[], applied: Appli
  * database so a fresh ClickHouse volume (before first connection) bootstraps
  * cleanly.
  */
-async function ensureDatabase(config: ClickHouseMigrationConfig): Promise<void> {
+async function createDatabaseIfMissing(config: ClickHouseMigrationConfig): Promise<void> {
   if (!IDENTIFIER_PATTERN.test(config.database)) {
     throw new Error(`Unsafe CLICKHOUSE_DB value '${config.database}': expected [A-Za-z0-9_]+`);
   }
@@ -298,7 +298,7 @@ async function ensureDatabase(config: ClickHouseMigrationConfig): Promise<void> 
   }
 }
 
-async function ensureHistoryTable(client: ClickHouseClient): Promise<void> {
+async function createHistoryTableIfMissing(client: ClickHouseClient): Promise<void> {
   await client.command({
     query: `
       CREATE TABLE IF NOT EXISTS ${HISTORY_TABLE}
@@ -326,7 +326,7 @@ async function withClient<T>(
   config: ClickHouseMigrationConfig,
   fn: (client: ClickHouseClient) => Promise<T>,
 ): Promise<T> {
-  await ensureDatabase(config);
+  await createDatabaseIfMissing(config);
   const client = createClient({
     url: config.url,
     username: config.username,
@@ -334,7 +334,7 @@ async function withClient<T>(
     database: config.database,
   });
   try {
-    await ensureHistoryTable(client);
+    await createHistoryTableIfMissing(client);
     return await fn(client);
   } finally {
     await client.close();

@@ -2,7 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { TaskStatus } from "@generated/prisma/enums";
 
-export interface EnsureParticipantInput {
+export interface GetOrCreateParticipantInput {
   /** Host user this participant stands for; also the participant's identity. */
   userId: string;
   name?: string;
@@ -53,7 +53,7 @@ export class TaskParticipantService {
     });
   }
 
-  async ensureParticipant(input: EnsureParticipantInput) {
+  async getOrCreateParticipant(input: GetOrCreateParticipantInput) {
     return await this.prisma.taskParticipant.upsert({
       where: { userId: input.userId },
       create: {
@@ -65,13 +65,13 @@ export class TaskParticipantService {
     });
   }
 
-  async ensureHostParticipant(input: { userId: string }) {
+  async getOrCreateHostParticipant(input: { userId: string }) {
     const user = await this.prisma.user.findUnique({
       where: { id: input.userId },
       select: { name: true, uiAvatarsUrl: true },
     });
 
-    return await this.ensureParticipant({
+    return await this.getOrCreateParticipant({
       userId: input.userId,
       ...(user?.name ? { name: user.name } : {}),
       ...(user?.uiAvatarsUrl ? { avatarUrl: user.uiAvatarsUrl } : {}),

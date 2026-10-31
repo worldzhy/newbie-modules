@@ -37,16 +37,16 @@ function subject(kind: string): EvaluationSubjectRef {
 function createProvider() {
   const calls: string[] = [];
   const seed = {
-    ensureDependencyBaseline: async () => {
+    seedDependencyBaseline: async () => {
       calls.push("dependency");
     },
-    ensureAwsConfigBaseline: async () => {
+    seedAwsConfigBaseline: async () => {
       calls.push("cis");
     },
-    ensureAwsCustomBaseline: async () => {
+    seedAwsCustomBaseline: async () => {
       calls.push("custom");
     },
-    ensureIntelligenceBaseline: async () => {
+    seedIntelligenceBaseline: async () => {
       calls.push("intel");
     },
   };

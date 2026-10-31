@@ -33,7 +33,7 @@ export class EvaluationSubjectService {
   ) {}
 
   /** Idempotent: the same natural key always resolves to the same row. */
-  async ensureSubject(descriptor: EvaluationSubjectDescriptor) {
+  async getOrCreateSubject(descriptor: EvaluationSubjectDescriptor) {
     return this.prisma.evaluationSubject.upsert({
       where: {
         kind_scopeType_scopeId_subjectKey: {
@@ -58,8 +58,8 @@ export class EvaluationSubjectService {
     });
   }
 
-  async ensureSubjects(descriptors: readonly EvaluationSubjectDescriptor[]) {
-    return Promise.all(descriptors.map((descriptor) => this.ensureSubject(descriptor)));
+  async getOrCreateSubjects(descriptors: readonly EvaluationSubjectDescriptor[]) {
+    return Promise.all(descriptors.map((descriptor) => this.getOrCreateSubject(descriptor)));
   }
 
   /**
@@ -74,7 +74,7 @@ export class EvaluationSubjectService {
   async syncSubjects(input: SyncEvaluationSubjectsInput) {
     const provider = this.providers.getSubjectProvider();
     const descriptors = await provider.listSubjects({ scopeType: input.scopeType, scopeId: input.scopeId }, input.kind);
-    return this.ensureSubjects(descriptors);
+    return this.getOrCreateSubjects(descriptors);
   }
 
   async getSubject(id: string) {

@@ -30,7 +30,7 @@ nightwatch 在 `src/application/` 内直接使用 CloudFormation / SSM / ECR SDK
 
 ### C. 重构为通用应用托管适配层
 
-环境只存 `awsAccountId` / `awsRegion` / `roleArn`（可选 `externalId`），每次操作由宿主实例角色 AssumeRole 拿临时凭证；栈模板作为模块内资源以 `TemplateBody` 提交；原语收敛为幂等的 `ensureStack` / `describeStack` / `deleteStack` / `sendCommand`；新增通用 `APP_HOST` 栈类型，删除所有宿主词汇与外部 S3 模板依赖。
+环境只存 `awsAccountId` / `awsRegion` / `roleArn`（可选 `externalId`），每次操作由宿主实例角色 AssumeRole 拿临时凭证；栈模板作为模块内资源以 `TemplateBody` 提交；原语收敛为幂等的 `getOrCreateStack` / `describeStack` / `deleteStack` / `sendCommand`；新增通用 `APP_HOST` 栈类型，删除所有宿主词汇与外部 S3 模板依赖。
 
 ## 决策
 
@@ -50,7 +50,7 @@ nightwatch 在 `src/application/` 内直接使用 CloudFormation / SSM / ECR SDK
    - 模板不包含任何产品业务策略；需要额外权限时由参数注入，而不是写死。
 
 3. **原语与状态**
-   - `ensureStack`：先 `DescribeStacks`；不存在则 `CreateStack` 并等待 `CREATE_COMPLETE`，存在则按状态返回当前终态或失败原因。
+   - `getOrCreateStack`：先 `DescribeStacks`；不存在则 `CreateStack` 并等待 `CREATE_COMPLETE`，存在则按状态返回当前终态或失败原因。
    - `deleteStack`：等待 `DELETE_COMPLETE`；不存在视为成功。
    - `sendCommand`：`SendCommand` + 轮询 `GetCommandInvocation` 直至成功/失败，返回标准化退出码与输出。
    - 所有原语幂等、带超时；模块只回报 AWS 事实，不定义"部署成功"的业务判定。

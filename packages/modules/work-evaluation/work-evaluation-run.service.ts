@@ -71,7 +71,7 @@ export class WorkEvaluationRunService {
     });
     if (!user) throw new NotFoundException(`User ${input.evaluateeUserId} not found`);
 
-    const subject = await this.subjects.ensureSubject({
+    const subject = await this.subjects.getOrCreateSubject({
       kind: WORK_EVALUATION_SUBJECT_KIND,
       scopeType: WORK_EVALUATION_SUBJECT_SCOPE_TYPE,
       scopeId: user.id,

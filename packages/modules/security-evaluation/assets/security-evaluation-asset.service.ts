@@ -42,7 +42,7 @@ export class SecurityEvaluationAssetService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** Idempotent: one asset row per subject, forever. */
-  async ensureAsset(subject: EvaluationSubjectRef) {
+  async getOrCreateAsset(subject: EvaluationSubjectRef) {
     return this.prisma.securityEvaluationAsset.upsert({
       where: { subjectId: subject.id },
       create: {
@@ -57,8 +57,8 @@ export class SecurityEvaluationAssetService {
     });
   }
 
-  async ensureAssets(subjects: readonly EvaluationSubjectRef[]) {
-    return Promise.all(subjects.map((subject) => this.ensureAsset(subject)));
+  async getOrCreateAssets(subjects: readonly EvaluationSubjectRef[]) {
+    return Promise.all(subjects.map((subject) => this.getOrCreateAsset(subject)));
   }
 
   /** Record that a run actually observed this asset's inventory. */

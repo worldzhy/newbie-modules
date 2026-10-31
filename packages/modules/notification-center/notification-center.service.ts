@@ -126,7 +126,7 @@ export class NotificationCenterService {
     }
 
     const severity = input.severity ?? setting.defaultSeverity;
-    const center = await this.ensureCenterSetting();
+    const center = await this.getOrCreateCenterSetting();
 
     // Drop deliveries below the center severity floor before any write.
     if (SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high)) {
@@ -223,7 +223,7 @@ export class NotificationCenterService {
   // --- Center settings -----------------------------------------------------
 
   async getCenterSettings(): Promise<NotificationCenterSettingDto> {
-    const setting = await this.ensureCenterSetting();
+    const setting = await this.getOrCreateCenterSetting();
     return {
       isPushEnabled: setting.isPushEnabled,
       minimumSeverity: setting.minimumSeverity,
@@ -231,7 +231,7 @@ export class NotificationCenterService {
   }
 
   async updateCenterSettings(body: UpdateNotificationCenterSettingDto): Promise<NotificationCenterSettingDto> {
-    const setting = await this.ensureCenterSetting();
+    const setting = await this.getOrCreateCenterSetting();
 
     const updated = await this.prisma.notificationCenterSetting.update({
       where: { id: setting.id },
@@ -248,7 +248,7 @@ export class NotificationCenterService {
   }
 
   async testPush(): Promise<TestPushResultDto> {
-    const setting = await this.ensureCenterSetting();
+    const setting = await this.getOrCreateCenterSetting();
     if (!setting.isPushEnabled) {
       throw new BadRequestException("Push is disabled.");
     }
@@ -288,7 +288,7 @@ export class NotificationCenterService {
     };
   }
 
-  private async ensureCenterSetting() {
+  private async getOrCreateCenterSetting() {
     const existing = await this.prisma.notificationCenterSetting.findUnique({
       where: { id: CENTER_SETTING_SINGLETON_ID },
     });

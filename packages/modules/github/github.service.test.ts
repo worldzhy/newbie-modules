@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { GitHubService, GitHubNotConfiguredError, RepoNameConflictError } from "./github.service";
 
 /**
- * M8 verification: GithubAdapter with an injected mock Octokit - verifies ensureRepoExists idempotency,
+ * M8 verification: GithubAdapter with an injected mock Octokit - verifies getOrCreateRepo idempotency,
  * upsertEnvExample merges without overwriting, deleteRepo is best-effort.
  *
  * Run: `npm test` in the container, or `node --import tsx --test src/modules/github/github.service.test.ts`
@@ -65,7 +65,7 @@ function httpError(status: number, message?: string) {
   return e;
 }
 
-// Speed up sleeps: zero out setTimeout only inside the generate retry loop of ensureRepoExists.
+// Speed up sleeps: zero out setTimeout only inside the generate retry loop of getOrCreateRepo.
 // A global replacement has side effects, so use an isolated approach here: skip the service's internal sleep directly
 // Applied via monkey-patching global.setTimeout only within the it blocks that need speeding up.
 function withNoSleep<T>(fn: () => Promise<T>): Promise<T> {
@@ -99,7 +99,7 @@ describe("GitHubService without credentials", () => {
     const service = makeUnconfiguredService();
     await assert.rejects(service.deleteRepo("o", "r"), (e: any) => e instanceof GitHubNotConfiguredError);
     await assert.rejects(
-      service.ensureRepoExists("o", "n", "to", "tr"),
+      service.getOrCreateRepo("o", "n", "to", "tr"),
       (e: any) => e instanceof GitHubNotConfiguredError,
     );
     await assert.rejects(
@@ -176,13 +176,13 @@ describe("GitHubService.parseGitHubUrl", () => {
   });
 });
 
-describe("GitHubService.ensureRepoExists", () => {
+describe("GitHubService.getOrCreateRepo", () => {
   it("returns existing clone_url without calling generate when repo already exists (idempotent)", async () => {
     const m = makeOctokitMock({
       "repos.get": async () => ({ data: { clone_url: "https://existing.example/x.git" } }),
     });
     const service = makeService(m);
-    const r = await service.ensureRepoExists("o", "n", "to", "tr");
+    const r = await service.getOrCreateRepo("o", "n", "to", "tr");
     assert.equal(r.generated, false);
     assert.equal(r.cloneUrl, "https://existing.example/x.git");
     assert.equal(m.calls["repos.createUsingTemplate"]?.length ?? 0, 0);
@@ -201,7 +201,7 @@ describe("GitHubService.ensureRepoExists", () => {
       }),
     });
     const service = makeService(m);
-    const r = await withNoSleep(() => service.ensureRepoExists("o", "n", "to", "tr"));
+    const r = await withNoSleep(() => service.getOrCreateRepo("o", "n", "to", "tr"));
     assert.equal(r.generated, true);
     assert.equal(r.cloneUrl, "https://gen.example/x.git");
     assert.equal(m.calls["repos.createUsingTemplate"].length, 1);
@@ -218,7 +218,7 @@ describe("GitHubService.ensureRepoExists", () => {
     });
     const service = makeService(m);
     await assert.rejects(
-      service.ensureRepoExists("o", "n", "to", "tr"),
+      service.getOrCreateRepo("o", "n", "to", "tr"),
       (e: any) => e instanceof RepoNameConflictError,
     );
   });
@@ -230,7 +230,7 @@ describe("GitHubService.ensureRepoExists", () => {
       },
     });
     const service = makeService(m);
-    await assert.rejects(service.ensureRepoExists("o", "n", "to", "tr"), (e: any) => e.status === 500);
+    await assert.rejects(service.getOrCreateRepo("o", "n", "to", "tr"), (e: any) => e.status === 500);
   });
 
   it("rethrows non-422 errors from generate", async () => {
@@ -243,7 +243,7 @@ describe("GitHubService.ensureRepoExists", () => {
       },
     });
     const service = makeService(m);
-    await assert.rejects(service.ensureRepoExists("o", "n", "to", "tr"), (e: any) => e.status === 403);
+    await assert.rejects(service.getOrCreateRepo("o", "n", "to", "tr"), (e: any) => e.status === 403);
   });
 
   it("warns and continues when repo not readable after 3 retries", async () => {
@@ -257,7 +257,7 @@ describe("GitHubService.ensureRepoExists", () => {
       }),
     });
     const service = makeService(m);
-    const r = await withNoSleep(() => service.ensureRepoExists("o", "n", "to", "tr"));
+    const r = await withNoSleep(() => service.getOrCreateRepo("o", "n", "to", "tr"));
     assert.equal(r.generated, true);
     assert.equal(r.cloneUrl, "https://gen.example/x.git");
     // initial GET + 3 retries = 4 GET calls; generate called once.
