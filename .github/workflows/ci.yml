@@ -27,6 +27,11 @@ jobs:
       # The shared backend eslint standard is syntactic only (no type-aware
       # rules), so it runs here without any module dependency installed.
       - run: npm run lint
+      # Module-manifest gate (ADR-024 F17): every physical "@modules/<key>"
+      # import must be declared in moduleDependencies, and layer edges must
+      # point downward. The CLI owns the rule, so it is fetched at run time
+      # instead of vendored into the registry.
+      - run: npx --yes @devbie/newbie-cli@1 modules lint
       # Module business-logic tests (e.g. account/auth/login-audit-coverage.test.ts)
       # cannot run standalone here: this registry has no NestJS/zod/etc.
       # dependencies installed, by design (modules are copied into a consumer
