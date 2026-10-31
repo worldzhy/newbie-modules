@@ -66,8 +66,9 @@ The module implements the skeleton's kind-scoped ports for both kinds:
 - `EVALUATION_EVIDENCE:repository` → `SecurityEvaluationEvidenceProvider`
 - `EVALUATION_EVIDENCE:aws-account` → `SecurityEvaluationAwsConfigEvidenceProvider`
 - `EVALUATION_JUDGMENT:{repository|aws-account}` → `SecurityEvaluationJudgmentService`
-  (dispatches on `ruleSetVersion.evaluationKey`: `npm-osv`, `aws-cis-1.5`,
-  `aws-custom`, `threat-intel`)
+  (looks up the mechanisms declared for `ruleSetVersion.evaluationKey` in the
+  registry: `npm-osv` → `dependency`, `aws-cis-1.5` / `aws-custom` → `aws-config`,
+  `threat-intel` → `intel`, then merges their judgments, ADR-046)
 
 The host must bind two more ports, owned by this module:
 

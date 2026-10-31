@@ -113,14 +113,12 @@ model SecurityEvaluationThreatKnowledgeItem {
   // Signal tags: kev, has-exploit, exploited-in-wild.
   signalTags  String[]
   rawPayload  Json?
-  // Negative cache for INTEL matching: { "scopeType:scopeId": reason }.
-  // An LLM "not-relevant" verdict is cached here so subsequent runs skip
-  // the pair; "unavailable" verdicts are never cached (ADR-018).
-  negativeCache Json?
   fetchedAt   DateTime @default(now())
   lastSeenAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  negativeCaches SecurityEvaluationThreatNegativeCache[]
 
   @@unique([source, externalId])
   @@index([category])
@@ -128,5 +126,28 @@ model SecurityEvaluationThreatKnowledgeItem {
   @@index([publishedAt])
   // Match-pipeline keyset scan: WHERE fetchedAt >= since ORDER BY fetchedAt, id.
   @@index([fetchedAt])
+  @@schema("module/security-evaluation")
+}
+
+/// Negative cache for INTEL matching (ADR-045): an LLM "not-relevant"
+/// verdict is recorded per (knowledge item, scope) so subsequent runs skip
+/// that pair; "unavailable" verdicts are never recorded (ADR-018).
+///
+/// A cache entry is not knowledge: it has its own lifecycle (it can expire
+/// and be cleared independently of the knowledge row), which is why it lives
+/// in its own table instead of a JSON column on the knowledge item. The
+/// composite unique key turns concurrent scope judgments into an upsert.
+model SecurityEvaluationThreatNegativeCache {
+  id              String   @id @default(uuid()) @db.Uuid
+  knowledgeItemId String   @db.Uuid
+  // Host-defined scope identifier, stored verbatim: "scopeType:scopeId".
+  scopeKey        String   @db.VarChar(512)
+  reason          String   @db.Text
+  updatedAt       DateTime @updatedAt
+
+  knowledgeItem SecurityEvaluationThreatKnowledgeItem @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
+
+  @@unique([knowledgeItemId, scopeKey])
+  @@index([scopeKey])
   @@schema("module/security-evaluation")
 }

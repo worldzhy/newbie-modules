@@ -1,10 +1,12 @@
-import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { Prisma } from "@generated/prisma/client";
+import { Inject, Injectable } from "@nestjs/common";
 import { SecurityEvaluationKnowledgeSeverity } from "../../knowledge/security-evaluation-knowledge.constants";
 import { SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET } from "../../security-evaluation.constants";
 import { SecurityEvaluationScopeEntity } from "./security-evaluation-scope-entities.port";
 import { SecurityEvaluationIntelReRanker } from "./security-evaluation-intel-re-ranker";
+import {
+  securityEvaluationIntelNegativeCacheToken,
+  SecurityEvaluationIntelNegativeCachePort,
+} from "./security-evaluation-intel-negative-cache.port";
 import {
   SECURITY_EVALUATION_INTEL_MATCH_CONFIDENCE,
   type SecurityEvaluationIntelMatchConfidence,
@@ -78,14 +80,15 @@ function entityAppearsIn(haystack: string, entity: string): boolean {
  * scope port itself.
  *
  * The LLM re-rank budget bounds how many candidates a single run may spend a
- * call on; hard-recall hits do not consume it (ADR-037 D9.4). Negative cache
- * is stored on `SecurityEvaluationThreatKnowledgeItem.negativeCache` keyed by
- * "scopeType:scopeId"; "unavailable" verdicts are never cached.
+ * call on; hard-recall hits do not consume it (ADR-037 D9.4). A "not-relevant"
+ * verdict is written through the negative-cache port keyed by
+ * "scopeType:scopeId" (ADR-045); "unavailable" verdicts are never cached.
  */
 @Injectable()
 export class SecurityEvaluationIntelMatchService {
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(securityEvaluationIntelNegativeCacheToken)
+    private readonly negativeCache: SecurityEvaluationIntelNegativeCachePort,
     private readonly reRanker: SecurityEvaluationIntelReRanker,
   ) {}
 
@@ -141,7 +144,7 @@ export class SecurityEvaluationIntelMatchService {
 
       if (!verdict.finalRelevant) {
         if (verdict.kind === "not-relevant") {
-          await this.cacheNotRelevant(candidate.knowledgeItemId, scopeKey, verdict.reason);
+          await this.negativeCache.record(candidate.knowledgeItemId, scopeKey, verdict.reason);
         }
         continue;
       }
@@ -170,19 +173,5 @@ export class SecurityEvaluationIntelMatchService {
 
   private shouldReRank(severity: SecurityEvaluationKnowledgeSeverity, signalTags: string[]): boolean {
     return SEVERITY_RANK[severity] >= SEVERITY_RANK[RE_RANK_MIN_SEVERITY] || signalTags.length > 0;
-  }
-
-  private async cacheNotRelevant(itemId: string, scopeKey: string, reason: string): Promise<void> {
-    const item = await this.prisma.securityEvaluationThreatKnowledgeItem.findUnique({
-      where: { id: itemId },
-      select: { negativeCache: true },
-    });
-    if (!item) return;
-    const cache = (item.negativeCache as Record<string, string> | null) ?? {};
-    cache[scopeKey] = reason;
-    await this.prisma.securityEvaluationThreatKnowledgeItem.update({
-      where: { id: itemId },
-      data: { negativeCache: cache as Prisma.InputJsonValue },
-    });
   }
 }

@@ -10,6 +10,10 @@ import {
   SECURITY_EVALUATION_ECOSYSTEM_NPM,
 } from "../../security-evaluation.constants";
 import { mapOsvSeverity } from "../security-evaluation-severity";
+import {
+  SECURITY_EVALUATION_MECHANISM_NAME_DEPENDENCY,
+  type SecurityEvaluationJudgmentMechanism,
+} from "../security-evaluation-mechanism";
 import { deriveExposure, deriveUrgency } from "../security-evaluation-urgency";
 import { dependencyFingerprint } from "./security-evaluation-dependency.identity";
 import { SecurityEvaluationOsvClient, osvPackageKey, type OsvVulnerability } from "./security-evaluation-osv.client";
@@ -33,7 +37,9 @@ const MAX_ALIASES = 10;
  * could not reach is reported as skipped rather than assumed clean.
  */
 @Injectable()
-export class SecurityEvaluationDependencyJudgment {
+export class SecurityEvaluationDependencyJudgment implements SecurityEvaluationJudgmentMechanism {
+  readonly name = SECURITY_EVALUATION_MECHANISM_NAME_DEPENDENCY;
+
   constructor(private readonly osv: SecurityEvaluationOsvClient) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {

@@ -24,9 +24,12 @@ import { SecurityEvaluationDependencyJudgment } from "./judgment/dependency/secu
 import { SecurityEvaluationOsvClient } from "./judgment/dependency/security-evaluation-osv.client";
 import { SecurityEvaluationIntelJudgment } from "./judgment/intel/security-evaluation-intel.judgment";
 import { SecurityEvaluationIntelMatchService } from "./judgment/intel/security-evaluation-intel-match.service";
+import { securityEvaluationIntelNegativeCacheToken } from "./judgment/intel/security-evaluation-intel-negative-cache.port";
 import { SecurityEvaluationIntelModelScopeRegistration } from "./judgment/intel/security-evaluation-intel-model-scope";
 import { SecurityEvaluationIntelReRanker } from "./judgment/intel/security-evaluation-intel-re-ranker";
 import { SecurityEvaluationJudgmentService } from "./judgment/security-evaluation-judgment.service";
+import { SECURITY_EVALUATION_JUDGMENT_MECHANISMS } from "./judgment/security-evaluation-mechanism";
+import { SecurityEvaluationIntelNegativeCacheRepository } from "./persistence/security-evaluation-intel-negative-cache.repository";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationController } from "./security-evaluation.controller";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
@@ -44,6 +47,8 @@ import {
  * Foundations criteria for subject kind "aws-account", its evidence provider
  * and its rulebook judgment, dispatched by evaluationKey through the same judgment
  * service. INTEL arrives in a later slice with its own evaluationKey dispatch.
+ * ADR-046 turns that dispatch into a mechanism registry: each key declares a
+ * mechanism list, executed in parallel and merged under a single contract.
  *
  * The run lifecycle, result immutability, finding lifecycle and subject registry
  * belong to the skeleton; this module only implements the ports and the HTTP
@@ -74,8 +79,28 @@ import {
     SecurityEvaluationIntelModelScopeRegistration,
     SecurityEvaluationIntelReRanker,
     SecurityEvaluationIntelMatchService,
+    SecurityEvaluationIntelNegativeCacheRepository,
     SecurityEvaluationIntelJudgment,
     SecurityEvaluationJudgmentService,
+    // The dispatcher's mechanism set (ADR-046): each key's declared mechanisms
+    // are looked up here, so a new key or dimension is a registry data change.
+    {
+      provide: SECURITY_EVALUATION_JUDGMENT_MECHANISMS,
+      useFactory: (
+        dependency: SecurityEvaluationDependencyJudgment,
+        awsConfig: SecurityEvaluationAwsConfigJudgment,
+        intel: SecurityEvaluationIntelJudgment,
+      ) => [dependency, awsConfig, intel],
+      inject: [
+        SecurityEvaluationDependencyJudgment,
+        SecurityEvaluationAwsConfigJudgment,
+        SecurityEvaluationIntelJudgment,
+      ],
+    },
+    {
+      provide: securityEvaluationIntelNegativeCacheToken,
+      useExisting: SecurityEvaluationIntelNegativeCacheRepository,
+    },
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,
     SecurityEvaluationKnowledgeService,

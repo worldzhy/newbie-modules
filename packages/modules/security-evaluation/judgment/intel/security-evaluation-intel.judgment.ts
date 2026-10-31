@@ -13,6 +13,10 @@ import {
 } from "../../security-evaluation.constants";
 import { SecurityEvaluationKnowledgeSeverity } from "../../knowledge/security-evaluation-knowledge.constants";
 import {
+  SECURITY_EVALUATION_MECHANISM_NAME_INTEL,
+  type SecurityEvaluationJudgmentMechanism,
+} from "../security-evaluation-mechanism";
+import {
   SecurityEvaluationIntelMatchService,
   type IntelEvidenceCandidate,
 } from "./security-evaluation-intel-match.service";
@@ -49,7 +53,9 @@ const KNOWLEDGE_LAYER = "knowledge";
  * cached (ADR-018).
  */
 @Injectable()
-export class SecurityEvaluationIntelJudgment {
+export class SecurityEvaluationIntelJudgment implements SecurityEvaluationJudgmentMechanism {
+  readonly name = SECURITY_EVALUATION_MECHANISM_NAME_INTEL;
+
   constructor(private readonly matchService: SecurityEvaluationIntelMatchService) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
