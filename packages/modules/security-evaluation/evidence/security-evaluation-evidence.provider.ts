@@ -116,13 +116,22 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
    */
   private async collectIntel(subject: EvaluationSubjectRef): Promise<EvidenceCollection> {
     const scopeEntitiesProvider = this.scopeEntitiesProvider;
-    if (!scopeEntitiesProvider) return this.emptyCollection();
+    if (!scopeEntitiesProvider) {
+      throw new Error(
+        "No SecurityEvaluationScopeEntitiesProvider is bound to SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER; the host must bind the port before running threat-intel evaluations.",
+      );
+    }
 
     const scopes = await scopeEntitiesProvider.listScopeEntities();
     const scope = scopes.find(
       (candidate) => candidate.scopeType === subject.scopeType && candidate.scopeId === subject.scopeId,
     );
-    if (!scope || scope.entities.length === 0) return this.emptyCollection();
+    if (!scope) {
+      throw new BadRequestException(
+        `No scope "${subject.scopeType}:${subject.scopeId}" is registered with the host; a run over an unknown scope would report a vacuous clean result.`,
+      );
+    }
+    if (scope.entities.length === 0) return this.emptyCollection();
 
     const observedAt = new Date();
     const scopeKey = `${subject.scopeType}:${subject.scopeId}`;
@@ -174,6 +183,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       refs: [candidate.id],
       payload: {
         knowledgeItemId: candidate.id,
+        summary: candidate.summary,
         severity: candidate.severity,
         signalTags: candidate.signalTags,
       },

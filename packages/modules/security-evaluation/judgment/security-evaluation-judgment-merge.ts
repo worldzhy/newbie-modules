@@ -55,7 +55,9 @@ function mergeMetadata(
  * - findings: dedupe by fingerprint; severity takes the higher value and
  *   metadata is shallow-merged without overwriting existing non-empty values.
  * - evaluatedRefs: union.
- * - skipped: totals summed, items unioned, notes prefixed by mechanism name.
+ * - skipped: items unioned and the merged total is the distinct-id count, so
+ *   items.length === total holds (evaluation-invariants D5.2); notes prefixed
+ *   by mechanism name.
  * - metadata: namespaced by mechanism name so comparability (ADR-023) survives.
  * - summary: non-empty summaries joined in mechanism order.
  */
@@ -68,7 +70,6 @@ export function mergeJudgments(parts: readonly SecurityEvaluationJudgmentPart[])
   const skippedNotes: string[] = [];
   const metadata: Record<string, unknown> = {};
   const summaries: string[] = [];
-  let skippedTotal = 0;
   let hasSkipped = false;
 
   for (const part of parts) {
@@ -104,7 +105,6 @@ export function mergeJudgments(parts: readonly SecurityEvaluationJudgmentPart[])
     const skipped = part.judgment.skipped;
     if (skipped) {
       hasSkipped = true;
-      skippedTotal += skipped.total;
       for (const item of skipped.items ?? []) skippedItems.add(item);
       if (skipped.note) skippedNotes.push(`${part.mechanismName}: ${skipped.note}`);
     }
@@ -120,7 +120,7 @@ export function mergeJudgments(parts: readonly SecurityEvaluationJudgmentPart[])
   };
 
   if (hasSkipped) {
-    merged.skipped = buildSkippedBucket(skippedTotal, skippedItems, skippedNotes);
+    merged.skipped = buildSkippedBucket(skippedItems, skippedNotes);
   }
   if (Object.keys(metadata).length > 0) merged.metadata = metadata;
   if (summaries.length > 0) merged.summary = summaries.join(" ");
@@ -128,8 +128,10 @@ export function mergeJudgments(parts: readonly SecurityEvaluationJudgmentPart[])
   return merged;
 }
 
-function buildSkippedBucket(total: number, items: Set<string>, notes: string[]): EvaluationCoverageBucket {
-  const bucket: EvaluationCoverageBucket = { total };
+function buildSkippedBucket(items: Set<string>, notes: string[]): EvaluationCoverageBucket {
+  // The skeleton requires items.length === total; two mechanisms skipping the
+  // same evidence id is one skipped item, not two.
+  const bucket: EvaluationCoverageBucket = { total: items.size };
   if (items.size > 0) bucket.items = [...items];
   if (notes.length > 0) bucket.note = notes.join(" ");
   return bucket;

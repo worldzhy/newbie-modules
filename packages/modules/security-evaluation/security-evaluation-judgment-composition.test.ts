@@ -179,6 +179,17 @@ test("merge: refs union, skipped totals summed with named notes, metadata namesp
   assert.equal(merged.summary, "summary a summary b");
 });
 
+test("merge: an evidence id skipped by two mechanisms is counted once so items.length === total", () => {
+  const merged = mergeJudgments([
+    { mechanismName: "a", judgment: judgment({ skipped: { total: 1, items: ["e-1"], note: "budget exhausted" } }) },
+    { mechanismName: "b", judgment: judgment({ skipped: { total: 1, items: ["e-1"], note: "negative cache" } }) },
+  ]);
+
+  assert.equal(merged.skipped?.total, 1);
+  assert.deepEqual(merged.skipped?.items, ["e-1"]);
+  assert.equal(merged.skipped?.note, "a: budget exhausted b: negative cache");
+});
+
 test("dispatcher: unknown evaluationKey is a contract error, known keys run their mechanisms", async () => {
   const input = {
     subject: { id: "s-1", scopeType: "project", scopeId: "p-1", subjectKey: "k", displayName: "k" },

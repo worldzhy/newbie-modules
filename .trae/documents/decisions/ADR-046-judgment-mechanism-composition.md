@@ -40,7 +40,7 @@ switch (input.ruleSetVersion.evaluationKey) {
 - `verdicts`：同一 `criterionKey` 只允许一个机制产出。冲突即 fail-fast（抛错并指明两个机制名），禁止隐式加权——多个机制给同一准则打分会产生无法解释的分数。
 - `findings`：按 `fingerprint` 去重；重复时 severity 取最高（复用现有 `security-evaluation-severity.ts` 的排序），`metadata` 浅合并且不覆盖已有非空值。
 - `evaluatedRefs`：并集。
-- `skipped`：计数累加，`note` 按机制名拼接。
+- `skipped`：`items` 取并集，合并后的 `total` 为去重后的条目数——骨架要求 `items.length === total`（ADR-020 D5.2），同一证据被两个机制跳过只算一条。`note` 按机制名拼接。
 - `metadata`：以机制名为命名空间合并（`{ [mechanismName]: {...} }`），保证 ADR-023 的可比性不被覆盖。
 - `summary`：非空的按机制名顺序拼接。
 

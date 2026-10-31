@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { BadRequestException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import type { ChatModelResolver } from "@modules/llm/chat-model.resolver";
 import type { EvaluationRuleSetVersionRef, EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 import type { JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
@@ -8,8 +10,8 @@ import type { SecurityEvaluationAssetService } from "./assets/security-evaluatio
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
 import { SecurityEvaluationIntelJudgment } from "./judgment/intel/security-evaluation-intel.judgment";
 import { SecurityEvaluationIntelMatchService } from "./judgment/intel/security-evaluation-intel-match.service";
+import { SecurityEvaluationIntelReRanker } from "./judgment/intel/security-evaluation-intel-re-ranker";
 import type { SecurityEvaluationIntelNegativeCachePort } from "./judgment/intel/security-evaluation-intel-negative-cache.port";
-import type { SecurityEvaluationIntelReRanker } from "./judgment/intel/security-evaluation-intel-re-ranker";
 import type { SecurityEvaluationScopeEntitiesProvider } from "./judgment/intel/security-evaluation-scope-entities.port";
 import {
   SECURITY_EVALUATION_INTEL_EVIDENCE_BUDGET,
@@ -143,7 +145,7 @@ function judgmentInput(evidence: Awaited<ReturnType<typeof buildEvidence>>["item
 
 test("INTEL candidates are registered as knowledge evidence items and negative-cached ones are skipped", async () => {
   const rows = [
-    row("kn-1", { title: "Next.js advisory", severity: "high" }),
+    row("kn-1", { title: "Next.js advisory", severity: "high", summary: "Affects next@<14.2." }),
     row("kn-2", { negativeCache: { [SCOPE_KEY]: "not relevant" } }),
   ];
   const { port } = stubNegativeCache(rows);
@@ -156,6 +158,7 @@ test("INTEL candidates are registered as knowledge evidence items and negative-c
   );
   assert.equal(knowledge[0].payload?.knowledgeItemId, "kn-1");
   assert.equal(knowledge[0].payload?.severity, "high");
+  assert.equal(knowledge[0].payload?.summary, "Affects next@<14.2.");
   assert.equal(evidence.items.filter((item) => item.layer === "declared").length, 2);
   assert.equal(evidence.skipped.total, 1);
   assert.deepEqual(evidence.skipped.items, ["kn-2"]);
@@ -225,4 +228,66 @@ test("the re-rank budget leaves overflow candidates in the judgment skipped buck
   assert.deepEqual(result.skipped?.items, ["threat-knowledge:rerank-100", "threat-knowledge:rerank-101"]);
   assert.match(result.skipped?.note ?? "", new RegExp(`budget of ${SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET}`));
   assert.equal(recorded.length, SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET);
+});
+
+test("INTEL collection fails loudly when the scope port is unbound or the subject scope is unknown", async () => {
+  const { port } = stubNegativeCache();
+  const build = (scope: SecurityEvaluationScopeEntitiesProvider | undefined) =>
+    new SecurityEvaluationEvidenceProvider(stubPrisma([]), stubAssets(), port, undefined, scope).collect(
+      SUBJECT,
+      INTEL_VERSION,
+    );
+
+  await assert.rejects(() => build(undefined), /No SecurityEvaluationScopeEntitiesProvider/);
+  await assert.rejects(
+    () => build({ listScopeEntities: async () => [] }),
+    (error: unknown) => error instanceof BadRequestException,
+  );
+});
+
+function reRankerReturning(payload: unknown): SecurityEvaluationIntelReRanker {
+  const resolver = {
+    resolve: async () => ({ complete: async () => ({ text: JSON.stringify(payload) }) }),
+  } as unknown as ChatModelResolver;
+  return new SecurityEvaluationIntelReRanker(resolver);
+}
+
+test("the re-ranker compares entity labels case-insensitively", async () => {
+  const verdict = await reRankerReturning({
+    entityMatches: [{ entity: "next.js", matched: true, evidence: "mentions next.js" }],
+    semanticMatch: true,
+    finalRelevant: true,
+    reason: "the version range covers the entity",
+  }).reRank({ title: "advisory" }, [{ value: "Next.js" }]);
+
+  assert.equal(verdict.kind, "relevant");
+  assert.equal(verdict.finalRelevant, true);
+});
+
+test("the re-ranker treats entities outside the input profile as unavailable, not not-relevant", async () => {
+  const verdict = await reRankerReturning({
+    entityMatches: [{ entity: "unknown-vendor", matched: true, evidence: null }],
+    semanticMatch: false,
+    finalRelevant: true,
+    reason: "matched unknown-vendor",
+  }).reRank({ title: "advisory" }, [{ value: "Next.js" }]);
+
+  assert.equal(verdict.kind, "unavailable");
+});
+
+test("unavailable verdicts are never cached and leave the candidate unexamined", async () => {
+  const { port, recorded } = stubNegativeCache();
+  const service = new SecurityEvaluationIntelMatchService(
+    port,
+    stubReRanker({ kind: "unavailable", finalRelevant: false, reason: "LLM call failed." }),
+  );
+
+  const outcome = await service.match(
+    [{ knowledgeItemId: "kn-1", title: "advisory", severity: "high", signalTags: [] }],
+    [{ value: "next" }],
+    SCOPE_KEY,
+  );
+
+  assert.equal(recorded.length, 0);
+  assert.deepEqual(outcome.examinedRefs, []);
 });

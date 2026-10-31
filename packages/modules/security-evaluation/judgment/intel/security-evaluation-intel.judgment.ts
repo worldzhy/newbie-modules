@@ -129,6 +129,9 @@ export class SecurityEvaluationIntelJudgment implements SecurityEvaluationJudgme
       candidates.push({
         knowledgeItemId,
         title: item.summary,
+        // The collector carries the knowledge summary alongside the manifest
+        // title so hard recall and the LLM see the same context.
+        summary: typeof payload?.summary === "string" ? payload.summary : undefined,
         severity: typeof payload?.severity === "string" ? payload.severity : "info",
         signalTags: Array.isArray(payload?.signalTags)
           ? payload.signalTags.filter((tag): tag is string => typeof tag === "string")

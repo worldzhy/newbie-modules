@@ -168,16 +168,18 @@ export class SecurityEvaluationIntelReRanker {
     if (!hasEntityMatch) {
       return { ...verdict, kind: "not-relevant", finalRelevant: false };
     }
-    const sentLabels = new Set(entities.map((e) => e.value));
-    const returnedLabels = new Set(verdict.entityMatches.map((m) => m.entity));
+    const sentLabels = new Set(entities.map((e) => e.value.toLowerCase()));
+    const returnedLabels = new Set(verdict.entityMatches.map((m) => m.entity.toLowerCase()));
     for (const label of returnedLabels) {
       if (!sentLabels.has(label)) {
+        // An output naming entities the caller never sent is not evidence of
+        // "not relevant" — it is an untrustworthy judgment. Do not cache it.
         return {
-          kind: "not-relevant",
+          kind: "unavailable",
           entityMatches: entities.map((e) => ({ entity: e.value, matched: false, evidence: null })),
           semanticMatch: false,
           finalRelevant: false,
-          reason: "LLM returned entities not in the input profile; rejected as unsafe.",
+          reason: "LLM returned entities not in the input profile; rejected as unavailable.",
         };
       }
     }
