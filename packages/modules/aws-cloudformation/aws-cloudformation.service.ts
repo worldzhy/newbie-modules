@@ -1,91 +1,54 @@
-import { CreateStackCommandOutput, DeleteStackCommandOutput } from "@aws-sdk/client-cloudformation";
 import { BadRequestException, Injectable } from "@nestjs/common";
-import { AwsResourceStackState } from "@generated/prisma/client";
+import { AwsResourceStack } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { AwsCloudformationStackService, CloudFormationStackType } from "./stack/stack.service";
+import { AwsCloudformationStackService, StackCommandResult, StackWithEnvironment } from "./stack/stack.service";
+import { AppHostStack } from "./stack/app-host.stack";
+import { StackSnapshot } from "./stack/stack.helper";
 
+/**
+ * Facade over the stack primitives. Resolves the stored stack record and
+ * delegates to AwsCloudformationStackService; it adds no business semantics.
+ */
 @Injectable()
 export class AwsCloudformationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cloudformationStackService: AwsCloudformationStackService,
-  ) {
-    // this.prisma.$use(awsResourceStackPrismaMiddleware);
+  ) {}
+
+  listStackTypes(): string[] {
+    return [AppHostStack.type];
   }
 
-  listStackTypes() {
-    return Object.values(CloudFormationStackType);
-  }
-
-  getStackParams(params: { manager: string; type: string }) {
-    return this.cloudformationStackService.getStackParams(params.type);
-  }
-
-  async createStack(stackId: string) {
-    // [step 1] Get the infrastructure stack.
-    const stack = await this.prisma.awsResourceStack.findUniqueOrThrow({
-      where: { id: stackId },
-      include: { environment: true },
-    });
-
-    // if (
-    //   stack.state !== AwsResourceStackState.PENDING &&
-    //   stack.state !== AwsResourceStackState.DESTROY_SUCCEEDED
-    // ) {
-    //   throw new BadRequestException('The infrastructure has been built.');
-    // }
-
-    // [step 2] Build the infrastructure stack.
-    if (
-      false ===
-      this.cloudformationStackService.checkStackParams({
-        stackType: stack.type,
-        stackParams: stack.params as object,
-      })
-    ) {
-      throw new BadRequestException("This infrastructure stack parameters are not ready.");
+  getStackParams(type: string): Record<string, string> {
+    if (type !== AppHostStack.type) {
+      throw new BadRequestException(`Unsupported stack type: ${type}`);
     }
-
-    const output: CreateStackCommandOutput = await this.cloudformationStackService.createResources(stack);
-    const state = AwsResourceStackState.BUILD_PROCESSING;
-
-    return await this.prisma.awsResourceStack.update({
-      where: { id: stack.id },
-      data: {
-        state: state,
-        createStackOutput: output as object,
-      },
-    });
+    return AppHostStack.getStackParams();
   }
 
-  async destroyStack(stackId: string) {
-    // [step 1] Get the infrastructure stack.
-    const stack = await this.prisma.awsResourceStack.findUniqueOrThrow({
-      where: { id: stackId },
-      include: { environment: true },
-    });
+  async getOrCreateStack(stackId: string): Promise<StackSnapshot> {
+    return await this.cloudformationStackService.getOrCreateStack(await this.getStackOrThrow(stackId));
+  }
 
-    // if (
-    //   stack.state === AwsResourceStackState.PENDING ||
-    //   stack.state === AwsResourceStackState.BUILD_PROCESSING ||
-    //   stack.state === AwsResourceStackState.DESTROY_PROCESSING ||
-    //   stack.state === AwsResourceStackState.DESTROY_SUCCEEDED
-    // ) {
-    //   throw new BadRequestException(
-    //     'The stack has not been built or is processing.'
-    //   );
-    // }
+  async describeStack(stackId: string): Promise<StackSnapshot | null> {
+    return await this.cloudformationStackService.describeStack(await this.getStackOrThrow(stackId));
+  }
 
-    // [step 2] Delete the stack on AWS CloudFormation.
-    const output: DeleteStackCommandOutput = await this.cloudformationStackService.destroyResources(stack);
-    const state = AwsResourceStackState.DESTROY_PROCESSING;
+  async deleteStack(stackId: string): Promise<StackSnapshot> {
+    return await this.cloudformationStackService.deleteStack(await this.getStackOrThrow(stackId));
+  }
 
-    return await this.prisma.awsResourceStack.update({
-      where: { id: stack.id },
-      data: {
-        state: state,
-        deleteStackOutput: output as object,
-      },
-    });
+  async sendCommand(stackId: string, commands: string[]): Promise<StackCommandResult> {
+    return await this.cloudformationStackService.sendCommand(await this.getStackOrThrow(stackId), commands);
+  }
+
+  private async getStackOrThrow(stackId: string): Promise<StackWithEnvironment> {
+    const stack: AwsResourceStack & { environment?: StackWithEnvironment["environment"] } =
+      await this.prisma.awsResourceStack.findUniqueOrThrow({
+        where: { id: stackId },
+        include: { environment: true },
+      });
+    return stack as StackWithEnvironment;
   }
 }

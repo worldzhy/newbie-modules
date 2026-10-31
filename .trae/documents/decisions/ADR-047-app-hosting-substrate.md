@@ -67,6 +67,10 @@ nightwatch 在 `src/application/` 内直接使用 CloudFormation / SSM / ECR SDK
 ## 影响
 
 - nightwatch 通过 `newbie modules add aws-cloudformation` 装配；`modules.json` 与 Prisma schema 随之更新。
-- 依赖新增 `@aws-sdk/client-ssm`、`@aws-sdk/client-ecr`、`@aws-sdk/client-sts`；移除签名 token 服务及其配置/环境变量。
+- 依赖新增 `@aws-sdk/client-ssm`（SSM 命令）；`@aws-sdk/client-sts` 经 `aws-identity` 的 `assumeRole` 使用，由该模块声明。ECR 仓库由 `APP_HOST` 模板创建，模块不直接调用 ECR API，因此不引入 `@aws-sdk/client-ecr`；移除签名 token 服务及其配置/环境变量。
 - 旧栈类型删除后，任何历史 `AwsResourceStack` 记录失去对应类型；系统未上线，直接清库重置。
 - 后续义务：`APP_HOST` 模板需要真实部署一次作为验收证据；模板参数变更属于契约变更，必须同步本 ADR 或新 ADR。
+
+## 更新记录
+
+- 2026-10-31 — 实现对齐：`APP_HOST` 首版不建 `CreateVpc` 分支（VPC/子网由调用方传入）；实例无独立数据卷，暂不纳入快照资源，数据备份以可选 `BackupBucketName` 表达；依赖集按实际调用收敛为 `client-cloudformation` + `client-ssm`（`client-sts` 由 `aws-identity` 提供）。

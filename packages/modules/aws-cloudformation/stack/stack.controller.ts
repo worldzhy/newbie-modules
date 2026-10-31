@@ -1,11 +1,13 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { AwsResourceStack, AwsResourceStackState, PermissionAction, Prisma } from "@generated/prisma/client";
-import { CloudFormationStackType } from "@modules/aws-cloudformation/stack/stack.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { AwsCloudformationService } from "@modules/aws-cloudformation/aws-cloudformation.service";
-import { ListStacksRequestDto } from "./stack.dto";
+import { StackCommandResult } from "./stack.service";
+import { StackSnapshot } from "./stack.helper";
+import { AppHostStack } from "./app-host.stack";
+import { ListStacksRequestDto, RunStackCommandRequestDto } from "./stack.dto";
 
 @ApiTags("AWS CloudFormation Stack")
 @ApiBearerAuth()
@@ -19,45 +21,46 @@ export class AwsCloudformationStackController {
   @Get("types")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse({ type: String, isArray: true })
-  listStackTypes() {
+  listStackTypes(): string[] {
     return this.cloudformationService.listStackTypes();
   }
 
   @Get("params")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse({ type: Object })
-  async getStackParams(@Query("type") type: string, @Query("manager") manager: string) {
-    return this.cloudformationService.getStackParams({ manager, type });
+  getStackParams(@Query("type") type: string): Record<string, string> {
+    return this.cloudformationService.getStackParams(type);
   }
 
   @Post("")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.AwsResourceStack)
   @ApiCreatedResponse()
   @ApiBody({
-    description: "Create infrastructure stack.",
+    description: "Register a stack record; nothing is created on AWS yet.",
     examples: {
       a: {
-        summary: "1. CloudFormation stack",
+        summary: "1. APP_HOST stack",
         value: {
-          type: CloudFormationStackType.MESSAGE_TRACKER,
+          type: AppHostStack.type,
+          name: "project-prod",
           params: {
-            DatabaseHost: "<rds-endpoint>",
-            DatabasePort: "5432",
-            DatabaseMasterUsername: "<database-user>",
-            DatabaseMasterUserPassword: "<database-password>",
-            DatabaseName: "postgres",
-            SESIdentityARN: "<ses-identity-arn>",
-            FromAddress: "<from-address>",
+            ProjectKey: "project",
+            EnvironmentName: "prod",
+            InstanceType: "t3.small",
+            VpcId: "<vpc-id>",
+            SubnetIds: "<subnet-id>",
+            Domain: "app.example.com",
+            HostedZoneId: "<hosted-zone-id>",
+            RepositoryFullName: "owner/repo",
+            Branch: "main",
+            GitHubOidcProviderArn: "<oidc-provider-arn>",
           },
           environmentId: "<environment-id>",
         },
       },
     },
   })
-  async createStack(
-    @Body()
-    body: Prisma.AwsResourceStackUncheckedCreateInput,
-  ): Promise<AwsResourceStack> {
+  async createStack(@Body() body: Prisma.AwsResourceStackUncheckedCreateInput): Promise<AwsResourceStack> {
     return await this.prisma.awsResourceStack.create({ data: body });
   }
 
@@ -76,91 +79,74 @@ export class AwsCloudformationStackController {
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse()
   async getStack(@Param("stackId") stackId: string): Promise<AwsResourceStack> {
-    return await this.prisma.awsResourceStack.findUniqueOrThrow({
-      where: { id: stackId },
-    });
+    return await this.prisma.awsResourceStack.findUniqueOrThrow({ where: { id: stackId } });
   }
 
   @Patch(":stackId")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse()
   @ApiBody({
-    description: "Update infrastructure stack.",
+    description: "Update stack parameters before creating the stack on AWS.",
     examples: {
       a: {
-        summary: "1. AWS VPC stack",
-        value: {
-          params: {
-            vpcName: "pulumi-test-vpc-modified",
-            vpcCidrBlock: "10.21.0.0/16",
-          },
-        },
-      },
-      b: {
-        summary: "2. Database stack",
-        value: {
-          params: {
-            instanceName: "postgres-default-modified",
-            instanceClass: "db.t3.small",
-          },
-        },
+        summary: "1. Change the host size",
+        value: { params: { InstanceType: "t3.medium" } },
       },
     },
   })
   async updateStack(
     @Param("stackId") stackId: string,
-    @Body()
-    body: Prisma.AwsResourceStackUpdateInput,
+    @Body() body: Prisma.AwsResourceStackUpdateInput,
   ): Promise<AwsResourceStack> {
-    return await this.prisma.awsResourceStack.update({
-      where: { id: stackId },
-      data: body,
-    });
+    return await this.prisma.awsResourceStack.update({ where: { id: stackId }, data: body });
   }
 
   @Delete(":stackId")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse()
-  async deleteStack(
-    @Param("stackId")
-    stackId: string,
-  ): Promise<AwsResourceStack> {
-    // [step 1] Get the infrastructure stack.
-    const stack = await this.prisma.awsResourceStack.findUniqueOrThrow({
-      where: { id: stackId },
-    });
-
-    if (stack.state !== AwsResourceStackState.PENDING && stack.state !== AwsResourceStackState.DESTROY_SUCCEEDED) {
+  async deleteStackRecord(@Param("stackId") stackId: string): Promise<AwsResourceStack> {
+    const stack = await this.prisma.awsResourceStack.findUniqueOrThrow({ where: { id: stackId } });
+    if (stack.state !== AwsResourceStackState.PENDING && stack.state !== AwsResourceStackState.DELETE_COMPLETE) {
       throw new BadRequestException(
         "The stack record can not be deleted because the infrastructure resource is still there.",
       );
     }
-
-    // [step 2] Delete the stack record on database.
     return await this.prisma.awsResourceStack.delete({ where: { id: stackId } });
   }
 
-  //* Create resources
-  @Post(":stackId/create-resources")
+  //* Idempotent create + wait for CREATE_COMPLETE.
+  @Post(":stackId/get-or-create")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.AwsResourceStack)
   @ApiCreatedResponse()
-  async createResources(
-    @Param("stackId")
-    stackId: string,
-  ): Promise<AwsResourceStack> {
-    return await this.cloudformationService.createStack(stackId);
+  async getOrCreateStack(@Param("stackId") stackId: string): Promise<StackSnapshot> {
+    return await this.cloudformationService.getOrCreateStack(stackId);
   }
 
-  //* Destroy resources
-  @Post(":stackId/destroy-resources")
+  //* Report the current AWS state; null when the stack no longer exists.
+  @Get(":stackId/status")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsResourceStack)
+  @ApiOkResponse()
+  async describeStack(@Param("stackId") stackId: string): Promise<StackSnapshot | null> {
+    return await this.cloudformationService.describeStack(stackId);
+  }
+
+  //* Delete + wait for DELETE_COMPLETE.
+  @Post(":stackId/delete")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.AwsResourceStack)
   @ApiOkResponse()
-  async destroyResources(
-    @Param("stackId")
-    stackId: string,
-  ): Promise<AwsResourceStack> {
-    return await this.cloudformationService.destroyStack(stackId);
+  async deleteStack(@Param("stackId") stackId: string): Promise<StackSnapshot> {
+    return await this.cloudformationService.deleteStack(stackId);
   }
 
-  /* End */
+  //* Run shell commands on the host instance through SSM.
+  @Post(":stackId/command")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsResourceStack)
+  @ApiOkResponse()
+  @ApiBody({ type: RunStackCommandRequestDto })
+  async sendCommand(
+    @Param("stackId") stackId: string,
+    @Body() body: RunStackCommandRequestDto,
+  ): Promise<StackCommandResult> {
+    return await this.cloudformationService.sendCommand(stackId, body.commands);
+  }
 }

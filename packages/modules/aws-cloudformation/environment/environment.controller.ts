@@ -3,74 +3,61 @@ import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } fr
 import { AwsEnvironment, PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
-import { AwsEnvironmentService } from "@modules/aws-cloudformation/environment/environment.service";
 
-/** An AWS environment row without the (encrypted-at-rest) secret access key. */
-type PublicAwsEnvironment = Omit<AwsEnvironment, "awsSecretAccessKey">;
-
+/**
+ * Cross-account AWS environments. Credentials are never stored: every AWS
+ * call assumes `roleArn` (optionally guarded by `externalId`) with temporary
+ * STS credentials.
+ */
 @ApiTags("AWS Environment")
 @ApiBearerAuth()
 @Controller("aws-environments")
 export class AwsEnvironmentController {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly awsEnvironmentService: AwsEnvironmentService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   @Post("")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.AwsEnvironment)
   @ApiCreatedResponse()
   @ApiBody({
-    description: "The 'name' is required in request body.",
+    description: "Every field except externalId is required.",
     examples: {
       a: {
         summary: "1. Create",
         value: {
-          name: "Aircruiser Prod",
-          awsAccessKeyId: "",
-          awsSecretAccessKey: "",
-          awsRegion: "",
+          name: "Production",
+          awsAccountId: "123456789012",
+          awsRegion: "us-east-1",
+          roleArn: "arn:aws:iam::123456789012:role/host-deployer",
+          externalId: "generated-external-id",
         },
       },
     },
   })
-  async createEnvironment(
-    @Body()
-    body: Prisma.AwsEnvironmentUncheckedCreateInput,
-  ): Promise<PublicAwsEnvironment> {
-    // [step 1] Guard statement.
-    if (!body.name) {
-      throw new BadRequestException("Invalid project environment name in the request body.");
+  async createEnvironment(@Body() body: Prisma.AwsEnvironmentUncheckedCreateInput): Promise<AwsEnvironment> {
+    if (!body.name || !body.awsAccountId || !body.awsRegion || !body.roleArn) {
+      throw new BadRequestException("name, awsAccountId, awsRegion and roleArn are required.");
     }
-
-    // [step 2] Create project.
-    return this.withoutSecret(await this.awsEnvironmentService.create({ data: body }));
+    return await this.prisma.awsEnvironment.create({ data: body });
   }
 
   @Get(":environmentId")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsEnvironment)
   @ApiOkResponse()
-  async getEnvironment(@Param("environmentId") environmentId: string): Promise<PublicAwsEnvironment> {
-    return this.withoutSecret(
-      await this.prisma.awsEnvironment.findUniqueOrThrow({
-        where: { id: environmentId },
-      }),
-    );
+  async getEnvironment(@Param("environmentId") environmentId: string): Promise<AwsEnvironment> {
+    return await this.prisma.awsEnvironment.findUniqueOrThrow({ where: { id: environmentId } });
   }
 
   @Patch(":environmentId")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsEnvironment)
   @ApiOkResponse()
   @ApiBody({
-    description: "Update environment variables.",
+    description: "Update the target account, region or assumed role.",
     examples: {
       a: {
-        summary: "1. Without AWS profile",
+        summary: "1. Rotate the assumed role",
         value: {
-          awsAccountId: "929553487761",
-          awsAccessKeyId: "fakeAKIXXXXXQB3I56H72",
-          awsSecretAccessKey: "fakeNyXXXXXXXXXrBJk7LUEhXBqHKxG4PiCJ6cQ",
-          awsRegion: "us-east-1",
+          roleArn: "arn:aws:iam::123456789012:role/host-deployer-v2",
+          externalId: "rotated-external-id",
         },
       },
     },
@@ -78,35 +65,14 @@ export class AwsEnvironmentController {
   async updateEnvironment(
     @Param("environmentId") environmentId: string,
     @Body() body: Prisma.AwsEnvironmentUpdateInput,
-  ): Promise<PublicAwsEnvironment> {
-    return this.withoutSecret(
-      await this.awsEnvironmentService.update({
-        where: { id: environmentId },
-        data: body,
-      }),
-    );
+  ): Promise<AwsEnvironment> {
+    return await this.prisma.awsEnvironment.update({ where: { id: environmentId }, data: body });
   }
 
   @Delete(":environmentId")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.AwsEnvironment)
   @ApiOkResponse()
-  async deleteEnvironment(@Param("environmentId") environmentId: string): Promise<PublicAwsEnvironment> {
-    return this.withoutSecret(
-      await this.prisma.awsEnvironment.delete({
-        where: { id: environmentId },
-      }),
-    );
+  async deleteEnvironment(@Param("environmentId") environmentId: string): Promise<AwsEnvironment> {
+    return await this.prisma.awsEnvironment.delete({ where: { id: environmentId } });
   }
-
-  /**
-   * The secret access key is encrypted at rest but still recoverable; it must
-   * never leave the API. Every response route projects through this helper.
-   */
-  private withoutSecret(environment: AwsEnvironment): PublicAwsEnvironment {
-    const safe = { ...environment } as Partial<AwsEnvironment>;
-    delete safe.awsSecretAccessKey;
-    return safe as PublicAwsEnvironment;
-  }
-
-  /* End */
 }

@@ -36,7 +36,7 @@ const DEFAULT_STS_REGION = "us-east-1";
  */
 export async function assumeRole(params: {
   roleArn: string;
-  externalId: string;
+  externalId?: string;
   region: string;
   sessionName: string;
   durationSeconds?: number;
@@ -47,8 +47,8 @@ export async function assumeRole(params: {
     new AssumeRoleCommand({
       RoleArn: params.roleArn,
       RoleSessionName: params.sessionName,
-      ExternalId: params.externalId,
       DurationSeconds: params.durationSeconds ?? ROLE_SESSION_DURATION_SECONDS,
+      ...(params.externalId ? { ExternalId: params.externalId } : {}),
     }),
   );
   if (!response.Credentials?.AccessKeyId || !response.Credentials.SecretAccessKey) {

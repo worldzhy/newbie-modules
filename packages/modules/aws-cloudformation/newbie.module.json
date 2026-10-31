@@ -6,18 +6,12 @@
     "className": "AwsCloudformationModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
-  "config-service": {
-    "aws-cloudformation": {
-      "token": {
-        "secret": "process.env.AWS_CLOUDFORMATION_SECRETKEY_TOKEN_SECRET || 'your-secretkey-token-secret'"
-      }
-    }
-  },
-  "env": {
-    "AWS_CLOUDFORMATION_SECRETKEY_TOKEN_SECRET": ""
-  },
+  "moduleDependencies": ["aws-identity", "security"],
+  "config-service": {},
+  "env": {},
   "dependencies": {
-    "@aws-sdk/client-cloudformation": "latest"
-  }
+    "@aws-sdk/client-cloudformation": "latest",
+    "@aws-sdk/client-ssm": "latest"
+  },
+  "devDependencies": {}
 }
