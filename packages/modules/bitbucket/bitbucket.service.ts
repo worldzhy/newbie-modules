@@ -29,11 +29,11 @@ export class BitbucketService {
   private mintedToken?: { token: string; expiresAt: number };
 
   constructor(private readonly config: ConfigService) {
-    const config = this.config.getOrThrow("modules.bitbucket");
-    this.workspace = config.workspace;
-    this.accessToken = config.accessToken;
-    this.clientId = config.clientId;
-    this.clientSecret = config.clientSecret;
+    const bitbucket = this.config.getOrThrow("modules.bitbucket");
+    this.workspace = bitbucket.workspace;
+    this.accessToken = bitbucket.accessToken;
+    this.clientId = bitbucket.clientId;
+    this.clientSecret = bitbucket.clientSecret;
 
     if (this.workspace && (this.accessToken || (this.clientId && this.clientSecret))) {
       this.logger.log(`Bitbucket service configured for workspace "${this.workspace}"`);
