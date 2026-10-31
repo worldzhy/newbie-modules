@@ -15,6 +15,6 @@
   "devDependencies": {
     "@devbie/style-guide": "^1.4.1",
     "eslint": "^9.39.4",
-    "prettier": "^3.9.9"
+    "prettier": "^3.9.10"
   }
 }
