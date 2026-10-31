@@ -15,7 +15,7 @@ import {
 } from "@aws-sdk/client-ssm";
 import { AwsEnvironment, AwsResourceStack, AwsResourceStackState, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { assumeRole, type AwsCredentialsProvider } from "@modules/aws-identity/aws-sts.helper";
+import { assumeRole, type AwsTemporaryCredentials } from "@modules/aws-identity/aws-sts.helper";
 import { AppHostStack } from "./app-host.stack";
 import {
   isCreateFailed,
@@ -274,7 +274,7 @@ export class AwsCloudformationStackService {
    */
   private async resolveClientConfig(
     environment: AwsEnvironment,
-  ): Promise<{ region: string; credentials: AwsCredentialsProvider }> {
+  ): Promise<{ region: string; credentials: AwsTemporaryCredentials }> {
     try {
       const { credentials } = await assumeRole({
         roleArn: environment.roleArn,
