@@ -1,9 +1,14 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { EvaluationSubjectService, toSubjectRef } from "@modules/evaluation/evaluation-subject.service";
 import type { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
-import { SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT } from "../security-evaluation.constants";
+import {
+  SECURITY_EVALUATION_PLATFORM_SCOPE_ID,
+  SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE,
+  SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
+} from "../security-evaluation.constants";
 
 export interface SecurityEvaluationAssetKnowledgeItemInput {
   type: string;
@@ -11,9 +16,28 @@ export interface SecurityEvaluationAssetKnowledgeItemInput {
   value: Record<string, unknown> | null;
 }
 
-export interface ListSecurityEvaluationAssetsInput {
-  scopeType: string;
-  scopeId: string;
+/** One subject submission, with the provenance of who supplied it (ADR-039). */
+export interface IngestSecurityEvaluationSubjectInput {
+  kind: string;
+  subjectKey: string;
+  displayName: string;
+  metadata?: Record<string, unknown>;
+  sourceType: string;
+  sourceId: string;
+}
+
+export interface IngestSecurityEvaluationSubjectResult {
+  subjectId: string;
+  assetId: string;
+}
+
+/** Optional provenance filter; omission means the platform view. */
+export interface SecurityEvaluationSourceFilter {
+  scopeType?: string;
+  scopeId?: string;
+}
+
+export interface ListSecurityEvaluationAssetsInput extends SecurityEvaluationSourceFilter {
   kinds: readonly string[];
   page?: number;
   pageSize?: number;
@@ -30,16 +54,87 @@ export interface ListSecurityEvaluationAssetKnowledgeItemsInput {
 const KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE = 100;
 
 /**
- * SecurityEvaluationAssetService — the asset inventory (ADR-022 D2).
+ * SecurityEvaluationAssetService — the asset inventory (ADR-022) plus the
+ * platform-level ingest contract (ADR-039).
  *
  * `Asset` is the feature's persistent view of an `EvaluationSubject`: the
  * subject coordinate belongs to the skeleton, while this row owns the
  * inventory lifecycle (`firstSeenAt`, `lastSeenAt`) and the current-state
  * knowledge items hanging off it.
+ *
+ * Subjects are platform-level: `subjectKey` alone identifies the asset across
+ * the deployment, so several projects referencing the same repository share one
+ * subject, one run history and one finding set. Who supplied it is recorded on
+ * `SecurityEvaluationAssetSource` rows — provenance for display and routing,
+ * never an authorization boundary.
  */
 @Injectable()
 export class SecurityEvaluationAssetService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly subjects: EvaluationSubjectService,
+  ) {}
+
+  /**
+   * Ingest subjects: upsert the platform-level subject, materialise its asset
+   * row and record the submitting source. Idempotent per
+   * `(subjectKey, sourceType, sourceId)`; a repeat submission only bumps
+   * `lastSubmittedAt`.
+   */
+  async ingest(
+    submissions: readonly IngestSecurityEvaluationSubjectInput[],
+  ): Promise<IngestSecurityEvaluationSubjectResult[]> {
+    const results: IngestSecurityEvaluationSubjectResult[] = [];
+    for (const submission of submissions) {
+      const subject = await this.subjects.getOrCreateSubject({
+        kind: submission.kind,
+        scopeType: SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE,
+        scopeId: SECURITY_EVALUATION_PLATFORM_SCOPE_ID,
+        subjectKey: submission.subjectKey,
+        displayName: submission.displayName,
+        metadata: submission.metadata,
+      });
+      const asset = await this.getOrCreateAsset(toSubjectRef(subject));
+      const now = new Date();
+      await this.prisma.securityEvaluationAssetSource.upsert({
+        where: {
+          subjectId_sourceType_sourceId: {
+            subjectId: subject.id,
+            sourceType: submission.sourceType,
+            sourceId: submission.sourceId,
+          },
+        },
+        create: {
+          subjectId: subject.id,
+          sourceType: submission.sourceType,
+          sourceId: submission.sourceId,
+          firstSubmittedAt: now,
+          lastSubmittedAt: now,
+        },
+        update: { lastSubmittedAt: now },
+      });
+      results.push({ subjectId: subject.id, assetId: asset.id });
+    }
+    return results;
+  }
+
+  /**
+   * Resolve an optional provenance filter to the subjects it contributed.
+   * `null` means "no filter" (the platform view); an empty array means the
+   * filter matched nothing.
+   */
+  async listSubjectIdsBySource(filter: SecurityEvaluationSourceFilter): Promise<string[] | null> {
+    if (!filter.scopeType && !filter.scopeId) return null;
+    const sources = await this.prisma.securityEvaluationAssetSource.findMany({
+      where: {
+        ...(filter.scopeType ? { sourceType: filter.scopeType } : {}),
+        ...(filter.scopeId ? { sourceId: filter.scopeId } : {}),
+      },
+      select: { subjectId: true },
+      distinct: ["subjectId"],
+    });
+    return sources.map((source) => source.subjectId);
+  }
 
   /** Idempotent: one asset row per subject, forever. */
   async getOrCreateAsset(subject: EvaluationSubjectRef) {
@@ -55,10 +150,6 @@ export class SecurityEvaluationAssetService {
         displayName: subject.displayName,
       },
     });
-  }
-
-  async getOrCreateAssets(subjects: readonly EvaluationSubjectRef[]) {
-    return Promise.all(subjects.map((subject) => this.getOrCreateAsset(subject)));
   }
 
   /** Record that a run actually observed this asset's inventory. */
@@ -139,27 +230,63 @@ export class SecurityEvaluationAssetService {
   }
 
   /**
-   * Asset listing is scope-based because assets carry no scope columns of their
-   * own: the subject coordinate owns that, and foreign keys never cross schemas.
+   * The platform view, optionally narrowed by provenance. Assets carry no scope
+   * columns of their own; the subject coordinate owns that, and foreign keys
+   * never cross schemas.
    */
   async listAssets(query: ListSecurityEvaluationAssetsInput) {
-    const subjects = await this.prisma.evaluationSubject.findMany({
-      where: { kind: { in: [...query.kinds] }, scopeType: query.scopeType, scopeId: query.scopeId },
-      select: { id: true, kind: true },
-    });
-    const kindBySubject = new Map(subjects.map((subject) => [subject.id, subject.kind]));
+    const subjectIds = await this.listSubjectIdsBySource(query);
+    const allowedSubjectIds =
+      query.kinds.length > 0 ? await this.subjectIdsOfKinds(query.kinds, subjectIds ?? undefined) : subjectIds;
     const page = await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.SecurityEvaluationAsset,
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
-        where: { subjectId: { in: subjects.map((subject) => subject.id) } },
+        where: allowedSubjectIds ? { subjectId: { in: allowedSubjectIds } } : {},
         orderBy: [{ displayName: "asc" }, { id: "asc" }],
       },
     });
+
+    const pageSubjectIds = page.records.map((asset) => asset.subjectId);
+    const [subjects, sources] = await Promise.all([
+      this.prisma.evaluationSubject.findMany({
+        where: { id: { in: pageSubjectIds } },
+        select: { id: true, kind: true },
+      }),
+      this.prisma.securityEvaluationAssetSource.findMany({
+        where: { subjectId: { in: pageSubjectIds } },
+        select: { subjectId: true, sourceType: true, sourceId: true, firstSubmittedAt: true, lastSubmittedAt: true },
+        orderBy: [{ firstSubmittedAt: "asc" }, { sourceType: "asc" }, { sourceId: "asc" }],
+      }),
+    ]);
+    const kindBySubject = new Map(subjects.map((subject) => [subject.id, subject.kind]));
+    const sourcesBySubject = new Map<string, typeof sources>();
+    for (const source of sources) {
+      const existing = sourcesBySubject.get(source.subjectId) ?? [];
+      existing.push(source);
+      sourcesBySubject.set(source.subjectId, existing);
+    }
+
     return {
       ...page,
-      records: page.records.map((asset) => ({ ...asset, kind: kindBySubject.get(asset.subjectId) ?? "" })),
+      records: page.records.map((asset) => ({
+        ...asset,
+        kind: kindBySubject.get(asset.subjectId) ?? "",
+        sources: sourcesBySubject.get(asset.subjectId) ?? [],
+      })),
     };
+  }
+
+  /** Subjects of the given kinds, intersected with an optional provenance set. */
+  private async subjectIdsOfKinds(kinds: readonly string[], subjectIds?: readonly string[]): Promise<string[]> {
+    const rows = await this.prisma.evaluationSubject.findMany({
+      where: {
+        kind: { in: [...kinds] },
+        ...(subjectIds ? { id: { in: [...subjectIds] } } : {}),
+      },
+      select: { id: true },
+    });
+    return rows.map((row) => row.id);
   }
 
   /**

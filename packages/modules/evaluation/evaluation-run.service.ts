@@ -78,6 +78,8 @@ export interface StartEvaluationRunInput {
 export interface ListEvaluationRunsInput {
   /** Omitted lists every run (of `kind`, when given) newest first. */
   subjectId?: string;
+  /** Narrow to an explicit subject set (feature-level provenance filters). */
+  subjectIds?: readonly string[];
   ruleSetVersionId?: string;
   /** When present, only runs whose subject matches this kind are returned. */
   kind?: string;
@@ -238,6 +240,7 @@ export class EvaluationRunService {
       findManyArgs: {
         where: {
           subjectId: query.subjectId,
+          ...(query.subjectIds ? { subjectId: { in: [...query.subjectIds] } } : {}),
           ...(query.ruleSetVersionId ? { ruleSetVersionId: query.ruleSetVersionId } : {}),
           ...(query.kind || query.scopeType || query.scopeId
             ? {

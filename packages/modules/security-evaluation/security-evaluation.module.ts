@@ -5,7 +5,6 @@ import { evidenceProviderToken } from "@modules/evaluation/ports/evidence.provid
 import { judgmentPortToken } from "@modules/evaluation/ports/judgment.port";
 
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
-import { SecurityEvaluationAssetSyncService } from "./assets/security-evaluation-asset-sync.service";
 import { SecurityEvaluationCriteriaProvider } from "./criteria/security-evaluation-criteria.provider";
 import { SecurityEvaluationCriteriaSeed } from "./criteria/security-evaluation-criteria.seed";
 import { SecurityEvaluationAwsConfigEvidenceProvider } from "./evidence/security-evaluation-aws-config-evidence.provider";
@@ -68,7 +67,6 @@ import {
   controllers: [SecurityEvaluationController],
   providers: [
     SecurityEvaluationAssetService,
-    SecurityEvaluationAssetSyncService,
     SecurityEvaluationCriteriaSeed,
     SecurityEvaluationCriteriaProvider,
     SecurityEvaluationEvidenceProvider,
@@ -162,7 +160,6 @@ import {
   ],
   exports: [
     SecurityEvaluationAssetService,
-    SecurityEvaluationAssetSyncService,
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,
     SecurityEvaluationKnowledgeService,

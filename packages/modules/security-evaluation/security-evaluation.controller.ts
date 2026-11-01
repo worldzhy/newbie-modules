@@ -6,13 +6,14 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { UserRequest } from "@modules/security/security.interface";
 
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
-import { SecurityEvaluationAssetSyncService } from "./assets/security-evaluation-asset-sync.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
 import { SECURITY_EVALUATION_SUBJECT_KINDS } from "./security-evaluation.constants";
 import {
   GetSecurityEvaluationAssetRequestDto,
   GetSecurityEvaluationReportRequestDto,
+  IngestSecurityEvaluationSubjectRequestDto,
+  IngestSecurityEvaluationSubjectResponseDto,
   ListSecurityEvaluationAssetKnowledgeItemsRequestDto,
   ListSecurityEvaluationAssetKnowledgeItemsResponseDto,
   ListSecurityEvaluationAssetsRequestDto,
@@ -26,17 +27,19 @@ import {
   SecurityEvaluationReportResponseDto,
   SecurityEvaluationRunAcceptedResponseDto,
   StartSecurityEvaluationRunRequestDto,
-  SyncSecurityEvaluationSubjectsRequestDto,
-  SyncSecurityEvaluationSubjectsResponseDto,
 } from "./security-evaluation.dto";
 
 /**
- * Security-evaluation HTTP surface (ADR-022).
+ * Security-evaluation HTTP surface (ADR-022, ADR-039).
  *
- * Asset inventory reads, host-driven subject sync, run triggering, archived
- * result reads, the finding list and the single-axis report. The run lifecycle
- * and finding lifecycle belong to the evaluation skeleton; this controller only
- * bridges the feature's DTO surface.
+ * Asset inventory reads, platform-level subject ingest, run triggering,
+ * archived result reads, the finding list and the single-axis report. The run
+ * lifecycle and finding lifecycle belong to the evaluation skeleton; this
+ * controller only bridges the feature's DTO surface.
+ *
+ * Every read is a platform view: the optional `scopeType` / `scopeId` pair is a
+ * provenance filter, not an authorization boundary. Access is decided by the
+ * system-level permission grant alone (ADR-039 D3).
  *
  * There is deliberately no finding-suppression endpoint here: human decisions
  * on findings are skeleton-level operations, not this feature's vocabulary.
@@ -47,28 +50,30 @@ import {
 export class SecurityEvaluationController {
   constructor(
     private readonly assets: SecurityEvaluationAssetService,
-    private readonly assetSync: SecurityEvaluationAssetSyncService,
     private readonly runs: SecurityEvaluationRunService,
     private readonly findings: EvaluationFindingService,
     private readonly reports: SecurityEvaluationReportService,
   ) {}
 
-  // --- Subject sync ------------------------------------------------------
+  // --- Subject ingest ----------------------------------------------------
 
   @Post("subjects/sync")
   @HttpCode(HttpStatus.OK)
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.EvaluationSubject)
-  @ApiOperation({ summary: "Synchronise evaluation subjects and their asset rows from the host provider (idempotent)" })
-  @ApiResponse({ status: 200, type: SyncSecurityEvaluationSubjectsResponseDto })
-  syncSubjects(@Body() body: SyncSecurityEvaluationSubjectsRequestDto) {
-    return this.assetSync.sync({ scopeType: body.scopeType, scopeId: body.scopeId });
+  @ApiOperation({
+    summary: "Ingest one subject and its asset row (platform-level, idempotent) with the submitting source",
+  })
+  @ApiResponse({ status: 200, type: IngestSecurityEvaluationSubjectResponseDto })
+  async ingestSubject(@Body() body: IngestSecurityEvaluationSubjectRequestDto) {
+    const [result] = await this.assets.ingest([{ ...body }]);
+    return result;
   }
 
   // --- Assets ------------------------------------------------------------
 
   @Get("assets")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.SecurityEvaluationAsset)
-  @ApiOperation({ summary: "List asset inventory rows under a host scope" })
+  @ApiOperation({ summary: "List asset inventory rows (platform view, optionally filtered by provenance source)" })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationAssetsResponseDto })
   listAssets(@Query() query: ListSecurityEvaluationAssetsRequestDto) {
     return this.assets.listAssets({
@@ -118,12 +123,14 @@ export class SecurityEvaluationController {
 
   @Get("runs")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationRun)
-  @ApiOperation({ summary: "List runs under a host scope, optionally narrowed to one subject (newest first)" })
+  @ApiOperation({
+    summary: "List runs (platform view, optionally filtered by provenance source or subject), newest first",
+  })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationRunsResponseDto })
-  listRuns(@Query() query: ListSecurityEvaluationRunsRequestDto) {
+  async listRuns(@Query() query: ListSecurityEvaluationRunsRequestDto) {
+    const subjectIds = query.subjectId ? null : await this.assets.listSubjectIdsBySource(query);
     return this.runs.listRuns({
-      scopeType: query.scopeType,
-      scopeId: query.scopeId,
+      subjectIds: subjectIds ?? undefined,
       subjectId: query.subjectId,
       ruleSetVersionId: query.ruleSetVersionId,
       page: query.page,
@@ -151,13 +158,14 @@ export class SecurityEvaluationController {
   @Get("findings")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationFinding)
   @ApiOperation({
-    summary: "List findings under a host scope, optionally filtered by subject, run, evaluationKey, status, severity",
+    summary:
+      "List findings (platform view), optionally filtered by provenance source, subject, run, evaluationKey, status, severity",
   })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationFindingsResponseDto })
-  listFindings(@Query() query: ListSecurityEvaluationFindingsRequestDto) {
+  async listFindings(@Query() query: ListSecurityEvaluationFindingsRequestDto) {
+    const subjectIds = query.subjectId ? null : await this.assets.listSubjectIdsBySource(query);
     return this.findings.listFindings({
-      scopeType: query.scopeType,
-      scopeId: query.scopeId,
+      subjectIds: subjectIds ?? undefined,
       subjectId: query.subjectId,
       runId: query.runId,
       evaluationKey: query.evaluationKey,
@@ -172,9 +180,10 @@ export class SecurityEvaluationController {
 
   @Get("report")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationFinding)
-  @ApiOperation({ summary: "Single-axis security report for a host scope (no composite score)" })
+  @ApiOperation({ summary: "Single-axis security report (platform view, optionally filtered by provenance source)" })
   @ApiResponse({ status: 200, type: SecurityEvaluationReportResponseDto })
-  getReport(@Query() query: GetSecurityEvaluationReportRequestDto) {
-    return this.reports.getReport({ scopeType: query.scopeType, scopeId: query.scopeId });
+  async getReport(@Query() query: GetSecurityEvaluationReportRequestDto) {
+    const subjectIds = await this.assets.listSubjectIdsBySource(query);
+    return this.reports.getReport(subjectIds);
   }
 }

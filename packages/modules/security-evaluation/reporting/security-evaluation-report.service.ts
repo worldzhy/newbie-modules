@@ -1,7 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { EvaluationFindingStatus, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import type { EvaluationScope } from "@modules/evaluation/ports/evaluation.contracts";
 
 import {
   SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS,
@@ -78,15 +77,18 @@ export interface SecurityEvaluationReport {
 export class SecurityEvaluationReportService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getReport(scope: EvaluationScope): Promise<SecurityEvaluationReport> {
-    const subjects = await this.prisma.evaluationSubject.findMany({
-      where: {
-        kind: { in: [...SECURITY_EVALUATION_SUBJECT_KINDS] },
-        scopeType: scope.scopeType,
-        scopeId: scope.scopeId,
-      },
-      select: { id: true },
-    });
+  /**
+   * Build the platform report, or a provenance-filtered slice when `subjectIds`
+   * is given (ADR-039): `null` means the whole platform, an empty array means
+   * the filter matched nothing.
+   */
+  async getReport(subjectIdsFilter: readonly string[] | null): Promise<SecurityEvaluationReport> {
+    const subjects = subjectIdsFilter
+      ? subjectIdsFilter.map((id) => ({ id }))
+      : await this.prisma.evaluationSubject.findMany({
+          where: { kind: { in: [...SECURITY_EVALUATION_SUBJECT_KINDS] } },
+          select: { id: true },
+        });
     const subjectIds = subjects.map((subject) => subject.id);
     const now = new Date();
     const staleBefore = new Date(now.getTime() - SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS * DAY_MS);

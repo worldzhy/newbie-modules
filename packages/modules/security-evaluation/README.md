@@ -12,7 +12,7 @@ lands in a later slice on the same run and finding lifecycle.
 
 | Term           | Meaning                                                                                                                                                                                                                                                                                                                                        |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subject        | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; `scopeType` / `scopeId` are host-assigned (nightwatch uses `project`).                                                                                                                                                                                        |
+| Subject        | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; the coordinate is the module's `platform` constant (ADR-039) — projects are provenance, not scope.                                                                                                                                                            |
 | Asset          | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state knowledge items.                                                                                                                                                                                                   |
 | Knowledge item | `SecurityEvaluationAwsConfigKnowledgeItem` / `SecurityEvaluationNpmPackageKnowledgeItem`: something observed about an asset right now (`type`, `key`, small intrinsic `value`); `SecurityEvaluationThreatKnowledgeItem` is the world-scoped intel sibling. Items are upserted, never deleted here; history lives in the archived run manifest. |
 | Criteria       | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                                                                                                                                                    |
@@ -27,10 +27,16 @@ lands in a later slice on the same run and finding lifecycle.
   configured `awsCrossAccountBinding` to one subject.
 
 Hosts declare subjects by calling `POST /security-evaluation/subjects/sync` with
-a scope; the skeleton's `SubjectProvider` does the enumeration and every returned
-subject is materialised as an asset. Sync is upsert-only: a subject that
-disappears from the host is not deleted, because removal semantics are still an
-open decision (ADR-022).
+one subject and the source that supplied it (`sourceType` / `sourceId`, opaque
+strings). The module upserts the platform-level subject, materialises its asset
+and records a `SecurityEvaluationAssetSource` row; a second project referencing
+the same repository adds provenance instead of a second subject. Ingest is
+upsert-only: a subject that disappears from the host is not deleted, because
+removal semantics are still an open decision (ADR-022).
+
+Reads are platform-wide. The optional `scopeType` / `scopeId` query pair filters
+by provenance (e.g. "only what project X submitted") and never authorizes
+anything — access is the system-level permission grant (ADR-039 D3).
 
 ## Knowledge types
 
@@ -119,14 +125,14 @@ SECURITY_EVALUATION_SCHEDULES = [
 
 | Method | Path                                                   | Purpose                                                                                             |
 | ------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| POST   | `/security-evaluation/subjects/sync`                   | Ask the host provider to sync subjects and assets (idempotent).                                     |
-| GET    | `/security-evaluation/assets`                          | Asset inventory under a scope.                                                                      |
+| POST   | `/security-evaluation/subjects/sync`                   | Ingest one subject with its provenance source (idempotent).                                         |
+| GET    | `/security-evaluation/assets`                          | Asset inventory, platform-wide or provenance-filtered.                                              |
 | GET    | `/security-evaluation/assets/:assetId/knowledge-items` | Current-state knowledge items of one asset.                                                         |
 | POST   | `/security-evaluation/runs`                            | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously. |
-| GET    | `/security-evaluation/runs`                            | Run history for a subject.                                                                          |
+| GET    | `/security-evaluation/runs`                            | Run history, platform-wide or provenance/subject-filtered.                                          |
 | GET    | `/security-evaluation/results`                         | Archived results (manifest excluded).                                                               |
-| GET    | `/security-evaluation/findings`                        | Findings with evaluationKey / status / severity filters.                                            |
-| GET    | `/security-evaluation/report`                          | Single-axis report: assets, coverage, findings, trend, MTTR.                                        |
+| GET    | `/security-evaluation/findings`                        | Findings with evaluationKey / status / severity filters (platform-wide or provenance-filtered).     |
+| GET    | `/security-evaluation/report`                          | Single-axis report: assets, coverage, findings, trend, MTTR (platform-wide or provenance-filtered). |
 
 ## Limitations
 

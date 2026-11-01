@@ -9,6 +9,15 @@ export const SECURITY_EVALUATION_SUBJECT_KINDS = [
 
 export type SecurityEvaluationSubjectKind = (typeof SECURITY_EVALUATION_SUBJECT_KINDS)[number];
 
+/**
+ * The feature is platform-level (ADR-039 nightwatch-backend): one subject per
+ * natural asset in the whole deployment, regardless of which project supplied
+ * it. The coordinate is a module constant so hosts never pick the value; the
+ * project (or any other supplier) is recorded on the subject's source rows.
+ */
+export const SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE = "platform";
+export const SECURITY_EVALUATION_PLATFORM_SCOPE_ID = "deployment";
+
 /** Evaluation keys. Each evaluationKey is a versioned rule set within an EvaluationCategory (ADR-037). */
 export const SECURITY_EVALUATION_KEY_NPM_OSV = "npm-osv";
 export const SECURITY_EVALUATION_KEY_AWS_CIS_1_5 = "aws-cis-1.5";

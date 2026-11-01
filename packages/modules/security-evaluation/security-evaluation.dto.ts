@@ -12,37 +12,74 @@ export class GetSecurityEvaluationAssetRequestDto {
   assetId!: string;
 }
 
-// --- Subject sync --------------------------------------------------------
+// --- Subject ingest ------------------------------------------------------
 
-export class SyncSecurityEvaluationSubjectsRequestDto {
-  @ApiProperty({ description: "Host-assigned scope type the subjects are declared under" })
+/**
+ * One subject submission (ADR-039). The subject is platform-level — the caller
+ * does NOT declare a scope; it only says where the material came from, through
+ * the opaque `sourceType` / `sourceId` pair. Re-submitting the same subject and
+ * source is idempotent; a new source adds a provenance row.
+ */
+export class IngestSecurityEvaluationSubjectRequestDto {
+  @ApiProperty({ description: 'Subject kind, e.g. "repository" or "aws-account"' })
   @IsString()
   @IsNotEmpty()
-  scopeType!: string;
+  kind!: string;
 
-  @ApiProperty({ description: "Host-assigned scope id the subjects are declared under" })
+  @ApiProperty({ description: "Stable identity of the subject in the deployment" })
   @IsString()
   @IsNotEmpty()
-  scopeId!: string;
+  subjectKey!: string;
+
+  @ApiProperty({ description: "Human-readable name of the subject" })
+  @IsString()
+  @IsNotEmpty()
+  displayName!: string;
+
+  @ApiPropertyOptional({ type: Object, description: "Opaque subject metadata forwarded to the run ports" })
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
+
+  @ApiProperty({ description: 'Opaque provenance type, e.g. "project"' })
+  @IsString()
+  @IsNotEmpty()
+  sourceType!: string;
+
+  @ApiProperty({ description: "Opaque provenance id inside the source type" })
+  @IsString()
+  @IsNotEmpty()
+  sourceId!: string;
 }
 
-export class SyncSecurityEvaluationSubjectsResponseDto {
-  @ApiProperty({ description: "Subjects synchronised from the host provider" })
-  subjects!: number;
+export class IngestSecurityEvaluationSubjectResponseDto {
+  @ApiProperty() subjectId!: string;
+  @ApiProperty() assetId!: string;
 }
 
 // --- Assets --------------------------------------------------------------
 
 export class ListSecurityEvaluationAssetsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Host-assigned scope type the assets are listed under" })
+  @ApiPropertyOptional({
+    description:
+      'Optional provenance filter: only assets submitted by this source type (e.g. "project"). Omit for the platform view.',
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  scopeType!: string;
+  scopeType?: string;
 
-  @ApiProperty({ description: "Host-assigned scope id the assets are listed under" })
+  @ApiPropertyOptional({ description: "Optional provenance filter: only assets submitted by this source id" })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  scopeId!: string;
+  scopeId?: string;
+}
+
+/** One provenance row of an asset (ADR-039). */
+export class SecurityEvaluationAssetSourceResponseDto {
+  @ApiProperty() sourceType!: string;
+  @ApiProperty() sourceId!: string;
+  @ApiProperty() firstSubmittedAt!: Date;
+  @ApiProperty() lastSubmittedAt!: Date;
 }
 
 /** Mirrors the SecurityEvaluationAsset row, decorated with the subject kind. */
@@ -56,6 +93,12 @@ export class SecurityEvaluationAssetResponseDto {
   @ApiProperty() firstSeenAt!: Date;
   @ApiProperty({ description: "Last run that actually observed this asset's inventory" })
   lastSeenAt!: Date;
+  @ApiProperty({
+    type: [SecurityEvaluationAssetSourceResponseDto],
+    isArray: true,
+    description: "Who submitted this asset",
+  })
+  sources!: SecurityEvaluationAssetSourceResponseDto[];
 }
 
 export class ListSecurityEvaluationAssetsResponseDto extends CommonListResponseDto<SecurityEvaluationAssetResponseDto> {}
@@ -116,15 +159,18 @@ export class SecurityEvaluationRunAcceptedResponseDto {
 }
 
 export class ListSecurityEvaluationRunsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Host-assigned scope type the runs are listed under" })
+  @ApiPropertyOptional({
+    description:
+      "Optional provenance filter: only runs of assets submitted by this source type. Omit for the platform view.",
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  scopeType!: string;
+  scopeType?: string;
 
-  @ApiProperty({ description: "Host-assigned scope id the runs are listed under" })
+  @ApiPropertyOptional({ description: "Optional provenance filter: only runs of assets submitted by this source id" })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  scopeId!: string;
+  scopeId?: string;
 
   @ApiPropertyOptional({ description: "Restrict to one subject" })
   @IsOptional()
@@ -192,15 +238,20 @@ export class ListSecurityEvaluationResultsResponseDto extends CommonListResponse
 // --- Findings ------------------------------------------------------------
 
 export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Host-assigned scope type the findings are listed under" })
+  @ApiPropertyOptional({
+    description:
+      "Optional provenance filter: only findings of assets submitted by this source type. Omit for the platform view.",
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  scopeType!: string;
+  scopeType?: string;
 
-  @ApiProperty({ description: "Host-assigned scope id the findings are listed under" })
+  @ApiPropertyOptional({
+    description: "Optional provenance filter: only findings of assets submitted by this source id",
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  scopeId!: string;
+  scopeId?: string;
 
   @ApiPropertyOptional({ description: "Restrict to one subject" })
   @IsOptional()
@@ -256,15 +307,18 @@ export class ListSecurityEvaluationFindingsResponseDto extends CommonListRespons
 // --- Report --------------------------------------------------------------
 
 export class GetSecurityEvaluationReportRequestDto {
-  @ApiProperty({ description: "Host-assigned scope type the report is built for" })
+  @ApiPropertyOptional({
+    description:
+      "Optional provenance filter: report only assets submitted by this source type. Omit for the platform view.",
+  })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  scopeType!: string;
+  scopeType?: string;
 
-  @ApiProperty({ description: "Host-assigned scope id the report is built for" })
+  @ApiPropertyOptional({ description: "Optional provenance filter: report only assets submitted by this source id" })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  scopeId!: string;
+  scopeId?: string;
 }
 
 export class SecurityEvaluationReportAssetsDto {
