@@ -1,7 +1,8 @@
 import { Controller, Delete, Get, Patch, Post, Body, Param, ParseIntPipe, Query } from "@nestjs/common";
 import { ApiCreatedResponse, ApiOkResponse, ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
-import { Prisma, Place } from "@generated/prisma/client";
+import { PermissionAction, Prisma, Place } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { CreatePlaceRequestDto, ListPlacesRequestDto, UpdatePlaceRequestDto } from "./place.dto";
 
 @ApiTags("Place")
@@ -11,6 +12,7 @@ export class PlaceController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Post("")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.Place)
   @ApiCreatedResponse()
   @ApiBody({
     description: "Optional fields are address2 and geoJSON.",
@@ -42,6 +44,7 @@ export class PlaceController {
   }
 
   @Get("")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Place)
   @ApiOkResponse()
   async list(@Query() query: ListPlacesRequestDto) {
     const { page, pageSize } = query;
@@ -52,12 +55,14 @@ export class PlaceController {
   }
 
   @Get(":placeId")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.Place)
   @ApiOkResponse()
   async getPlace(@Param("placeId", ParseIntPipe) placeId: number): Promise<Place> {
     return await this.prisma.place.findUniqueOrThrow({ where: { id: placeId } });
   }
 
   @Patch(":placeId")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Place)
   @ApiOkResponse()
   @ApiBody({
     description: "Update a specific user location.",
@@ -95,6 +100,7 @@ export class PlaceController {
   }
 
   @Delete(":placeId")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Place)
   @ApiOkResponse()
   async deletePlace(@Param("placeId", ParseIntPipe) placeId: number): Promise<Place> {
     return await this.prisma.place.delete({
