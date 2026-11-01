@@ -10,6 +10,7 @@ import {
   UpdateMessageBotChannelRequestDto,
 } from "../message-bot.dto";
 import { MessageBotProvider } from "../message-bot.constants";
+import { assertAllowedWebhook } from "../webhook-url";
 
 @ApiTags("Message Bot / Slack Channel")
 @ApiBearerAuth()
@@ -21,6 +22,7 @@ export class SlackChannelController {
   @ApiOperation({ summary: "Create a Slack message channel" })
   @ApiResponse({ type: MessageBotChannelDetailResDto })
   async channelCreate(@Body() body: CreateMessageBotChannelRequestDto) {
+    assertAllowedWebhook(body.webhook, MessageBotProvider.Slack);
     return await this.prisma.messageBotChannel.create({
       data: { ...body, provider: MessageBotProvider.Slack },
     });
@@ -30,6 +32,9 @@ export class SlackChannelController {
   @ApiOperation({ summary: "Update a Slack message channel" })
   @ApiResponse({ type: MessageBotChannelDetailResDto })
   async channelUpdate(@Param("id") id: string, @Body() body: UpdateMessageBotChannelRequestDto) {
+    if (body.webhook !== undefined) {
+      assertAllowedWebhook(body.webhook, MessageBotProvider.Slack);
+    }
     return await this.prisma.messageBotChannel.update({
       where: { id },
       data: body,
