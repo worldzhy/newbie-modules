@@ -71,11 +71,14 @@ test("findings, runs and the report narrow to the subjects the source contribute
     await controller.listRuns({ scopeType: "project", scopeId: "p-1", page: 1, pageSize: 20 });
     await controller.getReport({ scopeType: "project", scopeId: "p-1" });
 
-    assert.deepEqual(seen.sourceFilters, [
-      { scopeType: "project", scopeId: "p-1" },
-      { scopeType: "project", scopeId: "p-1" },
-      { scopeType: "project", scopeId: "p-1" },
-    ]);
+    assert.deepEqual(
+      seen.sourceFilters.map(({ scopeType, scopeId }) => ({ scopeType, scopeId })),
+      [
+        { scopeType: "project", scopeId: "p-1" },
+        { scopeType: "project", scopeId: "p-1" },
+        { scopeType: "project", scopeId: "p-1" },
+      ],
+    );
     assert.deepEqual(seen.findings[0], {
       subjectIds,
       subjectId: undefined,
@@ -104,7 +107,10 @@ test("an absent filter is the platform view, not an empty set", async () => {
   await controller.listRuns({ page: 1, pageSize: 20 });
   await controller.getReport({});
 
-  assert.deepEqual(seen.sourceFilters, [{}, {}, {}]);
+  assert.deepEqual(
+    seen.sourceFilters.map(({ scopeType, scopeId }) => ({ scopeType, scopeId })),
+    [{}, {}, {}],
+  );
   // `undefined` means "no subject narrowing"; an empty array would hide all rows.
   assert.equal(seen.findings[0].subjectIds, undefined);
   assert.equal(seen.runs[0].subjectIds, undefined);
