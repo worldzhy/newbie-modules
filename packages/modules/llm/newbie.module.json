@@ -7,8 +7,14 @@
   },
   "schema": "prisma/schema.prisma",
   "moduleDependencies": ["security"],
-  "config-service": {},
-  "env": {},
+  "config-service": {
+    "llm": {
+      "apiKeySecret": "process.env.LLM_API_KEY_SECRET || process.env.SECURITY_USER_REFRESH_TOKEN_SECRET"
+    }
+  },
+  "env": {
+    "LLM_API_KEY_SECRET": ""
+  },
   "dependencies": {
     "ai": "^6.0.301",
     "@ai-sdk/provider": "^3.0.18",
