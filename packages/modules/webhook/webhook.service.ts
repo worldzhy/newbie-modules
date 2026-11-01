@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { createHmac } from "node:crypto";
 import { Prisma, Webhook } from "@generated/prisma/client";
@@ -18,30 +18,60 @@ export class WebhookService {
     private configService: ConfigService,
   ) {}
 
+  /**
+   * Columns a client may filter on. Everything else — including `teamId`,
+   * `secret` and relation predicates — is rejected so a caller cannot widen the
+   * tenant scope or probe columns that are never meant as filters.
+   */
+  private static readonly FILTER_FIELDS = new Set([
+    "id",
+    "isActive",
+    "url",
+    "contentType",
+    "event",
+    "lastFiredAt",
+    "createdAt",
+    "updatedAt",
+  ]);
+
   async createWebhook(data: Omit<Omit<Prisma.WebhookCreateInput, "webhook">, "team">): Promise<Webhook> {
     return this.prisma.webhook.create({ data });
   }
 
   async getWebhooks(params: {
+    teamId: number;
     skip?: number;
     take?: number;
     cursor?: Prisma.WebhookWhereUniqueInput;
-    where?: Prisma.WebhookWhereInput;
+    where?: Record<string, unknown>;
     orderBy?: Prisma.WebhookOrderByWithAggregationInput;
   }): Promise<Webhook[]> {
-    const { skip, take, cursor, where, orderBy } = params;
+    const { teamId, skip, take, cursor, where, orderBy } = params;
+    const scopedWhere = this.scopeWhere(teamId, where);
     try {
       const webhooks = await this.prisma.webhook.findMany({
         skip,
         take,
         cursor,
-        where,
+        where: scopedWhere,
         orderBy,
       });
       return webhooks;
     } catch {
       return [];
     }
+  }
+
+  /** Merge the caller's filters into an AND clause that always pins `teamId`. */
+  private scopeWhere(teamId: number, where?: Record<string, unknown>): Prisma.WebhookWhereInput {
+    const conditions: Prisma.WebhookWhereInput[] = [];
+    for (const [field, value] of Object.entries(where ?? {})) {
+      if (!WebhookService.FILTER_FIELDS.has(field)) {
+        throw new BadRequestException(`Unsupported webhook filter field: ${field}`);
+      }
+      conditions.push({ [field]: value } as Prisma.WebhookWhereInput);
+    }
+    return conditions.length > 0 ? { teamId, AND: conditions } : { teamId };
   }
 
   async getWebhook(teamId: number, id: number): Promise<Webhook> {
