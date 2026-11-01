@@ -7,7 +7,7 @@
 | ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
 |---|---|---|---|---|---|---|
 | R4-01 | newbie-modules | `newbie.module.json` 未声明 `llm`，与物理 import 矛盾；`newbie modules lint` 报错 | P1 | artifact（已发布模块） | 新宿主装配 security-evaluation 时 | fixed：manifest 补 `llm`；registry CI 新增 `modules lint`（同批补 aws-cloudformation/tencent-cos 的 `security` 声明） |
-| R4-02 | newbie-modules + nightwatch-backend | security-evaluation 读面 `scopeType/scopeId/subjectId` 完全由客户端决定，OPERATOR 可跨项目读 | P1 | live | OPERATOR（持有 Security Evaluation 权限组） | open（round3 已列，本轮不变量重验仍成立） |
+| R4-02 | newbie-modules + nightwatch-backend | security-evaluation 读面 `scopeType/scopeId/subjectId` 完全由客户端决定，OPERATOR 可跨项目读 | P1 | live | OPERATOR（持有 Security Evaluation 权限组） | 重判：非缺陷（2026-11-02 用户决定 SE 为平台级模块，scope 降为溯源筛选；见 nightwatch-backend ADR-039），代码待按该 ADR 落地 |
 | R4-03 | newbie-modules | `mergeJudgments` 的 skipped 去重 items 与累加 total 不一致，多机制同跳一条时违反骨架 coverage 不变量 | P2 | source（当前每 key 单机制，不可达） | 启用多机制组合后 | fixed：`total` 改取去重条目数，补重叠 skipped 用例；ADR-046 合并契约同步 |
 | R4-04 | newbie-modules | 负缓存键仅 `(knowledgeItemId, scopeKey)`，无实体集/模型版本维度，且采集层在硬召回之前过滤 | P2 | live | OPERATOR 变更项目实体后触发 INTEL 运行 | open |
 | R4-05 | newbie-modules | LLM 返回输入外实体（含大小写差异）被判 `not-relevant` 并永久负缓存，应视为 `unavailable` 重试 | P2 | live | 需 LLM 输出异常/注入链条 | fixed：非法实体输出改判 `unavailable`（不缓存）；实体标签比较大小写不敏感；补用例 |
