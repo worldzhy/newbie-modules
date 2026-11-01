@@ -31,9 +31,12 @@ describe("llm api key encryption", () => {
 
   it("rejects a tampered payload", () => {
     const stored = encryptApiKey(SECRET, PLAINTEXT);
-    const payload = stored.slice("enc:v1:".length, -1) + (stored.endsWith("A") ? "B" : "A");
+    // Flip a ciphertext bit (not a base64 padding bit, which can decode to the
+    // same bytes and make this test vacuous).
+    const payload = Buffer.from(stored.slice("enc:v1:".length), "base64");
+    payload[payload.length - 1] ^= 0x01;
 
-    assert.throws(() => decryptApiKey(`enc:v1:${payload}`, SECRET));
+    assert.throws(() => decryptApiKey(`enc:v1:${payload.toString("base64")}`, SECRET));
   });
 
   it("rejects the wrong secret", () => {
