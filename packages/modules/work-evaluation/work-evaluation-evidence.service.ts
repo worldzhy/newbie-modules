@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { WorkEvaluationPeriodType, Prisma } from "@generated/prisma/client";
 import { CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
@@ -24,6 +24,18 @@ import {
 @Injectable()
 export class WorkEvaluationEvidenceService {
   constructor(private readonly prisma: PrismaService) {}
+
+  /**
+   * Every read must name an evaluatee. An absent id would otherwise widen the
+   * query to every member's evidence, so it is rejected rather than defaulted.
+   */
+  private evaluateeId(query: { evaluateeUserId?: string }): string {
+    const evaluateeUserId = query.evaluateeUserId;
+    if (!evaluateeUserId) {
+      throw new BadRequestException("evaluateeUserId is required for evidence reads.");
+    }
+    return evaluateeUserId;
+  }
 
   // --- Reported workspaces ------------------------------------------------
 
@@ -55,8 +67,9 @@ export class WorkEvaluationEvidenceService {
   }
 
   async listWorkspaces(query: ListWorkEvaluationWorkspacesRequestDto) {
+    const evaluateeUserId = this.evaluateeId(query);
     return this.prisma.workEvaluationWorkspace.findMany({
-      where: { evaluateeUserId: query.evaluateeUserId },
+      where: { evaluateeUserId },
       orderBy: { reportedAt: "desc" },
     });
   }
@@ -141,12 +154,13 @@ export class WorkEvaluationEvidenceService {
   async listSessions(
     query: ListWorkEvaluationSessionsRequestDto,
   ): Promise<CommonListResponseDto<WorkEvaluationSessionResponseDto>> {
+    const evaluateeUserId = this.evaluateeId(query);
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.WorkEvaluationSession,
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
         where: {
-          evaluateeUserId: query.evaluateeUserId,
+          evaluateeUserId,
           ...(query.collectionPeriodId ? { collectionPeriodId: query.collectionPeriodId } : {}),
         },
         orderBy: [{ startedAt: "asc" }, { id: "asc" }],
@@ -203,11 +217,12 @@ export class WorkEvaluationEvidenceService {
   async listDocuments(
     query: ListWorkEvaluationDeclaredDocumentsRequestDto,
   ): Promise<CommonListResponseDto<WorkEvaluationDeclaredDocumentResponseDto>> {
+    const evaluateeUserId = this.evaluateeId(query);
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.WorkEvaluationDeclaredDocument,
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
-        where: { evaluateeUserId: query.evaluateeUserId },
+        where: { evaluateeUserId },
         orderBy: { capturedAt: "desc" },
         select: {
           id: true,
@@ -223,8 +238,17 @@ export class WorkEvaluationEvidenceService {
     });
   }
 
-  async getDocument(id: string) {
-    const document = await this.prisma.workEvaluationDeclaredDocument.findUnique({ where: { id } });
+  /**
+   * Read one declared document. When `evaluateeUserId` is provided the lookup
+   * is bound to that evaluatee (`(evaluateeUserId, id)`), so a document id
+   * guessed from elsewhere resolves to nothing instead of another member's
+   * content. Internal callers (the judgment tools) already pin the id to the
+   * evaluation manifest and may omit it.
+   */
+  async getDocument(id: string, evaluateeUserId?: string) {
+    const document = await this.prisma.workEvaluationDeclaredDocument.findFirst({
+      where: { id, ...(evaluateeUserId ? { evaluateeUserId } : {}) },
+    });
     if (!document) {
       throw new NotFoundException(`Declared document ${id} not found`);
     }

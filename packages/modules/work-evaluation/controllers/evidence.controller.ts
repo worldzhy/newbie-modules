@@ -1,15 +1,30 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  ForbiddenException,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Inject,
+  Optional,
+  Param,
+  Post,
+  Query,
+  Req,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { Request } from "express";
 import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
-import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { PERMISSION_AUTHORIZER, PermissionAuthorizer } from "@modules/security/ports/permission.authorizer";
+import { UserRequest } from "@modules/security/security.interface";
 import {
   CreateWorkEvaluationDeclaredDocumentBatchRequestDto,
   CreateWorkEvaluationSessionBatchRequestDto,
   CreateWorkEvaluationWorkspaceBatchRequestDto,
   GetWorkEvaluationByIdRequestDto,
+  GetWorkEvaluationDeclaredDocumentRequestDto,
   ListWorkEvaluationDeclaredDocumentsRequestDto,
   ListWorkEvaluationDeclaredDocumentsResponseDto,
   ListWorkEvaluationSessionsRequestDto,
@@ -34,6 +49,12 @@ import { ResolvedWorkEvaluationInstallationToken } from "../work-evaluation-inst
  * evaluatee field, so there is no second identity source to reconcile. The
  * service never adjudicates the company/personal workspace split — it only
  * stores what the member declared.
+ *
+ * Reads are authorized by identity, not by the request alone: a caller may
+ * always read their own evidence, and reading another member's evidence
+ * requires the corresponding manager permission (`List`/`Get` on the model).
+ * `getDocument` additionally resolves the document inside the evaluatee's
+ * rows, so a guessed id cannot cross the evaluated member boundary.
  */
 @ApiTags("Work Evaluation / Evidence")
 @ApiBearerAuth()
@@ -43,7 +64,31 @@ export class WorkEvaluationEvidenceController {
     private readonly evidence: WorkEvaluationEvidenceService,
     private readonly sessions: WorkEvaluationSessionStore,
     private readonly installations: WorkEvaluationInstallationService,
+    @Optional()
+    @Inject(PERMISSION_AUTHORIZER)
+    private readonly authorizer?: PermissionAuthorizer,
   ) {}
+
+  /**
+   * Resolves the evaluatee a read may target. A missing or equal id means "own
+   * evidence"; any other id is a cross-member read and requires the manager
+   * permission for the resource being read. The check fails closed when the
+   * identity provider did not bind an authorizer.
+   */
+  private async resolveReadableEvaluatee(
+    request: UserRequest,
+    requested: string | undefined,
+    requirement: { resource: string; action: PermissionAction },
+  ): Promise<string> {
+    const callerUserId = request.user.userId;
+    if (!requested || requested === callerUserId) return callerUserId;
+
+    const permitted = this.authorizer ? await this.authorizer.authorize(callerUserId, requirement) : false;
+    if (!permitted) {
+      throw new ForbiddenException("Reading another member's work-evaluation evidence requires manager permission.");
+    }
+    return requested;
+  }
 
   // --- Ingest (installation token) ---------------------------------------
 
@@ -128,37 +173,57 @@ export class WorkEvaluationEvidenceController {
     await this.installations.touchOnIngest(installationId);
   }
 
-  // --- Reads (platform JWT) ----------------------------------------------
+  // --- Reads (platform JWT, self or manager) -----------------------------
 
   @Get("workspaces")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.WorkEvaluationWorkspace)
-  @ApiOperation({ summary: "List the workspaces a member's installation agent has reported" })
+  @ApiOperation({ summary: "List the workspaces a member's installation agent has reported (own by default)" })
   @ApiResponse({ type: WorkEvaluationWorkspaceResponseDto, isArray: true })
-  listWorkspaces(@Query() query: ListWorkEvaluationWorkspacesRequestDto) {
-    return this.evidence.listWorkspaces(query);
+  @ApiResponse({ status: 403, description: "Reading another member's evidence without manager permission." })
+  async listWorkspaces(@Req() request: UserRequest, @Query() query: ListWorkEvaluationWorkspacesRequestDto) {
+    const evaluateeUserId = await this.resolveReadableEvaluatee(request, query.evaluateeUserId, {
+      resource: Prisma.ModelName.WorkEvaluationWorkspace,
+      action: PermissionAction.List,
+    });
+    return this.evidence.listWorkspaces({ ...query, evaluateeUserId });
   }
 
   @Get("sessions")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.WorkEvaluationSession)
-  @ApiOperation({ summary: "List collected session index rows for a member" })
+  @ApiOperation({ summary: "List collected session index rows for a member (own by default)" })
   @ApiResponse({ type: ListWorkEvaluationSessionsResponseDto })
-  listSessions(@Query() query: ListWorkEvaluationSessionsRequestDto) {
-    return this.evidence.listSessions(query);
+  @ApiResponse({ status: 403, description: "Reading another member's evidence without manager permission." })
+  async listSessions(@Req() request: UserRequest, @Query() query: ListWorkEvaluationSessionsRequestDto) {
+    const evaluateeUserId = await this.resolveReadableEvaluatee(request, query.evaluateeUserId, {
+      resource: Prisma.ModelName.WorkEvaluationSession,
+      action: PermissionAction.List,
+    });
+    return this.evidence.listSessions({ ...query, evaluateeUserId });
   }
 
   @Get("documents")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.WorkEvaluationDeclaredDocument)
-  @ApiOperation({ summary: "List declared work artifacts for a member" })
+  @ApiOperation({ summary: "List declared work artifacts for a member (own by default)" })
   @ApiResponse({ type: ListWorkEvaluationDeclaredDocumentsResponseDto })
-  listDocuments(@Query() query: ListWorkEvaluationDeclaredDocumentsRequestDto) {
-    return this.evidence.listDocuments(query);
+  @ApiResponse({ status: 403, description: "Reading another member's evidence without manager permission." })
+  async listDocuments(@Req() request: UserRequest, @Query() query: ListWorkEvaluationDeclaredDocumentsRequestDto) {
+    const evaluateeUserId = await this.resolveReadableEvaluatee(request, query.evaluateeUserId, {
+      resource: Prisma.ModelName.WorkEvaluationDeclaredDocument,
+      action: PermissionAction.List,
+    });
+    return this.evidence.listDocuments({ ...query, evaluateeUserId });
   }
 
   @Get("documents/:id")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.WorkEvaluationDeclaredDocument)
-  @ApiOperation({ summary: "Get one declared work artifact, including its content" })
+  @ApiOperation({ summary: "Get one declared work artifact, including its content (own by default)" })
   @ApiResponse({ status: 200, type: WorkEvaluationDeclaredDocumentResponseDto })
-  getDocument(@Param() params: GetWorkEvaluationByIdRequestDto) {
-    return this.evidence.getDocument(params.id);
+  @ApiResponse({ status: 403, description: "Reading another member's evidence without manager permission." })
+  async getDocument(
+    @Param() params: GetWorkEvaluationByIdRequestDto,
+    @Query() query: GetWorkEvaluationDeclaredDocumentRequestDto,
+    @Req() request: UserRequest,
+  ) {
+    const evaluateeUserId = await this.resolveReadableEvaluatee(request, query.evaluateeUserId, {
+      resource: Prisma.ModelName.WorkEvaluationDeclaredDocument,
+      action: PermissionAction.Get,
+    });
+    return this.evidence.getDocument(params.id, evaluateeUserId);
   }
 }
