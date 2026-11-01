@@ -88,12 +88,6 @@ export class CreateSubscriptionRequestDto {
   planId!: number;
 }
 
-export class UpdateSubscriptionRequestDto {
-  @ApiProperty({ type: String, enum: SubscriptionStatus })
-  @IsEnum(SubscriptionStatus)
-  status: SubscriptionStatus;
-}
-
 export class GetSubscriptionRequestDto {
   @ApiProperty({ type: String })
   @IsString()

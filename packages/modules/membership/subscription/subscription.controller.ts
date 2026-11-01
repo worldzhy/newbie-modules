@@ -1,7 +1,22 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Inject,
+  Optional,
+  Param,
+  Post,
+  Query,
+  Req,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { Prisma } from "@generated/prisma/client";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { PERMISSION_AUTHORIZER, PermissionAuthorizer } from "@modules/security/ports/permission.authorizer";
+import { UserRequest } from "@modules/security/security.interface";
 import { MembershipService } from "../membership.service";
 import { SubscriptionService } from "./subscription.service";
 import {
@@ -10,7 +25,6 @@ import {
   ListSubscriptionsRequestDto,
   ListSubscriptionsResponseDto,
   SubscriptionResponseDto,
-  UpdateSubscriptionRequestDto,
 } from "./subscription.dto";
 
 @ApiTags("Membership / Subscription")
@@ -21,15 +35,22 @@ export class SubscriptionController {
     private readonly prisma: PrismaService,
     private readonly membershipService: MembershipService,
     private readonly subscriptionService: SubscriptionService,
+    @Optional() @Inject(PERMISSION_AUTHORIZER) private readonly authorizer?: PermissionAuthorizer,
   ) {}
 
   @Get()
-  @ApiOperation({ summary: "List all subscriptions" })
+  @ApiOperation({ summary: "List subscriptions — own by default, all for managers" })
   @ApiOkResponse({ type: ListSubscriptionsResponseDto })
-  async listSubscriptions(@Query() query: ListSubscriptionsRequestDto) {
+  async listSubscriptions(@Query() query: ListSubscriptionsRequestDto, @Req() request: UserRequest) {
+    const callerUserId = request.user.userId;
+    // Managers hold List on Subscription and see the global ledger; everyone
+    // else is pinned to their own membership so the member directory
+    // (names/phones) never leaks across accounts.
+    const canReadAll = await this.isAuthorized(callerUserId, PermissionAction.List);
     const result = await this.prisma.findManyInManyPages({
       model: Prisma.ModelName.Subscription,
       pagination: { page: query.page, pageSize: query.pageSize },
+      ...(canReadAll ? {} : { findManyArgs: { where: { membership: { userId: callerUserId } } } }),
     });
 
     // Collect membership IDs
@@ -82,7 +103,12 @@ export class SubscriptionController {
   @Post()
   @ApiOperation({ summary: "Create a new subscription" })
   @ApiCreatedResponse({ type: SubscriptionResponseDto })
-  async createSubscription(@Body() body: CreateSubscriptionRequestDto) {
+  async createSubscription(@Body() body: CreateSubscriptionRequestDto, @Req() request: UserRequest) {
+    const callerUserId = request.user.userId;
+    if (body.userId !== callerUserId && !(await this.isAuthorized(callerUserId, PermissionAction.Create))) {
+      throw new ForbiddenException("Creating a subscription for another member requires manager permission.");
+    }
+
     // [step 1] Find or create the membership for the user
     let membership = await this.prisma.membership.findUnique({
       where: { userId: body.userId },
@@ -94,27 +120,26 @@ export class SubscriptionController {
       });
     }
 
-    // [step 2] Create the subscription
+    // [step 2] Create the subscription — always PENDING_PAYMENT; only the
+    // payment callback (wechat-subscriptions) may move the status forward.
     return await this.subscriptionService.createSubscription({
       membershipId: membership.id,
       planId: body.planId,
     });
   }
 
-  @Patch(":id")
-  @ApiOperation({ summary: "Update an existing subscription" })
-  @ApiOkResponse({ type: SubscriptionResponseDto })
-  async updateSubscription(@Param() params: GetSubscriptionRequestDto, @Body() body: UpdateSubscriptionRequestDto) {
-    return await this.prisma.subscription.update({
-      where: { id: params.id },
-      data: body,
-    });
-  }
-
   @Delete(":id")
-  @ApiOperation({ summary: "Delete a subscription plan" })
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Subscription)
+  @ApiOperation({ summary: "Delete a subscription" })
   @ApiOkResponse({ type: SubscriptionResponseDto })
   async deleteSubscriptionPlan(@Param() params: GetSubscriptionRequestDto) {
     return await this.prisma.subscription.delete({ where: { id: params.id } });
   }
+
+  private async isAuthorized(userId: string, action: PermissionAction): Promise<boolean> {
+    if (!this.authorizer) return false;
+    return this.authorizer.authorize(userId, { resource: Prisma.ModelName.Subscription, action });
+  }
+
+  /* End */
 }

@@ -1,7 +1,8 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { Prisma } from "@generated/prisma/client";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import {
   CreateSubscriptionPlanRequestDto,
   GetSubscriptionPlanRequestDto,
@@ -17,6 +18,7 @@ export class SubscriptionPlanController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.SubscriptionPlan)
   @ApiOperation({ summary: "List all subscription plans" })
   @ApiOkResponse({ type: ListSubscriptionPlansResponseDto })
   async listSubscriptionPlans() {
@@ -27,6 +29,7 @@ export class SubscriptionPlanController {
   }
 
   @Post()
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.SubscriptionPlan)
   @ApiOperation({ summary: "Create a new subscription plan" })
   @ApiCreatedResponse({ type: SubscriptionPlanResponseDto })
   async createSubscriptionPlan(@Body() body: CreateSubscriptionPlanRequestDto) {
@@ -34,6 +37,7 @@ export class SubscriptionPlanController {
   }
 
   @Patch(":id")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.SubscriptionPlan)
   @ApiOperation({ summary: "Update an existing subscription plan" })
   @ApiOkResponse({ type: SubscriptionPlanResponseDto })
   async updateSubscriptionPlan(
@@ -47,6 +51,7 @@ export class SubscriptionPlanController {
   }
 
   @Delete(":id")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.SubscriptionPlan)
   @ApiOperation({ summary: "Delete a subscription plan" })
   @ApiOkResponse({ type: SubscriptionPlanResponseDto })
   async deleteSubscriptionPlan(@Param() params: GetSubscriptionPlanRequestDto) {
