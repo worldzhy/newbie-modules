@@ -12,12 +12,12 @@ through `sts:AssumeRole` (provided by `aws-identity`). No access key is stored.
 
 ## Primitives
 
-| Primitive | Behaviour |
-| --- | --- |
+| Primitive          | Behaviour                                                                                                                                             |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `getOrCreateStack` | `DescribeStacks`; creates from the in-module `TemplateBody` when absent, then waits for `CREATE_COMPLETE`. A rolled-back stack is reported as failed. |
-| `describeStack` | Current status and outputs; `null` when the stack does not exist. |
-| `deleteStack` | Waits for `DELETE_COMPLETE`; a missing stack counts as deleted. |
-| `sendCommand` | `AWS-RunShellScript` on the host instance, polls `GetCommandInvocation`, returns status, exit code and output. |
+| `describeStack`    | Current status and outputs; `null` when the stack does not exist.                                                                                     |
+| `deleteStack`      | Waits for `DELETE_COMPLETE`; a missing stack counts as deleted.                                                                                       |
+| `sendCommand`      | `AWS-RunShellScript` on the host instance, polls `GetCommandInvocation`, returns status, exit code and output.                                        |
 
 All primitives are idempotent and bounded by a deadline (timeout → HTTP 408,
 terminal failure or timeout → HTTP 400/504 through the service layer).

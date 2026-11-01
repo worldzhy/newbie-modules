@@ -217,10 +217,7 @@ describe("GitHubService.getOrCreateRepo", () => {
       },
     });
     const service = makeService(m);
-    await assert.rejects(
-      service.getOrCreateRepo("o", "n", "to", "tr"),
-      (e: any) => e instanceof RepoNameConflictError,
-    );
+    await assert.rejects(service.getOrCreateRepo("o", "n", "to", "tr"), (e: any) => e instanceof RepoNameConflictError);
   });
 
   it("rethrows non-404 errors from initial GET", async () => {
