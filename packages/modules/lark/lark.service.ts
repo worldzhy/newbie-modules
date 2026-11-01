@@ -1,6 +1,12 @@
 import { timingSafeEqual } from "node:crypto";
 
-import { Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from "@nestjs/common";
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { GetChatHistoryRequestDto, SendTextDto, SendCardDto, UpdateCardDto } from "./lark.dto";
@@ -72,6 +78,12 @@ export class LarkService {
   private readonly DIRECTORY_CACHE_TTL_MS = 10 * 60_000;
   private directoryTraversalInFlight: Promise<LarkDirectoryUser[]> | null = null;
 
+  // Chat ids the bot currently belongs to. Every history read is checked
+  // against this set, so a caller holding "List LarkMessage" cannot pull
+  // arbitrary tenant chats — only chats the bot itself was added to.
+  private botChatsCache: { chatIds: Set<string>; expiresAt: number } | null = null;
+  private readonly BOT_CHAT_CACHE_TTL_MS = 5 * 60_000;
+
   constructor(private readonly configService: ConfigService) {
     this.botOpenId = this.configService.get<string>("modules.lark.botOpenId");
   }
@@ -119,6 +131,14 @@ export class LarkService {
 
   async getChatHistory(dto: GetChatHistoryRequestDto) {
     try {
+      // `chatId` comes from the request body, so it is only trustworthy after
+      // proving the bot itself belongs to that chat. Membership is read from
+      // the bot's own chat list (im.chat.list), never from user input.
+      const botChatIds = await this.botChatIds();
+      if (!botChatIds.has(dto.chatId)) {
+        throw new ForbiddenException("The bot is not a member of the requested chat.");
+      }
+
       const res = await this.client.im.message.list({
         params: {
           container_id_type: "chat",
@@ -496,6 +516,22 @@ export class LarkService {
       this.logger.error("Error listing bot chats", error);
       throw error;
     }
+  }
+
+  /**
+   * Chat ids the bot belongs to, cached briefly: history reads cost one chat
+   * list traversal, not one API call per request. A newly added chat becomes
+   * readable within the cache window; a removed one stays readable that long.
+   */
+  private async botChatIds(): Promise<Set<string>> {
+    const now = Date.now();
+    if (this.botChatsCache && this.botChatsCache.expiresAt > now) {
+      return this.botChatsCache.chatIds;
+    }
+    const chats = await this.listBotChats();
+    const chatIds = new Set(chats.map((chat) => chat.chatId));
+    this.botChatsCache = { chatIds, expiresAt: now + this.BOT_CHAT_CACHE_TTL_MS };
+    return chatIds;
   }
 
   /**
