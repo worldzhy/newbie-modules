@@ -86,3 +86,4 @@ scope 一旦解析成功就只信 scope；系统级 grant 只在「没有 scope 
 - 清单盘点：10 个资源有控制器路由；`WebMonitorSite` 的 `/list`、`/getSysForUserId` 显式 `{scope:"self"}`，属于「按调用者身份取数」的豁免，仍只走系统级 grant——登记刻意不覆盖 `self` 路由，这是已知边界。`AwsAuditScan`、`DependencyScan` 在 nightwatch 当前无控制器引用，属清单中的惰性条目（清理候选，不影响授权）。
 - 启动校验：`MatrixCompletenessValidator` 通过，59 个 `(resource, action)` 组合在矩阵中有 rank 行；后端以新构建重启后 `/` 返回 200。
 - 端到端对照（2026-11-02）：宿主 seed 增加一个可选回归账号（`NIGHTWATCH_SEED_NON_MEMBER_OPERATOR_EMAIL/PASSWORD`，默认不创建），角色 OPERATOR、不属于任何项目。实测 `GET /url-check-targets?projectId=…`：ADMIN（项目成员）返回 200，该 OPERATOR 返回 403；数据库核对确认它持有 `UrlCheckTarget.List` 的系统级 grant、项目成员数为 0。
+- 惰性条目清理（2026-11-02）：登记表中 `AwsAuditScan`、`DependencyScan` 没有任何控制器引用，已从宿主清单移除，矩阵中对应 rank 行一并删除；清单现为 10 个资源，启动校验仍为 59 个 scoped 对（说明两条本来就未参与求值）。
