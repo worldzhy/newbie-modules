@@ -35,8 +35,6 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 - [ ] `[R3-P2-02]` **P2** aws-sqs `send`/`receive` 允许调用方覆盖 `queueUrl`：`aws-sqs/aws-sqs.service.ts` L34-41、L57-60。
 - [ ] `[R3-P2-03]` **P2** clickhouse DDL 标识符未加引号：`clickhouse/clickhouse.service.ts` L64、L101、L142-148。
 - [ ] `[R3-P2-04]` **P2** pdf 异常路径不清理临时目录：`pdf/pdf.service.ts` L32-63，catch 仅返回 `[]`，`savePath` 残留。
-- [ ] `[R3-P2-05]` **P2** people-finder 通知把 `accessKey` 放入 body，catch 又序列化整个 axios error（含请求 config）：`people-finder/people-finder.notification.service.ts` L24-38。同模块 PDL 成功响应全文（含邮箱/电话）入日志：`peopledatalabs/peopledatalabs.service.ts` L88-91、L137-140。
-- [ ] `[R3-P2-06]` **P2** lark 消息正文入 info 日志：`lark/lark.service.ts` L306。
 - [ ] `[R3-P2-08]` **P2** event-emitter 全量事件落库、无保留期：`event-emitter/event-emitter.service.ts` L36、L99-107。
 - [ ] `[R3-P2-09]` **P2** elasticsearch 代码读 `retries` 但 manifest 未声明：`elasticsearch/elasticsearch.service.ts` L32 vs `newbie.module.json` L8-14。
 - [ ] `[R3-P2-10]` **P2** web-monitor `POST /system/add` body 用 `projectId`，宿主 resolver 只认 `params/query/body.appId`：`web-monitor/modules/site/site.service.ts` L27 vs nightwatch-backend `scope-resolvers.ts` L202-212（跨仓，修复在两边对齐字段）。

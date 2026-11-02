@@ -86,16 +86,12 @@ export class PeopledatalabsService {
             if (res.status === PeopledatalabsStatus.SUCCESS) {
               resolve({ res: res });
               this.logger.log(
-                "Peopledatalabs searchPeopleByDomain success: " + JSON.stringify(res),
+                `Peopledatalabs searchPeopleByDomain success: status=${res.status} credits=${res.rateLimit?.callCreditsSpent} records=${res.data?.length ?? 0}`,
                 this.loggerContext,
               );
             } else {
-              const resError = { error: res.status, ctx: res };
-              resolve({ error: resError });
-              this.logger.error(
-                "Peopledatalabs searchPeopleByDomain error: " + JSON.stringify(resError),
-                this.loggerContext,
-              );
+              resolve({ error: { error: res.status, status: res.status } });
+              this.logger.error(`Peopledatalabs searchPeopleByDomain failed: status=${res.status}`, this.loggerContext);
             }
           })
           .catch((error) => {
@@ -135,14 +131,13 @@ export class PeopledatalabsService {
             if (res.status === PeopledatalabsStatus.SUCCESS) {
               resolve({ res });
               this.logger.log(
-                "Peopledatalabs searchPeopleByLinkedin success: " + JSON.stringify(res),
+                `Peopledatalabs searchPeopleByLinkedin success: status=${res.status} credits=${res.rateLimit?.callCreditsSpent}`,
                 this.loggerContext,
               );
             } else {
-              const resError = { error: res.status, ctx: res };
-              resolve({ error: resError });
+              resolve({ error: { error: res.status, status: res.status } });
               this.logger.error(
-                "Peopledatalabs searchPeopleByLinkedin error: " + JSON.stringify(resError),
+                `Peopledatalabs searchPeopleByLinkedin failed: status=${res.status}`,
                 this.loggerContext,
               );
             }
@@ -173,9 +168,13 @@ export class PeopledatalabsService {
     errorTitle: string;
     resolve: (error: object) => void;
   }) => {
-    const resError = { error };
-    resolve({ error: resError });
-    this.logger.error(errorTitle + JSON.stringify(resError), this.loggerContext);
+    const message = error instanceof Error ? error.message : String(error);
+    const status =
+      error && typeof error === "object" && "response" in error
+        ? (error as { response?: { status?: number } }).response?.status
+        : undefined;
+    resolve({ error: { error: message, status } });
+    this.logger.error(errorTitle + message, this.loggerContext);
   };
 
   /**

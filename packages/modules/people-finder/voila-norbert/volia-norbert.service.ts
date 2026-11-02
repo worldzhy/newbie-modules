@@ -71,30 +71,29 @@ export class VoilaNorbertService {
         .then(async (res: SearchEmailThirdResDto) => {
           if (res.status === VoliaNorbertStatus.SUCCESS) {
             resolve({ res: res.data });
-            this.logger.log(
-              "VoliaNorbert searchEmailByDomain success: " + JSON.stringify(res.data),
-              this.loggerContext,
-            );
+            this.logger.log(`VoliaNorbert searchEmailByDomain success: status=${res.status}`, this.loggerContext);
           } else {
             if (res.status === VoliaNorbertStatus.INSUFFICIENT_CREDITS) {
-              // notification webhook
               await this.peopleFinderNotification.send({
                 message: "[VoliaNorbert] Not have enough credits",
               });
               noCredits = true;
             }
-            const resError = { error: res.data, status: res.status };
-            resolve({ error: resError, noCredits });
-            this.logger.error(
-              "VoliaNorbert searchEmailByDomain error: " + JSON.stringify(resError),
-              this.loggerContext,
-            );
+            resolve({ error: { error: res.data, status: res.status }, noCredits });
+            this.logger.error(`VoliaNorbert searchEmailByDomain failed: status=${res.status}`, this.loggerContext);
           }
         })
         .catch((e) => {
-          const resError = { error: e.response.data };
-          resolve({ error: resError, noCredits });
-          this.logger.error("VoliaNorbert searchEmailByDomain error: " + JSON.stringify(resError), this.loggerContext);
+          const message = e instanceof Error ? e.message : String(e);
+          const status =
+            e && typeof e === "object" && "response" in e
+              ? (e as { response?: { status?: number } }).response?.status
+              : undefined;
+          resolve({ error: { error: message, status }, noCredits });
+          this.logger.error(
+            `VoliaNorbert searchEmailByDomain failed: status=${status ?? "unknown"} ${message}`,
+            this.loggerContext,
+          );
         });
     });
   }

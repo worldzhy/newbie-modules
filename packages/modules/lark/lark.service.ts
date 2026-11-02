@@ -303,7 +303,7 @@ export class LarkService {
       return;
     }
 
-    this.logger.log(`Message content (cleaned): ${parsed.text}`);
+    this.logger.debug(`Message content (cleaned) for ${input.messageId}: ${parsed.text}`);
 
     if (this.messageHandler) {
       await this.messageHandler(
