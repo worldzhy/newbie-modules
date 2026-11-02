@@ -16,11 +16,30 @@ import { SECURITY_EVALUATION_SUBJECT_KINDS } from "./security-evaluation.constan
  * matches nothing (empty set, never `undefined`).
  */
 
+interface FindingsInput {
+  subjectIds?: string[];
+  subjectId?: string;
+  runId?: string;
+  evaluationKey?: string;
+  status?: string;
+  severity?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+interface RunsInput {
+  subjectIds?: string[];
+  subjectId?: string;
+  ruleSetVersionId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 interface SeenCalls {
   sourceFilters: Array<{ scopeType?: string; scopeId?: string }>;
-  assets: unknown[];
-  runs: unknown[];
-  findings: unknown[];
+  assets: Array<Record<string, unknown>>;
+  runs: RunsInput[];
+  findings: FindingsInput[];
   reports: Array<string[] | null>;
 }
 
@@ -32,20 +51,20 @@ function createController(subjectIds: string[] | null) {
       seen.sourceFilters.push(filter);
       return subjectIds;
     },
-    listAssets: async (input: unknown) => {
+    listAssets: async (input: Record<string, unknown>) => {
       seen.assets.push(input);
       return { items: [], countOfTotal: 0, page: 1, pageSize: 20 };
     },
     listKnowledgeItems: async () => ({ items: [], countOfTotal: 0, page: 1, pageSize: 20 }),
   };
   const runs = {
-    listRuns: async (input: unknown) => {
+    listRuns: async (input: RunsInput) => {
       seen.runs.push(input);
       return { items: [], countOfTotal: 0, page: 1, pageSize: 20 };
     },
   };
   const findings = {
-    listFindings: async (input: unknown) => {
+    listFindings: async (input: FindingsInput) => {
       seen.findings.push(input);
       return { items: [], countOfTotal: 0, page: 1, pageSize: 20 };
     },
