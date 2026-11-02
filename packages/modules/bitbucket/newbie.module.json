@@ -1,0 +1,22 @@
+{
+  "key": "bitbucket",
+  "layer": "infrastructure",
+  "module": {
+    "file": "bitbucket.module",
+    "className": "BitbucketModule"
+  },
+  "config-service": {
+    "bitbucket": {
+      "workspace": "process.env.BITBUCKET_WORKSPACE",
+      "accessToken": "process.env.BITBUCKET_ACCESS_TOKEN",
+      "clientId": "process.env.BITBUCKET_CLIENT_ID",
+      "clientSecret": "process.env.BITBUCKET_CLIENT_SECRET"
+    }
+  },
+  "env": {
+    "BITBUCKET_WORKSPACE": "",
+    "BITBUCKET_ACCESS_TOKEN": "",
+    "BITBUCKET_CLIENT_ID": "",
+    "BITBUCKET_CLIENT_SECRET": ""
+  }
+}

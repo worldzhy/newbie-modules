@@ -13,6 +13,10 @@ import {
 } from "../../security-evaluation.constants";
 import { SecurityEvaluationKnowledgeSeverity } from "../../knowledge/security-evaluation-knowledge.constants";
 import {
+  SECURITY_EVALUATION_MECHANISM_NAME_INTEL,
+  type SecurityEvaluationJudgmentMechanism,
+} from "../security-evaluation-mechanism";
+import {
   SecurityEvaluationIntelMatchService,
   type IntelEvidenceCandidate,
 } from "./security-evaluation-intel-match.service";
@@ -49,7 +53,9 @@ const KNOWLEDGE_LAYER = "knowledge";
  * cached (ADR-018).
  */
 @Injectable()
-export class SecurityEvaluationIntelJudgment {
+export class SecurityEvaluationIntelJudgment implements SecurityEvaluationJudgmentMechanism {
+  readonly name = SECURITY_EVALUATION_MECHANISM_NAME_INTEL;
+
   constructor(private readonly matchService: SecurityEvaluationIntelMatchService) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
@@ -123,6 +129,9 @@ export class SecurityEvaluationIntelJudgment {
       candidates.push({
         knowledgeItemId,
         title: item.summary,
+        // The collector carries the knowledge summary alongside the manifest
+        // title so hard recall and the LLM see the same context.
+        summary: typeof payload?.summary === "string" ? payload.summary : undefined,
         severity: typeof payload?.severity === "string" ? payload.severity : "info",
         signalTags: Array.isArray(payload?.signalTags)
           ? payload.signalTags.filter((tag): tag is string => typeof tag === "string")

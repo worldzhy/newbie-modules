@@ -1,8 +1,21 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { CreateLlmConnectionDto, LlmConnectionResponseDto, UpdateLlmConnectionDto } from "./llm-connection.dto";
+import { decryptApiKey, encryptApiKey, fingerprintApiKey, isEncryptedApiKey } from "./llm-api-key";
 
+/**
+ * Decrypted connection shape handed to consumers. `apiKey` is always plaintext
+ * here; encrypted rows are unwrapped at the service boundary.
+ */
 export type LlmConnectionRecord = {
   id: string;
   name: string;
@@ -16,6 +29,16 @@ export type LlmConnectionRecord = {
   lastFailureMessage: string | null;
   createdAt: Date;
   updatedAt: Date;
+};
+
+/** Raw Prisma row: `apiKey` may still be ciphertext, plus the credential digest. */
+type LlmConnectionRow = LlmConnectionRecord & {
+  apiKeyFingerprint: string | null;
+  scopes: Array<{ scope: string }>;
+};
+
+type LlmConnectionBareRow = LlmConnectionRecord & {
+  apiKeyFingerprint: string | null;
 };
 
 /**
@@ -47,7 +70,34 @@ const DUPLICATE_ENDPOINT_MESSAGE = "A connection with this API key already exist
 export class LlmConnectionService {
   private readonly logger = new Logger(LlmConnectionService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  /**
+   * Encryption secret for stored API keys. A dedicated LLM_API_KEY_SECRET is
+   * preferred; the fallback reuses the refresh-token secret every deployment
+   * already sets, so encrypting keys needs no new deployment step. Rotation
+   * makes existing ciphertext unreadable — admins re-enter the affected keys.
+   */
+  private requireApiKeySecret(): string {
+    const secret = this.configService.get<string>("modules.llm.apiKeySecret");
+    if (!secret || secret.length < 32) {
+      throw new ServiceUnavailableException(
+        "LLM API key encryption is not configured: set LLM_API_KEY_SECRET (at least 32 characters).",
+      );
+    }
+    return secret;
+  }
+
+  /** Unwraps an encrypted `apiKey`; legacy plaintext rows pass through. */
+  private decryptRow<T extends { apiKey: string }>(row: T): T {
+    if (!isEncryptedApiKey(row.apiKey)) {
+      return row;
+    }
+    return { ...row, apiKey: decryptApiKey(row.apiKey, this.requireApiKeySecret()) };
+  }
 
   /**
    * Provider-level health fold (fire-and-forget): folds the latest model-call
@@ -88,15 +138,16 @@ export class LlmConnectionService {
     const records = (await this.prisma.llmConnection.findMany({
       include: { scopes: true },
       orderBy: [{ createdAt: "asc" }],
-    })) as Array<LlmConnectionRecord & { scopes: Array<{ scope: string }> }>;
-    return records.map((record) => this.toResponse(record));
+    })) as LlmConnectionRow[];
+    return records.map((record) => this.toResponse(this.decryptRow(record)));
   }
 
   async create(dto: CreateLlmConnectionDto): Promise<LlmConnectionResponseDto> {
     const baseUrl = normalizeBaseUrl(dto.baseUrl ?? "");
-    await this.requireEndpointAvailable(baseUrl, dto.apiKey);
+    const apiKeyFingerprint = fingerprintApiKey(dto.apiKey);
+    await this.requireEndpointAvailable(baseUrl, dto.apiKey, apiKeyFingerprint);
 
-    let record: LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+    let record: LlmConnectionRow;
     try {
       record = (await this.prisma.llmConnection.create({
         data: {
@@ -104,15 +155,16 @@ export class LlmConnectionService {
           provider: dto.provider ?? "openai-compatible",
           model: dto.model,
           baseUrl,
-          apiKey: dto.apiKey,
+          apiKey: encryptApiKey(this.requireApiKeySecret(), dto.apiKey),
+          apiKeyFingerprint,
         },
         include: { scopes: true },
-      })) as LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+      })) as LlmConnectionRow;
     } catch (error) {
       rethrowUniqueAsConflict(error);
     }
     this.logger.log(`LLM connection created: ${record.id} (${record.provider}/${record.model})`);
-    return this.toResponse(record);
+    return this.toResponse(this.decryptRow(record));
   }
 
   async update(id: string, dto: UpdateLlmConnectionDto): Promise<LlmConnectionResponseDto> {
@@ -135,7 +187,11 @@ export class LlmConnectionService {
     // another row just as much as changing the key itself.
     const effectiveBaseUrl = changes.baseUrl ?? existing.baseUrl;
     const effectiveApiKey = changes.apiKey ?? existing.apiKey;
-    await this.requireEndpointAvailable(effectiveBaseUrl, effectiveApiKey, id);
+    const effectiveFingerprint =
+      changes.apiKey !== undefined
+        ? fingerprintApiKey(changes.apiKey)
+        : (existing.apiKeyFingerprint ?? fingerprintApiKey(existing.apiKey));
+    await this.requireEndpointAvailable(effectiveBaseUrl, effectiveApiKey, effectiveFingerprint, id);
 
     // The health snapshot describes the endpoint that produced it. Once any
     // endpoint-defining field changes, the snapshot belongs to a configuration
@@ -149,6 +205,10 @@ export class LlmConnectionService {
       (changes.apiKey !== undefined && changes.apiKey !== existing.apiKey);
 
     const data: Prisma.LlmConnectionUpdateInput = { ...changes };
+    if (changes.apiKey !== undefined) {
+      data.apiKey = encryptApiKey(this.requireApiKeySecret(), changes.apiKey);
+      data.apiKeyFingerprint = effectiveFingerprint;
+    }
     if (endpointChanged) {
       data.lastCallAt = null;
       data.lastCallSuccess = null;
@@ -156,29 +216,32 @@ export class LlmConnectionService {
       data.lastFailureMessage = null;
     }
 
-    let record: LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+    let record: LlmConnectionRow;
     try {
       record = (await this.prisma.llmConnection.update({
         where: { id },
         data,
         include: { scopes: true },
-      })) as LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+      })) as LlmConnectionRow;
     } catch (error) {
       rethrowUniqueAsConflict(error);
     }
     this.logger.log(`LLM connection updated: ${id}`);
-    return this.toResponse(record);
+    return this.toResponse(this.decryptRow(record));
   }
 
   async remove(id: string): Promise<LlmConnectionResponseDto> {
+    // Fail before the delete if the stored key cannot be unwrapped, so a
+    // misconfigured secret never removes a row it then cannot report on.
+    await this.requireConnection(id);
     const record = (await this.prisma.llmConnection.delete({
       where: { id },
       include: { scopes: true },
-    })) as LlmConnectionRecord & { scopes: Array<{ scope: string }> };
+    })) as LlmConnectionRow;
     this.logger.log(
       `LLM connection deleted: ${id} (was bound by scopes: ${record.scopes.map((s) => s.scope).join(", ") || "none"})`,
     );
-    return this.toResponse(record);
+    return this.toResponse(this.decryptRow(record));
   }
 
   /**
@@ -190,14 +253,16 @@ export class LlmConnectionService {
       where: { scope },
     });
     if (!assignment) return null;
-    return (await this.prisma.llmConnection.findUnique({
+    const connection = (await this.prisma.llmConnection.findUnique({
       where: { id: assignment.connectionId },
-    })) as LlmConnectionRecord | null;
+    })) as LlmConnectionBareRow | null;
+    return connection === null ? null : this.decryptRow(connection);
   }
 
   /** Every connection; drives the periodic status probe. */
   async listAll(): Promise<LlmConnectionRecord[]> {
-    return (await this.prisma.llmConnection.findMany()) as LlmConnectionRecord[];
+    const rows = (await this.prisma.llmConnection.findMany()) as LlmConnectionBareRow[];
+    return rows.map((row) => this.decryptRow(row));
   }
 
   /**
@@ -220,26 +285,34 @@ export class LlmConnectionService {
     return submittedApiKey === maskApiKey(connection.apiKey) ? connection.apiKey : submittedApiKey;
   }
 
-  private async requireConnection(id: string): Promise<LlmConnectionRecord> {
+  private async requireConnection(id: string): Promise<LlmConnectionBareRow> {
     const record = (await this.prisma.llmConnection.findUnique({
       where: { id },
-    })) as LlmConnectionRecord | null;
+    })) as LlmConnectionBareRow | null;
     if (!record) {
       throw new NotFoundException("LLM connection not found.");
     }
-    return record;
+    return this.decryptRow(record);
   }
 
   /**
    * Pre-write guard for the (baseUrl, apiKey) unique invariant: gives clients
-   * a deterministic 409 instead of a raw database error. The unique index
-   * stays the source of truth for concurrent writes, handled via P2002.
+   * a deterministic 409 instead of a raw database error. The stored key is
+   * ciphertext (random IV), so the invariant compares the plaintext
+   * fingerprint; `apiKey` additionally matches legacy plaintext rows. The
+   * unique index stays the source of truth for concurrent writes, handled
+   * via P2002.
    */
-  private async requireEndpointAvailable(baseUrl: string, apiKey: string, excludeId?: string): Promise<void> {
+  private async requireEndpointAvailable(
+    baseUrl: string,
+    apiKey: string,
+    apiKeyFingerprint: string,
+    excludeId?: string,
+  ): Promise<void> {
     const duplicate = await this.prisma.llmConnection.findFirst({
       where: {
         baseUrl,
-        apiKey,
+        OR: [{ apiKeyFingerprint }, { apiKey }],
         ...(excludeId !== undefined ? { NOT: { id: excludeId } } : {}),
       },
       select: { id: true },

@@ -46,7 +46,7 @@ export class SecurityEvaluationAwsConfigEvidenceProvider implements EvidenceProv
       );
     }
 
-    const asset = await this.assets.ensureAsset(subject);
+    const asset = await this.assets.getOrCreateAsset(subject);
     const observedAt = new Date();
     const collection = await access.collect(subject);
 

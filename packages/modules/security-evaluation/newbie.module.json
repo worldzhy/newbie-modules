@@ -6,7 +6,7 @@
     "className": "SecurityEvaluationModule"
   },
   "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["evaluation", "security"],
+  "moduleDependencies": ["evaluation", "security", "llm"],
   "config-service": {},
   "env": {},
   "dependencies": {}

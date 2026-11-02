@@ -2,7 +2,8 @@ import { HttpService } from "@nestjs/axios";
 import { AxiosResponse, AxiosError } from "axios";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { MessageBotRecordStatus } from "../message-bot.constants";
+import { MessageBotRecordStatus, MessageBotProvider } from "../message-bot.constants";
+import { assertAllowedWebhook, WEBHOOK_TIMEOUT_MS } from "../webhook-url";
 import { LarkWebhookSendStatus } from "./lark.constants";
 import {
   LarkMessageBotSendTextMessageReqDto,
@@ -24,6 +25,10 @@ export class LarkMessageBotService {
       where: { id: channelId },
     });
 
+    // Re-check at send time: rows written before the allowlist existed, or by
+    // a direct database write, must not turn into outbound requests.
+    assertAllowedWebhook(channel.webhook, MessageBotProvider.Lark);
+
     const newRecord = await this.prisma.messageBotRecord.create({
       data: {
         channelId: channel.id,
@@ -34,7 +39,9 @@ export class LarkMessageBotService {
     });
 
     const result: LarkMessageBotSendMessageResDto = await this.httpService.axiosRef
-      .post<LarkMessageBotSendMessageReqBody, AxiosResponse<LarkMessageBotSendMessageRes>>(channel.webhook, body)
+      .post<LarkMessageBotSendMessageReqBody, AxiosResponse<LarkMessageBotSendMessageRes>>(channel.webhook, body, {
+        timeout: WEBHOOK_TIMEOUT_MS,
+      })
       .then((res) => {
         if (res.data.code === LarkWebhookSendStatus.Succeeded) {
           return { res: res.data };

@@ -263,9 +263,12 @@ export class GetWorkEvaluationHomeGroundRequestDto {
 // --- Reported evidence reads --------------------------------------------
 
 export class ListWorkEvaluationWorkspacesRequestDto {
-  @ApiProperty({ description: "Evaluatee whose reported workspaces are listed" })
+  @ApiPropertyOptional({
+    description: "Evaluatee whose reported workspaces are listed; defaults to the authenticated user",
+  })
+  @IsOptional()
   @IsUUID()
-  evaluateeUserId!: string;
+  evaluateeUserId?: string;
 }
 
 export class WorkEvaluationWorkspaceResponseDto {
@@ -278,9 +281,12 @@ export class WorkEvaluationWorkspaceResponseDto {
 }
 
 export class ListWorkEvaluationSessionsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Evaluatee whose collected sessions are listed" })
+  @ApiPropertyOptional({
+    description: "Evaluatee whose collected sessions are listed; defaults to the authenticated user",
+  })
+  @IsOptional()
   @IsUUID()
-  evaluateeUserId!: string;
+  evaluateeUserId?: string;
 
   @ApiPropertyOptional({ description: "Restrict to one collection period" })
   @IsOptional()
@@ -309,9 +315,22 @@ export class WorkEvaluationSessionResponseDto {
 export class ListWorkEvaluationSessionsResponseDto extends CommonListResponseDto<WorkEvaluationSessionResponseDto> {}
 
 export class ListWorkEvaluationDeclaredDocumentsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Evaluatee whose declared documents are listed" })
+  @ApiPropertyOptional({
+    description: "Evaluatee whose declared documents are listed; defaults to the authenticated user",
+  })
+  @IsOptional()
   @IsUUID()
-  evaluateeUserId!: string;
+  evaluateeUserId?: string;
+}
+
+/** Query part of `GET /work-evaluation/evidence/documents/:id` (the path carries the document id). */
+export class GetWorkEvaluationDeclaredDocumentRequestDto {
+  @ApiPropertyOptional({
+    description: "Evaluatee whose document is read; defaults to the authenticated user",
+  })
+  @IsOptional()
+  @IsUUID()
+  evaluateeUserId?: string;
 }
 
 export class WorkEvaluationDeclaredDocumentResponseDto {

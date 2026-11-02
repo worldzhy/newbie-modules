@@ -17,6 +17,8 @@ import { validateJudgment } from "./evaluation-invariants";
 export interface ListEvaluationFindingsInput {
   /** Omitted lists findings across subjects (narrowed by scope or run when given). */
   subjectId?: string;
+  /** Narrow to an explicit subject set (feature-level provenance filters). */
+  subjectIds?: readonly string[];
   /** Host scope coordinate on the subject; narrows the list to one scope. */
   scopeType?: string;
   scopeId?: string;
@@ -193,6 +195,7 @@ export class EvaluationFindingService {
       findManyArgs: {
         where: {
           ...(query.subjectId ? { subjectId: query.subjectId } : {}),
+          ...(query.subjectIds ? { subjectId: { in: [...query.subjectIds] } } : {}),
           ...(query.runId ? { lastSeenRunId: query.runId } : {}),
           ...(query.evaluationKey ? { evaluationKey: query.evaluationKey } : {}),
           ...(query.status ? { status: query.status } : {}),

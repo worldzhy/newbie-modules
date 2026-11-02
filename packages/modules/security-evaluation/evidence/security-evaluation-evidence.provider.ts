@@ -30,6 +30,10 @@ import {
   SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER,
   SecurityEvaluationScopeEntitiesProvider,
 } from "../judgment/intel/security-evaluation-scope-entities.port";
+import {
+  securityEvaluationIntelNegativeCacheToken,
+  SecurityEvaluationIntelNegativeCachePort,
+} from "../judgment/intel/security-evaluation-intel-negative-cache.port";
 import { RepositoryAccess, securityEvaluationRepositoryAccessToken } from "../ports/repository-access.port";
 
 interface ResolvedLockfile {
@@ -49,15 +53,18 @@ interface ResolvedLockfile {
  *
  * For INTEL the provider reads the world-scoped threat-knowledge store and
  * registers what the run considered: the subject's scope entities as declared
- * items and the recent knowledge candidates as knowledge items. Candidates
- * skipped by the negative cache or the evidence budget are accounted in the
- * skipped bucket rather than silently dropped.
+ * items and the recent knowledge candidates as knowledge items. The negative
+ * cache is consulted through its port (ADR-045); candidates it filters out,
+ * and candidates cut by the evidence budget, are accounted in the skipped
+ * bucket rather than silently dropped.
  */
 @Injectable()
 export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
   constructor(
     private readonly prisma: PrismaService,
     private readonly assets: SecurityEvaluationAssetService,
+    @Inject(securityEvaluationIntelNegativeCacheToken)
+    private readonly negativeCache: SecurityEvaluationIntelNegativeCachePort,
     @Optional()
     @Inject(securityEvaluationRepositoryAccessToken)
     private readonly repositoryAccess?: RepositoryAccess,
@@ -74,7 +81,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       return this.collectIntel(subject);
     }
 
-    const asset = await this.assets.ensureAsset(subject);
+    const asset = await this.assets.getOrCreateAsset(subject);
     const observedAt = new Date();
     const lockfile = await this.resolveLockfile(subject);
     const packages = this.readPackages(lockfile);
@@ -109,13 +116,22 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
    */
   private async collectIntel(subject: EvaluationSubjectRef): Promise<EvidenceCollection> {
     const scopeEntitiesProvider = this.scopeEntitiesProvider;
-    if (!scopeEntitiesProvider) return this.emptyCollection();
+    if (!scopeEntitiesProvider) {
+      throw new Error(
+        "No SecurityEvaluationScopeEntitiesProvider is bound to SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER; the host must bind the port before running threat-intel evaluations.",
+      );
+    }
 
     const scopes = await scopeEntitiesProvider.listScopeEntities();
     const scope = scopes.find(
       (candidate) => candidate.scopeType === subject.scopeType && candidate.scopeId === subject.scopeId,
     );
-    if (!scope || scope.entities.length === 0) return this.emptyCollection();
+    if (!scope) {
+      throw new BadRequestException(
+        `No scope "${subject.scopeType}:${subject.scopeId}" is registered with the host; a run over an unknown scope would report a vacuous clean result.`,
+      );
+    }
+    if (scope.entities.length === 0) return this.emptyCollection();
 
     const observedAt = new Date();
     const scopeKey = `${subject.scopeType}:${subject.scopeId}`;
@@ -140,17 +156,19 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
         severity: true,
         signalTags: true,
         fetchedAt: true,
-        negativeCache: true,
       },
     });
 
-    const cachedIds: string[] = [];
-    const eligible: typeof candidates = [];
-    for (const candidate of candidates) {
-      const cache = (candidate.negativeCache as Record<string, string> | null) ?? {};
-      if (cache[scopeKey] !== undefined) cachedIds.push(candidate.id);
-      else eligible.push(candidate);
-    }
+    // The negative cache decides which pairs a previous run already judged
+    // not relevant; the port keeps the store's shape out of this layer.
+    const uncached = new Set(
+      await this.negativeCache.filterUncached(
+        scopeKey,
+        candidates.map((candidate) => candidate.id),
+      ),
+    );
+    const cachedIds = candidates.filter((candidate) => !uncached.has(candidate.id)).map((candidate) => candidate.id);
+    const eligible = candidates.filter((candidate) => uncached.has(candidate.id));
 
     const budget = SECURITY_EVALUATION_INTEL_EVIDENCE_BUDGET;
     const withinBudget = eligible.slice(0, budget);
@@ -165,6 +183,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       refs: [candidate.id],
       payload: {
         knowledgeItemId: candidate.id,
+        summary: candidate.summary,
         severity: candidate.severity,
         signalTags: candidate.signalTags,
       },

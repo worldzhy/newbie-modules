@@ -23,13 +23,15 @@ export class WebhookController {
   @Get()
   @ApiOkResponse()
   async getAll(
+    @Param("teamId", ParseIntPipe) teamId: number,
     @Query("skip") skip?: number,
     @Query("take") take?: number,
     @Query("cursor", CursorPipe) cursor?: Prisma.WebhookWhereUniqueInput,
-    @Query("where", WherePipe) where?: Record<string, number | string>,
+    @Query("where", WherePipe) where?: Record<string, unknown>,
     @Query("orderBy", OrderByPipe) orderBy?: Record<string, "asc" | "desc">,
   ): Promise<Webhook[]> {
     return this.webhookService.getWebhooks({
+      teamId,
       skip,
       take,
       orderBy,

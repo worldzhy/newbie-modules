@@ -3,6 +3,10 @@ import type { EvaluationFindingCandidate } from "@modules/evaluation/ports/evalu
 import type { EvaluationJudgment, JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
 import type { SecurityEvaluationFindingSeverity } from "../security-evaluation-severity";
+import {
+  SECURITY_EVALUATION_MECHANISM_NAME_AWS_CONFIG,
+  type SecurityEvaluationJudgmentMechanism,
+} from "../security-evaluation-mechanism";
 import { deriveUrgency } from "../security-evaluation-urgency";
 import { SECURITY_EVALUATION_KEY_AWS_CIS_1_5 } from "../../security-evaluation.constants";
 import { awsConfigFingerprint } from "./security-evaluation-aws-config.identity";
@@ -26,7 +30,9 @@ const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
  * evidence provider already recorded them in the skipped bucket.
  */
 @Injectable()
-export class SecurityEvaluationAwsConfigJudgment {
+export class SecurityEvaluationAwsConfigJudgment implements SecurityEvaluationJudgmentMechanism {
+  readonly name = SECURITY_EVALUATION_MECHANISM_NAME_AWS_CONFIG;
+
   judge(input: JudgmentInput): Promise<EvaluationJudgment> {
     const { items, skippedRefs } = rebuildAwsConfigKnowledge(input.evidence);
     const evaluationKey = input.ruleSetVersion.evaluationKey;

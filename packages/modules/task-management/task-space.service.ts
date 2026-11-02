@@ -13,7 +13,7 @@ export class TaskSpaceService {
    * linking step. The space name is optional and supplied by the caller from
    * the project name; this module never reads the host Project table.
    */
-  async ensureSpaceForProject(projectId: string, name?: string) {
+  async getOrCreateSpaceForProject(projectId: string, name?: string) {
     const existing = await this.getSpaceByProjectId(projectId);
     if (existing) return existing;
 

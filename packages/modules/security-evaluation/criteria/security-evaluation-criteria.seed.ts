@@ -57,13 +57,13 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    void this.ensureAllBaselines().catch((error: unknown) => {
+    void this.seedMissingBaselines().catch((error: unknown) => {
       this.logger.warn(`Criteria baselines not seeded yet: ${describe(error)}`);
     });
   }
 
-  async ensureDependencyBaseline(): Promise<void> {
-    await this.ensureBaseline({
+  async seedDependencyBaseline(): Promise<void> {
+    await this.seedBaselineIfMissing({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
       evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV,
       version: SECURITY_EVALUATION_DEPENDENCY_RULE_SET_VERSION,
@@ -81,11 +81,11 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   }
 
   /** CIS AWS Foundations Benchmark v1.5 initial set (ADR-027 D3). */
-  async ensureAwsConfigBaseline(): Promise<void> {
+  async seedAwsConfigBaseline(): Promise<void> {
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
       (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     );
-    await this.ensureBaseline({
+    await this.seedBaselineIfMissing({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
       evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
       version: SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,
@@ -107,11 +107,11 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   }
 
   /** aws-custom rules inherited from the predecessor aws-audit module (ADR-033/ADR-037). */
-  async ensureAwsCustomBaseline(): Promise<void> {
+  async seedAwsCustomBaseline(): Promise<void> {
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
       (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     );
-    await this.ensureBaseline({
+    await this.seedBaselineIfMissing({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
       evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
       version: SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION,
@@ -132,8 +132,8 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   }
 
   /** INTEL criteria: recent threat-intel items matched to the subject's scope (ADR-039). */
-  async ensureIntelligenceBaseline(): Promise<void> {
-    await this.ensureBaseline({
+  async seedIntelligenceBaseline(): Promise<void> {
+    await this.seedBaselineIfMissing({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
       evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
       version: SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
@@ -152,14 +152,14 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     });
   }
 
-  private async ensureAllBaselines(): Promise<void> {
-    await this.ensureDependencyBaseline();
-    await this.ensureAwsConfigBaseline();
-    await this.ensureAwsCustomBaseline();
-    await this.ensureIntelligenceBaseline();
+  private async seedMissingBaselines(): Promise<void> {
+    await this.seedDependencyBaseline();
+    await this.seedAwsConfigBaseline();
+    await this.seedAwsCustomBaseline();
+    await this.seedIntelligenceBaseline();
   }
 
-  private async ensureBaseline(baseline: BaselineSeed): Promise<void> {
+  private async seedBaselineIfMissing(baseline: BaselineSeed): Promise<void> {
     const seedKey = `${baseline.kind}/${baseline.evaluationKey}/${baseline.version}`;
     if (this.seededFamilies.has(seedKey)) return;
 

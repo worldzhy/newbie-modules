@@ -2,7 +2,8 @@ import { HttpService } from "@nestjs/axios";
 import { AxiosError, AxiosResponse } from "axios";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { MessageBotRecordStatus } from "../message-bot.constants";
+import { MessageBotRecordStatus, MessageBotProvider } from "../message-bot.constants";
+import { assertAllowedWebhook, WEBHOOK_TIMEOUT_MS } from "../webhook-url";
 import { SendSlackMessageRequestDto, SendSlackMessageResponseDto, SendSlackTextMessageRequestDto } from "./slack.dto";
 import { SlackMessageBotSendMessageReqBody, SlackMessageBotSendMessageRes } from "./slack.interface";
 
@@ -19,6 +20,10 @@ export class SlackMessageBotService {
       where: { id: channelId },
     });
 
+    // Re-check at send time: rows written before the allowlist existed, or by
+    // a direct database write, must not turn into outbound requests.
+    assertAllowedWebhook(channel.webhook, MessageBotProvider.Slack);
+
     const newRecord = await this.prisma.messageBotRecord.create({
       data: {
         channelId: channel.id,
@@ -29,7 +34,9 @@ export class SlackMessageBotService {
     });
 
     const result: SendSlackMessageResponseDto = await this.httpService.axiosRef
-      .post<SlackMessageBotSendMessageReqBody, AxiosResponse<SlackMessageBotSendMessageRes>>(channel.webhook, body)
+      .post<SlackMessageBotSendMessageReqBody, AxiosResponse<SlackMessageBotSendMessageRes>>(channel.webhook, body, {
+        timeout: WEBHOOK_TIMEOUT_MS,
+      })
       .then((res) => {
         return { res: res.data };
       })

@@ -10,6 +10,7 @@ import {
   UpdateMessageBotChannelRequestDto,
 } from "../message-bot.dto";
 import { MessageBotProvider } from "../message-bot.constants";
+import { assertAllowedWebhook } from "../webhook-url";
 
 @ApiTags("Message Bot / Lark Channel")
 @ApiBearerAuth()
@@ -35,6 +36,7 @@ export class LarkChannelController {
   @ApiOperation({ summary: "Create a Lark message channel" })
   @ApiResponse({ type: MessageBotChannelDetailResDto })
   async createChannel(@Body() body: CreateMessageBotChannelRequestDto) {
+    assertAllowedWebhook(body.webhook, MessageBotProvider.Lark);
     return await this.prisma.messageBotChannel.create({
       data: { ...body, provider: MessageBotProvider.Lark },
     });
@@ -44,6 +46,9 @@ export class LarkChannelController {
   @ApiOperation({ summary: "Update a Lark message channel" })
   @ApiResponse({ type: MessageBotChannelDetailResDto })
   async updateChannel(@Param("id") id: string, @Body() body: UpdateMessageBotChannelRequestDto) {
+    if (body.webhook !== undefined) {
+      assertAllowedWebhook(body.webhook, MessageBotProvider.Lark);
+    }
     return await this.prisma.messageBotChannel.update({
       where: { id },
       data: body,

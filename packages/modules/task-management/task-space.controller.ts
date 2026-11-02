@@ -41,7 +41,7 @@ export class TaskSpaceController {
   @ApiOperation({ summary: "Get (auto-provisioning on first access) the task space of a Nightwatch project" })
   @ApiResponse({ status: 200, type: TaskSpaceResponseDto })
   async getSpaceByProjectId(@Param("projectId") projectId: string): Promise<TaskSpaceResponseDto> {
-    const space = await this.taskSpaceService.ensureSpaceForProject(projectId);
+    const space = await this.taskSpaceService.getOrCreateSpaceForProject(projectId);
     return { success: true, data: space };
   }
 
@@ -56,7 +56,7 @@ export class TaskSpaceController {
     const page = query.page ?? 0;
     const pageSize = query.pageSize ?? 10;
 
-    const space = await this.taskSpaceService.ensureSpaceForProject(projectId);
+    const space = await this.taskSpaceService.getOrCreateSpaceForProject(projectId);
 
     const result = await this.taskService.listTasks({
       spaceId: space.id,
@@ -88,8 +88,8 @@ export class TaskSpaceController {
     @Body() dto: CreateTaskRequestDto,
     @Req() req: UserRequest,
   ): Promise<CreateTaskResponseDto> {
-    const space = await this.taskSpaceService.ensureSpaceForProject(projectId);
-    const creator = await this.taskParticipantService.ensureHostParticipant({
+    const space = await this.taskSpaceService.getOrCreateSpaceForProject(projectId);
+    const creator = await this.taskParticipantService.getOrCreateHostParticipant({
       userId: req.user.userId,
     });
 

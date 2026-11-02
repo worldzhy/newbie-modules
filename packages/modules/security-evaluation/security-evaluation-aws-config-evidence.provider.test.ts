@@ -31,7 +31,7 @@ const VERSION: EvaluationRuleSetVersionRef = {
 
 function stubAssets(): SecurityEvaluationAssetService {
   return {
-    ensureAsset: async () => ({ id: "asset-1" }),
+    getOrCreateAsset: async () => ({ id: "asset-1" }),
     upsertAwsConfigKnowledgeItems: async () => undefined,
     touchObserved: async () => undefined,
   } as unknown as SecurityEvaluationAssetService;

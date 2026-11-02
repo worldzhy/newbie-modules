@@ -1,39 +1,41 @@
 // ! ------------------------------------------------------------ //
-// !          [Module] Cloud resource models                //
+// !          [Module] Application hosting stacks             //
 // ! ------------------------------------------------------------ //
-// * InfrastructureStack                                          //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
+/// Mirrors the AWS CloudFormation stack status this module last observed.
+/// The module reports AWS facts; it does not decide whether an application
+/// deployment succeeded.
 enum AwsResourceStackState {
   PENDING
-  BUILD_PROCESSING
-  BUILD_SUCCEEDED
-  BUILD_FAILED
-  DESTROY_PROCESSING
-  DESTROY_SUCCEEDED
-  DESTROY_FAILED
+  CREATE_IN_PROGRESS
+  CREATE_COMPLETE
+  CREATE_FAILED
+  DELETE_IN_PROGRESS
+  DELETE_COMPLETE
+  DELETE_FAILED
 
   @@schema("module/aws-cloudformation")
 }
 
+/// A cross-account target: the host assumes `roleArn` in `awsAccountId` on
+/// every AWS call. No long-lived access key is stored.
 model AwsEnvironment {
-  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                String
-  awsAccountId        String?
-  awsAccessKeyId      String
-  awsSecretAccessKey  String // automatic hashing
-  awsRegion           String
-  s3ForCloudformation String?
-  createdAt           DateTime           @default(now())
-  updatedAt           DateTime           @updatedAt
-  stacks              AwsResourceStack[]
+  id           String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  awsAccountId String
+  awsRegion    String
+  roleArn      String
+  externalId   String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  stacks       AwsResourceStack[]
 
   @@schema("module/aws-cloudformation")
 }
 
 model AwsResourceStack {
   id                  String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name                String?               @unique // Set default value via prisma middleware.
+  name                String?               @unique // Set default value via prisma extension.
   type                String
   params              Json?
   state               AwsResourceStackState @default(PENDING)

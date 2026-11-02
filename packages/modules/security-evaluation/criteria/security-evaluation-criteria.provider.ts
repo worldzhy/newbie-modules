@@ -38,26 +38,26 @@ export class SecurityEvaluationCriteriaProvider implements CriteriaProvider {
     switch (subject.kind) {
       case SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY:
         if (runConfig?.evaluationKey === SECURITY_EVALUATION_KEY_THREAT_INTEL) {
-          await this.seed.ensureIntelligenceBaseline();
+          await this.seed.seedIntelligenceBaseline();
           return {
             evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
             version: SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
           };
         }
-        await this.seed.ensureDependencyBaseline();
+        await this.seed.seedDependencyBaseline();
         return {
           evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV,
           version: SECURITY_EVALUATION_DEPENDENCY_RULE_SET_VERSION,
         };
       case SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT:
         if (runConfig?.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM) {
-          await this.seed.ensureAwsCustomBaseline();
+          await this.seed.seedAwsCustomBaseline();
           return {
             evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
             version: SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION,
           };
         }
-        await this.seed.ensureAwsConfigBaseline();
+        await this.seed.seedAwsConfigBaseline();
         return {
           evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
           version: SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,

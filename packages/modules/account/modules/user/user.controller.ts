@@ -1,4 +1,16 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  ForbiddenException,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma, User } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
@@ -37,8 +49,14 @@ export class UserController {
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.User)
   @ApiOperation({ summary: "Create a new user" })
   @ApiResponse({ type: CreateUserResponseDto })
-  async createUser(@Body() body: CreateUserDto) {
+  async createUser(@Body() body: CreateUserDto, @Req() request: UserRequest) {
     const { roles, ...scalarFields } = body;
+
+    // A caller may only hand out roles it already holds; otherwise a custom
+    // role that merely carries "Create User" could mint an ADMIN account.
+    if (roles && roles.length > 0) {
+      this.assertGrantableRoles(roles, request.user.roles ?? []);
+    }
 
     // Resolve role names to Role rows for the UserRole join table.
     const roleConnect =
@@ -161,6 +179,30 @@ export class UserController {
     const data: Prisma.UserUpdateInput = scalarFields as Prisma.UserUpdateInput;
 
     if (roles !== undefined) {
+      const callerRoles = request.user.roles ?? [];
+
+      // Nobody may change their own role set: that is the difference between
+      // holding "Update User" and being able to promote oneself to ADMIN.
+      if (userId === request.user.userId) {
+        throw new BadRequestException("You cannot change your own roles.");
+      }
+
+      // Refuse to touch a user who holds a role the caller does not have; the
+      // caller could otherwise strip a higher-privileged user's roles and
+      // replace them with its own.
+      const target = await this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { roles: { select: { role: { select: { name: true } } } } },
+      });
+      const outOfReach = target.roles.map((entry) => entry.role.name).filter((name) => !callerRoles.includes(name));
+      if (outOfReach.length > 0) {
+        throw new ForbiddenException(
+          `You cannot change the roles of a user holding roles you do not have: ${outOfReach.join(", ")}.`,
+        );
+      }
+
+      this.assertGrantableRoles(roles, callerRoles);
+
       const roleRows = await this.prisma.role.findMany({
         where: { name: { in: roles } },
         select: { id: true },
@@ -234,7 +276,11 @@ export class UserController {
       },
     },
   })
-  async changePassword(@Param("userId") userId: string, @Body() body: ChangeUserPasswordDto) {
+  async changePassword(
+    @Param("userId") userId: string,
+    @Body() body: ChangeUserPasswordDto,
+    @Req() request: UserRequest,
+  ) {
     // [step 1] Verify if the new password is same with the current password.
     if (body.currentPassword.trim() === body.newPassword.trim()) {
       throw new BadRequestException("The new password is same with the current password.");
@@ -250,11 +296,32 @@ export class UserController {
     }
 
     // [step 3] Change password (the Prisma extension validates strength and hashes it).
-    return await this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id: userId },
       data: { password: body.newPassword },
       select: { id: true, email: true, phone: true },
     });
+
+    // [step 4] Revoke the user's sessions, mirroring the self-service flow:
+    // old refresh tokens must not keep rotating after a password change. The
+    // acting session survives only when an admin resets their own password.
+    const currentSessionId = userId === request.user.userId ? request.user.sessionId : undefined;
+    await this.prisma.session.deleteMany({
+      where: {
+        userId,
+        ...(currentSessionId ? { NOT: { id: currentSessionId } } : {}),
+      },
+    });
+
+    return updated;
+  }
+
+  /** Reject any role the caller does not hold, so permissions cannot be escalated. */
+  private assertGrantableRoles(requested: string[], callerRoles: string[]): void {
+    const missing = requested.filter((name) => !callerRoles.includes(name));
+    if (missing.length > 0) {
+      throw new ForbiddenException(`You cannot grant roles you do not hold: ${missing.join(", ")}.`);
+    }
   }
 
   /* External platform identities (evidence attribution, ADR-029) */
