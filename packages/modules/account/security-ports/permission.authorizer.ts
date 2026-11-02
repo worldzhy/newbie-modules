@@ -17,7 +17,9 @@ import { SCOPE_PERMISSION_CHECKER, ScopePermissionChecker } from "@modules/secur
  * There is no hardcoded admin bypass and no wildcard matching.
  *
  * Scoped (project) decisions are delegated to the host-bound
- * SCOPE_PERMISSION_CHECKER, since membership data is host-owned.
+ * SCOPE_PERMISSION_CHECKER. Per ADR-048 the two layers are not ORed: a resolved
+ * scope is the sole criterion, and system-level grants only decide routes that
+ * carry no scope semantics.
  */
 @Injectable()
 // eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- bound via the PERMISSION_AUTHORIZER useClass provider
@@ -36,9 +38,18 @@ export class AccountPermissionAuthorizer implements PermissionAuthorizer {
       return true;
     }
 
-    // UNION path 1 (merged): Role → Permission OR trustedUserId → Permission
-    // Both hit the same Prisma model — one query, pushed down to the exact
-    // (resource, action) atom so a superuser's full grant set is never loaded.
+    // ADR-048: a resolved scope is the only criterion. A `none` scope means the
+    // route is scope-sensitive but the request could not be resolved, so it is a
+    // gap to surface — never a reason to fall back to a system-level grant.
+    if (scope) {
+      if (scope.type === "none" || !this.scopeChecker) {
+        return false;
+      }
+      return this.scopeChecker.check(userId, resource, action, scope);
+    }
+
+    // No scope semantics on this route: the two system-level UNION paths decide.
+    //
     const directGrant = await this.prisma.permission.findFirst({
       where: {
         resource,
@@ -64,15 +75,6 @@ export class AccountPermissionAuthorizer implements PermissionAuthorizer {
       select: { id: true },
     });
 
-    if (groupGrant) {
-      return true;
-    }
-
-    // No system-level grant; defer to the host's scope checker if present.
-    if (scope && this.scopeChecker) {
-      return this.scopeChecker.check(userId, resource, action, scope);
-    }
-
-    return false;
+    return Boolean(groupGrant);
   }
 }
