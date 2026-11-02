@@ -1,6 +1,6 @@
 # ADR-048: 显式 scope 优先于系统级 grant（授权求值顺序）
 
-状态：提议中
+状态：已采纳
 日期：2026-11-01
 归属：框架层（newbie-modules registry：`packages/modules/account/security-ports`、`packages/modules/security/ports`）
 关联：newbie-modules ADR-017（scope 名由宿主声明）、newbie-modules ADR-012（项目级 RBAC 契约）、nightwatch-backend ADR-019（宿主实施）、nightwatch-backend ADR-039（security-evaluation 按平台级模块建模，已退出项目 scope，不在本决策范围内）
@@ -78,3 +78,11 @@ scope 一旦解析成功就只信 scope；系统级 grant 只在「没有 scope 
 2. `security/ports/scope-permission.authorizer.ts`：更新 SPI 文档注释与 `ScopePermissionChecker` 契约描述。
 3. 契约测试（`account` 侧）：fake Prisma + fake scopeChecker 覆盖四个组合——grant 命中 + scope 允许 → 允许；grant 命中 + scope 拒绝 → 拒绝；grant 命中 + `none` → 拒绝；无 scope + grant 命中 → 允许。
 4. 消费仓迁移核对（nightwatch）：12 个作用域资源的路由 → scope 可解析性清单，缺的补 resolver，完成后才升本 ADR 为「已采纳」。
+
+## 落地记录（2026-11-02）
+
+- 切面 1–3 已在 registry 完成：`authorize` 按五步求值；SPI 注释改为「有 scope 时的唯一判据、未绑定即拒绝」；契约测试 7 例（grant/scope 四组合、无 grant 的 scope 放行、未绑定 checker、无 scope 无 grant、kill switch）。
+- 切面 4 核对结论：`AuthorizationGuard` 在本次改动之前就已对清单成员在 scope 解析失败时返回 `false`（`resolveHostScope() === null`），因此本决策不会让任何**当前可用**的项目路由变为不可用；新增的拒绝对象只有「持系统级 grant 但不是项目成员」的调用方，这正是决策目的。
+- 清单盘点：10 个资源有控制器路由；`WebMonitorSite` 的 `/list`、`/getSysForUserId` 显式 `{scope:"self"}`，属于「按调用者身份取数」的豁免，仍只走系统级 grant——登记刻意不覆盖 `self` 路由，这是已知边界。`AwsAuditScan`、`DependencyScan` 在 nightwatch 当前无控制器引用，属清单中的惰性条目（清理候选，不影响授权）。
+- 启动校验：`MatrixCompletenessValidator` 通过，59 个 `(resource, action)` 组合在矩阵中有 rank 行；后端以新构建重启后 `/` 返回 200。
+- 残余：宿主暂无「非项目成员但持系统级 grant」的账号，未做 403/200 的端到端对照；如需回归，可在 seed 里加一个仅系统级 grant 的测试角色。
