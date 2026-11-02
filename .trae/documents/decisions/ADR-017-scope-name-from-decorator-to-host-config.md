@@ -186,7 +186,7 @@ export const HOST_SCOPED_RESOURCES = Symbol("HOST_SCOPED_RESOURCES");
 
 ### 2. 资源粒度语义（设计澄清）
 
-`HOST_SCOPED_RESOURCES` 是 **resource 级**白名单，不是 `(resource, action)` 级。因此该资源的**所有** action 都会尝试解析 scope，而旧机制允许逐 action 显式声明或不声明。
+`HOST_SCOPED_RESOURCES` 是 **resource 级**的登记（不是 `(resource, action)` 级），语义为「该资源的授权必须按数据 scope 求值」。因此该资源的**所有** action 都会尝试解析 scope，而旧机制允许逐 action 显式声明或不声明。
 
 已核实的等价性与差异：
 
@@ -198,7 +198,7 @@ export const HOST_SCOPED_RESOURCES = Symbol("HOST_SCOPED_RESOURCES");
 | `GET /ec2-metric?projectId=` | `{scope:"project"}` | project resolver 命中 | 等价 |
 | `GET /task-spaces/by-project/:projectId` | **无 scope**（系统级） | project resolver 命中 → 项目级 | **行为变更**：成员从 403 → 允许 |
 
-最后一行是唯一的实际变更，方向为放宽且符合 nightwatch-backend ADR-019 的语义（项目成员应能访问自己项目），但**必须知道它是白名单的副作用**，不是显式决策。若未来需要 action 级精度，应升级 token 类型为 `Record<resource, actions[]>`，而不是回到装饰器携带 key。
+最后一行是唯一的实际变更，方向为放宽且符合 nightwatch-backend ADR-019 的语义（项目成员应能访问自己项目），但**必须知道它是资源级登记的副作用**，不是显式决策。若未来需要 action 级精度，应升级 token 类型为 `Record<resource, actions[]>`，而不是回到装饰器携带 key。
 
 ### 3. 迁移面遗漏（已修）
 
