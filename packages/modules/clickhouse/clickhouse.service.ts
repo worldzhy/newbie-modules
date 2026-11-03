@@ -4,6 +4,25 @@ import { ClickHouseClient, createClient } from "@clickhouse/client";
 import { ClickHouseModel } from "./clickhouse.model";
 import { ClickHouseTableConfig, ClickHouseColumnMeta, ClickHouseSchemaDiff } from "./clickhouse.types";
 
+// Identifier names in ClickHouse follow MySQL rules: alphanumeric, underscore,
+// dollar sign. Quoted identifiers (backticks) can be arbitrary, but we restrict
+// unquoted to the safe set and always quote so keywords and edge cases are
+// handled consistently.
+const IDENTIFIER_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+function quoteIdentifier(name: string): string {
+  if (!IDENTIFIER_RE.test(name)) {
+    throw new Error(`Invalid ClickHouse identifier: ${name}`);
+  }
+  return `\`${name}\``;
+}
+
+function quoteTable(table: string): string {
+  // Split on '.' to handle `database.table` form; quote each part separately.
+  const parts = table.split(".");
+  return parts.map(quoteIdentifier).join(".");
+}
+
 /**
  * Shared ClickHouse service.
  *
@@ -61,7 +80,7 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
 
   // Create database if not exists.
   async createDatabase(dbName: string): Promise<void> {
-    await this.query({ query: `CREATE DATABASE IF NOT EXISTS ${dbName}` });
+    await this.query({ query: `CREATE DATABASE IF NOT EXISTS ${quoteIdentifier(dbName)}` });
   }
 
   // Create a model instance:
@@ -98,7 +117,7 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
   // Returns null when the table does not exist.
   private async getTableMeta(table: string): Promise<ClickHouseColumnMeta[] | null> {
     try {
-      const result = await this.query({ query: `DESCRIBE TABLE ${table}`, format: "JSONEachRow" });
+      const result = await this.query({ query: `DESCRIBE TABLE ${quoteTable(table)}`, format: "JSONEachRow" });
       return (await result.json()) as ClickHouseColumnMeta[];
     } catch (err: unknown) {
       const e = err as { message?: string; code?: number };
@@ -137,15 +156,16 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
 
   // Apply the schema diff to the table via ALTER TABLE ADD/DROP/MODIFY COLUMN.
   private async syncTable(table: string, diff: ClickHouseSchemaDiff): Promise<void> {
+    const qTable = quoteTable(table);
     const statements: string[] = [];
     for (const name of diff.deleteColumns) {
-      statements.push(`ALTER TABLE ${table} DROP COLUMN ${name}`);
+      statements.push(`ALTER TABLE ${qTable} DROP COLUMN ${quoteIdentifier(name)}`);
     }
     for (const item of diff.addColumns) {
-      statements.push(`ALTER TABLE ${table} ADD COLUMN ${item.name} ${item.type}`);
+      statements.push(`ALTER TABLE ${qTable} ADD COLUMN ${quoteIdentifier(item.name)} ${item.type}`);
     }
     for (const item of diff.modifyColumns) {
-      statements.push(`ALTER TABLE ${table} MODIFY COLUMN ${item.name} ${item.type}`);
+      statements.push(`ALTER TABLE ${qTable} MODIFY COLUMN ${quoteIdentifier(item.name)} ${item.type}`);
     }
     for (const sql of statements) {
       await this.query({ query: sql });
@@ -157,14 +177,14 @@ export class ClickHouseService implements OnModuleInit, OnModuleDestroy {
   private async createTable(table: string, config: ClickHouseTableConfig): Promise<void> {
     const columns = Object.entries(config.schema)
       .map(([name, def]) => {
-        const parts = [name, def.type];
+        const parts = [quoteIdentifier(name), def.type];
         if (def.default !== undefined && typeof def.default !== "function") {
           parts.push(`DEFAULT ${def.default}`);
         }
         return parts.join(" ");
       })
       .join(", ");
-    const ddl = `CREATE TABLE IF NOT EXISTS ${table} (${columns}) ${config.options}`;
+    const ddl = `CREATE TABLE IF NOT EXISTS ${quoteTable(table)} (${columns}) ${config.options}`;
     await this.query({ query: ddl });
   }
 }
