@@ -31,6 +31,8 @@
 | R5-P2-05 | newbie-modules | web-monitor `systemName` 直接编译为正则（项目范围已收敛，仅 ReDoS） | P2 | artifact | MEMBER/OPERATOR | open |
 | R5-P2-06 | newbie-modules | security-evaluation 报告 `latestResultsBySubject` 无界查询（全量载入再按 key 去重） | P2 | artifact | OPERATOR/ADMIN | open |
 | R5-P2-07 | newbie-modules | notification push-failures 无分页，随累积行数无界返回 | P2 | artifact | OPERATOR/ADMIN | open |
-| R5-13 | newbie-modules ↔ nightwatch-backend | ClickHouse 标识符注入：registry 已加 `quoteIdentifier/quoteTable`，宿主副本仍裸插值；web-monitor `appId` 无校验（详见 devbie 台账同名条目） | P1 | live（宿主旧副本） | MEMBER/OPERATOR 且项目 EDITOR+ | open（registry 已修，host 未装配；复核新增） |
+| R5-13 | newbie-modules ↔ nightwatch-backend | ClickHouse 标识符注入：registry 已加 `quoteIdentifier/quoteTable`，宿主副本仍裸插值；web-monitor `appId` 无校验（详见 devbie 台账同名条目） | P1 | live（宿主旧副本） | MEMBER/OPERATOR 且项目 EDITOR+ | partial（W1 `0891fcb` 已装配到宿主 `b5ca19f`）；web-monitor `appId` 校验待 W2 |
 
 复核轮（2026-11-03）：R5-P2-02 的 `link` 条款降为契约不对称；R5-P2-03 的「owner 状态」修正为「verifier 端口未做该校验，且通道无调用方」（与 devbie 台账 N-1 同源）；新增 R5-13。详见 `devbie/.trae/documents/expert-review-2026-11-03-round5.md` §12。
+
+W1 落地（2026-11-03）：`d78bf84` security 拒绝公开/过短签名密钥（启动、签名、验签三处 fail-closed）；`0891fcb` clickhouse 配置改为纯 `process.env`。根因是 manifest 中 `process.env.X || 'fallback'` 含内层引号，CLI 正则不解包、原样写成字符串字面量；devbie CLI 已补装配期告警（`5ccd7c9`），其余同类 manifest 仍待逐模块收敛。
