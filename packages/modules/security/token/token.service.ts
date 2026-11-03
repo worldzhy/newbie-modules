@@ -15,12 +15,29 @@ interface TokenModuleConfig {
   userRefresh: { secret: string; expiresIn: SignOptions["expiresIn"] };
 }
 
+/** Public literal that must never be accepted as a signing key. */
+const KNOWN_PUBLIC_SECRET = "your-default-token-secret";
+
+/**
+ * A signing secret is only usable when it is long enough to be unguessable.
+ * Failing here stops the process at startup instead of letting every token be
+ * forgeable with a value that ships in the source tree.
+ */
+function assertUsableSecret(secret: unknown, key: string, minimumLength = 32): asserts secret is string {
+  if (typeof secret !== "string" || secret.length < minimumLength || secret === KNOWN_PUBLIC_SECRET) {
+    throw new Error(
+      `${key} must be a non-public secret of at least ${minimumLength} characters; refusing to sign tokens`,
+    );
+  }
+}
+
 @Injectable()
 export class TokenService {
   private tokenConfig: TokenModuleConfig;
 
   constructor(private config: ConfigService) {
     this.tokenConfig = this.config.getOrThrow("modules.security.token");
+    assertUsableSecret(this.tokenConfig.defaultSecret, "modules.security.token.defaultSecret");
   }
 
   /**
@@ -31,6 +48,7 @@ export class TokenService {
     const { options } = params;
     if (typeof payload === "number") payload = payload.toString();
     secret = secret ?? this.tokenConfig.defaultSecret;
+    assertUsableSecret(secret, "token signing secret");
     return sign(payload, secret, options);
   }
 
@@ -45,6 +63,9 @@ export class TokenService {
     const { token, options } = params;
     let { secret } = params;
     secret = secret ?? this.tokenConfig.defaultSecret;
+    // Verification also fails closed: a missing secret must not degrade into an
+    // implicit "any token signed with the literal" acceptance path.
+    assertUsableSecret(secret, "token verification secret");
 
     try {
       return verify(token, secret, options) as T;

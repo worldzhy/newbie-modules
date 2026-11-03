@@ -31,7 +31,7 @@
         }
       },
       "token": {
-        "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET || 'your-default-token-secret'",
+        "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET",
         "userAccess": {
           "expiresIn": "10m",
           "secret": "process.env.SECURITY_USER_ACCESS_TOKEN_SECRET"
@@ -44,7 +44,7 @@
           "secret": "process.env.SECURITY_APIKEY_ACCESS_TOKEN_SECRET"
         }
       },
-      "defaultGuard": "process.env.SECURITY_DEFAULT_GUARD || 'jwt'"
+      "defaultGuard": "jwt"
     }
   },
   "env": {
