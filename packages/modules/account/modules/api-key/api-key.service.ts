@@ -1,13 +1,11 @@
 import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
-import { ApiKey, Prisma, UserStatus } from "@generated/prisma/client";
+import { ApiKey, Prisma } from "@generated/prisma/client";
 import { API_KEY_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { generateRandomString } from "@devbie/newbie/utilities/random.util";
 import { generateHash } from "@devbie/newbie/utilities/common.util";
 import { Expose, expose } from "../../helpers/expose";
 import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
-import { LRUCache } from "lru-cache";
 
 /** An API key belongs to either a user (personal key) or an organization. */
 type ApiKeyOwner = { userId: string } | { organizationId: string };
@@ -28,21 +26,10 @@ type ApiKeyLogsQuery = {
 
 @Injectable()
 export class ApiKeyService {
-  private lru: LRUCache<string, ApiKey>;
-
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService,
     private auditLogService: AuditLogService,
-  ) {
-    const cacheConfig = this.configService.getOrThrow<{ apiKeyLruSize: number; apiKeyLruTtlMs: number }>(
-      "modules.account.cache",
-    );
-    this.lru = new LRUCache<string, ApiKey>({
-      max: cacheConfig.apiKeyLruSize,
-      ttl: cacheConfig.apiKeyLruTtlMs,
-    });
-  }
+  ) {}
 
   async createApiKey(params: {
     userId: string;
@@ -88,40 +75,6 @@ export class ApiKeyService {
 
   async getApiKeyForUser(userId: string, id: number): Promise<Expose<ApiKey>> {
     return expose<ApiKey>(await this.getOwnedApiKey({ userId }, id));
-  }
-
-  async getApiKeyFromKey(key: string) {
-    const cached = this.lru.get(key);
-    if (cached) {
-      // Even when cached, do not hand out keys whose owner has been
-      // disabled/suspended since last cache. This is a cheap guard
-      // (single User row lookup) that prevents a cached ACTIVE key from
-      // surviving a User.status transition to INACTIVE.
-      await this.assertOwnerActive(cached);
-      // expose() mutates its argument, so hand it a copy to keep the cached row intact.
-      return expose<ApiKey>({ ...cached });
-    }
-    const apiKey = await this.prisma.apiKey.findFirst({
-      where: { key },
-    });
-    if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    await this.assertOwnerActive(apiKey);
-    this.lru.set(key, apiKey);
-    return expose<ApiKey>({ ...apiKey });
-  }
-
-  /**
-   * Personal API keys are only usable while the owning User is ACTIVE.
-   * Organization-scoped keys skip this check (they belong to an org, not
-   * a user; org suspension is handled elsewhere).
-   */
-  private async assertOwnerActive(apiKey: ApiKey): Promise<void> {
-    if (!apiKey.userId) return; // Organization-scoped — no user to gate.
-    const user = await this.prisma.user.findUnique({ where: { id: apiKey.userId } });
-    if (!user || user.status !== UserStatus.ACTIVE) {
-      this.lru.delete(apiKey.key);
-      throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-    }
   }
 
   async updateApiKey(userId: string, id: number, data: Prisma.ApiKeyUpdateInput): Promise<Expose<ApiKey>> {
@@ -186,12 +139,11 @@ export class ApiKeyService {
     data: Prisma.ApiKeyUpdateInput,
     attribution?: { actorId?: string },
   ): Promise<Expose<ApiKey>> {
-    const ownedApiKey = await this.getOwnedApiKey(owner, id);
+    await this.getOwnedApiKey(owner, id);
     const apiKey = await this.prisma.apiKey.update({
       where: { id },
       data,
     });
-    this.lru.delete(ownedApiKey.key);
     await this.auditLogService.record(AuditEvent.API_KEY_UPDATED, {
       actorId: attribution?.actorId,
       resourceType: "api-key",
@@ -208,11 +160,10 @@ export class ApiKeyService {
     id: number,
     attribution?: { actorId?: string; ipAddress?: string; userAgent?: string },
   ): Promise<Expose<ApiKey>> {
-    const ownedApiKey = await this.getOwnedApiKey(owner, id);
+    await this.getOwnedApiKey(owner, id);
     const apiKey = await this.prisma.apiKey.delete({
       where: { id },
     });
-    this.lru.delete(ownedApiKey.key);
     await this.auditLogService.record(AuditEvent.API_KEY_DELETED, {
       actorId: attribution?.actorId,
       resourceType: "api-key",
