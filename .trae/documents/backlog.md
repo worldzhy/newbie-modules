@@ -24,8 +24,7 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 报告：`.trae/documents/expert-review-2026-10-31-round4.md`；台账：同目录 `findings.md`。
 
-- [ ] `[round4 R4-04]` **P2** 负缓存键仅 `(knowledgeItemId, scopeKey)`，缺实体集/模型版本维度，且采集层在硬召回前过滤（`evidence/security-evaluation-evidence.provider.ts`）。需产品确认失效语义：缓存键加实体集指纹，或缓存只用于"是否再调 LLM"、硬召回始终先跑。
-- [ ] `[round4 R4-09]` **P2** 证据预算 `fetchedAt asc` 截断，硬命中永不负缓存，候选 >200 时新条目永久落在 `overBudget`。需决定预算策略：改新条目优先（翻转排序，老条目可能饿死），或建 per-scope 已评估水位（需 schema 变更）。
+（R4-04 + R4-09 已修复：NegativeCache → VerdictCache（加 verdict 枚举），record 加 verdict/matchedEntity 字段；filterUncached 加 verdict="not-relevant" + TTL 过滤（默认 7 天，NEGATIVE_CACHE_TTL_DAYS env 可覆盖）；evidence provider fetchedAt asc → desc；硬命中也写缓存（audit-only，不进 filterUncached）。commit 待写。）
 
 ## 安全评审 round3 P2（二次取证后 open，2026-11-02 入账）
 
