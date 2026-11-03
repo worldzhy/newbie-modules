@@ -4,6 +4,11 @@ import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EventCatalogService } from "./event-catalog.service";
 
+/// Default event-emission retention. Events older than this many days are
+/// pruned before each new insert (lazy cleanup — no scheduler, no extra
+/// dependency). Hosts can override via EVENT_EMISSION_RETENTION_DAYS.
+const DEFAULT_RETENTION_DAYS = 30;
+
 export interface EventDescription {
   key: string;
   name: string;
@@ -18,6 +23,11 @@ export interface EventDescription {
 @Injectable()
 export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventEmitterService.name);
+
+  /// Retention cut point computed once at construction (env read is a boot-time
+  /// decision, not a per-request concern).
+  private readonly retentionDays: number;
+
   /// Bound once so onModuleDestroy can detach the exact same callback.
   private readonly recordEmission = (event: string | string[], payload: unknown) => {
     const eventKey = Array.isArray(event) ? event.join(".") : String(event);
@@ -30,7 +40,10 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly eventCatalog: EventCatalogService,
-  ) {}
+  ) {
+    const parsed = Number.parseInt(process.env.EVENT_EMISSION_RETENTION_DAYS ?? "", 10);
+    this.retentionDays = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RETENTION_DAYS;
+  }
 
   onModuleInit() {
     this.eventEmitter.onAny(this.recordEmission);
@@ -97,6 +110,18 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async record(eventKey: string, payload: unknown) {
+    // Lazy cleanup: each insert prunes all rows older than the configured
+    // retention. No scheduler, no extra dependency — write pressure is
+    // proportional to insert rate so cleanup scales naturally.
+    // Prisma deleteMany doesn't support take/limit, so this is a full
+    // prune per write; because writes are frequent the accumulated stale
+    // rows are bounded under normal operation.
+    await this.prisma.eventEmission.deleteMany({
+      where: {
+        emittedAt: { lt: new Date(Date.now() - this.retentionDays * 86_400_000) },
+      },
+    });
+
     await this.prisma.eventEmission.create({
       data: {
         eventKey,

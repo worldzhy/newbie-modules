@@ -31,5 +31,5 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 > 来源：devbie `.trae/documents/expert-review-2026-10-31-round3.md` §P2 + §R3-G1。9 条误报与 1 条出界已剔除（见同文件 §误报剔除与本次复核记录）。
 
-- [ ] `[R3-P2-08]` **P2** event-emitter 全量事件落库、无保留期：`event-emitter/event-emitter.service.ts` L36、L99-107。
+（Wave 5 最后一条 P2-08 已修复：event-emitter `record()` 前加 lazy `deleteMany({ emittedAt: < now - N days })`，默认 30 天，`EVENT_EMISSION_RETENTION_DAYS` env 可覆盖；无 @nestjs/schedule 依赖、无 migration。）
 
