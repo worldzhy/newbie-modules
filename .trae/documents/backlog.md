@@ -32,6 +32,5 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 > 来源：devbie `.trae/documents/expert-review-2026-10-31-round3.md` §P2 + §R3-G1。9 条误报与 1 条出界已剔除（见同文件 §误报剔除与本次复核记录）。
 
 - [ ] `[R3-P2-08]` **P2** event-emitter 全量事件落库、无保留期：`event-emitter/event-emitter.service.ts` L36、L99-107。
-- [ ] `[R3-P2-10]` **P2** web-monitor `POST /system/add` body 用 `projectId`，宿主 resolver 只认 `params/query/body.appId`：`web-monitor/modules/site/site.service.ts` L27 vs nightwatch-backend `scope-resolvers.ts` L202-212（跨仓，修复在两边对齐字段）。
 - [ ] `[R3-P2-11]` **P2** `@RequireOwner` 注释与 guard 行为相反：`security/authorization/require-owner.decorator.ts` L9-11 称 admin 可绕过，`ownership.guard.ts` L9-13 明确无绕过；改注释或加 ADMIN bypass 需拍板。
 
