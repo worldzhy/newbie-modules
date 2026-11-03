@@ -1,8 +1,9 @@
 import { Controller, Delete, Get, Patch, Post, Body, Param, Query } from "@nestjs/common";
 import { ApiCreatedResponse, ApiOkResponse, ApiTags, ApiBearerAuth, ApiBody } from "@nestjs/swagger";
-import { Tag, Prisma } from "@generated/prisma/client";
+import { Tag, Prisma, PermissionAction } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { ListTagsRequestDto } from "./tag.dto";
+import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { CreateTagDto, ListTagsRequestDto, UpdateTagDto } from "./tag.dto";
 
 /**
  * Sentinel id of the synthetic group holding groupless tags in the
@@ -19,6 +20,7 @@ export class TagController {
 
   @Get("grouped")
   @ApiOkResponse({ type: Object, isArray: true })
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Tag)
   async getGroupedTags() {
     const tagGroups = await this.prisma.tagGroup.findMany({
       select: {
@@ -56,14 +58,16 @@ export class TagController {
       },
     },
   })
-  async createTag(@Body() body: Prisma.TagUncheckedCreateInput): Promise<Tag> {
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.Tag)
+  async createTag(@Body() body: CreateTagDto): Promise<Tag> {
     return await this.prisma.tag.create({
-      data: body,
+      data: { ...body },
     });
   }
 
   @Get("")
   @ApiOkResponse()
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Tag)
   async list(@Query() query: ListTagsRequestDto) {
     const { page, pageSize } = query;
 
@@ -94,6 +98,7 @@ export class TagController {
 
   @Get(":tagId")
   @ApiOkResponse()
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.Tag)
   async getTag(@Param("tagId") tagId: number): Promise<Tag> {
     return await this.prisma.tag.findUniqueOrThrow({
       where: { id: tagId },
@@ -114,19 +119,23 @@ export class TagController {
       },
     },
   })
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Tag)
   async updateTag(
     @Param("tagId") tagId: number,
     @Body()
-    body: Prisma.TagUpdateInput,
+    body: UpdateTagDto,
   ): Promise<Tag> {
+    // Strip undefined keys so Prisma only touches fields the caller actually sent.
+    const data = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined));
     return await this.prisma.tag.update({
       where: { id: tagId },
-      data: body,
+      data,
     });
   }
 
   @Delete(":tagId")
   @ApiOkResponse()
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Tag)
   async deleteTag(@Param("tagId") tagId: number): Promise<Tag> {
     return await this.prisma.tag.delete({
       where: { id: tagId },

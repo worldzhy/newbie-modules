@@ -31,11 +31,9 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 > 来源：devbie `.trae/documents/expert-review-2026-10-31-round3.md` §P2 + §R3-G1。9 条误报与 1 条出界已剔除（见同文件 §误报剔除与本次复核记录）。
 
-- [ ] `[R3-P2-01]` **P2** account api-key LRU 仅 `max` 无 TTL，校验只比对 hash 不查 `UserStatus`：`account/modules/api-key/api-key.service.ts` L38-93、`account/security-ports/api-key.verifier.ts` L16-30。
 - [ ] `[R3-P2-08]` **P2** event-emitter 全量事件落库、无保留期：`event-emitter/event-emitter.service.ts` L36、L99-107。
 - [ ] `[R3-P2-09]` **P2** elasticsearch 代码读 `retries` 但 manifest 未声明：`elasticsearch/elasticsearch.service.ts` L32 vs `newbie.module.json` L8-14。
 - [ ] `[R3-P2-10]` **P2** web-monitor `POST /system/add` body 用 `projectId`，宿主 resolver 只认 `params/query/body.appId`：`web-monitor/modules/site/site.service.ts` L27 vs nightwatch-backend `scope-resolvers.ts` L202-212（跨仓，修复在两边对齐字段）。
 - [ ] `[R3-P2-11]` **P2** `@RequireOwner` 注释与 guard 行为相反：`security/authorization/require-owner.decorator.ts` L9-11 称 admin 可绕过，`ownership.guard.ts` L9-13 明确无绕过；改注释或加 ADMIN bypass 需拍板。
 - [ ] `[R3-P2-12]` **P2** people-finder `createTaskBatch` check-then-create，`schema.prisma` L34 `batchId` 无 `@unique`：`people-finder/people-finder.service.ts` L126-137。
-- [ ] `[R3-G1-1]` **P2** tag/tag-group 全部路由零授权、DTO 直通 Prisma 输入：`tag/tag.controller.ts` L45-63、L117-134；`tag/tag-group.controller.ts` L13-28。
 

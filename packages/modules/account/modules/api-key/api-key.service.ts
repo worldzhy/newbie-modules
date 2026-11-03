@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { ApiKey, Prisma } from "@generated/prisma/client";
+import { ApiKey, Prisma, UserStatus } from "@generated/prisma/client";
 import { API_KEY_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { generateRandomString } from "@devbie/newbie/utilities/random.util";
@@ -35,9 +35,12 @@ export class ApiKeyService {
     private configService: ConfigService,
     private auditLogService: AuditLogService,
   ) {
-    // The configured size is the maximum number of cached entries.
+    const cacheConfig = this.configService.getOrThrow<{ apiKeyLruSize: number; apiKeyLruTtlMs: number }>(
+      "modules.account.cache",
+    );
     this.lru = new LRUCache<string, ApiKey>({
-      max: this.configService.getOrThrow<number>("modules.account.cache.apiKeyLruSize"),
+      max: cacheConfig.apiKeyLruSize,
+      ttl: cacheConfig.apiKeyLruTtlMs,
     });
   }
 
@@ -89,14 +92,36 @@ export class ApiKeyService {
 
   async getApiKeyFromKey(key: string) {
     const cached = this.lru.get(key);
-    // expose() mutates its argument, so hand it a copy to keep the cached row intact.
-    if (cached) return expose<ApiKey>({ ...cached });
+    if (cached) {
+      // Even when cached, do not hand out keys whose owner has been
+      // disabled/suspended since last cache. This is a cheap guard
+      // (single User row lookup) that prevents a cached ACTIVE key from
+      // surviving a User.status transition to INACTIVE.
+      await this.assertOwnerActive(cached);
+      // expose() mutates its argument, so hand it a copy to keep the cached row intact.
+      return expose<ApiKey>({ ...cached });
+    }
     const apiKey = await this.prisma.apiKey.findFirst({
       where: { key },
     });
     if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
+    await this.assertOwnerActive(apiKey);
     this.lru.set(key, apiKey);
     return expose<ApiKey>({ ...apiKey });
+  }
+
+  /**
+   * Personal API keys are only usable while the owning User is ACTIVE.
+   * Organization-scoped keys skip this check (they belong to an org, not
+   * a user; org suspension is handled elsewhere).
+   */
+  private async assertOwnerActive(apiKey: ApiKey): Promise<void> {
+    if (!apiKey.userId) return; // Organization-scoped — no user to gate.
+    const user = await this.prisma.user.findUnique({ where: { id: apiKey.userId } });
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      this.lru.delete(apiKey.key);
+      throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    }
   }
 
   async updateApiKey(userId: string, id: number, data: Prisma.ApiKeyUpdateInput): Promise<Expose<ApiKey>> {
