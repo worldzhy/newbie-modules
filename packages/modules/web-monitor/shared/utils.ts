@@ -1,3 +1,23 @@
+import { BadRequestException } from "@nestjs/common";
+
+/**
+ * `appId` is a storage partition key: it becomes part of Mongo collection
+ * names and ClickHouse table names. Restrict it to the identifier-safe set so
+ * a malformed value is rejected at the boundary instead of reaching DDL.
+ */
+export const APP_ID_PATTERN = /^[A-Za-z0-9_]{1,64}$/;
+
+export function isValidAppId(appId: unknown): appId is string {
+  return typeof appId === "string" && APP_ID_PATTERN.test(appId);
+}
+
+export function assertAppId(appId: unknown): string {
+  if (!isValidAppId(appId)) {
+    throw new BadRequestException("appId must match ^[A-Za-z0-9_]{1,64}$");
+  }
+  return appId;
+}
+
 const decryptP: Record<string, number> = {
   QR: 0,
   xa: 1,
