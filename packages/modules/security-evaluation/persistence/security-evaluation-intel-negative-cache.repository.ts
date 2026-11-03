@@ -12,6 +12,16 @@ import type {
 const DEFAULT_TTL_DAYS = 7;
 
 /**
+ * Prisma enum values must be identifiers, so the schema keeps the domain
+ * vocabulary (`not-relevant` / `hard-hit`) as `@map`ped database values.
+ * Translate at this adapter boundary only.
+ */
+const PRISMA_VERDICT: Record<SecurityEvaluationVerdictKind, "notRelevant" | "hardHit"> = {
+  "not-relevant": "notRelevant",
+  "hard-hit": "hardHit",
+};
+
+/**
  * Prisma adapter for the INTEL verdict cache (ADR-045, R4-04, R4-09).
  *
  * Reads filter to `verdict: "not-relevant"` AND respect TTL — hard-hit rows
@@ -43,7 +53,7 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
       where: {
         scopeKey,
         knowledgeItemId: { in: [...knowledgeItemIds] },
-        verdict: "not-relevant",
+        verdict: PRISMA_VERDICT["not-relevant"],
         updatedAt: { gt: cutoff },
       },
       select: { knowledgeItemId: true },
@@ -63,10 +73,11 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
     const r = reason ?? null;
     const m = matchedEntity ?? null;
 
+    const prismaVerdict = PRISMA_VERDICT[verdict];
     await this.prisma.securityEvaluationThreatVerdictCache.upsert({
       where: { knowledgeItemId_scopeKey: { knowledgeItemId, scopeKey } },
-      create: { knowledgeItemId, scopeKey, verdict, reason: r, matchedEntity: m },
-      update: { verdict, reason: r, matchedEntity: m },
+      create: { knowledgeItemId, scopeKey, verdict: prismaVerdict, reason: r, matchedEntity: m },
+      update: { verdict: prismaVerdict, reason: r, matchedEntity: m },
     });
   }
 }
