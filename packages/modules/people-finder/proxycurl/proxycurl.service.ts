@@ -65,26 +65,25 @@ export class ProxycurlService {
           },
           (error, data, response) => {
             let spent = 0;
-            if (response.header["x-proxycurl-credit-cost"]) {
+            if (response && response.header && response.header["x-proxycurl-credit-cost"]) {
               try {
                 spent = Number(response.header["x-proxycurl-credit-cost"]);
               } catch {
                 spent = 0;
               }
             }
-            // data {url:string}
+            const status = error?.status ?? response?.status;
             if (error) {
-              const resError = { error };
-              resolve({ error: resError, spent });
+              const message = error instanceof Error ? error.message : String(error);
+              resolve({ error: { error: message, status }, spent });
               this.logger.error(
-                "Proxycurl searchPeopleLinkedin error: " + JSON.stringify(resError),
+                `Proxycurl searchPeopleLinkedin failed: status=${status ?? "unknown"} ${message}`,
                 this.loggerContext,
               );
             } else {
-              // response.body has more details
               resolve({ res: response.body, spent });
               this.logger.log(
-                "Proxycurl searchPeopleLinkedin success: " + JSON.stringify(response.body),
+                `Proxycurl searchPeopleLinkedin success: status=${status} spent=${spent}`,
                 this.loggerContext,
               );
             }
@@ -130,16 +129,20 @@ export class ProxycurlService {
                 spent = 0;
               }
             }
+            const status = error?.status ?? response?.status;
             if (error) {
-              const resError = { error };
-              resolve({ error: resError, spent });
+              const message = error instanceof Error ? error.message : String(error);
+              resolve({ error: { error: message, status }, spent });
               this.logger.error(
-                "Proxycurl searchPeopleByLinkedin error: " + JSON.stringify(resError),
+                `Proxycurl searchPeopleByLinkedin failed: status=${status ?? "unknown"} ${message}`,
                 this.loggerContext,
               );
             } else {
               resolve({ res: data, spent });
-              this.logger.log("Proxycurl searchPeopleByLinkedin success: " + JSON.stringify(data), this.loggerContext);
+              this.logger.log(
+                `Proxycurl searchPeopleByLinkedin success: status=${status} spent=${spent}`,
+                this.loggerContext,
+              );
             }
           },
         );
@@ -161,9 +164,11 @@ export class ProxycurlService {
     errorTitle: string;
     resolve: (error: object) => void;
   }) => {
-    const resError = { error, spent: 0 };
-    resolve({ error: resError });
-    this.logger.error(errorTitle + JSON.stringify(resError), this.loggerContext);
+    const message = error instanceof Error ? error.message : String(error);
+    const status =
+      error && typeof error === "object" && "status" in error ? (error as { status?: number }).status : undefined;
+    resolve({ error: { error: message, status }, spent: 0 });
+    this.logger.error(errorTitle + message, this.loggerContext);
   };
 
   /**

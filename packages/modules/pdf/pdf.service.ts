@@ -27,10 +27,8 @@ export class PdfService {
   }
 
   async convertToImages(params: { buffer: Buffer }) {
+    const savePath = path.join(TEMP_PDF2PIC_DIR, `${Date.now()}`);
     try {
-      // Set up save path
-      const savePath = path.join(TEMP_PDF2PIC_DIR, `${Date.now()}`);
-
       // Ensure the directory exists, if not, create it.
       await ensureDir(savePath);
 
@@ -59,6 +57,12 @@ export class PdfService {
       return fileNames.map((fileName) => path.join(savePath, fileName));
     } catch (error) {
       this.logger.error("PDF conversion to images failed: " + (error instanceof Error ? error.message : String(error)));
+      // Clean up the partially populated temp directory so failed conversions
+      // do not leak disk space. On success the caller owns the returned paths
+      // and is responsible for calling removeTempImages().
+      await remove(savePath).catch((e) =>
+        this.logger.error("Failed to clean up temp pdf2pic dir:", e instanceof Error ? e.message : String(e)),
+      );
       return [];
     }
   }

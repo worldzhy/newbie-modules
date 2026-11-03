@@ -7,11 +7,13 @@
   },
   "config-service": {
     "puppeteer": {
-      "chromiumPath": "process.env.CHROMIUM_PATH ?? ''"
+      "chromiumPath": "process.env.CHROMIUM_PATH ?? ''",
+      "noSandbox": "process.env.PUPPETEER_NO_SANDBOX !== 'false'"
     }
   },
   "env": {
-    "CHROMIUM_PATH": ""
+    "CHROMIUM_PATH": "",
+    "PUPPETEER_NO_SANDBOX": "true"
   },
   "dependencies": {
     "puppeteer": "latest"

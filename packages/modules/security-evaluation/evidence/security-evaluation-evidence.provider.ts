@@ -147,7 +147,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     const since = new Date(observedAt.getTime() - SECURITY_EVALUATION_INTEL_EVIDENCE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
     const candidates = await this.prisma.securityEvaluationThreatKnowledgeItem.findMany({
       where: { fetchedAt: { gte: since } },
-      orderBy: [{ fetchedAt: "asc" }, { id: "asc" }],
+      orderBy: [{ fetchedAt: "desc" }, { id: "desc" }],
       select: {
         id: true,
         source: true,

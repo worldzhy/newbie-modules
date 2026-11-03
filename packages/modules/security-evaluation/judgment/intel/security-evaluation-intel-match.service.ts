@@ -111,16 +111,20 @@ export class SecurityEvaluationIntelMatchService {
       const hardHits = entities.filter((entity) => entityAppearsIn(haystack, entity.value));
 
       if (hardHits.length > 0) {
+        const matchedEntity = hardHits[0].value;
         matches.push({
           itemId: candidate.knowledgeItemId,
           itemTitle: candidate.title,
           itemSeverity: candidate.severity,
-          matchedEntity: hardHits[0].value,
+          matchedEntity,
           confidence: SECURITY_EVALUATION_INTEL_MATCH_CONFIDENCE.HIGH,
           evidence: hardHits.map((hit) => hit.value).join(", "),
           verdictSource: "hard-recall",
         });
         examinedRefs.push(candidate.knowledgeItemId);
+        // Hard-hit verdict as audit trace only — the cache does not filter
+        // this pair out of subsequent pipelines (entity sets are dynamic).
+        await this.negativeCache.record(candidate.knowledgeItemId, scopeKey, "hard-hit", null, matchedEntity);
         continue;
       }
 
@@ -144,7 +148,7 @@ export class SecurityEvaluationIntelMatchService {
 
       if (!verdict.finalRelevant) {
         if (verdict.kind === "not-relevant") {
-          await this.negativeCache.record(candidate.knowledgeItemId, scopeKey, verdict.reason);
+          await this.negativeCache.record(candidate.knowledgeItemId, scopeKey, "not-relevant", verdict.reason, null);
         }
         continue;
       }

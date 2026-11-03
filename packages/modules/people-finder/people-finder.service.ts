@@ -123,25 +123,37 @@ export class PeopleFinderService {
     peoples,
     callbackUrl,
   }: CreateContactSearchTaskBatchReqDto): Promise<{ taskBatchId: number }> {
-    const taskBatch = await this.prisma.peopleFinderTaskBatch.findFirst({
-      where: {
-        batchId,
-      },
-    });
-    if (taskBatch) {
-      throw new BadRequestException("BatchId already exists.");
-    }
     if (callbackUrl && !this.isSafeCallbackUrl(callbackUrl)) {
       throw new BadRequestException("Invalid callbackUrl.");
     }
-    const newTaskBatch = await this.prisma.peopleFinderTaskBatch.create({
-      data: {
-        batchId,
-        status: PeopleFinderBatchTaskStatus.pending,
-        callbackUrl,
-        callbackStatus: PeopleFinderBatchTaskCallBackStatus.pending,
-      },
-    });
+    // batchId has a @unique constraint in Prisma, so upsert is atomic: two
+    // concurrent callers with the same batchId will get exactly one row,
+    // eliminating the check-then-create TOCTOU race.
+    let newTaskBatch: Awaited<ReturnType<typeof this.prisma.peopleFinderTaskBatch.upsert>>;
+    try {
+      newTaskBatch = await this.prisma.peopleFinderTaskBatch.upsert({
+        where: { batchId },
+        create: {
+          batchId,
+          status: PeopleFinderBatchTaskStatus.pending,
+          callbackUrl,
+          callbackStatus: PeopleFinderBatchTaskCallBackStatus.pending,
+        },
+        update: {
+          callbackUrl,
+          // Re-pending so a caller can retry a previously stalled batch.
+          status: PeopleFinderBatchTaskStatus.pending,
+          callbackStatus: PeopleFinderBatchTaskCallBackStatus.pending,
+        },
+      });
+    } catch (err) {
+      // The unique constraint violation could also come from a real race at
+      // the DB layer — surface it cleanly instead of letting Prisma wrap it.
+      if (err && typeof err === "object" && "code" in err && (err as { code: string }).code === "P2002") {
+        throw new BadRequestException("BatchId already exists.");
+      }
+      throw err;
+    }
     await this.prisma.peopleFinderTask.createMany({
       data: peoples.map((item) => ({
         ...item,

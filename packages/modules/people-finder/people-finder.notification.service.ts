@@ -32,10 +32,18 @@ export class PeopleFinderNotificationService {
         },
       })
       .then(async (res) => {
-        this.logger.log("PeopleFinder notification catch: " + JSON.stringify(res.data), this.loggerContext);
+        this.logger.log(`PeopleFinder notification sent: status=${res.status}`, this.loggerContext);
       })
-      .catch(async (e) => {
-        this.logger.error("PeopleFinder notification catch: " + JSON.stringify({ error: e }), this.loggerContext);
+      .catch(async (e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e);
+        const status =
+          e && typeof e === "object" && "response" in e
+            ? (e as { response?: { status?: number } }).response?.status
+            : undefined;
+        this.logger.error(
+          `PeopleFinder notification failed: status=${status ?? "unknown"} ${message}`,
+          this.loggerContext,
+        );
       });
   }
 }

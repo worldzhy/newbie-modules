@@ -27,18 +27,16 @@ export class AwsSqsService {
   /**
    * See the API doc for more details:
    * https://docs.aws.amazon.com/AWSSimpleQueueService/latest/APIReference/API_SendMessage.html
+   *
+   * The queue URL is read from config only — callers cannot override it, so
+   * there is no injection surface for arbitrary AWS SQS endpoints.
    * @param {object} params
    * @returns {(Promise<{data: SQS.SendMessageResult | void;err: AWSError | void;}>)}
    * @memberof SqsService
    */
-  async sendMessage(params: {
-    queueUrl?: string;
-    body: object;
-    MessageGroupId?: string;
-    MessageDeduplicationId?: string;
-  }) {
+  async sendMessage(params: { body: object; MessageGroupId?: string; MessageDeduplicationId?: string }) {
     const sendMessageRequest: any = {
-      QueueUrl: params.queueUrl ?? this.queueUrl,
+      QueueUrl: this.queueUrl,
       MessageBody: JSON.stringify(params.body),
     };
 
@@ -54,9 +52,9 @@ export class AwsSqsService {
     return await this.client.send(new SendMessageCommand(sendMessageRequest));
   }
 
-  async getQueueAttributes(params: { queueUrl?: string; attributeNames: QueueAttributeName[] }) {
+  async getQueueAttributes(params: { attributeNames: QueueAttributeName[] }) {
     const getQueueAttributesRequest = {
-      QueueUrl: params.queueUrl ?? this.queueUrl,
+      QueueUrl: this.queueUrl,
       AttributeNames: params.attributeNames,
     };
 

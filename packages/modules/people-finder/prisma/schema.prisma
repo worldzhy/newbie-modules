@@ -31,7 +31,7 @@ model PeopleFinderCallThirdParty {
 
 model PeopleFinderTaskBatch {
   id               Int                @id @default(autoincrement())
-  batchId          String
+  batchId          String             @unique
   callbackUrl      String?
   callbackStatus   String
   status           String // pending | completed

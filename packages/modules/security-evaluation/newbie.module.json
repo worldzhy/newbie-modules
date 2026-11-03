@@ -8,6 +8,12 @@
   "schema": "prisma/schema.prisma",
   "moduleDependencies": ["evaluation", "security", "llm"],
   "config-service": {},
-  "env": {},
+  "env": {
+    "NEGATIVE_CACHE_TTL_DAYS": {
+      "type": "int",
+      "default": 7,
+      "description": "Days to keep 'not-relevant' verdict cache rows before they expire. Hard-hit rows are audit-only and never expire."
+    }
+  },
   "dependencies": {}
 }

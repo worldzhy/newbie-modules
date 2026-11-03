@@ -24,24 +24,11 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 报告：`.trae/documents/expert-review-2026-10-31-round4.md`；台账：同目录 `findings.md`。
 
-- [ ] `[round4 R4-04]` **P2** 负缓存键仅 `(knowledgeItemId, scopeKey)`，缺实体集/模型版本维度，且采集层在硬召回前过滤（`evidence/security-evaluation-evidence.provider.ts`）。需产品确认失效语义：缓存键加实体集指纹，或缓存只用于"是否再调 LLM"、硬召回始终先跑。
-- [ ] `[round4 R4-09]` **P2** 证据预算 `fetchedAt asc` 截断，硬命中永不负缓存，候选 >200 时新条目永久落在 `overBudget`。需决定预算策略：改新条目优先（翻转排序，老条目可能饿死），或建 per-scope 已评估水位（需 schema 变更）。
+（R4-04 + R4-09 已修复：NegativeCache → VerdictCache（加 verdict 枚举），record 加 verdict/matchedEntity 字段；filterUncached 加 verdict="not-relevant" + TTL 过滤（默认 7 天，NEGATIVE_CACHE_TTL_DAYS env 可覆盖）；evidence provider fetchedAt asc → desc；硬命中也写缓存（audit-only，不进 filterUncached）。commit 16930cf。）
 
 ## 安全评审 round3 P2（二次取证后 open，2026-11-02 入账）
 
 > 来源：devbie `.trae/documents/expert-review-2026-10-31-round3.md` §P2 + §R3-G1。9 条误报与 1 条出界已剔除（见同文件 §误报剔除与本次复核记录）。
 
-- [ ] `[R3-P2-01]` **P2** account api-key LRU 仅 `max` 无 TTL，校验只比对 hash 不查 `UserStatus`：`account/modules/api-key/api-key.service.ts` L38-93、`account/security-ports/api-key.verifier.ts` L16-30。
-- [ ] `[R3-P2-02]` **P2** aws-sqs `send`/`receive` 允许调用方覆盖 `queueUrl`：`aws-sqs/aws-sqs.service.ts` L34-41、L57-60。
-- [ ] `[R3-P2-03]` **P2** clickhouse DDL 标识符未加引号：`clickhouse/clickhouse.service.ts` L64、L101、L142-148。
-- [ ] `[R3-P2-04]` **P2** pdf 异常路径不清理临时目录：`pdf/pdf.service.ts` L32-63，catch 仅返回 `[]`，`savePath` 残留。
-- [ ] `[R3-P2-05]` **P2** people-finder 通知把 `accessKey` 放入 body，catch 又序列化整个 axios error（含请求 config）：`people-finder/people-finder.notification.service.ts` L24-38。同模块 PDL 成功响应全文（含邮箱/电话）入日志：`peopledatalabs/peopledatalabs.service.ts` L88-91、L137-140。
-- [ ] `[R3-P2-06]` **P2** lark 消息正文入 info 日志：`lark/lark.service.ts` L306。
-- [ ] `[R3-P2-08]` **P2** event-emitter 全量事件落库、无保留期：`event-emitter/event-emitter.service.ts` L36、L99-107。
-- [ ] `[R3-P2-09]` **P2** elasticsearch 代码读 `retries` 但 manifest 未声明：`elasticsearch/elasticsearch.service.ts` L32 vs `newbie.module.json` L8-14。
-- [ ] `[R3-P2-10]` **P2** web-monitor `POST /system/add` body 用 `projectId`，宿主 resolver 只认 `params/query/body.appId`：`web-monitor/modules/site/site.service.ts` L27 vs nightwatch-backend `scope-resolvers.ts` L202-212（跨仓，修复在两边对齐字段）。
-- [ ] `[R3-P2-11]` **P2** `@RequireOwner` 注释与 guard 行为相反：`security/authorization/require-owner.decorator.ts` L9-11 称 admin 可绕过，`ownership.guard.ts` L9-13 明确无绕过；改注释或加 ADMIN bypass 需拍板。
-- [ ] `[R3-P2-12]` **P2** people-finder `createTaskBatch` check-then-create，`schema.prisma` L34 `batchId` 无 `@unique`：`people-finder/people-finder.service.ts` L126-137。
-- [ ] `[R3-G1-1]` **P2** tag/tag-group 全部路由零授权、DTO 直通 Prisma 输入：`tag/tag.controller.ts` L45-63、L117-134；`tag/tag-group.controller.ts` L13-28。
-- [ ] `[R3-G1-2]` **P2** puppeteer 启动参数带 `--no-sandbox`，异常路径不释放 browser：`puppeteer/puppeteer.service.ts` L14-22、L27-35。
+（Wave 5 最后一条 P2-08 已修复：event-emitter `record()` 前加 lazy `deleteMany({ emittedAt: < now - N days })`，默认 30 天，`EVENT_EMISSION_RETENTION_DAYS` env 可覆盖；无 @nestjs/schedule 依赖、无 migration。）
 
