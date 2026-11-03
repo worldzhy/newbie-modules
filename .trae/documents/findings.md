@@ -25,9 +25,12 @@
 | ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
 |---|---|---|---|---|---|---|
 | R5-P2-01 | newbie-modules | notification `markRead` 不校验可见性（任意 notification id 可写回执 + 存在性 oracle） | P2 | artifact | 任意登录用户 | open |
-| R5-P2-02 | newbie-modules | notification `notify` 平台级写入口不校验 `projectId` 归属、`link` 无协议约束 | P2 | artifact | OPERATOR/ADMIN | open |
+| R5-P2-02 | newbie-modules | notification `notify` 平台级写入口不校验 `projectId` 归属；读写 DTO 契约不对称（`projectId` 读侧 `@IsUUID`、写侧仅 `@IsString`，`link` 无协议约束） | P2 | artifact | OPERATOR/ADMIN | open |
 | R5-P2-03 | newbie-modules | `api-key.verifier` 从不执行 `ipRestrictions`/`referrerRestrictions`，也不校验 owner 状态（宿主暂未启用该通道） | P2 | artifact | API key 持有者（启用后） | open |
 | R5-P2-04 | newbie-modules | webhook 模块无权限/团队归属校验，`isSafeUrl` 不解析 DNS、不复检重定向，出站无 timeout（未装配） | P2 | source | 任意登录用户（装配后） | open |
 | R5-P2-05 | newbie-modules | web-monitor `systemName` 直接编译为正则（项目范围已收敛，仅 ReDoS） | P2 | artifact | MEMBER/OPERATOR | open |
 | R5-P2-06 | newbie-modules | security-evaluation 报告 `latestResultsBySubject` 无界查询（全量载入再按 key 去重） | P2 | artifact | OPERATOR/ADMIN | open |
 | R5-P2-07 | newbie-modules | notification push-failures 无分页，随累积行数无界返回 | P2 | artifact | OPERATOR/ADMIN | open |
+| R5-13 | newbie-modules ↔ nightwatch-backend | ClickHouse 标识符注入：registry 已加 `quoteIdentifier/quoteTable`，宿主副本仍裸插值；web-monitor `appId` 无校验（详见 devbie 台账同名条目） | P1 | live（宿主旧副本） | MEMBER/OPERATOR 且项目 EDITOR+ | open（registry 已修，host 未装配；复核新增） |
+
+复核轮（2026-11-03）：R5-P2-02 的 `link` 条款降为契约不对称；R5-P2-03 的「owner 状态」修正为「verifier 端口未做该校验，且通道无调用方」（与 devbie 台账 N-1 同源）；新增 R5-13。详见 `devbie/.trae/documents/expert-review-2026-11-03-round5.md` §12。
