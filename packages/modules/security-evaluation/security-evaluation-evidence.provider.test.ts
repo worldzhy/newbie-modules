@@ -71,7 +71,7 @@ function stubPrisma(): PrismaService {
 
 function stubNegativeCache(): SecurityEvaluationIntelNegativeCachePort {
   return {
-    filterUncached: async (_scopeKey, knowledgeItemIds) => [...knowledgeItemIds],
+    filterUncached: async (_scopeKey, candidates) => candidates.map((candidate) => candidate.knowledgeItemId),
     record: async () => {},
   };
 }
