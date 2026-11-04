@@ -14,6 +14,9 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 ## 暂不做（条件触发后再启动）
 
+- [ ] `[2026-11-05 设计讨论，未拍板]` **message-tracker 重构方向（挂起，待后续讨论拍板）**：现状为 NestJS 模块 + 完整 SST serverless app 混装（`packages/modules/message-tracker/sst/`，Lambda 裸 SQL 直写宿主库、独立 DB_* 配置，registry 唯一 package-lock + 99 条告警均出于此），装配后不可用。已讨论的候选方向：A. worker 折进 backend 进程（发送复用 aws-ses/aws-sms，异步复用 queue 模块，SES/SMS → SNS HTTPS 验签回调写 Prisma；删除 sst/、infrastructure/cloudformation、MESSAGE_TRACKER_SQS_*）；B. 保留 Lambda 但升级为独立 service 产物 + 强制回调宿主 API 写库。关键判据：消息量是否需要独立于 API 扩缩容。附：manifest 当前 `layer: "capability"`，按 2026-11-05 用户定位应为 `feature`，落地时一并订正。配套框架契约见 devbie backlog 同日期条目。
+- [ ] `[2026-11-05 设计讨论，未拍板]` **feature 模块 AWS 资源统一标准（挂起，待后续讨论拍板）**：拟在 manifest 增加 `infrastructure` 字段（CFN 模板路径、参数、outputs、账号级 prerequisites 只检查不创建），模板随模块同仓存放；已拍板的边界：不为此单开新仓库，Lambda/ECS 等外部运行时不进模块（另立 service 产物）。runner 与部署链契约见 devbie backlog 同日期条目。落地前先出 ADR（本仓写 manifest 契约）。
+
 - [ ] `[安全评审 round2 #6]` **（暂不做，待有微信消费端再启动）** account 微信登录无服务端校验：`packages/modules/account/auth/wechat/auth.service.ts` L17-38，`phone`/`openId` 取自请求体，无 code2session/getPhoneNumber 服务端校验；且漏 `UserStatus.INACTIVE` 检查。修复方案（恢复时按此执行）：改收 `code` 服务端换 openId、服务端解密手机号，补 INACTIVE 拒绝。决策：2026-10-31 用户明确在出现首个微信消费端之前不做；风险留痕——若届时已有调用方接入而未修复，属高危未修复项。
 
 ## 装配配置字面量（W1 后残余，2026-11-03 入账）
