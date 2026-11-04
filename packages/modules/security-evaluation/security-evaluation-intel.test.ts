@@ -13,7 +13,10 @@ import { SecurityEvaluationIntelMatchService } from "./judgment/intel/security-e
 import { SecurityEvaluationIntelReRanker } from "./judgment/intel/security-evaluation-intel-re-ranker";
 import type { SecurityEvaluationIntelNegativeCachePort } from "./judgment/intel/security-evaluation-intel-negative-cache.port";
 import { buildSecurityEvaluationIntelReRankRequest } from "./judgment/intel/security-evaluation-intel-request";
-import type { SecurityEvaluationScopeEntitiesProvider } from "./judgment/intel/security-evaluation-scope-entities.port";
+import type {
+  SecurityEvaluationScopeEntitiesProvider,
+  SecurityEvaluationScopeEntity,
+} from "./judgment/intel/security-evaluation-scope-entities.port";
 import { SecurityEvaluationIntelNegativeCacheRepository } from "./persistence/security-evaluation-intel-negative-cache.repository";
 import {
   SECURITY_EVALUATION_INTEL_EVIDENCE_BUDGET,
@@ -308,19 +311,29 @@ test("unavailable verdicts are never cached and leave the candidate unexamined",
 
 test("the re-rank request signature is content-addressed over the exact model input", () => {
   const item = { title: "advisory", summary: "affects next@<14" };
-  const entities = [{ value: "next" }, { value: "webpack" }];
-  const request = (
-    overrides: Parameters<typeof buildSecurityEvaluationIntelReRankRequest>[0] = item,
-    scope = entities,
-    modelId: string | null = "model-a",
-  ) => buildSecurityEvaluationIntelReRankRequest(overrides, scope, modelId);
+  const entities: SecurityEvaluationScopeEntity[] = [{ value: "next" }, { value: "webpack" }];
+  const base = buildSecurityEvaluationIntelReRankRequest(item, entities, "model-a");
 
-  assert.equal(request().signature, request().signature);
-  assert.notEqual(request().signature, request({ title: "advisory", summary: "affects other" }).signature);
-  assert.notEqual(request(item, entities, "model-b").signature);
-  assert.notEqual(request(item, [...entities].reverse()).signature);
-  assert.notEqual(request(item, [{ value: "next", context: "web" }, { value: "webpack" }]).signature);
-  assert.deepEqual(request().messages[1], {
+  assert.equal(base.signature, buildSecurityEvaluationIntelReRankRequest(item, entities, "model-a").signature);
+  assert.notEqual(
+    base.signature,
+    buildSecurityEvaluationIntelReRankRequest({ title: "advisory", summary: "affects other" }, entities, "model-a")
+      .signature,
+  );
+  assert.notEqual(base.signature, buildSecurityEvaluationIntelReRankRequest(item, entities, "model-b").signature);
+  assert.notEqual(
+    base.signature,
+    buildSecurityEvaluationIntelReRankRequest(item, [...entities].reverse(), "model-a").signature,
+  );
+  assert.notEqual(
+    base.signature,
+    buildSecurityEvaluationIntelReRankRequest(
+      item,
+      [{ value: "next", context: "web" }, { value: "webpack" }],
+      "model-a",
+    ).signature,
+  );
+  assert.deepEqual(base.messages[1], {
     role: "user",
     content: JSON.stringify({
       item: { title: "advisory", summary: "affects next@<14" },
