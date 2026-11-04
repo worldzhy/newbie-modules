@@ -19,8 +19,8 @@ export interface EmailMessageEvent {
 export interface EmailMessageEventCreateInput {
   eventType: string;
   eventTime: Date;
-  event: object;
-  mail: object;
+  event: any;
+  mail: any;
   sesMessageId: string;
   messageId?: number;
 }
@@ -51,7 +51,7 @@ export interface TextMessageEvent {
 export interface TextMessageEventCreateInput {
   eventType: string;
   eventTime: Date;
-  event: object;
+  event: any;
   isFinalEvent: boolean;
   messageStatus: string;
   messageStatusDescription: string;
