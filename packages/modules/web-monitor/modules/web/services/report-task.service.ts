@@ -193,7 +193,7 @@ export class WebReportTaskService {
     }
     const resource: Record<string, unknown> = {
       appId: data.appId,
-      createTime: item.requestTime ? func.toDate(item.requestTime) : data.createTime,
+      createTime: item.requestTime ? func.toDateOrNow(item.requestTime) : data.createTime,
       url: data.url,
       fullUrl: item.name,
       speedType,
@@ -372,7 +372,7 @@ export class WebReportTaskService {
     const str = (value: unknown, fallback = "") => (typeof value === "string" && value ? value : fallback);
     const item: WebReportItem = {
       appId: str(query.appId),
-      createTime: func.toDate(query.time),
+      createTime: func.toDateOrNow(query.time),
       userAgent: str(query.userAgent),
       ip: str(query.ip) || undefined,
       markPage: str(query.markPage, func.randomString()),
@@ -423,7 +423,7 @@ export class WebReportTaskService {
 
     const _ajax: Record<string, unknown> = {
       appId: data.appId,
-      createTime: item.requestTime ? func.toDate(item.requestTime) : data.createTime,
+      createTime: item.requestTime ? func.toDateOrNow(item.requestTime) : data.createTime,
     };
     _ajax.url = newName || "";
     _ajax.fullUrl = item.name || "";
@@ -467,7 +467,7 @@ export class WebReportTaskService {
       errors.resourceUrl = newName || "";
       errors.fullUrl = resourceUrl;
       errors.url = data.url || "";
-      errors.createTime = item.createTime ? func.toDate(item.createTime) : data.createTime;
+      errors.createTime = item.createTime ? func.toDateOrNow(item.createTime) : data.createTime;
 
       if (typeof item.msg === "object") errors.msg = JSON.stringify(item.msg);
       else if (typeof item.msg === "string") errors.msg = item.msg;

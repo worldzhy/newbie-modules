@@ -106,6 +106,13 @@ export const func = {
     if (typeof value === "number") return new Date(value);
     return new Date(String(value));
   },
+  // Client-supplied timestamps must never poison the drain: an unparseable
+  // value falls back to the ingest time instead of becoming `Invalid Date`,
+  // which would make every store write fail and requeue the raw item forever.
+  toDateOrNow(value: unknown) {
+    const date = value instanceof Date ? value : typeof value === "number" ? new Date(value) : new Date(String(value));
+    return Number.isNaN(date.getTime()) ? new Date() : date;
+  },
   filterKeyWord(input: unknown) {
     try {
       return typeof input === "string" ? input : JSON.stringify(input);
