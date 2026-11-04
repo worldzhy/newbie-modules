@@ -53,7 +53,7 @@ W1 落地（2026-11-03）：`d78bf84` security 拒绝公开/过短签名密钥�
 | R6-09 | newbie-modules | verdict cache 缺实体集/模型版本维度，`not-relevant` 仅靠 7 天 TTL 失效 | P2 | live | OPERATOR 变更实体后 INTEL 运行 | open |
 | R6-10 | newbie-modules / nightwatch-backend | shortcut 更新 DTO 的 `ValidateIf` 可跳过 http(s) 白名单，危险 scheme 可落库 | P2 | artifact / live | 项目 EDITOR | fixed（2026-11-04）：`26247a3`+`ca2ba33`；update 校验合并后的有效 type/content，非法 scheme 400、缺行 404，自带 8 例 |
 | R6-11 | newbie-modules | event-emitter 保留期配置用 `config.env` 形状，`apply` 未渲染到宿主 env；单条无上限清理 | P2 | artifact | 运维 | fixed（2026-11-04）：`0f191c0`；env 提升到 manifest 顶层，宿主 `.env`/`.env.example` 实测命中；无上限清理按既有注释的摊还设计保留 |
-| R6-12 | newbie-modules / nightwatch-backend | account 组织键分支 schema 不可达、测试用非法数据；`CACHE_APIKEY_LRU_SIZE` 死配置残留 | P2 | artifact / ops | 文档与测试 | fixed（初段，2026-11-04）：`66fa30d`；注释/测试与 schema 对齐，宿主死键删除；组织专属键去留待决策 |
+| R6-12 | newbie-modules / nightwatch-backend | account 组织键分支 schema 不可达、测试用非法数据；`CACHE_APIKEY_LRU_SIZE` 死配置残留 | P2 | artifact / ops | 文档与测试 | fixed（初段，2026-11-04）：`66fa30d`；注释/测试与 schema 对齐，`deploy/env.template` 死键删除；组织专属键去留待决策。复核更正（2026-11-04）：宿主 `.env` 两行死键曾被误装配（main 快照）重新渲染，仍待删 |
 | R6-13 | newbie-modules / nightwatch-backend | web-monitor 历史 appId 被新白名单击穿（存量读 400、ingest 整批丢弃） | P2 | live | 已认证 WebMonitor 用户 | open（未上线，限于开发数据）；盘点（2026-11-04）：本地安装 1 行、Mongo 17 个分区键全部合规，0 行需 backfill |
 | R6-14 | newbie-modules | registry CI `modules lint` 仍钉 1.14.5，落后已发布 1.15.0 | P2 | source / CI | 所有 registry PR | fixed（2026-11-04）：`2d9ea7b` 钉到 `@devbie/newbie-cli@1.15.0` |
 
