@@ -36,3 +36,25 @@
 复核轮（2026-11-03）：R5-P2-02 的 `link` 条款降为契约不对称；R5-P2-03 的「owner 状态」修正为「verifier 端口未做该校验，且通道无调用方」（与 devbie 台账 N-1 同源）；新增 R5-13。详见 `devbie/.trae/documents/expert-review-2026-11-03-round5.md` §12。
 
 W1 落地（2026-11-03）：`d78bf84` security 拒绝公开/过短签名密钥（启动、签名、验签三处 fail-closed）；`0891fcb` clickhouse 配置改为纯 `process.env`。根因是 manifest 中 `process.env.X || 'fallback'` 含内层引号，CLI 正则不解包、原样写成字符串字面量；devbie CLI 已补装配期告警（`5ccd7c9`），其余同类 manifest 仍待逐模块收敛。
+
+## round6 复核（2026-11-04，scope=`workspace`，报告在 `devbie/.trae/documents/expert-review-2026-11-04-round6.md`）
+
+状态更正（历史行保留，以本节为准）：
+- **R5-13 → fixed**：宿主 `diff -rq` 与 registry 零差异，`assertAppId` 已在 Mongo/ClickHouse 工厂、`saveSiteData` 与 ingest 生效；原「待 W2」已由 `5adec55` 完成。
+- **R4-04 → partial（重开为 R6-09）**：`16930cf` 的 TTL/预算排序已装配且生效，但负缓存唯一键仍只有 `(knowledgeItemId, scopeKey)`，实体集/模型版本维度未加入；`host 未装配` 描述作废（现为零差异）。
+- **R4-09 → verified**：`fetchedAt desc` 排序与预算逻辑在宿主副本存在；“host 未装配”作废。
+- **R5-P2-03 → partial**：owner ACTIVE 校验已进入 `AccountApiKeyVerifier.verify`（`59ff47c`）；仍缺 `ipRestrictions`/`referrerRestrictions` 执行。
+- **R5-P2-04/05/06/07 → 维持 open**（本轮未装配、未改动）。
+
+本轮新增 registry 侧条目（编号延续 devbie 台账）：
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+|---|---|---|---|---|---|---|
+| R6-09 | newbie-modules | verdict cache 缺实体集/模型版本维度，`not-relevant` 仅靠 7 天 TTL 失效 | P2 | live | OPERATOR 变更实体后 INTEL 运行 | open |
+| R6-10 | newbie-modules / nightwatch-backend | shortcut 更新 DTO 的 `ValidateIf` 可跳过 http(s) 白名单，危险 scheme 可落库 | P2 | artifact / live | 项目 EDITOR | open |
+| R6-11 | newbie-modules | event-emitter 保留期配置用 `config.env` 形状，`apply` 未渲染到宿主 env；单条无上限清理 | P2 | artifact | 运维 | open（未运行时复现） |
+| R6-12 | newbie-modules / nightwatch-backend | account 组织键分支 schema 不可达、测试用非法数据；`CACHE_APIKEY_LRU_SIZE` 死配置残留 | P2 | artifact / ops | 文档与测试 | open |
+| R6-13 | newbie-modules / nightwatch-backend | web-monitor 历史 appId 被新白名单击穿（存量读 400、ingest 整批丢弃） | P2 | live | 已认证 WebMonitor 用户 | open（未上线，限于开发数据） |
+| R6-14 | newbie-modules | registry CI `modules lint` 仍钉 1.14.5，落后已发布 1.15.0 | P2 | source / CI | 所有 registry PR | open |
+
+复核取证：registry 与宿主 34 个模块 `diff -rq` 零差异；registry 模块单测无法在 registry 仓独立运行（`tsx` 未声明为 devDependency，`ERR_MODULE_NOT_FOUND`），相关用例改由宿主副本执行并通过。
