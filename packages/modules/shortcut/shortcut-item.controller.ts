@@ -1,6 +1,17 @@
-import { Controller, Post, Body, Get, Query, Patch, Delete, Param } from "@nestjs/common";
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Query,
+  Patch,
+  Delete,
+  Param,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
 import { ApiTags, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
-import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { PermissionAction, Prisma, ShortcutItemType } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   ListShortcutItemsRequestDto,
@@ -12,6 +23,24 @@ import {
 } from "./shortcut-item.dto";
 import { ShortcutItemEntity } from "./shortcut.entity";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+
+/**
+ * A LINK item must store an absolute http(s) URL: the frontend opens its
+ * content with `window.open`, so `javascript:`, `data:` or `file:` payloads
+ * would become an XSS / local-file-read primitive (R6-10). The create DTO
+ * enforces this for the submitted payload; the update path has to validate the
+ * *merged* row because `type` can be changed without resending `content`.
+ */
+export function assertLinkContent(type: ShortcutItemType, content: string): void {
+  if (type !== ShortcutItemType.LINK) return;
+  try {
+    const parsed = new URL(content);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:") return;
+  } catch {
+    // Not an absolute URL — fall through to the rejection below.
+  }
+  throw new BadRequestException("A LINK shortcut must store an http(s) URL");
+}
 
 @ApiTags("Shortcut")
 @ApiBearerAuth()
@@ -89,7 +118,16 @@ export class ShortcutItemController {
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.ShortcutItem)
   @ApiResponse({ type: ShortcutItemEntity })
   async update(@Param("shortcutItemId") shortcutItemId: string, @Body() body: UpdateShortcutItemRequestDto) {
-    return await this.prisma.shortcutItem.update({ where: { id: Number(shortcutItemId) }, data: body });
+    const id = Number(shortcutItemId);
+    const existing = await this.prisma.shortcutItem.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException(`Shortcut item ${shortcutItemId} not found`);
+
+    // Validate the merged row, not the patch: `type` may be omitted, and
+    // switching TEXT -> LINK must not smuggle a `javascript:` payload past the
+    // create-time DTO rule (R6-10).
+    assertLinkContent(body.type ?? existing.type, body.content ?? existing.content);
+
+    return await this.prisma.shortcutItem.update({ where: { id }, data: body });
   }
 
   @Delete(":shortcutItemId")

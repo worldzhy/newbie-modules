@@ -9,10 +9,6 @@
   "moduleDependencies": ["audit", "aws-ses", "aws-sms", "security", "redis"],
   "config-service": {
     "account": {
-      "cache": {
-        "apiKeyLruSize": "int(process.env.CACHE_APIKEY_LRU_SIZE, 100)",
-        "apiKeyLruTtlMs": "int(process.env.CACHE_APIKEY_LRU_TTL_MS, 600000)"
-      },
       "verificationCode": {
         "timeoutMinutes": 10,
         "resendMinutes": 1,
@@ -39,8 +35,6 @@
   },
   "env": {
     "ACCOUNT_APPROVED_SUBNET_HMAC_SECRET": "",
-    "CACHE_APIKEY_LRU_SIZE": "",
-    "CACHE_APIKEY_LRU_TTL_MS": "",
     "GOOGLE_AUTH_CLIENT_ID": "",
     "GOOGLE_AUTH_CLIENT_SECRET": "",
     "GOOGLE_AUTH_CALLBACK_URL": "",
@@ -52,7 +46,6 @@
     "@larksuiteoapi/node-sdk": "^1.59.0",
     "@nestjs/passport": "latest",
     "ip-anonymize": "latest",
-    "lru-cache": "latest",
     "otplib": "latest",
     "passport": "latest",
     "passport-custom": "latest",

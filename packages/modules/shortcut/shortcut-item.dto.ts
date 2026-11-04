@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsString, IsNumber, IsOptional, IsEnum } from "class-validator";
+import { IsString, IsNumber, IsOptional, IsEnum, ValidateIf, IsUrl } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { ShortcutGroupEntity, ShortcutItemEntity } from "./shortcut.entity";
 import { ShortcutItemType } from "@generated/prisma/client";
@@ -68,6 +68,10 @@ export class CreateShortcutItemRequestDto {
 
   @ApiProperty({ type: String })
   @IsString()
+  // For Link-type shortcuts content is a URL — whitelist http/https so
+  // javascript:, data:, file:, etc. cannot be stored and later executed.
+  @ValidateIf((o: CreateShortcutItemRequestDto) => o.type === ShortcutItemType.LINK)
+  @IsUrl({ protocols: ["http", "https"], require_protocol: true } as const)
   content!: string;
 
   @ApiProperty({ type: String, enum: ShortcutItemType })
@@ -89,6 +93,10 @@ export class UpdateShortcutItemRequestDto {
   @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
+  // The URL rule depends on the *effective* type, which an update may omit:
+  // a partial patch can turn a TEXT item into a LINK one without resending
+  // content. The controller merges the patch with the stored row and rejects
+  // a non-http(s) URL for LINK items (R6-10).
   content?: string;
 
   @ApiPropertyOptional({ type: String })

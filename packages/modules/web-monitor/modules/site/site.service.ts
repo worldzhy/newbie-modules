@@ -37,7 +37,10 @@ export class SiteService {
       if (search && search.systemDomain) return func.errResult({ desc: "Add system: system already exists" });
     }
 
-    const appId = body.appId ? String(body.appId) : func.randomString();
+    // The appId is a storage partition key and must never be caller-supplied:
+    // mint it here. The installation-sync path (upsertSiteForWebMonitor)
+    // backfills it from the credential's immutable appKey instead.
+    const appId = func.randomString(7).slice(0, 7);
     const SystemModel = this.models.System();
     const system = new SystemModel();
     system.projectId = String(body.projectId);

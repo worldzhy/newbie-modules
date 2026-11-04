@@ -16,6 +16,7 @@ import {
 import { WebPvuvipSchema, WebPvuvipDocument } from "./web/web-pvuvip.schema";
 
 import { MongoCollectionPrefix, MongoStaticCollection } from "../enum";
+import { assertAppId } from "../../shared/utils";
 
 @Injectable()
 export class WebMonitorModelsService {
@@ -39,6 +40,7 @@ export class WebMonitorModelsService {
 
   // WEB dynamic models (by appId)
   WebEnvironment(appId: string) {
+    assertAppId(appId);
     return this.modelRegistry.getOrCreateModel<WebEnvironmentDocument>(
       `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appId}`,
       WebEnvironmentSchema,
@@ -46,6 +48,7 @@ export class WebMonitorModelsService {
   }
 
   WebPage(appId: string) {
+    assertAppId(appId);
     return this.modelRegistry.getOrCreateModel<WebPageDocument>(
       `${MongoCollectionPrefix.WEB_PAGE}${appId}`,
       WebPageSchema,
@@ -53,6 +56,7 @@ export class WebMonitorModelsService {
   }
 
   WebResource(appId: string) {
+    assertAppId(appId);
     return this.modelRegistry.getOrCreateModel<WebResourceDocument>(
       `${MongoCollectionPrefix.WEB_RESOURCE}${appId}`,
       WebResourceSchema,
@@ -60,6 +64,7 @@ export class WebMonitorModelsService {
   }
 
   WebCustom(appId: string) {
+    assertAppId(appId);
     return this.modelRegistry.getOrCreateModel<WebCustomDocument>(
       `${MongoCollectionPrefix.WEB_CUSTOM}${appId}`,
       WebCustomSchema,
@@ -67,6 +72,7 @@ export class WebMonitorModelsService {
   }
 
   WebCustomFilter(appId: string) {
+    assertAppId(appId);
     return this.modelRegistry.getOrCreateModel<WebCustomFilterDocument>(
       `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appId}`,
       WebCustomFilterSchema,

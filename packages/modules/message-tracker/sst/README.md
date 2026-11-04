@@ -86,14 +86,14 @@ npm run dev
 
 ## Production:
 
-1. Download code.zip from the Lambda sst deployed.
+1. Build and deploy the stack.
 
 ```bash
 npm run build
 npm run deploy
 ```
 
-2. Upload code.zip to the Lambda you actually use.
+2. Download the function code from the Lambda console (Actions → Export function) and upload it to the Lambda you actually use.
 
 ## Tech Stack
 

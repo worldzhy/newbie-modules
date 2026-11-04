@@ -205,7 +205,9 @@ test("the judgment maps examined candidates to manifest ids and budget cut-offs 
   assert.deepEqual(result.metadata, { matchedCount: 1, scopeEntities: 2 });
   assert.deepEqual(
     recorded.map((entry) => entry.knowledgeItemId),
-    ["not-relevant"],
+    // The hard recall match is recorded as an audit-only "hard-hit" row; the
+    // re-ranked candidate is recorded as "not-relevant".
+    ["hard", "not-relevant"],
   );
 });
 

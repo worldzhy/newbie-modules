@@ -158,8 +158,10 @@ model SecurityEvaluationThreatKnowledgeItem {
 /// subsequent pipelines) and hard-recall "hard-hit" verdicts (audit-only,
 /// always re-computed per run).
 enum SecurityEvaluationVerdictKind {
-  not-relevant
-  hard-hit
+  notRelevant @map("not-relevant")
+  hardHit     @map("hard-hit")
+
+  @@schema("module/security-evaluation")
 }
 
 /// Verdict cache for INTEL matching (ADR-045): every judgment outcome
@@ -181,13 +183,12 @@ model SecurityEvaluationThreatVerdictCache {
   knowledgeItemId  String                             @db.Uuid
   // Host-defined scope identifier, stored verbatim: "scopeType:scopeId".
   scopeKey        String                             @db.VarChar(512)
-  verdict         SecurityEvaluationVerdictKind      @default("not-relevant")
+  verdict         SecurityEvaluationVerdictKind      @default(notRelevant)
   reason          String?                            @db.Text           // LLM reason for not-relevant; null on hard-hit
   matchedEntity   String?                            @db.VarChar(512)   // Entity string that matched on hard-hit; null otherwise
   updatedAt       DateTime                           @updatedAt
 
-  knowledgeItem SecurityEvaluationThreatKnowledgeItem
-    @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
+  knowledgeItem SecurityEvaluationThreatKnowledgeItem @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
 
   @@unique([knowledgeItemId, scopeKey])
   @@index([scopeKey])
