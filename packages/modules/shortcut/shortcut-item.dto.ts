@@ -92,8 +92,10 @@ export class UpdateShortcutItemRequestDto {
 
   @ApiPropertyOptional({ type: String })
   @IsString()
-  @ValidateIf((_o, value) => value !== undefined && /^[a-z]+:\/\//i.test(value))
-  @IsUrl({ protocols: ["http", "https"], require_protocol: true } as const)
+  // The URL rule depends on the *effective* type, which an update may omit:
+  // a partial patch can turn a TEXT item into a LINK one without resending
+  // content. The controller merges the patch with the stored row and rejects
+  // a non-http(s) URL for LINK items (R6-10).
   content?: string;
 
   @ApiPropertyOptional({ type: String })
