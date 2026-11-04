@@ -48,7 +48,6 @@
     "@nestjs/schedule": "latest",
     "cron-parser": "4.x",
     "dotenv": "latest",
-    "ip": "latest",
     "ua-parser-js": "latest"
   },
   "devDependencies": {}

@@ -16,7 +16,7 @@ import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.s
 import { WebMonitorClickHouseService } from "../../models/clickhouse/web-monitor-clickhouse.service";
 import { SystemDocument } from "../../models/mongo/system.schema";
 import { WEB_THRESHOLD_ALERT_EVENT, WebThresholdAlertCategory, WebThresholdAlertEvent } from "./threshold-alert.event";
-import ip from "ip";
+import * as os from "os";
 
 @Injectable()
 export class JobsService implements OnModuleInit {
@@ -395,8 +395,20 @@ export class JobsService implements OnModuleInit {
     return error instanceof Error ? error.message : String(error);
   }
 
+  /** First non-internal IPv4 address of this host, used as a Redis lock holder tag. */
+  private localAddress(): string {
+    for (const infos of Object.values(os.networkInterfaces())) {
+      for (const info of infos ?? []) {
+        if (info.family === "IPv4" && !info.internal) {
+          return info.address;
+        }
+      }
+    }
+    return "127.0.0.1";
+  }
+
   private async redisLock(redisKey: string, ttl: number) {
-    const lock = `${ip.address()}:${String(this.cfg.port)}:${func.randomString(3)}`;
+    const lock = `${this.localAddress()}:${String(this.cfg.port)}:${func.randomString(3)}`;
     const res = await this.redis.getClient().set(redisKey, lock, "EX", ttl, "NX");
     if (!res) {
       // Lock is held by another instance — normal in multi-instance deployments.
