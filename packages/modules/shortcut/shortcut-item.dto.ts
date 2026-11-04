@@ -91,6 +91,7 @@ export class UpdateShortcutItemRequestDto {
   label?: string;
 
   @ApiPropertyOptional({ type: String })
+  @IsOptional()
   @IsString()
   // The URL rule depends on the *effective* type, which an update may omit:
   // a partial patch can turn a TEXT item into a LINK one without resending
