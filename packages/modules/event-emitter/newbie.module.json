@@ -10,13 +10,11 @@
   "dependencies": {
     "@nestjs/event-emitter": "latest"
   },
-  "config": {
-    "env": {
-      "EVENT_EMISSION_RETENTION_DAYS": {
-        "type": "int",
-        "default": 30,
-        "description": "Days to keep EventEmission rows. Rows older than this are pruned lazily on each new emission insert."
-      }
+  "env": {
+    "EVENT_EMISSION_RETENTION_DAYS": {
+      "type": "int",
+      "default": 30,
+      "description": "Days to keep EventEmission rows. Rows older than this are pruned lazily on each new emission insert."
     }
   }
 }
