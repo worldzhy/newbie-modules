@@ -16,20 +16,36 @@ export const securityEvaluationIntelNegativeCacheToken = "SECURITY_EVALUATION_IN
 
 export type SecurityEvaluationVerdictKind = "not-relevant" | "hard-hit";
 
+/** One pair whose cached verdict is being tested against a current signature. */
+export interface SecurityEvaluationIntelCacheCandidate {
+  knowledgeItemId: string;
+  /**
+   * Content address of the judgment input for this candidate (model + prompt
+   * + item text + entity set). A cached row recorded under a different
+   * signature describes a different input and must not be reused.
+   */
+  signature: string;
+}
+
+export interface SecurityEvaluationIntelVerdictRecord {
+  knowledgeItemId: string;
+  scopeKey: string;
+  verdict: SecurityEvaluationVerdictKind;
+  /** Content address of the input that produced this verdict. */
+  signature: string;
+  reason?: string | null;
+  matchedEntity?: string | null;
+}
+
 export interface SecurityEvaluationIntelNegativeCachePort {
   /**
-   * Of the given knowledge item ids, which are not yet cached as "not-relevant"
-   * for this scope (respecting TTL). Returns the ids in input order; an empty
-   * input yields an empty result. Hard-hit cache rows are intentionally not
-   * filtered — they are audit-only, the pair re-enters the pipeline each run.
+   * Of the given candidates, which are not yet cached as "not-relevant" for
+   * this scope under the current signature (respecting TTL). Returns the ids
+   * in input order; an empty input yields an empty result. Hard-hit cache
+   * rows are intentionally not filtered — they are audit-only, the pair
+   * re-enters the pipeline each run.
    */
-  filterUncached(scopeKey: string, knowledgeItemIds: readonly string[]): Promise<string[]>;
+  filterUncached(scopeKey: string, candidates: readonly SecurityEvaluationIntelCacheCandidate[]): Promise<string[]>;
   /** Record a verdict for this (knowledge item, scope) pair. */
-  record(
-    knowledgeItemId: string,
-    scopeKey: string,
-    verdict: SecurityEvaluationVerdictKind,
-    reason?: string | null,
-    matchedEntity?: string | null,
-  ): Promise<void>;
+  record(entry: SecurityEvaluationIntelVerdictRecord): Promise<void>;
 }

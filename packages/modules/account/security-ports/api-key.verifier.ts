@@ -30,14 +30,11 @@ export class AccountApiKeyVerifier implements ApiKeyVerifier {
       throw new UnauthorizedException(API_KEY_NOT_FOUND);
     }
 
-    // Personal keys are only usable while the owning user is ACTIVE. The Prisma
-    // schema makes `userId` required today, so this check always runs; a
-    // nullable owner for organization-scoped keys is not modelled yet (R6-12).
-    if (apiKey.userId) {
-      const owner = await this.prisma.user.findUnique({ where: { id: apiKey.userId } });
-      if (!owner || owner.status !== UserStatus.ACTIVE) {
-        throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
-      }
+    // A key is only usable while its owning user is ACTIVE. `userId` is a
+    // required relation column, so this check always runs.
+    const owner = await this.prisma.user.findUnique({ where: { id: apiKey.userId } });
+    if (!owner || owner.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
     }
 
     const match = await compareHash(secret, apiKey.secret);

@@ -7,9 +7,6 @@ import { generateHash } from "@devbie/newbie/utilities/common.util";
 import { Expose, expose } from "../../helpers/expose";
 import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
 
-/** An API key belongs to either a user (personal key) or an organization. */
-type ApiKeyOwner = { userId: string } | { organizationId: string };
-
 type ApiKeyListQuery = {
   skip?: number;
   take?: number;
@@ -33,10 +30,9 @@ export class ApiKeyService {
 
   async createApiKey(params: {
     userId: string;
-    organizationId?: string;
     ipAddress?: string;
     userAgent?: string;
-    data: Omit<Omit<Prisma.ApiKeyCreateInput, "key" | "secret">, "user" | "organization">;
+    data: Omit<Prisma.ApiKeyCreateInput, "key" | "secret" | "user">;
   }): Promise<Expose<ApiKey> & { secret: string }> {
     const key = await generateRandomString();
     // The plaintext secret is returned to the caller exactly once, on creation.
@@ -47,7 +43,6 @@ export class ApiKeyService {
         secret: await generateHash(secret),
         ...params.data,
         user: { connect: { id: params.userId } },
-        organizationId: params.organizationId,
       },
     });
     await this.auditLogService.record(AuditEvent.API_KEY_CREATED, {
@@ -61,24 +56,16 @@ export class ApiKeyService {
     return { ...expose<ApiKey>({ ...apiKey }), secret };
   }
 
-  async getApiKeysForOrganization(organizationId: string, params: ApiKeyListQuery): Promise<Expose<ApiKey>[]> {
-    return await this.listApiKeys({ organizationId }, params);
-  }
-
   async getApiKeysForUser(userId: string, params: ApiKeyListQuery): Promise<Expose<ApiKey>[]> {
-    return await this.listApiKeys({ userId }, params);
-  }
-
-  async getApiKeyForOrganization(organizationId: string, id: number): Promise<Expose<ApiKey>> {
-    return expose<ApiKey>(await this.getOwnedApiKey({ organizationId }, id));
+    return await this.listApiKeys(userId, params);
   }
 
   async getApiKeyForUser(userId: string, id: number): Promise<Expose<ApiKey>> {
-    return expose<ApiKey>(await this.getOwnedApiKey({ userId }, id));
+    return expose<ApiKey>(await this.getOwnedApiKey(userId, id));
   }
 
   async updateApiKey(userId: string, id: number, data: Prisma.ApiKeyUpdateInput): Promise<Expose<ApiKey>> {
-    return await this.updateOwnedApiKey({ userId }, id, data, { actorId: userId });
+    return await this.updateOwnedApiKey(userId, id, data, { actorId: userId });
   }
 
   async deleteApiKey(
@@ -86,60 +73,41 @@ export class ApiKeyService {
     id: number,
     requestContext?: { ipAddress?: string; userAgent?: string },
   ): Promise<Expose<ApiKey>> {
-    return await this.deleteOwnedApiKey({ userId }, id, { ...requestContext, actorId: userId });
-  }
-
-  async updateApiKeyForOrganization(
-    organizationId: string,
-    id: number,
-    data: Prisma.ApiKeyUpdateInput,
-    actorId?: string,
-  ): Promise<Expose<ApiKey>> {
-    return await this.updateOwnedApiKey({ organizationId }, id, data, { actorId });
-  }
-
-  async deleteApiKeyForOrganization(organizationId: string, id: number, actorId?: string): Promise<Expose<ApiKey>> {
-    return await this.deleteOwnedApiKey({ organizationId }, id, { actorId });
-  }
-
-  async getApiKeyLogsForOrganization(organizationId: string, id: number, params: ApiKeyLogsQuery) {
-    return await this.getOwnedApiKeyLogs({ organizationId }, id, params);
+    return await this.deleteOwnedApiKey(userId, id, { ...requestContext, actorId: userId });
   }
 
   async getApiKeyLogs(userId: string, id: number, params: ApiKeyLogsQuery) {
-    return await this.getOwnedApiKeyLogs({ userId }, id, params);
+    return await this.getOwnedApiKeyLogs(userId, id, params);
   }
 
-  private async listApiKeys(owner: ApiKeyOwner, params: ApiKeyListQuery): Promise<Expose<ApiKey>[]> {
+  private async listApiKeys(userId: string, params: ApiKeyListQuery): Promise<Expose<ApiKey>[]> {
     const { skip, take, cursor, where, orderBy } = params;
     const apiKeys = await this.prisma.apiKey.findMany({
       skip,
       take,
       cursor,
-      where: { ...where, ...this.ownerWhere(owner) },
+      where: { ...where, user: { id: userId } },
       orderBy,
     });
     return apiKeys.map((apiKey) => expose<ApiKey>(apiKey));
   }
 
-  private async getOwnedApiKey(owner: ApiKeyOwner, id: number): Promise<ApiKey> {
+  private async getOwnedApiKey(userId: string, id: number): Promise<ApiKey> {
     const apiKey = await this.prisma.apiKey.findUnique({
       where: { id },
     });
     if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    const owned =
-      "organizationId" in owner ? apiKey.organizationId === owner.organizationId : apiKey.userId === owner.userId;
-    if (!owned) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    if (apiKey.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
     return apiKey;
   }
 
   private async updateOwnedApiKey(
-    owner: ApiKeyOwner,
+    userId: string,
     id: number,
     data: Prisma.ApiKeyUpdateInput,
     attribution?: { actorId?: string },
   ): Promise<Expose<ApiKey>> {
-    await this.getOwnedApiKey(owner, id);
+    await this.getOwnedApiKey(userId, id);
     const apiKey = await this.prisma.apiKey.update({
       where: { id },
       data,
@@ -156,11 +124,11 @@ export class ApiKeyService {
   }
 
   private async deleteOwnedApiKey(
-    owner: ApiKeyOwner,
+    userId: string,
     id: number,
     attribution?: { actorId?: string; ipAddress?: string; userAgent?: string },
   ): Promise<Expose<ApiKey>> {
-    await this.getOwnedApiKey(owner, id);
+    await this.getOwnedApiKey(userId, id);
     const apiKey = await this.prisma.apiKey.delete({
       where: { id },
     });
@@ -174,17 +142,9 @@ export class ApiKeyService {
     return expose<ApiKey>(apiKey);
   }
 
-  private async getOwnedApiKeyLogs(owner: ApiKeyOwner, id: number, params: ApiKeyLogsQuery) {
-    const apiKey = await this.getOwnedApiKey(owner, id);
+  private async getOwnedApiKeyLogs(userId: string, id: number, params: ApiKeyLogsQuery) {
+    const apiKey = await this.getOwnedApiKey(userId, id);
     return await this.getApiLogsFromKey(apiKey.key, params);
-  }
-
-  private ownerWhere(owner: ApiKeyOwner): Prisma.ApiKeyWhereInput {
-    if ("organizationId" in owner) {
-      return { organizationId: owner.organizationId };
-    }
-    // Personal API keys are those without an organization.
-    return { user: { id: owner.userId }, organizationId: null };
   }
 
   private async getApiLogsFromKey(_apiKey: string, _params: ApiKeyLogsQuery): Promise<Record<string, unknown>[]> {

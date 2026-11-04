@@ -12,7 +12,12 @@ import { SecurityEvaluationIntelJudgment } from "./judgment/intel/security-evalu
 import { SecurityEvaluationIntelMatchService } from "./judgment/intel/security-evaluation-intel-match.service";
 import { SecurityEvaluationIntelReRanker } from "./judgment/intel/security-evaluation-intel-re-ranker";
 import type { SecurityEvaluationIntelNegativeCachePort } from "./judgment/intel/security-evaluation-intel-negative-cache.port";
-import type { SecurityEvaluationScopeEntitiesProvider } from "./judgment/intel/security-evaluation-scope-entities.port";
+import { buildSecurityEvaluationIntelReRankRequest } from "./judgment/intel/security-evaluation-intel-request";
+import type {
+  SecurityEvaluationScopeEntitiesProvider,
+  SecurityEvaluationScopeEntity,
+} from "./judgment/intel/security-evaluation-scope-entities.port";
+import { SecurityEvaluationIntelNegativeCacheRepository } from "./persistence/security-evaluation-intel-negative-cache.repository";
 import {
   SECURITY_EVALUATION_INTEL_EVIDENCE_BUDGET,
   SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET,
@@ -78,12 +83,20 @@ function stubPrisma(rows: IntelRow[]): PrismaService {
 }
 
 function stubNegativeCache(rows: IntelRow[] = []) {
-  const recorded: { knowledgeItemId: string; scopeKey: string; reason: string }[] = [];
+  const recorded: { knowledgeItemId: string; scopeKey: string; verdict: string; signature: string }[] = [];
   const cachedIds = new Set(rows.filter((row) => row.negativeCache?.[SCOPE_KEY] !== undefined).map((row) => row.id));
   const port: SecurityEvaluationIntelNegativeCachePort = {
-    filterUncached: async (_scopeKey, knowledgeItemIds) => knowledgeItemIds.filter((id) => !cachedIds.has(id)),
-    record: async (knowledgeItemId, scopeKey, reason) => {
-      recorded.push({ knowledgeItemId, scopeKey, reason });
+    filterUncached: async (_scopeKey, candidates) =>
+      candidates
+        .filter((candidate) => !cachedIds.has(candidate.knowledgeItemId))
+        .map((candidate) => candidate.knowledgeItemId),
+    record: async (entry) => {
+      recorded.push({
+        knowledgeItemId: entry.knowledgeItemId,
+        scopeKey: entry.scopeKey,
+        verdict: entry.verdict,
+        signature: entry.signature,
+      });
     },
   };
   return { port, recorded };
@@ -110,12 +123,14 @@ function stubReRanker(
   entity = "next",
 ): SecurityEvaluationIntelReRanker {
   return {
+    currentModelId: async () => "stub-model",
     reRank: async () => ({
       kind: verdict.kind,
       entityMatches: [{ entity, matched: verdict.finalRelevant, evidence: null }],
       semanticMatch: false,
       finalRelevant: verdict.finalRelevant,
       reason: verdict.reason,
+      signature: "stub-signature",
     }),
   } as unknown as SecurityEvaluationIntelReRanker;
 }
@@ -249,7 +264,7 @@ test("INTEL collection fails loudly when the scope port is unbound or the subjec
 
 function reRankerReturning(payload: unknown): SecurityEvaluationIntelReRanker {
   const resolver = {
-    resolve: async () => ({ complete: async () => ({ text: JSON.stringify(payload) }) }),
+    resolve: async () => ({ modelId: "stub-model", complete: async () => ({ text: JSON.stringify(payload) }) }),
   } as unknown as ChatModelResolver;
   return new SecurityEvaluationIntelReRanker(resolver);
 }
@@ -292,4 +307,81 @@ test("unavailable verdicts are never cached and leave the candidate unexamined",
 
   assert.equal(recorded.length, 0);
   assert.deepEqual(outcome.examinedRefs, []);
+});
+
+test("the re-rank request signature is content-addressed over the exact model input", () => {
+  const item = { title: "advisory", summary: "affects next@<14" };
+  const entities: SecurityEvaluationScopeEntity[] = [{ value: "next" }, { value: "webpack" }];
+  const base = buildSecurityEvaluationIntelReRankRequest(item, entities, "model-a");
+
+  assert.equal(base.signature, buildSecurityEvaluationIntelReRankRequest(item, entities, "model-a").signature);
+  assert.notEqual(
+    base.signature,
+    buildSecurityEvaluationIntelReRankRequest({ title: "advisory", summary: "affects other" }, entities, "model-a")
+      .signature,
+  );
+  assert.notEqual(base.signature, buildSecurityEvaluationIntelReRankRequest(item, entities, "model-b").signature);
+  assert.notEqual(
+    base.signature,
+    buildSecurityEvaluationIntelReRankRequest(item, [...entities].reverse(), "model-a").signature,
+  );
+  assert.notEqual(
+    base.signature,
+    buildSecurityEvaluationIntelReRankRequest(
+      item,
+      [{ value: "next", context: "web" }, { value: "webpack" }],
+      "model-a",
+    ).signature,
+  );
+  assert.deepEqual(base.messages[1], {
+    role: "user",
+    content: JSON.stringify({
+      item: { title: "advisory", summary: "affects next@<14" },
+      entities: [
+        { value: "next", context: null },
+        { value: "webpack", context: null },
+      ],
+    }),
+  });
+});
+
+test("the verdict cache TTL is read from the environment and never defaulted (ADR-033)", () => {
+  const prisma = {} as unknown as PrismaService;
+  const previous = process.env.NEGATIVE_CACHE_TTL_DAYS;
+  try {
+    delete process.env.NEGATIVE_CACHE_TTL_DAYS;
+    assert.throws(() => new SecurityEvaluationIntelNegativeCacheRepository(prisma), /NEGATIVE_CACHE_TTL_DAYS/);
+    process.env.NEGATIVE_CACHE_TTL_DAYS = "0";
+    assert.throws(() => new SecurityEvaluationIntelNegativeCacheRepository(prisma), /positive integer/);
+    process.env.NEGATIVE_CACHE_TTL_DAYS = "7";
+    assert.doesNotThrow(() => new SecurityEvaluationIntelNegativeCacheRepository(prisma));
+  } finally {
+    if (previous === undefined) {
+      delete process.env.NEGATIVE_CACHE_TTL_DAYS;
+    } else {
+      process.env.NEGATIVE_CACHE_TTL_DAYS = previous;
+    }
+  }
+});
+
+test("the verdict cache reuses only rows recorded under the current signature", async () => {
+  process.env.NEGATIVE_CACHE_TTL_DAYS = "7";
+  const repository = new SecurityEvaluationIntelNegativeCacheRepository({
+    securityEvaluationThreatVerdictCache: {
+      findMany: async () => [
+        { knowledgeItemId: "same", inputSignature: "sig" },
+        { knowledgeItemId: "changed", inputSignature: "old" },
+        { knowledgeItemId: "legacy", inputSignature: null },
+      ],
+    },
+  } as unknown as PrismaService);
+
+  const uncached = await repository.filterUncached(SCOPE_KEY, [
+    { knowledgeItemId: "same", signature: "sig" },
+    { knowledgeItemId: "changed", signature: "new" },
+    { knowledgeItemId: "legacy", signature: "sig" },
+    { knowledgeItemId: "missing", signature: "sig" },
+  ]);
+
+  assert.deepEqual(uncached, ["changed", "legacy", "missing"]);
 });

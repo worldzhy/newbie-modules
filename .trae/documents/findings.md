@@ -58,3 +58,12 @@ W1 落地（2026-11-03）：`d78bf84` security 拒绝公开/过短签名密钥�
 | R6-14 | newbie-modules | registry CI `modules lint` 仍钉 1.14.5，落后已发布 1.15.0 | P2 | source / CI | 所有 registry PR | fixed（2026-11-04）：`2d9ea7b` 钉到 `@devbie/newbie-cli@1.15.0` |
 
 复核取证：registry 与宿主 34 个模块 `diff -rq` 零差异；registry 模块单测无法在 registry 仓独立运行（`tsx` 未声明为 devDependency，`ERR_MODULE_NOT_FOUND`），相关用例改由宿主副本执行并通过。
+
+## round7 裁决（2026-11-04，scope=`workspace`，报告在本仓 `.trae/documents/expert-review-2026-11-04-round7.md`）
+
+状态更正（历史行保留，以本节为准）：
+- **R6-09 → fixed**：方案由「两层签名」收敛为**内容寻址单签名**。`security-evaluation-intel-request.ts` 以 `sha256(modelId + SYSTEM_PROMPT 原文 + user payload JSON + responseFormat + temperature)` 生成签名，装配即哈希，prompt/context/采样参数变化自动失效，无需人工 bump 版本常量。registry `e3bdc11`+`3008b10`+`597ba64`；宿主持有副本 `5252e38`（`inputSignature` 列走 `db push`，无 migration）。`SecurityEvaluationThreatVerdictCache.inputSignature` 为 `String? @db.VarChar(64)`，读写两侧签名不等（含 legacy null）即 miss 重判；hard-hit 行仍仅审计不过滤。
+- **R6-12 → fixed（2026-11-04）**：按用户输入「organization 以后不会使用」彻底删除 organizationId 全链。registry `34cd698`：`ApiKey.organizationId` 列、`ApiKeyOwner` 联合类型、5 个 `*ForOrganization` 方法、`createApiKey` 的 organization 参数与过期 `Omit`、响应 DTO 字段、verifier 的恒真 `if (apiKey.userId)` 一并删除，`listApiKeys` 直接按 `user.id` 过滤。宿主 `8e729cd`（`db push` 删列，`ApiKey` 0 行无数据风险），前端 apits 重生成 `c96e9a7`（仅少 `organizationId` 一行，无消费方）。取证：`ApiKey` 表 0 行；organization 模块在 registry 存在但**未装配**（backend 模块键无 organization）；列无 relation、organization schema 无反向引用，即从未存在契约。archived：`organization` 模块定义本身仍在 registry，未装配，另行处理。
+- **R6-13 → 裁定（待执行）**：fail-closed 保留，但异常语义分层——请求边界（`site.controller.ts` query 与 upsert body）非法 `appId` 返回 400 并指明字段；存储侧读取/聚合出现非法 `appId` 属内部不变量破坏，记内部错误 + 告警，不向调用方伪装成 400。理由：appId 来源混合（服务端 `func.randomString(7)`、客户端 query、库内 ingest），不能统一改 5xx。
+
+回归证据（宿主副本）：`security-evaluation-intel.test.ts` + `security-evaluation-evidence.provider.test.ts` 共 15 例全过，含「签名按模型看到的确切字节内容寻址」「缓存只复用当前签名下的行（changed/legacy/missing 均 miss）」「hard-hit 仅审计」。

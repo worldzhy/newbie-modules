@@ -3,6 +3,7 @@ import { SecurityEvaluationKnowledgeSeverity } from "../../knowledge/security-ev
 import { SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET } from "../../security-evaluation.constants";
 import { SecurityEvaluationScopeEntity } from "./security-evaluation-scope-entities.port";
 import { SecurityEvaluationIntelReRanker } from "./security-evaluation-intel-re-ranker";
+import { buildSecurityEvaluationIntelReRankRequest } from "./security-evaluation-intel-request";
 import {
   securityEvaluationIntelNegativeCacheToken,
   SecurityEvaluationIntelNegativeCachePort,
@@ -105,6 +106,9 @@ export class SecurityEvaluationIntelMatchService {
     const examinedRefs: string[] = [];
     const skippedByBudget: string[] = [];
     let reRankCalls = 0;
+    // Resolved once per run so audit rows carry the same model identity the
+    // collection layer used when it decided not to reuse a cached verdict.
+    const modelId = await this.reRanker.currentModelId();
 
     for (const candidate of candidates) {
       const haystack = `${candidate.title}\n${candidate.summary ?? ""}`;
@@ -124,7 +128,17 @@ export class SecurityEvaluationIntelMatchService {
         examinedRefs.push(candidate.knowledgeItemId);
         // Hard-hit verdict as audit trace only — the cache does not filter
         // this pair out of subsequent pipelines (entity sets are dynamic).
-        await this.negativeCache.record(candidate.knowledgeItemId, scopeKey, "hard-hit", null, matchedEntity);
+        await this.negativeCache.record({
+          knowledgeItemId: candidate.knowledgeItemId,
+          scopeKey,
+          verdict: "hard-hit",
+          signature: buildSecurityEvaluationIntelReRankRequest(
+            { title: candidate.title, summary: candidate.summary },
+            entities,
+            modelId,
+          ).signature,
+          matchedEntity,
+        });
         continue;
       }
 
@@ -147,8 +161,16 @@ export class SecurityEvaluationIntelMatchService {
       examinedRefs.push(candidate.knowledgeItemId);
 
       if (!verdict.finalRelevant) {
-        if (verdict.kind === "not-relevant") {
-          await this.negativeCache.record(candidate.knowledgeItemId, scopeKey, "not-relevant", verdict.reason, null);
+        // A verdict without a signature judged no request we can reproduce, so
+        // it must not become a reusable negative cache entry.
+        if (verdict.kind === "not-relevant" && verdict.signature) {
+          await this.negativeCache.record({
+            knowledgeItemId: candidate.knowledgeItemId,
+            scopeKey,
+            verdict: "not-relevant",
+            signature: verdict.signature,
+            reason: verdict.reason,
+          });
         }
         continue;
       }

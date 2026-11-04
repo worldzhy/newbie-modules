@@ -2,14 +2,27 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import type {
+  SecurityEvaluationIntelCacheCandidate,
   SecurityEvaluationIntelNegativeCachePort,
+  SecurityEvaluationIntelVerdictRecord,
   SecurityEvaluationVerdictKind,
 } from "../judgment/intel/security-evaluation-intel-negative-cache.port";
 
-/// Default TTL for not-relevant verdict cache rows. Hosts can override via
-/// NEGATIVE_CACHE_TTL_DAYS env; hard-hit rows are NOT subject to this TTL
-/// (they are audit traces, not pipeline-skip signals).
-const DEFAULT_TTL_DAYS = 7;
+/// TTL in days for not-relevant verdict cache rows; hard-hit rows are NOT
+/// subject to this TTL (they are audit traces, not pipeline-skip signals).
+/// Every environment declares the value explicitly (ADR-033): there is no
+/// built-in fallback, so a host that forgets it fails to boot instead of
+/// silently expiring on a guessed window.
+const TTL_DAYS_ENV = "NEGATIVE_CACHE_TTL_DAYS";
+
+function requirePositiveIntegerEnv(name: string): number {
+  const raw = process.env[name];
+  const parsed = raw === undefined ? Number.NaN : Number(raw.trim());
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer; received ${raw === undefined ? "no value" : `'${raw}'`}.`);
+  }
+  return parsed;
+}
 
 /**
  * Prisma enum values must be identifiers, so the schema keeps the domain
@@ -37,13 +50,14 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
   private readonly ttlMs: number;
 
   constructor(private readonly prisma: PrismaService) {
-    const parsed = Number.parseInt(process.env.NEGATIVE_CACHE_TTL_DAYS ?? "", 10);
-    const ttlDays = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TTL_DAYS;
-    this.ttlMs = ttlDays * 86_400_000;
+    this.ttlMs = requirePositiveIntegerEnv(TTL_DAYS_ENV) * 86_400_000;
   }
 
-  async filterUncached(scopeKey: string, knowledgeItemIds: readonly string[]): Promise<string[]> {
-    if (knowledgeItemIds.length === 0) return [];
+  async filterUncached(
+    scopeKey: string,
+    candidates: readonly SecurityEvaluationIntelCacheCandidate[],
+  ): Promise<string[]> {
+    if (candidates.length === 0) return [];
 
     // Only rows with verdict="not-relevant" AND within TTL filter the pipeline.
     // Hard-hit rows are audit-only and intentionally invisible here — the pair
@@ -52,32 +66,32 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
     const cached = await this.prisma.securityEvaluationThreatVerdictCache.findMany({
       where: {
         scopeKey,
-        knowledgeItemId: { in: [...knowledgeItemIds] },
+        knowledgeItemId: { in: candidates.map((candidate) => candidate.knowledgeItemId) },
         verdict: PRISMA_VERDICT["not-relevant"],
         updatedAt: { gt: cutoff },
       },
-      select: { knowledgeItemId: true },
+      select: { knowledgeItemId: true, inputSignature: true },
     });
-    const cachedIds = new Set(cached.map((row) => row.knowledgeItemId));
-    return knowledgeItemIds.filter((id) => !cachedIds.has(id));
+    // A row recorded under a different signature describes a different
+    // judgment input, so it is a miss. Rows written before signatures existed
+    // carry null and are misses too.
+    const signatureById = new Map(cached.map((row) => [row.knowledgeItemId, row.inputSignature]));
+    return candidates
+      .filter((candidate) => signatureById.get(candidate.knowledgeItemId) !== candidate.signature)
+      .map((candidate) => candidate.knowledgeItemId);
   }
 
-  async record(
-    knowledgeItemId: string,
-    scopeKey: string,
-    verdict: SecurityEvaluationVerdictKind,
-    reason?: string | null,
-    matchedEntity?: string | null,
-  ): Promise<void> {
+  async record(entry: SecurityEvaluationIntelVerdictRecord): Promise<void> {
+    const { knowledgeItemId, scopeKey, verdict, signature } = entry;
     // Normalize: undefined → null for the optional payload columns.
-    const r = reason ?? null;
-    const m = matchedEntity ?? null;
+    const reason = entry.reason ?? null;
+    const matchedEntity = entry.matchedEntity ?? null;
 
     const prismaVerdict = PRISMA_VERDICT[verdict];
     await this.prisma.securityEvaluationThreatVerdictCache.upsert({
       where: { knowledgeItemId_scopeKey: { knowledgeItemId, scopeKey } },
-      create: { knowledgeItemId, scopeKey, verdict: prismaVerdict, reason: r, matchedEntity: m },
-      update: { verdict: prismaVerdict, reason: r, matchedEntity: m },
+      create: { knowledgeItemId, scopeKey, verdict: prismaVerdict, inputSignature: signature, reason, matchedEntity },
+      update: { verdict: prismaVerdict, inputSignature: signature, reason, matchedEntity },
     });
   }
 }
