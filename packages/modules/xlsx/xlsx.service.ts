@@ -1,6 +1,5 @@
 import { BadRequestException, Injectable, Logger } from "@nestjs/common";
-import type { Express } from "express";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 /** Cap on the total bytes a single workbook may expand to (zip bomb guard). */
 const MAX_UNCOMPRESSED_BYTES = 128 * 1024 * 1024;
@@ -22,12 +21,6 @@ export interface XlsxSheetMatrix {
 @Injectable()
 export class XLSXService {
   private readonly logger = new Logger(XLSXService.name);
-  // All methods are stateless: the workbook is held by the caller, never by
-  // this singleton. Keeping per-request workbook state on the service instance
-  // would let concurrent requests corrupt each other.
-  createWorkbook(): XLSX.WorkBook {
-    return XLSX.utils.book_new();
-  }
 
   //****************************************/
   //* Stateless buffer parsing (multi-sheet) */
@@ -36,37 +29,69 @@ export class XLSXService {
   /**
    * Parse every sheet of an xlsx buffer into raw string matrices.
    *
-   * Unlike the stateful loadFile/getRows flow (which targets object-style CRUD
-   * imports), this method preserves the full grid including the header row and
-   * empty cells, making it suitable for downstream consumers (e.g. LLM prompts)
+   * The method preserves the full grid including the header row and empty
+   * cells, making it suitable for downstream consumers (e.g. LLM prompts)
    * that need an exact textual representation of the workbook.
    *
-   * - `cellDates: true` parses date-formatted cells into JS Date objects, which
-   *   are normalized to UTC `YYYY-MM-DD` to avoid timezone drift on bank data.
-   * - `header: 1` returns raw row arrays; `defval: ''` fills empty cells so
-   *   columns stay aligned.
+   * - Date cells are normalized to UTC `YYYY-MM-DD` to avoid timezone drift
+   *   on bank data.
    * - The buffer is rejected before parsing when its zip container would
-   *   expand past a sane bound (zip bomb), and the parser's own console
-   *   warnings are left untouched: overriding the global console from a
-   *   request path is not safe for concurrent callers.
+   *   expand past a sane bound (zip bomb).
    */
-  parseToMatrix(buffer: Buffer): XlsxSheetMatrix[] {
+  async parseToMatrix(buffer: Buffer): Promise<XlsxSheetMatrix[]> {
     this.assertReasonableZipVolume(buffer);
 
-    const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
+    const workbook = new ExcelJS.Workbook();
+    // exceljs pins an older @types/node whose Buffer structurally differs from
+    // the host's generic Buffer<T>; the runtime value is a plain Node Buffer.
+    await workbook.xlsx.load(buffer as unknown as never);
 
-    return workbook.SheetNames.map((sheetName) => {
-      const sheet = workbook.Sheets[sheetName];
-      // header:1 returns raw row arrays; defval:'' fills empty cells.
-      const rawRows: unknown[][] = XLSX.utils.sheet_to_json(sheet, {
-        header: 1,
-        defval: "",
-      });
-      const rows: string[][] = rawRows.map((row) =>
-        (row as unknown[]).map((cell) => (cell instanceof Date ? cell.toISOString().slice(0, 10) : String(cell ?? ""))),
-      );
-      return { sheetName, rows };
+    return workbook.worksheets.map((sheet) => {
+      const matrix: string[][] = [];
+      const { rowCount, columnCount } = sheet;
+      for (let r = 1; r <= rowCount; r += 1) {
+        const row: string[] = [];
+        for (let c = 1; c <= columnCount; c += 1) {
+          row.push(this.cellToString(sheet.getCell(r, c).value));
+        }
+        matrix.push(row);
+      }
+      return { sheetName: sheet.name, rows: matrix };
     });
+  }
+
+  /**
+   * Convert a single ExcelJS cell value to its textual representation.
+   *
+   * Handles the cell value shapes exceljs can produce: scalars, Date values
+   * (date-typed cells), hyperlink objects, formula results and rich text.
+   */
+  private cellToString(value: ExcelJS.CellValue): string {
+    if (value === null || value === undefined) return "";
+    if (value instanceof Date) return value.toISOString().slice(0, 10);
+    if (typeof value === "object") {
+      // { text, hyperlink }
+      if ("text" in value && typeof (value as { text?: unknown }).text === "string") {
+        return (value as { text: string }).text;
+      }
+      // { formula, result } — fall through to the computed result
+      if ("result" in value) {
+        return this.cellToString((value as { result: ExcelJS.CellValue }).result);
+      }
+      // { richText: Array<{ text }> }
+      const rich = (value as { richText?: unknown }).richText;
+      if (Array.isArray(rich)) {
+        return rich
+          .map((segment) =>
+            segment && typeof segment === "object" && "text" in segment
+              ? String((segment as { text?: unknown }).text ?? "")
+              : "",
+          )
+          .join("");
+      }
+      return "";
+    }
+    return String(value);
   }
 
   /**
@@ -123,90 +148,5 @@ export class XLSXService {
       if (buffer.readUInt32LE(offset) === EOCD_SIGNATURE) return offset;
     }
     return -1;
-  }
-
-  getSheets(workbook: XLSX.WorkBook): string[] {
-    return workbook.SheetNames;
-  }
-
-  //**********************/
-  //* Load file          */
-  //**********************/
-
-  loadLocalFile(filePath: string): XLSX.WorkBook {
-    return XLSX.readFile(filePath);
-  }
-
-  loadFile(file: Express.Multer.File): XLSX.WorkBook {
-    return XLSX.read(file.buffer);
-  }
-
-  loadBuffer(buffer: Buffer): XLSX.WorkBook {
-    return XLSX.read(buffer);
-  }
-
-  //************************/
-  //* Get columns and rows */
-  //************************/
-
-  getColumnsBySheetIndex(workbook: XLSX.WorkBook, index: number): string[] {
-    const sheet = workbook.Sheets[workbook.SheetNames[index]];
-
-    return this.getColumns(sheet);
-  }
-
-  getColumnsBySheetName(workbook: XLSX.WorkBook, name: string): string[] {
-    const sheet = workbook.Sheets[name];
-
-    return this.getColumns(sheet);
-  }
-
-  getRowsBySheetIndex(workbook: XLSX.WorkBook, index: number): object[] {
-    const sheet = workbook.Sheets[workbook.SheetNames[index]];
-    return this.getRows(sheet);
-  }
-
-  getRowsBySheetName(workbook: XLSX.WorkBook, name: string): object[] {
-    const sheet = workbook.Sheets[name];
-    return this.getRows(sheet);
-  }
-
-  //**********************/
-  //* Save file          */
-  //**********************/
-
-  writeFile(workbook: XLSX.WorkBook, fileName: string) {
-    XLSX.writeFile(workbook, fileName);
-  }
-
-  //**********************/
-  //* Private operations */
-  //**********************/
-
-  private getColumns(sheet: XLSX.WorkSheet): string[] {
-    const columns: string[] = [];
-
-    if (sheet["!ref"]) {
-      const range = XLSX.utils.decode_range(sheet["!ref"]);
-      const startRow = range.s.r; // start in the first row
-
-      // walk every column in the range
-      for (let C = range.s.c; C <= range.e.c; ++C) {
-        let column = "UNKNOWN " + C; // <-- replace with your desired default
-
-        const cell = sheet[XLSX.utils.encode_cell({ c: C, r: startRow })]; // find the cell in the first row
-        if (cell && cell.t) {
-          column = XLSX.utils.format_cell(cell);
-        }
-
-        columns.push(column);
-      }
-    }
-
-    return columns;
-  }
-
-  private getRows(sheet: XLSX.WorkSheet): object[] {
-    return XLSX.utils.sheet_to_json(sheet);
   }
 }
