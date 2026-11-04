@@ -90,9 +90,6 @@ export class ApiKeyResponseDto {
 
   @ApiProperty({ type: String })
   userId!: string;
-
-  @ApiPropertyOptional({ type: String })
-  organizationId?: string | null;
 }
 
 /**
