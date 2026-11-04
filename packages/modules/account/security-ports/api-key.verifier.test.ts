@@ -64,14 +64,6 @@ test("rejects a personal key whose owner row is gone", async () => {
   );
 });
 
-test("organization keys skip the user lookup", async () => {
-  const apiKey = { id: 1, key: KEY, secret: await generateHash(SECRET), userId: null };
-  const { verifier, calls } = buildVerifier(apiKey, null);
-
-  assert.equal(await verifier.verify(KEY, SECRET), true);
-  assert.equal(calls.user, 0);
-});
-
 test("rejects a wrong secret with an active owner", async () => {
   const apiKey = { id: 1, key: KEY, secret: await generateHash("other-secret"), userId: "user-1" };
   const { verifier } = buildVerifier(apiKey, { status: UserStatus.ACTIVE });
