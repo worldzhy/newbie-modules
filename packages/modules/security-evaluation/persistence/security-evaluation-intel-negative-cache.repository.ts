@@ -2,7 +2,9 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import type {
+  SecurityEvaluationIntelCacheCandidate,
   SecurityEvaluationIntelNegativeCachePort,
+  SecurityEvaluationIntelVerdictRecord,
   SecurityEvaluationVerdictKind,
 } from "../judgment/intel/security-evaluation-intel-negative-cache.port";
 
@@ -42,8 +44,11 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
     this.ttlMs = ttlDays * 86_400_000;
   }
 
-  async filterUncached(scopeKey: string, knowledgeItemIds: readonly string[]): Promise<string[]> {
-    if (knowledgeItemIds.length === 0) return [];
+  async filterUncached(
+    scopeKey: string,
+    candidates: readonly SecurityEvaluationIntelCacheCandidate[],
+  ): Promise<string[]> {
+    if (candidates.length === 0) return [];
 
     // Only rows with verdict="not-relevant" AND within TTL filter the pipeline.
     // Hard-hit rows are audit-only and intentionally invisible here — the pair
@@ -52,32 +57,32 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
     const cached = await this.prisma.securityEvaluationThreatVerdictCache.findMany({
       where: {
         scopeKey,
-        knowledgeItemId: { in: [...knowledgeItemIds] },
+        knowledgeItemId: { in: candidates.map((candidate) => candidate.knowledgeItemId) },
         verdict: PRISMA_VERDICT["not-relevant"],
         updatedAt: { gt: cutoff },
       },
-      select: { knowledgeItemId: true },
+      select: { knowledgeItemId: true, inputSignature: true },
     });
-    const cachedIds = new Set(cached.map((row) => row.knowledgeItemId));
-    return knowledgeItemIds.filter((id) => !cachedIds.has(id));
+    // A row recorded under a different signature describes a different
+    // judgment input, so it is a miss. Rows written before signatures existed
+    // carry null and are misses too.
+    const signatureById = new Map(cached.map((row) => [row.knowledgeItemId, row.inputSignature]));
+    return candidates
+      .filter((candidate) => signatureById.get(candidate.knowledgeItemId) !== candidate.signature)
+      .map((candidate) => candidate.knowledgeItemId);
   }
 
-  async record(
-    knowledgeItemId: string,
-    scopeKey: string,
-    verdict: SecurityEvaluationVerdictKind,
-    reason?: string | null,
-    matchedEntity?: string | null,
-  ): Promise<void> {
+  async record(entry: SecurityEvaluationIntelVerdictRecord): Promise<void> {
+    const { knowledgeItemId, scopeKey, verdict, signature } = entry;
     // Normalize: undefined → null for the optional payload columns.
-    const r = reason ?? null;
-    const m = matchedEntity ?? null;
+    const reason = entry.reason ?? null;
+    const matchedEntity = entry.matchedEntity ?? null;
 
     const prismaVerdict = PRISMA_VERDICT[verdict];
     await this.prisma.securityEvaluationThreatVerdictCache.upsert({
       where: { knowledgeItemId_scopeKey: { knowledgeItemId, scopeKey } },
-      create: { knowledgeItemId, scopeKey, verdict: prismaVerdict, reason: r, matchedEntity: m },
-      update: { verdict: prismaVerdict, reason: r, matchedEntity: m },
+      create: { knowledgeItemId, scopeKey, verdict: prismaVerdict, inputSignature: signature, reason, matchedEntity },
+      update: { verdict: prismaVerdict, inputSignature: signature, reason, matchedEntity },
     });
   }
 }

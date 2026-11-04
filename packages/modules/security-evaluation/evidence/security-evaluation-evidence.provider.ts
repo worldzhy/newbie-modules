@@ -1,5 +1,6 @@
 import { BadRequestException, Inject, Injectable, Optional } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { ChatModelResolver } from "@modules/llm/chat-model.resolver";
 import type { EvidenceCollection, EvidenceProvider } from "@modules/evaluation/ports/evidence.provider";
 import type {
   EvaluationCoverageBucket,
@@ -34,6 +35,8 @@ import {
   securityEvaluationIntelNegativeCacheToken,
   SecurityEvaluationIntelNegativeCachePort,
 } from "../judgment/intel/security-evaluation-intel-negative-cache.port";
+import { buildSecurityEvaluationIntelReRankRequest } from "../judgment/intel/security-evaluation-intel-request";
+import { SECURITY_EVALUATION_INTEL_LLM_SCOPE } from "../judgment/intel/security-evaluation-intel-re-ranker";
 import { RepositoryAccess, securityEvaluationRepositoryAccessToken } from "../ports/repository-access.port";
 
 interface ResolvedLockfile {
@@ -71,6 +74,8 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     @Optional()
     @Inject(SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER)
     private readonly scopeEntitiesProvider?: SecurityEvaluationScopeEntitiesProvider,
+    @Optional()
+    private readonly chatModelResolver?: ChatModelResolver,
   ) {}
 
   async collect(
@@ -160,11 +165,25 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     });
 
     // The negative cache decides which pairs a previous run already judged
-    // not relevant; the port keeps the store's shape out of this layer.
+    // not relevant; the port keeps the store's shape out of this layer. Each
+    // candidate carries the content address of the request the judgment would
+    // send today, so a row recorded under different input is a miss.
+    const modelId = await this.currentIntelModelId();
+    // The judgment rebuilds entities from the evidence manifest, which carries
+    // only the value today; project the same shape so both sides hash the
+    // identical payload the model sees.
+    const projectedEntities = scope.entities.map((entity) => ({ value: entity.value }));
     const uncached = new Set(
       await this.negativeCache.filterUncached(
         scopeKey,
-        candidates.map((candidate) => candidate.id),
+        candidates.map((candidate) => ({
+          knowledgeItemId: candidate.id,
+          signature: buildSecurityEvaluationIntelReRankRequest(
+            { title: candidate.title, summary: candidate.summary },
+            projectedEntities,
+            modelId,
+          ).signature,
+        })),
       ),
     );
     const cachedIds = candidates.filter((candidate) => !uncached.has(candidate.id)).map((candidate) => candidate.id);
@@ -217,6 +236,20 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       );
     }
     return { total: items.length, items, note: notes.join(" ") };
+  }
+
+  /**
+   * Model bound to the INTEL scope, or null when the scope cannot be resolved.
+   * Null only makes the signature differ from a record written under a real
+   * model, so the pair is re-judged instead of reused.
+   */
+  private async currentIntelModelId(): Promise<string | null> {
+    if (!this.chatModelResolver) return null;
+    try {
+      return (await this.chatModelResolver.resolve(SECURITY_EVALUATION_INTEL_LLM_SCOPE)).modelId;
+    } catch {
+      return null;
+    }
   }
 
   private async resolveLockfile(subject: EvaluationSubjectRef): Promise<ResolvedLockfile> {

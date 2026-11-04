@@ -186,6 +186,10 @@ model SecurityEvaluationThreatVerdictCache {
   verdict         SecurityEvaluationVerdictKind      @default(notRelevant)
   reason          String?                            @db.Text           // LLM reason for not-relevant; null on hard-hit
   matchedEntity   String?                            @db.VarChar(512)   // Entity string that matched on hard-hit; null otherwise
+  // Content address of the exact re-rank request that produced this verdict
+  // (model id + system prompt + item payload + sampling options). A read-side
+  // mismatch means the judgment input changed and the verdict must be re-judged.
+  inputSignature  String?                            @db.VarChar(64)
   updatedAt       DateTime                           @updatedAt
 
   knowledgeItem SecurityEvaluationThreatKnowledgeItem @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
