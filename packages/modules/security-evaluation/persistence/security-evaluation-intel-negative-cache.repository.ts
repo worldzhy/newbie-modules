@@ -8,10 +8,21 @@ import type {
   SecurityEvaluationVerdictKind,
 } from "../judgment/intel/security-evaluation-intel-negative-cache.port";
 
-/// Default TTL for not-relevant verdict cache rows. Hosts can override via
-/// NEGATIVE_CACHE_TTL_DAYS env; hard-hit rows are NOT subject to this TTL
-/// (they are audit traces, not pipeline-skip signals).
-const DEFAULT_TTL_DAYS = 7;
+/// TTL in days for not-relevant verdict cache rows; hard-hit rows are NOT
+/// subject to this TTL (they are audit traces, not pipeline-skip signals).
+/// Every environment declares the value explicitly (ADR-033): there is no
+/// built-in fallback, so a host that forgets it fails to boot instead of
+/// silently expiring on a guessed window.
+const TTL_DAYS_ENV = "NEGATIVE_CACHE_TTL_DAYS";
+
+function requirePositiveIntegerEnv(name: string): number {
+  const raw = process.env[name];
+  const parsed = raw === undefined ? Number.NaN : Number(raw.trim());
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer; received ${raw === undefined ? "no value" : `'${raw}'`}.`);
+  }
+  return parsed;
+}
 
 /**
  * Prisma enum values must be identifiers, so the schema keeps the domain
@@ -39,9 +50,7 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
   private readonly ttlMs: number;
 
   constructor(private readonly prisma: PrismaService) {
-    const parsed = Number.parseInt(process.env.NEGATIVE_CACHE_TTL_DAYS ?? "", 10);
-    const ttlDays = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_TTL_DAYS;
-    this.ttlMs = ttlDays * 86_400_000;
+    this.ttlMs = requirePositiveIntegerEnv(TTL_DAYS_ENV) * 86_400_000;
   }
 
   async filterUncached(

@@ -4,10 +4,21 @@ import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EventCatalogService } from "./event-catalog.service";
 
-/// Default event-emission retention. Events older than this many days are
+/// Event-emission retention in days. Events older than this many days are
 /// pruned before each new insert (lazy cleanup — no scheduler, no extra
-/// dependency). Hosts can override via EVENT_EMISSION_RETENTION_DAYS.
-const DEFAULT_RETENTION_DAYS = 30;
+/// dependency). Every environment declares the value explicitly (ADR-033):
+/// there is no built-in fallback, so a host that forgets it fails to boot
+/// instead of silently pruning on a guessed window.
+const RETENTION_DAYS_ENV = "EVENT_EMISSION_RETENTION_DAYS";
+
+function requirePositiveIntegerEnv(name: string): number {
+  const raw = process.env[name];
+  const parsed = raw === undefined ? Number.NaN : Number(raw.trim());
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name} must be a positive integer; received ${raw === undefined ? "no value" : `'${raw}'`}.`);
+  }
+  return parsed;
+}
 
 export interface EventDescription {
   key: string;
@@ -41,8 +52,7 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
     private readonly eventEmitter: EventEmitter2,
     private readonly eventCatalog: EventCatalogService,
   ) {
-    const parsed = Number.parseInt(process.env.EVENT_EMISSION_RETENTION_DAYS ?? "", 10);
-    this.retentionDays = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RETENTION_DAYS;
+    this.retentionDays = requirePositiveIntegerEnv(RETENTION_DAYS_ENV);
   }
 
   onModuleInit() {

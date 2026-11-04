@@ -345,7 +345,27 @@ test("the re-rank request signature is content-addressed over the exact model in
   });
 });
 
+test("the verdict cache TTL is read from the environment and never defaulted (ADR-033)", () => {
+  const prisma = {} as unknown as PrismaService;
+  const previous = process.env.NEGATIVE_CACHE_TTL_DAYS;
+  try {
+    delete process.env.NEGATIVE_CACHE_TTL_DAYS;
+    assert.throws(() => new SecurityEvaluationIntelNegativeCacheRepository(prisma), /NEGATIVE_CACHE_TTL_DAYS/);
+    process.env.NEGATIVE_CACHE_TTL_DAYS = "0";
+    assert.throws(() => new SecurityEvaluationIntelNegativeCacheRepository(prisma), /positive integer/);
+    process.env.NEGATIVE_CACHE_TTL_DAYS = "7";
+    assert.doesNotThrow(() => new SecurityEvaluationIntelNegativeCacheRepository(prisma));
+  } finally {
+    if (previous === undefined) {
+      delete process.env.NEGATIVE_CACHE_TTL_DAYS;
+    } else {
+      process.env.NEGATIVE_CACHE_TTL_DAYS = previous;
+    }
+  }
+});
+
 test("the verdict cache reuses only rows recorded under the current signature", async () => {
+  process.env.NEGATIVE_CACHE_TTL_DAYS = "7";
   const repository = new SecurityEvaluationIntelNegativeCacheRepository({
     securityEvaluationThreatVerdictCache: {
       findMany: async () => [
