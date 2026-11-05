@@ -102,3 +102,18 @@ C 层草案判定：现状主张 C1–C4 与支撑论证 P4 成立；方案主�
 
 - 误报剔除：「CH bodySize NaN 构成写失败毒丸」被探针否决（null → Int32 落 0）；「round11 编号可用」否决（他会话已占用）。
 - R9-04/R9-07 维持 open：C 层细化方案须先回答 round12 §9 四问，再评审后落地。
+
+## round15（2026-11-06，scope=`workspace`，报告在 `devbie/.trae/documents/expert-review-2026-11-06-round15.md`）
+
+锚点：newbie-modules `a3ab33c`。registry 4 个新提交全为 ADR-034 manifest 迁移，模块源码未动，故 round12 及之前条目结论维持。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+|---|---|---|---|---|---|---|
+| R15-01 | newbie-modules ↔ nightwatch-backend | web-monitor ingest Mongo 毒丸第二向量簇：`customs[].customName={}`、`resourceList[].method/type/name/nextHopProtocol={}`、`p={}` 经 `decryptPhone` 透传 → CastError → 整批失败永久重入队；CH 向量经探针反驳（对象 stringify 落库） | P1 | live | anonymous（installation token） | open（R12-01 的 open 部分；建议类级归一化 + 重入队上限/死信） |
+| R15-02 | newbie-modules | web-monitor `custom.service.ts:60,73` 客户端 `customName`/`customFilter` key/value 直拼 `$regex` 未转义，Mongo 服务端 ReDoS | P2 | artifact | 已认证 + WebMonitorSite Get | open |
+| R15-05 | newbie-modules | aws-cloudformation `stack.controller.ts:63`、`environment.controller.ts:36` 以 `Prisma.*UncheckedCreateInput` 作 `@Body`（role-gated） | P2 | artifact | 具 Create 权限 | open |
+| R13-03 | newbie-modules | 模块代码直读 `process.env` 且 manifest 未声明：tencent-cos `STORE_PATH`（未装配，同时违反准入标准）、account `ENVIRONMENT`（live）；`modules apply` 永不渲染进 `.env.example` | P2 | artifact / live | 部署时缺键 | open（round15 重验维持，且比记录更重） |
+
+carry-over 维持：R12-01 partial（open=R15-01）、R12-02 partial、R9-04 partial、R9-07 open、R10-02 open、R5-P2-01/02/03/04/05/06/07 open、R6-13 open（裁定未执行）。
+
+误报剔除：R12-01 CH 侧毒丸向量（探针反驳）；registry CI pin 滞后（已升 1.18.0）。详见 devbie round15 报告 §7。
