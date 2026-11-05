@@ -3,9 +3,8 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
-import { ConfigService } from "@nestjs/config";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
-import { func, getRandomIp } from "../../shared/utils";
+import { func } from "../../shared/utils";
 import { WEB_MONITOR_CONFIG } from "../../shared/web-monitor-config";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { RedisService } from "@modules/redis/redis.service";
@@ -25,17 +24,12 @@ import { ResolvedWebToken, WebTokenResolver } from "../../services/web-token.res
 @ApiTags("Frontend Monitor / Web / Report")
 @Controller("/web-monitor")
 export class WebReportController {
-  private config: Record<string, unknown>;
-
   constructor(
     private readonly site: SiteService,
-    private readonly configService: ConfigService,
     private readonly dayReportNum: DayReportNumService,
     private readonly redis: RedisService,
     private readonly tokenResolver: WebTokenResolver,
-  ) {
-    this.config = this.configService.get("modules.web-monitor") || {};
-  }
+  ) {}
 
   @Post("/report")
   @InstallationAuth("web-monitor")
@@ -65,7 +59,6 @@ export class WebReportController {
     query.appId = appKey;
 
     query.ip = func.getRealIp(req.headers, req.ip);
-    if (this.config.isLocalDev) query.ip = getRandomIp();
 
     query.url = query.url || headers["referer"];
     query.userAgent = headers["user-agent"];
