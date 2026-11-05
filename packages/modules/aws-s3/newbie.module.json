@@ -23,15 +23,15 @@
         "example": "my-app-bucket"
       },
       "AWS_S3_CDN_HOSTNAME": ""
+    },
+    "dependencies": {
+      "@aws-sdk/client-s3": "latest",
+      "@aws-sdk/s3-request-presigner": "latest",
+      "validator": "latest"
+    },
+    "devDependencies": {
+      "@types/multer": "latest",
+      "@types/validator": "latest"
     }
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "latest",
-    "@aws-sdk/s3-request-presigner": "latest",
-    "validator": "latest"
-  },
-  "devDependencies": {
-    "@types/multer": "latest",
-    "@types/validator": "latest"
   }
 }

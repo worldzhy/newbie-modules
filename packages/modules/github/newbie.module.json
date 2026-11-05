@@ -21,10 +21,10 @@
       "GITHUB_APP_ID": "",
       "GITHUB_PRIVATE_KEY": "",
       "GITHUB_INSTALLATION_ID": ""
+    },
+    "dependencies": {
+      "@octokit/rest": "latest",
+      "@octokit/auth-app": "latest"
     }
-  },
-  "dependencies": {
-    "@octokit/rest": "latest",
-    "@octokit/auth-app": "latest"
   }
 }

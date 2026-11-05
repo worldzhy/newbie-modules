@@ -18,10 +18,10 @@
         "example": "us-east-1"
       },
       "AWS_SMS_CONFIGURATION_SET_NAME": ""
-    }
-  },
-  "dependencies": {
-    "@aws-sdk/client-pinpoint-sms-voice-v2": "latest"
-  },
-  "devDependencies": {}
+    },
+    "dependencies": {
+      "@aws-sdk/client-pinpoint-sms-voice-v2": "latest"
+    },
+    "devDependencies": {}
+  }
 }

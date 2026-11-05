@@ -17,12 +17,12 @@
       "ELASTICSEARCH_NODE": "http://127.0.0.1",
       "ELASTICSEARCH_USERNAME": "",
       "ELASTICSEARCH_PASSWORD": ""
-    }
-  },
-  "dependencies": {
-    "@elastic/elasticsearch": "7.13.0",
-    "p-queue": "latest",
-    "p-retry": "latest"
-  },
-  "devDependencies": {}
+    },
+    "dependencies": {
+      "@elastic/elasticsearch": "7.13.0",
+      "p-queue": "latest",
+      "p-retry": "latest"
+    },
+    "devDependencies": {}
+  }
 }

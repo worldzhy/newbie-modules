@@ -9,7 +9,7 @@
   "requires": {
     "modules": ["account", "audit", "security", "llm", "clickhouse", "evaluation"],
     "config": {},
-    "env": {}
-  },
-  "dependencies": {}
+    "env": {},
+    "dependencies": {}
+  }
 }

@@ -8,8 +8,8 @@
   "requires": {
     "modules": ["llm", "lark"],
     "config": {},
-    "env": {}
-  },
-  "dependencies": {},
-  "devDependencies": {}
+    "env": {},
+    "dependencies": {},
+    "devDependencies": {}
+  }
 }

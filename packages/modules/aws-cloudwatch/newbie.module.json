@@ -7,13 +7,13 @@
     "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
-    "modules": ["aws-identity", "security"]
-  },
-  "dependencies": {
-    "@aws-sdk/client-cloudwatch": "latest",
-    "@aws-sdk/client-ec2": "latest",
-    "@aws-sdk/client-rds": "latest",
-    "dayjs": "latest"
-  },
-  "devDependencies": {}
+    "modules": ["aws-identity", "security"],
+    "dependencies": {
+      "@aws-sdk/client-cloudwatch": "latest",
+      "@aws-sdk/client-ec2": "latest",
+      "@aws-sdk/client-rds": "latest",
+      "dayjs": "latest"
+    },
+    "devDependencies": {}
+  }
 }

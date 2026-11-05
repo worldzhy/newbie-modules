@@ -9,9 +9,9 @@
   "requires": {
     "modules": ["clickhouse", "event-emitter", "security"],
     "config": {},
-    "env": {}
-  },
-  "dependencies": {
-    "@nestjs/event-emitter": "latest"
+    "env": {},
+    "dependencies": {
+      "@nestjs/event-emitter": "latest"
+    }
   }
 }

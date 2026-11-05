@@ -6,8 +6,10 @@
     "className": "WebhookModule",
     "prismaSchema": "prisma/schema.prisma"
   },
-  "dependencies": {
-    "p-queue": "latest",
-    "p-retry": "latest"
+  "requires": {
+    "dependencies": {
+      "p-queue": "latest",
+      "p-retry": "latest"
+    }
   }
 }

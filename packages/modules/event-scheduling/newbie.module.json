@@ -11,15 +11,15 @@
       "eventScheduling": {
         "minutesOfTimeslotUnit": 5
       }
+    },
+    "dependencies": {
+      "@nestjs/bull": "latest",
+      "bull": "latest",
+      "cron-parser": "latest",
+      "lodash": "latest"
+    },
+    "devDependencies": {
+      "@types/lodash": "latest"
     }
-  },
-  "dependencies": {
-    "@nestjs/bull": "latest",
-    "bull": "latest",
-    "cron-parser": "latest",
-    "lodash": "latest"
-  },
-  "devDependencies": {
-    "@types/lodash": "latest"
   }
 }

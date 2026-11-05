@@ -7,7 +7,7 @@
     "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
-    "modules": ["security"]
-  },
-  "dependencies": {}
+    "modules": ["security"],
+    "dependencies": {}
+  }
 }

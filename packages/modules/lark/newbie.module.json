@@ -22,9 +22,9 @@
       "LARK_BOT_OPEN_ID": "",
       "LARK_ENCRYPT_KEY": "",
       "LARK_VERIFICATION_TOKEN": ""
+    },
+    "dependencies": {
+      "@larksuiteoapi/node-sdk": "^1.59.0"
     }
-  },
-  "dependencies": {
-    "@larksuiteoapi/node-sdk": "^1.59.0"
   }
 }

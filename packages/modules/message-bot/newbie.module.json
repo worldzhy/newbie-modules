@@ -8,7 +8,7 @@
   },
   "requires": {
     "config": {},
-    "env": {}
-  },
-  "dependencies": {}
+    "env": {},
+    "dependencies": {}
+  }
 }

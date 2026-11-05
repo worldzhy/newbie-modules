@@ -18,10 +18,10 @@
     "env": {
       "GOOGLE_CREDENTIALS_API_KEY": "",
       "GOOGLE_CREDENTIALS_SERVICE_ACCOUNT": ""
-    }
-  },
-  "dependencies": {
-    "@googlemaps/places": "^2.1.0"
-  },
-  "devDependencies": {}
+    },
+    "dependencies": {
+      "@googlemaps/places": "^2.1.0"
+    },
+    "devDependencies": {}
+  }
 }

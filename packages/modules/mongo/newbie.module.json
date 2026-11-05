@@ -13,10 +13,10 @@
     },
     "env": {
       "MONGO_URL": ""
+    },
+    "dependencies": {
+      "@nestjs/mongoose": "^11.0.4",
+      "mongoose": "^7.8.12"
     }
-  },
-  "dependencies": {
-    "@nestjs/mongoose": "^11.0.4",
-    "mongoose": "^7.8.12"
   }
 }

@@ -20,9 +20,9 @@
       "CLICKHOUSE_USER": "",
       "CLICKHOUSE_PASSWORD": "",
       "CLICKHOUSE_DB": ""
+    },
+    "dependencies": {
+      "@clickhouse/client": "latest"
     }
-  },
-  "dependencies": {
-    "@clickhouse/client": "latest"
   }
 }

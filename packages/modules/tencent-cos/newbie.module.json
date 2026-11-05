@@ -21,12 +21,12 @@
       "TENCENT_COS_SECRET_KEY": "",
       "TENCENT_COS_REGION": "",
       "TENCENT_COS_BUCKET": ""
+    },
+    "dependencies": {
+      "cos-nodejs-sdk-v5": "latest"
+    },
+    "devDependencies": {
+      "@types/multer": "latest"
     }
-  },
-  "dependencies": {
-    "cos-nodejs-sdk-v5": "latest"
-  },
-  "devDependencies": {
-    "@types/multer": "latest"
   }
 }

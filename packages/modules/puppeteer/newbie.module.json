@@ -13,9 +13,9 @@
     },
     "env": {
       "CHROMIUM_PATH": ""
+    },
+    "dependencies": {
+      "puppeteer": "latest"
     }
-  },
-  "dependencies": {
-    "puppeteer": "latest"
   }
 }

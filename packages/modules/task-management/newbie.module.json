@@ -7,10 +7,10 @@
     "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
-    "modules": ["account", "event-emitter", "security"]
-  },
-  "dependencies": {
-    "@nestjs/event-emitter": "latest",
-    "chinese-days": "^1.5.7"
+    "modules": ["account", "event-emitter", "security"],
+    "dependencies": {
+      "@nestjs/event-emitter": "latest",
+      "chinese-days": "^1.5.7"
+    }
   }
 }

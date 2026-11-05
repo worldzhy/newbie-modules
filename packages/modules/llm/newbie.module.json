@@ -15,13 +15,13 @@
     },
     "env": {
       "LLM_API_KEY_SECRET": ""
-    }
-  },
-  "dependencies": {
-    "ai": "^6.0.301",
-    "@ai-sdk/provider": "^3.0.18",
-    "@ai-sdk/openai-compatible": "^2.0.81",
-    "@ai-sdk/anthropic": "^3.0.128"
-  },
-  "devDependencies": {}
+    },
+    "dependencies": {
+      "ai": "^6.0.301",
+      "@ai-sdk/provider": "^3.0.18",
+      "@ai-sdk/openai-compatible": "^2.0.81",
+      "@ai-sdk/anthropic": "^3.0.128"
+    },
+    "devDependencies": {}
+  }
 }

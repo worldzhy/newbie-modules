@@ -34,10 +34,10 @@
       "PEOPLE_FINDER_WEBHOOK_FEISHU": "",
       "PEOPLE_FINDER_ACCESS_KEY": "",
       "PEOPLE_FINDER_SYSTEM_CHANNEL": ""
+    },
+    "dependencies": {
+      "peopledatalabs": "latest",
+      "proxycurl-js-linkedin-profile-scraper": "latest"
     }
-  },
-  "dependencies": {
-    "peopledatalabs": "latest",
-    "proxycurl-js-linkedin-profile-scraper": "latest"
   }
 }

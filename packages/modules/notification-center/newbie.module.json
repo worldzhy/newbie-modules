@@ -9,7 +9,7 @@
   "requires": {
     "modules": ["security"],
     "config": {},
-    "env": {}
-  },
-  "dependencies": {}
+    "env": {},
+    "dependencies": {}
+  }
 }

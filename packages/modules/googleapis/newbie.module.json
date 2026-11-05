@@ -21,15 +21,15 @@
       "GOOGLE_CREDENTIALS_API_KEY": "",
       "GOOGLE_CREDENTIALS_SERVICE_ACCOUNT": "",
       "GOOGLE_SHARED_DRIVE_ID": ""
+    },
+    "dependencies": {
+      "@googleapis/drive": "latest",
+      "multer": "latest",
+      "@googleapis/forms": "latest",
+      "@googleapis/sheets": "latest"
+    },
+    "devDependencies": {
+      "@types/multer": "latest"
     }
-  },
-  "dependencies": {
-    "@googleapis/drive": "latest",
-    "multer": "latest",
-    "@googleapis/forms": "latest",
-    "@googleapis/sheets": "latest"
-  },
-  "devDependencies": {
-    "@types/multer": "latest"
   }
 }

@@ -34,12 +34,12 @@
       "SNOWFLAKE_DATABASE": "",
       "SNOWFLAKE_SCHEMA": "",
       "SNOWFLAKE_WAREHOUSE": ""
+    },
+    "dependencies": {
+      "snowflake-sdk": "latest"
+    },
+    "devDependencies": {
+      "@types/snowflake-sdk": "latest"
     }
-  },
-  "dependencies": {
-    "snowflake-sdk": "latest"
-  },
-  "devDependencies": {
-    "@types/snowflake-sdk": "latest"
   }
 }

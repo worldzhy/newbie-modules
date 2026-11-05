@@ -15,11 +15,11 @@
     "env": {
       "SLACK_TOKEN": "",
       "SLACK_API_URL": ""
+    },
+    "dependencies": {
+      "@slack/web-api": "latest",
+      "p-queue": "^6.6.2",
+      "p-retry": "^4.6.2"
     }
-  },
-  "dependencies": {
-    "@slack/web-api": "latest",
-    "p-queue": "^6.6.2",
-    "p-retry": "^4.6.2"
   }
 }

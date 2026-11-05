@@ -9,9 +9,9 @@
   "requires": {
     "modules": ["security", "event-emitter"],
     "config": {},
-    "env": {}
-  },
-  "dependencies": {
-    "@nestjs/event-emitter": "latest"
+    "env": {},
+    "dependencies": {
+      "@nestjs/event-emitter": "latest"
+    }
   }
 }

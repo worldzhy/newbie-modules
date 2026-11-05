@@ -7,10 +7,10 @@
     "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
-    "modules": ["event-emitter", "security"]
-  },
-  "dependencies": {
-    "@nestjs/event-emitter": "latest",
-    "@nestjs/schedule": "latest"
+    "modules": ["event-emitter", "security"],
+    "dependencies": {
+      "@nestjs/event-emitter": "latest",
+      "@nestjs/schedule": "latest"
+    }
   }
 }

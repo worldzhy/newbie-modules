@@ -12,8 +12,8 @@
   "requires": {
     "modules": ["audit", "clickhouse", "security", "llm"],
     "config": {},
-    "env": {}
-  },
-  "dependencies": {},
-  "devDependencies": {}
+    "env": {},
+    "dependencies": {},
+    "devDependencies": {}
+  }
 }

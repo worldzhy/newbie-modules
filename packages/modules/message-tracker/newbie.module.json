@@ -18,10 +18,10 @@
       "MESSAGE_TRACKER_AWS_REGION": "",
       "MESSAGE_TRACKER_SQS_EMAIL_QUEUE_URL": "",
       "MESSAGE_TRACKER_SQS_TEXT_QUEUE_URL": ""
-    }
-  },
-  "dependencies": {
-    "@aws-sdk/client-sqs": "^3.831.0"
-  },
-  "devDependencies": {}
+    },
+    "dependencies": {
+      "@aws-sdk/client-sqs": "^3.831.0"
+    },
+    "devDependencies": {}
+  }
 }

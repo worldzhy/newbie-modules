@@ -5,11 +5,13 @@
     "file": "xlsx.module",
     "className": "XLSXModule"
   },
-  "dependencies": {
-    "exceljs": "^4.4.0",
-    "multer": "latest"
-  },
-  "devDependencies": {
-    "@types/multer": "latest"
+  "requires": {
+    "dependencies": {
+      "exceljs": "^4.4.0",
+      "multer": "latest"
+    },
+    "devDependencies": {
+      "@types/multer": "latest"
+    }
   }
 }

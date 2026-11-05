@@ -16,12 +16,12 @@
     },
     "env": {
       "STORAGE_LOCAL_PATH": ""
+    },
+    "dependencies": {
+      "multer": "latest"
+    },
+    "devDependencies": {
+      "@types/multer": "latest"
     }
-  },
-  "dependencies": {
-    "multer": "latest"
-  },
-  "devDependencies": {
-    "@types/multer": "latest"
   }
 }

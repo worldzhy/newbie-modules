@@ -44,27 +44,27 @@
       "LARK_APP_ID": "",
       "LARK_APP_SECRET": "",
       "LARK_AUTH_CALLBACK_URL": ""
+    },
+    "dependencies": {
+      "@larksuiteoapi/node-sdk": "^1.59.0",
+      "@nestjs/passport": "latest",
+      "ip-anonymize": "latest",
+      "otplib": "latest",
+      "passport": "latest",
+      "passport-custom": "latest",
+      "passport-google-oauth20": "latest",
+      "passport-local": "latest",
+      "qrcode": "latest",
+      "randomcolor": "latest",
+      "rate-limiter-flexible": "latest",
+      "ua-parser-js": "latest",
+      "validator": "latest"
+    },
+    "devDependencies": {
+      "@types/passport-google-oauth20": "latest",
+      "@types/passport-local": "latest",
+      "@types/qrcode": "latest",
+      "@types/validator": "latest"
     }
-  },
-  "dependencies": {
-    "@larksuiteoapi/node-sdk": "^1.59.0",
-    "@nestjs/passport": "latest",
-    "ip-anonymize": "latest",
-    "otplib": "latest",
-    "passport": "latest",
-    "passport-custom": "latest",
-    "passport-google-oauth20": "latest",
-    "passport-local": "latest",
-    "qrcode": "latest",
-    "randomcolor": "latest",
-    "rate-limiter-flexible": "latest",
-    "ua-parser-js": "latest",
-    "validator": "latest"
-  },
-  "devDependencies": {
-    "@types/passport-google-oauth20": "latest",
-    "@types/passport-local": "latest",
-    "@types/qrcode": "latest",
-    "@types/validator": "latest"
   }
 }

@@ -28,19 +28,19 @@
       "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
       "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
       "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": ""
+    },
+    "dependencies": {
+      "@nestjs/passport": "latest",
+      "crypto-random-string": "^5.0.0",
+      "jsonwebtoken": "latest",
+      "passport": "latest",
+      "passport-custom": "latest",
+      "passport-jwt": "latest",
+      "rate-limiter-flexible": "latest",
+      "uuid": "^14.0.0"
+    },
+    "devDependencies": {
+      "@types/passport-jwt": "latest"
     }
-  },
-  "dependencies": {
-    "@nestjs/passport": "latest",
-    "crypto-random-string": "^5.0.0",
-    "jsonwebtoken": "latest",
-    "passport": "latest",
-    "passport-custom": "latest",
-    "passport-jwt": "latest",
-    "rate-limiter-flexible": "latest",
-    "uuid": "^14.0.0"
-  },
-  "devDependencies": {
-    "@types/passport-jwt": "latest"
   }
 }

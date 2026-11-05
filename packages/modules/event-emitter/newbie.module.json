@@ -19,9 +19,9 @@
         "example": 30,
         "description": "Days to keep EventEmission rows. Rows older than this are pruned lazily on each new emission insert."
       }
+    },
+    "dependencies": {
+      "@nestjs/event-emitter": "latest"
     }
-  },
-  "dependencies": {
-    "@nestjs/event-emitter": "latest"
   }
 }

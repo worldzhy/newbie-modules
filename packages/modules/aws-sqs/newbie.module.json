@@ -18,13 +18,13 @@
         "example": "us-east-1"
       },
       "AWS_SQS_QUEUE_URL": ""
+    },
+    "dependencies": {
+      "@aws-sdk/client-sqs": "latest",
+      "validator": "latest"
+    },
+    "devDependencies": {
+      "@types/validator": "latest"
     }
-  },
-  "dependencies": {
-    "@aws-sdk/client-sqs": "latest",
-    "validator": "latest"
-  },
-  "devDependencies": {
-    "@types/validator": "latest"
   }
 }

@@ -17,9 +17,9 @@
       "CLOUDINARY_CLOUD_NAME": "",
       "CLOUDINARY_API_KEY": "",
       "CLOUDINARY_API_SECRET": ""
+    },
+    "dependencies": {
+      "cloudinary": "latest"
     }
-  },
-  "dependencies": {
-    "cloudinary": "latest"
   }
 }

@@ -8,13 +8,13 @@
   },
   "requires": {
     "modules": ["security"],
-    "env": {}
-  },
-  "dependencies": {
-    "geolite2-redist": "latest",
-    "lru-cache": "latest",
-    "maxmind": "latest",
-    "ua-parser-js": "latest"
-  },
-  "devDependencies": {}
+    "env": {},
+    "dependencies": {
+      "geolite2-redist": "latest",
+      "lru-cache": "latest",
+      "maxmind": "latest",
+      "ua-parser-js": "latest"
+    },
+    "devDependencies": {}
+  }
 }
