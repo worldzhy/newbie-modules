@@ -7,13 +7,13 @@ import { EventCatalogService } from "./event-catalog.service";
 
 const RETENTION_DAYS_KEY = "modules.event-emitter.retentionDays";
 
-/// Validates the retention days resolved by the assembler's `int(...)` config
-/// declaration (ADR-033): the value must be a declared positive integer —
-/// there is no built-in fallback, so a host that forgets it fails to boot
-/// instead of silently pruning on a guessed window.
-function requirePositiveInteger(value: number | undefined, name: string): number {
-  if (value === undefined || !Number.isInteger(value) || value <= 0) {
-    throw new Error(`${name} must be a positive integer; received ${value === undefined ? "no value" : `'${value}'`}.`);
+/// Validates the retention days resolved from the assembler's bare env
+/// mapping (ADR-033): the value must be a declared positive integer — there
+/// is no built-in fallback, so a host that forgets it fails to boot instead
+/// of silently pruning on a guessed window.
+function requirePositiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer; received '${value}'.`);
   }
   return value;
 }
@@ -51,7 +51,10 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
     private readonly eventCatalog: EventCatalogService,
     private readonly config: ConfigService,
   ) {
-    this.retentionDays = requirePositiveInteger(this.config.getOrThrow<number>(RETENTION_DAYS_KEY), RETENTION_DAYS_KEY);
+    this.retentionDays = requirePositiveInteger(
+      Number(this.config.getOrThrow<string>(RETENTION_DAYS_KEY)),
+      RETENTION_DAYS_KEY,
+    );
   }
 
   onModuleInit() {

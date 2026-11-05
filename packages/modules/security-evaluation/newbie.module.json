@@ -9,7 +9,7 @@
   "moduleDependencies": ["evaluation", "security", "llm"],
   "config-service": {
     "security-evaluation": {
-      "ttlDays": "int(process.env.NEGATIVE_CACHE_TTL_DAYS)"
+      "ttlDays": "process.env.NEGATIVE_CACHE_TTL_DAYS"
     }
   },
   "env": {

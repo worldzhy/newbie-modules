@@ -93,8 +93,8 @@ export class ResourceService {
   async getOneResourceList(
     appId: string,
     url: string,
-    pageNo = 1,
-    pageSize = WEB_MONITOR_CONFIG.pageSize,
+    pageNo: number = 1,
+    pageSize: number = WEB_MONITOR_CONFIG.pageSize,
     beginTime?: string,
     endTime?: string,
   ) {

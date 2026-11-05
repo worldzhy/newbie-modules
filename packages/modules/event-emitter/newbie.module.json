@@ -9,7 +9,7 @@
   "moduleDependencies": ["security"],
   "config-service": {
     "event-emitter": {
-      "retentionDays": "int(process.env.EVENT_EMISSION_RETENTION_DAYS)"
+      "retentionDays": "process.env.EVENT_EMISSION_RETENTION_DAYS"
     }
   },
   "dependencies": {

@@ -11,13 +11,13 @@ import type {
 
 const TTL_DAYS_KEY = "modules.security-evaluation.ttlDays";
 
-/// Validates the TTL days resolved by the assembler's `int(...)` config
-/// declaration (ADR-033): the value must be a declared positive integer —
-/// there is no built-in fallback, so a host that forgets it fails to boot
-/// instead of silently expiring on a guessed window.
-function requirePositiveInteger(value: number | undefined, name: string): number {
-  if (value === undefined || !Number.isInteger(value) || value <= 0) {
-    throw new Error(`${name} must be a positive integer; received ${value === undefined ? "no value" : `'${value}'`}.`);
+/// Validates the TTL days resolved from the assembler's bare env mapping
+/// (ADR-033): the value must be a declared positive integer — there is no
+/// built-in fallback, so a host that forgets it fails to boot instead of
+/// silently expiring on a guessed window.
+function requirePositiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer; received '${value}'.`);
   }
   return value;
 }
@@ -51,7 +51,7 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
     private readonly prisma: PrismaService,
     config: ConfigService,
   ) {
-    this.ttlMs = requirePositiveInteger(config.getOrThrow<number>(TTL_DAYS_KEY), TTL_DAYS_KEY) * 86_400_000;
+    this.ttlMs = requirePositiveInteger(Number(config.getOrThrow<string>(TTL_DAYS_KEY)), TTL_DAYS_KEY) * 86_400_000;
   }
 
   async filterUncached(

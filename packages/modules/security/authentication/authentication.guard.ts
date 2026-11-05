@@ -16,7 +16,6 @@ import { IS_REFRESHING_ACCESS_TOKEN_KEY } from "./refresh-token/refresh-token.de
 import { IS_LOGGING_IN_APIKEY_KEY } from "./api-key/api-key.decorator";
 import { IS_LOGGING_IN_GOOGLE_KEY } from "./google-oauth/google.decorator";
 import { INSTALLATION_AUTH_KEY } from "./installation/installation.decorator";
-import { GuardType } from "./guard.types";
 
 @Injectable()
 // eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- registered as an APP_GUARD provider
@@ -99,25 +98,9 @@ export class AuthenticationGuard extends AuthGuard("authentication") {
       return this.googleAuthGuard.canActivate(context);
     }
 
-    // JWT guard is the default guard.
-    const defaultGuard = GuardType.JWT;
-
-    switch (defaultGuard) {
-      case GuardType.NONE:
-        return this.noAuthGuard.canActivate(context);
-      case GuardType.PASSWORD:
-        return this.passwordAuthGuard.canActivate(context);
-      case GuardType.API_KEY:
-        return this.apiKeyAuthGuard.canActivate(context);
-      case GuardType.VERIFICATION_CODE:
-        return this.verificationCodeAuthGuard.canActivate(context);
-      case GuardType.REFRESH_TOKEN:
-        return this.refreshTokenAuthGuard.canActivate(context);
-      case GuardType.GOOGLE:
-        return this.googleAuthGuard.canActivate(context);
-      case GuardType.JWT:
-      default:
-        return this.jwtAuthGuard.canActivate(context);
-    }
+    // JWT is the default guard. The former `modules.security.defaultGuard`
+    // config entry was a constant "jwt" (sunk in ADR-033 constant cleanup) —
+    // the switch over other guard types was unreachable dead config.
+    return this.jwtAuthGuard.canActivate(context);
   }
 }
