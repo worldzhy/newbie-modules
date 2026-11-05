@@ -7,9 +7,6 @@
     "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
-    "modules": ["account", "audit", "security", "llm", "clickhouse", "evaluation"],
-    "config": {},
-    "env": {},
-    "dependencies": {}
+    "modules": ["account", "audit", "security", "llm", "clickhouse", "evaluation"]
   }
 }

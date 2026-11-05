@@ -8,12 +8,9 @@
   },
   "requires": {
     "modules": ["aws-identity", "security"],
-    "config": {},
-    "env": {},
     "dependencies": {
       "@aws-sdk/client-cloudformation": "latest",
       "@aws-sdk/client-ssm": "latest"
-    },
-    "devDependencies": {}
+    }
   }
 }

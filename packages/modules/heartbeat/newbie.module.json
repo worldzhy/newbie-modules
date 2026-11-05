@@ -10,8 +10,6 @@
     "peerSdk": "@devbie/heartbeat-sdk"
   },
   "requires": {
-    "modules": ["audit", "security"],
-    "dependencies": {},
-    "devDependencies": {}
+    "modules": ["audit", "security"]
   }
 }

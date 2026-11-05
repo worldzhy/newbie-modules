@@ -22,7 +22,6 @@
       "@elastic/elasticsearch": "7.13.0",
       "p-queue": "latest",
       "p-retry": "latest"
-    },
-    "devDependencies": {}
+    }
   }
 }

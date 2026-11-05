@@ -21,7 +21,6 @@
     },
     "dependencies": {
       "@googlemaps/places": "^2.1.0"
-    },
-    "devDependencies": {}
+    }
   }
 }

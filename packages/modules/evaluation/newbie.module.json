@@ -8,8 +8,6 @@
   },
   "requires": {
     "modules": ["security", "event-emitter"],
-    "config": {},
-    "env": {},
     "dependencies": {
       "@nestjs/event-emitter": "latest"
     }

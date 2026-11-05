@@ -6,10 +6,6 @@
     "className": "CopilotModule"
   },
   "requires": {
-    "modules": ["llm", "lark"],
-    "config": {},
-    "env": {},
-    "dependencies": {},
-    "devDependencies": {}
+    "modules": ["llm", "lark"]
   }
 }

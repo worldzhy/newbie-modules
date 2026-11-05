@@ -21,7 +21,6 @@
     },
     "dependencies": {
       "@aws-sdk/client-sqs": "^3.831.0"
-    },
-    "devDependencies": {}
+    }
   }
 }

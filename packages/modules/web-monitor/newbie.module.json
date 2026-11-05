@@ -25,7 +25,6 @@
       "cron-parser": "4.x",
       "dotenv": "latest",
       "ua-parser-js": "latest"
-    },
-    "devDependencies": {}
+    }
   }
 }
