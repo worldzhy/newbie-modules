@@ -85,7 +85,7 @@ round9 是对 round8 结论的元评审；R9-02..R9-08 为方案/报告缺陷，
 
 | ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
 |---|---|---|---|---|---|---|
-| R10-01 | newbie-modules | R9-01 测试覆盖缺口：4 处修复点仅 L375/L426 有真实覆盖，test3 名实不符（走 saveAjaxs 而非 collectResource）；L196/L470 无哨兵 | P2 | source | 后续回归 | open |
+| R10-01 | newbie-modules | R9-01 测试覆盖缺口：4 处修复点仅 L375/L426 有真实覆盖，test3 名实不符（走 saveAjaxs 而非 collectResource）；L196/L470 无哨兵 | P2 | source | 后续回归 | fixed（2026-11-05：test3 更名标注 saveAjaxs 分支；新增 collectResource（img+duration 5000）与 collectErrors 两例哨兵，6/6 过） |
 | R10-02 | newbie-modules | `toDateOrNow` 对数字字符串 epoch（如 `"1700000000000"`）回落 now 而非按 epoch 解析；非回归（旧行为为毒丸），精度改进建议 | P2 | source | SDK 字符串上送 epoch 时 | open |
 
 - 误报剔除：「合法但越界 Date 构成同类毒丸」被 CH 探针否决——`DateTime` 列对 1966/3000 年插入静默截断为 `[1970-01-01, 2106-02-07]`，写不失败，不构成重入队（round10 §7）。

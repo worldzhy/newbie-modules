@@ -105,7 +105,7 @@ test("omitted time falls back to the ingest time instead of an invalid date", as
   assert.ok(assertValidDates(buckets, before) > 0, "a page-performance item must produce at least one row");
 });
 
-test("an unparseable resource requestTime also falls back to the ingest time", async () => {
+test("an unparseable ajax requestTime also falls back to the ingest time (saveAjaxs branch)", async () => {
   const buckets = emptyBuckets();
   const before = Date.now();
   const outcome = await drain(
@@ -121,6 +121,48 @@ test("an unparseable resource requestTime also falls back to the ingest time", a
   );
   assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
   assert.ok(assertValidDates(buckets, before) > 0, "an ajax item must produce at least one row");
+});
+
+test("an unparseable slow-resource requestTime also falls back to the ingest time (collectResource branch)", async () => {
+  const buckets = emptyBuckets();
+  const before = Date.now();
+  const outcome = await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.AjaxPerf,
+      time: "not-a-date",
+      url: "https://example.com/a",
+      // Non-ajax type routes through collectResource; duration must clear the
+      // 2s default slowTime or no row is produced at all.
+      resourceList: [{ type: "img", name: "https://example.com/x.png", duration: 5000, requestTime: "not-a-date" }],
+    },
+    buckets,
+  );
+  assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
+  const resources = Object.values(buckets.appResources).flat() as Record<string, unknown>[];
+  assert.ok(resources.length > 0, "a slow img resource must produce a resource row");
+  assert.ok(assertValidDates(buckets, before) > 0, "resource rows must carry valid dates");
+});
+
+test("an unparseable error createTime also falls back to the ingest time (collectErrors branch)", async () => {
+  const buckets = emptyBuckets();
+  const before = Date.now();
+  const outcome = await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.Error,
+      time: "not-a-date",
+      url: "https://example.com/a",
+      errorList: [{ createTime: "not-a-date", msg: "boom" }],
+    },
+    buckets,
+  );
+  assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
+  const errors = Object.values(buckets.appErrors).flat() as Record<string, unknown>[];
+  assert.ok(errors.length > 0, "an error item must produce an error row");
+  assert.ok(assertValidDates(buckets, before) > 0, "error rows must carry valid dates");
 });
 
 test("a parseable time still flows through and keeps its timestamp", async () => {
