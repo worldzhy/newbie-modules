@@ -1,23 +1,25 @@
 {
   "key": "cloudinary",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "cloudinary.module",
     "className": "CloudinaryModule"
   },
-  "config-service": {
-    "cloudinary": {
-      "cloudName": "process.env.CLOUDINARY_CLOUD_NAME",
-      "apiKey": "process.env.CLOUDINARY_API_KEY",
-      "apiSecret": "process.env.CLOUDINARY_API_SECRET"
+  "requires": {
+    "config": {
+      "cloudinary": {
+        "cloudName": "process.env.CLOUDINARY_CLOUD_NAME",
+        "apiKey": "process.env.CLOUDINARY_API_KEY",
+        "apiSecret": "process.env.CLOUDINARY_API_SECRET"
+      }
+    },
+    "env": {
+      "CLOUDINARY_CLOUD_NAME": "",
+      "CLOUDINARY_API_KEY": "",
+      "CLOUDINARY_API_SECRET": ""
+    },
+    "dependencies": {
+      "cloudinary": "latest"
     }
-  },
-  "env": {
-    "CLOUDINARY_CLOUD_NAME": "",
-    "CLOUDINARY_API_KEY": "",
-    "CLOUDINARY_API_SECRET": ""
-  },
-  "dependencies": {
-    "cloudinary": "latest"
   }
 }

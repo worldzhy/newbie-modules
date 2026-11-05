@@ -1,14 +1,16 @@
 {
   "key": "job-scheduler",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "job-scheduler.module",
-    "className": "JobSchedulerModule"
+    "className": "JobSchedulerModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["event-emitter", "security"],
-  "dependencies": {
-    "@nestjs/event-emitter": "latest",
-    "@nestjs/schedule": "latest"
+  "requires": {
+    "modules": ["event-emitter", "security"],
+    "dependencies": {
+      "@nestjs/event-emitter": "latest",
+      "@nestjs/schedule": "latest"
+    }
   }
 }

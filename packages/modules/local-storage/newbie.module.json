@@ -1,25 +1,27 @@
 {
   "key": "local-storage",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "local-storage.module",
-    "className": "LocalStorageModule"
+    "className": "LocalStorageModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "config-service": {
-    "storage": {
-      "local": {
-        "path": "process.env.STORAGE_LOCAL_PATH"
+  "requires": {
+    "config": {
+      "storage": {
+        "local": {
+          "path": "process.env.STORAGE_LOCAL_PATH"
+        }
       }
+    },
+    "env": {
+      "STORAGE_LOCAL_PATH": ""
+    },
+    "dependencies": {
+      "multer": "latest"
+    },
+    "devDependencies": {
+      "@types/multer": "latest"
     }
-  },
-  "env": {
-    "STORAGE_LOCAL_PATH": ""
-  },
-  "dependencies": {
-    "multer": "latest"
-  },
-  "devDependencies": {
-    "@types/multer": "latest"
   }
 }

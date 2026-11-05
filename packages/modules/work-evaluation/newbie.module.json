@@ -1,13 +1,12 @@
 {
   "key": "work-evaluation",
   "layer": "feature",
-  "module": {
+  "wiring": {
     "file": "work-evaluation.module",
-    "className": "WorkEvaluationModule"
+    "className": "WorkEvaluationModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["account", "audit", "security", "llm", "clickhouse", "evaluation"],
-  "config-service": {},
-  "env": {},
-  "dependencies": {}
+  "requires": {
+    "modules": ["account", "audit", "security", "llm", "clickhouse", "evaluation"]
+  }
 }

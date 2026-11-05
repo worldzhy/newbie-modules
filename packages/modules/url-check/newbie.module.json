@@ -1,16 +1,15 @@
 {
   "key": "url-check",
   "layer": "capability",
-  "role": "collector",
-  "module": {
+  "wiring": {
     "file": "url-check.module",
-    "className": "UrlCheckModule"
+    "className": "UrlCheckModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["clickhouse", "event-emitter", "security"],
-  "config-service": {},
-  "env": {},
-  "dependencies": {
-    "@nestjs/event-emitter": "latest"
+  "requires": {
+    "modules": ["clickhouse", "event-emitter", "security"],
+    "dependencies": {
+      "@nestjs/event-emitter": "latest"
+    }
   }
 }

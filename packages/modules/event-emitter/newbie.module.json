@@ -1,25 +1,27 @@
 {
   "key": "event-emitter",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "event-emitter.module",
-    "className": "EventEmitterModule"
+    "className": "EventEmitterModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
-  "config-service": {
-    "event-emitter": {
-      "retentionDays": "process.env.EVENT_EMISSION_RETENTION_DAYS"
-    }
-  },
-  "dependencies": {
-    "@nestjs/event-emitter": "latest"
-  },
-  "env": {
-    "EVENT_EMISSION_RETENTION_DAYS": {
-      "type": "int",
-      "example": 30,
-      "description": "Days to keep EventEmission rows. Rows older than this are pruned lazily on each new emission insert."
+  "requires": {
+    "modules": ["security"],
+    "config": {
+      "event-emitter": {
+        "retentionDays": "process.env.EVENT_EMISSION_RETENTION_DAYS"
+      }
+    },
+    "env": {
+      "EVENT_EMISSION_RETENTION_DAYS": {
+        "type": "int",
+        "example": 30,
+        "description": "Days to keep EventEmission rows. Rows older than this are pruned lazily on each new emission insert."
+      }
+    },
+    "dependencies": {
+      "@nestjs/event-emitter": "latest"
     }
   }
 }

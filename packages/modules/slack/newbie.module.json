@@ -1,23 +1,25 @@
 {
   "key": "slack",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "slack.module",
     "className": "SlackModule"
   },
-  "config-service": {
-    "slack": {
-      "token": "process.env.SLACK_TOKEN",
-      "slackApiUrl": "process.env.SLACK_API_URL"
+  "requires": {
+    "config": {
+      "slack": {
+        "token": "process.env.SLACK_TOKEN",
+        "slackApiUrl": "process.env.SLACK_API_URL"
+      }
+    },
+    "env": {
+      "SLACK_TOKEN": "",
+      "SLACK_API_URL": ""
+    },
+    "dependencies": {
+      "@slack/web-api": "latest",
+      "p-queue": "^6.6.2",
+      "p-retry": "^4.6.2"
     }
-  },
-  "env": {
-    "SLACK_TOKEN": "",
-    "SLACK_API_URL": ""
-  },
-  "dependencies": {
-    "@slack/web-api": "latest",
-    "p-queue": "^6.6.2",
-    "p-retry": "^4.6.2"
   }
 }

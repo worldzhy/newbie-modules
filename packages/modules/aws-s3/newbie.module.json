@@ -1,31 +1,37 @@
 {
   "key": "aws-s3",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "aws-s3.module",
-    "className": "AwsS3Module"
+    "className": "AwsS3Module",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["aws-identity", "security"],
-  "config-service": {
-    "aws-s3": {
-      "region": "process.env.AWS_S3_REGION",
-      "bucket": "process.env.AWS_S3_BUCKET",
-      "cdnHostname": "process.env.AWS_S3_CDN_HOSTNAME"
+  "requires": {
+    "modules": ["aws-identity", "security"],
+    "config": {
+      "aws-s3": {
+        "region": "process.env.AWS_S3_REGION",
+        "bucket": "process.env.AWS_S3_BUCKET",
+        "cdnHostname": "process.env.AWS_S3_CDN_HOSTNAME"
+      }
+    },
+    "env": {
+      "AWS_S3_REGION": {
+        "example": "us-east-1"
+      },
+      "AWS_S3_BUCKET": {
+        "example": "my-app-bucket"
+      },
+      "AWS_S3_CDN_HOSTNAME": ""
+    },
+    "dependencies": {
+      "@aws-sdk/client-s3": "latest",
+      "@aws-sdk/s3-request-presigner": "latest",
+      "validator": "latest"
+    },
+    "devDependencies": {
+      "@types/multer": "latest",
+      "@types/validator": "latest"
     }
-  },
-  "env": {
-    "AWS_S3_REGION": { "example": "us-east-1" },
-    "AWS_S3_BUCKET": { "example": "my-app-bucket" },
-    "AWS_S3_CDN_HOSTNAME": ""
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "latest",
-    "@aws-sdk/s3-request-presigner": "latest",
-    "validator": "latest"
-  },
-  "devDependencies": {
-    "@types/multer": "latest",
-    "@types/validator": "latest"
   }
 }

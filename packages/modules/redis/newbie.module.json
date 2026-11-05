@@ -1,21 +1,23 @@
 {
   "key": "redis",
   "layer": "datastore",
-  "module": {
+  "wiring": {
     "file": "redis.module",
     "className": "RedisModule"
   },
-  "config-service": {
-    "redis": {
-      "host": "process.env.REDIS_HOST",
-      "password": "process.env.REDIS_PASSWORD"
+  "requires": {
+    "config": {
+      "redis": {
+        "host": "process.env.REDIS_HOST",
+        "password": "process.env.REDIS_PASSWORD"
+      }
+    },
+    "env": {
+      "REDIS_HOST": "",
+      "REDIS_PASSWORD": ""
+    },
+    "dependencies": {
+      "ioredis": "latest"
     }
-  },
-  "env": {
-    "REDIS_HOST": "",
-    "REDIS_PASSWORD": ""
-  },
-  "dependencies": {
-    "ioredis": "latest"
   }
 }

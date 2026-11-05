@@ -1,10 +1,12 @@
 {
   "key": "tag",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "tag.module",
-    "className": "TagModule"
+    "className": "TagModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"]
+  "requires": {
+    "modules": ["security"]
+  }
 }

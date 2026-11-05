@@ -1,23 +1,25 @@
 {
   "key": "event-scheduling",
   "layer": "feature",
-  "module": {
+  "wiring": {
     "file": "event-scheduling.module",
-    "className": "EventSchedulingModule"
+    "className": "EventSchedulingModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "config-service": {
-    "eventScheduling": {
-      "minutesOfTimeslotUnit": 5
+  "requires": {
+    "config": {
+      "eventScheduling": {
+        "minutesOfTimeslotUnit": 5
+      }
+    },
+    "dependencies": {
+      "@nestjs/bull": "latest",
+      "bull": "latest",
+      "cron-parser": "latest",
+      "lodash": "latest"
+    },
+    "devDependencies": {
+      "@types/lodash": "latest"
     }
-  },
-  "dependencies": {
-    "@nestjs/bull": "latest",
-    "bull": "latest",
-    "cron-parser": "latest",
-    "lodash": "latest"
-  },
-  "devDependencies": {
-    "@types/lodash": "latest"
   }
 }

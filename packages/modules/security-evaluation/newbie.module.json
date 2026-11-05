@@ -1,23 +1,24 @@
 {
   "key": "security-evaluation",
   "layer": "feature",
-  "module": {
+  "wiring": {
     "file": "security-evaluation.module",
-    "className": "SecurityEvaluationModule"
+    "className": "SecurityEvaluationModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["evaluation", "security", "llm"],
-  "config-service": {
-    "security-evaluation": {
-      "ttlDays": "process.env.NEGATIVE_CACHE_TTL_DAYS"
+  "requires": {
+    "modules": ["evaluation", "security", "llm"],
+    "config": {
+      "security-evaluation": {
+        "ttlDays": "process.env.NEGATIVE_CACHE_TTL_DAYS"
+      }
+    },
+    "env": {
+      "NEGATIVE_CACHE_TTL_DAYS": {
+        "type": "int",
+        "example": 7,
+        "description": "Days to keep 'not-relevant' verdict cache rows before they expire. Hard-hit rows are audit-only and never expire."
+      }
     }
-  },
-  "env": {
-    "NEGATIVE_CACHE_TTL_DAYS": {
-      "type": "int",
-      "example": 7,
-      "description": "Days to keep 'not-relevant' verdict cache rows before they expire. Hard-hit rows are audit-only and never expire."
-    }
-  },
-  "dependencies": {}
+  }
 }

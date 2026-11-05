@@ -1,25 +1,26 @@
 {
   "key": "googlemaps",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "googlemaps.module",
-    "className": "GoogleMapsModule"
+    "className": "GoogleMapsModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "config-service": {
-    "googlemaps": {
-      "credentials": {
-        "apiKey": "process.env.GOOGLE_CREDENTIALS_API_KEY",
-        "serviceAccount": "process.env.GOOGLE_CREDENTIALS_SERVICE_ACCOUNT"
+  "requires": {
+    "config": {
+      "googlemaps": {
+        "credentials": {
+          "apiKey": "process.env.GOOGLE_CREDENTIALS_API_KEY",
+          "serviceAccount": "process.env.GOOGLE_CREDENTIALS_SERVICE_ACCOUNT"
+        }
       }
+    },
+    "env": {
+      "GOOGLE_CREDENTIALS_API_KEY": "",
+      "GOOGLE_CREDENTIALS_SERVICE_ACCOUNT": ""
+    },
+    "dependencies": {
+      "@googlemaps/places": "^2.1.0"
     }
-  },
-  "env": {
-    "GOOGLE_CREDENTIALS_API_KEY": "",
-    "GOOGLE_CREDENTIALS_SERVICE_ACCOUNT": ""
-  },
-  "dependencies": {
-    "@googlemaps/places": "^2.1.0"
-  },
-  "devDependencies": {}
+  }
 }

@@ -1,17 +1,16 @@
 {
   "key": "aws-cloudformation",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "aws-cloudformation.module",
-    "className": "AwsCloudformationModule"
+    "className": "AwsCloudformationModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["aws-identity", "security"],
-  "config-service": {},
-  "env": {},
-  "dependencies": {
-    "@aws-sdk/client-cloudformation": "latest",
-    "@aws-sdk/client-ssm": "latest"
-  },
-  "devDependencies": {}
+  "requires": {
+    "modules": ["aws-identity", "security"],
+    "dependencies": {
+      "@aws-sdk/client-cloudformation": "latest",
+      "@aws-sdk/client-ssm": "latest"
+    }
+  }
 }

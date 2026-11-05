@@ -1,9 +1,9 @@
 {
   "key": "workflow",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "workflow.module",
-    "className": "WorkflowModule"
-  },
-  "schema": "prisma/schema.prisma"
+    "className": "WorkflowModule",
+    "prismaSchema": "prisma/schema.prisma"
+  }
 }

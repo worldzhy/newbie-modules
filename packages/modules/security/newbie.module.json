@@ -1,44 +1,46 @@
 {
   "key": "security",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "security.module",
     "className": "SecurityModule"
   },
-  "moduleDependencies": ["redis"],
-  "config-service": {
-    "security": {
-      "token": {
-        "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET",
-        "userAccess": {
-          "secret": "process.env.SECURITY_USER_ACCESS_TOKEN_SECRET"
-        },
-        "userRefresh": {
-          "secret": "process.env.SECURITY_USER_REFRESH_TOKEN_SECRET"
-        },
-        "apiKeyAccess": {
-          "secret": "process.env.SECURITY_APIKEY_ACCESS_TOKEN_SECRET"
+  "requires": {
+    "modules": ["redis"],
+    "config": {
+      "security": {
+        "token": {
+          "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET",
+          "userAccess": {
+            "secret": "process.env.SECURITY_USER_ACCESS_TOKEN_SECRET"
+          },
+          "userRefresh": {
+            "secret": "process.env.SECURITY_USER_REFRESH_TOKEN_SECRET"
+          },
+          "apiKeyAccess": {
+            "secret": "process.env.SECURITY_APIKEY_ACCESS_TOKEN_SECRET"
+          }
         }
       }
+    },
+    "env": {
+      "SECURITY_DEFAULT_TOKEN_SECRET": "",
+      "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
+      "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
+      "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": ""
+    },
+    "dependencies": {
+      "@nestjs/passport": "latest",
+      "crypto-random-string": "^5.0.0",
+      "jsonwebtoken": "latest",
+      "passport": "latest",
+      "passport-custom": "latest",
+      "passport-jwt": "latest",
+      "rate-limiter-flexible": "latest",
+      "uuid": "^14.0.0"
+    },
+    "devDependencies": {
+      "@types/passport-jwt": "latest"
     }
-  },
-  "env": {
-    "SECURITY_DEFAULT_TOKEN_SECRET": "",
-    "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
-    "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
-    "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": ""
-  },
-  "dependencies": {
-    "@nestjs/passport": "latest",
-    "crypto-random-string": "^5.0.0",
-    "jsonwebtoken": "latest",
-    "passport": "latest",
-    "passport-custom": "latest",
-    "passport-jwt": "latest",
-    "rate-limiter-flexible": "latest",
-    "uuid": "^14.0.0"
-  },
-  "devDependencies": {
-    "@types/passport-jwt": "latest"
   }
 }

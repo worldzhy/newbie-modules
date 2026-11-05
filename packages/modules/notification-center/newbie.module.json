@@ -1,13 +1,12 @@
 {
   "key": "notification-center",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "notification-center.module",
-    "className": "NotificationCenterModule"
+    "className": "NotificationCenterModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
-  "config-service": {},
-  "env": {},
-  "dependencies": {}
+  "requires": {
+    "modules": ["security"]
+  }
 }

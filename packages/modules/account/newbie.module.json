@@ -1,68 +1,70 @@
 {
   "key": "account",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "account.module",
-    "className": "AccountModule"
+    "className": "AccountModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["audit", "aws-ses", "aws-sms", "security", "redis"],
-  "config-service": {
-    "account": {
-      "verificationCode": {
-        "timeoutMinutes": 10,
-        "resendMinutes": 1,
-        "maxAttempts": 5
-      },
-      "approvedSubnet": {
-        "hmacSecret": "process.env.ACCOUNT_APPROVED_SUBNET_HMAC_SECRET"
-      },
-      "googleAuth": {
-        "clientId": "process.env.GOOGLE_AUTH_CLIENT_ID",
-        "clientSecret": "process.env.GOOGLE_AUTH_CLIENT_SECRET",
-        "callbackURL": "process.env.GOOGLE_AUTH_CALLBACK_URL"
-      },
-      "wechat": {
-        "appId": "process.env.WECHAT_APP_ID",
-        "appSecret": "process.env.WECHAT_APP_SECRET"
-      },
-      "larkAuth": {
-        "appId": "process.env.LARK_APP_ID",
-        "appSecret": "process.env.LARK_APP_SECRET",
-        "callbackURL": "process.env.LARK_AUTH_CALLBACK_URL"
+  "requires": {
+    "modules": ["audit", "aws-ses", "aws-sms", "security", "redis"],
+    "config": {
+      "account": {
+        "verificationCode": {
+          "timeoutMinutes": 10,
+          "resendMinutes": 1,
+          "maxAttempts": 5
+        },
+        "approvedSubnet": {
+          "hmacSecret": "process.env.ACCOUNT_APPROVED_SUBNET_HMAC_SECRET"
+        },
+        "googleAuth": {
+          "clientId": "process.env.GOOGLE_AUTH_CLIENT_ID",
+          "clientSecret": "process.env.GOOGLE_AUTH_CLIENT_SECRET",
+          "callbackURL": "process.env.GOOGLE_AUTH_CALLBACK_URL"
+        },
+        "wechat": {
+          "appId": "process.env.WECHAT_APP_ID",
+          "appSecret": "process.env.WECHAT_APP_SECRET"
+        },
+        "larkAuth": {
+          "appId": "process.env.LARK_APP_ID",
+          "appSecret": "process.env.LARK_APP_SECRET",
+          "callbackURL": "process.env.LARK_AUTH_CALLBACK_URL"
+        }
       }
+    },
+    "env": {
+      "ACCOUNT_APPROVED_SUBNET_HMAC_SECRET": "",
+      "GOOGLE_AUTH_CLIENT_ID": "",
+      "GOOGLE_AUTH_CLIENT_SECRET": "",
+      "GOOGLE_AUTH_CALLBACK_URL": "",
+      "WECHAT_APP_ID": "",
+      "WECHAT_APP_SECRET": "",
+      "LARK_APP_ID": "",
+      "LARK_APP_SECRET": "",
+      "LARK_AUTH_CALLBACK_URL": ""
+    },
+    "dependencies": {
+      "@larksuiteoapi/node-sdk": "^1.59.0",
+      "@nestjs/passport": "latest",
+      "ip-anonymize": "latest",
+      "otplib": "latest",
+      "passport": "latest",
+      "passport-custom": "latest",
+      "passport-google-oauth20": "latest",
+      "passport-local": "latest",
+      "qrcode": "latest",
+      "randomcolor": "latest",
+      "rate-limiter-flexible": "latest",
+      "ua-parser-js": "latest",
+      "validator": "latest"
+    },
+    "devDependencies": {
+      "@types/passport-google-oauth20": "latest",
+      "@types/passport-local": "latest",
+      "@types/qrcode": "latest",
+      "@types/validator": "latest"
     }
-  },
-  "env": {
-    "ACCOUNT_APPROVED_SUBNET_HMAC_SECRET": "",
-    "GOOGLE_AUTH_CLIENT_ID": "",
-    "GOOGLE_AUTH_CLIENT_SECRET": "",
-    "GOOGLE_AUTH_CALLBACK_URL": "",
-    "WECHAT_APP_ID": "",
-    "WECHAT_APP_SECRET": "",
-    "LARK_APP_ID": "",
-    "LARK_APP_SECRET": "",
-    "LARK_AUTH_CALLBACK_URL": ""
-  },
-  "dependencies": {
-    "@larksuiteoapi/node-sdk": "^1.59.0",
-    "@nestjs/passport": "latest",
-    "ip-anonymize": "latest",
-    "otplib": "latest",
-    "passport": "latest",
-    "passport-custom": "latest",
-    "passport-google-oauth20": "latest",
-    "passport-local": "latest",
-    "qrcode": "latest",
-    "randomcolor": "latest",
-    "rate-limiter-flexible": "latest",
-    "ua-parser-js": "latest",
-    "validator": "latest"
-  },
-  "devDependencies": {
-    "@types/passport-google-oauth20": "latest",
-    "@types/passport-local": "latest",
-    "@types/qrcode": "latest",
-    "@types/validator": "latest"
   }
 }

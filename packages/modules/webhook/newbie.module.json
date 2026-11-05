@@ -1,13 +1,15 @@
 {
   "key": "webhook",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "webhook.module",
-    "className": "WebhookModule"
+    "className": "WebhookModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "dependencies": {
-    "p-queue": "latest",
-    "p-retry": "latest"
+  "requires": {
+    "dependencies": {
+      "p-queue": "latest",
+      "p-retry": "latest"
+    }
   }
 }

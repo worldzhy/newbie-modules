@@ -1,20 +1,22 @@
 {
   "key": "mongo",
   "layer": "datastore",
-  "module": {
+  "wiring": {
     "file": "mongo.module",
     "className": "MongoModule"
   },
-  "config-service": {
-    "mongo": {
-      "uri": "process.env.MONGO_URL"
+  "requires": {
+    "config": {
+      "mongo": {
+        "uri": "process.env.MONGO_URL"
+      }
+    },
+    "env": {
+      "MONGO_URL": ""
+    },
+    "dependencies": {
+      "@nestjs/mongoose": "^11.0.4",
+      "mongoose": "^7.8.12"
     }
-  },
-  "env": {
-    "MONGO_URL": ""
-  },
-  "dependencies": {
-    "@nestjs/mongoose": "^11.0.4",
-    "mongoose": "^7.8.12"
   }
 }
