@@ -12,32 +12,7 @@
   "sdk": "@devbie/web-monitor-sdk",
   "config-service": {
     "web-monitor": {
-      "isLocalDev": false,
-      "redis_consumption": {
-        "task_time": "*/10 * * * * *",
-        "thread_web": 1000,
-        "total_limit_web": 100000
-      },
-      "TENCENTMAPKEY": "process.env.WEB_MONITOR_TENCENT_MAP_KEY || ''",
-      "top_alalysis_size": {
-        "web": 10
-      },
-      "pvuvip_task_minute_cron_time": "0 */2 * * * *",
-      "pvuvip_task_minute_lock_time": 20,
-      "ipRedisTTL": 2592000,
-      "ip_task_cron_time": "0 */1 * * * *",
-      "ip_task_lock_time": 20,
-      "ip_task_space_time": 60000,
-      "alertTaskLockTime": 20,
-      "alertWindowMs": 60000,
-      "is_web_consume_task_run": true,
-      "day_report_num": true,
-      "day_report_num_task_cron_time": "0 0 0 */1 * *",
-      "day_report_num_task_lock_time": 3000,
-      "pvuvip_task_day_time": "0 0 0 */1 * *",
-      "ip_thread": 5,
-      "appid_task_time": "0 */5 * * * *",
-      "pageSize": 15
+      "TENCENTMAPKEY": "process.env.WEB_MONITOR_TENCENT_MAP_KEY"
     }
   },
   "env": {
@@ -48,7 +23,6 @@
     "@nestjs/schedule": "latest",
     "cron-parser": "4.x",
     "dotenv": "latest",
-    "ip": "latest",
     "ua-parser-js": "latest"
   },
   "devDependencies": {}

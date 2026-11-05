@@ -9,7 +9,7 @@
   "moduleDependencies": ["security"],
   "config-service": {
     "llm": {
-      "apiKeySecret": "process.env.LLM_API_KEY_SECRET || process.env.SECURITY_USER_REFRESH_TOKEN_SECRET"
+      "apiKeySecret": "process.env.LLM_API_KEY_SECRET"
     }
   },
   "env": {

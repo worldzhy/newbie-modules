@@ -1,23 +1,21 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EventCatalogService } from "./event-catalog.service";
 
-/// Event-emission retention in days. Events older than this many days are
-/// pruned before each new insert (lazy cleanup — no scheduler, no extra
-/// dependency). Every environment declares the value explicitly (ADR-033):
-/// there is no built-in fallback, so a host that forgets it fails to boot
-/// instead of silently pruning on a guessed window.
-const RETENTION_DAYS_ENV = "EVENT_EMISSION_RETENTION_DAYS";
+const RETENTION_DAYS_KEY = "modules.event-emitter.retentionDays";
 
-function requirePositiveIntegerEnv(name: string): number {
-  const raw = process.env[name];
-  const parsed = raw === undefined ? Number.NaN : Number(raw.trim());
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer; received ${raw === undefined ? "no value" : `'${raw}'`}.`);
+/// Validates the retention days resolved from the assembler's bare env
+/// mapping (ADR-033): the value must be a declared positive integer — there
+/// is no built-in fallback, so a host that forgets it fails to boot instead
+/// of silently pruning on a guessed window.
+function requirePositiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer; received '${value}'.`);
   }
-  return parsed;
+  return value;
 }
 
 export interface EventDescription {
@@ -35,8 +33,8 @@ export interface EventDescription {
 export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventEmitterService.name);
 
-  /// Retention cut point computed once at construction (env read is a boot-time
-  /// decision, not a per-request concern).
+  /// Retention cut point computed once at construction (a boot-time decision,
+  /// not a per-request concern).
   private readonly retentionDays: number;
 
   /// Bound once so onModuleDestroy can detach the exact same callback.
@@ -51,8 +49,12 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly eventCatalog: EventCatalogService,
+    private readonly config: ConfigService,
   ) {
-    this.retentionDays = requirePositiveIntegerEnv(RETENTION_DAYS_ENV);
+    this.retentionDays = requirePositiveInteger(
+      Number(this.config.getOrThrow<string>(RETENTION_DAYS_KEY)),
+      RETENTION_DAYS_KEY,
+    );
   }
 
   onModuleInit() {

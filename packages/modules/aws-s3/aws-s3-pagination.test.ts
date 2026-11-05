@@ -16,7 +16,6 @@ function makeService(s3Client: { send: (command: any) => Promise<any> }) {
   const configValues: Record<string, unknown> = {
     "modules.aws-s3.bucket": BUCKET,
     "modules.aws-s3.region": "us-east-1",
-    "modules.aws-s3.signedUrlExpiresIn": 900,
   };
   const config = { getOrThrow: (key: string) => configValues[key] } as any;
   const credentials = { resolveDefaultCredentials: () => ({}) } as any;

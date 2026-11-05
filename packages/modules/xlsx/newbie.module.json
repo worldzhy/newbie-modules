@@ -6,8 +6,8 @@
     "className": "XLSXModule"
   },
   "dependencies": {
-    "multer": "latest",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.19.3/xlsx-0.19.3.tgz"
+    "exceljs": "^4.4.0",
+    "multer": "latest"
   },
   "devDependencies": {
     "@types/multer": "latest"

@@ -8,51 +8,25 @@
   "moduleDependencies": ["redis"],
   "config-service": {
     "security": {
-      "ratelimiter": {
-        "ipLoginLimiter": {
-          "points": 10,
-          "durationSeconds": 600
-        },
-        "userLoginLimiter": {
-          "points": 5,
-          "durationSeconds": 600
-        },
-        "ipAccessLimiter": {
-          "points": 20,
-          "durationSeconds": 60
-        },
-        "installationLimiter": {
-          "points": 120,
-          "durationSeconds": 60
-        },
-        "totpLoginLimiter": {
-          "points": 5,
-          "durationSeconds": 300
-        }
-      },
       "token": {
         "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET",
         "userAccess": {
-          "expiresIn": "10m",
           "secret": "process.env.SECURITY_USER_ACCESS_TOKEN_SECRET"
         },
         "userRefresh": {
-          "expiresIn": "30d",
           "secret": "process.env.SECURITY_USER_REFRESH_TOKEN_SECRET"
         },
         "apiKeyAccess": {
           "secret": "process.env.SECURITY_APIKEY_ACCESS_TOKEN_SECRET"
         }
-      },
-      "defaultGuard": "jwt"
+      }
     }
   },
   "env": {
     "SECURITY_DEFAULT_TOKEN_SECRET": "",
     "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
     "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
-    "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": "",
-    "SECURITY_DEFAULT_GUARD": ""
+    "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": ""
   },
   "dependencies": {
     "@nestjs/passport": "latest",

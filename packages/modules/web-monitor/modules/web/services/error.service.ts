@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { WebMonitorClickHouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
 import { ConfigService } from "@nestjs/config";
+import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 
 @Injectable()
 export class ErrorService {
@@ -20,7 +21,7 @@ export class ErrorService {
       type = "",
       realTime,
       resourceUrl,
-      pageSize = this.cfg.pageSize,
+      pageSize = WEB_MONITOR_CONFIG.pageSize,
       uid,
       phone,
     } = query;
@@ -93,7 +94,7 @@ export class ErrorService {
   async getOneErrorList(query: Record<string, unknown>) {
     const { appId, url, name = "", status = "", type = "", beginTime, endTime, phone = "", uid = "" } = query;
     const pageNo = Number(query.pageNo || 1);
-    const pageSize = Number(query.pageSize || this.cfg.pageSize);
+    const pageSize = Number(query.pageSize || WEB_MONITOR_CONFIG.pageSize);
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
     if (url) {

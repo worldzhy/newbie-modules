@@ -5,6 +5,10 @@ import { Index } from "@elastic/elasticsearch/api/requestParams";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
 
+/// Indexing retries per record (ADR-033: a tuning knob nobody tuned stays
+/// code, not environment surface).
+const INDEX_RETRIES = 3;
+
 @Injectable()
 export class ElasticsearchService extends Client implements OnModuleDestroy {
   private logger = new Logger("Elasticsearch");
@@ -29,7 +33,7 @@ export class ElasticsearchService extends Client implements OnModuleDestroy {
     this.queue
       .add(() =>
         pRetry(() => this.indexRecord(index, record, params), {
-          retries: this.configService.get<number>("modules.elasticsearch.retries") ?? 3,
+          retries: INDEX_RETRIES,
           onFailedAttempt: (error) => {
             this.logger.error(
               `Indexing record failed, retrying (${error.retriesLeft} attempts left)`,

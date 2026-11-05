@@ -4,7 +4,8 @@
  * Every judgment outcome that is stable over short runs is recorded per
  * (knowledge item, scope):
  * - `not-relevant`: LLM re-ranker said this item has no bearing. Cached for
- *   NEGATIVE_CACHE_TTL_DAYS (default 7); subsequent runs skip the pair.
+ *   the declared ttlDays (ADR-033: every environment declares it); subsequent
+ *   runs skip the pair.
  * - `hard-hit`: hard-recall matched this item to this scope's entities.
  *   Audit only — the pair still re-enters the pipeline each run.
  *

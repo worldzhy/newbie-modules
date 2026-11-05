@@ -1,10 +1,13 @@
 import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import geolite2, { GeoIpDbName } from "geolite2-redist";
 import maxmind, { CityResponse, Reader } from "maxmind";
 import { LRUCache } from "lru-cache";
+
+/// Maximum number of cached IP geolocation entries (ADR-033: a tuning knob
+/// nobody tuned stays code, not environment surface).
+const GEOLOCATION_LRU_SIZE = 100;
 
 @Injectable()
 export class GeolocationService implements OnModuleDestroy {
@@ -13,11 +16,8 @@ export class GeolocationService implements OnModuleDestroy {
   private openFailed = false;
   private lru: LRUCache<string, Partial<CityResponse>>;
 
-  constructor(private config: ConfigService) {
-    // The configured size is the maximum number of cached entries.
-    this.lru = new LRUCache({
-      max: this.config.getOrThrow<number>("modules.audit.geolocationLruSize"),
-    });
+  constructor() {
+    this.lru = new LRUCache({ max: GEOLOCATION_LRU_SIZE });
   }
 
   onModuleDestroy() {

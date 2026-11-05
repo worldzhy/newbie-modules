@@ -8,13 +8,13 @@
   "moduleDependencies": ["aws-identity", "security"],
   "config-service": {
     "aws-ses": {
-      "region": "process.env.AWS_SES_REGION || 'us-east-1'",
+      "region": "process.env.AWS_SES_REGION",
       "configurationSetName": "process.env.AWS_SES_CONFIGURATION_SET_NAME",
       "fromEmailAddress": "process.env.AWS_SES_FROM_EMAIL_ADDRESS"
     }
   },
   "env": {
-    "AWS_SES_REGION": "",
+    "AWS_SES_REGION": { "example": "us-east-1" },
     "AWS_SES_CONFIGURATION_SET_NAME": "",
     "AWS_SES_FROM_EMAIL_ADDRESS": ""
   },

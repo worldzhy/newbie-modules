@@ -2,6 +2,11 @@ import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import Redis from "ioredis";
 
+/// Fixed connection coordinates (ADR-033: a tuning knob nobody tuned stays
+/// code, not environment surface). Only host/password stay configurable.
+const REDIS_PORT = 6379;
+const REDIS_DB = 0;
+
 /**
  * Single shared ioredis connection for the whole application.
  *
@@ -25,9 +30,9 @@ export class RedisService implements OnModuleDestroy {
     if (!host) return;
     this.client = new Redis({
       host,
-      port: this.configService.get<number>("modules.redis.port"),
+      port: REDIS_PORT,
       password: this.configService.get<string>("modules.redis.password") || undefined,
-      db: this.configService.get<number>("modules.redis.db"),
+      db: REDIS_DB,
     });
     this.client.on("error", (err: Error) => {
       this.logger.error("Redis error:", err.message);

@@ -3,6 +3,7 @@ import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { func } from "../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../shared/web-monitor-config";
 import { PvuvipService } from "./services/pvuvip.service";
 import { WebMonitorPvUvIpResponseDto } from "./pvuvip.dto";
 import parser from "cron-parser";
@@ -29,7 +30,7 @@ export class PvuvipController {
     const { appId } = q;
     if (!appId) throw new Error("PV/UV/IP overview: appId must not be empty");
     const appIdStr = String(appId);
-    const interval = parser.parseExpression(String(this.cfg.pvuvip_task_minute_cron_time));
+    const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
     const betweenTime = Math.abs(new Date(timer).getTime() - timestrat);
@@ -79,7 +80,7 @@ export class PvuvipController {
   async getPvUvIpList(@Query() q: Record<string, unknown>) {
     const { appId, beginTime, endTime } = q;
     if (!appId) throw new Error("UI PV/UV/IP query: appId must not be empty");
-    const interval = parser.parseExpression(String(this.cfg.pvuvip_task_minute_cron_time));
+    const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
     const betweenTime = Math.abs(new Date(timer).getTime() - timestrat);
@@ -96,7 +97,7 @@ export class PvuvipController {
   async getPvUvIpOne(@Query() q: Record<string, unknown>) {
     const { appId, beginTime, endTime } = q;
     if (!appId) throw new Error("UI PV/UV/IP query: appId must not be empty");
-    const interval = parser.parseExpression(String(this.cfg.pvuvip_task_minute_cron_time));
+    const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     interval.prev();
     let et: Date;
     let bt: Date;

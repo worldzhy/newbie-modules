@@ -8,7 +8,7 @@
   "schema": "prisma/schema.prisma",
   "config-service": {
     "message-tracker": {
-      "region": "process.env.MESSAGE_TRACKER_AWS_REGION || 'us-east-1'",
+      "region": "process.env.MESSAGE_TRACKER_AWS_REGION",
       "emailQueueUrl": "process.env.MESSAGE_TRACKER_SQS_EMAIL_QUEUE_URL",
       "textQueueUrl": "process.env.MESSAGE_TRACKER_SQS_TEXT_QUEUE_URL"
     }

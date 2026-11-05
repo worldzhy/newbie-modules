@@ -3,6 +3,7 @@ import { PipelineStage } from "mongoose";
 import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 import { ConfigService } from "@nestjs/config";
 import { func } from "../../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 
 @Injectable()
 export class PageService {
@@ -15,7 +16,7 @@ export class PageService {
   }
 
   async getAveragePageList(query: Record<string, unknown>) {
-    const { appId, type = "", pageNo = 1, pageSize = this.cfg.pageSize, url, isFirstIn } = query;
+    const { appId, type = "", pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
     const appIdStr = String(appId);
     const match: Record<string, unknown> = {};
     if (isFirstIn !== undefined && isFirstIn !== "") {
@@ -177,7 +178,7 @@ export class PageService {
       appId: rawAppId,
       type,
       pageNo = 1,
-      pageSize = this.cfg.pageSize,
+      pageSize = WEB_MONITOR_CONFIG.pageSize,
       url,
       isFirstIn,
       beginTime,

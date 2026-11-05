@@ -7,6 +7,11 @@
   },
   "schema": "prisma/schema.prisma",
   "moduleDependencies": ["security"],
+  "config-service": {
+    "event-emitter": {
+      "retentionDays": "process.env.EVENT_EMISSION_RETENTION_DAYS"
+    }
+  },
   "dependencies": {
     "@nestjs/event-emitter": "latest"
   },

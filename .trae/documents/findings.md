@@ -67,3 +67,38 @@ W1 落地（2026-11-03）：`d78bf84` security 拒绝公开/过短签名密钥�
 - **R6-13 → 裁定（待执行）**：fail-closed 保留，但异常语义分层——请求边界（`site.controller.ts` query 与 upsert body）非法 `appId` 返回 400 并指明字段；存储侧读取/聚合出现非法 `appId` 属内部不变量破坏，记内部错误 + 告警，不向调用方伪装成 400。理由：appId 来源混合（服务端 `func.randomString(7)`、客户端 query、库内 ingest），不能统一改 5xx。
 
 回归证据（宿主副本）：`security-evaluation-intel.test.ts` + `security-evaluation-evidence.provider.test.ts` 共 15 例全过，含「签名按模型看到的确切字节内容寻址」「缓存只复用当前签名下的行（changed/legacy/missing 均 miss）」「hard-hit 仅审计」。
+
+## round9 元评审（2026-11-04，scope=`modules: [web-monitor]`，报告在本仓 `.trae/documents/expert-review-2026-11-04-round9.md`）
+
+round9 是对 round8 结论的元评审；R9-02..R9-08 为方案/报告缺陷，正文保留在 round9 报告（快照规则），此处只登记代码级 finding：
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+|---|---|---|---|---|---|---|
+| R9-01 | newbie-modules | drain 毒丸：payload `time` 不可解析 → `func.toDate` 铸成 `Invalid Date` → store 写确定性失败 → raw 永久 `lpush` 重入队（绕过限流） | P1 | live | anonymous（持公开 installation token） | **fixed（2026-11-05，待提交）**：4 处客户端时间写入点改 `toDateOrNow`（非法值回落采集时刻）；回归指针 `report-task.service.test.ts` 4 例；round10 复核通过（未修复代码 3/4 红、修复后 4/4 绿） |
+| R9-04 | newbie-modules | drain per-item catch 吞错丢弃无记账（R8-04 只覆盖 flush 层） | P2 | live | 同 R9-01 触发面 | open |
+| R9-07 | newbie-modules | 重入队无重试计数/退避/死信；分类法无法覆盖全部永久失败（R9-01 即反例） | P2 | live | 同 R9-01 触发面 | open（随 C 层切片落地） |
+
+- **R6-13 修订注记**（2026-11-04）：round8 裁决方向成立；round9 修订——毒丸等级上调 P1（R9-01，仅对 appId 向量的 P2 结论撤回）；切片顺序改为 C 层先行、A 批次与 B 同批或用模块级异常过滤器；计数与清单按 R9-03 修正（site 8 端点、custom 4、controllers 11、`assertAppId` 7 调用点、补 analysis 与 49 处 `throw new Error`）。
+- R9-02（切片顺序矛盾）/R9-03（计数不实）/R9-05（R8-02 确认）/R9-06（R8-07 未定级）/R9-08（R8-03 措辞收窄）：方案与报告层结论，见 round9 报告 §5/§10，不占用代码 finding 状态位。
+
+## round10 复核（2026-11-05，scope=`modules: [web-monitor]` 的 R9-01 变更集，报告在本仓 `.trae/documents/expert-review-2026-11-05-round10.md`）
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+|---|---|---|---|---|---|---|
+| R10-01 | newbie-modules | R9-01 测试覆盖缺口：4 处修复点仅 L375/L426 有真实覆盖，test3 名实不符（走 saveAjaxs 而非 collectResource）；L196/L470 无哨兵 | P2 | source | 后续回归 | fixed（2026-11-05：test3 更名标注 saveAjaxs 分支；新增 collectResource（img+duration 5000）与 collectErrors 两例哨兵，6/6 过） |
+| R10-02 | newbie-modules | `toDateOrNow` 对数字字符串 epoch（如 `"1700000000000"`）回落 now 而非按 epoch 解析；非回归（旧行为为毒丸），精度改进建议 | P2 | source | SDK 字符串上送 epoch 时 | open |
+
+- 误报剔除：「合法但越界 Date 构成同类毒丸」被 CH 探针否决——`DateTime` 列对 1966/3000 年插入静默截断为 `[1970-01-01, 2106-02-07]`，写不失败，不构成重入队（round10 §7）。
+- R9-01 状态更新见上表；backend 装配与提交待用户确认后按 registry-first 流程执行。
+
+## round12（2026-11-05，scope=`plan`：round9 §10 C 层切片草案，报告在本仓 `.trae/documents/expert-review-2026-11-05-round12.md`）
+
+C 层草案判定：现状主张 C1–C4 与支撑论证 P4 成立；方案主张 P1/P2/P3 与隐含充分性 P5 均「证据不足/待细化」（dropped 粒度与行级识别、分类表须覆盖 drain+flush 两段、重试计数载体、与限流绕过关系四问未定）。新发现：
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+|---|---|---|---|---|---|---|
+| R12-01 | newbie-modules | Mongo 数字/字符串路径毒丸向量簇：`screenWidth`/`performance.*` 原样入 Number 路径、`customContent` 对象入 String 路径、`bodySize` NaN → CastError → 整批失败重入队（R9-01 修复后仍 live） | P1 | live | anonymous（持公开 installation token） | open（建议并入 R9-01 提交链，回归指针：round12 §5 探针 + 反驳轮） |
+| R12-02 | newbie-modules | CH `bodySize` NaN → null → 静默落 0，数据质量非可用性 | P2 | live | 同上 | open（随 R12-01 归一化顺带处理） |
+
+- 误报剔除：「CH bodySize NaN 构成写失败毒丸」被探针否决（null → Int32 落 0）；「round11 编号可用」否决（他会话已占用）。
+- R9-04/R9-07 维持 open：C 层细化方案须先回答 round12 §9 四问，再评审后落地。

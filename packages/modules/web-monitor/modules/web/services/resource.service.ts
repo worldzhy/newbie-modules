@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 import { ConfigService } from "@nestjs/config";
 import { func } from "../../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 
 @Injectable()
 export class ResourceService {
@@ -39,7 +40,7 @@ export class ResourceService {
   }
 
   async getAverageResourceList(query: Record<string, unknown>) {
-    const { appId, type = 1, pageNo = 1, pageSize = this.cfg.pageSize, beginTime, endTime, url } = query;
+    const { appId, type = 1, pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, beginTime, endTime, url } = query;
     const match: Record<string, unknown> = { speedType: Number(type) };
     if (url) match.name = { $regex: new RegExp(String(url), "i") };
     if (beginTime || endTime) {
@@ -92,8 +93,8 @@ export class ResourceService {
   async getOneResourceList(
     appId: string,
     url: string,
-    pageNo = 1,
-    pageSize = this.cfg.pageSize,
+    pageNo: number = 1,
+    pageSize: number = WEB_MONITOR_CONFIG.pageSize,
     beginTime?: string,
     endTime?: string,
   ) {

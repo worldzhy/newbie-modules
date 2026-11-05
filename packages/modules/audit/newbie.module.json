@@ -7,14 +7,7 @@
   },
   "schema": "prisma/schema.prisma",
   "moduleDependencies": ["security"],
-  "config-service": {
-    "audit": {
-      "geolocationLruSize": "int(process.env.AUDIT_GEOLOCATION_LRU_SIZE, 100)"
-    }
-  },
-  "env": {
-    "AUDIT_GEOLOCATION_LRU_SIZE": ""
-  },
+  "env": {},
   "dependencies": {
     "geolite2-redist": "latest",
     "lru-cache": "latest",

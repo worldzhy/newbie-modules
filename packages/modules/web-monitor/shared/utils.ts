@@ -106,6 +106,37 @@ export const func = {
     if (typeof value === "number") return new Date(value);
     return new Date(String(value));
   },
+  // Client-supplied timestamps must never poison the drain: an unparseable
+  // value falls back to the ingest time instead of becoming `Invalid Date`,
+  // which would make every store write fail and requeue the raw item forever.
+  toDateOrNow(value: unknown) {
+    const date = value instanceof Date ? value : typeof value === "number" ? new Date(value) : new Date(String(value));
+    return Number.isNaN(date.getTime()) ? new Date() : date;
+  },
+  // Coerce a client-supplied numeric field to a finite number; anything else
+  // (NaN, Infinity, non-numeric string, object) returns undefined so the
+  // caller can decide whether to skip writing the field entirely. Skipping
+  // is preferred over writing 0 because Mongo's $avg skips missing keys but
+  // includes explicit zeros — a poisoned "abc" must never drag the average down.
+  toNumberOrUndefined(value: unknown): number | undefined {
+    if (value === undefined || value === null) return undefined;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+  },
+  // Coerce a client-supplied field to a string; objects are JSON-stringified,
+  // anything else returns undefined so the caller can skip writing the field.
+  toStringOrUndefined(value: unknown): string | undefined {
+    if (value === undefined || value === null) return undefined;
+    if (typeof value === "string") return value;
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return undefined;
+      }
+    }
+    return undefined;
+  },
   filterKeyWord(input: unknown) {
     try {
       return typeof input === "string" ? input : JSON.stringify(input);

@@ -168,7 +168,7 @@ enum SecurityEvaluationVerdictKind {
 /// that is stable over short runs is recorded per (knowledge item, scope).
 ///
 /// - `not-relevant`: LLM re-ranker said this knowledge item has no bearing
-///   on this scope. Expires after NEGATIVE_CACHE_TTL_DAYS (default 7).
+///   on this scope. Expires after the declared ttlDays (ADR-033).
 ///   Subsequent runs skip the pair entirely — no re-check.
 /// - `hard-hit`: hard-recall matched this item to this scope's entities.
 ///   Audit only — the pair still re-enters the pipeline each run because

@@ -6,14 +6,6 @@
     "className": "WebhookModule"
   },
   "schema": "prisma/schema.prisma",
-  "config-service": {
-    "webhook": {
-      "retries": "int(process.env.WEBHOOK_FAIL_RETRIES, 3)"
-    }
-  },
-  "env": {
-    "WEBHOOK_FAIL_RETRIES": 3
-  },
   "dependencies": {
     "p-queue": "latest",
     "p-retry": "latest"

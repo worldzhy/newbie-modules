@@ -7,7 +7,11 @@
   },
   "schema": "prisma/schema.prisma",
   "moduleDependencies": ["evaluation", "security", "llm"],
-  "config-service": {},
+  "config-service": {
+    "security-evaluation": {
+      "ttlDays": "process.env.NEGATIVE_CACHE_TTL_DAYS"
+    }
+  },
   "env": {
     "NEGATIVE_CACHE_TTL_DAYS": {
       "type": "int",
