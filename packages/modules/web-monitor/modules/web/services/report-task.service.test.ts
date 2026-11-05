@@ -178,3 +178,143 @@ test("a parseable time still flows through and keeps its timestamp", async () =>
   const page = Object.values(buckets.appPages).flat()[0] as Record<string, unknown>;
   assert.equal((page.createTime as Date).toISOString(), iso);
 });
+
+/**
+ * R12-01: Client-supplied non-numeric strings/objects on numeric fields were
+ * cast by Mongoose at insert time — "abc" → CastError → flush requeue loop →
+ * the same item returns forever, other apps' reports get rate-limited out.
+ *
+ * Invariant: a page-performance row must never carry a non-finite numeric
+ * field. Invalid values are skipped entirely so Mongo $avg correctly ignores
+ * missing keys instead of averaging in a poisoned 0.
+ */
+
+function collectPageRow(buckets: ReturnType<typeof emptyBuckets>) {
+  return (Object.values(buckets.appPages).flat()[0] as Record<string, unknown>) ?? {};
+}
+function collectCustomRow(buckets: ReturnType<typeof emptyBuckets>) {
+  return (Object.values(buckets.appCustoms).flat()[0] as Record<string, unknown>) ?? {};
+}
+function collectResourceRows(buckets: ReturnType<typeof emptyBuckets>) {
+  return Object.values(buckets.appResources).flat() as Record<string, unknown>[];
+}
+function collectAjaxRows(buckets: ReturnType<typeof emptyBuckets>) {
+  return Object.values(buckets.appAjaxs).flat() as Record<string, unknown>[];
+}
+
+test("poison string screenWidth is skipped instead of cast to NaN", async () => {
+  const buckets = emptyBuckets();
+  await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.PagePerf,
+      url: "https://example.com/a",
+      markPage: "p1",
+      isFirstIn: true,
+      screenWidth: "abc",
+      screenHeight: 900,
+    },
+    buckets,
+  );
+  const page = collectPageRow(buckets);
+  // Invalid screenWidth must not be present in the row at all.
+  assert.ok(!("screenWidth" in page), "poison screenWidth must be absent, not 0 or NaN");
+  // Valid screenHeight still flows through.
+  assert.equal(page.screenHeight, 900);
+});
+
+test("poison performance metrics are skipped instead of cast to NaN", async () => {
+  const buckets = emptyBuckets();
+  await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.PagePerf,
+      url: "https://example.com/a",
+      markPage: "p1",
+      isFirstIn: true,
+      performance: { wit: "abc", lodt: "def", dnst: 50 },
+    },
+    buckets,
+  );
+  const page = collectPageRow(buckets);
+  assert.ok(!("whiteTime" in page), "poison whiteTime (wit) must be absent");
+  assert.ok(!("loadTime" in page), "poison loadTime (lodt) must be absent");
+  assert.equal(page.dnsTime, 50, "valid dnsTime still flows through");
+});
+
+test("object customContent is JSON-stringified instead of cast error", async () => {
+  const buckets = emptyBuckets();
+  await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.Custom,
+      customs: [{ customName: "c1", customContent: { foo: "bar" } }],
+    },
+    buckets,
+  );
+  const custom = collectCustomRow(buckets);
+  assert.equal(typeof custom.customContent, "string", "object customContent must become a string");
+  assert.equal(custom.customContent, JSON.stringify({ foo: "bar" }));
+});
+
+test("poison bodySize on slow resource is skipped instead of cast to NaN", async () => {
+  const buckets = emptyBuckets();
+  // duration must exceed 2s default slowTime for a resource row to be emitted.
+  await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.AjaxPerf,
+      url: "https://example.com/a",
+      resourceList: [{ type: "img", name: "https://example.com/x.png", duration: 5000, bodySize: "abc" }],
+    },
+    buckets,
+  );
+  const resources = collectResourceRows(buckets);
+  assert.ok(resources.length > 0, "a slow img must produce a resource row");
+  const r = resources[0];
+  assert.ok(!("bodySize" in r), "poison resource bodySize must be absent");
+  assert.equal(r.duration, 5000, "valid duration still flows through");
+});
+
+test("poison bodySize on ajax row is skipped instead of cast to NaN", async () => {
+  const buckets = emptyBuckets();
+  await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.AjaxPerf,
+      url: "https://example.com/a",
+      resourceList: [{ type: "fetch", name: "https://example.com/x", duration: 300, bodySize: "abc" }],
+    },
+    buckets,
+  );
+  const ajaxs = collectAjaxRows(buckets);
+  assert.ok(ajaxs.length > 0, "an ajax row must be emitted");
+  const a = ajaxs[0];
+  assert.ok(!("bodySize" in a), "poison ajax bodySize must be absent from the row");
+});
+
+test("valid numeric strings still coerce correctly", async () => {
+  const buckets = emptyBuckets();
+  await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.PagePerf,
+      url: "https://example.com/a",
+      markPage: "p1",
+      isFirstIn: true,
+      screenWidth: "1920",
+      performance: { wit: "1500", lodt: "3000" },
+    },
+    buckets,
+  );
+  const page = collectPageRow(buckets);
+  assert.equal(page.screenWidth, 1920);
+  assert.equal(page.whiteTime, 1500);
+  assert.equal(page.loadTime, 3000);
+});

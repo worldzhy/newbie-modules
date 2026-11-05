@@ -132,15 +132,26 @@ export class WebReportTaskService {
       isFirstIn: item.isFirstIn,
       markPage: item.markPage,
       markUser: item.markUser,
-      screenWidth: item.screenWidth,
-      screenHeight: item.screenHeight,
     };
-    if (performance.wit !== undefined) page.whiteTime = performance.wit;
-    if (performance.dnst !== undefined) page.dnsTime = performance.dnst;
-    if (performance.lodt !== undefined) page.loadTime = performance.lodt;
-    if (performance.reqt !== undefined) page.requestTime = performance.reqt;
-    if (performance.tcpt !== undefined) page.tcpTime = performance.tcpt;
-    if (performance.andt !== undefined) page.analysisDomTime = performance.andt;
+    // Client-supplied numeric fields are normalized to skip writes for invalid
+    // values so Mongo $avg correctly ignores missing keys instead of averaging
+    // in a poisoned 0. See R12-01.
+    const sw = func.toNumberOrUndefined(item.screenWidth);
+    if (sw !== undefined) page.screenWidth = sw;
+    const sh = func.toNumberOrUndefined(item.screenHeight);
+    if (sh !== undefined) page.screenHeight = sh;
+    const wt = func.toNumberOrUndefined(performance.wit);
+    if (wt !== undefined) page.whiteTime = wt;
+    const dns = func.toNumberOrUndefined(performance.dnst);
+    if (dns !== undefined) page.dnsTime = dns;
+    const load = func.toNumberOrUndefined(performance.lodt);
+    if (load !== undefined) page.loadTime = load;
+    const req = func.toNumberOrUndefined(performance.reqt);
+    if (req !== undefined) page.requestTime = req;
+    const tcp = func.toNumberOrUndefined(performance.tcpt);
+    if (tcp !== undefined) page.tcpTime = tcp;
+    const adom = func.toNumberOrUndefined(performance.andt);
+    if (adom !== undefined) page.analysisDomTime = adom;
     this.pushRow(appPages, item.appId, page);
   }
 
@@ -160,9 +171,13 @@ export class WebReportTaskService {
         markUser: data.markUser,
         path: "",
         customName: item.customName,
-        customContent: item.customContent,
         customFilter: item.customFilter,
       };
+      // customContent is declared string; JSON-stringify object values and skip
+      // anything that isn't string-or-object so Mongoose doesn't receive a type
+      // it can't cast. See R12-01.
+      const cc = func.toStringOrUndefined(item.customContent);
+      if (cc !== undefined) custom.customContent = cc;
       this.setUser(custom, data);
       this.pushRow(appCustoms, data.appId, custom);
     }
@@ -176,7 +191,10 @@ export class WebReportTaskService {
   ) {
     let slowTime = 2;
     let speedType = 1;
-    let duration = Math.floor(Math.abs(Number(item.duration) || 0));
+    const rawDuration = func.toNumberOrUndefined(item.duration);
+    // Invalid duration falls back to 0 for the speed-type threshold only — the
+    // actual row write skips the field so Mongo $avg doesn't average in 0.
+    let duration = Math.floor(Math.abs((rawDuration ?? 0) as number));
     if (duration > 60000) duration = 60000;
     if (item.type === "link" || item.type === "css") slowTime = (system.slowCssTime || 2) * 1000;
     else if (item.type === "script") slowTime = (system.slowJsTime || 2) * 1000;
@@ -200,12 +218,18 @@ export class WebReportTaskService {
       name: newName,
       method: item.method,
       type: item.type,
-      duration,
-      bodySize: item.bodySize ? Number(item.bodySize) : 0,
-      nextHopProtocol: item.nextHopProtocol,
-      markPage: data.markPage,
-      markUser: data.markUser,
     };
+    // duration: always write when the row passes the slow filter (the
+    // threshold already normalized it); don't skip here — rawDuration is
+    // already guarded by the early-return above which fires on short durations.
+    resource.duration = duration;
+    // bodySize: skip write for values that don't parse as finite numbers so
+    // Mongo $avg ignores missing keys instead of averaging in a poisoned 0.
+    const bs = func.toNumberOrUndefined(item.bodySize);
+    if (bs !== undefined) resource.bodySize = bs;
+    resource.nextHopProtocol = item.nextHopProtocol;
+    resource.markPage = data.markPage;
+    resource.markUser = data.markUser;
     this.setUser(resource, data);
     this.pushRow(appResources, data.appId, resource);
   }
@@ -419,7 +443,11 @@ export class WebReportTaskService {
     } catch {
       newName = typeof item.name === "string" ? item.name : "";
     }
-    const duration = Math.floor(Math.abs(Number(item.duration) || 0));
+    const rawDuration = func.toNumberOrUndefined(item.duration);
+    // Invalid duration falls back to 0 for the row write — CH silently
+    // coerces NaN to 0 anyway (R12-02), but we normalize on the way in
+    // so the value is explicit.
+    const duration = Math.floor(Math.abs((rawDuration ?? 0) as number));
 
     const _ajax: Record<string, unknown> = {
       appId: data.appId,
@@ -429,7 +457,10 @@ export class WebReportTaskService {
     _ajax.fullUrl = item.name || "";
     _ajax.method = item.method || "";
     _ajax.duration = duration;
-    _ajax.bodySize = item.bodySize ? Number(item.bodySize) : 0;
+    // bodySize: skip write for invalid values — CH Nullable column (or just
+    // let CH coerce to 0; we normalize to make the intent explicit).
+    const bs = func.toNumberOrUndefined(item.bodySize);
+    if (bs !== undefined) _ajax.bodySize = bs;
     _ajax.callUrl = data.url || "";
     if (item.options) _ajax.options = func.filterKeyWord(item.options);
     try {

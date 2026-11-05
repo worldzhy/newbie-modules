@@ -12,8 +12,8 @@ export class WebResource {
   @Prop() name!: string; // Resource name
   @Prop({ default: "GET" }) method!: string; // Request method
   @Prop() type!: string; // Resource type
-  @Prop({ default: 0 }) duration!: number; // Request duration (ms)
-  @Prop({ default: 0 }) bodySize!: number; // Response size (bytes)
+  @Prop() duration!: number; // Request duration (ms)
+  @Prop() bodySize!: number; // Response size (bytes)
   @Prop({ default: "http/1.1" }) nextHopProtocol!: string; // Protocol
   @Prop() markPage!: string; // Page mark (unified tag)
   @Prop() markUser!: string; // User mark (session tag)
