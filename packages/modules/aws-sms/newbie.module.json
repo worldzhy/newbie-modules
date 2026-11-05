@@ -8,12 +8,12 @@
   "moduleDependencies": ["aws-identity"],
   "config-service": {
     "aws-sms": {
-      "region": "process.env.AWS_SMS_REGION || 'us-east-1'",
+      "region": "process.env.AWS_SMS_REGION",
       "configurationSetName": "process.env.AWS_SMS_CONFIGURATION_SET_NAME"
     }
   },
   "env": {
-    "AWS_SMS_REGION": "",
+    "AWS_SMS_REGION": { "example": "us-east-1" },
     "AWS_SMS_CONFIGURATION_SET_NAME": ""
   },
   "dependencies": {

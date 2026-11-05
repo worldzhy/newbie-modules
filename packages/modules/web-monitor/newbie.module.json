@@ -18,7 +18,7 @@
         "thread_web": 1000,
         "total_limit_web": 100000
       },
-      "TENCENTMAPKEY": "process.env.WEB_MONITOR_TENCENT_MAP_KEY || ''",
+      "TENCENTMAPKEY": "process.env.WEB_MONITOR_TENCENT_MAP_KEY",
       "top_alalysis_size": {
         "web": 10
       },
