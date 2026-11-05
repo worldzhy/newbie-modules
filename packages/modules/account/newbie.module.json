@@ -40,6 +40,8 @@
     "GOOGLE_AUTH_CALLBACK_URL": "",
     "WECHAT_APP_ID": "",
     "WECHAT_APP_SECRET": "",
+    "LARK_APP_ID": "",
+    "LARK_APP_SECRET": "",
     "LARK_AUTH_CALLBACK_URL": ""
   },
   "dependencies": {

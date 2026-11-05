@@ -5,14 +5,15 @@ import cryptoRandomString from "crypto-random-string";
 import { JwtPayload, sign, SignOptions, verify } from "jsonwebtoken";
 import { v4 } from "uuid";
 import { INVALID_TOKEN } from "@devbie/newbie/exceptions/errors.constants";
+import { SECURITY_TOKEN_EXPIRES_IN } from "../security-config.constants";
 import { TokenSubject } from "./token.constants";
 import express from "express";
 
 /** Shape of the `modules.security.token` configuration subtree. */
 interface TokenModuleConfig {
   defaultSecret: string;
-  userAccess: { secret: string; expiresIn: SignOptions["expiresIn"] };
-  userRefresh: { secret: string; expiresIn: SignOptions["expiresIn"] };
+  userAccess: { secret: string };
+  userRefresh: { secret: string };
 }
 
 /** Public literal that must never be accepted as a signing key. */
@@ -109,7 +110,7 @@ export class TokenService {
       secret: this.tokenConfig.userAccess.secret || this.tokenConfig.defaultSecret,
       options: {
         subject: TokenSubject.USER_ACCESS_TOKEN,
-        expiresIn: this.tokenConfig.userAccess.expiresIn,
+        expiresIn: SECURITY_TOKEN_EXPIRES_IN.userAccess,
         // Unique per issuance so repeated signings in the same second still
         // produce distinct tokens (sessions are keyed by the token string).
         jwtid: this.generateUuid(),
@@ -141,7 +142,7 @@ export class TokenService {
       secret: this.tokenConfig.userRefresh.secret || this.tokenConfig.defaultSecret,
       options: {
         subject: TokenSubject.USER_REFRESH_TOKEN,
-        expiresIn: options ? options.expiresIn : this.tokenConfig.userRefresh.expiresIn,
+        expiresIn: options ? options.expiresIn : SECURITY_TOKEN_EXPIRES_IN.userRefresh,
         // Unique per issuance: within the same second, iat/exp would otherwise
         // be identical and rotation would store the same token string, which
         // makes reuse detection impossible.

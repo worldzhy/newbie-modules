@@ -18,7 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   ) {
     const tokenConfig = config.getOrThrow<{
       defaultSecret: string;
-      userAccess: { secret: string; expiresIn: string | number };
+      userAccess: { secret: string };
     }>("modules.security.token");
 
     super({

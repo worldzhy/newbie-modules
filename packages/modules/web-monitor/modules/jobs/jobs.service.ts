@@ -7,6 +7,7 @@ import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
 import { func } from "../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../shared/web-monitor-config";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { RedisKeys } from "../../models/enum";
 import { WebReportTaskService } from "@modules/web-monitor/modules/web/services/report-task.service";
@@ -49,8 +50,8 @@ export class JobsService implements OnModuleInit {
   }
 
   private registerReportStoreTask() {
-    const consumption = func.isObject(this.cfg.redis_consumption) ? this.cfg.redis_consumption : {};
-    const expr = typeof consumption.task_time === "string" ? consumption.task_time : "*/10 * * * * *";
+    const consumption = WEB_MONITOR_CONFIG.redis_consumption;
+    const expr = consumption.task_time;
     const job = new CronJob(
       expr,
       async () => {
@@ -79,7 +80,7 @@ export class JobsService implements OnModuleInit {
   private static readonly TOP_ITEMS_LIMIT = 3;
 
   async evaluateThresholdAlerts() {
-    const acquired = await this.redisLock(RedisKeys.ALERT_EVALUATION_TASK_LOCK, Number(this.cfg.alertTaskLockTime));
+    const acquired = await this.redisLock(RedisKeys.ALERT_EVALUATION_TASK_LOCK, WEB_MONITOR_CONFIG.alertTaskLockTime);
     if (!acquired) return;
 
     let systems: SystemDocument[];
@@ -90,12 +91,12 @@ export class JobsService implements OnModuleInit {
       return;
     }
 
-    const windowMs = Number(this.cfg.alertWindowMs) || 60000;
+    const windowMs = WEB_MONITOR_CONFIG.alertWindowMs;
     const windowEnd = new Date();
     const windowStart = new Date(windowEnd.getTime() - windowMs);
     // Bounded worker pool: evaluate systems in parallel but cap concurrency so a
     // large system list cannot stampede Mongo/ClickHouse at once.
-    const concurrency = Number(this.cfg.alertEvaluationConcurrency) || 5;
+    const concurrency = 5;
     let nextIndex = 0;
     const workers = Array.from({ length: Math.min(concurrency, systems.length) }, async () => {
       while (nextIndex < systems.length) {
@@ -408,7 +409,7 @@ export class JobsService implements OnModuleInit {
   }
 
   private async redisLock(redisKey: string, ttl: number) {
-    const lock = `${this.localAddress()}:${String(this.cfg.port)}:${func.randomString(3)}`;
+    const lock = `${this.localAddress()}:${func.randomString(3)}`;
     const res = await this.redis.getClient().set(redisKey, lock, "EX", ttl, "NX");
     if (!res) {
       // Lock is held by another instance — normal in multi-instance deployments.
@@ -439,14 +440,14 @@ export class JobsService implements OnModuleInit {
   async pvuvipMinuteCount() {
     const getLock = await this.redisLock(
       RedisKeys.PVUVIP_PRE_MINUTE_LOCK,
-      Number(this.cfg.pvuvip_task_minute_lock_time),
+      WEB_MONITOR_CONFIG.pvuvip_task_minute_lock_time,
     );
     if (!getLock) return;
     await this.webPvuvipTask.getWebPvUvIpByMinute();
   }
 
   async ipTask() {
-    const getLock = await this.redisLock(RedisKeys.IP_TASK_LOCK, Number(this.cfg.ip_task_lock_time));
+    const getLock = await this.redisLock(RedisKeys.IP_TASK_LOCK, WEB_MONITOR_CONFIG.ip_task_lock_time);
     if (!getLock) return;
     await this.webIpTask.saveWebGetIpDatas();
   }
@@ -454,7 +455,7 @@ export class JobsService implements OnModuleInit {
   async dayReportNumTask() {
     const getLock = await this.redisLock(
       RedisKeys.DAY_REPORT_NUM_TASK_LOCK,
-      Number(this.cfg.day_report_num_task_lock_time),
+      WEB_MONITOR_CONFIG.day_report_num_task_lock_time,
     );
     if (!getLock) return;
     await this.dayReportNum.numCountTask();
@@ -463,7 +464,7 @@ export class JobsService implements OnModuleInit {
   async consumeReportQueues() {
     // Use the cron expression from configuration
     try {
-      if (this.cfg.is_web_consume_task_run) await this.consumeWebQueue();
+      if (WEB_MONITOR_CONFIG.is_web_consume_task_run) await this.consumeWebQueue();
     } catch (e) {
       this.logger.error("Consumer queue exception", e instanceof Error ? e.message : String(e));
     }

@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { PvuvipService } from "./pvuvip.service";
 import { func, mapWithConcurrency } from "../../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 import { SystemDocument } from "../../../models/mongo/system.schema";
 
 function cronMinuteInterval(cronExp: string) {
@@ -25,7 +26,7 @@ export class WebPvuvipTaskService {
   }
 
   async getWebPvUvIpByMinute() {
-    const between = cronMinuteInterval(String(this.cfg.pvuvip_task_minute_cron_time));
+    const between = cronMinuteInterval(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const endTime = new Date();
     const beginTime = new Date(endTime.getTime() - between);
 
@@ -34,7 +35,7 @@ export class WebPvuvipTaskService {
 
     // Bounded worker pool: keep at most pvuvipTaskConcurrency sites in flight
     // so a large site list cannot stampede Mongo/ClickHouse at once.
-    const concurrency = Number(this.cfg.pvuvipTaskConcurrency) || 5;
+    const concurrency = 5;
     await mapWithConcurrency(systems, concurrency, async (sys) => {
       const appId = sys.appId;
       if (!appId) return;

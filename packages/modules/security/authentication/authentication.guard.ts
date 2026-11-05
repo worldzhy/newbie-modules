@@ -1,5 +1,4 @@
 import { Injectable, ExecutionContext } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { Reflector } from "@nestjs/core";
 import { AuthGuard } from "@nestjs/passport";
 import { NoAuthGuard } from "./public/public.guard";
@@ -23,7 +22,6 @@ import { GuardType } from "./guard.types";
 // eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- registered as an APP_GUARD provider
 export class AuthenticationGuard extends AuthGuard("authentication") {
   constructor(
-    private readonly config: ConfigService,
     private reflector: Reflector,
     private noAuthGuard: NoAuthGuard,
     private passwordAuthGuard: PasswordAuthGuard,
@@ -102,7 +100,7 @@ export class AuthenticationGuard extends AuthGuard("authentication") {
     }
 
     // JWT guard is the default guard.
-    const defaultGuard = (this.config.get<string>("modules.security.defaultGuard") as GuardType) || GuardType.JWT;
+    const defaultGuard = GuardType.JWT;
 
     switch (defaultGuard) {
       case GuardType.NONE:

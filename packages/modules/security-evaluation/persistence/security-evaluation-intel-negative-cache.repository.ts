@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import type {
@@ -8,20 +9,17 @@ import type {
   SecurityEvaluationVerdictKind,
 } from "../judgment/intel/security-evaluation-intel-negative-cache.port";
 
-/// TTL in days for not-relevant verdict cache rows; hard-hit rows are NOT
-/// subject to this TTL (they are audit traces, not pipeline-skip signals).
-/// Every environment declares the value explicitly (ADR-033): there is no
-/// built-in fallback, so a host that forgets it fails to boot instead of
-/// silently expiring on a guessed window.
-const TTL_DAYS_ENV = "NEGATIVE_CACHE_TTL_DAYS";
+const TTL_DAYS_KEY = "modules.security-evaluation.ttlDays";
 
-function requirePositiveIntegerEnv(name: string): number {
-  const raw = process.env[name];
-  const parsed = raw === undefined ? Number.NaN : Number(raw.trim());
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer; received ${raw === undefined ? "no value" : `'${raw}'`}.`);
+/// Validates the TTL days resolved by the assembler's `int(...)` config
+/// declaration (ADR-033): the value must be a declared positive integer —
+/// there is no built-in fallback, so a host that forgets it fails to boot
+/// instead of silently expiring on a guessed window.
+function requirePositiveInteger(value: number | undefined, name: string): number {
+  if (value === undefined || !Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer; received ${value === undefined ? "no value" : `'${value}'`}.`);
   }
-  return parsed;
+  return value;
 }
 
 /**
@@ -49,8 +47,11 @@ const PRISMA_VERDICT: Record<SecurityEvaluationVerdictKind, "notRelevant" | "har
 export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityEvaluationIntelNegativeCachePort {
   private readonly ttlMs: number;
 
-  constructor(private readonly prisma: PrismaService) {
-    this.ttlMs = requirePositiveIntegerEnv(TTL_DAYS_ENV) * 86_400_000;
+  constructor(
+    private readonly prisma: PrismaService,
+    config: ConfigService,
+  ) {
+    this.ttlMs = requirePositiveInteger(config.getOrThrow<number>(TTL_DAYS_KEY), TTL_DAYS_KEY) * 86_400_000;
   }
 
   async filterUncached(

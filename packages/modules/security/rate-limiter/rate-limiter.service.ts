@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { RateLimiterMemory, RateLimiterRedis } from "rate-limiter-flexible";
 import { RedisService } from "@modules/redis/redis.service";
+import { SECURITY_RATE_LIMITER } from "../security-config.constants";
 
 enum LimiterType {
   IP_ACCESS = "ip-access",
@@ -16,33 +16,27 @@ abstract class RateLimiterService {
   private points: number;
   private duration: number;
 
-  constructor(
-    private readonly config: ConfigService,
-    redis: RedisService,
-    limiterType: LimiterType,
-  ) {
+  constructor(redis: RedisService, limiterType: LimiterType) {
     switch (limiterType) {
       case LimiterType.IP_ACCESS:
-        this.points = this.config.getOrThrow<number>("modules.security.ratelimiter.ipAccessLimiter.points");
-        this.duration = this.config.getOrThrow<number>("modules.security.ratelimiter.ipAccessLimiter.durationSeconds");
+        this.points = SECURITY_RATE_LIMITER.ipAccessLimiter.points;
+        this.duration = SECURITY_RATE_LIMITER.ipAccessLimiter.durationSeconds;
         break;
       case LimiterType.IP_LOGIN:
-        this.points = this.config.getOrThrow<number>("modules.security.ratelimiter.ipLoginLimiter.points");
-        this.duration = this.config.getOrThrow<number>("modules.security.ratelimiter.ipLoginLimiter.durationSeconds");
+        this.points = SECURITY_RATE_LIMITER.ipLoginLimiter.points;
+        this.duration = SECURITY_RATE_LIMITER.ipLoginLimiter.durationSeconds;
         break;
       case LimiterType.USER_LOGIN:
-        this.points = this.config.getOrThrow<number>("modules.security.ratelimiter.userLoginLimiter.points");
-        this.duration = this.config.getOrThrow<number>("modules.security.ratelimiter.userLoginLimiter.durationSeconds");
+        this.points = SECURITY_RATE_LIMITER.userLoginLimiter.points;
+        this.duration = SECURITY_RATE_LIMITER.userLoginLimiter.durationSeconds;
         break;
       case LimiterType.INSTALLATION:
-        this.points = this.config.getOrThrow<number>("modules.security.ratelimiter.installationLimiter.points");
-        this.duration = this.config.getOrThrow<number>(
-          "modules.security.ratelimiter.installationLimiter.durationSeconds",
-        );
+        this.points = SECURITY_RATE_LIMITER.installationLimiter.points;
+        this.duration = SECURITY_RATE_LIMITER.installationLimiter.durationSeconds;
         break;
       case LimiterType.TOTP_LOGIN:
-        this.points = this.config.getOrThrow<number>("modules.security.ratelimiter.totpLoginLimiter.points");
-        this.duration = this.config.getOrThrow<number>("modules.security.ratelimiter.totpLoginLimiter.durationSeconds");
+        this.points = SECURITY_RATE_LIMITER.totpLoginLimiter.points;
+        this.duration = SECURITY_RATE_LIMITER.totpLoginLimiter.durationSeconds;
         break;
     }
 
@@ -75,22 +69,22 @@ abstract class RateLimiterService {
 
 @Injectable()
 export class LimitAccessByIpService extends RateLimiterService {
-  constructor(configService: ConfigService, redisService: RedisService) {
-    super(configService, redisService, LimiterType.IP_ACCESS);
+  constructor(redisService: RedisService) {
+    super(redisService, LimiterType.IP_ACCESS);
   }
 }
 
 @Injectable()
 export class LimitLoginByIpService extends RateLimiterService {
-  constructor(configService: ConfigService, redisService: RedisService) {
-    super(configService, redisService, LimiterType.IP_LOGIN);
+  constructor(redisService: RedisService) {
+    super(redisService, LimiterType.IP_LOGIN);
   }
 }
 
 @Injectable()
 export class LimitLoginByUserService extends RateLimiterService {
-  constructor(configService: ConfigService, redisService: RedisService) {
-    super(configService, redisService, LimiterType.USER_LOGIN);
+  constructor(redisService: RedisService) {
+    super(redisService, LimiterType.USER_LOGIN);
   }
 }
 
@@ -103,8 +97,8 @@ export class LimitLoginByUserService extends RateLimiterService {
  */
 @Injectable()
 export class LimitInstallationByTokenService extends RateLimiterService {
-  constructor(configService: ConfigService, redisService: RedisService) {
-    super(configService, redisService, LimiterType.INSTALLATION);
+  constructor(redisService: RedisService) {
+    super(redisService, LimiterType.INSTALLATION);
   }
 }
 
@@ -116,7 +110,7 @@ export class LimitInstallationByTokenService extends RateLimiterService {
  */
 @Injectable()
 export class LimitTotpLoginByUserService extends RateLimiterService {
-  constructor(configService: ConfigService, redisService: RedisService) {
-    super(configService, redisService, LimiterType.TOTP_LOGIN);
+  constructor(redisService: RedisService) {
+    super(redisService, LimiterType.TOTP_LOGIN);
   }
 }

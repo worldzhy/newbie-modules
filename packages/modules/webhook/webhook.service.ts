@@ -1,5 +1,4 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, UnauthorizedException } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { createHmac } from "node:crypto";
 import { Prisma, Webhook } from "@generated/prisma/client";
 import pQueue from "p-queue";
@@ -8,15 +7,16 @@ import axios from "axios";
 import { UNAUTHORIZED_RESOURCE, WEBHOOK_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
+/// Delivery retries per webhook call (ADR-033: a tuning knob nobody tuned
+/// stays code, not environment surface).
+const WEBHOOK_RETRIES = 3;
+
 @Injectable()
 export class WebhookService {
   private readonly logger = new Logger(WebhookService.name);
   private queue = new pQueue({ concurrency: 1 });
 
-  constructor(
-    private prisma: PrismaService,
-    private configService: ConfigService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   /**
    * Columns a client may filter on. Everything else — including `teamId`,
@@ -157,7 +157,7 @@ export class WebhookService {
           this.queue
             .add(() =>
               pRetry(() => this.callWebhook(webhook, event), {
-                retries: this.configService.get<number>("modules.webhook.retries"),
+                retries: WEBHOOK_RETRIES,
                 onFailedAttempt: (error) => {
                   this.logger.error(
                     `Triggering webhoook failed, retrying (${error.retriesLeft} attempts left)`,

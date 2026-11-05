@@ -2,27 +2,24 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { launch, PDFOptions } from "puppeteer";
 
+/// --no-sandbox is required in every supported runtime (containerized hosts
+/// where the kernel user-namespace sandbox is unavailable), so it is not a
+/// configuration switch (ADR-033).
+const LAUNCH_ARGS = ["--no-sandbox"];
+
 @Injectable()
 export class PuppeteerService {
   private readonly logger = new Logger(PuppeteerService.name);
-  private config: { chromiumPath: string; noSandbox: boolean };
+  private config: { chromiumPath: string };
 
   constructor(private readonly configService: ConfigService) {
     this.config = this.configService.getOrThrow("modules.puppeteer");
   }
 
-  private launchArgs(): string[] {
-    // --no-sandbox is required in containerized environments where the kernel
-    // user-namespace sandbox is unavailable. It is configurable so hosts that
-    // can run Chromium with the sandbox enabled (native, rootless containers)
-    // can opt out by setting PUPPETEER_NO_SANDBOX=false.
-    return this.config.noSandbox ? ["--no-sandbox"] : [];
-  }
-
   async renderHtmlToImage(html: string, viewport?: { width: number; height: number }) {
     const browser = await launch({
       executablePath: this.config.chromiumPath,
-      args: this.launchArgs(),
+      args: LAUNCH_ARGS,
     });
     try {
       const page = await browser.newPage();
@@ -37,7 +34,7 @@ export class PuppeteerService {
   async renderHtmlToPdf(html: string, viewport?: { width: number; height: number }, options?: PDFOptions) {
     const browser = await launch({
       executablePath: this.config.chromiumPath,
-      args: this.launchArgs(),
+      args: LAUNCH_ARGS,
     });
     try {
       const page = await browser.newPage();

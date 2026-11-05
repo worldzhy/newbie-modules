@@ -8,16 +8,12 @@
   "config-service": {
     "redis": {
       "host": "process.env.REDIS_HOST",
-      "port": "int(process.env.REDIS_PORT, 6379)",
-      "password": "process.env.REDIS_PASSWORD",
-      "db": "int(process.env.REDIS_DB, 0)"
+      "password": "process.env.REDIS_PASSWORD"
     }
   },
   "env": {
     "REDIS_HOST": "",
-    "REDIS_PORT": "6379",
-    "REDIS_PASSWORD": "",
-    "REDIS_DB": "0"
+    "REDIS_PASSWORD": ""
   },
   "dependencies": {
     "ioredis": "latest"

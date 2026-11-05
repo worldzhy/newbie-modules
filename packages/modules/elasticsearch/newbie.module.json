@@ -9,15 +9,13 @@
     "elasticsearch": {
       "node": "process.env.ELASTICSEARCH_NODE",
       "username": "process.env.ELASTICSEARCH_USERNAME",
-      "password": "process.env.ELASTICSEARCH_PASSWORD",
-      "retries": "int(process.env.ELASTICSEARCH_RETRIES, 3)"
+      "password": "process.env.ELASTICSEARCH_PASSWORD"
     }
   },
   "env": {
     "ELASTICSEARCH_NODE": "http://127.0.0.1",
     "ELASTICSEARCH_USERNAME": "",
-    "ELASTICSEARCH_PASSWORD": "",
-    "ELASTICSEARCH_RETRIES": ""
+    "ELASTICSEARCH_PASSWORD": ""
   },
   "dependencies": {
     "@elastic/elasticsearch": "7.13.0",

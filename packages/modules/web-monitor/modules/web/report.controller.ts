@@ -6,6 +6,7 @@ import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { ConfigService } from "@nestjs/config";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 import { func, getRandomIp } from "../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../shared/web-monitor-config";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { RedisService } from "@modules/redis/redis.service";
 import { RedisKeys } from "../../models/enum";
@@ -77,7 +78,7 @@ export class WebReportController {
   }
 
   private async saveWebReportDataForRedis(query: Record<string, unknown>) {
-    const consumption = func.isObject(this.config.redis_consumption) ? this.config.redis_consumption : {};
+    const consumption = WEB_MONITOR_CONFIG.redis_consumption;
     const limit = Number(consumption.total_limit_web) || 0;
     if (limit) {
       const length = await this.redis.getClient().llen(RedisKeys.WEB_REPORT_DATAS);

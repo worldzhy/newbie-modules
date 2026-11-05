@@ -11,14 +11,12 @@
     "aws-s3": {
       "region": "process.env.AWS_S3_REGION",
       "bucket": "process.env.AWS_S3_BUCKET",
-      "signedUrlExpiresIn": "int(process.env.AWS_S3_SIGNED_URL_EXPIRESIN, 1800)",
       "cdnHostname": "process.env.AWS_S3_CDN_HOSTNAME"
     }
   },
   "env": {
     "AWS_S3_REGION": { "example": "us-east-1" },
     "AWS_S3_BUCKET": { "example": "my-app-bucket" },
-    "AWS_S3_SIGNED_URL_EXPIRESIN": "1800",
     "AWS_S3_CDN_HOSTNAME": ""
   },
   "dependencies": {

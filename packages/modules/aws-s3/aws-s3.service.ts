@@ -30,6 +30,10 @@ const MAX_PAGE_SIZE = 1000;
  */
 const DEFAULT_MAX_OBJECTS = 500;
 
+/// Lifetime of presigned URLs in seconds (ADR-033: a tuning knob nobody tuned
+/// stays code, not environment surface).
+const SIGNED_URL_EXPIRES_IN = 1800;
+
 export interface S3ObjectSummary {
   s3Key: string;
   size?: number;
@@ -52,7 +56,6 @@ export class AwsS3Service {
   private client: S3Client;
   private bucket: string;
   private region: string;
-  private signedUrlExpiresIn: number;
 
   constructor(
     private readonly config: ConfigService,
@@ -60,7 +63,6 @@ export class AwsS3Service {
   ) {
     this.bucket = this.config.getOrThrow<string>("modules.aws-s3.bucket");
     this.region = this.config.getOrThrow<string>("modules.aws-s3.region");
-    this.signedUrlExpiresIn = this.config.getOrThrow<number>("modules.aws-s3.signedUrlExpiresIn");
 
     this.client = new S3Client({
       region: this.region,
@@ -386,7 +388,7 @@ export class AwsS3Service {
   //* Get signed URL operations */
   //*****************************/
 
-  /** Get a signed URL to access an S3 object for signedUrlExpiresIn seconds */
+  /** Get a signed URL to access an S3 object for SIGNED_URL_EXPIRES_IN seconds */
   async getSignedDownloadUrl(params: { bucket?: string; key: string }) {
     const command = new GetObjectCommand({
       Bucket: params.bucket ?? this.bucket,
@@ -394,11 +396,11 @@ export class AwsS3Service {
     });
 
     return await getSignedUrl(this.client, command, {
-      expiresIn: this.signedUrlExpiresIn,
+      expiresIn: SIGNED_URL_EXPIRES_IN,
     });
   }
 
-  /** Get a signed URL to upload an S3 object for signedUrlExpiresIn seconds */
+  /** Get a signed URL to upload an S3 object for SIGNED_URL_EXPIRES_IN seconds */
   async getSignedUploadUrl(params: { bucket?: string; key: string; contentType?: string; contentEncoding?: string }) {
     const command = new PutObjectCommand({
       Bucket: params.bucket ?? this.bucket,
@@ -408,7 +410,7 @@ export class AwsS3Service {
     });
 
     return await getSignedUrl(this.client, command, {
-      expiresIn: this.signedUrlExpiresIn,
+      expiresIn: SIGNED_URL_EXPIRES_IN,
     });
   }
 
@@ -422,7 +424,7 @@ export class AwsS3Service {
     });
 
     return getSignedUrl(this.client, command, {
-      expiresIn: this.signedUrlExpiresIn,
+      expiresIn: SIGNED_URL_EXPIRES_IN,
     });
   }
 

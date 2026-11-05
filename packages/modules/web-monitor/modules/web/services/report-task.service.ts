@@ -6,6 +6,7 @@ import { WebMonitorClickHouseService } from "../../../models/clickhouse/web-moni
 import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 import { SystemDocument } from "../../../models/mongo/system.schema";
 import { func } from "../../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 import { UAParser } from "ua-parser-js";
 import { RedisKeys, RedisKeyPrefix, ReportType } from "../../../models/enum";
 
@@ -304,7 +305,7 @@ export class WebReportTaskService {
   }
 
   async saveWebReportDatasForRedis() {
-    const consumption = func.isObject(this.cfg.redis_consumption) ? this.cfg.redis_consumption : {};
+    const consumption = WEB_MONITOR_CONFIG.redis_consumption;
     const count = Number(consumption.thread_web) || 1000;
     const buckets: DrainBuckets = {
       appAjaxs: {},

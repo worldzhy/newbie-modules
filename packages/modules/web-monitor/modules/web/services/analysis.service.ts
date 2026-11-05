@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
 import { ConfigService } from "@nestjs/config";
 import { func } from "../../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 
 @Injectable()
 export class WebMonitorAnalysisService {
@@ -14,7 +15,7 @@ export class WebMonitorAnalysisService {
   }
 
   private get topAnalysisLimit() {
-    const size = this.cfg.top_alalysis_size;
+    const size = WEB_MONITOR_CONFIG.top_alalysis_size;
     return func.isObject(size) ? Number(size.web) || 10 : 10;
   }
 

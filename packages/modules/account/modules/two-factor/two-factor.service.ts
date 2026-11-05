@@ -26,7 +26,7 @@ export class TwoFactorService {
     private readonly auditLogService: AuditLogService,
     // Bounds online guessing of TOTP codes during the login challenge; shares
     // the Redis-backed limiter base with the other login limiters so the cap
-    // holds across instances (modules.security.ratelimiter.totpLoginLimiter).
+    // holds across instances (SECURITY_RATE_LIMITER.totpLoginLimiter).
     private readonly limitTotpLoginByUserService: LimitTotpLoginByUserService,
   ) {}
 

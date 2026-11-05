@@ -4,6 +4,7 @@ import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-model
 import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { func } from "../../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 import https from "https";
 import { RedisKeyPrefix } from "../../../models/enum";
 import { WebEnvironmentDocument } from "../../../models/mongo/web/web-environment.schema";
@@ -41,9 +42,9 @@ export class WebIpTaskService {
       const query: Record<string, unknown> = { city: { $exists: false } };
       const beginTime = await this.redis.getClient().get(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`);
       query.createTime = {
-        $gt: beginTime ? new Date(beginTime) : new Date(Date.now() - Number(this.cfg.ip_task_space_time)),
+        $gt: beginTime ? new Date(beginTime) : new Date(Date.now() - WEB_MONITOR_CONFIG.ip_task_space_time),
       };
-      const ipThread = Number(this.cfg.ip_thread);
+      const ipThread = WEB_MONITOR_CONFIG.ip_thread;
       const datas = await this.models
         .WebEnvironment(appId)
         .find(query)
@@ -123,7 +124,7 @@ export class WebIpTaskService {
         };
         await this.redis
           .getClient()
-          .set(`${RedisKeyPrefix.IP_GEO_CACHE}${copyip}`, JSON.stringify(json), "EX", Number(this.cfg.ipRedisTTL));
+          .set(`${RedisKeyPrefix.IP_GEO_CACHE}${copyip}`, JSON.stringify(json), "EX", WEB_MONITOR_CONFIG.ipRedisTTL);
         return await this.updateWebEnvironment(json, _id, appId);
       }
       return {};
