@@ -1,10 +1,12 @@
 {
   "key": "organization",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "organization.module",
-    "className": "OrganizationModule"
+    "className": "OrganizationModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["account", "aws-ses", "security"]
+  "requires": {
+    "modules": ["account", "aws-ses", "security"]
+  }
 }

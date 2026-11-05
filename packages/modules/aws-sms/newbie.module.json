@@ -1,20 +1,24 @@
 {
   "key": "aws-sms",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "aws-sms.module",
     "className": "AwsSmsModule"
   },
-  "moduleDependencies": ["aws-identity"],
-  "config-service": {
-    "aws-sms": {
-      "region": "process.env.AWS_SMS_REGION",
-      "configurationSetName": "process.env.AWS_SMS_CONFIGURATION_SET_NAME"
+  "requires": {
+    "modules": ["aws-identity"],
+    "config": {
+      "aws-sms": {
+        "region": "process.env.AWS_SMS_REGION",
+        "configurationSetName": "process.env.AWS_SMS_CONFIGURATION_SET_NAME"
+      }
+    },
+    "env": {
+      "AWS_SMS_REGION": {
+        "example": "us-east-1"
+      },
+      "AWS_SMS_CONFIGURATION_SET_NAME": ""
     }
-  },
-  "env": {
-    "AWS_SMS_REGION": { "example": "us-east-1" },
-    "AWS_SMS_CONFIGURATION_SET_NAME": ""
   },
   "dependencies": {
     "@aws-sdk/client-pinpoint-sms-voice-v2": "latest"

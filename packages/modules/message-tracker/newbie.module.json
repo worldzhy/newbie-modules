@@ -1,22 +1,24 @@
 {
   "key": "message-tracker",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "message-tracker.module",
-    "className": "MessageTrackerModule"
+    "className": "MessageTrackerModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "config-service": {
-    "message-tracker": {
-      "region": "process.env.MESSAGE_TRACKER_AWS_REGION",
-      "emailQueueUrl": "process.env.MESSAGE_TRACKER_SQS_EMAIL_QUEUE_URL",
-      "textQueueUrl": "process.env.MESSAGE_TRACKER_SQS_TEXT_QUEUE_URL"
+  "requires": {
+    "config": {
+      "message-tracker": {
+        "region": "process.env.MESSAGE_TRACKER_AWS_REGION",
+        "emailQueueUrl": "process.env.MESSAGE_TRACKER_SQS_EMAIL_QUEUE_URL",
+        "textQueueUrl": "process.env.MESSAGE_TRACKER_SQS_TEXT_QUEUE_URL"
+      }
+    },
+    "env": {
+      "MESSAGE_TRACKER_AWS_REGION": "",
+      "MESSAGE_TRACKER_SQS_EMAIL_QUEUE_URL": "",
+      "MESSAGE_TRACKER_SQS_TEXT_QUEUE_URL": ""
     }
-  },
-  "env": {
-    "MESSAGE_TRACKER_AWS_REGION": "",
-    "MESSAGE_TRACKER_SQS_EMAIL_QUEUE_URL": "",
-    "MESSAGE_TRACKER_SQS_TEXT_QUEUE_URL": ""
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "^3.831.0"

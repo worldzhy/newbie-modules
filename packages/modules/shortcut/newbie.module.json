@@ -1,10 +1,12 @@
 {
   "key": "shortcut",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "shortcut.module",
-    "className": "ShortcutModule"
+    "className": "ShortcutModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"]
+  "requires": {
+    "modules": ["security"]
+  }
 }

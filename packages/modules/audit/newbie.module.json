@@ -1,13 +1,15 @@
 {
   "key": "audit",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "audit.module",
-    "className": "AuditModule"
+    "className": "AuditModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
-  "env": {},
+  "requires": {
+    "modules": ["security"],
+    "env": {}
+  },
   "dependencies": {
     "geolite2-redist": "latest",
     "lru-cache": "latest",

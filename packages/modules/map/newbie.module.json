@@ -1,10 +1,12 @@
 {
   "key": "map",
   "layer": "feature",
-  "module": {
+  "wiring": {
     "file": "map.module",
-    "className": "MapModule"
+    "className": "MapModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"]
+  "requires": {
+    "modules": ["security"]
+  }
 }

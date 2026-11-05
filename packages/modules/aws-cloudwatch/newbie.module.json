@@ -1,12 +1,14 @@
 {
   "key": "aws-cloudwatch",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "aws-cloudwatch.module",
-    "className": "AwsCloudwatchModule"
+    "className": "AwsCloudwatchModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["aws-identity", "security"],
+  "requires": {
+    "modules": ["aws-identity", "security"]
+  },
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "latest",
     "@aws-sdk/client-ec2": "latest",

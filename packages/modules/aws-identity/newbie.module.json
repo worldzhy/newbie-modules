@@ -1,14 +1,16 @@
 {
   "key": "aws-identity",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "aws-identity.module",
-    "className": "AwsIdentityModule"
+    "className": "AwsIdentityModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
-  "config-service": {},
-  "env": {},
+  "requires": {
+    "modules": ["security"],
+    "config": {},
+    "env": {}
+  },
   "dependencies": {
     "@aws-sdk/client-sts": "latest",
     "@aws-sdk/credential-provider-node": "latest"

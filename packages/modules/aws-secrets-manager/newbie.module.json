@@ -1,19 +1,21 @@
 {
   "key": "aws-secrets-manager",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "aws-secrets-manager.module",
-    "className": "AwsSecretsManagerModule"
+    "className": "AwsSecretsManagerModule",
+    "newbieCli": "secrets"
   },
-  "moduleDependencies": ["audit", "aws-identity", "security"],
-  "config-service": {
-    "aws-secrets-manager": {}
+  "requires": {
+    "modules": ["audit", "aws-identity", "security"],
+    "config": {
+      "aws-secrets-manager": {}
+    },
+    "env": {}
   },
-  "env": {},
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "latest",
     "@devbie/aws-secrets-cli": "^1.1.0"
   },
-  "devDependencies": {},
-  "cli": "secrets"
+  "devDependencies": {}
 }

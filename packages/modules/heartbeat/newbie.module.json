@@ -1,14 +1,17 @@
 {
   "key": "heartbeat",
   "layer": "capability",
-  "role": "collector",
-  "module": {
+  "wiring": {
     "file": "heartbeat.module",
-    "className": "HeartbeatModule"
+    "className": "HeartbeatModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["audit", "security"],
-  "sdk": "@devbie/heartbeat-sdk",
+  "collector": {
+    "peerSdk": "@devbie/heartbeat-sdk"
+  },
+  "requires": {
+    "modules": ["audit", "security"]
+  },
   "dependencies": {},
   "devDependencies": {}
 }

@@ -1,17 +1,19 @@
 {
   "key": "puppeteer",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "puppeteer.module",
     "className": "PuppeteerModule"
   },
-  "config-service": {
-    "puppeteer": {
-      "chromiumPath": "process.env.CHROMIUM_PATH"
+  "requires": {
+    "config": {
+      "puppeteer": {
+        "chromiumPath": "process.env.CHROMIUM_PATH"
+      }
+    },
+    "env": {
+      "CHROMIUM_PATH": ""
     }
-  },
-  "env": {
-    "CHROMIUM_PATH": ""
   },
   "dependencies": {
     "puppeteer": "latest"

@@ -1,22 +1,24 @@
 {
   "key": "web-monitor",
   "layer": "feature",
-  "publicNamespace": true,
-  "role": "collector",
-  "module": {
+  "wiring": {
     "file": "web-monitor.module",
-    "className": "WebMonitorModule"
+    "className": "WebMonitorModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["audit", "clickhouse", "event-emitter", "mongo", "redis", "security"],
-  "sdk": "@devbie/web-monitor-sdk",
-  "config-service": {
-    "web-monitor": {
-      "TENCENTMAPKEY": "process.env.WEB_MONITOR_TENCENT_MAP_KEY"
+  "collector": {
+    "peerSdk": "@devbie/web-monitor-sdk"
+  },
+  "requires": {
+    "modules": ["audit", "clickhouse", "event-emitter", "mongo", "redis", "security"],
+    "config": {
+      "web-monitor": {
+        "TENCENTMAPKEY": "process.env.WEB_MONITOR_TENCENT_MAP_KEY"
+      }
+    },
+    "env": {
+      "WEB_MONITOR_TENCENT_MAP_KEY": ""
     }
-  },
-  "env": {
-    "WEB_MONITOR_TENCENT_MAP_KEY": ""
   },
   "dependencies": {
     "@nestjs/event-emitter": "latest",

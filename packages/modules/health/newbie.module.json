@@ -1,14 +1,17 @@
 {
   "key": "health",
   "layer": "capability",
-  "role": "collector",
-  "module": {
+  "wiring": {
     "file": "health.module",
-    "className": "HealthModule"
+    "className": "HealthModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["audit", "security"],
-  "sdk": "@devbie/health-sdk",
+  "collector": {
+    "peerSdk": "@devbie/health-sdk"
+  },
+  "requires": {
+    "modules": ["audit", "security"]
+  },
   "dependencies": {},
   "devDependencies": {}
 }

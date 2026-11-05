@@ -1,10 +1,12 @@
 {
   "key": "membership",
   "layer": "feature",
-  "module": {
+  "wiring": {
     "file": "membership.module",
-    "className": "MembershipModule"
+    "className": "MembershipModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"]
+  "requires": {
+    "modules": ["security"]
+  }
 }

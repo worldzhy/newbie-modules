@@ -1,11 +1,13 @@
 {
   "key": "order",
   "layer": "feature",
-  "module": {
+  "wiring": {
     "file": "order.module",
-    "className": "OrderModule"
+    "className": "OrderModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
+  "requires": {
+    "modules": ["security"]
+  },
   "dependencies": {}
 }

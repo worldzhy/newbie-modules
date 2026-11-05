@@ -1,9 +1,9 @@
 {
   "key": "stock-mgmt",
   "layer": "feature",
-  "module": {
+  "wiring": {
     "file": "stock-mgmt.module",
-    "className": "StockManagementModule"
-  },
-  "schema": "prisma/schema.prisma"
+    "className": "StockManagementModule",
+    "prismaSchema": "prisma/schema.prisma"
+  }
 }

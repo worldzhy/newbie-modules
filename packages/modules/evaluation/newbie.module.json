@@ -1,14 +1,16 @@
 {
   "key": "evaluation",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "evaluation.module",
-    "className": "EvaluationModule"
+    "className": "EvaluationModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security", "event-emitter"],
-  "config-service": {},
-  "env": {},
+  "requires": {
+    "modules": ["security", "event-emitter"],
+    "config": {},
+    "env": {}
+  },
   "dependencies": {
     "@nestjs/event-emitter": "latest"
   }

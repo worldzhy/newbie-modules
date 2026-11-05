@@ -1,12 +1,14 @@
 {
   "key": "task-management",
   "layer": "feature",
-  "module": {
+  "wiring": {
     "file": "task-management.module",
-    "className": "TaskManagementModule"
+    "className": "TaskManagementModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["account", "event-emitter", "security"],
+  "requires": {
+    "modules": ["account", "event-emitter", "security"]
+  },
   "dependencies": {
     "@nestjs/event-emitter": "latest",
     "chinese-days": "^1.5.7"

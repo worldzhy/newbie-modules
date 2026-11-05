@@ -1,15 +1,19 @@
 {
   "key": "backend-monitor",
   "layer": "capability",
-  "role": "collector",
-  "module": {
+  "wiring": {
     "file": "backend-monitor.module",
-    "className": "BackendMonitorModule"
+    "className": "BackendMonitorModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["audit", "clickhouse", "security", "llm"],
-  "config-service": {},
-  "env": {},
+  "collector": {
+    "peerSdk": null
+  },
+  "requires": {
+    "modules": ["audit", "clickhouse", "security", "llm"],
+    "config": {},
+    "env": {}
+  },
   "dependencies": {},
   "devDependencies": {}
 }

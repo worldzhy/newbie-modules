@@ -1,25 +1,27 @@
 {
   "key": "googleapis",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "googleapis.module",
-    "className": "GoogleAPIsModule"
+    "className": "GoogleAPIsModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
-  "config-service": {
-    "googleapis": {
-      "credentials": {
-        "apiKey": "process.env.GOOGLE_CREDENTIALS_API_KEY",
-        "serviceAccount": "process.env.GOOGLE_CREDENTIALS_SERVICE_ACCOUNT"
-      },
-      "googleSharedDriveId": "process.env.GOOGLE_SHARED_DRIVE_ID"
+  "requires": {
+    "modules": ["security"],
+    "config": {
+      "googleapis": {
+        "credentials": {
+          "apiKey": "process.env.GOOGLE_CREDENTIALS_API_KEY",
+          "serviceAccount": "process.env.GOOGLE_CREDENTIALS_SERVICE_ACCOUNT"
+        },
+        "googleSharedDriveId": "process.env.GOOGLE_SHARED_DRIVE_ID"
+      }
+    },
+    "env": {
+      "GOOGLE_CREDENTIALS_API_KEY": "",
+      "GOOGLE_CREDENTIALS_SERVICE_ACCOUNT": "",
+      "GOOGLE_SHARED_DRIVE_ID": ""
     }
-  },
-  "env": {
-    "GOOGLE_CREDENTIALS_API_KEY": "",
-    "GOOGLE_CREDENTIALS_SERVICE_ACCOUNT": "",
-    "GOOGLE_SHARED_DRIVE_ID": ""
   },
   "dependencies": {
     "@googleapis/drive": "latest",

@@ -1,7 +1,7 @@
 {
   "key": "xlsx",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "xlsx.module",
     "className": "XLSXModule"
   },

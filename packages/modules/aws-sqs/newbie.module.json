@@ -1,20 +1,24 @@
 {
   "key": "aws-sqs",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "aws-sqs.module",
     "className": "AwsSqsModule"
   },
-  "moduleDependencies": ["aws-identity"],
-  "config-service": {
-    "aws-sqs": {
-      "region": "process.env.AWS_SQS_REGION",
-      "queueUrl": "process.env.AWS_SQS_QUEUE_URL"
+  "requires": {
+    "modules": ["aws-identity"],
+    "config": {
+      "aws-sqs": {
+        "region": "process.env.AWS_SQS_REGION",
+        "queueUrl": "process.env.AWS_SQS_QUEUE_URL"
+      }
+    },
+    "env": {
+      "AWS_SQS_REGION": {
+        "example": "us-east-1"
+      },
+      "AWS_SQS_QUEUE_URL": ""
     }
-  },
-  "env": {
-    "AWS_SQS_REGION": { "example": "us-east-1" },
-    "AWS_SQS_QUEUE_URL": ""
   },
   "dependencies": {
     "@aws-sdk/client-sqs": "latest",

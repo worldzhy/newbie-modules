@@ -1,7 +1,7 @@
 {
   "key": "pdf",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "pdf.module",
     "className": "PdfModule"
   },

@@ -1,19 +1,21 @@
 {
   "key": "llm",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "llm.module",
-    "className": "LlmModule"
+    "className": "LlmModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "moduleDependencies": ["security"],
-  "config-service": {
-    "llm": {
-      "apiKeySecret": "process.env.LLM_API_KEY_SECRET"
+  "requires": {
+    "modules": ["security"],
+    "config": {
+      "llm": {
+        "apiKeySecret": "process.env.LLM_API_KEY_SECRET"
+      }
+    },
+    "env": {
+      "LLM_API_KEY_SECRET": ""
     }
-  },
-  "env": {
-    "LLM_API_KEY_SECRET": ""
   },
   "dependencies": {
     "ai": "^6.0.301",

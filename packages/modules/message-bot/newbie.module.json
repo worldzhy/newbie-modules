@@ -1,12 +1,14 @@
 {
   "key": "message-bot",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "message-bot.module",
-    "className": "MessageBotModule"
+    "className": "MessageBotModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
-  "schema": "prisma/schema.prisma",
-  "config-service": {},
-  "env": {},
+  "requires": {
+    "config": {},
+    "env": {}
+  },
   "dependencies": {}
 }

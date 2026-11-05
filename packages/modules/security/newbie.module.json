@@ -1,32 +1,34 @@
 {
   "key": "security",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "security.module",
     "className": "SecurityModule"
   },
-  "moduleDependencies": ["redis"],
-  "config-service": {
-    "security": {
-      "token": {
-        "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET",
-        "userAccess": {
-          "secret": "process.env.SECURITY_USER_ACCESS_TOKEN_SECRET"
-        },
-        "userRefresh": {
-          "secret": "process.env.SECURITY_USER_REFRESH_TOKEN_SECRET"
-        },
-        "apiKeyAccess": {
-          "secret": "process.env.SECURITY_APIKEY_ACCESS_TOKEN_SECRET"
+  "requires": {
+    "modules": ["redis"],
+    "config": {
+      "security": {
+        "token": {
+          "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET",
+          "userAccess": {
+            "secret": "process.env.SECURITY_USER_ACCESS_TOKEN_SECRET"
+          },
+          "userRefresh": {
+            "secret": "process.env.SECURITY_USER_REFRESH_TOKEN_SECRET"
+          },
+          "apiKeyAccess": {
+            "secret": "process.env.SECURITY_APIKEY_ACCESS_TOKEN_SECRET"
+          }
         }
       }
+    },
+    "env": {
+      "SECURITY_DEFAULT_TOKEN_SECRET": "",
+      "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
+      "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
+      "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": ""
     }
-  },
-  "env": {
-    "SECURITY_DEFAULT_TOKEN_SECRET": "",
-    "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
-    "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
-    "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": ""
   },
   "dependencies": {
     "@nestjs/passport": "latest",

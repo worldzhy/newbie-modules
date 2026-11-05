@@ -1,22 +1,26 @@
 {
   "key": "aws-ses",
   "layer": "infrastructure",
-  "module": {
+  "wiring": {
     "file": "aws-ses.module",
     "className": "AwsSesModule"
   },
-  "moduleDependencies": ["aws-identity", "security"],
-  "config-service": {
-    "aws-ses": {
-      "region": "process.env.AWS_SES_REGION",
-      "configurationSetName": "process.env.AWS_SES_CONFIGURATION_SET_NAME",
-      "fromEmailAddress": "process.env.AWS_SES_FROM_EMAIL_ADDRESS"
+  "requires": {
+    "modules": ["aws-identity", "security"],
+    "config": {
+      "aws-ses": {
+        "region": "process.env.AWS_SES_REGION",
+        "configurationSetName": "process.env.AWS_SES_CONFIGURATION_SET_NAME",
+        "fromEmailAddress": "process.env.AWS_SES_FROM_EMAIL_ADDRESS"
+      }
+    },
+    "env": {
+      "AWS_SES_REGION": {
+        "example": "us-east-1"
+      },
+      "AWS_SES_CONFIGURATION_SET_NAME": "",
+      "AWS_SES_FROM_EMAIL_ADDRESS": ""
     }
-  },
-  "env": {
-    "AWS_SES_REGION": { "example": "us-east-1" },
-    "AWS_SES_CONFIGURATION_SET_NAME": "",
-    "AWS_SES_FROM_EMAIL_ADDRESS": ""
   },
   "dependencies": {
     "@aws-sdk/client-ses": "latest",

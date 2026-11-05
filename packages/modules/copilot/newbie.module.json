@@ -1,13 +1,15 @@
 {
   "key": "copilot",
   "layer": "capability",
-  "module": {
+  "wiring": {
     "file": "copilot.module",
     "className": "CopilotModule"
   },
-  "moduleDependencies": ["llm", "lark"],
-  "config-service": {},
-  "env": {},
+  "requires": {
+    "modules": ["llm", "lark"],
+    "config": {},
+    "env": {}
+  },
   "dependencies": {},
   "devDependencies": {}
 }
