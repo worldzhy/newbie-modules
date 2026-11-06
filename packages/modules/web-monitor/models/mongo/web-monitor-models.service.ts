@@ -38,43 +38,43 @@ export class WebMonitorModelsService {
     );
   }
 
-  // WEB dynamic models (by appKey partition)
+  // WEB dynamic models (by appId)
   WebEnvironment(appKey: string) {
-    assertAppKey(appKey);
+    assertAppKey(appId);
     return this.modelRegistry.getOrCreateModel<WebEnvironmentDocument>(
-      `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appKey}`,
+      `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appId}`,
       WebEnvironmentSchema,
     );
   }
 
   WebPage(appKey: string) {
-    assertAppKey(appKey);
+    assertAppKey(appId);
     return this.modelRegistry.getOrCreateModel<WebPageDocument>(
-      `${MongoCollectionPrefix.WEB_PAGE}${appKey}`,
+      `${MongoCollectionPrefix.WEB_PAGE}${appId}`,
       WebPageSchema,
     );
   }
 
   WebResource(appKey: string) {
-    assertAppKey(appKey);
+    assertAppKey(appId);
     return this.modelRegistry.getOrCreateModel<WebResourceDocument>(
-      `${MongoCollectionPrefix.WEB_RESOURCE}${appKey}`,
+      `${MongoCollectionPrefix.WEB_RESOURCE}${appId}`,
       WebResourceSchema,
     );
   }
 
   WebCustom(appKey: string) {
-    assertAppKey(appKey);
+    assertAppKey(appId);
     return this.modelRegistry.getOrCreateModel<WebCustomDocument>(
-      `${MongoCollectionPrefix.WEB_CUSTOM}${appKey}`,
+      `${MongoCollectionPrefix.WEB_CUSTOM}${appId}`,
       WebCustomSchema,
     );
   }
 
   WebCustomFilter(appKey: string) {
-    assertAppKey(appKey);
+    assertAppKey(appId);
     return this.modelRegistry.getOrCreateModel<WebCustomFilterDocument>(
-      `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appKey}`,
+      `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appId}`,
       WebCustomFilterSchema,
     );
   }

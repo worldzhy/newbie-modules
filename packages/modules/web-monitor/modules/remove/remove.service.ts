@@ -20,7 +20,7 @@ export class RemoveService {
   ) {}
 
   async customDelete(fil: CustomDeleteFilter) {
-    const { appId: appKey, type = "", resource = [], time = [] } = fil;
+    const { appId, type = "", resource = [], time = [] } = fil;
     if (!time.length) {
       throw new BadRequestException("A time must be selected");
     }
@@ -43,23 +43,23 @@ export class RemoveService {
     for (const item of resource) {
       switch (item) {
         case "ajax": {
-          const ajaxModel = await this.clickhouse.WebAjax(appKey);
+          const ajaxModel = await this.clickhouse.WebAjax(appId);
           deletions.push(ajaxModel.delete({ where: chWhere, queryParams: chQueryParams }));
           break;
         }
         case "page":
-          deletions.push(this.models.WebPage(appKey).deleteMany(query).exec());
+          deletions.push(this.models.WebPage(appId).deleteMany(query).exec());
           break;
         case "env":
-          deletions.push(this.models.WebEnvironment(appKey).deleteMany(query).exec());
+          deletions.push(this.models.WebEnvironment(appId).deleteMany(query).exec());
           break;
         case "err": {
-          const errorModel = await this.clickhouse.WebError(appKey);
+          const errorModel = await this.clickhouse.WebError(appId);
           deletions.push(errorModel.delete({ where: chWhere, queryParams: chQueryParams }));
           break;
         }
         case "resource":
-          deletions.push(this.models.WebResource(appKey).deleteMany(query).exec());
+          deletions.push(this.models.WebResource(appId).deleteMany(query).exec());
           break;
       }
     }

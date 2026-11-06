@@ -6,17 +6,17 @@ export class NodeCacheService {
   private appInfo = new Map<string, SystemDocument>();
 
   getAppInfo(appKey: string) {
-    if (!appKey) throw new Error("Get app info: appKey must not be empty");
-    return this.appInfo.get(appKey);
+    if (!appId) throw new Error("Get app info: appId must not be empty");
+    return this.appInfo.get(appId);
   }
 
   setAppInfo(appKey: string, system: SystemDocument) {
-    if (!appKey) throw new Error("Set app info: appKey must not be empty");
-    this.appInfo.set(appKey, system);
+    if (!appId) throw new Error("Set app info: appId must not be empty");
+    this.appInfo.set(appId, system);
   }
 
   removeAppInfo(appKey: string) {
-    this.appInfo.delete(appKey);
+    this.appInfo.delete(appId);
   }
 
   updateAllSiteCache(systems: SystemDocument[]) {

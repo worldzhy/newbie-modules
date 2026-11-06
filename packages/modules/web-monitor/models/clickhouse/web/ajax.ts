@@ -33,21 +33,21 @@ export default function WebAjax(clickhouse: ClickHouseService, dbName: string) {
   const models: Record<string, ClickHouseModel> = {};
   const modelCreates: Record<string, Promise<ClickHouseModel>> = {};
   return async (appKey: string) => {
-    assertAppKey(appKey);
-    if (!models[appKey]) {
-      if (!modelCreates[appKey]) {
-        modelCreates[appKey] = clickhouse.createModel(
+    assertAppKey(appId);
+    if (!models[appId]) {
+      if (!modelCreates[appId]) {
+        modelCreates[appId] = clickhouse.createModel(
           {
             ...schema,
-            tableName: schema.tableName + appKey,
+            tableName: schema.tableName + appId,
           },
           dbName,
         );
       }
-      const model = await modelCreates[appKey];
-      delete modelCreates[appKey];
-      models[appKey] = model;
+      const model = await modelCreates[appId];
+      delete modelCreates[appId];
+      models[appId] = model;
     }
-    return models[appKey];
+    return models[appId];
   };
 }

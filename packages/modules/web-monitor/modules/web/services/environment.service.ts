@@ -15,7 +15,7 @@ export class EnvironmentService {
       system: `${type === 3 ? "$system" : ""}`,
     };
     const datas = await this.models
-      .WebEnvironment(appKey)
+      .WebEnvironment(appId)
       .aggregate([
         { $match: match },
         { $group: { _id: group_id, count: { $sum: 1 } } },
@@ -28,6 +28,6 @@ export class EnvironmentService {
   }
 
   async getEnvironmentForPage(appKey: string, markPage: string) {
-    return await this.models.WebEnvironment(appKey).findOne({ markPage }).read("secondaryPreferred").exec();
+    return await this.models.WebEnvironment(appId).findOne({ markPage }).read("secondaryPreferred").exec();
   }
 }

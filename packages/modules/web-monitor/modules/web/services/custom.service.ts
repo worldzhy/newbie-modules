@@ -8,7 +8,7 @@ export class WebCustomService {
 
   async getCustomFilterList(appKey: string) {
     const rows = await this.models
-      .WebCustomFilter(appKey)
+      .WebCustomFilter(appId)
       .find()
       .sort({ createTime: -1 })
       .read("secondaryPreferred")
@@ -18,13 +18,13 @@ export class WebCustomService {
 
   async addCustomFilter(appKey: string, filterKey: string, filterDesc: string) {
     if (!filterKey) throw new Error("Add filter: filterKey must not be empty");
-    if (!appKey) throw new Error("Add filter: appKey must not be empty");
+    if (!appId) throw new Error("Add filter: appId must not be empty");
     if (!filterDesc) throw new Error("Add filter: filterDesc must not be empty");
-    const model = this.models.WebCustomFilter(appKey);
+    const model = this.models.WebCustomFilter(appId);
     const exists = await model.findOne({ filterKey }).exec();
     if (exists && exists.filterKey) throw new Error("Add filter: filterKey already exists");
     const doc = new model();
-    doc.appKey = appKey;
+    doc.appId = appId;
     doc.filterKey = filterKey;
     doc.filterDesc = filterDesc;
     await doc.save();
@@ -33,8 +33,8 @@ export class WebCustomService {
 
   async delCustomFilter(appKey: string, id: string) {
     if (!id) throw new Error("Delete filter: _id must not be empty");
-    if (!appKey) throw new Error("Delete filter: appKey must not be empty");
-    const model = this.models.WebCustomFilter(appKey);
+    if (!appId) throw new Error("Delete filter: appId must not be empty");
+    const model = this.models.WebCustomFilter(appId);
     try {
       await model.findOne({ _id: id }).exec();
     } catch {
@@ -49,7 +49,7 @@ export class WebCustomService {
   }
 
   async getAverageCustomList(
-  appKey: string,
+    appKey: string,
     pageNo: number,
     pageSize: number,
     beginTime?: string,
@@ -75,7 +75,7 @@ export class WebCustomService {
         }
       });
     }
-    const model = this.models.WebCustom(appKey);
+    const model = this.models.WebCustom(appId);
     const totalNum = await model.count(filter).read("secondaryPreferred").exec();
     const dataList = await model
       .find(filter)

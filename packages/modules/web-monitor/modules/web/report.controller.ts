@@ -17,7 +17,7 @@ import { ResolvedWebToken, WebTokenResolver } from "../../services/web-token.res
  * WebMonitorInstallation token travels in the request body because the
  * browser SDK posts via navigator.sendBeacon, which cannot set headers —
  * the documented exception to the Bearer standard. The InstallationAuthGuard
- * resolves it to the public appKey (storage partition key); appKey is no
+ * resolves it to the public appKey (storage partition key); appId is no
  * longer a credential. Resolution is cached and liveness writes are
  * throttled.
  */
@@ -56,15 +56,15 @@ export class WebReportController {
 
     const { installationId, appKey } = req.installation;
     await this.tokenResolver.touchOnReport(installationId);
-    query.appKey = appKey;
+    query.appId = appKey;
 
     query.ip = func.getRealIp(req.headers, req.ip);
 
     query.url = query.url || headers["referer"];
     query.userAgent = headers["user-agent"];
 
-    const system = await this.site.getSiteForAppId(String(query.appKey));
-    if (!system?.appKey) throw new BadRequestException(`appKey:${query.appKey} does not exist`);
+    const system = await this.site.getSiteForAppId(String(query.appId));
+    if (!system?.appId) throw new BadRequestException(`appId:${query.appId} does not exist`);
 
     await this.saveWebReportDataForRedis(query);
     return func.result({ data: "ok" });
@@ -82,6 +82,6 @@ export class WebReportController {
         );
     }
     await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DATAS, JSON.stringify(query));
-    await this.dayReportNum.redisCount(String(query.appKey));
+    await this.dayReportNum.redisCount(String(query.appId));
   }
 }

@@ -37,14 +37,14 @@ export class WebPvuvipTaskService {
     // so a large site list cannot stampede Mongo/ClickHouse at once.
     const concurrency = 5;
     await mapWithConcurrency(systems, concurrency, async (sys) => {
-      const appKey = sys.appKey;
-      if (!appKey) return;
+      const appId = sys.appId;
+      if (!appId) return;
       try {
-        const data = await this.pvuvip.getPvUvIpSurvey(appKey, beginTime, endTime);
-        await this.pvuvip.savePvUvIpData(appKey, endTime, 1, data);
+        const data = await this.pvuvip.getPvUvIpSurvey(appId, beginTime, endTime);
+        await this.pvuvip.savePvUvIpData(appId, endTime, 1, data);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        this.logger.error(`Pvuvip minute task failed for site ${appKey}: ${message}`);
+        this.logger.error(`Pvuvip minute task failed for site ${appId}: ${message}`);
       }
     });
   }
@@ -60,14 +60,14 @@ export class WebPvuvipTaskService {
 
   private async groupData(datas: SystemDocument[], type: number, beginTime: Date, endTime: Date, createTime: Date) {
     for (const sys of datas) {
-      const appKey = sys.appKey;
-      if (!appKey) continue;
-      await this.savePvUvIpData(appKey, createTime, type, beginTime, endTime);
+      const appId = sys.appId;
+      if (!appId) continue;
+      await this.savePvUvIpData(appId, createTime, type, beginTime, endTime);
     }
   }
 
   private async savePvUvIpData(appKey: string, createTime: Date, type: number, beginTime: Date, endTime: Date) {
-    const pvuvipdata = await this.pvuvip.getPvUvIpSurvey(appKey, beginTime, endTime, type === 2);
-    await this.pvuvip.savePvUvIpData(appKey, createTime, type, pvuvipdata);
+    const pvuvipdata = await this.pvuvip.getPvUvIpSurvey(appId, beginTime, endTime, type === 2);
+    await this.pvuvip.savePvUvIpData(appId, createTime, type, pvuvipdata);
   }
 }
