@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from "@nestjs/common";
@@ -130,6 +131,8 @@ function renderTemplate(template: string, context?: Record<string, unknown>): st
 
 @Injectable()
 export class NotificationCenterService {
+  private readonly logger = new Logger(NotificationCenterService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly registry: NotificationRegistryService,
@@ -180,6 +183,11 @@ export class NotificationCenterService {
 
     // Drop deliveries below the center severity floor before any write.
     if (SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high)) {
+      // Below the floor the record never lands; log at debug so a missing
+      // notification stays explainable after the fact.
+      this.logger.debug(
+        `Notification ${input.notificationKey} dropped: severity ${severity} is below the configured minimum ${center.minimumSeverity}`,
+      );
       return { id: "", deduplicated: false, dropped: true };
     }
 
