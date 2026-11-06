@@ -11,4 +11,4 @@ export class DayReportNum {
 }
 export type DayReportNumDocument = DayReportNum & Document;
 export const DayReportNumSchema = SchemaFactory.createForClass(DayReportNum);
-DayReportNumSchema.index({ appKey: , dayTime: -1 });
+DayReportNumSchema.index({ appKey: 1, dayTime: -1 });

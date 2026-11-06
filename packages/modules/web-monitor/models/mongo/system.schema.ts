@@ -19,4 +19,4 @@ export class System {
 }
 export type SystemDocument = System & Document;
 export const SystemSchema = SchemaFactory.createForClass(System);
-SystemSchema.index({ appKey: , createTime: 1, systemDomain: -1, userId: -1 });
+SystemSchema.index({ appKey: -1, createTime: 1, systemDomain: -1, userId: -1 });

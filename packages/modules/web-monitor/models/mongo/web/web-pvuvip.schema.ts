@@ -16,5 +16,5 @@ export class WebPvuvip {
 }
 export type WebPvuvipDocument = WebPvuvip & Document;
 export const WebPvuvipSchema = SchemaFactory.createForClass(WebPvuvip);
-WebPvuvipSchema.index({ type: 1, appKey: , createTime: -1 });
+WebPvuvipSchema.index({ type: 1, appKey: 1, createTime: -1 });
 WebPvuvipSchema.index({ createTime: -1 });
