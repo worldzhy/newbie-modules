@@ -5,13 +5,13 @@ import { test } from "node:test";
 
 /**
  * ADR-051 wiring contract: every threshold signal funnels through the Redis
- * state machine (shouldFire on breach, resolveIfClean on clean window) so a
+ * state machine (shouldFire on breach, recoverIfClean on clean window) so a
  * persistent alert does not re-notify every minute and a recovered one emits a
- * single resolved notification.
+ * single recovered notification.
  *
  * The state logic itself is hard to unit-test without booting Nest + Redis +
  * ClickHouse, so this test pins the wiring counts in jobs.service.ts. A future
- * behavioral change (e.g. skipping resolved for one more signal) must update
+ * behavioral change (e.g. skipping recovered for one more signal) must update
  * these expectations deliberately.
  */
 const SERVICE_SOURCE = readFileSync(join(__dirname, "jobs.service.ts"), "utf8");
@@ -26,20 +26,20 @@ test("every signal checks the cooldown before firing", () => {
   assert.equal(occurrences(SERVICE_SOURCE, "await this.shouldFire("), 6);
 });
 
-test("every level signal resolves after clean windows; first-seen does not", () => {
-  // five level-style signals (slow-* x4 + js-error-spike) resolve; the
-  // first-seen edge detector has no resolved notification.
-  assert.equal(occurrences(SERVICE_SOURCE, "await this.resolveIfClean("), 5);
+test("every level signal recovers after clean windows; first-seen does not", () => {
+  // five level-style signals (slow-* x4 + js-error-spike) recover; the
+  // first-seen edge detector has no recovered notification.
+  assert.equal(occurrences(SERVICE_SOURCE, "await this.recoverIfClean("), 5);
 });
 
-test("firing and resolved phases are emitted with the right counts", () => {
+test("firing and recovered phases are emitted with the right counts", () => {
   assert.equal(occurrences(SERVICE_SOURCE, 'phase: "firing"'), 6);
-  assert.equal(occurrences(SERVICE_SOURCE, 'phase: "resolved"'), 5);
+  assert.equal(occurrences(SERVICE_SOURCE, 'phase: "recovered"'), 5);
 });
 
 test("cooldown and recovery constants are declared", () => {
   assert.ok(SERVICE_SOURCE.includes("ALERT_COOLDOWN_MS"));
-  assert.ok(SERVICE_SOURCE.includes("ALERT_RESOLVED_WINDOWS"));
+  assert.ok(SERVICE_SOURCE.includes("ALERT_RECOVERY_WINDOWS"));
   assert.ok(SERVICE_SOURCE.includes("alert-state:"));
 });
 
@@ -50,20 +50,20 @@ function methodBody(source: string, signature: string, nextSignature: string): s
   return source.slice(start, end);
 }
 
-test("shouldFire fails open on Redis failure; resolveIfClean fails closed", () => {
+test("shouldFire fails open on Redis failure; recoverIfClean fails closed", () => {
   // ADR-051: a Redis outage must never silence alerts, and must never claim
-  // "resolved" while the firing state cannot be confirmed.
-  const shouldFire = methodBody(SERVICE_SOURCE, "private async shouldFire(", "private async resolveIfClean(");
+  // "recovered" while the firing state cannot be confirmed.
+  const shouldFire = methodBody(SERVICE_SOURCE, "private async shouldFire(", "private async recoverIfClean(");
   assert.ok(shouldFire.includes("catch"), "shouldFire must guard Redis commands with try/catch");
   assert.ok(shouldFire.includes("firing without cooldown"), "shouldFire must log its fail-open path");
 
-  const resolveIfClean = methodBody(
+  const recoverIfClean = methodBody(
     SERVICE_SOURCE,
-    "private async resolveIfClean(",
+    "private async recoverIfClean(",
     "private buildClickHouseTimeFilter(",
   );
-  assert.ok(resolveIfClean.includes("catch"), "resolveIfClean must guard Redis commands with try/catch");
-  assert.ok(resolveIfClean.includes("skipping recovery check"), "resolveIfClean must log its fail-closed path");
+  assert.ok(recoverIfClean.includes("catch"), "recoverIfClean must guard Redis commands with try/catch");
+  assert.ok(recoverIfClean.includes("skipping recovery check"), "recoverIfClean must log its fail-closed path");
 });
 
 test("evaluation proceeds without the Redis lock when Redis fails", () => {

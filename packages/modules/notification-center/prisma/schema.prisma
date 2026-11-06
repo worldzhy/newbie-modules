@@ -59,11 +59,11 @@ model NotificationRecord {
   // Frontend relative path the notification deep-links to.
   link      String?  @db.VarChar(512)
   // Lifecycle phase for alert-style notifications: "firing" (default) or
-  // "resolved". Plain notifications ignore it; the frontend uses it to pair
-  // firing/resolved records and dim resolved ones (ADR-051).
+  // "recovered". Plain notifications ignore it; the frontend uses it to pair
+  // firing/recovered records and dim recovered ones (ADR-051).
   status    String    @db.VarChar(10) @default("firing")
-  // When this record represents a resolved alert.
-  resolvedAt DateTime?
+  // When this record represents a recovered alert.
+  recoveredAt DateTime?
   createdAt DateTime @default(now())
 
   receipts NotificationReceipt[]
