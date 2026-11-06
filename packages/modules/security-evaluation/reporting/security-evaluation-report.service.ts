@@ -93,14 +93,20 @@ export class SecurityEvaluationReportService {
     const now = new Date();
     const staleBefore = new Date(now.getTime() - SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS * DAY_MS);
 
-    const assets = await this.prisma.securityEvaluationAsset.findMany({
-      where: { subjectId: { in: subjectIds } },
-      select: { lastSeenAt: true },
-    });
-    const lastObservedAt = assets.reduce<Date | null>(
-      (latest, asset) => (latest === null || asset.lastSeenAt > latest ? asset.lastSeenAt : latest),
-      null,
-    );
+    // Aggregate in the database instead of loading every asset row: the report
+    // only needs total/stale counts plus the latest observation time
+    // (R5-P2-06).
+    const [assetTotal, assetStale, assetLatest] = await Promise.all([
+      this.prisma.securityEvaluationAsset.count({ where: { subjectId: { in: subjectIds } } }),
+      this.prisma.securityEvaluationAsset.count({
+        where: { subjectId: { in: subjectIds }, lastSeenAt: { lt: staleBefore } },
+      }),
+      this.prisma.securityEvaluationAsset.aggregate({
+        where: { subjectId: { in: subjectIds } },
+        _max: { lastSeenAt: true },
+      }),
+    ]);
+    const lastObservedAt = assetLatest._max.lastSeenAt;
 
     const latestResults = await this.latestResultsBySubject(subjectIds);
     const coverage = {
@@ -126,8 +132,8 @@ export class SecurityEvaluationReportService {
     return {
       generatedAt: now,
       assets: {
-        total: assets.length,
-        stale: assets.filter((asset) => asset.lastSeenAt < staleBefore).length,
+        total: assetTotal,
+        stale: assetStale,
         lastObservedAt,
       },
       coverage,
@@ -143,8 +149,13 @@ export class SecurityEvaluationReportService {
     const results = await this.prisma.evaluationResult.findMany({
       where: { subjectId: { in: [...subjectIds] } },
       orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      // Only the newest result per subject×rule-set is needed; distinct keeps
+      // the response bounded by subjects×evaluation keys instead of history
+      // depth (R5-P2-06).
+      distinct: ["subjectId", "ruleSetVersionId"],
       select: {
         subjectId: true,
+        ruleSetVersionId: true,
         coverageStats: true,
         ruleSetVersion: { select: { evaluationKey: true } },
       },

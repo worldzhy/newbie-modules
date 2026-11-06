@@ -318,3 +318,119 @@ test("valid numeric strings still coerce correctly", async () => {
   assert.equal(page.whiteTime, 1500);
   assert.equal(page.loadTime, 3000);
 });
+
+/**
+ * R15-01: Client values on String-declared columns were written raw. A plain
+ * object (`{}`) makes Mongoose throw a CastError for the whole app batch, the
+ * failed batch is requeued, and the same poison item returns forever.
+ *
+ * Invariant (class, not one field): no row emitted by the drain may carry a
+ * non-string value on a String-declared column.
+ */
+
+function assertStringColumns(buckets: ReturnType<typeof emptyBuckets>) {
+  for (const row of collectRows(buckets)) {
+    for (const [key, value] of Object.entries(row)) {
+      if (value === undefined || value === null) continue;
+      // Mixed/numeric/date columns are asserted by their own tests; here we
+      // only guard the columns declared as String in the Mongo schemas.
+      const stringColumns = new Set([
+        "appId",
+        "url",
+        "fullUrl",
+        "preUrl",
+        "markPage",
+        "markUser",
+        "markUv",
+        "markDevice",
+        "name",
+        "method",
+        "type",
+        "nextHopProtocol",
+        "customName",
+        "customContent",
+        "phone",
+        "uid",
+        "traceId",
+      ]);
+      if (!stringColumns.has(key)) continue;
+      assert.equal(typeof value, "string", `${key} must be a string, got ${typeof value} on ${JSON.stringify(row)}`);
+    }
+  }
+}
+
+test("object client values on String columns are coerced, not cast-error poison (R15-01)", async () => {
+  const buckets = emptyBuckets();
+  const outcome = await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.AjaxPerf,
+      url: "https://example.com/a",
+      markPage: "p1",
+      p: {},
+      resourceList: [
+        { type: "fetch", name: {}, method: {}, nextHopProtocol: {}, duration: 300 },
+        { type: "img", name: {}, method: {}, duration: 5000 },
+      ],
+    },
+    buckets,
+  );
+  assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
+  assertStringColumns(buckets);
+  assert.ok(!("customName" in collectCustomRow(buckets)), "an object customName must be skipped, not stringified");
+  const ajax = collectAjaxRows(buckets)[0];
+  assert.equal(ajax.fullUrl, "", "object resource name must not reach fullUrl as an object");
+});
+
+test("object client values on custom/resource String columns are coerced as well", async () => {
+  const buckets = emptyBuckets();
+  await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.Custom,
+      url: "https://example.com/a",
+      markPage: "p1",
+      customs: [{ customName: {}, customContent: ["x", "y"] }],
+    },
+    buckets,
+  );
+  assertStringColumns(buckets);
+  assert.ok(!("customName" in collectCustomRow(buckets)), "an object customName must be skipped");
+});
+
+test("a digits-only time string is an epoch timestamp, not a now fallback (R10-02)", async () => {
+  const buckets = emptyBuckets();
+  const epoch = 1700000000000;
+  await drain(
+    buildService(),
+    {
+      appId: VALID_APP_ID,
+      type: ReportType.PagePerf,
+      time: String(epoch),
+      url: "https://example.com/a",
+      markPage: "p1",
+    },
+    buckets,
+  );
+  const page = collectPageRow(buckets);
+  assert.equal((page.createTime as Date).getTime(), epoch, "a numeric timestamp must keep its instant");
+});
+
+test("requeue attempts are capped and exhausted reports go to the dead-letter list (R15-01/R9-07)", () => {
+  const service = buildService() as unknown as { nextAttemptPayload: (raw: string) => string | null };
+  const raw = JSON.stringify({ appId: VALID_APP_ID, type: ReportType.PagePerf });
+  const first = service.nextAttemptPayload(raw);
+  assert.ok(first, "the first failure must be requeued");
+  assert.equal(JSON.parse(first as string).__reportAttempts, 1);
+  const second = service.nextAttemptPayload(first as string);
+  assert.ok(second, "the second failure must be requeued");
+  assert.equal(JSON.parse(second as string).__reportAttempts, 2);
+  assert.equal(service.nextAttemptPayload(second as string), null, "the third delivery must dead-letter");
+});
+
+test("an unparseable raw payload is dead-lettered instead of requeued", () => {
+  const service = buildService() as unknown as { nextAttemptPayload: (raw: string) => string | null };
+  assert.equal(service.nextAttemptPayload("not-json"), null);
+});

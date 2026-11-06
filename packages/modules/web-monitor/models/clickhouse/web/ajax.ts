@@ -12,7 +12,7 @@ export default function WebAjax(clickhouse: ClickHouseService, dbName: string) {
       url: { type: ClickHouseDataType.String }, // AJAX URL
       method: { type: ClickHouseDataType.LowCardinality(ClickHouseDataType.String) }, // Request method
       duration: { type: ClickHouseDataType.UInt32 }, // AJAX response time (ms)
-      bodySize: { type: ClickHouseDataType.Int32 }, // Response size (bytes)
+      bodySize: { type: ClickHouseDataType.Nullable(ClickHouseDataType.Int32) }, // Response size (bytes)
       options: { type: ClickHouseDataType.String }, // Request body options
       query: { type: ClickHouseDataType.String }, // Query params
       fullUrl: { type: ClickHouseDataType.String }, // Full URL

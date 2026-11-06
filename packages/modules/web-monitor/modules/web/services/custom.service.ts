@@ -1,5 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
+import { func } from "../../../shared/utils";
 
 @Injectable()
 export class WebCustomService {
@@ -57,7 +58,7 @@ export class WebCustomService {
     customFilter?: Record<string, unknown>,
   ) {
     const filter: Record<string, unknown> = {};
-    if (customName) filter.customName = { $regex: customName, $options: "i" };
+    if (customName) filter.customName = { $regex: func.escapeRegExp(customName), $options: "i" };
     const createTime: Record<string, unknown> = {};
     if (beginTime) {
       createTime.$gte = new Date(beginTime);
@@ -70,7 +71,7 @@ export class WebCustomService {
     if (customFilter && Object.prototype.toString.apply(customFilter) === "[object Object]") {
       Object.keys(customFilter).forEach((key) => {
         if (customFilter[key] !== null && customFilter[key] !== "" && typeof customFilter[key] !== "undefined") {
-          filter[`customFilter.${key}`] = { $regex: customFilter[key], $options: "i" };
+          filter[`customFilter.${key}`] = { $regex: func.escapeRegExp(customFilter[key]), $options: "i" };
         }
       });
     }

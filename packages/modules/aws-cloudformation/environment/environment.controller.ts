@@ -1,8 +1,9 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { AwsEnvironment, PermissionAction, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { CreateEnvironmentDto } from "./environment.dto";
 
 /**
  * Cross-account AWS environments. Credentials are never stored: every AWS
@@ -33,11 +34,16 @@ export class AwsEnvironmentController {
       },
     },
   })
-  async createEnvironment(@Body() body: Prisma.AwsEnvironmentUncheckedCreateInput): Promise<AwsEnvironment> {
-    if (!body.name || !body.awsAccountId || !body.awsRegion || !body.roleArn) {
-      throw new BadRequestException("name, awsAccountId, awsRegion and roleArn are required.");
-    }
-    return await this.prisma.awsEnvironment.create({ data: body });
+  async createEnvironment(@Body() body: CreateEnvironmentDto): Promise<AwsEnvironment> {
+    return await this.prisma.awsEnvironment.create({
+      data: {
+        name: body.name,
+        awsAccountId: body.awsAccountId,
+        awsRegion: body.awsRegion,
+        roleArn: body.roleArn,
+        externalId: body.externalId,
+      },
+    });
   }
 
   @Get(":environmentId")

@@ -109,8 +109,17 @@ export const func = {
   // Client-supplied timestamps must never poison the drain: an unparseable
   // value falls back to the ingest time instead of becoming `Invalid Date`,
   // which would make every store write fail and requeue the raw item forever.
+  // A digits-only string is an epoch timestamp, not a date string: parsing it
+  // with `Date` would silently fall back to now (R10-02).
   toDateOrNow(value: unknown) {
-    const date = value instanceof Date ? value : typeof value === "number" ? new Date(value) : new Date(String(value));
+    const date =
+      value instanceof Date
+        ? value
+        : typeof value === "number"
+          ? new Date(value)
+          : typeof value === "string" && /^\d+$/.test(value)
+            ? new Date(Number(value))
+            : new Date(String(value));
     return Number.isNaN(date.getTime()) ? new Date() : date;
   },
   // Coerce a client-supplied numeric field to a finite number; anything else
@@ -143,6 +152,12 @@ export const func = {
     } catch {
       return "";
     }
+  },
+  // Client-supplied search text must never be compiled as a pattern: an
+  // unescaped value turns a user filter into a regex (Mongo server-side ReDoS
+  // for `$regex`, Node-side ReDoS for `new RegExp`). See R15-02/R5-P2-05.
+  escapeRegExp(input: unknown) {
+    return String(input).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   },
   decryptPhone(str: unknown) {
     if (typeof str !== "string") return str;

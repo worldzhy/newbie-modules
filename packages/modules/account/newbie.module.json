@@ -43,7 +43,8 @@
       "WECHAT_APP_SECRET": "",
       "LARK_APP_ID": "",
       "LARK_APP_SECRET": "",
-      "LARK_AUTH_CALLBACK_URL": ""
+      "LARK_AUTH_CALLBACK_URL": "",
+      "ENVIRONMENT": ""
     },
     "dependencies": {
       "@larksuiteoapi/node-sdk": "^1.59.0",

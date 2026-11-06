@@ -41,8 +41,8 @@ export class NotificationCenterController {
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.NotificationRecord)
   @ApiOperation({ summary: "Deliver a notification from a registered notification" })
   @ApiResponse({ status: 201, type: NotifyResultDto })
-  notify(@Body() body: NotifyDto): Promise<NotifyResult> {
-    return this.notificationCenter.notify(body as NotifyInput);
+  notify(@Req() req: AuthenticatedRequest, @Body() body: NotifyDto): Promise<NotifyResult> {
+    return this.notificationCenter.notify({ ...body, actorUserId: req.user.userId } as NotifyInput);
   }
 
   // --- Notification reads -------------------------------------------------

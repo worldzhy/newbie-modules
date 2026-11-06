@@ -22,6 +22,7 @@ export enum MongoStaticCollection {
 // owns one Redis connection/database (the redis foundation module).
 export enum RedisKeys {
   WEB_REPORT_DATAS = "web-monitor:WebReportDatas",
+  WEB_REPORT_DEAD_LETTERS = "web-monitor:WebReportDeadLetters",
   PVUVIP_PRE_MINUTE_LOCK = "web-monitor:PvuvipPreMinuteLock",
   IP_TASK_LOCK = "web-monitor:IpTaskLock",
   DAY_REPORT_NUM_TASK_LOCK = "web-monitor:DayReportNumTaskLock",
