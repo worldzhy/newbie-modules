@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { isValidAppId } from "../../shared/utils";
+import { isValidAppKey } from "../../shared/utils";
 
 /**
  * Resolves an appKey for management-side web-monitor queries and enforces
@@ -56,8 +56,8 @@ export class WebMonitorAccessService {
    * The default path does not need it because we derive appKey from the
    * installation registry, which is the same generator that produces it.
    */
-  assertAppIdLike(value: unknown): string {
-    if (!isValidAppId(value)) {
+  assertAppKeyLike(value: unknown): string {
+    if (!isValidAppKey(value)) {
       throw new ForbiddenException("Internal invariant: resolved appKey failed format check");
     }
     return value as string;
