@@ -15,7 +15,6 @@ When neither is present, no Octokit client is constructed and a warning is logge
 
 | env                      | Required             | Description                                                                     |
 | ------------------------ | -------------------- | ------------------------------------------------------------------------------- |
-| `GITHUB_USER_AGENT`      | No                   | User-Agent, defaults to `saas-starter`                                          |
 | `GITHUB_AUTH`            | Optional in App mode | PAT / personal token                                                            |
 | `GITHUB_APP_ID`          | Optional in PAT mode | GitHub App ID                                                                   |
 | `GITHUB_PRIVATE_KEY`     | Optional in PAT mode | App PEM private key; newlines stored as literal `\n` (restored at construction) |

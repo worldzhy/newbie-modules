@@ -62,6 +62,9 @@ function extractEnvKeys(content: string): Set<string> {
  */
 const PACKAGE_NAME_RE = /^(?:@[a-z0-9][a-z0-9-._]*\/)?[a-z0-9][a-z0-9-._]*$/;
 
+/** Fixed User-Agent for all GitHub API calls; not environment-dependent, so it stays a code constant. */
+const USER_AGENT = "newbie";
+
 /** A regular file fetched from a repository, with the sha needed to update it. */
 interface RepoFile {
   content: string;
@@ -101,14 +104,14 @@ export class GitHubService {
           privateKey,
           installationId: Number(this.installationId),
         },
-        userAgent: config.userAgent ?? "saas-starter",
+        userAgent: USER_AGENT,
       });
       this.logger.log("GitHub Octokit initialized with GitHub App authentication");
     } else if (this.pat) {
       // PAT mode (transition / single-user use).
       this.octokit = new Octokit({
         auth: this.pat,
-        userAgent: config.userAgent ?? "saas-starter",
+        userAgent: USER_AGENT,
       });
       this.logger.log("GitHub Octokit initialized with PAT authentication");
     } else {

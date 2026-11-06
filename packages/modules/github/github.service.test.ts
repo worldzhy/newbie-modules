@@ -44,7 +44,7 @@ function makeOctokitMock(handlers: Partial<OctokitMethods>) {
 
 function makeService(octokit: any): GitHubService {
   const fakeConfig = {
-    getOrThrow: () => ({ auth: "fake-pat", userAgent: "test" }),
+    getOrThrow: () => ({ auth: "fake-pat" }),
   } as any;
   const service = new GitHubService(fakeConfig);
   service.octokit = octokit;
