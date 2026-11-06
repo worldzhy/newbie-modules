@@ -12,10 +12,7 @@ import { BitbucketNotConfiguredError, BitbucketService } from "./bitbucket.servi
 function makeService(env: Record<string, string | undefined>): BitbucketService {
   return new BitbucketService({
     getOrThrow: () => ({
-      workspace: env.BITBUCKET_WORKSPACE,
       accessToken: env.BITBUCKET_ACCESS_TOKEN,
-      clientId: env.BITBUCKET_CLIENT_ID,
-      clientSecret: env.BITBUCKET_CLIENT_SECRET,
     }),
   } as any);
 }
@@ -74,7 +71,7 @@ describe("BitbucketService.parseBitbucketUrl", () => {
 
 describe("BitbucketService.getFileContent", () => {
   it("reads HEAD content and encodes every path segment", async () => {
-    const service = makeService({ BITBUCKET_WORKSPACE: "acme", BITBUCKET_ACCESS_TOKEN: "token" });
+    const service = makeService({ BITBUCKET_ACCESS_TOKEN: "token" });
     const calls = stubFetch(200, '{"lockfileVersion":3}');
 
     const content = await service.getFileContent("acme", "atlas-api", "packages/web app/package-lock.json");
@@ -89,13 +86,13 @@ describe("BitbucketService.getFileContent", () => {
   });
 
   it("returns null when the file does not exist (404)", async () => {
-    const service = makeService({ BITBUCKET_WORKSPACE: "acme", BITBUCKET_ACCESS_TOKEN: "token" });
+    const service = makeService({ BITBUCKET_ACCESS_TOKEN: "token" });
     stubFetch(404, "Not found");
     assert.equal(await service.getFileContent("acme", "atlas-api", "package-lock.json"), null);
   });
 
   it("throws on other API failures instead of reporting no material", async () => {
-    const service = makeService({ BITBUCKET_WORKSPACE: "acme", BITBUCKET_ACCESS_TOKEN: "token" });
+    const service = makeService({ BITBUCKET_ACCESS_TOKEN: "token" });
     stubFetch(403, "Forbidden");
     await assert.rejects(service.getFileContent("acme", "atlas-api", "package-lock.json"), /Bitbucket API 403/);
   });
