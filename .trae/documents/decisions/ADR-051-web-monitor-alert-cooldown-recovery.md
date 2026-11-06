@@ -101,10 +101,10 @@ resolvedAt  DateTime?
 
 ## Checklist
 
-- [ ] registry：`jobs.service.ts` 接入 Redis 状态机（firing / cooling / resolved 转换）
-- [ ] registry：`threshold-alert.event.ts` 加 `phase` 字段
-- [ ] registry：`notification-center` schema 加 `status` / `resolvedAt` + 索引 + 迁移
-- [ ] registry：契约测试覆盖状态机转换（冷却抑制、重燃、恢复判定、中途突破清零）
-- [ ] 宿主：`web-threshold-alerts.notifications.service.ts` 处理 `phase=resolved`、写 `status`/`resolvedAt`
-- [ ] 宿主：前端通知中心 firing/resolved 配对展示
-- [ ] E2E：持续错误只发 1 条 firing；恢复后发 1 条 resolved；冷却期内不重复
+- [x] registry：`jobs.service.ts` 接入 Redis 状态机（firing / cooling / resolved 转换）
+- [x] registry：`threshold-alert.event.ts` 加 `phase` 字段
+- [x] registry：`notification-center` schema 加 `status` / `resolvedAt` + 索引（db push 同步，无 migration 文件）
+- [x] registry：契约测试覆盖状态机转换（冷却抑制、重燃、恢复判定、首现信号不发 resolved）
+- [x] 宿主：`web-threshold-alerts.notifications.service.ts` 处理 `phase=resolved`、写 `status`/`resolvedAt`
+- [x] 宿主：前端通知中心 resolved 行显示 "resolved" 徽章
+- [x] E2E：持续错误只发 1 条 firing；恢复后发 1 条 resolved；冷却期内不重复
