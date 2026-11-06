@@ -119,3 +119,19 @@ C 层草案判定：现状主张 C1–C4 与支撑论证 P4 成立；方案主�
 carry-over 更新（2026-11-06）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转 fixed（见各轮表）；R5-P2-01/02/05/06/07 转 fixed；仍 open：R5-P2-03 partial、R5-P2-04（webhook 未装配）、R6-13（裁定未执行）、R3-25。
 
 误报剔除：R12-01 CH 侧毒丸向量（探针反驳）；registry CI pin 滞后（已升 1.18.0）。详见 devbie round15 报告 §7。
+
+## round18（2026-11-06，scope=`plan`：ADR-050 错误来源分级，报告在本仓 `.trae/documents/expert-review-2026-11-06-round18.md`）
+
+锚点：newbie-modules `971721e`（0 dirty）/ devbie `4df0a04c`（3 untracked，均不在 SDK 区）。结论摘要：ADR 的"复用 `api` 作来源真源、不改 schema"方向成立；两条 high 信号的来源边界未闭合。
+
+| ID     | 仓             | 标题                                                                                                                                          | 严重度 | 暴露面         | 可达性    | 状态 |
+| ------ | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------- | --------- | ---- |
+| R18-01 | newbie-modules | `js-error-spike`（high，阈值 10）对错误表全窗口计数、无 `type`/`api` 过滤；5B 下降级入库的 console 事件仍可触发 high 告警，ADR 验收标准"console 不产生 high 告警"不可达（jobs.service.ts L253-L288、L77） | P1     | artifact + live | anonymous | open |
+| R18-02 | devbie (SDK)   | `api=onerror` 同时用于资源加载失败（core.ts L473）与 JS 未捕获异常（L491/L497），决策 4 的 `api ∈ {onerror, unhandled-rejection}` 无法只保留运行时异常，资源噪音仍进 high 首现告警 | P1     | artifact       | anonymous | open |
+| R18-03 | devbie (SDK)   | `ERRORAPIS` 为发布包导出符号（`dist/common/utils.d.ts` L15-L18），ADR 决策 2 未声明导出面/消费方校验（当前跨仓外部引用 0）                    | P2     | artifact       | 构建期    | open |
+| R18-04 | newbie-modules | 枚举改值 + 不迁移：历史 `api='reject'` 行退出新基线，已见运行时错误会重新首现；ADR 未写"验证前清表"前置。本机 CH 实例当前无 web 错误表，无实际影响 | P2     | docs           | N/A       | open |
+| R18-05 | newbie-modules | 背景取证措辞/路径：`name = Error` 实为 `error.name`；分组发生在告警任务而非 ClickHouse 模型；`models/clickhouse/web/error.ts` 缺 `packages/modules/web-monitor/` 前缀 | P2     | docs           | N/A       | open |
+| R18-06 | newbie-modules | 决策 3 的可观察影响未记录：`type=script → log` 改变前端错误列表聚合口径（error.service.ts L72-L77），ADR 却称前端不涉及改动             | P2     | docs           | N/A       | open |
+
+- 误报剔除：反驳代理将 console 分支概括为"一律 type=log"，与 core.ts L528→L49 不符，按读码裁决不采信；"基线占指纹使真崩溃永不告警"仅在 name/resourceUrl/line 重合时成立，并入 A7 结论、不单列。
+- ADR-050 状态不变（仍「提议中」，待决策 5 拍板）；R18-01/R18-02 需在拍板后先补 ADR 决策 4 再实施。
