@@ -16,10 +16,10 @@ export type WebThresholdAlertSignal =
 
 /**
  * Lifecycle phase of a threshold alert. `firing` is the default (a breach was
- * observed); `resolved` is emitted when the same signal fingerprint has been
+ * observed); `recovered` is emitted when the same signal fingerprint has been
  * clean for N consecutive evaluation windows (ADR-051).
  */
-export type WebThresholdAlertPhase = "firing" | "resolved";
+export type WebThresholdAlertPhase = "firing" | "recovered";
 
 export type WebThresholdAlertCategory = "js" | "css" | "img";
 

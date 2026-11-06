@@ -98,10 +98,10 @@ export class JobsService implements OnModuleInit {
 
   // Alert lifecycle (ADR-051): a firing notification is suppressed inside the
   // cooldown window; a signal that stays clean for N consecutive windows fires
-  // one resolved notification and clears its state. These constants will move
+  // one recovered notification and clears its state. These constants will move
   // to per-site configuration in the upcoming threshold-configurability ADR.
   private static readonly ALERT_COOLDOWN_MS = 60 * 60 * 1000;
-  private static readonly ALERT_RESOLVED_WINDOWS = 2;
+  private static readonly ALERT_RECOVERY_WINDOWS = 2;
   // State TTL comfortably exceeds the cooldown so a slow-bleeding signal keeps
   // its state between evaluations, but not forever.
   private static readonly ALERT_STATE_TTL_SECONDS = 2 * 60 * 60;
@@ -193,11 +193,11 @@ export class JobsService implements OnModuleInit {
             ),
           });
         }
-      } else if (await this.resolveIfClean(this.alertStateKey(base.appKey, "slow-page"))) {
+      } else if (await this.recoverIfClean(this.alertStateKey(base.appKey, "slow-page"))) {
         this.emitAlert({
           ...base,
           signal: "slow-page",
-          phase: "resolved",
+          phase: "recovered",
           severity: "medium",
           count: 0,
           thresholdMs: (system.slowPageTime ?? 5) * 1000,
@@ -235,11 +235,11 @@ export class JobsService implements OnModuleInit {
             ),
           });
         }
-      } else if (await this.resolveIfClean(this.alertStateKey(base.appKey, "slow-first-paint"))) {
+      } else if (await this.recoverIfClean(this.alertStateKey(base.appKey, "slow-first-paint"))) {
         this.emitAlert({
           ...base,
           signal: "slow-first-paint",
-          phase: "resolved",
+          phase: "recovered",
           severity: "medium",
           count: 0,
           thresholdMs: paintThresholdMs,
@@ -289,11 +289,11 @@ export class JobsService implements OnModuleInit {
               ),
             });
           }
-        } else if (await this.resolveIfClean(this.alertStateKey(base.appKey, "slow-resource", category))) {
+        } else if (await this.recoverIfClean(this.alertStateKey(base.appKey, "slow-resource", category))) {
           this.emitAlert({
             ...base,
             signal: "slow-resource",
-            phase: "resolved",
+            phase: "recovered",
             category,
             severity: "medium",
             count: 0,
@@ -336,11 +336,11 @@ export class JobsService implements OnModuleInit {
             ),
           });
         }
-      } else if (await this.resolveIfClean(this.alertStateKey(base.appKey, "slow-ajax"))) {
+      } else if (await this.recoverIfClean(this.alertStateKey(base.appKey, "slow-ajax"))) {
         this.emitAlert({
           ...base,
           signal: "slow-ajax",
-          phase: "resolved",
+          phase: "recovered",
           severity: "medium",
           count: 0,
           thresholdMs,
@@ -390,11 +390,11 @@ export class JobsService implements OnModuleInit {
             ),
           });
         }
-      } else if (await this.resolveIfClean(key)) {
+      } else if (await this.recoverIfClean(key)) {
         this.emitAlert({
           ...base,
           signal: "js-error-spike",
-          phase: "resolved",
+          phase: "recovered",
           severity: "high",
           count: 0,
           affectedUsers: 0,
@@ -435,7 +435,7 @@ export class JobsService implements OnModuleInit {
         if (existedRows.length > 0) continue;
         // First-seen is an edge detector: a fingerprint fires once and the
         // baseline check prevents re-firing. The cooldown state still applies
-        // (defense in depth), but there is no resolved notification — a
+        // (defense in depth), but there is no recovered notification — a
         // "new error" signal has no level to recover from. The state key
         // TTL-expires when the fingerprint stops recurring.
         const key = this.alertStateKey(base.appKey, "js-error-first-seen", undefined, fingerprint);
@@ -547,12 +547,12 @@ export class JobsService implements OnModuleInit {
 
   /**
    * Called on a clean window. Returns true when the signal has stayed clean for
-   * ALERT_RESOLVED_WINDOWS consecutive windows, in which case the caller emits
-   * a resolved notification and the state key is deleted. Fails closed when
-   * Redis is unavailable: never claim "resolved" while the firing state cannot
+   * ALERT_RECOVERY_WINDOWS consecutive windows, in which case the caller emits
+   * a recovered notification and the state key is deleted. Fails closed when
+   * Redis is unavailable: never claim "recovered" while the firing state cannot
    * be confirmed.
    */
-  private async resolveIfClean(key: string): Promise<boolean> {
+  private async recoverIfClean(key: string): Promise<boolean> {
     if (!this.redis.isConfigured()) return false;
     const client = this.redis.getClient();
     try {
@@ -560,7 +560,7 @@ export class JobsService implements OnModuleInit {
       if (!raw) return false;
       const state = JSON.parse(raw) as AlertState;
       state.cleanWindows += 1;
-      if (state.cleanWindows >= JobsService.ALERT_RESOLVED_WINDOWS) {
+      if (state.cleanWindows >= JobsService.ALERT_RECOVERY_WINDOWS) {
         await client.del(key);
         return true;
       }

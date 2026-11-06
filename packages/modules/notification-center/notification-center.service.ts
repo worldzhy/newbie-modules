@@ -3,6 +3,7 @@ import {
   ForbiddenException,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from "@nestjs/common";
@@ -85,15 +86,15 @@ export interface NotifyInput {
    */
   deduplicationKey?: string;
   /**
-   * Lifecycle phase for alert-style notifications ("firing" | "resolved").
+   * Lifecycle phase for alert-style notifications ("firing" | "recovered").
    * Defaults to "firing" (ADR-051).
    */
-  status?: "firing" | "resolved";
+  status?: "firing" | "recovered";
   /**
-   * Resolution timestamp for resolved-phase notifications; defaults to now()
-   * when status is "resolved" and this is omitted.
+   * Recovery timestamp for recovered-phase notifications; defaults to now()
+   * when status is "recovered" and this is omitted.
    */
-  resolvedAt?: Date;
+  recoveredAt?: Date;
   /**
    * Caller identity for the HTTP delivery endpoint. Set only by the controller;
    * internal job callers omit it because they act on behalf of the platform.
@@ -130,6 +131,8 @@ function renderTemplate(template: string, context?: Record<string, unknown>): st
 
 @Injectable()
 export class NotificationCenterService {
+  private readonly logger = new Logger(NotificationCenterService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly registry: NotificationRegistryService,
@@ -180,15 +183,20 @@ export class NotificationCenterService {
 
     // Drop deliveries below the center severity floor before any write.
     if (SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high)) {
+      // Below the floor the record never lands; log at debug so a missing
+      // notification stays explainable after the fact.
+      this.logger.debug(
+        `Notification ${input.notificationKey} dropped: severity ${severity} is below the configured minimum ${center.minimumSeverity}`,
+      );
       return { id: "", deduplicated: false, dropped: true };
     }
 
-    // ADR-051: resolved-phase notifications prefer the declaration's resolved
+    // ADR-051: recovered-phase notifications prefer the declaration's recovered
     // template overrides so a recovered alert reads "…recovered" instead of
     // rendering the firing template with a zero count.
-    const resolved = input.status === "resolved";
-    const titleTemplate = (resolved && declared.resolvedTitleTemplate) || declared.titleTemplate;
-    const detailTemplate = (resolved && declared.resolvedDetailTemplate) || declared.detailTemplate;
+    const recovered = input.status === "recovered";
+    const titleTemplate = (recovered && declared.recoveredTitleTemplate) || declared.titleTemplate;
+    const detailTemplate = (recovered && declared.recoveredDetailTemplate) || declared.detailTemplate;
     const title = renderTemplate(titleTemplate, input.context);
     const detail = detailTemplate ? renderTemplate(detailTemplate, input.context) : null;
 
@@ -202,7 +210,7 @@ export class NotificationCenterService {
       projectId: input.projectId ?? null,
       link: input.link ?? null,
       status: input.status ?? "firing",
-      resolvedAt: input.status === "resolved" ? (input.resolvedAt ?? new Date()) : null,
+      recoveredAt: input.status === "recovered" ? (input.recoveredAt ?? new Date()) : null,
     };
 
     let recordId: string;

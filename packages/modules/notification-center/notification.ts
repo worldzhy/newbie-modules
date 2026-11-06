@@ -19,9 +19,9 @@ export abstract class Notification implements OnModuleInit {
   // (platform-wide, no owning project) declare "system" explicitly.
   protected readonly scope: NotificationScope = DEFAULT_NOTIFICATION_SCOPE;
   protected readonly detailTemplate?: string;
-  /** Optional ADR-051 phase overrides, used when notify() passes status "resolved". */
-  protected readonly resolvedTitleTemplate?: string;
-  protected readonly resolvedDetailTemplate?: string;
+  /** Optional ADR-051 phase overrides, used when notify() passes status "recovered". */
+  protected readonly recoveredTitleTemplate?: string;
+  protected readonly recoveredDetailTemplate?: string;
   protected readonly defaultPushEnabled?: boolean;
   protected abstract readonly logger: Logger;
 
@@ -35,8 +35,8 @@ export abstract class Notification implements OnModuleInit {
       scope: this.scope,
       titleTemplate: this.titleTemplate,
       detailTemplate: this.detailTemplate,
-      resolvedTitleTemplate: this.resolvedTitleTemplate,
-      resolvedDetailTemplate: this.resolvedDetailTemplate,
+      recoveredTitleTemplate: this.recoveredTitleTemplate,
+      recoveredDetailTemplate: this.recoveredDetailTemplate,
       defaultSeverity: this.defaultSeverity,
       defaultPushEnabled: this.defaultPushEnabled,
     });
