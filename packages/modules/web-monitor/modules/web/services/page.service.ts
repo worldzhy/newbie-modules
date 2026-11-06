@@ -16,8 +16,8 @@ export class PageService {
   }
 
   async getAveragePageList(query: Record<string, unknown>) {
-    const { appId, type = "", pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
-    const appIdStr = String(appId);
+    const { appKey, type = "", pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
+    const appIdStr = String(appKey);
     const match: Record<string, unknown> = {};
     if (isFirstIn !== undefined && isFirstIn !== "") {
       match.isFirstIn = isFirstIn === "true" ? true : false;
@@ -32,7 +32,7 @@ export class PageService {
   }
 
   private async getPages(appKey: string, match: Record<string, unknown>, pageNo: number, pageSize: number) {
-    const model = this.models.WebPage(appId);
+    const model = this.models.WebPage(appKey);
     const distinct = (await model.distinct("url", match).read("secondaryPreferred").exec()) || [];
     const copdistinct = distinct.slice();
     const slice = distinct.slice((pageNo - 1) * pageSize, (pageNo - 1) * pageSize + pageSize);
@@ -54,7 +54,7 @@ export class PageService {
     }
     const jobs = slice.map((url: string) =>
       this.models
-        .WebPage(appId)
+        .WebPage(appKey)
         .aggregate([
           { $match: { ...match, url } },
           {
@@ -76,9 +76,9 @@ export class PageService {
     pageSize: number,
     group_id: Record<string, unknown>,
   ) {
-    const count = await this.models.WebPage(appId).distinct("url", match).read("secondaryPreferred").exec();
+    const count = await this.models.WebPage(appKey).distinct("url", match).read("secondaryPreferred").exec();
     const dataList = await this.models
-      .WebPage(appId)
+      .WebPage(appKey)
       .aggregate([
         { $match: match },
         {
@@ -105,13 +105,13 @@ export class PageService {
   }
 
   async getRealTimeAveragePageList(query: Record<string, unknown>) {
-    const { appId: rawAppId, type = "", beginTime, endTime } = query;
-    const appId = String(rawAppId);
+    const { appKey: rawAppId, type = "", beginTime, endTime } = query;
+    const appKey = String(rawAppId);
     const match: Record<string, unknown> = { isFirstIn: true };
     if (type) match.speedType = Number(type);
     const _querys = this.getSpaceTime(beginTime, endTime, 60000);
     const result = await this.models
-      .WebPage(appId)
+      .WebPage(appKey)
       .aggregate([
         { $match: match },
         {
@@ -175,7 +175,7 @@ export class PageService {
 
   async getOnePageList(query: Record<string, unknown>) {
     const {
-      appId: rawAppId,
+      appKey: rawAppId,
       type,
       pageNo = 1,
       pageSize = WEB_MONITOR_CONFIG.pageSize,
@@ -184,7 +184,7 @@ export class PageService {
       beginTime,
       endTime,
     } = query;
-    const appId = String(rawAppId);
+    const appKey = String(rawAppId);
     const match: Record<string, unknown> = { url };
     if (isFirstIn !== undefined && isFirstIn !== "") {
       const isFirstInNum = Number(isFirstIn);
@@ -200,9 +200,9 @@ export class PageService {
         $gte: func.toDate(beginTime),
         $lte: func.toDate(endTime),
       };
-    const count = await this.models.WebPage(appId).count(match).read("secondaryPreferred").exec();
+    const count = await this.models.WebPage(appKey).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models
-      .WebPage(appId)
+      .WebPage(appKey)
       .aggregate([
         { $match: match },
         { $sort: { createTime: -1 } },
@@ -215,7 +215,7 @@ export class PageService {
   }
 
   async getPageDetails(appKey: string, id: string) {
-    return await this.models.WebPage(appId).findOne({ _id: id }).read("secondaryPreferred").exec();
+    return await this.models.WebPage(appKey).findOne({ _id: id }).read("secondaryPreferred").exec();
   }
 
   private getSpaceTime(beginTime?: unknown, endTime?: unknown, spaceTime = 60000) {

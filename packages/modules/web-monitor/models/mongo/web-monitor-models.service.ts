@@ -24,7 +24,7 @@ export class WebMonitorModelsService {
 
   // Model registration mechanics (register-once / OverwriteModelError guard)
   // live in the shared MongoModelRegistry; this service only maps business
-  // schemas to collection names (incl. per-appId dynamic collections).
+  // schemas to collection names (incl. per-appKey dynamic collections).
 
   // Static models
   System() {
@@ -38,43 +38,43 @@ export class WebMonitorModelsService {
     );
   }
 
-  // WEB dynamic models (by appId)
+  // WEB dynamic models (by appKey)
   WebEnvironment(appKey: string) {
-    assertAppKey(appId);
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebEnvironmentDocument>(
-      `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appId}`,
+      `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appKey}`,
       WebEnvironmentSchema,
     );
   }
 
   WebPage(appKey: string) {
-    assertAppKey(appId);
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebPageDocument>(
-      `${MongoCollectionPrefix.WEB_PAGE}${appId}`,
+      `${MongoCollectionPrefix.WEB_PAGE}${appKey}`,
       WebPageSchema,
     );
   }
 
   WebResource(appKey: string) {
-    assertAppKey(appId);
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebResourceDocument>(
-      `${MongoCollectionPrefix.WEB_RESOURCE}${appId}`,
+      `${MongoCollectionPrefix.WEB_RESOURCE}${appKey}`,
       WebResourceSchema,
     );
   }
 
   WebCustom(appKey: string) {
-    assertAppKey(appId);
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebCustomDocument>(
-      `${MongoCollectionPrefix.WEB_CUSTOM}${appId}`,
+      `${MongoCollectionPrefix.WEB_CUSTOM}${appKey}`,
       WebCustomSchema,
     );
   }
 
   WebCustomFilter(appKey: string) {
-    assertAppKey(appId);
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebCustomFilterDocument>(
-      `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appId}`,
+      `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appKey}`,
       WebCustomFilterSchema,
     );
   }

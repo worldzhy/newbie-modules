@@ -50,7 +50,7 @@ const WEB_THRESHOLD_ALERT = defineEvent<WebThresholdAlertEvent>({
   name: "Web monitor threshold alert",
   description: "Emitted when a monitored system breaches a performance or error threshold in the evaluation window.",
   payloadExample: {
-    appId: "storefront-web",
+    appKey: "storefront-web",
     systemName: "Storefront Web",
     projectId: "00000000-0000-0000-0000-000000000000",
     signal: "slow-page",

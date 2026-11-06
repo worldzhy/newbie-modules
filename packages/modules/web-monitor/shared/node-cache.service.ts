@@ -6,23 +6,23 @@ export class NodeCacheService {
   private appInfo = new Map<string, SystemDocument>();
 
   getAppInfo(appKey: string) {
-    if (!appId) throw new Error("Get app info: appId must not be empty");
-    return this.appInfo.get(appId);
+    if (!appKey) throw new Error("Get app info: appKey must not be empty");
+    return this.appInfo.get(appKey);
   }
 
   setAppInfo(appKey: string, system: SystemDocument) {
-    if (!appId) throw new Error("Set app info: appId must not be empty");
-    this.appInfo.set(appId, system);
+    if (!appKey) throw new Error("Set app info: appKey must not be empty");
+    this.appInfo.set(appKey, system);
   }
 
   removeAppInfo(appKey: string) {
-    this.appInfo.delete(appId);
+    this.appInfo.delete(appKey);
   }
 
   updateAllSiteCache(systems: SystemDocument[]) {
     // Reconcile, not just upsert: evict entries whose site no longer exists so
     // deleted sites stop accepting ingest after the next refresh.
-    const liveAppIds = new Set(systems.map((system) => system.appId));
+    const liveAppIds = new Set(systems.map((system) => system.appKey));
     for (const cachedAppId of [...this.appInfo.keys()]) {
       if (!liveAppIds.has(cachedAppId)) this.appInfo.delete(cachedAppId);
     }
@@ -32,6 +32,6 @@ export class NodeCacheService {
   }
 
   updateSiteCache(system: SystemDocument) {
-    this.setAppInfo(system.appId, system);
+    this.setAppInfo(system.appKey, system);
   }
 }

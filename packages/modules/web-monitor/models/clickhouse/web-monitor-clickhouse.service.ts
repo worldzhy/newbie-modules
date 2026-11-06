@@ -35,11 +35,11 @@ export class WebMonitorClickHouseService implements OnModuleInit {
   }
 
   async WebAjax(appKey: string) {
-    return this.webAjaxFactory(appId);
+    return this.webAjaxFactory(appKey);
   }
 
   async WebError(appKey: string) {
-    return this.webErrorFactory(appId);
+    return this.webErrorFactory(appKey);
   }
 
   async WebSdkError() {

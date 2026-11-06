@@ -29,7 +29,7 @@ export class AjaxService {
       queryParams.endTime = endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebAjax(appId);
+    const model = await this.ch.WebAjax(appKey);
     const countQuery = model.find([
       { where, select: "url", groupBy: "url,method", queryParams },
       { select: "count() as total" },
@@ -50,7 +50,7 @@ export class AjaxService {
   }
 
   async getAverageAjaxList(query: Record<string, unknown>) {
-    const { appId, beginTime, endTime, type = 1, url, pageSize = WEB_MONITOR_CONFIG.pageSize } = query;
+    const { appKey, beginTime, endTime, type = 1, url, pageSize = WEB_MONITOR_CONFIG.pageSize } = query;
     const pageNo = Number(query.pageNo || 1);
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
@@ -68,7 +68,7 @@ export class AjaxService {
       queryParams.endTime = endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebAjax(String(appId));
+    const model = await this.ch.WebAjax(String(appKey));
     const countQuery = model.find([
       { where, select: "url", groupBy: "url,method", queryParams },
       { select: "count() as total" },
@@ -118,7 +118,7 @@ export class AjaxService {
       queryParams.endTime = endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebAjax(appId);
+    const model = await this.ch.WebAjax(appKey);
     const countQuery = model.find([{ where, select: "url", queryParams }, { select: "count() as total" }]);
     const listQuery = model.find({
       where,
@@ -148,7 +148,7 @@ export class AjaxService {
       queryParams.endTime = opts.endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebAjax(appId);
+    const model = await this.ch.WebAjax(appKey);
     const list = await model.find({ where, select: "*", orderBy: "createTime ASC", queryParams });
     return { list };
   }
