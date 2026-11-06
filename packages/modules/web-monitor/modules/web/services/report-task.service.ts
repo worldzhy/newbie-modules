@@ -10,6 +10,11 @@ import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 import { UAParser } from "ua-parser-js";
 import { RedisKeys, RedisKeyPrefix, ReportType } from "../../../models/enum";
 
+// A report that keeps failing to flush is retried at most this many times
+// before it is parked in the dead-letter list (R15-01/R9-07).
+const MAX_REPORT_ATTEMPTS = 3;
+const MAX_DEAD_LETTER_ENTRIES = 1000;
+
 /**
  * Plain-row accumulators for one drain tick. ClickHouse destinations were
  * already batched per app; Mongo destinations now batch the same way so a
@@ -40,7 +45,7 @@ interface WebReportItem {
   markUv: string;
   markDevice: string;
   url: string;
-  p?: unknown;
+  p?: string;
   uid?: unknown;
   isFirstIn: boolean;
   errorList?: Record<string, unknown>[];
@@ -171,9 +176,13 @@ export class WebReportTaskService {
         markPage: data.markPage,
         markUser: data.markUser,
         path: "",
-        customName: item.customName,
-        customFilter: item.customFilter,
       };
+      // String-declared columns must never receive a raw client object:
+      // Mongoose turns `{}` into a CastError and the whole app batch fails.
+      // Normalize every string column at the row boundary (R15-01).
+      const customName = func.toStringOrUndefined(item.customName);
+      if (customName !== undefined) custom.customName = customName;
+      custom.customFilter = item.customFilter;
       // customContent is declared string; JSON-stringify object values and skip
       // anything that isn't string-or-object so Mongoose doesn't receive a type
       // it can't cast. See R12-01.
@@ -214,12 +223,19 @@ export class WebReportTaskService {
       appId: data.appId,
       createTime: item.requestTime ? func.toDateOrNow(item.requestTime) : data.createTime,
       url: data.url,
-      fullUrl: item.name,
       speedType,
       name: newName,
-      method: item.method,
-      type: item.type,
     };
+    // String-declared columns: coerce client values so an object can never
+    // produce a Mongoose CastError that fails the whole app batch (R15-01).
+    const fullUrl = func.toStringOrUndefined(item.name);
+    if (fullUrl !== undefined) resource.fullUrl = fullUrl;
+    const method = func.toStringOrUndefined(item.method);
+    if (method !== undefined) resource.method = method;
+    const type = func.toStringOrUndefined(item.type);
+    if (type !== undefined) resource.type = type;
+    const nextHopProtocol = func.toStringOrUndefined(item.nextHopProtocol);
+    if (nextHopProtocol !== undefined) resource.nextHopProtocol = nextHopProtocol;
     // duration: always write when the row passes the slow filter (the
     // threshold already normalized it); don't skip here — rawDuration is
     // already guarded by the early-return above which fires on short durations.
@@ -228,7 +244,6 @@ export class WebReportTaskService {
     // Mongo $avg ignores missing keys instead of averaging in a poisoned 0.
     const bs = func.toNumberOrUndefined(item.bodySize);
     if (bs !== undefined) resource.bodySize = bs;
-    resource.nextHopProtocol = item.nextHopProtocol;
     resource.markPage = data.markPage;
     resource.markUser = data.markUser;
     this.setUser(resource, data);
@@ -281,10 +296,10 @@ export class WebReportTaskService {
       appId: data.appId,
       createTime: data.createTime,
       markUser: data.markUser,
-      sdkVersion: data.sdkVersion,
-      name: data.name,
-      msg: data.msg,
-      stack: data.stack,
+      sdkVersion: func.toStringOrUndefined(data.sdkVersion),
+      name: func.toStringOrUndefined(data.name),
+      msg: func.toStringOrUndefined(data.msg),
+      stack: func.toStringOrUndefined(data.stack),
     };
     this.setUser(sdkErr, data);
 
@@ -320,12 +335,15 @@ export class WebReportTaskService {
     // (RPOP key count, Redis >= 6.2).
     const raws = (await this.redis.getClient().rpop(RedisKeys.WEB_REPORT_DATAS, count)) || [];
     const rawsByApp: Record<string, string[]> = {};
+    let failedItems = 0;
     for (const raw of raws) {
       try {
         const appId = await this.collectQueueItem(raw, buckets);
         if (appId) (rawsByApp[appId] ||= []).push(raw);
       } catch (e: unknown) {
         // A single malformed/poisoned item must not abort the rest of the batch.
+        // Count them so silent drops are visible in the tick summary (R9-04).
+        failedItems += 1;
         this.logger.error("web report item processing failed", e instanceof Error ? e.message : String(e));
       }
     }
@@ -335,16 +353,43 @@ export class WebReportTaskService {
       // tick retries them instead of silently dropping the batch. Duplicates
       // are acceptable for append-only analytics; loss is not.
       let requeued = 0;
+      let deadLettered = 0;
       for (const appId of failedAppIds) {
         for (const raw of rawsByApp[appId] ?? []) {
-          await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DATAS, raw);
-          requeued += 1;
+          const payload = this.nextAttemptPayload(raw);
+          if (payload) {
+            await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DATAS, payload);
+            requeued += 1;
+          } else {
+            await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DEAD_LETTERS, raw);
+            await this.redis.getClient().ltrim(RedisKeys.WEB_REPORT_DEAD_LETTERS, 0, MAX_DEAD_LETTER_ENTRIES - 1);
+            deadLettered += 1;
+          }
         }
       }
       this.logger.warn(
-        `web report flush failed; re-queued ${requeued} reports for apps: ${[...failedAppIds].join(",")}`,
+        `web report flush failed; re-queued ${requeued}, dead-lettered ${deadLettered} reports for apps: ${[...failedAppIds].join(",")}`,
       );
     }
+    if (failedItems) {
+      this.logger.warn(`web report tick dropped ${failedItems} unparseable/poisoned report(s) out of ${raws.length}`);
+    }
+  }
+
+  // Every requeue adds an attempt marker. An item that can never be written
+  // (an unknown poison vector) must not cycle forever: after
+  // MAX_REPORT_ATTEMPTS deliveries it is parked in the dead-letter list
+  // instead of starving the queue (R15-01/R9-07).
+  private nextAttemptPayload(raw: string): string | null {
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+    const attempts = (Number(payload.__reportAttempts) || 0) + 1;
+    if (attempts >= MAX_REPORT_ATTEMPTS) return null;
+    return JSON.stringify({ ...payload, __reportAttempts: attempts });
   }
 
   private async flushBuckets(buckets: DrainBuckets): Promise<Set<string>> {
@@ -405,7 +450,9 @@ export class WebReportTaskService {
       markUv: str(query.markUv),
       markDevice: str(query.markDevice),
       url: str(query.url),
-      p: query.p,
+      // The encrypted phone is declared a string; a non-string payload value
+      // must not reach a String column (Mongoose cast error → requeue loop).
+      p: str(query.p) || undefined,
       uid: query.uid,
       isFirstIn: Boolean(query.isFirstIn),
       errorList: Array.isArray(query.errorList) ? query.errorList : undefined,
@@ -455,8 +502,8 @@ export class WebReportTaskService {
       createTime: item.requestTime ? func.toDateOrNow(item.requestTime) : data.createTime,
     };
     _ajax.url = newName || "";
-    _ajax.fullUrl = item.name || "";
-    _ajax.method = item.method || "";
+    _ajax.fullUrl = func.toStringOrUndefined(item.name) ?? "";
+    _ajax.method = func.toStringOrUndefined(item.method) ?? "";
     _ajax.duration = duration;
     // bodySize: skip write for invalid values — CH Nullable column (or just
     // let CH coerce to 0; we normalize to make the intent explicit).
@@ -470,7 +517,7 @@ export class WebReportTaskService {
     } catch {
       // Expected failure: the URL may be malformed — skip query extraction.
     }
-    if (item.traceId) _ajax.traceId = item.traceId;
+    if (item.traceId) _ajax.traceId = func.toStringOrUndefined(item.traceId) ?? "";
     if (data.uid) _ajax.uid = String(data.uid);
     if (data.p) _ajax.phone = func.decryptPhone(data.p);
     _ajax.markPage = data.markPage || "";
@@ -505,15 +552,15 @@ export class WebReportTaskService {
       else if (typeof item.msg === "string") errors.msg = item.msg;
       else errors.msg = item.msg || "";
 
-      errors.type = item.type || "";
-      errors.name = item.name || "";
-      errors.api = item.api || "";
+      errors.type = func.toStringOrUndefined(item.type) ?? "";
+      errors.name = func.toStringOrUndefined(item.name) ?? "";
+      errors.api = func.toStringOrUndefined(item.api) ?? "";
       if (Array.isArray(item.stack)) errors.stack = JSON.stringify(item.stack);
-      errors.target = itemData.target || "";
+      errors.target = func.toStringOrUndefined(itemData.target) ?? "";
       errors.status = itemData.status ? String(itemData.status) : "";
       errors.col = itemData.col ? String(itemData.col) : "";
       errors.line = itemData.line ? String(itemData.line) : "";
-      errors.method = item.method || "";
+      errors.method = func.toStringOrUndefined(item.method) ?? "";
 
       try {
         const u = new URL(resourceUrl);

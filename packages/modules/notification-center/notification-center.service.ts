@@ -1,4 +1,11 @@
-import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
@@ -24,6 +31,21 @@ import {
   UpdateNotificationCenterSettingDto,
 } from "./notification-center.dto";
 import { NotificationRegistryService } from "./notification-registry.service";
+
+// Upper bound for the unresolved push-failure admin listing (R5-P2-07).
+const MAX_UNRESOLVED_PUSH_FAILURES = 200;
+
+// Links stored on a notification are rendered as anchors. Site-relative paths
+// and http(s) URLs are the only forms the UI can open safely (R5-P2-02).
+function isSafeNotificationLink(link: string): boolean {
+  if (link.startsWith("/")) return !link.startsWith("//");
+  try {
+    const url = new URL(link);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Host-provided push adapter, injected under the NOTIFICATION_PUSH_PORT token.
@@ -62,6 +84,11 @@ export interface NotifyInput {
    * key is a no-op (the existing record is returned).
    */
   deduplicationKey?: string;
+  /**
+   * Caller identity for the HTTP delivery endpoint. Set only by the controller;
+   * internal job callers omit it because they act on behalf of the platform.
+   */
+  actorUserId?: string;
 }
 
 export interface NotifyResult {
@@ -118,6 +145,19 @@ export class NotificationCenterService {
     const declared = this.registry.get(input.notificationKey);
     if (!declared) {
       throw new NotFoundException(`Notification is not registered: ${input.notificationKey}`);
+    }
+
+    // The HTTP delivery endpoint accepts a client-supplied projectId: it must
+    // be the caller's own project, otherwise a permission holder could inject
+    // notifications into an unrelated project (R5-P2-02).
+    if (input.actorUserId && input.projectId) {
+      await this.assertProjectVisible(input.actorUserId, input.projectId);
+    }
+    // Links are rendered as an anchor in the frontend; only site-relative
+    // paths and http(s) URLs are allowed so a stored `javascript:` link can
+    // never become a click target (R5-P2-02).
+    if (input.link && !isSafeNotificationLink(input.link)) {
+      throw new BadRequestException(`Notification link scheme is not allowed: ${input.link}`);
     }
 
     const setting = await this.prisma.notificationSetting.findUnique({ where: { key: input.notificationKey } });
@@ -355,7 +395,11 @@ export class NotificationCenterService {
   }
 
   async markRead(userId: string, id: string): Promise<MarkNotificationReadResponseDto> {
-    const record = await this.prisma.notificationRecord.findUnique({ where: { id } });
+    // Scope the lookup exactly like list/unreadCount: a record outside the
+    // caller's visible projects must read as not-found, not be marked read.
+    const record = await this.prisma.notificationRecord.findFirst({
+      where: { id, ...(await this.buildProjectVisibilityWhere(userId)) },
+    });
     if (!record) {
       throw new NotFoundException(`Notification not found: ${id}`);
     }
@@ -420,6 +464,10 @@ export class NotificationCenterService {
     const failures = await this.prisma.notificationPushFailure.findMany({
       where: { resolvedAt: null },
       orderBy: { createdAt: "desc" },
+      // Unresolved failures accumulate forever when a recipient stays broken;
+      // this admin view is bounded so the response cannot grow without limit
+      // (R5-P2-07).
+      take: MAX_UNRESOLVED_PUSH_FAILURES,
       include: { notificationRecord: { select: { title: true } } },
     });
     return failures.map((failure) => ({
@@ -450,6 +498,15 @@ export class NotificationCenterService {
       return undefined;
     }
     return { OR: [{ projectId: null }, { projectId: { in: visible } }] };
+  }
+
+  // Reject a client-supplied projectId that the caller cannot see. Hosts without
+  // a visibility port keep the legacy platform-wide behavior.
+  private async assertProjectVisible(userId: string, projectId: string): Promise<void> {
+    if (!this.visibilityPort) return;
+    const visible = await this.visibilityPort.visibleProjectIds(userId);
+    if (visible === "all" || visible.includes(projectId)) return;
+    throw new ForbiddenException(`Project not visible to the caller: ${projectId}`);
   }
 
   // Notifications created before the user account existed stay invisible,

@@ -183,7 +183,9 @@ export class AuthService {
 
     // Auto-approve the email only in explicit non-production environments; an
     // unset or unexpected ENVIRONMENT must fail closed and send the email.
-    const environment = process.env.ENVIRONMENT;
+    // ENVIRONMENT is deployment-level and owned by the framework (declared in
+    // the framework env block), so it is not an account-scoped config key.
+    const environment = this.config.get<string>("ENVIRONMENT");
     if (environment === "development" || environment === "test") {
       const emailId = user.emails[0]?.id;
       if (emailId)

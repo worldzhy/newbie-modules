@@ -42,7 +42,7 @@ export class ResourceService {
   async getAverageResourceList(query: Record<string, unknown>) {
     const { appId, type = 1, pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, beginTime, endTime, url } = query;
     const match: Record<string, unknown> = { speedType: Number(type) };
-    if (url) match.name = { $regex: new RegExp(String(url), "i") };
+    if (url) match.name = { $regex: new RegExp(func.escapeRegExp(url), "i") };
     if (beginTime || endTime) {
       const createTime: Record<string, unknown> = {};
       if (beginTime) createTime.$gte = func.toDate(beginTime);

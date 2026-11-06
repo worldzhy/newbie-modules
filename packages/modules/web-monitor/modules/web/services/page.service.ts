@@ -24,7 +24,7 @@ export class PageService {
     }
     func.setMatchTime(query, match);
     if (type) match.speedType = Number(type);
-    if (url) match.url = { $regex: new RegExp(String(url), "i") };
+    if (url) match.url = { $regex: new RegExp(func.escapeRegExp(url), "i") };
     const group_id = { url: "$url" };
     return url
       ? await this.oneThread(appIdStr, match, Number(pageNo), Number(pageSize), group_id)

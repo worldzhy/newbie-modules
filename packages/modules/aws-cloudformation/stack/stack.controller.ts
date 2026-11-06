@@ -7,7 +7,7 @@ import { AwsCloudformationService } from "@modules/aws-cloudformation/aws-cloudf
 import { StackCommandResult } from "./stack.service";
 import { StackSnapshot } from "./stack.helper";
 import { AppHostStack } from "./app-host.stack";
-import { ListStacksRequestDto, RunStackCommandRequestDto } from "./stack.dto";
+import { ListStacksRequestDto, CreateStackDto, RunStackCommandRequestDto } from "./stack.dto";
 
 @ApiTags("AWS CloudFormation Stack")
 @ApiBearerAuth()
@@ -60,8 +60,15 @@ export class AwsCloudformationStackController {
       },
     },
   })
-  async createStack(@Body() body: Prisma.AwsResourceStackUncheckedCreateInput): Promise<AwsResourceStack> {
-    return await this.prisma.awsResourceStack.create({ data: body });
+  async createStack(@Body() body: CreateStackDto): Promise<AwsResourceStack> {
+    return await this.prisma.awsResourceStack.create({
+      data: {
+        name: body.name,
+        type: body.type,
+        params: body.params as Prisma.InputJsonValue | undefined,
+        environmentId: body.environmentId,
+      },
+    });
   }
 
   @Get("")

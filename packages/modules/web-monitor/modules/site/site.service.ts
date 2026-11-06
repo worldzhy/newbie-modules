@@ -117,7 +117,7 @@ export class SiteService {
   async getSitesForUserId(query: Record<string, unknown>, userId: string) {
     const { systemName, type, projectId } = query;
     const param: Record<string, unknown> = {};
-    if (systemName) param.systemName = new RegExp(String(systemName));
+    if (systemName) param.systemName = new RegExp(func.escapeRegExp(systemName));
     if (type) param.type = type;
     const projectIds = await this.userProjectIds(userId);
     // Restrict to the caller's projects; an explicit projectId filter is honoured

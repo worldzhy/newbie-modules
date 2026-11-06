@@ -13,7 +13,7 @@ import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audi
  * idempotent replay and returns the already-minted token pair, so a dropped
  * response or a double-fetch from two tabs does not look like token theft.
  * Outside the window the same token is a genuine reuse and the session is
- * revoked (ADR-034).
+ * revoked (nightwatch-backend ADR-034).
  */
 const REFRESH_IDEMPOTENCY_WINDOW_MS = 30_000;
 

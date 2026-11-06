@@ -5,7 +5,7 @@ import { UnauthorizedException } from "@nestjs/common";
 import { SessionService } from "./session.service";
 
 /**
- * Behavior tests for SessionService.refresh (ADR-034). Prisma and TokenService
+ * Behavior tests for SessionService.refresh (nightwatch-backend ADR-034). Prisma and TokenService
  * are replaced by hand-rolled fakes so the test exercises the rotation CAS,
  * the idempotency window, and genuine-reuse revocation without a database.
  */

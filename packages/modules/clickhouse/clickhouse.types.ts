@@ -6,6 +6,9 @@ export const ClickHouseDataType = {
   UInt32: "UInt32",
   Int32: "Int32",
   LowCardinality: (inner: string) => `LowCardinality(${inner})`,
+  // Nullable(inner) keeps "value absent" distinguishable from the column's
+  // zero/default value (R12-02).
+  Nullable: (inner: string) => `Nullable(${inner})`,
 } as const;
 
 // Column definition: type + optional default value

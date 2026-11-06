@@ -168,7 +168,7 @@ export class TokenService {
 
   /**
    * Deterministic SHA-256 hex digest of a token. Used to store refresh tokens
-   * as hashes at rest (ADR-034): lookup and rotation match by hash, and a
+   * as hashes at rest (nightwatch-backend ADR-034): lookup and rotation match by hash, and a
    * database read never yields a usable credential.
    */
   hashToken(token: string): string {

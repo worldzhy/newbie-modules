@@ -28,7 +28,12 @@ model User {
   gender               UserGender?
   avatarFileId         String?
   uiAvatarsUrl         String?
-  timezone             String           @default("America/Los_Angeles")
+  // Display preferences are nullable with no default: the framework does not
+  // choose a language, theme or timezone for the user. Each host falls back at
+  // its own boundary (ADR-049).
+  language             String? // BCP-47 tag, e.g. "en" or "zh"
+  theme                UserTheme?
+  timezone             String?
   twoFactorMethod      MfaMethod        @default(NONE)
   twoFactorPhone       String?
   twoFactorSecret      String?
@@ -180,7 +185,7 @@ model Session {
   id              Int      @id @default(autoincrement())
   accessToken     String   @unique
   // SHA-256 hex of the current refresh token. The plaintext is never stored
-  // (ADR-034); refresh matches by hash and rotates with a CAS update.
+  // (nightwatch-backend ADR-034); refresh matches by hash and rotates with a CAS update.
   refreshTokenHash        String   @unique
   // Hash of the token rotated out by the most recent refresh. Used to detect
   // idempotent retries of the same rotation within the short reuse window.
@@ -278,6 +283,14 @@ enum UserGender {
   FEMALE
   NONBINARY
   UNKNOWN
+
+  @@schema("module/account")
+}
+
+enum UserTheme {
+  LIGHT
+  DARK
+  SYSTEM
 
   @@schema("module/account")
 }
