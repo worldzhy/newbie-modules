@@ -6,11 +6,15 @@ import { func } from "../../shared/utils";
 import { WebMonitorSiteResponseDto } from "./site.dto";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
+import { WebMonitorAccessService } from "../web/web-monitor-access.service";
 
 @ApiTags("Frontend Monitor / System")
 @Controller("/web-monitor/system")
 export class SiteController {
-  constructor(private readonly site: SiteService) {}
+  constructor(
+    private readonly site: SiteService,
+    private readonly access: WebMonitorAccessService,
+  ) {}
 
   @Post("/add")
   @RequirePermission(PermissionAction.Create, "WebMonitorSite")
@@ -41,10 +45,15 @@ export class SiteController {
 
   @Get("/getSystemForId")
   @RequirePermission(PermissionAction.Get, "WebMonitorSite")
-  @ApiOperation({ summary: "Get system by appId" })
+  @ApiOperation({ summary: "Get system by applicationId (with project membership gate)" })
   @ApiResponse({ type: WebMonitorSiteResponseDto })
-  async getSiteForId(@Query("appId") appId: string) {
-    const result = await this.site.getSiteForDb(appId);
+  async getSiteForId(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId } = q;
+    if (!projectId || !applicationId) {
+      throw new BadRequestException("projectId and applicationId are required");
+    }
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const result = await this.site.getSiteForDb(appKey);
     return func.result({ data: result });
   }
 
@@ -61,12 +70,14 @@ export class SiteController {
   @RequirePermission(PermissionAction.Delete, "WebMonitorSite")
   @ApiOperation({ summary: "Delete a user from a system" })
   @ApiResponse({ type: Object })
-  async deleteWebSiteUser(@Body() body: Record<string, unknown>) {
-    const appId = body.appId;
-    const userToken = body.userToken;
-    if (!appId) throw new BadRequestException("Delete a user from the system: appId must not be empty");
-    if (!userToken) throw new BadRequestException("Delete a user from the system: user token must not be empty");
-    const result = await this.site.deleteWebSiteUser(String(appId), String(userToken));
+  async deleteWebSiteUser(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, userToken } = body;
+    if (!projectId || !applicationId) {
+      throw new BadRequestException("projectId and applicationId are required");
+    }
+    if (!userToken) throw new BadRequestException("Delete a user from the system: userToken is required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const result = await this.site.deleteWebSiteUser(appKey, String(userToken));
     return func.result({ data: result });
   }
 
@@ -74,24 +85,28 @@ export class SiteController {
   @RequirePermission(PermissionAction.Create, "WebMonitorSite")
   @ApiOperation({ summary: "Add a user to a system" })
   @ApiResponse({ type: Object })
-  async addWebSiteUser(@Body() body: Record<string, unknown>) {
-    const appId = body.appId;
-    const userToken = body.userToken;
-    if (!appId) throw new BadRequestException("Add a user to the system: appId must not be empty");
-    if (!userToken) throw new BadRequestException("Add a user to the system: user token must not be empty");
-    const result = await this.site.addWebSiteUser(String(appId), String(userToken));
+  async addWebSiteUser(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, userToken } = body;
+    if (!projectId || !applicationId) {
+      throw new BadRequestException("projectId and applicationId are required");
+    }
+    if (!userToken) throw new BadRequestException("Add a user to the system: userToken is required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const result = await this.site.addWebSiteUser(appKey, String(userToken));
     return func.result({ data: result });
   }
 
   @Post("/deleteSystem")
   @RequirePermission(PermissionAction.Delete, "WebMonitorSite")
-  @ApiOperation({ summary: "Delete a system" })
+  @ApiOperation({ summary: "Delete a system (with project membership gate)" })
   @ApiResponse({ type: Object })
-  async deleteSite(@Body() body: Record<string, unknown>) {
-    const appId = body.appId;
-    const type = body.type;
-    if (!appId) throw new BadRequestException("Delete a system: appId must not be empty");
-    const result = await this.site.deleteSite(String(appId), String(type));
+  async deleteSite(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, type } = body;
+    if (!projectId || !applicationId) {
+      throw new BadRequestException("projectId and applicationId are required");
+    }
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const result = await this.site.deleteSite(appKey, String(type));
     return func.result({ data: result });
   }
 }
