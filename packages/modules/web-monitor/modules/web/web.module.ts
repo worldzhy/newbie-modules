@@ -29,6 +29,7 @@ import { WebCustomService } from "./services/custom.service";
 import { WebReportTaskService } from "./services/report-task.service";
 import { WebPvuvipTaskService } from "./services/pvuvip-task.service";
 import { WebIpTaskService } from "./services/ip-task.service";
+import { WebMonitorAccessService } from "./web-monitor-access.service";
 
 @Module({
   imports: [WebMonitorClickHouseModule, WebMonitorModelsModule, SharedModule, DayReportModule, SiteModule],
@@ -55,6 +56,7 @@ import { WebIpTaskService } from "./services/ip-task.service";
     WebReportTaskService,
     WebPvuvipTaskService,
     WebIpTaskService,
+    WebMonitorAccessService,
     // Installation identity lives here (not on the root WebMonitorModule) so
     // WebReportController can resolve WebTokenResolver without a module cycle.
     WebInstallationService,
