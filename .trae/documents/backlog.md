@@ -39,14 +39,5 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 （Wave 5 最后一条 P2-08 已修复：event-emitter `record()` 前加 lazy `deleteMany({ emittedAt: < now - N days })`，默认 30 天，`EVENT_EMISSION_RETENTION_DAYS` env 可覆盖；无 @nestjs/schedule 依赖、无 migration。）
 
-## web-monitor 告警来源分级（ADR-050 落地，2026-11-06 入账）
-
-契约真源：`.trae/documents/decisions/ADR-050-web-monitor-console-channel-severity.md`（已采纳）；评审依据：`.trae/documents/expert-review-2026-11-06-round18.md`（R18-01 / R18-02，open）。
-
-- [ ] `[R18-01]` registry：`js-error-spike` 计数与 topItems 查询加黑名单 `api != "console-error"`（`jobs.service.ts` L253-L288），否则 5B 下 console 噪音仍触发 high 告警。
-- [ ] `[R18-02]` SDK：资源加载失败改用 `resource-error`（`core.ts` L461-L482），并同步 `ERROR_APIS` 取值规范化；registry 首现分组与基线查询加白名单 `{onerror, unhandled-rejection}`（L294-L333）。
-- [ ] `[R18-01/R18-02]` 契约测试四向 + 未修复代码下的阴性对照；装配验证前清空错误表。
-- [ ] `[R18-03]` SDK：`ERROR_APIS` 改名后校验发布导出面引用（当前跨仓为 0），按 1.x minor 发布。
-- [ ] `[R18-05/R18-06]` 文档订正：`name` 措辞、告警分组主体、`error.ts` 全路径；前端聚合口径变化写入 ADR 影响节。
 
 

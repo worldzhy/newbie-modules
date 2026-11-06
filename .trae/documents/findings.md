@@ -126,13 +126,21 @@ carry-over 更新（2026-11-06）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转
 
 | ID     | 仓             | 标题                                                                                                                                          | 严重度 | 暴露面         | 可达性    | 状态 |
 | ------ | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------- | --------- | ---- |
-| R18-01 | newbie-modules | `js-error-spike`（high，阈值 10）对错误表全窗口计数、无 `type`/`api` 过滤；5B 下降级入库的 console 事件仍可触发 high 告警，ADR 验收标准"console 不产生 high 告警"不可达（jobs.service.ts L253-L288、L77） | P1     | artifact + live | anonymous | open |
-| R18-02 | devbie (SDK)   | `api=onerror` 同时用于资源加载失败（core.ts L473）与 JS 未捕获异常（L491/L497），决策 4 的 `api ∈ {onerror, unhandled-rejection}` 无法只保留运行时异常，资源噪音仍进 high 首现告警 | P1     | artifact       | anonymous | open |
-| R18-03 | devbie (SDK)   | `ERRORAPIS` 为发布包导出符号（`dist/common/utils.d.ts` L15-L18），ADR 决策 2 未声明导出面/消费方校验（当前跨仓外部引用 0）                    | P2     | artifact       | 构建期    | open |
-| R18-04 | newbie-modules | 枚举改值 + 不迁移：历史 `api='reject'` 行退出新基线，已见运行时错误会重新首现；ADR 未写"验证前清表"前置。本机 CH 实例当前无 web 错误表，无实际影响 | P2     | docs           | N/A       | open |
-| R18-05 | newbie-modules | 背景取证措辞/路径：`name = Error` 实为 `error.name`；分组发生在告警任务而非 ClickHouse 模型；`models/clickhouse/web/error.ts` 缺 `packages/modules/web-monitor/` 前缀 | P2     | docs           | N/A       | open |
-| R18-06 | newbie-modules | 决策 3 的可观察影响未记录：`type=script → log` 改变前端错误列表聚合口径（error.service.ts L72-L77），ADR 却称前端不涉及改动             | P2     | docs           | N/A       | open |
+| R18-01 | newbie-modules | `js-error-spike`（high，阈值 10）对错误表全窗口计数、无 `type`/`api` 过滤；5B 下降级入库的 console 事件仍可触发 high 告警，ADR 验收标准"console 不产生 high 告警"不可达（jobs.service.ts L253-L288、L77） | P1     | artifact + live | anonymous | fixed |
+| R18-02 | devbie (SDK)   | `api=onerror` 同时用于资源加载失败（core.ts L473）与 JS 未捕获异常（L491/L497），决策 4 的 `api ∈ {onerror, unhandled-rejection}` 无法只保留运行时异常，资源噪音仍进 high 首现告警 | P1     | artifact       | anonymous | fixed |
+| R18-03 | devbie (SDK)   | `ERRORAPIS` 为发布包导出符号（`dist/common/utils.d.ts` L15-L18），ADR 决策 2 未声明导出面/消费方校验（当前跨仓外部引用 0）                    | P2     | artifact       | 构建期    | fixed |
+| R18-04 | newbie-modules | 枚举改值 + 不迁移：历史 `api='reject'` 行退出新基线，已见运行时错误会重新首现；ADR 未写"验证前清表"前置。本机 CH 实例当前无 web 错误表，无实际影响 | P2     | docs           | N/A       | fixed |
+| R18-05 | newbie-modules | 背景取证措辞/路径：`name = Error` 实为 `error.name`；分组发生在告警任务而非 ClickHouse 模型；`models/clickhouse/web/error.ts` 缺 `packages/modules/web-monitor/` 前缀 | P2     | docs           | N/A       | fixed |
+| R18-06 | newbie-modules | 决策 3 的可观察影响未记录：`type=script → log` 改变前端错误列表聚合口径（error.service.ts L72-L77），ADR 却称前端不涉及改动             | P2     | docs           | N/A       | fixed |
 
 - 误报剔除：反驳代理将 console 分支概括为"一律 type=log"，与 core.ts L528→L49 不符，按读码裁决不采信；"基线占指纹使真崩溃永不告警"仅在 name/resourceUrl/line 重合时成立，并入 A7 结论、不单列。
 - 评审时点状态：ADR-050 当时为「提议中」（决策 5 待拍板）；R18-01/R18-02 需先补决策 4 再实施。
 - 2026-11-06 裁决：ADR-050 已定稿（状态改为已采纳）——5B；首现白名单 + 尖峰黑名单；新增 `resource-error` 取值。R18-01/R18-02 保持 **open**，待 SDK 与 registry 实现落地后按不变量重验关闭（不是按"ADR 已改"关闭）。
+- 2026-11-06 关闭（实现 + 四向取证）：
+  - R18-01 fixed：`packages/modules/web-monitor/modules/jobs/error-source.ts` 新增 `SPIKE_SOURCE_FILTER`（`api NOT IN ('console-error')`），`jobs.service.ts` 的 spike 计数与 topItems 两条查询均引用；registry `1218851`，宿主装配 `6422537`。
+  - R18-02 fixed：SDK `ERROR_APIS` 取值规范化并新增 `resourceError`，资源加载失败分支改用 `resource-error`（`devbie 6837c2ee`，`@devbie/web-monitor-sdk@1.6.0` 已发布）；registry 首现分组与基线两条查询引用 `FIRST_SEEN_SOURCE_FILTER`（`api IN ('onerror','unhandled-rejection')`）。
+  - 契约测试：`packages/modules/web-monitor/modules/jobs/error-source.test.ts`（4 断言，含接线计数）；未修复版本的阴性对照在 `jobs.service.ts` 旧接线副本下红于接线断言。
+  - 端到端（清表后 4 向）：console → `log/console-error` 入库、13 行零告警；资源 → `resource/resource-error` 入库、零告警；运行时 → `script/onerror` 触发 1 条 `js-error-first-seen`（11:57:00）；ajax（`api=""`）→ 12 行触发 `js-error-spike`「12 JS errors in 60s」（计 12 而非 25，证明 console 未计入）。
+  - R18-03 fixed：`ERRORAPIS` 改名后跨仓外部引用为 0，按 1.6.0 minor 发布并通过。
+  - R18-04 fixed：ADR-050「验证（registry-first）」已写明"清表"前置。
+  - R18-05/R18-06 fixed：ADR-050 已按评审订正措辞（`error.name`、分组在告警任务、`models/clickhouse/web/error.ts` 全路径），并在影响节记录 `type=script → log` 改变前端错误列表聚合口径（`error.service.ts` L72-L77）。

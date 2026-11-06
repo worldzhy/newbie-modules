@@ -83,13 +83,14 @@
 
 ## Checklist
 
-- [ ] SDK：`ERROR_APIS` 改名与取值规范化；console 一律 `type=log`；资源加载失败改用 `resource-error`
-- [ ] SDK：核对导出面引用并按 1.x minor 发布
-- [ ] registry：`FIRST_SEEN_SOURCES` / `NON_ERROR_SOURCES` 常量 + 首现（分组/基线）与尖峰（计数/topItems）四处查询改造
-- [ ] registry：契约测试四向 + 未修复代码下的阴性对照
-- [ ] 装配验证：update → 清表 → 重启 → 三类事件核对（type/api、基线、告警开关）
-- [ ] 文档：round18 评审 R18-05 / R18-06 的措辞与路径订正并入本文
+- [x] SDK：`ERROR_APIS` 改名与取值规范化；console 一律 `type=log`；资源加载失败改用 `resource-error`
+- [x] SDK：核对导出面引用并按 1.x minor 发布
+- [x] registry：`FIRST_SEEN_SOURCES` / `NON_ERROR_SOURCES` 常量 + 首现（分组/基线）与尖峰（计数/topItems）四处查询改造
+- [x] registry：契约测试四向 + 未修复代码下的阴性对照
+- [x] 装配验证：update → 清表 → 重启 → 三类事件核对（type/api、基线、告警开关）
+- [x] 文档：round18 评审 R18-05 / R18-06 的措辞与路径订正并入本文
 
 ## 更新记录
 
+- 2026-11-06 落地验收：SDK `devbie 6837c2ee`（`@devbie/web-monitor-sdk@1.6.0` 已发布）；registry `1218851`（含 `error-source.ts` 与 `error-source.test.ts`）；宿主装配 `nightwatch-backend 6422537`（无 schema 变更）。E2E 四向：console 13 行 / resource 1 行零告警，runtime 1 行触发首现，ajax 12 行触发尖峰（计 12 条，console 未计入）。
 - 2026-11-06 定稿（状态：提议中 → 已采纳）：决策 5 定为 5B；决策 4 覆盖 `js-error-spike`（与首现分开：白名单 / 黑名单）；决策 2 增加 `resource-error`。依据 `expert-review-2026-11-06-round18.md`（R18-01 / R18-02）。
