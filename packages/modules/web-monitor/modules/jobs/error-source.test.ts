@@ -1,14 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
 
-import {
-  FIRST_SEEN_SOURCE_FILTER,
-  FIRST_SEEN_SOURCES,
-  NON_ERROR_SOURCES,
-  SPIKE_SOURCE_FILTER,
-} from "./error-source.ts";
+import { FIRST_SEEN_SOURCE_FILTER, FIRST_SEEN_SOURCES, NON_ERROR_SOURCES, SPIKE_SOURCE_FILTER } from "./error-source";
 
 /**
  * ADR-050 contract: `api` is the single error-source column, "new error" alerts
@@ -18,18 +13,16 @@ import {
  * The literal source names mirror `ERROR_APIS` in
  * `devbie/packages/web-monitor-sdk/src/common/utils.ts`; the registry cannot
  * import the published SDK, so the cross-repo contract is asserted here.
- *
- * This file is plain JS on purpose: it runs under `node --test` with a direct
- * `.ts` import (the consumer compiles its assembled copy with `allowJs: false`,
- * so it stays out of the build).
  */
 const SDK_RUNTIME_SOURCES = ["onerror", "unhandled-rejection"];
 const SDK_CONSOLE_SOURCE = "console-error";
 const SDK_RESOURCE_SOURCE = "resource-error";
 
-const SERVICE_SOURCE = readFileSync(fileURLToPath(new URL("./jobs.service.ts", import.meta.url)), "utf8");
+// Read the sibling service as text so the test pins the wiring (every signal
+// query consumes the shared predicates) without booting the Nest container.
+const SERVICE_SOURCE = readFileSync(join(__dirname, "jobs.service.ts"), "utf8");
 
-function occurrences(source, needle) {
+function occurrences(source: string, needle: string): number {
   return source.split(needle).length - 1;
 }
 
