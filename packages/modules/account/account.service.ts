@@ -26,6 +26,9 @@ export class AccountService {
         middleName: true,
         lastName: true,
         avatarFileId: true,
+        language: true,
+        theme: true,
+        timezone: true,
         roles: {
           select: {
             role: {

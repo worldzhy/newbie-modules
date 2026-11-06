@@ -1,6 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { MfaMethod, NavPlacement, UserGender } from "@generated/prisma/client";
-import { IsDateString, IsEmail, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
+import { MfaMethod, NavPlacement, UserGender, UserTheme } from "@generated/prisma/client";
+import {
+  IsDateString,
+  IsEmail,
+  IsEnum,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
 
 export class GetCurrentUserResponseDto {
@@ -40,6 +50,15 @@ export class GetCurrentUserResponseDto {
 
   @ApiPropertyOptional({ type: String })
   avatarFileId?: string | null;
+
+  @ApiPropertyOptional({ type: String, description: 'BCP-47 language tag, e.g. "en" or "zh".' })
+  language?: string | null;
+
+  @ApiPropertyOptional({ enum: UserTheme, description: "LIGHT | DARK | SYSTEM" })
+  theme?: UserTheme | null;
+
+  @ApiPropertyOptional({ type: String, description: 'IANA timezone name, e.g. "Asia/Shanghai".' })
+  timezone?: string | null;
 }
 
 /**
@@ -198,6 +217,20 @@ export class UpdateMeDto {
   @IsString()
   @IsOptional()
   timezone?: string;
+
+  // Only the shape is validated here. Whether a given language is supported is
+  // a host concern: the registry cannot know a host's locale list (ADR-049).
+  @ApiPropertyOptional({ type: String, description: 'BCP-47 language tag, e.g. "en" or "zh".' })
+  @IsString()
+  @MaxLength(35)
+  @Matches(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$/, { message: "language must be a BCP-47 language tag" })
+  @IsOptional()
+  language?: string;
+
+  @ApiPropertyOptional({ enum: UserTheme, description: "LIGHT | DARK | SYSTEM" })
+  @IsEnum(UserTheme)
+  @IsOptional()
+  theme?: UserTheme;
 
   @ApiPropertyOptional({ type: String })
   @IsString()

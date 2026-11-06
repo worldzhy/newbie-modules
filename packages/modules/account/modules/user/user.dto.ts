@@ -299,8 +299,8 @@ export class UserResponseDto {
   @ApiPropertyOptional({ type: String })
   uiAvatarsUrl?: string | null;
 
-  @ApiProperty({ type: String })
-  timezone!: string;
+  @ApiPropertyOptional({ type: String })
+  timezone?: string | null;
 
   @ApiProperty({ enum: MfaMethod })
   twoFactorMethod!: MfaMethod;
