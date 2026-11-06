@@ -17,6 +17,7 @@ import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.s
 import { WebMonitorClickHouseService } from "../../models/clickhouse/web-monitor-clickhouse.service";
 import { SystemDocument } from "../../models/mongo/system.schema";
 import { WEB_THRESHOLD_ALERT_EVENT, WebThresholdAlertCategory, WebThresholdAlertEvent } from "./threshold-alert.event";
+import { FIRST_SEEN_SOURCE_FILTER, SPIKE_SOURCE_FILTER } from "./error-source";
 import * as os from "os";
 
 @Injectable()
@@ -256,8 +257,10 @@ export class JobsService implements OnModuleInit {
       // Count both errors and distinct identified visitors. Anonymous
       // traffic (empty markUser) cannot be attributed, so the user gate only
       // applies when at least one visitor in the window is identifiable.
+      // Console rows are diagnostics rather than an error rate (ADR-050); the
+      // count and the top-items grouping share the same source predicate.
       const countRows = await errorModel.find({
-        where: timeFilter.where,
+        where: `${timeFilter.where} AND ${SPIKE_SOURCE_FILTER}`,
         select: "count() AS total, uniqExactIf(markUser, markUser != '') AS markedUsers",
         queryParams: timeFilter.queryParams,
       });
@@ -266,7 +269,7 @@ export class JobsService implements OnModuleInit {
       const enoughUsers = markedUsers === 0 || markedUsers >= JobsService.JS_ERROR_SPIKE_USER_COUNT;
       if (count >= JobsService.JS_ERROR_SPIKE_COUNT && enoughUsers) {
         const topRows = await errorModel.find({
-          where: timeFilter.where,
+          where: `${timeFilter.where} AND ${SPIKE_SOURCE_FILTER}`,
           select: "name, type, resourceUrl, COUNT() AS count",
           groupBy: "name, type, resourceUrl",
           orderBy: "count DESC",
@@ -290,12 +293,14 @@ export class JobsService implements OnModuleInit {
     // First-seen JS errors (Sentry-style new issues): group the window by
     // error fingerprint and alert for fingerprints with no row before the
     // window. A fingerprint that persists is already "known" one minute
-    // later, so it never re-alerts.
+    // later, so it never re-alerts. Only runtime sources qualify (ADR-050);
+    // the grouping and the baseline share that predicate so console or
+    // resource rows can neither alert nor occupy a fingerprint.
     await this.runSignal("js-error-first-seen", async () => {
       const errorModel = await this.clickhouse.WebError(system.appKey);
       const timeFilter = this.buildClickHouseTimeFilter(windowStart, windowEnd);
       const groups = await errorModel.find({
-        where: timeFilter.where,
+        where: `${timeFilter.where} AND ${FIRST_SEEN_SOURCE_FILTER}`,
         select: "name, resourceUrl, line, type, COUNT() AS count, uniqExactIf(markUser, markUser != '') AS users",
         groupBy: "name, resourceUrl, line, type",
         orderBy: "count DESC",
@@ -309,7 +314,7 @@ export class JobsService implements OnModuleInit {
         const fingerprint = this.errorFingerprint(name, resourceUrl, line);
         const beforeFilter = this.buildClickHouseBeforeFilter(windowStart);
         const existedRows = await errorModel.find({
-          where: `${beforeFilter.where} AND name = {name:String} AND resourceUrl = {resourceUrl:String} AND line = {line:String}`,
+          where: `${beforeFilter.where} AND ${FIRST_SEEN_SOURCE_FILTER} AND name = {name:String} AND resourceUrl = {resourceUrl:String} AND line = {line:String}`,
           select: "1",
           limit: 1,
           queryParams: { ...beforeFilter.queryParams, name, resourceUrl, line },
