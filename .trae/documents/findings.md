@@ -182,3 +182,21 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 - `R20-08` / `R20-09` / `R20-10` / `R20-11` / `R20-31`..`R20-33` / `R20-41`：模块层 P2/P3（message-tracker 不可装配、alert-lifecycle 文本断言、API Key 限制不校验、refreshTokenNext 明文、ioredis 超时、CH 时间语义、Approved Subnet 审计）。
 - `R20-03`（P1）：本仓 `lark.service.ts` 12 处 raw error 入日志，与宿主金蝶同根因；executed 序列化探针证明 token 会被打印。
 
+
+## round21（2026-11-07，scope=`plan`：alert-lifecycle resolved→recovered 改动集，报告在本仓 `.trae/documents/expert-review-2026-11-07-round21.md`）
+
+锚点：newbie-modules `2513d4c`（0 dirty）/ nightwatch-backend `0a6d7a6`（0 dirty）/ nightwatch-frontend `fd25aca`（1 dirty=next-env.d.ts 生成噪音，不在被审域）。结论摘要：9 条主张全部成立（四层契约一致、E2E 证据独立复核为真）；方案外新发现 4 条均 P2。
+
+| ID     | 仓                  | 标题                                                                                                                            | 严重度 | 暴露面 | 可达性       | 状态 |
+| ------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------ | ------ | ------ | ---- |
+| R21-01 | nightwatch-frontend | 契约改名 commit 12228d7 的 api.ts 1582 行 diff 中仅 6 行契约相关，其余为 apits 生成器升级 churn，稀释可审性                      | P2     | source | N/A    | fixed |
+| R21-02 | nightwatch-backend  | 2 条历史 NotificationRecord 的 deduplicationKey 残留 `:resolved:` 段（status 已迁移为 recovered；分钟桶保证唯一性，未上线数据）    | P2     | live   | 仅管理员 | withdrawn |
+| R21-03 | newbie-modules      | notification-center.service.ts:184-186 低于 minimumSeverity 的通知静默丢弃（`dropped:true`，无日志无指标），排障盲区               | P2     | live   | 仅管理员 | fixed |
+| R21-04 | nightwatch-backend  | url-check/heartbeat 恢复通知 notify 未传 `status`，落库默认 firing、recoveredAt=null，与 dedup key `:recovered:` 段不一致           | P2     | live   | 任意登录用户 | fixed |
+
+处置（2026-11-07，用户拍板「修 R21-03+04」）：
+
+- R21-01 fixed：约定固化进 worldzhy-knowledge `skills/apigen-refactor/SKILL.md` 收尾节（`30dfe62`）——apits 重生成产生的契约外 churn 必须单独一笔提交，不得与功能契约改动混合。
+- R21-02 withdrawn：未上线环境数据；分钟桶保证 dedup key 唯一性不受 `:resolved:` 残留影响；数据随下次清库消失，不做迁移。
+- R21-03 fixed：registry `d469238`（drop 分支补 debug 日志）+ 宿主装配 `f930bce`。报告中行号引用 `:181-184` 系凭记忆重构所致偏差，实际 drop 分支在 `:184-186`，此处已更正。
+- R21-04 fixed：宿主 `9961dc8`（url-check/heartbeat 恢复通知补 `status:"recovered"` + `recoveredAt`）。验证边界：tsc+eslint 绿、build 绿、重启健康检查正常；两调用点复用既有 center 落库路径（其 recovered 相位已由 round21 E2E 证据覆盖），R21-03 的 debug 日志行无独立运行时探针。
