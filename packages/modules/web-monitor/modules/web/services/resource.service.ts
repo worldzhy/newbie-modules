@@ -15,7 +15,7 @@ export class ResourceService {
   }
 
   async getResourceForType(
-    appId: string,
+  appKey: string,
     url: string,
     speedType: number,
     pageNo: number,
@@ -25,9 +25,9 @@ export class ResourceService {
   ) {
     const match: Record<string, unknown> = { url, speedType: Number(speedType) };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
-    const count = await this.models.WebResource(appId).count(match).read("secondaryPreferred").exec();
+    const count = await this.models.WebResource(appKey).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models
-      .WebResource(appId)
+      .WebResource(appKey)
       .aggregate([
         { $match: match },
         { $sort: { createTime: -1 } },
@@ -40,7 +40,7 @@ export class ResourceService {
   }
 
   async getAverageResourceList(query: Record<string, unknown>) {
-    const { appId, type = 1, pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, beginTime, endTime, url } = query;
+    const { appId: appKey, type = 1, pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, beginTime, endTime, url } = query;
     const match: Record<string, unknown> = { speedType: Number(type) };
     if (url) match.name = { $regex: new RegExp(func.escapeRegExp(url), "i") };
     if (beginTime || endTime) {
@@ -51,12 +51,12 @@ export class ResourceService {
     }
     const group_id = { url: "$name", method: "$method" };
     const count = await this.models
-      .WebResource(String(appId))
+      .WebResource(String(appKey))
       .distinct("name", match)
       .read("secondaryPreferred")
       .exec();
     const dataList = await this.models
-      .WebResource(String(appId))
+      .WebResource(String(appKey))
       .aggregate([
         { $match: match },
         {
@@ -76,11 +76,11 @@ export class ResourceService {
     return { dataList, totalNum: count.length, pageNo: Number(pageNo) };
   }
 
-  async getOneResourceAvg(appId: string, url: string, beginTime?: string, endTime?: string) {
+  async getOneResourceAvg(appKey: string, url: string, beginTime?: string, endTime?: string) {
     const match: Record<string, unknown> = { name: url };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
     const rows = await this.models
-      .WebResource(appId)
+      .WebResource(appKey)
       .aggregate([
         { $match: match },
         { $group: { _id: null, count: { $sum: 1 }, duration: { $avg: "$duration" }, bodySize: { $avg: "$bodySize" } } },
@@ -91,7 +91,7 @@ export class ResourceService {
   }
 
   async getOneResourceList(
-    appId: string,
+  appKey: string,
     url: string,
     pageNo: number = 1,
     pageSize: number = WEB_MONITOR_CONFIG.pageSize,
@@ -100,9 +100,9 @@ export class ResourceService {
   ) {
     const match: Record<string, unknown> = { name: url };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
-    const count = await this.models.WebResource(appId).count(match).read("secondaryPreferred").exec();
+    const count = await this.models.WebResource(appKey).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models
-      .WebResource(appId)
+      .WebResource(appKey)
       .aggregate([
         { $match: match },
         { $sort: { createTime: -1 } },
@@ -114,7 +114,7 @@ export class ResourceService {
     return { dataList, totalNum: count, pageNo: Number(pageNo) };
   }
 
-  async getOneResourceDetail(appId: string, id: string) {
-    return await this.models.WebResource(appId).findOne({ _id: id }).read("secondaryPreferred").exec();
+  async getOneResourceDetail(appKey: string, id: string) {
+    return await this.models.WebResource(appKey).findOne({ _id: id }).read("secondaryPreferred").exec();
   }
 }

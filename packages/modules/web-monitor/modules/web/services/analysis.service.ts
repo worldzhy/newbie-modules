@@ -20,7 +20,7 @@ export class WebMonitorAnalysisService {
   }
 
   async getAnalysislist(
-    appId: string,
+  appKey: string,
     beginTime?: string,
     endTime?: string,
     filter?: { phone?: string; uid?: string },
@@ -38,7 +38,7 @@ export class WebMonitorAnalysisService {
       query.$match.createTime = createTime;
     }
     const result = await this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .aggregate([
         query,
         { $group: { _id: { markUser: "$markUser" }, visitTime: { $first: "$createTime" } } },
@@ -49,25 +49,25 @@ export class WebMonitorAnalysisService {
     return { list: result };
   }
 
-  async getAnalysisOneList(appId: string, markUser: string) {
+  async getAnalysisOneList(appKey: string, markUser: string) {
     return await this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .find({ markUser })
       .read("secondaryPreferred")
       .sort({ createTime: 1 })
       .exec();
   }
 
-  async getTopDatas(appId: string, beginTime?: string, endTime?: string) {
-    const top_pages = await this.getRealTimeTopPagesForDb(appId, beginTime, endTime);
-    const top_jump_out = await this.getRealTimeTopJumpOutForDb(appId, beginTime, endTime);
-    const top_browser = await this.getRealTimeTopBrowserForDb(appId, beginTime, endTime);
-    const provinces = await this.getRealTimeTopProvinceForDb(appId, beginTime, endTime);
+  async getTopDatas(appKey: string, beginTime?: string, endTime?: string) {
+    const top_pages = await this.getRealTimeTopPagesForDb(appKey, beginTime, endTime);
+    const top_jump_out = await this.getRealTimeTopJumpOutForDb(appKey, beginTime, endTime);
+    const top_browser = await this.getRealTimeTopBrowserForDb(appKey, beginTime, endTime);
+    const provinces = await this.getRealTimeTopProvinceForDb(appKey, beginTime, endTime);
     return { top_pages, top_jump_out, top_browser, provinces };
   }
 
-  async getProvinceCount(appId: string, beginTime?: string, endTime?: string) {
-    const res = await this.getRealTimeTopProvinceForDb(appId, beginTime, endTime);
+  async getProvinceCount(appKey: string, beginTime?: string, endTime?: string) {
+    const res = await this.getRealTimeTopProvinceForDb(appKey, beginTime, endTime);
     return { provinces: res };
   }
 
@@ -85,10 +85,10 @@ export class WebMonitorAnalysisService {
     return $match;
   }
 
-  private async getRealTimeTopPagesForDb(appId: string, beginTime?: string, endTime?: string) {
+  private async getRealTimeTopPagesForDb(appKey: string, beginTime?: string, endTime?: string) {
     const $match = this.getMatch(beginTime, endTime);
     return await this.models
-      .WebPage(appId)
+      .WebPage(appKey)
       .aggregate([
         { $match: { ...$match } },
         { $group: { _id: { url: "$url" }, count: { $sum: 1 } } },
@@ -99,10 +99,10 @@ export class WebMonitorAnalysisService {
       .exec();
   }
 
-  private async getRealTimeTopJumpOutForDb(appId: string, beginTime?: string, endTime?: string) {
+  private async getRealTimeTopJumpOutForDb(appKey: string, beginTime?: string, endTime?: string) {
     const $match = this.getMatch(beginTime, endTime);
     return await this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .aggregate([
         { $match: $match },
         { $group: { _id: { markUser: "$markUser" }, urls: { $push: "$url" }, count: { $sum: 1 } } },
@@ -115,10 +115,10 @@ export class WebMonitorAnalysisService {
       .exec();
   }
 
-  private async getRealTimeTopBrowserForDb(appId: string, beginTime?: string, endTime?: string) {
+  private async getRealTimeTopBrowserForDb(appKey: string, beginTime?: string, endTime?: string) {
     const $match = this.getMatch(beginTime, endTime);
     return await this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .aggregate([
         { $match: { ...$match } },
         { $group: { _id: { browser: "$browser" }, count: { $sum: 1 } } },
@@ -129,10 +129,10 @@ export class WebMonitorAnalysisService {
       .exec();
   }
 
-  private async getRealTimeTopProvinceForDb(appId: string, beginTime?: string, endTime?: string) {
+  private async getRealTimeTopProvinceForDb(appKey: string, beginTime?: string, endTime?: string) {
     const $match = this.getMatch(beginTime, endTime);
     return await this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .aggregate([
         { $match: { ...$match } },
         { $group: { _id: { province: "$province" }, count: { $sum: 1 } } },

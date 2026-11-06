@@ -13,7 +13,7 @@ export class AjaxService {
     this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
-  async getPageAjaxsAvg(appId: string, url?: string, beginTime?: string, endTime?: string) {
+  async getPageAjaxsAvg(appKey: string, url?: string, beginTime?: string, endTime?: string) {
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
     if (url) {
@@ -29,7 +29,7 @@ export class AjaxService {
       queryParams.endTime = endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebAjax(appId);
+    const model = await this.ch.WebAjax(appKey);
     const countQuery = model.find([
       { where, select: "url", groupBy: "url,method", queryParams },
       { select: "count() as total" },
@@ -50,7 +50,7 @@ export class AjaxService {
   }
 
   async getAverageAjaxList(query: Record<string, unknown>) {
-    const { appId, beginTime, endTime, type = 1, url, pageSize = WEB_MONITOR_CONFIG.pageSize } = query;
+    const { appId: appKey, beginTime, endTime, type = 1, url, pageSize = WEB_MONITOR_CONFIG.pageSize } = query;
     const pageNo = Number(query.pageNo || 1);
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
@@ -68,7 +68,7 @@ export class AjaxService {
       queryParams.endTime = endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebAjax(String(appId));
+    const model = await this.ch.WebAjax(String(appKey));
     const countQuery = model.find([
       { where, select: "url", groupBy: "url,method", queryParams },
       { select: "count() as total" },
@@ -91,7 +91,7 @@ export class AjaxService {
   }
 
   async getOneAjaxList(
-    appId: string,
+  appKey: string,
     url?: string,
     pageNo = 1,
     pageSize = 15,
@@ -118,7 +118,7 @@ export class AjaxService {
       queryParams.endTime = endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebAjax(appId);
+    const model = await this.ch.WebAjax(appKey);
     const countQuery = model.find([{ where, select: "url", queryParams }, { select: "count() as total" }]);
     const listQuery = model.find({
       where,
@@ -132,7 +132,7 @@ export class AjaxService {
     return { dataList: list, totalNum: count?.[0]?.total || 0, pageNo };
   }
 
-  async getMarkUserAjaxList(appId: string, opts: { markUser?: string; beginTime?: string; endTime?: string }) {
+  async getMarkUserAjaxList(appKey: string, opts: { markUser?: string; beginTime?: string; endTime?: string }) {
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
     if (opts.markUser) {
@@ -148,7 +148,7 @@ export class AjaxService {
       queryParams.endTime = opts.endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebAjax(appId);
+    const model = await this.ch.WebAjax(appKey);
     const list = await model.find({ where, select: "*", orderBy: "createTime ASC", queryParams });
     return { list };
   }

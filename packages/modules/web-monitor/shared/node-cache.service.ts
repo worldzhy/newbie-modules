@@ -5,18 +5,18 @@ import { SystemDocument } from "../models/mongo/system.schema";
 export class NodeCacheService {
   private appInfo = new Map<string, SystemDocument>();
 
-  getAppInfo(appId: string) {
-    if (!appId) throw new Error("Get app info: appId must not be empty");
-    return this.appInfo.get(appId);
+  getAppInfo(appKey: string) {
+    if (!appKey) throw new Error("Get app info: appKey must not be empty");
+    return this.appInfo.get(appKey);
   }
 
-  setAppInfo(appId: string, system: SystemDocument) {
-    if (!appId) throw new Error("Set app info: appId must not be empty");
-    this.appInfo.set(appId, system);
+  setAppInfo(appKey: string, system: SystemDocument) {
+    if (!appKey) throw new Error("Set app info: appKey must not be empty");
+    this.appInfo.set(appKey, system);
   }
 
-  removeAppInfo(appId: string) {
-    this.appInfo.delete(appId);
+  removeAppInfo(appKey: string) {
+    this.appInfo.delete(appKey);
   }
 
   updateAllSiteCache(systems: SystemDocument[]) {

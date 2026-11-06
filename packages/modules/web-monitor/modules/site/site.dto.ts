@@ -24,7 +24,7 @@ export class WebMonitorSiteResponseDto {
   systemCommonName?: string;
 
   @ApiProperty({ type: String, description: "Unique application ID used by the SDK" })
-  appId!: string;
+  appKey!: string;
 
   @ApiProperty({ type: String, description: "Application type: web / wx" })
   type!: string;

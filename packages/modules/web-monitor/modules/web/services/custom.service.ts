@@ -6,9 +6,9 @@ import { func } from "../../../shared/utils";
 export class WebCustomService {
   constructor(private readonly models: WebMonitorModelsService) {}
 
-  async getCustomFilterList(appId: string) {
+  async getCustomFilterList(appKey: string) {
     const rows = await this.models
-      .WebCustomFilter(appId)
+      .WebCustomFilter(appKey)
       .find()
       .sort({ createTime: -1 })
       .read("secondaryPreferred")
@@ -16,25 +16,25 @@ export class WebCustomService {
     return { list: rows || [] };
   }
 
-  async addCustomFilter(appId: string, filterKey: string, filterDesc: string) {
+  async addCustomFilter(appKey: string, filterKey: string, filterDesc: string) {
     if (!filterKey) throw new Error("Add filter: filterKey must not be empty");
-    if (!appId) throw new Error("Add filter: appId must not be empty");
+    if (!appKey) throw new Error("Add filter: appKey must not be empty");
     if (!filterDesc) throw new Error("Add filter: filterDesc must not be empty");
-    const model = this.models.WebCustomFilter(appId);
+    const model = this.models.WebCustomFilter(appKey);
     const exists = await model.findOne({ filterKey }).exec();
     if (exists && exists.filterKey) throw new Error("Add filter: filterKey already exists");
     const doc = new model();
-    doc.appId = appId;
+    doc.appKey = appKey;
     doc.filterKey = filterKey;
     doc.filterDesc = filterDesc;
     await doc.save();
     return true;
   }
 
-  async delCustomFilter(appId: string, id: string) {
+  async delCustomFilter(appKey: string, id: string) {
     if (!id) throw new Error("Delete filter: _id must not be empty");
-    if (!appId) throw new Error("Delete filter: appId must not be empty");
-    const model = this.models.WebCustomFilter(appId);
+    if (!appKey) throw new Error("Delete filter: appKey must not be empty");
+    const model = this.models.WebCustomFilter(appKey);
     try {
       await model.findOne({ _id: id }).exec();
     } catch {
@@ -49,7 +49,7 @@ export class WebCustomService {
   }
 
   async getAverageCustomList(
-    appId: string,
+  appKey: string,
     pageNo: number,
     pageSize: number,
     beginTime?: string,
@@ -75,7 +75,7 @@ export class WebCustomService {
         }
       });
     }
-    const model = this.models.WebCustom(appId);
+    const model = this.models.WebCustom(appKey);
     const totalNum = await model.count(filter).read("secondaryPreferred").exec();
     const dataList = await model
       .find(filter)

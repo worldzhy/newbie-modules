@@ -37,17 +37,17 @@ export class SiteService {
       if (search && search.systemDomain) return func.errResult({ desc: "Add system: system already exists" });
     }
 
-    // The appId is a storage partition key and must never be caller-supplied:
+    // The appKey is a storage partition key and must never be caller-supplied:
     // mint it here. The installation-sync path (upsertSiteForWebMonitor)
     // backfills it from the credential's immutable appKey instead.
-    const appId = func.randomString(7).slice(0, 7);
+    const appKey = func.randomString(7).slice(0, 7);
     const SystemModel = this.models.System();
     const system = new SystemModel();
     system.projectId = String(body.projectId);
     system.systemDomain = typeof body.systemDomain === "string" ? body.systemDomain : "";
     system.systemName = String(body.systemName);
     system.type = type || "web";
-    system.appId = appId;
+    system.appKey = appKey;
     system.userId = [typeof body.token === "string" ? body.token : ""];
     system.createTime = new Date();
     system.slowPageTime = Number(body.slowPageTime) || 5;
@@ -58,14 +58,14 @@ export class SiteService {
     system.slowAjaxTime = Number(body.slowAjaxTime) || 2;
 
     const result = await system.save();
-    await this.updateSiteNodeCache(appId);
+    await this.updateSiteNodeCache(appKey);
     return func.result({ data: result });
   }
 
   async updateSiteData(body: Record<string, unknown>) {
-    const appId = body.appId;
-    if (!appId) return func.errResult({ desc: "Update system: appId must not be empty" });
-    const appIdStr = String(appId);
+    const appKey = body.appKey;
+    if (!appKey) return func.errResult({ desc: "Update system: appKey must not be empty" });
+    const appKeyStr = String(appKey);
 
     const update = {
       $set: {
@@ -80,38 +80,38 @@ export class SiteService {
         slowAjaxTime: body.slowAjaxTime || 2,
       },
     };
-    const result = await this.models.System().updateOne({ appId: appIdStr }, update, { multi: true }).exec();
-    await this.updateSiteNodeCache(appIdStr);
+    const result = await this.models.System().updateOne({ appId: appKeyStr }, update, { multi: true }).exec();
+    await this.updateSiteNodeCache(appKeyStr);
     return func.result({ data: result });
   }
 
-  async updateSiteNodeCache(appId: string) {
-    const system = await this.getSiteForDb(appId);
+  async updateSiteNodeCache(appKey: string) {
+    const system = await this.getSiteForDb(appKey);
     if (system) this.nodeCache.updateSiteCache(system);
   }
 
   /**
    * Upserts the Mongo System document backing a web-monitor installation.
    * The document carries the anomaly detection thresholds (config truth source
-   * stays in Mongo); appId equals the installation's immutable appKey.
-   * Idempotent by appId so it can be safely retried after credential issuance.
+   * stays in Mongo); appKey equals the installation's immutable appKey.
+   * Idempotent by appKey so it can be safely retried after credential issuance.
    */
-  async upsertSiteForWebMonitor(body: { appId: string; projectId: string; systemName: string }) {
+  async upsertSiteForWebMonitor(body: { appKey: string; projectId: string; systemName: string }) {
     const result = await this.models
       .System()
       .findOneAndUpdate(
-        { appId: body.appId },
+        { appId: body.appKey },
         { $set: { projectId: body.projectId, systemName: body.systemName, type: "web" } },
         { upsert: true, new: true },
       )
       .exec();
-    await this.updateSiteNodeCache(body.appId);
+    await this.updateSiteNodeCache(body.appKey);
     return result;
   }
 
-  async getSiteForDb(appId: string) {
-    if (!appId) throw new Error("Query a system: appId must not be empty");
-    return await this.models.System().findOne({ appId: appId }).exec();
+  async getSiteForDb(appKey: string) {
+    if (!appKey) throw new Error("Query a system: appKey must not be empty");
+    return await this.models.System().findOne({ appId: appKey }).exec();
   }
 
   async getSitesForUserId(query: Record<string, unknown>, userId: string) {
@@ -130,13 +130,13 @@ export class SiteService {
     return (await this.models.System().find(param).exec()) || [];
   }
 
-  async getSiteForAppId(appId: string) {
-    if (!appId) throw new Error("Query a system: appId must not be empty");
-    const cached = this.nodeCache.getAppInfo(appId);
+  async getSiteForAppId(appKey: string) {
+    if (!appKey) throw new Error("Query a system: appKey must not be empty");
+    const cached = this.nodeCache.getAppInfo(appKey);
     if (cached) return cached;
     // Cache miss (cold start, or a site created outside the API): fall back to
-    // Mongo and backfill so ingest never rejects a legitimate appId with a 500.
-    const system = await this.getSiteForDb(appId);
+    // Mongo and backfill so ingest never rejects a legitimate appKey with a 500.
+    const system = await this.getSiteForDb(appKey);
     if (system) this.nodeCache.updateSiteCache(system);
     return system;
   }
@@ -160,22 +160,22 @@ export class SiteService {
     );
   }
 
-  async deleteWebSiteUser(appId: string, userToken: string) {
+  async deleteWebSiteUser(appKey: string, userToken: string) {
     return this.models
       .System()
-      .updateOne({ appId: appId }, { $pull: { userId: userToken } }, { multi: true })
+      .updateOne({ appId: appKey }, { $pull: { userId: userToken } }, { multi: true })
       .exec();
   }
-  async addWebSiteUser(appId: string, userToken: string) {
+  async addWebSiteUser(appKey: string, userToken: string) {
     return this.models
       .System()
-      .updateOne({ appId: appId }, { $push: { userId: userToken } }, { multi: true })
+      .updateOne({ appId: appKey }, { $push: { userId: userToken } }, { multi: true })
       .exec();
   }
 
-  async deleteSite(appId: string, type: string): Promise<DeleteResult> {
-    const result = await this.models.System().deleteOne({ appId: appId, type }).exec();
-    this.nodeCache.removeAppInfo(appId);
+  async deleteSite(appKey: string, type: string): Promise<DeleteResult> {
+    const result = await this.models.System().deleteOne({ appId: appKey, type }).exec();
+    this.nodeCache.removeAppInfo(appKey);
     return result;
   }
 }

@@ -9,8 +9,8 @@ import WebSdkErrorFactory from "./web/sdk-error";
 
 @Injectable()
 export class WebMonitorClickHouseService implements OnModuleInit {
-  private webAjaxFactory!: (appId: string) => Promise<ClickHouseModel>;
-  private webErrorFactory!: (appId: string) => Promise<ClickHouseModel>;
+  private webAjaxFactory!: (appKey: string) => Promise<ClickHouseModel>;
+  private webErrorFactory!: (appKey: string) => Promise<ClickHouseModel>;
   private webSdkErrorFactory!: () => Promise<ClickHouseModel>;
 
   constructor(
@@ -34,12 +34,12 @@ export class WebMonitorClickHouseService implements OnModuleInit {
     this.webSdkErrorFactory = WebSdkErrorFactory(this.clickhouse, dbName);
   }
 
-  async WebAjax(appId: string) {
-    return this.webAjaxFactory(appId);
+  async WebAjax(appKey: string) {
+    return this.webAjaxFactory(appKey);
   }
 
-  async WebError(appId: string) {
-    return this.webErrorFactory(appId);
+  async WebError(appKey: string) {
+    return this.webErrorFactory(appKey);
   }
 
   async WebSdkError() {

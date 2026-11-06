@@ -18,7 +18,7 @@ export type WebThresholdAlertCategory = "js" | "css" | "img";
 
 export interface WebThresholdAlertEvent {
   /** System partition key (browser SDK appKey). */
-  appId: string;
+  appKey: string;
   systemName: string;
   projectId?: string;
   signal: WebThresholdAlertSignal;
