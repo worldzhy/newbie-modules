@@ -441,7 +441,7 @@ export class WebReportTaskService {
   private handleWebData(query: Record<string, unknown>): WebReportItem {
     const str = (value: unknown, fallback = "") => (typeof value === "string" && value ? value : fallback);
     const item: WebReportItem = {
-      appId: str(query.appKey),
+      appKey: str(query.appKey),
       createTime: func.toDateOrNow(query.time),
       userAgent: str(query.userAgent),
       ip: str(query.ip) || undefined,
