@@ -18,6 +18,21 @@ export function assertAppKey(appKey: unknown): string {
   return appKey;
 }
 
+/**
+ * Reads a target identifier with the same precedence the authorization guard
+ * uses (route params → query → body). A controller must never resolve the
+ * write target from a different source than the guard: otherwise a request
+ * can be authorized against a project where the caller holds the action
+ * (e.g. from `?projectId=A`) while the write lands on another project.
+ */
+export function pickRequestId(
+  req: { params?: Record<string, unknown>; query?: Record<string, unknown>; body?: Record<string, unknown> },
+  key: string,
+): string | undefined {
+  const value = req.params?.[key] ?? req.query?.[key] ?? req.body?.[key];
+  return typeof value === "string" && value ? value : undefined;
+}
+
 const decryptP: Record<string, number> = {
   QR: 0,
   xa: 1,

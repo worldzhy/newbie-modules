@@ -6,7 +6,6 @@ import { WebMonitorClickHouseService } from "../../models/clickhouse/web-monitor
 type WebResourceType = "ajax" | "page" | "env" | "err" | "resource";
 
 export interface CustomDeleteFilter {
-  appKey: string;
   type?: string;
   resource?: WebResourceType[];
   time?: (string | number | Date)[];
@@ -19,8 +18,8 @@ export class RemoveService {
     private readonly clickhouse: WebMonitorClickHouseService,
   ) {}
 
-  async customDelete(fil: CustomDeleteFilter) {
-    const { appKey, type = "", resource = [], time = [] } = fil;
+  async customDelete(appKey: string, fil: CustomDeleteFilter) {
+    const { type = "", resource = [], time = [] } = fil;
     if (!time.length) {
       throw new BadRequestException("A time must be selected");
     }

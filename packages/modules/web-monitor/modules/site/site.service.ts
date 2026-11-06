@@ -62,11 +62,7 @@ export class SiteService {
     return func.result({ data: result });
   }
 
-  async updateSiteData(body: Record<string, unknown>) {
-    const appKey = body.appKey;
-    if (!appKey) return func.errResult({ desc: "Update system: appKey must not be empty" });
-    const appIdStr = String(appKey);
-
+  async updateSiteData(appKey: string, body: Record<string, unknown>) {
     const update = {
       $set: {
         systemName: body.systemName || "",
@@ -80,8 +76,8 @@ export class SiteService {
         slowAjaxTime: body.slowAjaxTime || 2,
       },
     };
-    const result = await this.models.System().updateOne({ appKey: appIdStr }, update, { multi: true }).exec();
-    await this.updateSiteNodeCache(appIdStr);
+    const result = await this.models.System().updateOne({ appKey: appKey }, update, { multi: true }).exec();
+    await this.updateSiteNodeCache(appKey);
     return func.result({ data: result });
   }
 
