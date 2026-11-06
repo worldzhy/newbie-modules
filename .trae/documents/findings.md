@@ -173,3 +173,12 @@ carry-over 更新（2026-11-06）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转
 - **旁证**：宿主进程以 `node dist/src/main.js` 运行（非 watch），模板/seed 的 `appKey` 修复只做了 tsc/format/lint 静态验证，运行态渲染未复测——需重塑/重启后复核，标记为遗留验证项。
 - **清理**：删除 12 行 e2e 探针资源文档；保留 4 行通知记录（14:32 firing、14:34 resolved、14:36 firing、14:40 resolved）作为证据锚点。
 
+## round20（workspace scope）模块级条目指针
+
+round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/documents/expert-review-2026-11-06-round20.md`、`devbie/.trae/documents/findings.md` R20-01..R20-41）。本仓相关条目（按不复制正文规则仅留指针）：
+
+- `R20-01` / `R20-02`（P1，fixed 2026-11-07）：web-monitor `/system/update` 与 `/remove/customDeleteData` 鉴权按 body `projectId` 解析、写入/删除按 body `appKey` 执行，二者无绑定 → 跨租户改写/删除。修复：controller 取参与 guard 同源，appKey 由安装注册表派生（`5c47402` + 宿主 `b54062d`）；宿主另加 appKey scope resolver 纵深。E2E 探针：body 他人 appKey → 403，受害文档/时间窗数据未变。
+- `R20-04`（P1，live）：ajax `duration` 无上限，`1e21` → ClickHouse `Code: 27`，整批失败后按 app 全量重排 → 死信（executed 探针，Memory 表已 DROP）。
+- `R20-08` / `R20-09` / `R20-10` / `R20-11` / `R20-31`..`R20-33` / `R20-41`：模块层 P2/P3（message-tracker 不可装配、alert-lifecycle 文本断言、API Key 限制不校验、refreshTokenNext 明文、ioredis 超时、CH 时间语义、Approved Subnet 审计）。
+- `R20-03`（P1）：本仓 `lark.service.ts` 12 处 raw error 入日志，与宿主金蝶同根因；executed 序列化探针证明 token 会被打印。
+
