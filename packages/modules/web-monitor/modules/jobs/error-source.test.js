@@ -16,9 +16,12 @@ import {
  * without dropping ajax/fetch/resource rows.
  *
  * The literal source names mirror `ERROR_APIS` in
- * `devbie/packages/web-monitor-sdk/src/common/utils.ts`; the SDK is a published
- * dependency, so the registry cannot import it and asserts the cross-repo
- * contract explicitly here.
+ * `devbie/packages/web-monitor-sdk/src/common/utils.ts`; the registry cannot
+ * import the published SDK, so the cross-repo contract is asserted here.
+ *
+ * This file is plain JS on purpose: it runs under `node --test` with a direct
+ * `.ts` import (the consumer compiles its assembled copy with `allowJs: false`,
+ * so it stays out of the build).
  */
 const SDK_RUNTIME_SOURCES = ["onerror", "unhandled-rejection"];
 const SDK_CONSOLE_SOURCE = "console-error";
@@ -26,7 +29,7 @@ const SDK_RESOURCE_SOURCE = "resource-error";
 
 const SERVICE_SOURCE = readFileSync(fileURLToPath(new URL("./jobs.service.ts", import.meta.url)), "utf8");
 
-function occurrences(source: string, needle: string): number {
+function occurrences(source, needle) {
   return source.split(needle).length - 1;
 }
 
