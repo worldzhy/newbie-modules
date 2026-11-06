@@ -180,7 +180,7 @@ model Session {
   id              Int      @id @default(autoincrement())
   accessToken     String   @unique
   // SHA-256 hex of the current refresh token. The plaintext is never stored
-  // (ADR-034); refresh matches by hash and rotates with a CAS update.
+  // (nightwatch-backend ADR-034); refresh matches by hash and rotates with a CAS update.
   refreshTokenHash        String   @unique
   // Hash of the token rotated out by the most recent refresh. Used to detect
   // idempotent retries of the same rotation within the short reuse window.

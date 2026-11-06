@@ -25,7 +25,7 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.ref
   /**
    * Authenticate the refresh token and check the account is still active.
    * Rotation, idempotent replay, and reuse revocation live in
-   * SessionService.refresh (ADR-034); this guard only proves the token is a
+   * SessionService.refresh (nightwatch-backend ADR-034); this guard only proves the token is a
    * genuine, unexpired credential for an active account.
    */
   async validate(req: Request): Promise<boolean> {

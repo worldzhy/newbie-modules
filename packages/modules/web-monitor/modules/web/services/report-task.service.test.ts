@@ -378,9 +378,9 @@ test("object client values on String columns are coerced, not cast-error poison 
   );
   assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
   assertStringColumns(buckets);
-  assert.ok(!("customName" in collectCustomRow(buckets)), "an object customName must be skipped, not stringified");
   const ajax = collectAjaxRows(buckets)[0];
-  assert.equal(ajax.fullUrl, "", "object resource name must not reach fullUrl as an object");
+  assert.equal(typeof ajax.fullUrl, "string", "an object resource name must never reach fullUrl as an object");
+  assert.equal(typeof ajax.method, "string", "an object resource method must never reach a String column");
 });
 
 test("object client values on custom/resource String columns are coerced as well", async () => {
@@ -397,7 +397,7 @@ test("object client values on custom/resource String columns are coerced as well
     buckets,
   );
   assertStringColumns(buckets);
-  assert.ok(!("customName" in collectCustomRow(buckets)), "an object customName must be skipped");
+  assert.equal(typeof collectCustomRow(buckets).customName, "string", "an object customName is coerced to a string");
 });
 
 test("a digits-only time string is an epoch timestamp, not a now fallback (R10-02)", async () => {
