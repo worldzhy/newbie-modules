@@ -115,7 +115,7 @@ resolvedAt  DateTime?
 - [x] 宿主：`web-threshold-alerts.notifications.service.ts` 处理 `phase=resolved`、写 `status`/`resolvedAt`
 - [x] 宿主：5 个电平信号通知类补 resolved 文案（"…recovered"，detail 无空 Top 列表）
 - [x] 宿主：前端通知中心 bell 与 /notifications 列表 resolved 行显示徽章（i18n）
-- [x] E2E：持续错误只发 1 条 firing；恢复后发 1 条 resolved；冷却期内不重复（取证见交付记录）
+- [x] E2E：持续错误只发 1 条 firing；恢复后发 1 条 resolved；冷却期内不重复（executed 证据见 `findings.md` 的「round19 E2E 证据」）
 
 ## 修订记录
 

@@ -144,3 +144,32 @@ carry-over 更新（2026-11-06）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转
   - R18-03 fixed：`ERRORAPIS` 改名后跨仓外部引用为 0，按 1.6.0 minor 发布并通过。
   - R18-04 fixed：ADR-050「验证（registry-first）」已写明"清表"前置。
   - R18-05/R18-06 fixed：ADR-050 已按评审订正措辞（`error.name`、分组在告警任务、`models/clickhouse/web/error.ts` 全路径），并在影响节记录 `type=script → log` 改变前端错误列表聚合口径（`error.service.ts` L72-L77）。
+
+## round19（2026-11-06，scope=`plan`：ADR-051 告警冷却与恢复落地，报告在本仓 `.trae/documents/expert-review-2026-11-06-round19.md`）
+
+锚点：newbie-modules `066cac8`（0 dirty）/ nightwatch-backend `6a48981`（1 untracked，不在被审域）/ nightwatch-frontend `025caed`（0 dirty）。结论摘要：状态机接线、schema、宿主/前端链路与装配一致性成立；P1 fail-open 注释失实、E2E 勾选无持久证据。
+
+| ID     | 仓                        | 标题                                                                                                                                 | 严重度 | 暴露面         | 可达性    | 状态 |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------ | -------------- | --------- | ---- |
+| R19-01 | newbie-modules            | fail-open 注释失实：Redis 断连时 `shouldFire`/`resolveIfClean` 异常上抛、`redisLock` 无守卫，整个评估周期静默失败                    | P1     | artifact+live  | 需链条    | fixed：`ead62ef`（锁守卫 + 两方法 try/catch fail-open，`resolveIfClean` fail-closed；注释与实现对齐；宿主装配 `1f06d3a`） |
+| R19-02 | newbie-modules            | ADR 伪代码"冷却期内刷新 lastFiredAt"使"已过冷却期→重燃"恒不可达，重燃分支为死代码                                                     | P2     | docs           | N/A       | fixed：`ead62ef`（ADR 修订记录明确持续突破只 firing/resolved 各一次，仅评估中断 ≥1h 且 key 未过期时重发） |
+| R19-03 | nightwatch-frontend       | ADR 正文"firing/resolved 配对展示"未实现；/notifications 行内无徽章；bell 徽章硬编码英文                                              | P2     | artifact+live  | anonymous | fixed：`8e01d56`（列表行 + bell 统一本地化徽章）；ADR 口径同步修订为"resolved 徽章"（分组键含标题，配对合并会误并 first-seen 指纹） |
+| R19-04 | newbie-modules + 宿主     | resolved 通知与 firing 同模板：标题渲染"0 slow page load(s) in 60s"、detail 尾部空 Top 列表                                            | P2     | live           | anonymous | fixed：registry `ead62ef`（声明支持 `resolvedTitleTemplate`/`resolvedDetailTemplate`）+ 宿主 `1f06d3a`（5 个电平信号补"…recovered"文案）；E2E 实测标题「slow JavaScript resources recovered」 |
+| R19-05 | newbie-modules            | 契约测试浅于 checklist 声称；registry 无 test script，裸 `node --test` 因 ESM `__dirname` 失败                                         | P2     | source         | N/A       | fixed：`alert-lifecycle.test.ts` 补 fail-open/fail-closed 与锁守卫断言；registry 增 `test:web-monitor`（`node --import tsx --test`，10/10 通过）并声明 `tsx` devDependency |
+| R19-06 | newbie-modules + 宿主     | E2E checklist 勾选但零持久证据（26 行全 firing、0 resolved、无 alert-state key）                                                        | P2     | docs           | N/A       | fixed：本会话重做生命周期 E2E，executed 证据见下方「round19 E2E 证据」 |
+| R19-07 | newbie-modules            | ADR 迁移行文（`prisma migrate dev`）与项目实际（无 migrations、`db push`）矛盾                                                          | P2     | docs           | N/A       | fixed：`ead62ef`（ADR 正文更正为 `db push`） |
+| R19-08 | newbie-modules            | js-error-first-seen 每指纹一个 Redis key，高基数应用下的 key 数量待审视                                                                | 观察   | live           | 需规模    | open（已入 backlog，并入"阈值配置化"ADR 审视） |
+| R19-09 | nightwatch-backend        | E2E 新发现：所有 web 通知模板用 `{{appId}}`，宿主上下文只给 `appKey` → detail 恒渲染 `System: <name> ()`                              | P2     | live           | anonymous | fixed：`ae3aa34`（7 个模板占位符改为 `{{appKey}}`） |
+| R19-10 | nightwatch-backend        | E2E 新发现：seed 以 `appId` 写 Mongo `systems` 文档，模型按 `appKey` 查询 → seed 出来的安装被 `/web-monitor/report` 以 "appKey does not exist" 拒绝 | P2     | live           | N/A       | fixed：`ae3aa34`（convergence 接口/查询/日志改 `appKey`） |
+
+### round19 E2E 证据（2026-11-06 22:26-22:40 +0800，executed）
+
+- **前置**：`module/notification-center.NotificationCenterSetting.minimumSeverity` 临时调为 `medium`（默认 `high` 会把 medium 电平信号整条丢弃，无法观察），结束后已恢复 `high`；`systems` 集合补 converge `fsQNmFK` 文档（见 R19-10）。
+- **基线**：`NotificationRecord` 26 firing / 0 resolved；`web-monitor:alert-state:*` 无 key。
+- **触发**：向 `/web-monitor/report`（token=自观测安装）投递 3 条 `type=script`、duration 3000-4500ms 的慢资源（采集落 `webresources_fsqnmfks`）。
+- **firing**：14:32:00Z 生成 1 行 `web.slow-resource`，`status=firing`，标题「3 slow JavaScript resource(s) in 60s」，Redis key `{"status":"firing","cleanWindows":0}`。
+- **resolved**：干净窗口 14:33、14:34 → 14:34:00Z 生成 1 行 `status=resolved`，`resolvedAt=14:34:00.082Z`，标题「slow JavaScript resources recovered」（无空 Top 列表）；alert-state key 已删除。
+- **冷却抑制**：第二段持续突破 → 14:36:00 仅 1 行 firing；14:37 窗口再次突破（22:37:09 投递）→ 状态 `lastFiredAt` 刷新为 14:38:00、`cleanWindows` 归零，**未新增通知行**；停止后 14:40:00 生成 1 行 resolved。速率符合 ADR「持续告警只 firing/resolved 各一次」。
+- **旁证**：宿主进程以 `node dist/src/main.js` 运行（非 watch），模板/seed 的 `appKey` 修复只做了 tsc/format/lint 静态验证，运行态渲染未复测——需重塑/重启后复核，标记为遗留验证项。
+- **清理**：删除 12 行 e2e 探针资源文档；保留 4 行通知记录（14:32 firing、14:34 resolved、14:36 firing、14:40 resolved）作为证据锚点。
+
