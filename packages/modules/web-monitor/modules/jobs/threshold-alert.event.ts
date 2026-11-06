@@ -14,6 +14,13 @@ export const WEB_THRESHOLD_ALERT_EVENT = "web-monitor.threshold-alert";
 export type WebThresholdAlertSignal =
   "slow-page" | "slow-first-paint" | "slow-resource" | "slow-ajax" | "js-error-spike" | "js-error-first-seen";
 
+/**
+ * Lifecycle phase of a threshold alert. `firing` is the default (a breach was
+ * observed); `resolved` is emitted when the same signal fingerprint has been
+ * clean for N consecutive evaluation windows (ADR-051).
+ */
+export type WebThresholdAlertPhase = "firing" | "resolved";
+
 export type WebThresholdAlertCategory = "js" | "css" | "img";
 
 export interface WebThresholdAlertEvent {
@@ -22,6 +29,8 @@ export interface WebThresholdAlertEvent {
   systemName: string;
   projectId?: string;
   signal: WebThresholdAlertSignal;
+  /** Lifecycle phase; defaults to firing when omitted. */
+  phase?: WebThresholdAlertPhase;
   /** Set for slow-resource alerts to distinguish JS/CSS/image resources. */
   category?: WebThresholdAlertCategory;
   severity: "medium" | "high";

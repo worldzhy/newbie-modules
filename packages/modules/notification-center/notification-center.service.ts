@@ -85,6 +85,16 @@ export interface NotifyInput {
    */
   deduplicationKey?: string;
   /**
+   * Lifecycle phase for alert-style notifications ("firing" | "resolved").
+   * Defaults to "firing" (ADR-051).
+   */
+  status?: "firing" | "resolved";
+  /**
+   * Resolution timestamp for resolved-phase notifications; defaults to now()
+   * when status is "resolved" and this is omitted.
+   */
+  resolvedAt?: Date;
+  /**
    * Caller identity for the HTTP delivery endpoint. Set only by the controller;
    * internal job callers omit it because they act on behalf of the platform.
    */
@@ -185,6 +195,8 @@ export class NotificationCenterService {
       deduplicationKey: input.deduplicationKey ?? null,
       projectId: input.projectId ?? null,
       link: input.link ?? null,
+      status: input.status ?? "firing",
+      resolvedAt: input.status === "resolved" ? (input.resolvedAt ?? new Date()) : null,
     };
 
     let recordId: string;

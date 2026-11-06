@@ -1,6 +1,6 @@
 # ADR-051: web-monitor 告警冷却与恢复通知
 
-状态：提议中
+状态：已采纳
 日期：2026-11-06
 
 > 归属：本仓（治理 `web-monitor` 模块告警状态机与 `notification-center` 通知模型字段，两者均为 registry 模块）。前置 ADR：ADR-050（错误来源分级，已采纳）。
@@ -59,6 +59,8 @@ value: { status: "firing", firstFiredAt: <iso>, lastFiredAt: <iso>, cleanWindows
 - slow-* 信号：fingerprint 为空；slow-resource 带 category（js/css/img）作为 key 一部分
 - js-error-spike：无 fingerprint（聚合信号）
 - js-error-first-seen：fingerprint 为错误指纹
+
+**首现信号的特殊性**：`js-error-first-seen` 是边沿检测器（新指纹只在首次出现时告警，基线查询阻止后续重复告警），因此只走 `shouldFire`（冷却期内不重发），**不发 resolved 通知**——"新错误"信号没有可恢复的电平。状态 key 在指纹不再出现后由 TTL 自然过期。
 
 **默认参数**（后续由"阈值配置化"ADR 移出常量）：
 
