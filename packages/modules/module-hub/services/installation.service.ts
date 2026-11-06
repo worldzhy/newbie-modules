@@ -68,7 +68,7 @@ interface SnapshotModule {
   localPatches?: string[];
 }
 
-/** A module entry inside a stored targetSpec (modules.json modules[] shape). */
+/** A module entry inside a stored targetSpec (newbie-modules.json modules[] shape). */
 interface TargetModule {
   key: string;
   version?: string | null;
@@ -93,7 +93,7 @@ export interface TargetActualComparison {
 }
 
 /**
- * Pure read-time comparison between a stored targetSpec (modules.json shape)
+ * Pure read-time comparison between a stored targetSpec (newbie-modules.json shape)
  * and the last reported module snapshot (`newbie status --json` modules[]).
  *
  * The hub never dispatches the spec: developers/CI run `newbie modules update`, and
