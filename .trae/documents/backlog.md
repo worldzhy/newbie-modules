@@ -19,9 +19,9 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 - [ ] `[安全评审 round2 #6]` **（暂不做，待有微信消费端再启动）** account 微信登录无服务端校验：`packages/modules/account/auth/wechat/auth.service.ts` L17-38，`phone`/`openId` 取自请求体，无 code2session/getPhoneNumber 服务端校验；且漏 `UserStatus.INACTIVE` 检查。修复方案（恢复时按此执行）：改收 `code` 服务端换 openId、服务端解密手机号，补 INACTIVE 拒绝。决策：2026-10-31 用户明确在出现首个微信消费端之前不做；风险留痕——若届时已有调用方接入而未修复，属高危未修复项。
 
-## 装配配置字面量（W1 后残余，2026-11-03 入账）
+## 装配配置字面量（2026-11-06 清理：条目过时，修复已在现仓）
 
-- [ ] `[R5-01-followup]` 仍有 10 个 manifest 共 14 处 `process.env.X || '默认值'`：account、aws-s3、aws-ses、aws-sms、aws-sqs、elasticsearch、llm、message-tracker、tencent-cos、web-monitor。CLI 正则无法解包含内层引号的值，生成结果为**字符串字面量**而非表达式（`web-monitor`、`account`、`aws-s3` 等已装配宿主，值在运行时错误）。修复方向二选一：(a) 逐个改为纯 `process.env.X`（无默认值，缺省即失败）；(b) 让 CLI 直接把整段表达式原样输出（需处理内层引号）。判据：`newbie modules apply` 不再输出此类告警，且生成文件里 `process.env` 无引号包裹。
+> 2026-11-06 取证：registry 所有 manifest 的 `requires.config` 值全为纯 `process.env.XXX` 字符串（零 fallback 表达式）；CLI `assemble/modules.ts#L77-86 assertUnwrappableExpressions` reject 含引号内 fallback 的表达式（如 `process.env.X || 'fallback'`）；渲染产物 `modules.config.ts` 中 49 处 process.env 无一处被引号包裹——全是真实 TS 表达式。backlog 原条目描述"10 个 manifest 共 14 处 `|| '默认值'`"是 ADR-033 落地前的历史残留，现已闭环。
 
 ## 技术债（已在 ADR 登记，未落地）
 
