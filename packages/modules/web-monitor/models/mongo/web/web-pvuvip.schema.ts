@@ -3,7 +3,7 @@ import { Document } from "mongoose";
 
 @Schema()
 export class WebPvuvip {
-  @Prop() appId!: string; // App ID (system identifier)
+  @Prop() appKey!: string; // App ID (system identifier)
   @Prop() pv!: number; // PV count
   @Prop() uv!: number; // UV count
   @Prop() ip!: number; // IP count
@@ -16,5 +16,5 @@ export class WebPvuvip {
 }
 export type WebPvuvipDocument = WebPvuvip & Document;
 export const WebPvuvipSchema = SchemaFactory.createForClass(WebPvuvip);
-WebPvuvipSchema.index({ type: 1, appId: 1, createTime: -1 });
+WebPvuvipSchema.index({ type: 1, appKey: , createTime: -1 });
 WebPvuvipSchema.index({ createTime: -1 });

@@ -3,7 +3,7 @@ import { Document, Schema as MongooseSchema } from "mongoose";
 
 @Schema({ shardKey: { _id: "hashed" } })
 export class WebCustom {
-  @Prop() appId!: string; // App ID
+  @Prop() appKey!: string; // App ID
   @Prop({ default: Date.now }) createTime!: Date; // Created time
   @Prop() markPage!: string; // Page mark
   @Prop() markUser!: string; // User mark
@@ -20,7 +20,7 @@ WebCustomSchema.index({ createTime: -1 });
 
 @Schema({ shardKey: { _id: "hashed" } })
 export class WebCustomFilter {
-  @Prop() appId!: string; // App ID
+  @Prop() appKey!: string; // App ID
   @Prop({ default: Date.now }) createTime!: Date; // Created time
   @Prop() filterKey!: string; // Filter key
   @Prop() filterDesc!: string; // Filter description

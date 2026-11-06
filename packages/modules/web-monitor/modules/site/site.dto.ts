@@ -23,8 +23,8 @@ export class WebMonitorSiteResponseDto {
   @ApiPropertyOptional({ type: String, description: "Legacy common name (only in old documents)" })
   systemCommonName?: string;
 
-  @ApiProperty({ type: String, description: "Unique application ID used by the SDK" })
-  appId!: string;
+  @ApiProperty({ type: String, description: "Immutable appKey (SDK partition key)" })
+  appKey!: string;
 
   @ApiProperty({ type: String, description: "Application type: web / wx" })
   type!: string;

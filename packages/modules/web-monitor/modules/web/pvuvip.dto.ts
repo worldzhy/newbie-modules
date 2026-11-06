@@ -10,7 +10,7 @@ export class WebMonitorPvUvIpResponseDto {
   _id?: string;
 
   @ApiProperty({ type: String, description: "App ID (system identifier)" })
-  appId!: string;
+  appKey!: string;
 
   @ApiProperty({ type: Number, description: "PV count" })
   pv!: number;

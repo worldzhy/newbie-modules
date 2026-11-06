@@ -44,7 +44,7 @@ export class ResourceController {
     const { projectId, applicationId } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
-    const resolved = { ...q, appId: appKey };
+    const resolved = { ...q, appKey: appKey };
     const result = await this.resourceSrv.getAverageResourceList(resolved);
     return func.result({ data: result });
   }

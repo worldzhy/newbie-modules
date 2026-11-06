@@ -6,7 +6,7 @@ export class System {
   @Prop() systemDomain!: string; // System domain
   @Prop() projectId!: string;
   @Prop() systemName!: string; // System name
-  @Prop() appId!: string; // App ID
+  @Prop() appKey!: string; // App ID
   @Prop({ default: "web" }) type!: string; // App type: web
   @Prop({ type: [String], default: [] }) userId!: string[]; // Owner user IDs
   @Prop({ default: Date.now }) createTime!: Date; // Creation time
@@ -19,4 +19,4 @@ export class System {
 }
 export type SystemDocument = System & Document;
 export const SystemSchema = SchemaFactory.createForClass(System);
-SystemSchema.index({ appId: -1, createTime: 1, systemDomain: -1, userId: -1 });
+SystemSchema.index({ appKey: , createTime: 1, systemDomain: -1, userId: -1 });

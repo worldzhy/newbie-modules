@@ -28,7 +28,7 @@ export class WebMonitorPageDetailResponseDto {
   _id?: string;
 
   @ApiPropertyOptional({ type: String, description: "App ID (system identifier)" })
-  appId?: string;
+  appKey?: string;
 
   @ApiPropertyOptional({ type: String, description: "Visit time (ISO string)" })
   createTime?: string;

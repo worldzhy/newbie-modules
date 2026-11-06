@@ -29,7 +29,7 @@ export class PageController {
     const { projectId, applicationId } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
-    const resolved = { ...q, appId: appKey };
+    const resolved = { ...q, appKey: appKey };
     const result = await this.pageSrv.getAveragePageList(resolved);
     return func.result({ data: result });
   }
@@ -46,7 +46,7 @@ export class PageController {
       throw new BadRequestException("the interval between beginTime and endTime must not exceed one hour");
     }
     const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
-    const resolved = { ...q, appId: appKey };
+    const resolved = { ...q, appKey: appKey };
     const data = await this.pageSrv.getRealTimeAveragePageList(resolved);
     return func.result({ data });
   }
@@ -60,7 +60,7 @@ export class PageController {
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     if (!url) throw new BadRequestException("url is required");
     const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
-    const resolved = { ...q, appId: appKey };
+    const resolved = { ...q, appKey: appKey };
     const result = await this.pageSrv.getOnePageList(resolved);
     return func.result({ data: result });
   }

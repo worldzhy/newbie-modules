@@ -22,7 +22,7 @@ export class NodeCacheService {
   updateAllSiteCache(systems: SystemDocument[]) {
     // Reconcile, not just upsert: evict entries whose site no longer exists so
     // deleted sites stop accepting ingest after the next refresh.
-    const liveAppIds = new Set(systems.map((system) => system.appId));
+    const liveAppIds = new Set(systems.map((system) => system.appKey));
     for (const cachedAppId of [...this.appInfo.keys()]) {
       if (!liveAppIds.has(cachedAppId)) this.appInfo.delete(cachedAppId);
     }
@@ -32,6 +32,6 @@ export class NodeCacheService {
   }
 
   updateSiteCache(system: SystemDocument) {
-    this.setAppInfo(system.appId, system);
+    this.setAppInfo(system.appKey, system);
   }
 }

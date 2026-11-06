@@ -28,7 +28,7 @@ export class ErrorController {
     const { projectId, applicationId } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
-    const resolved = { ...q, appId: appKey };
+    const resolved = { ...q, appKey: appKey };
     const result = await this.errorSrv.getAverageErrorList(resolved);
     return func.result({ data: result });
   }
@@ -42,7 +42,7 @@ export class ErrorController {
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     if (!url) throw new BadRequestException("url is required");
     const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
-    const resolved = { ...q, appId: appKey };
+    const resolved = { ...q, appKey: appKey };
     const result = await this.errorSrv.getOneErrorList(resolved);
     return func.result({ data: result });
   }

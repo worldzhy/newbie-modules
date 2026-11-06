@@ -8,7 +8,7 @@ export default function WebSdkError(clickhouse: ClickHouseService, dbName: strin
     tableName: ClickHouseTablePrefix.WEB_SDK_ERROR,
     schema: {
       createTime: { type: ClickHouseDataType.DateTime, default: Date.now }, // Created time
-      appId: { type: ClickHouseDataType.String }, // App ID
+      appKey: { type: ClickHouseDataType.String }, // App Key
       name: { type: ClickHouseDataType.String }, // Error name
       msg: { type: ClickHouseDataType.String }, // Error message
       stack: { type: ClickHouseDataType.String }, // Error stack
