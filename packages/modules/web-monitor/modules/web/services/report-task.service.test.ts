@@ -18,7 +18,7 @@ import { WebReportTaskService } from "./report-task.service";
  * still persisted and no requeue loop can form.
  */
 
-const VALID_APP_ID = "Valid_App1";
+const VALID_APP_KEY = "Valid_App1";
 
 function emptyBuckets() {
   return {
@@ -36,7 +36,7 @@ function buildService() {
   const config = { get: () => ({}) } as unknown as ConfigService;
   const redis = {} as never;
   const site = {
-    getSiteForAppId: async () => ({ appId: VALID_APP_ID, slowPageTime: 5 }),
+    getSiteForAppId: async () => ({ appKey: VALID_APP_KEY, slowPageTime: 5 }),
   } as never;
   const models = {} as never;
   const ch = {} as never;
@@ -81,7 +81,7 @@ test("unparseable time falls back to the ingest time instead of an invalid date"
   const outcome = await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.PagePerf,
       time: "not-a-date",
       url: "https://example.com/a",
@@ -89,7 +89,7 @@ test("unparseable time falls back to the ingest time instead of an invalid date"
     },
     buckets,
   );
-  assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
+  assert.equal(outcome, VALID_APP_KEY, "the item must still be persisted, not dropped");
   assert.ok(assertValidDates(buckets, before) > 0, "a page-performance item must produce at least one row");
 });
 
@@ -98,10 +98,10 @@ test("omitted time falls back to the ingest time instead of an invalid date", as
   const before = Date.now();
   const outcome = await drain(
     buildService(),
-    { appId: VALID_APP_ID, type: ReportType.PagePerf, time: undefined, url: "https://example.com/a", markPage: "p1" },
+    { appKey: VALID_APP_KEY, type: ReportType.PagePerf, time: undefined, url: "https://example.com/a", markPage: "p1" },
     buckets,
   );
-  assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
+  assert.equal(outcome, VALID_APP_KEY, "the item must still be persisted, not dropped");
   assert.ok(assertValidDates(buckets, before) > 0, "a page-performance item must produce at least one row");
 });
 
@@ -111,7 +111,7 @@ test("an unparseable ajax requestTime also falls back to the ingest time (saveAj
   const outcome = await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.AjaxPerf,
       time: "not-a-date",
       url: "https://example.com/a",
@@ -119,7 +119,7 @@ test("an unparseable ajax requestTime also falls back to the ingest time (saveAj
     },
     buckets,
   );
-  assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
+  assert.equal(outcome, VALID_APP_KEY, "the item must still be persisted, not dropped");
   assert.ok(assertValidDates(buckets, before) > 0, "an ajax item must produce at least one row");
 });
 
@@ -129,7 +129,7 @@ test("an unparseable slow-resource requestTime also falls back to the ingest tim
   const outcome = await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.AjaxPerf,
       time: "not-a-date",
       url: "https://example.com/a",
@@ -139,7 +139,7 @@ test("an unparseable slow-resource requestTime also falls back to the ingest tim
     },
     buckets,
   );
-  assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
+  assert.equal(outcome, VALID_APP_KEY, "the item must still be persisted, not dropped");
   const resources = Object.values(buckets.appResources).flat() as Record<string, unknown>[];
   assert.ok(resources.length > 0, "a slow img resource must produce a resource row");
   assert.ok(assertValidDates(buckets, before) > 0, "resource rows must carry valid dates");
@@ -151,7 +151,7 @@ test("an unparseable error createTime also falls back to the ingest time (collec
   const outcome = await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.Error,
       time: "not-a-date",
       url: "https://example.com/a",
@@ -159,7 +159,7 @@ test("an unparseable error createTime also falls back to the ingest time (collec
     },
     buckets,
   );
-  assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
+  assert.equal(outcome, VALID_APP_KEY, "the item must still be persisted, not dropped");
   const errors = Object.values(buckets.appErrors).flat() as Record<string, unknown>[];
   assert.ok(errors.length > 0, "an error item must produce an error row");
   assert.ok(assertValidDates(buckets, before) > 0, "error rows must carry valid dates");
@@ -170,10 +170,10 @@ test("a parseable time still flows through and keeps its timestamp", async () =>
   const iso = "2026-11-05T01:02:03.000Z";
   const outcome = await drain(
     buildService(),
-    { appId: VALID_APP_ID, type: ReportType.PagePerf, time: iso, url: "https://example.com/a", markPage: "p1" },
+    { appKey: VALID_APP_KEY, type: ReportType.PagePerf, time: iso, url: "https://example.com/a", markPage: "p1" },
     buckets,
   );
-  assert.equal(outcome, VALID_APP_ID, "a valid item must still be processed");
+  assert.equal(outcome, VALID_APP_KEY, "a valid item must still be processed");
   assert.ok(assertValidDates(buckets) > 0, "a page-performance item must produce at least one row");
   const page = Object.values(buckets.appPages).flat()[0] as Record<string, unknown>;
   assert.equal((page.createTime as Date).toISOString(), iso);
@@ -207,7 +207,7 @@ test("poison string screenWidth is skipped instead of cast to NaN", async () => 
   await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.PagePerf,
       url: "https://example.com/a",
       markPage: "p1",
@@ -229,7 +229,7 @@ test("poison performance metrics are skipped instead of cast to NaN", async () =
   await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.PagePerf,
       url: "https://example.com/a",
       markPage: "p1",
@@ -249,7 +249,7 @@ test("object customContent is JSON-stringified instead of cast error", async () 
   await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.Custom,
       customs: [{ customName: "c1", customContent: { foo: "bar" } }],
     },
@@ -266,7 +266,7 @@ test("poison bodySize on slow resource is skipped instead of cast to NaN", async
   await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.AjaxPerf,
       url: "https://example.com/a",
       resourceList: [{ type: "img", name: "https://example.com/x.png", duration: 5000, bodySize: "abc" }],
@@ -285,7 +285,7 @@ test("poison bodySize on ajax row is skipped instead of cast to NaN", async () =
   await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.AjaxPerf,
       url: "https://example.com/a",
       resourceList: [{ type: "fetch", name: "https://example.com/x", duration: 300, bodySize: "abc" }],
@@ -303,7 +303,7 @@ test("valid numeric strings still coerce correctly", async () => {
   await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.PagePerf,
       url: "https://example.com/a",
       markPage: "p1",
@@ -335,7 +335,7 @@ function assertStringColumns(buckets: ReturnType<typeof emptyBuckets>) {
       // Mixed/numeric/date columns are asserted by their own tests; here we
       // only guard the columns declared as String in the Mongo schemas.
       const stringColumns = new Set([
-        "appId",
+        "appKey",
         "url",
         "fullUrl",
         "preUrl",
@@ -364,7 +364,7 @@ test("object client values on String columns are coerced, not cast-error poison 
   const outcome = await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.AjaxPerf,
       url: "https://example.com/a",
       markPage: "p1",
@@ -376,7 +376,7 @@ test("object client values on String columns are coerced, not cast-error poison 
     },
     buckets,
   );
-  assert.equal(outcome, VALID_APP_ID, "the item must still be persisted, not dropped");
+  assert.equal(outcome, VALID_APP_KEY, "the item must still be persisted, not dropped");
   assertStringColumns(buckets);
   const ajax = collectAjaxRows(buckets)[0];
   assert.equal(typeof ajax.fullUrl, "string", "an object resource name must never reach fullUrl as an object");
@@ -388,7 +388,7 @@ test("object client values on custom/resource String columns are coerced as well
   await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.Custom,
       url: "https://example.com/a",
       markPage: "p1",
@@ -406,7 +406,7 @@ test("a digits-only time string is an epoch timestamp, not a now fallback (R10-0
   await drain(
     buildService(),
     {
-      appId: VALID_APP_ID,
+      appKey: VALID_APP_KEY,
       type: ReportType.PagePerf,
       time: String(epoch),
       url: "https://example.com/a",
@@ -420,7 +420,7 @@ test("a digits-only time string is an epoch timestamp, not a now fallback (R10-0
 
 test("requeue attempts are capped and exhausted reports go to the dead-letter list (R15-01/R9-07)", () => {
   const service = buildService() as unknown as { nextAttemptPayload: (raw: string) => string | null };
-  const raw = JSON.stringify({ appId: VALID_APP_ID, type: ReportType.PagePerf });
+  const raw = JSON.stringify({ appKey: VALID_APP_KEY, type: ReportType.PagePerf });
   const first = service.nextAttemptPayload(raw);
   assert.ok(first, "the first failure must be requeued");
   assert.equal(JSON.parse(first as string).__reportAttempts, 1);

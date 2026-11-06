@@ -2,7 +2,7 @@ import { ClickHouseDataType } from "@modules/clickhouse/clickhouse.types";
 import { ClickHouseModel } from "@modules/clickhouse/clickhouse.model";
 import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { ClickHouseTablePrefix } from "../../enum";
-import { assertAppId } from "../../../shared/utils";
+import { assertAppKey } from "../../../shared/utils";
 
 export default function WebAjax(clickhouse: ClickHouseService, dbName: string) {
   const schema = {
@@ -32,22 +32,22 @@ export default function WebAjax(clickhouse: ClickHouseService, dbName: string) {
 
   const models: Record<string, ClickHouseModel> = {};
   const modelCreates: Record<string, Promise<ClickHouseModel>> = {};
-  return async (appId: string) => {
-    assertAppId(appId);
-    if (!models[appId]) {
-      if (!modelCreates[appId]) {
-        modelCreates[appId] = clickhouse.createModel(
+  return async (appKey: string) => {
+    assertAppKey(appKey);
+    if (!models[appKey]) {
+      if (!modelCreates[appKey]) {
+        modelCreates[appKey] = clickhouse.createModel(
           {
             ...schema,
-            tableName: schema.tableName + appId,
+            tableName: schema.tableName + appKey,
           },
           dbName,
         );
       }
-      const model = await modelCreates[appId];
-      delete modelCreates[appId];
-      models[appId] = model;
+      const model = await modelCreates[appKey];
+      delete modelCreates[appKey];
+      models[appKey] = model;
     }
-    return models[appId];
+    return models[appKey];
   };
 }

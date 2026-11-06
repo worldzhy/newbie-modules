@@ -5,7 +5,7 @@ import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-model
 export class EnvironmentService {
   constructor(private readonly models: WebMonitorModelsService) {}
 
-  async getDataGroupBy(type: number, url: string, appId: string, beginTime?: string, endTime?: string) {
+  async getDataGroupBy(type: number, url: string, appKey: string, beginTime?: string, endTime?: string) {
     const match: Record<string, unknown> = { url };
     if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
     const group_id = {
@@ -15,7 +15,7 @@ export class EnvironmentService {
       system: `${type === 3 ? "$system" : ""}`,
     };
     const datas = await this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .aggregate([
         { $match: match },
         { $group: { _id: group_id, count: { $sum: 1 } } },
@@ -27,7 +27,7 @@ export class EnvironmentService {
     return datas;
   }
 
-  async getEnvironmentForPage(appId: string, markPage: string) {
-    return await this.models.WebEnvironment(appId).findOne({ markPage }).read("secondaryPreferred").exec();
+  async getEnvironmentForPage(appKey: string, markPage: string) {
+    return await this.models.WebEnvironment(appKey).findOne({ markPage }).read("secondaryPreferred").exec();
   }
 }

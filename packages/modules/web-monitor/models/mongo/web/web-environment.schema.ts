@@ -3,7 +3,7 @@ import { Document } from "mongoose";
 
 @Schema({ shardKey: { _id: "hashed" } })
 export class WebEnvironment {
-  @Prop() appId!: string; // App ID
+  @Prop() appKey!: string; // App ID
   @Prop({ default: Date.now }) createTime!: Date; // Visit time
   @Prop() url!: string; // Page URL
   @Prop() markPage!: string; // Page mark

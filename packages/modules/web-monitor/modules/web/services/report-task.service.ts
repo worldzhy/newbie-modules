@@ -36,7 +36,7 @@ interface DrainBuckets {
  * entries and resource/error list items keep their raw per-key values.
  */
 interface WebReportItem {
-  appId: string;
+  appKey: string;
   createTime: Date;
   userAgent: string;
   ip?: string;
@@ -79,10 +79,10 @@ export class WebReportTaskService {
     this.cfg = this.config.get("modules.web-monitor") || {};
   }
 
-  private pushRow(bucket: Record<string, Record<string, unknown>[]>, appId: string, row: Record<string, unknown>) {
-    const rows = bucket[appId];
+  private pushRow(bucket: Record<string, Record<string, unknown>[]>, appKey: string, row: Record<string, unknown>) {
+    const rows = bucket[appKey];
     if (rows) rows.push(row);
-    else bucket[appId] = [row];
+    else bucket[appKey] = [row];
   }
 
   private async collectQueueItem(raw: string, buckets: DrainBuckets): Promise<string | null> {
@@ -96,15 +96,15 @@ export class WebReportTaskService {
     const item = this.handleWebData(query);
     if (query.type === ReportType.SdkError) {
       this.collectSdkError(item, buckets.sdkErrors);
-      return item.appId || null;
+      return item.appKey || null;
     }
-    if (!item.appId) {
-      this.logger.warn("web report item dropped: missing appId");
+    if (!item.appKey) {
+      this.logger.warn("web report item dropped: missing appKey");
       return null;
     }
-    const system = await this.site.getSiteForAppId(item.appId);
+    const system = await this.site.getSiteForAppId(item.appKey);
     if (!system) {
-      this.logger.warn(`web report item dropped: site not found for appId=${item.appId}`);
+      this.logger.warn(`web report item dropped: site not found for appKey=${item.appKey}`);
       return null;
     }
     // All anomaly-relevant data is always persisted; thresholds define what an
@@ -114,7 +114,7 @@ export class WebReportTaskService {
     this.collectErrors(item, buckets.appErrors);
     if (querytype === ReportType.PagePerf) await this.collectEnvironment(item, buckets.appEnvironments);
     this.collectCustoms(item, buckets.appCustoms);
-    return item.appId;
+    return item.appKey;
   }
 
   private collectPages(item: WebReportItem, slowPageTime = 5, appPages: Record<string, Record<string, unknown>[]>) {
@@ -129,7 +129,7 @@ export class WebReportTaskService {
     slowPageTime = slowPageTime * 1000;
     const speedType = Number(performance.lodt) >= slowPageTime ? 2 : 1;
     const page: Record<string, unknown> = {
-      appId: item.appId,
+      appKey: item.appKey,
       createTime: item.createTime,
       url: newName,
       fullUrl: item.url,
@@ -158,7 +158,7 @@ export class WebReportTaskService {
     if (tcp !== undefined) page.tcpTime = tcp;
     const adom = func.toNumberOrUndefined(performance.andt);
     if (adom !== undefined) page.analysisDomTime = adom;
-    this.pushRow(appPages, item.appId, page);
+    this.pushRow(appPages, item.appKey, page);
   }
 
   private collectCustoms(data: WebReportItem, appCustoms: Record<string, Record<string, unknown>[]>) {
@@ -171,7 +171,7 @@ export class WebReportTaskService {
         });
       }
       const custom: Record<string, unknown> = {
-        appId: data.appId,
+        appKey: data.appKey,
         createTime: data.createTime,
         markPage: data.markPage,
         markUser: data.markUser,
@@ -189,7 +189,7 @@ export class WebReportTaskService {
       const cc = func.toStringOrUndefined(item.customContent);
       if (cc !== undefined) custom.customContent = cc;
       this.setUser(custom, data);
-      this.pushRow(appCustoms, data.appId, custom);
+      this.pushRow(appCustoms, data.appKey, custom);
     }
   }
 
@@ -220,7 +220,7 @@ export class WebReportTaskService {
       newName = typeof item.name === "string" ? item.name : "";
     }
     const resource: Record<string, unknown> = {
-      appId: data.appId,
+      appKey: data.appKey,
       createTime: item.requestTime ? func.toDateOrNow(item.requestTime) : data.createTime,
       url: data.url,
       speedType,
@@ -247,7 +247,7 @@ export class WebReportTaskService {
     resource.markPage = data.markPage;
     resource.markUser = data.markUser;
     this.setUser(resource, data);
-    this.pushRow(appResources, data.appId, resource);
+    this.pushRow(appResources, data.appKey, resource);
   }
 
   private async collectEnvironment(data: WebReportItem, appEnvironments: Record<string, Record<string, unknown>[]>) {
@@ -263,7 +263,7 @@ export class WebReportTaskService {
       datas = null;
     }
     const environment: Record<string, unknown> = {
-      appId: data.appId,
+      appKey: data.appKey,
       createTime: data.createTime,
       url: data.url,
       markPage: data.markPage,
@@ -288,12 +288,12 @@ export class WebReportTaskService {
       environment.province = datas.province;
       environment.city = datas.city;
     }
-    this.pushRow(appEnvironments, data.appId, environment);
+    this.pushRow(appEnvironments, data.appKey, environment);
   }
 
   private collectSdkError(data: WebReportItem, sdkErrors: Record<string, unknown>[]) {
     const sdkErr: Record<string, unknown> = {
-      appId: data.appId,
+      appKey: data.appKey,
       createTime: data.createTime,
       markUser: data.markUser,
       sdkVersion: func.toStringOrUndefined(data.sdkVersion),
@@ -338,8 +338,8 @@ export class WebReportTaskService {
     let failedItems = 0;
     for (const raw of raws) {
       try {
-        const appId = await this.collectQueueItem(raw, buckets);
-        if (appId) (rawsByApp[appId] ||= []).push(raw);
+        const appKey = await this.collectQueueItem(raw, buckets);
+        if (appKey) (rawsByApp[appKey] ||= []).push(raw);
       } catch (e: unknown) {
         // A single malformed/poisoned item must not abort the rest of the batch.
         // Count them so silent drops are visible in the tick summary (R9-04).
@@ -354,8 +354,8 @@ export class WebReportTaskService {
       // are acceptable for append-only analytics; loss is not.
       let requeued = 0;
       let deadLettered = 0;
-      for (const appId of failedAppIds) {
-        for (const raw of rawsByApp[appId] ?? []) {
+      for (const appKey of failedAppIds) {
+        for (const raw of rawsByApp[appKey] ?? []) {
           const payload = this.nextAttemptPayload(raw);
           if (payload) {
             await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DATAS, payload);
@@ -394,23 +394,24 @@ export class WebReportTaskService {
 
   private async flushBuckets(buckets: DrainBuckets): Promise<Set<string>> {
     const failedAppIds = new Set<string>();
-    const flush = async (label: string, appId: string, write: () => Promise<unknown>) => {
+    const flush = async (label: string, appKey: string, write: () => Promise<unknown>) => {
       try {
         await write();
       } catch (e: unknown) {
         // One failing destination must not suppress the remaining flushes.
-        failedAppIds.add(appId);
+        failedAppIds.add(appKey);
         this.logger.error(`web report flush failed (${label})`, e instanceof Error ? e.message : String(e));
       }
     };
-    for (const appId of Object.keys(buckets.appAjaxs)) {
-      const rows = buckets.appAjaxs[appId];
-      if (rows.length) await flush(`ajax:${appId}`, appId, async () => (await this.ch.WebAjax(appId)).insertMany(rows));
-    }
-    for (const appId of Object.keys(buckets.appErrors)) {
-      const rows = buckets.appErrors[appId];
+    for (const appKey of Object.keys(buckets.appAjaxs)) {
+      const rows = buckets.appAjaxs[appKey];
       if (rows.length)
-        await flush(`error:${appId}`, appId, async () => (await this.ch.WebError(appId)).insertMany(rows));
+        await flush(`ajax:${appKey}`, appKey, async () => (await this.ch.WebAjax(appKey)).insertMany(rows));
+    }
+    for (const appKey of Object.keys(buckets.appErrors)) {
+      const rows = buckets.appErrors[appKey];
+      if (rows.length)
+        await flush(`error:${appKey}`, appKey, async () => (await this.ch.WebError(appKey)).insertMany(rows));
     }
     if (buckets.sdkErrors.length) {
       // SDK-error payloads are not produced by handleWebData today; a failure
@@ -418,22 +419,23 @@ export class WebReportTaskService {
       // re-queued (no raws are keyed under the empty app id).
       await flush("sdk-error", "", async () => (await this.ch.WebSdkError()).insertMany(buckets.sdkErrors));
     }
-    for (const appId of Object.keys(buckets.appPages)) {
-      const rows = buckets.appPages[appId];
-      if (rows.length) await flush(`page:${appId}`, appId, () => this.models.WebPage(appId).insertMany(rows));
+    for (const appKey of Object.keys(buckets.appPages)) {
+      const rows = buckets.appPages[appKey];
+      if (rows.length) await flush(`page:${appKey}`, appKey, () => this.models.WebPage(appKey).insertMany(rows));
     }
-    for (const appId of Object.keys(buckets.appEnvironments)) {
-      const rows = buckets.appEnvironments[appId];
+    for (const appKey of Object.keys(buckets.appEnvironments)) {
+      const rows = buckets.appEnvironments[appKey];
       if (rows.length)
-        await flush(`environment:${appId}`, appId, () => this.models.WebEnvironment(appId).insertMany(rows));
+        await flush(`environment:${appKey}`, appKey, () => this.models.WebEnvironment(appKey).insertMany(rows));
     }
-    for (const appId of Object.keys(buckets.appResources)) {
-      const rows = buckets.appResources[appId];
-      if (rows.length) await flush(`resource:${appId}`, appId, () => this.models.WebResource(appId).insertMany(rows));
+    for (const appKey of Object.keys(buckets.appResources)) {
+      const rows = buckets.appResources[appKey];
+      if (rows.length)
+        await flush(`resource:${appKey}`, appKey, () => this.models.WebResource(appKey).insertMany(rows));
     }
-    for (const appId of Object.keys(buckets.appCustoms)) {
-      const rows = buckets.appCustoms[appId];
-      if (rows.length) await flush(`custom:${appId}`, appId, () => this.models.WebCustom(appId).insertMany(rows));
+    for (const appKey of Object.keys(buckets.appCustoms)) {
+      const rows = buckets.appCustoms[appKey];
+      if (rows.length) await flush(`custom:${appKey}`, appKey, () => this.models.WebCustom(appKey).insertMany(rows));
     }
     return failedAppIds;
   }
@@ -441,7 +443,7 @@ export class WebReportTaskService {
   private handleWebData(query: Record<string, unknown>): WebReportItem {
     const str = (value: unknown, fallback = "") => (typeof value === "string" && value ? value : fallback);
     const item: WebReportItem = {
-      appId: str(query.appId),
+      appKey: str(query.appKey),
       createTime: func.toDateOrNow(query.time),
       userAgent: str(query.userAgent),
       ip: str(query.ip) || undefined,
@@ -498,7 +500,7 @@ export class WebReportTaskService {
     const duration = Math.floor(Math.abs((rawDuration ?? 0) as number));
 
     const _ajax: Record<string, unknown> = {
-      appId: data.appId,
+      appKey: data.appKey,
       createTime: item.requestTime ? func.toDateOrNow(item.requestTime) : data.createTime,
     };
     _ajax.url = newName || "";
@@ -523,7 +525,7 @@ export class WebReportTaskService {
     _ajax.markPage = data.markPage || "";
     _ajax.markUser = data.markUser || "";
 
-    this.pushRow(appAjaxs, data.appId, _ajax);
+    this.pushRow(appAjaxs, data.appKey, _ajax);
   }
 
   private collectErrors(data: WebReportItem, appErrors: Record<string, Record<string, unknown>[]>) {
@@ -576,7 +578,7 @@ export class WebReportTaskService {
       if (data.uid) errors.uid = String(data.uid);
       if (data.p) errors.phone = func.decryptPhone(data.p);
 
-      this.pushRow(appErrors, data.appId, errors);
+      this.pushRow(appErrors, data.appKey, errors);
     }
   }
 }

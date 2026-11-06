@@ -3,7 +3,7 @@ import { Document, Schema as MongooseSchema } from "mongoose";
 
 @Schema({ shardKey: { _id: "hashed" } })
 export class WebResource {
-  @Prop() appId!: string; // App ID (system identifier)
+  @Prop() appKey!: string; // App ID (system identifier)
   @Prop({ default: Date.now }) createTime!: Date; // Visit time
   @Prop() url!: string; // Page URL
   @Prop() fullUrl!: string; // Full resource URL

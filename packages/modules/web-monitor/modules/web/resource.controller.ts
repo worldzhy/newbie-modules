@@ -1,25 +1,31 @@
-import { Controller, Get, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { ResourceService } from "./services/resource.service";
 import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { UserRequest } from "@modules/security/security.interface";
+import { WebMonitorAccessService } from "./web-monitor-access.service";
 
 @ApiTags("Frontend Monitor / Web / Resource")
 @Controller("/web-monitor/resource")
 export class ResourceController {
-  constructor(private readonly resourceSrv: ResourceService) {}
+  constructor(
+    private readonly resourceSrv: ResourceService,
+    private readonly access: WebMonitorAccessService,
+  ) {}
 
   @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getResourceForType")
   @ApiOperation({ summary: "Get resource performance list by type" })
   @ApiResponse({ type: Object })
-  async getResourceForType(@Query() q: Record<string, unknown>) {
-    const { appId, url, type = 1, pageNo = 1, pageSize = 15, beginTime, endTime } = q;
-    if (!appId) throw new Error("Single page resource performance list: appId must not be empty");
-    if (!url) throw new Error("Single page resource performance list: url must not be empty");
+  async getResourceForType(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, url, type = 1, pageNo = 1, pageSize = 15, beginTime, endTime } = q;
+    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    if (!url) throw new BadRequestException("url is required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
     const result = await this.resourceSrv.getResourceForType(
-      String(appId),
+      appKey,
       String(url),
       Number(type),
       Number(pageNo),
@@ -34,10 +40,12 @@ export class ResourceController {
   @Get("/getAverageResourceList")
   @ApiOperation({ summary: "Get average resource performance list" })
   @ApiResponse({ type: Object })
-  async getAverageResourceList(@Query() q: Record<string, unknown>) {
-    const { appId } = q;
-    if (!appId) throw new Error("Get resource average performance list: appId must not be empty");
-    const result = await this.resourceSrv.getAverageResourceList(q);
+  async getAverageResourceList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId } = q;
+    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const resolved = { ...q, appKey: appKey };
+    const result = await this.resourceSrv.getAverageResourceList(resolved);
     return func.result({ data: result });
   }
 
@@ -45,12 +53,13 @@ export class ResourceController {
   @Get("/getOneResourceAvg")
   @ApiOperation({ summary: "Get single resource average performance" })
   @ApiResponse({ type: Object })
-  async getOneResourceAvg(@Query() q: Record<string, unknown>) {
-    const { appId, url, beginTime, endTime } = q;
-    if (!appId) throw new Error("Single resource average performance data: appId must not be empty");
-    if (!url) throw new Error("Single resource average performance data: api url must not be empty");
+  async getOneResourceAvg(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, url, beginTime, endTime } = q;
+    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    if (!url) throw new BadRequestException("url is required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
     const result = await this.resourceSrv.getOneResourceAvg(
-      String(appId),
+      appKey,
       String(url),
       beginTime as string | undefined,
       endTime as string | undefined,
@@ -62,12 +71,13 @@ export class ResourceController {
   @Get("/getOneResourceList")
   @ApiOperation({ summary: "Get single resource performance list" })
   @ApiResponse({ type: Object })
-  async getOneResourceList(@Query() q: Record<string, unknown>) {
-    const { appId, url, pageNo = 1, pageSize = 15, beginTime, endTime } = q;
-    if (!appId) throw new Error("Single resource performance list data: appId must not be empty");
-    if (!url) throw new Error("Single resource performance list data: api url must not be empty");
+  async getOneResourceList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, url, pageNo = 1, pageSize = 15, beginTime, endTime } = q;
+    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    if (!url) throw new BadRequestException("url is required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
     const result = await this.resourceSrv.getOneResourceList(
-      String(appId),
+      appKey,
       String(url),
       Number(pageNo),
       Number(pageSize),
@@ -81,11 +91,12 @@ export class ResourceController {
   @Get("/getOneResourceDetail")
   @ApiOperation({ summary: "Get single resource details" })
   @ApiResponse({ type: Object })
-  async getOneResourceDetail(@Query() q: Record<string, unknown>) {
-    const { appId, id } = q;
-    if (!id) throw new Error("Get single resource details: id must not be empty");
-    if (!appId) throw new Error("Get single resource details: appId must not be empty");
-    const row = await this.resourceSrv.getOneResourceDetail(String(appId), String(id));
+  async getOneResourceDetail(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, id } = q;
+    if (!id) throw new BadRequestException("id is required");
+    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const row = await this.resourceSrv.getOneResourceDetail(appKey, String(id));
     return func.result({ data: row || {} });
   }
 }

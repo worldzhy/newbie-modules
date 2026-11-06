@@ -58,6 +58,12 @@ model NotificationRecord {
   projectId String?  @db.Uuid
   // Frontend relative path the notification deep-links to.
   link      String?  @db.VarChar(512)
+  // Lifecycle phase for alert-style notifications: "firing" (default) or
+  // "resolved". Plain notifications ignore it; the frontend uses it to pair
+  // firing/resolved records and dim resolved ones (ADR-051).
+  status    String    @db.VarChar(10) @default("firing")
+  // When this record represents a resolved alert.
+  resolvedAt DateTime?
   createdAt DateTime @default(now())
 
   receipts NotificationReceipt[]
@@ -67,6 +73,7 @@ model NotificationRecord {
   @@index([createdAt])
   @@index([notificationKey])
   @@index([projectId])
+  @@index([status])
   @@schema("module/notification-center")
 }
 

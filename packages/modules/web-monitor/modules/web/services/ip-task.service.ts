@@ -31,22 +31,22 @@ export class WebIpTaskService {
     const systems = await this.site.getWebSiteList();
     if (!systems || !systems.length) return;
     for (const sys of systems) {
-      const appId = sys.appId;
-      if (!appId) continue;
-      await this.saveWebGetIpDatasByOne(appId);
+      const appKey = sys.appKey;
+      if (!appKey) continue;
+      await this.saveWebGetIpDatasByOne(appKey);
     }
   }
 
-  private async saveWebGetIpDatasByOne(appId: string) {
+  private async saveWebGetIpDatasByOne(appKey: string) {
     try {
       const query: Record<string, unknown> = { city: { $exists: false } };
-      const beginTime = await this.redis.getClient().get(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`);
+      const beginTime = await this.redis.getClient().get(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appKey}`);
       query.createTime = {
         $gt: beginTime ? new Date(beginTime) : new Date(Date.now() - WEB_MONITOR_CONFIG.ip_task_space_time),
       };
       const ipThread = WEB_MONITOR_CONFIG.ip_thread;
       const datas = await this.models
-        .WebEnvironment(appId)
+        .WebEnvironment(appKey)
         .find(query)
         .read("secondaryPreferred")
         .limit(ipThread * 60)
@@ -55,42 +55,42 @@ export class WebIpTaskService {
       if (datas && datas.length) {
         for (let i = 0; i < ipThread; i++) {
           const newSpit = datas.splice(0, 60);
-          await this.handleDatas(appId, newSpit, datas.length);
+          await this.handleDatas(appKey, newSpit, datas.length);
         }
       } else {
-        await this.redis.getClient().set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`, new Date().toString());
+        await this.redis.getClient().set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appKey}`, new Date().toString());
       }
     } catch (err) {
       this.logger.error("saveWebGetIpDatasByOne failed", err instanceof Error ? err.message : String(err));
     }
   }
 
-  private async handleDatas(appId: string, data: WebEnvironmentDocument[], lastLen: number) {
+  private async handleDatas(appKey: string, data: WebEnvironmentDocument[], lastLen: number) {
     if (!data || !data.length) return;
     for (let i = 0; i < data.length; i++) {
       const ip = data[i].ip;
-      await this.getIpData(ip, String(data[i]._id), data[i].appId);
+      await this.getIpData(ip, String(data[i]._id), data[i].appKey);
     }
     if (lastLen === 0) {
       await this.redis
         .getClient()
-        .set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appId}`, String(data[data.length - 1].createTime));
+        .set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appKey}`, String(data[data.length - 1].createTime));
     }
   }
 
-  private async getIpData(ip: string, _id: string, appId: string) {
+  private async getIpData(ip: string, _id: string, appKey: string) {
     const _copyip = ip.split(".");
     const copyip = `${_copyip[0]}.${_copyip[1]}.${_copyip[2]}`;
     const datas = await this.redis.getClient().get(`${RedisKeyPrefix.IP_GEO_CACHE}${copyip}`);
     if (datas) {
       try {
         const json = JSON.parse(datas);
-        return await this.updateWebEnvironment(json, _id, appId);
+        return await this.updateWebEnvironment(json, _id, appKey);
       } catch {
         // Expected failure: the cached value may be corrupt — refetch from the Tencent API.
       }
     }
-    return await this.getIpDataByTencentApi(ip, _id, copyip, appId);
+    return await this.getIpDataByTencentApi(ip, _id, copyip, appKey);
   }
 
   private httpGetJson<T>(url: string): Promise<T> {
@@ -111,7 +111,7 @@ export class WebIpTaskService {
     });
   }
 
-  private async getIpDataByTencentApi(ip: string, _id: string, copyip: string, appId: string) {
+  private async getIpDataByTencentApi(ip: string, _id: string, copyip: string, appKey: string) {
     if (func.isSkipIp(ip) || !this.cfg.TENCENTMAPKEY) return;
     try {
       const url = `https://apis.map.qq.com/ws/location/v1/ip?ip=${ip}&key=${String(this.cfg.TENCENTMAPKEY)}`;
@@ -125,7 +125,7 @@ export class WebIpTaskService {
         await this.redis
           .getClient()
           .set(`${RedisKeyPrefix.IP_GEO_CACHE}${copyip}`, JSON.stringify(json), "EX", WEB_MONITOR_CONFIG.ipRedisTTL);
-        return await this.updateWebEnvironment(json, _id, appId);
+        return await this.updateWebEnvironment(json, _id, appKey);
       }
       return {};
     } catch (err) {
@@ -134,9 +134,9 @@ export class WebIpTaskService {
     }
   }
 
-  private async updateWebEnvironment(data: Record<string, unknown>, id: string, appId: string) {
+  private async updateWebEnvironment(data: Record<string, unknown>, id: string, appKey: string) {
     return await this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .updateOne({ _id: id }, { $set: { province: data.province, city: data.city } }, { upsert: true })
       .exec();
   }

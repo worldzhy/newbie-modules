@@ -23,13 +23,13 @@ export class DayReportNumService {
     const apps = await this.models.System().find().read("secondaryPreferred").exec();
 
     for (const app of apps) {
-      const key = `${RedisKeyPrefix.DAY_REPORT_NUM}${app.appId}_${yesterday}`;
+      const key = `${RedisKeyPrefix.DAY_REPORT_NUM}${app.appKey}_${yesterday}`;
       const num = await this.redis.getClient().get(key);
       if (!num) continue;
 
       const DayModel = this.models.DayReportNum();
       const repore = new DayModel();
-      repore.appId = app.appId;
+      repore.appKey = app.appKey;
       repore.type = app.type;
       repore.dayTime = new Date(yesterday);
       repore.createTime = new Date();
@@ -40,13 +40,13 @@ export class DayReportNumService {
     }
   }
 
-  async getTodayFromRedis(appId: string, today: number) {
-    return await this.redis.getClient().get(`${RedisKeyPrefix.DAY_REPORT_NUM}${appId}_${today}`);
+  async getTodayFromRedis(appKey: string, today: number) {
+    return await this.redis.getClient().get(`${RedisKeyPrefix.DAY_REPORT_NUM}${appKey}_${today}`);
   }
 
-  async getDayFromMongo(appId: string, beginTime: string | Date, endTime: string | Date) {
+  async getDayFromMongo(appKey: string, beginTime: string | Date, endTime: string | Date) {
     const query = {
-      appId,
+      appKey,
       dayTime: {
         $gte: new Date(dayjs(beginTime).format("YYYY-MM-DD 00:00:00")),
         $lte: new Date(dayjs(endTime).format("YYYY-MM-DD 23:59:59")),
@@ -55,9 +55,9 @@ export class DayReportNumService {
     return await this.models.DayReportNum().findOne(query, { num: 1, dayTime: 1 }).read("secondaryPreferred").exec();
   }
 
-  async redisCount(appId: string) {
+  async redisCount(appKey: string) {
     const date = new Date();
     const today = new Date(func.format(date, "yyyy/MM/dd")).getTime();
-    await this.redis.getClient().incr(`${RedisKeyPrefix.DAY_REPORT_NUM}${appId}_${today}`);
+    await this.redis.getClient().incr(`${RedisKeyPrefix.DAY_REPORT_NUM}${appKey}_${today}`);
   }
 }

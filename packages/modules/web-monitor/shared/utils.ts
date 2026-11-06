@@ -1,21 +1,36 @@
 import { BadRequestException } from "@nestjs/common";
 
 /**
- * `appId` is a storage partition key: it becomes part of Mongo collection
+ * `appKey` is a storage partition key: it becomes part of Mongo collection
  * names and ClickHouse table names. Restrict it to the identifier-safe set so
  * a malformed value is rejected at the boundary instead of reaching DDL.
  */
-export const APP_ID_PATTERN = /^[A-Za-z0-9_]{1,64}$/;
+export const APP_KEY_PATTERN = /^[A-Za-z0-9_]{1,64}$/;
 
-export function isValidAppId(appId: unknown): appId is string {
-  return typeof appId === "string" && APP_ID_PATTERN.test(appId);
+export function isValidAppKey(appKey: unknown): appKey is string {
+  return typeof appKey === "string" && APP_KEY_PATTERN.test(appKey);
 }
 
-export function assertAppId(appId: unknown): string {
-  if (!isValidAppId(appId)) {
-    throw new BadRequestException("appId must match ^[A-Za-z0-9_]{1,64}$");
+export function assertAppKey(appKey: unknown): string {
+  if (!isValidAppKey(appKey)) {
+    throw new BadRequestException("appKey must match ^[A-Za-z0-9_]{1,64}$");
   }
-  return appId;
+  return appKey;
+}
+
+/**
+ * Reads a target identifier with the same precedence the authorization guard
+ * uses (route params → query → body). A controller must never resolve the
+ * write target from a different source than the guard: otherwise a request
+ * can be authorized against a project where the caller holds the action
+ * (e.g. from `?projectId=A`) while the write lands on another project.
+ */
+export function pickRequestId(
+  req: { params?: Record<string, unknown>; query?: Record<string, unknown>; body?: Record<string, unknown> },
+  key: string,
+): string | undefined {
+  const value = req.params?.[key] ?? req.query?.[key] ?? req.body?.[key];
+  return typeof value === "string" && value ? value : undefined;
 }
 
 const decryptP: Record<string, number> = {

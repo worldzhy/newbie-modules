@@ -119,3 +119,66 @@ C 层草案判定：现状主张 C1–C4 与支撑论证 P4 成立；方案主�
 carry-over 更新（2026-11-06）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转 fixed（见各轮表）；R5-P2-01/02/05/06/07 转 fixed；仍 open：R5-P2-03 partial、R5-P2-04（webhook 未装配）、R6-13（裁定未执行）、R3-25。
 
 误报剔除：R12-01 CH 侧毒丸向量（探针反驳）；registry CI pin 滞后（已升 1.18.0）。详见 devbie round15 报告 §7。
+
+## round18（2026-11-06，scope=`plan`：ADR-050 错误来源分级，报告在本仓 `.trae/documents/expert-review-2026-11-06-round18.md`）
+
+锚点：newbie-modules `971721e`（0 dirty）/ devbie `4df0a04c`（3 untracked，均不在 SDK 区）。结论摘要：ADR 的"复用 `api` 作来源真源、不改 schema"方向成立；两条 high 信号的来源边界未闭合。
+
+| ID     | 仓             | 标题                                                                                                                                          | 严重度 | 暴露面         | 可达性    | 状态 |
+| ------ | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------ | -------------- | --------- | ---- |
+| R18-01 | newbie-modules | `js-error-spike`（high，阈值 10）对错误表全窗口计数、无 `type`/`api` 过滤；5B 下降级入库的 console 事件仍可触发 high 告警，ADR 验收标准"console 不产生 high 告警"不可达（jobs.service.ts L253-L288、L77） | P1     | artifact + live | anonymous | fixed |
+| R18-02 | devbie (SDK)   | `api=onerror` 同时用于资源加载失败（core.ts L473）与 JS 未捕获异常（L491/L497），决策 4 的 `api ∈ {onerror, unhandled-rejection}` 无法只保留运行时异常，资源噪音仍进 high 首现告警 | P1     | artifact       | anonymous | fixed |
+| R18-03 | devbie (SDK)   | `ERRORAPIS` 为发布包导出符号（`dist/common/utils.d.ts` L15-L18），ADR 决策 2 未声明导出面/消费方校验（当前跨仓外部引用 0）                    | P2     | artifact       | 构建期    | fixed |
+| R18-04 | newbie-modules | 枚举改值 + 不迁移：历史 `api='reject'` 行退出新基线，已见运行时错误会重新首现；ADR 未写"验证前清表"前置。本机 CH 实例当前无 web 错误表，无实际影响 | P2     | docs           | N/A       | fixed |
+| R18-05 | newbie-modules | 背景取证措辞/路径：`name = Error` 实为 `error.name`；分组发生在告警任务而非 ClickHouse 模型；`models/clickhouse/web/error.ts` 缺 `packages/modules/web-monitor/` 前缀 | P2     | docs           | N/A       | fixed |
+| R18-06 | newbie-modules | 决策 3 的可观察影响未记录：`type=script → log` 改变前端错误列表聚合口径（error.service.ts L72-L77），ADR 却称前端不涉及改动             | P2     | docs           | N/A       | fixed |
+
+- 误报剔除：反驳代理将 console 分支概括为"一律 type=log"，与 core.ts L528→L49 不符，按读码裁决不采信；"基线占指纹使真崩溃永不告警"仅在 name/resourceUrl/line 重合时成立，并入 A7 结论、不单列。
+- 评审时点状态：ADR-050 当时为「提议中」（决策 5 待拍板）；R18-01/R18-02 需先补决策 4 再实施。
+- 2026-11-06 裁决：ADR-050 已定稿（状态改为已采纳）——5B；首现白名单 + 尖峰黑名单；新增 `resource-error` 取值。R18-01/R18-02 保持 **open**，待 SDK 与 registry 实现落地后按不变量重验关闭（不是按"ADR 已改"关闭）。
+- 2026-11-06 关闭（实现 + 四向取证）：
+  - R18-01 fixed：`packages/modules/web-monitor/modules/jobs/error-source.ts` 新增 `SPIKE_SOURCE_FILTER`（`api NOT IN ('console-error')`），`jobs.service.ts` 的 spike 计数与 topItems 两条查询均引用；registry `1218851`，宿主装配 `6422537`。
+  - R18-02 fixed：SDK `ERROR_APIS` 取值规范化并新增 `resourceError`，资源加载失败分支改用 `resource-error`（`devbie 6837c2ee`，`@devbie/web-monitor-sdk@1.6.0` 已发布）；registry 首现分组与基线两条查询引用 `FIRST_SEEN_SOURCE_FILTER`（`api IN ('onerror','unhandled-rejection')`）。
+  - 契约测试：`packages/modules/web-monitor/modules/jobs/error-source.test.ts`（4 断言，含接线计数）；未修复版本的阴性对照在 `jobs.service.ts` 旧接线副本下红于接线断言。
+  - 端到端（清表后 4 向）：console → `log/console-error` 入库、13 行零告警；资源 → `resource/resource-error` 入库、零告警；运行时 → `script/onerror` 触发 1 条 `js-error-first-seen`（11:57:00）；ajax（`api=""`）→ 12 行触发 `js-error-spike`「12 JS errors in 60s」（计 12 而非 25，证明 console 未计入）。
+  - R18-03 fixed：`ERRORAPIS` 改名后跨仓外部引用为 0，按 1.6.0 minor 发布并通过。
+  - R18-04 fixed：ADR-050「验证（registry-first）」已写明"清表"前置。
+  - R18-05/R18-06 fixed：ADR-050 已按评审订正措辞（`error.name`、分组在告警任务、`models/clickhouse/web/error.ts` 全路径），并在影响节记录 `type=script → log` 改变前端错误列表聚合口径（`error.service.ts` L72-L77）。
+
+## round19（2026-11-06，scope=`plan`：ADR-051 告警冷却与恢复落地，报告在本仓 `.trae/documents/expert-review-2026-11-06-round19.md`）
+
+锚点：newbie-modules `066cac8`（0 dirty）/ nightwatch-backend `6a48981`（1 untracked，不在被审域）/ nightwatch-frontend `025caed`（0 dirty）。结论摘要：状态机接线、schema、宿主/前端链路与装配一致性成立；P1 fail-open 注释失实、E2E 勾选无持久证据。
+
+| ID     | 仓                        | 标题                                                                                                                                 | 严重度 | 暴露面         | 可达性    | 状态 |
+| ------ | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------ | -------------- | --------- | ---- |
+| R19-01 | newbie-modules            | fail-open 注释失实：Redis 断连时 `shouldFire`/`resolveIfClean` 异常上抛、`redisLock` 无守卫，整个评估周期静默失败                    | P1     | artifact+live  | 需链条    | fixed：`ead62ef`（锁守卫 + 两方法 try/catch fail-open，`resolveIfClean` fail-closed；注释与实现对齐；宿主装配 `1f06d3a`） |
+| R19-02 | newbie-modules            | ADR 伪代码"冷却期内刷新 lastFiredAt"使"已过冷却期→重燃"恒不可达，重燃分支为死代码                                                     | P2     | docs           | N/A       | fixed：`ead62ef`（ADR 修订记录明确持续突破只 firing/resolved 各一次，仅评估中断 ≥1h 且 key 未过期时重发） |
+| R19-03 | nightwatch-frontend       | ADR 正文"firing/resolved 配对展示"未实现；/notifications 行内无徽章；bell 徽章硬编码英文                                              | P2     | artifact+live  | anonymous | fixed：`8e01d56`（列表行 + bell 统一本地化徽章）；ADR 口径同步修订为"resolved 徽章"（分组键含标题，配对合并会误并 first-seen 指纹） |
+| R19-04 | newbie-modules + 宿主     | resolved 通知与 firing 同模板：标题渲染"0 slow page load(s) in 60s"、detail 尾部空 Top 列表                                            | P2     | live           | anonymous | fixed：registry `ead62ef`（声明支持 `resolvedTitleTemplate`/`resolvedDetailTemplate`）+ 宿主 `1f06d3a`（5 个电平信号补"…recovered"文案）；E2E 实测标题「slow JavaScript resources recovered」 |
+| R19-05 | newbie-modules            | 契约测试浅于 checklist 声称；registry 无 test script，裸 `node --test` 因 ESM `__dirname` 失败                                         | P2     | source         | N/A       | fixed：`alert-lifecycle.test.ts` 补 fail-open/fail-closed 与锁守卫断言；registry 增 `test:web-monitor`（`node --import tsx --test`，10/10 通过）并声明 `tsx` devDependency |
+| R19-06 | newbie-modules + 宿主     | E2E checklist 勾选但零持久证据（26 行全 firing、0 resolved、无 alert-state key）                                                        | P2     | docs           | N/A       | fixed：本会话重做生命周期 E2E，executed 证据见下方「round19 E2E 证据」 |
+| R19-07 | newbie-modules            | ADR 迁移行文（`prisma migrate dev`）与项目实际（无 migrations、`db push`）矛盾                                                          | P2     | docs           | N/A       | fixed：`ead62ef`（ADR 正文更正为 `db push`） |
+| R19-08 | newbie-modules            | js-error-first-seen 每指纹一个 Redis key，高基数应用下的 key 数量待审视                                                                | 观察   | live           | 需规模    | open（已入 backlog，并入"阈值配置化"ADR 审视） |
+| R19-09 | nightwatch-backend        | E2E 新发现：所有 web 通知模板用 `{{appId}}`，宿主上下文只给 `appKey` → detail 恒渲染 `System: <name> ()`                              | P2     | live           | anonymous | fixed：`ae3aa34`（7 个模板占位符改为 `{{appKey}}`） |
+| R19-10 | nightwatch-backend        | E2E 新发现：seed 以 `appId` 写 Mongo `systems` 文档，模型按 `appKey` 查询 → seed 出来的安装被 `/web-monitor/report` 以 "appKey does not exist" 拒绝 | P2     | live           | N/A       | fixed：`ae3aa34`（convergence 接口/查询/日志改 `appKey`） |
+
+### round19 E2E 证据（2026-11-06 22:26-22:40 +0800，executed）
+
+- **前置**：`module/notification-center.NotificationCenterSetting.minimumSeverity` 临时调为 `medium`（默认 `high` 会把 medium 电平信号整条丢弃，无法观察），结束后已恢复 `high`；`systems` 集合补 converge `fsQNmFK` 文档（见 R19-10）。
+- **基线**：`NotificationRecord` 26 firing / 0 resolved；`web-monitor:alert-state:*` 无 key。
+- **触发**：向 `/web-monitor/report`（token=自观测安装）投递 3 条 `type=script`、duration 3000-4500ms 的慢资源（采集落 `webresources_fsqnmfks`）。
+- **firing**：14:32:00Z 生成 1 行 `web.slow-resource`，`status=firing`，标题「3 slow JavaScript resource(s) in 60s」，Redis key `{"status":"firing","cleanWindows":0}`。
+- **resolved**：干净窗口 14:33、14:34 → 14:34:00Z 生成 1 行 `status=resolved`，`resolvedAt=14:34:00.082Z`，标题「slow JavaScript resources recovered」（无空 Top 列表）；alert-state key 已删除。
+- **冷却抑制**：第二段持续突破 → 14:36:00 仅 1 行 firing；14:37 窗口再次突破（22:37:09 投递）→ 状态 `lastFiredAt` 刷新为 14:38:00、`cleanWindows` 归零，**未新增通知行**；停止后 14:40:00 生成 1 行 resolved。速率符合 ADR「持续告警只 firing/resolved 各一次」。
+- **旁证**：宿主进程以 `node dist/src/main.js` 运行（非 watch），模板/seed 的 `appKey` 修复只做了 tsc/format/lint 静态验证，运行态渲染未复测——需重塑/重启后复核，标记为遗留验证项。
+- **清理**：删除 12 行 e2e 探针资源文档；保留 4 行通知记录（14:32 firing、14:34 resolved、14:36 firing、14:40 resolved）作为证据锚点。
+
+## round20（workspace scope）模块级条目指针
+
+round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/documents/expert-review-2026-11-06-round20.md`、`devbie/.trae/documents/findings.md` R20-01..R20-41）。本仓相关条目（按不复制正文规则仅留指针）：
+
+- `R20-01` / `R20-02`（P1，fixed 2026-11-07）：web-monitor `/system/update` 与 `/remove/customDeleteData` 鉴权按 body `projectId` 解析、写入/删除按 body `appKey` 执行，二者无绑定 → 跨租户改写/删除。修复：controller 取参与 guard 同源，appKey 由安装注册表派生（`5c47402` + 宿主 `b54062d`）；宿主另加 appKey scope resolver 纵深。E2E 探针：body 他人 appKey → 403，受害文档/时间窗数据未变。
+- `R20-04`（P1，live）：ajax `duration` 无上限，`1e21` → ClickHouse `Code: 27`，整批失败后按 app 全量重排 → 死信（executed 探针，Memory 表已 DROP）。
+- `R20-08` / `R20-09` / `R20-10` / `R20-11` / `R20-31`..`R20-33` / `R20-41`：模块层 P2/P3（message-tracker 不可装配、alert-lifecycle 文本断言、API Key 限制不校验、refreshTokenNext 明文、ioredis 超时、CH 时间语义、Approved Subnet 审计）。
+- `R20-03`（P1）：本仓 `lark.service.ts` 12 处 raw error 入日志，与宿主金蝶同根因；executed 序列化探针证明 token 会被打印。
+

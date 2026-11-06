@@ -9,7 +9,7 @@ export class WebMonitorCustomFilterResponseDto {
   _id?: string;
 
   @ApiPropertyOptional({ type: String, description: "App ID (system identifier)" })
-  appId?: string;
+  appKey?: string;
 
   @ApiPropertyOptional({ type: String, description: "Row creation time (ISO string)" })
   createTime?: string;
@@ -38,7 +38,7 @@ export class WebMonitorCustomItemResponseDto {
   _id?: string;
 
   @ApiPropertyOptional({ type: String, description: "App ID (system identifier)" })
-  appId?: string;
+  appKey?: string;
 
   @ApiPropertyOptional({ type: String, description: "Row creation time (ISO string)" })
   createTime?: string;

@@ -1,4 +1,4 @@
-import { Controller, Get, Query } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { AjaxService } from "./services/ajax.service";
@@ -9,22 +9,28 @@ import {
 } from "./ajax.dto";
 import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
+import { UserRequest } from "@modules/security/security.interface";
+import { WebMonitorAccessService } from "./web-monitor-access.service";
 
 @ApiTags("Frontend Monitor / Web / Ajax")
 @Controller("/web-monitor/ajax")
 export class AjaxController {
-  constructor(private readonly ajax: AjaxService) {}
+  constructor(
+    private readonly ajax: AjaxService,
+    private readonly access: WebMonitorAccessService,
+  ) {}
 
   @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getPageAjaxsAvg")
   @ApiOperation({ summary: "Get page ajax average performance" })
   @ApiResponse({ type: ListWebMonitorAjaxAveragesResponseDto })
-  async getPageAjaxsAvg(@Query() q: Record<string, unknown>) {
-    const { appId, url, beginTime, endTime } = q;
-    if (!appId) throw new Error("Page ajax info: appId must not be empty");
-    if (!url) throw new Error("Page ajax info: url must not be empty");
+  async getPageAjaxsAvg(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, url, beginTime, endTime } = q;
+    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    if (!url) throw new BadRequestException("url is required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
     const result = await this.ajax.getPageAjaxsAvg(
-      String(appId),
+      appKey,
       String(url),
       beginTime as string | undefined,
       endTime as string | undefined,
@@ -36,10 +42,12 @@ export class AjaxController {
   @Get("/getAverageAjaxList")
   @ApiOperation({ summary: "Get average ajax performance list" })
   @ApiResponse({ type: ListWebMonitorAjaxAveragesResponseDto })
-  async getAverageAjaxList(@Query() q: Record<string, unknown>) {
-    const { appId } = q;
-    if (!appId) throw new Error("Average AJAX performance list: appId must not be empty");
-    const result = await this.ajax.getAverageAjaxList(q);
+  async getAverageAjaxList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId } = q;
+    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const resolved = { ...q, appKey: appKey };
+    const result = await this.ajax.getAverageAjaxList(resolved);
     return func.result({ data: result });
   }
 
@@ -47,12 +55,13 @@ export class AjaxController {
   @Get("/getOneAjaxList")
   @ApiOperation({ summary: "Get single ajax average performance data" })
   @ApiResponse({ type: ListWebMonitorAjaxOnesResponseDto })
-  async getOneAjaxList(@Query() q: Record<string, unknown>) {
-    const { appId, url, pageNo = 1, pageSize = 15, beginTime, endTime, type } = q;
-    if (!appId) throw new Error("Single AJAX average performance data: appId must not be empty");
-    if (!url) throw new Error("Single AJAX average performance data: api url must not be empty");
+  async getOneAjaxList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, url, pageNo = 1, pageSize = 15, beginTime, endTime, type } = q;
+    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    if (!url) throw new BadRequestException("url is required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
     const result = await this.ajax.getOneAjaxList(
-      String(appId),
+      appKey,
       String(url),
       Number(pageNo),
       Number(pageSize),
@@ -67,11 +76,12 @@ export class AjaxController {
   @Get("/getMarkUserAjaxList")
   @ApiOperation({ summary: "Get marked user ajax list" })
   @ApiResponse({ type: ListWebMonitorAjaxMarkUsersResponseDto })
-  async getMarkUserAjaxList(@Query() q: Record<string, unknown>) {
-    const { appId, markUser, beginTime, endTime } = q;
-    if (!markUser) throw new Error("markUser must not be empty");
-    if (!appId) throw new Error("Get single ajax details: appId must not be empty");
-    const result = await this.ajax.getMarkUserAjaxList(String(appId), {
+  async getMarkUserAjaxList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+    const { projectId, applicationId, markUser, beginTime, endTime } = q;
+    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    if (!markUser) throw new BadRequestException("markUser is required");
+    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const result = await this.ajax.getMarkUserAjaxList(appKey, {
       markUser: String(markUser),
       beginTime: beginTime as string | undefined,
       endTime: endTime as string | undefined,

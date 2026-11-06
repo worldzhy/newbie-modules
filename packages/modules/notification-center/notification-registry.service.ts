@@ -15,6 +15,15 @@ export interface NotificationDeclaration {
   titleTemplate: string;
   /** Optional multi-line detail template. */
   detailTemplate?: string;
+  /**
+   * Lifecycle-phase template overrides (ADR-051): when notify() is called with
+   * `status: "resolved"`, these replace titleTemplate/detailTemplate so a
+   * recovered alert reads "…recovered" instead of rendering the firing
+   * template with a zero count. Absent overrides fall back to the base
+   * templates.
+   */
+  resolvedTitleTemplate?: string;
+  resolvedDetailTemplate?: string;
   /** Severity applied when notify() does not pass an explicit override. */
   defaultSeverity: (typeof SEVERITIES)[number];
   /** Whether push is on for this notification by default. */

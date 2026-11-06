@@ -15,7 +15,7 @@ export class ErrorService {
 
   async getAverageErrorList(query: Record<string, unknown>) {
     const {
-      appId,
+      appKey,
       beginTime,
       endTime,
       type = "",
@@ -53,7 +53,7 @@ export class ErrorService {
       queryParams.typeArr = String(type).split("|");
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebError(String(appId));
+    const model = await this.ch.WebError(String(appKey));
 
     if (String(realTime) === "1") {
       const total = await model.find({ where, select: "count() as total", queryParams });
@@ -92,7 +92,7 @@ export class ErrorService {
   }
 
   async getOneErrorList(query: Record<string, unknown>) {
-    const { appId, url, name = "", status = "", type = "", beginTime, endTime, phone = "", uid = "" } = query;
+    const { appKey, url, name = "", status = "", type = "", beginTime, endTime, phone = "", uid = "" } = query;
     const pageNo = Number(query.pageNo || 1);
     const pageSize = Number(query.pageSize || WEB_MONITOR_CONFIG.pageSize);
     const wheres: string[] = [];
@@ -130,7 +130,7 @@ export class ErrorService {
       queryParams.endTime = endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebError(String(appId));
+    const model = await this.ch.WebError(String(appKey));
     const countQuery = model.find({ where, select: "count() as total", queryParams });
     const listQuery = model.find({
       where,
@@ -161,7 +161,7 @@ export class ErrorService {
     return { dataList: list, totalNum: count?.[0]?.total || 0, pageNo, first, last, userNum };
   }
 
-  async getMarkUserErrorListCH(appId: string, opts: { markUser?: string; beginTime?: string; endTime?: string }) {
+  async getMarkUserErrorListCH(appKey: string, opts: { markUser?: string; beginTime?: string; endTime?: string }) {
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
     if (opts.markUser) {
@@ -177,7 +177,7 @@ export class ErrorService {
       queryParams.endTime = opts.endTime;
     }
     const where = wheres.length ? wheres.join(" AND ") : undefined;
-    const model = await this.ch.WebError(appId);
+    const model = await this.ch.WebError(appKey);
     const list = await model.find({ where, select: "*", orderBy: "createTime ASC", queryParams });
     return { list };
   }

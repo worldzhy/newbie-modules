@@ -41,6 +41,12 @@ export class NotificationRecordDto {
   @ApiProperty({ type: String, required: false, nullable: true })
   link!: string | null;
 
+  @ApiProperty({ enum: ["firing", "resolved"], description: "Alert lifecycle phase (ADR-051)" })
+  status!: string;
+
+  @ApiProperty({ type: Date, required: false, nullable: true, description: "Resolution timestamp for resolved alerts" })
+  resolvedAt!: Date | null;
+
   @ApiProperty({ description: "Read state for the requesting user" })
   read!: boolean;
 

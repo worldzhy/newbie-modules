@@ -12,11 +12,11 @@ export class PvuvipService {
     private readonly dayReportNum: DayReportNumService,
   ) {}
 
-  async getPvUvIpData(appId: string, beginTime: Date, endTime: Date) {
+  async getPvUvIpData(appKey: string, beginTime: Date, endTime: Date) {
     return await this.models
       .WebPvuvip()
       .find({
-        appId: appId,
+        appKey: appKey,
         type: 1,
         createTime: { $gte: beginTime, $lte: endTime },
       })
@@ -24,10 +24,10 @@ export class PvuvipService {
       .exec();
   }
 
-  async getHistoryPvUvIplist(appId: string) {
+  async getHistoryPvUvIplist(appKey: string) {
     const data = await this.models
       .WebPvuvip()
-      .find({ appId, type: 2 })
+      .find({ appKey, type: 2 })
       .read("secondaryPreferred")
       .sort({ createTime: -1 })
       .limit(5)
@@ -35,7 +35,7 @@ export class PvuvipService {
     const result = data.map(async (item) => {
       const obj = JSON.parse(JSON.stringify(item));
       if (item.createTime) {
-        const num = await this.dayReportNum.getDayFromMongo(item.appId, item.createTime, item.createTime);
+        const num = await this.dayReportNum.getDayFromMongo(item.appKey, item.createTime, item.createTime);
         obj.num = num?.num;
       }
       return obj;
@@ -43,15 +43,15 @@ export class PvuvipService {
     return await Promise.all(result);
   }
 
-  async getHistoryPvUvIplistByRange(appId: string, beginTime: Date, endTime: Date) {
+  async getHistoryPvUvIplistByRange(appKey: string, beginTime: Date, endTime: Date) {
     const start = new Date(func.format(beginTime, "yyyy/MM/dd 00:00:00"));
     const end = new Date(func.format(endTime, "yyyy/MM/dd 23:59:59"));
     const days: Record<string, unknown>[] = [];
     for (let d = new Date(start); d.valueOf() <= end.valueOf(); d.setDate(d.getDate() + 1)) {
       const dayStart = new Date(func.format(d, "yyyy/MM/dd 00:00:00"));
       const dayEnd = new Date(func.format(d, "yyyy/MM/dd 23:59:59"));
-      const survey = await this.getPvUvIpSurvey(appId, dayStart, dayEnd, true);
-      const numRes = await this.dayReportNum.getDayFromMongo(appId, dayStart, dayEnd);
+      const survey = await this.getPvUvIpSurvey(appKey, dayStart, dayEnd, true);
+      const numRes = await this.dayReportNum.getDayFromMongo(appKey, dayStart, dayEnd);
       days.push({
         time: func.format(dayStart, "yyyy/MM/dd"),
         ...survey,
@@ -61,18 +61,18 @@ export class PvuvipService {
     return days;
   }
 
-  async getPvUvIpSurveyOne(appId: string, beginTime: Date, endTime: Date) {
+  async getPvUvIpSurveyOne(appKey: string, beginTime: Date, endTime: Date) {
     const query = {
-      appId: appId,
+      appKey: appKey,
       type: 2,
       createTime: { $gte: beginTime, $lte: endTime },
     };
     let num: string | number = 0;
     if (new Date().valueOf() >= beginTime.valueOf() && new Date().valueOf() < endTime.valueOf()) {
       const today = new Date(func.format(new Date(), "yyyy/MM/dd")).getTime();
-      num = (await this.dayReportNum.getTodayFromRedis(appId, today)) as string;
+      num = (await this.dayReportNum.getTodayFromRedis(appKey, today)) as string;
     } else {
-      const numResult = await this.dayReportNum.getDayFromMongo(appId, beginTime, endTime);
+      const numResult = await this.dayReportNum.getDayFromMongo(appKey, beginTime, endTime);
       num = numResult?.num || 0;
     }
     const data = await this.models.WebPvuvip().findOne(query).read("secondaryPreferred").exec();
@@ -81,19 +81,19 @@ export class PvuvipService {
       obj.num = num;
       return obj;
     }
-    const pvuvipdata = await this.getPvUvIpSurvey(appId, beginTime, endTime, true);
-    const result = await this.savePvUvIpData(appId, beginTime, 2, pvuvipdata);
+    const pvuvipdata = await this.getPvUvIpSurvey(appKey, beginTime, endTime, true);
+    const result = await this.savePvUvIpData(appKey, beginTime, 2, pvuvipdata);
     return result;
   }
 
-  async getPvUvIpSurvey(appId: string, beginTime: Date, endTime: Date, history = false) {
+  async getPvUvIpSurvey(appKey: string, beginTime: Date, endTime: Date, history = false) {
     const $match = this.getMatch(beginTime, endTime);
     const querydata = { ...$match };
-    const pvPro = Promise.resolve(this.pv(appId, querydata));
-    const uvPro = Promise.resolve(this.uv(appId, querydata));
-    const ipPro = Promise.resolve(this.ip(appId, querydata));
-    const ajaxPro = Promise.resolve(this.ajax(appId, { beginTime, endTime }));
-    const flowPro = Promise.resolve(this.flow(appId, { beginTime, endTime }));
+    const pvPro = Promise.resolve(this.pv(appKey, querydata));
+    const uvPro = Promise.resolve(this.uv(appKey, querydata));
+    const ipPro = Promise.resolve(this.ip(appKey, querydata));
+    const ajaxPro = Promise.resolve(this.ajax(appKey, { beginTime, endTime }));
+    const flowPro = Promise.resolve(this.flow(appKey, { beginTime, endTime }));
 
     if (!history) {
       const data = await Promise.all([pvPro, uvPro, ipPro, ajaxPro, flowPro]);
@@ -105,8 +105,8 @@ export class PvuvipService {
         flow: data[4] || 0,
       };
     } else {
-      const userPro = Promise.resolve(this.user(appId, querydata));
-      const bouncePro = Promise.resolve(this.bounce(appId, querydata));
+      const userPro = Promise.resolve(this.user(appKey, querydata));
+      const bouncePro = Promise.resolve(this.bounce(appKey, querydata));
       const data = await Promise.all([pvPro, uvPro, ipPro, ajaxPro, userPro, bouncePro, flowPro]);
       return {
         pv: data[0] || 0,
@@ -120,10 +120,10 @@ export class PvuvipService {
     }
   }
 
-  async savePvUvIpData(appId: string, endTime: Date, type: number, pvuvipdata: Record<string, unknown>) {
+  async savePvUvIpData(appKey: string, endTime: Date, type: number, pvuvipdata: Record<string, unknown>) {
     const pvuvipModel = this.models.WebPvuvip();
     const pvuvip = new pvuvipModel();
-    pvuvip.appId = appId;
+    pvuvip.appKey = appKey;
     pvuvip.pv = Number(pvuvipdata.pv) || 0;
     pvuvip.uv = Number(pvuvipdata.uv) || 0;
     pvuvip.ip = Number(pvuvipdata.ip) || 0;
@@ -155,14 +155,14 @@ export class PvuvipService {
     return $match;
   }
 
-  async pv(appId: string, querydata: Record<string, unknown>) {
-    return this.models.WebPage(appId).count(querydata).read("secondaryPreferred").exec();
+  async pv(appKey: string, querydata: Record<string, unknown>) {
+    return this.models.WebPage(appKey).count(querydata).read("secondaryPreferred").exec();
   }
 
-  async ajax(appId: string, times: { beginTime: Date | string; endTime: Date | string }) {
+  async ajax(appKey: string, times: { beginTime: Date | string; endTime: Date | string }) {
     const beginStr = func.format(new Date(times.beginTime), "yyyy/MM/dd hh:mm:ss");
     const endStr = func.format(new Date(times.endTime), "yyyy/MM/dd hh:mm:ss");
-    const model = await this.ch.WebAjax(appId);
+    const model = await this.ch.WebAjax(appKey);
     const rows = await model.find({
       select: "count() as count",
       where: `createTime >= toDateTime({beginTime:String}) AND createTime <= toDateTime({endTime:String})`,
@@ -171,9 +171,9 @@ export class PvuvipService {
     return rows?.[0]?.count || 0;
   }
 
-  async uv(appId: string, querydata: Record<string, unknown>) {
+  async uv(appKey: string, querydata: Record<string, unknown>) {
     return this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .aggregate([
         { $match: querydata },
         { $group: { _id: { markUv: "$markUv", uid: "$uid", phone: "$phone" } } },
@@ -183,9 +183,9 @@ export class PvuvipService {
       .exec();
   }
 
-  async ip(appId: string, querydata: Record<string, unknown>) {
+  async ip(appKey: string, querydata: Record<string, unknown>) {
     return this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .aggregate([
         { $match: querydata },
         { $project: { ip: true } },
@@ -196,9 +196,9 @@ export class PvuvipService {
       .exec();
   }
 
-  async user(appId: string, querydata: Record<string, unknown>) {
+  async user(appKey: string, querydata: Record<string, unknown>) {
     return this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .aggregate([
         { $match: querydata },
         { $project: { markUser: true } },
@@ -209,9 +209,9 @@ export class PvuvipService {
       .exec();
   }
 
-  async bounce(appId: string, $match: Record<string, unknown>) {
+  async bounce(appKey: string, $match: Record<string, unknown>) {
     const result = await this.models
-      .WebEnvironment(appId)
+      .WebEnvironment(appKey)
       .aggregate([
         { $match },
         { $group: { _id: { markUser: "$markUser" }, urls: { $push: 1 }, count: { $sum: 1 } } },
@@ -223,10 +223,10 @@ export class PvuvipService {
     return result?.[0]?.bounce || 0;
   }
 
-  async flow(appId: string, times: { beginTime: Date | string; endTime: Date | string }) {
+  async flow(appKey: string, times: { beginTime: Date | string; endTime: Date | string }) {
     const beginStr = func.format(new Date(times.beginTime), "yyyy/MM/dd hh:mm:ss");
     const endStr = func.format(new Date(times.endTime), "yyyy/MM/dd hh:mm:ss");
-    const model = await this.ch.WebAjax(appId);
+    const model = await this.ch.WebAjax(appKey);
     const rows = await model.find({
       select: "sum(bodySize) as sum",
       where: `createTime >= toDateTime({beginTime:String}) AND createTime <= toDateTime({endTime:String})`,

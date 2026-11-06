@@ -16,7 +16,7 @@ import {
 import { WebPvuvipSchema, WebPvuvipDocument } from "./web/web-pvuvip.schema";
 
 import { MongoCollectionPrefix, MongoStaticCollection } from "../enum";
-import { assertAppId } from "../../shared/utils";
+import { assertAppKey } from "../../shared/utils";
 
 @Injectable()
 export class WebMonitorModelsService {
@@ -24,7 +24,7 @@ export class WebMonitorModelsService {
 
   // Model registration mechanics (register-once / OverwriteModelError guard)
   // live in the shared MongoModelRegistry; this service only maps business
-  // schemas to collection names (incl. per-appId dynamic collections).
+  // schemas to collection names (incl. per-appKey dynamic collections).
 
   // Static models
   System() {
@@ -38,43 +38,43 @@ export class WebMonitorModelsService {
     );
   }
 
-  // WEB dynamic models (by appId)
-  WebEnvironment(appId: string) {
-    assertAppId(appId);
+  // WEB dynamic models (by appKey)
+  WebEnvironment(appKey: string) {
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebEnvironmentDocument>(
-      `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appId}`,
+      `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appKey}`,
       WebEnvironmentSchema,
     );
   }
 
-  WebPage(appId: string) {
-    assertAppId(appId);
+  WebPage(appKey: string) {
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebPageDocument>(
-      `${MongoCollectionPrefix.WEB_PAGE}${appId}`,
+      `${MongoCollectionPrefix.WEB_PAGE}${appKey}`,
       WebPageSchema,
     );
   }
 
-  WebResource(appId: string) {
-    assertAppId(appId);
+  WebResource(appKey: string) {
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebResourceDocument>(
-      `${MongoCollectionPrefix.WEB_RESOURCE}${appId}`,
+      `${MongoCollectionPrefix.WEB_RESOURCE}${appKey}`,
       WebResourceSchema,
     );
   }
 
-  WebCustom(appId: string) {
-    assertAppId(appId);
+  WebCustom(appKey: string) {
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebCustomDocument>(
-      `${MongoCollectionPrefix.WEB_CUSTOM}${appId}`,
+      `${MongoCollectionPrefix.WEB_CUSTOM}${appKey}`,
       WebCustomSchema,
     );
   }
 
-  WebCustomFilter(appId: string) {
-    assertAppId(appId);
+  WebCustomFilter(appKey: string) {
+    assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebCustomFilterDocument>(
-      `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appId}`,
+      `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appKey}`,
       WebCustomFilterSchema,
     );
   }
