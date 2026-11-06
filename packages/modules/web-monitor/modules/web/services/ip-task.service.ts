@@ -31,7 +31,7 @@ export class WebIpTaskService {
     const systems = await this.site.getWebSiteList();
     if (!systems || !systems.length) return;
     for (const sys of systems) {
-      const appKey = sys.appKey;
+      const appKey = sys.appId;
       if (!appKey) continue;
       await this.saveWebGetIpDatasByOne(appKey);
     }
@@ -69,7 +69,7 @@ export class WebIpTaskService {
     if (!data || !data.length) return;
     for (let i = 0; i < data.length; i++) {
       const ip = data[i].ip;
-      await this.getIpData(ip, String(data[i]._id), data[i].appKey);
+      await this.getIpData(ip, String(data[i]._id), data[i].appId);
     }
     if (lastLen === 0) {
       await this.redis

@@ -24,7 +24,7 @@ export class WebCustomService {
     const exists = await model.findOne({ filterKey }).exec();
     if (exists && exists.filterKey) throw new Error("Add filter: filterKey already exists");
     const doc = new model();
-    doc.appKey = appKey;
+    doc.appId = appKey;
     doc.filterKey = filterKey;
     doc.filterDesc = filterDesc;
     await doc.save();

@@ -23,13 +23,13 @@ export class DayReportNumService {
     const apps = await this.models.System().find().read("secondaryPreferred").exec();
 
     for (const app of apps) {
-      const key = `${RedisKeyPrefix.DAY_REPORT_NUM}${app.appKey}_${yesterday}`;
+      const key = `${RedisKeyPrefix.DAY_REPORT_NUM}${app.appId}_${yesterday}`;
       const num = await this.redis.getClient().get(key);
       if (!num) continue;
 
       const DayModel = this.models.DayReportNum();
       const repore = new DayModel();
-      repore.appKey = app.appKey;
+      repore.appId = app.appId;
       repore.type = app.type;
       repore.dayTime = new Date(yesterday);
       repore.createTime = new Date();

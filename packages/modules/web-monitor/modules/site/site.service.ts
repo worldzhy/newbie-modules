@@ -47,7 +47,7 @@ export class SiteService {
     system.systemDomain = typeof body.systemDomain === "string" ? body.systemDomain : "";
     system.systemName = String(body.systemName);
     system.type = type || "web";
-    system.appKey = appKey;
+    system.appId = appKey;
     system.userId = [typeof body.token === "string" ? body.token : ""];
     system.createTime = new Date();
     system.slowPageTime = Number(body.slowPageTime) || 5;
@@ -63,7 +63,7 @@ export class SiteService {
   }
 
   async updateSiteData(body: Record<string, unknown>) {
-    const appKey = body.appKey;
+    const appKey = body.appId;
     if (!appKey) return func.errResult({ desc: "Update system: appKey must not be empty" });
     const appIdStr = String(appKey);
 
@@ -100,12 +100,12 @@ export class SiteService {
     const result = await this.models
       .System()
       .findOneAndUpdate(
-        { appKey: body.appKey },
+        { appKey: body.appId },
         { $set: { projectId: body.projectId, systemName: body.systemName, type: "web" } },
         { upsert: true, new: true },
       )
       .exec();
-    await this.updateSiteNodeCache(body.appKey);
+    await this.updateSiteNodeCache(body.appId);
     return result;
   }
 

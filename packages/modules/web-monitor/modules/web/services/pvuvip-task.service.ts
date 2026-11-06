@@ -37,7 +37,7 @@ export class WebPvuvipTaskService {
     // so a large site list cannot stampede Mongo/ClickHouse at once.
     const concurrency = 5;
     await mapWithConcurrency(systems, concurrency, async (sys) => {
-      const appKey = sys.appKey;
+      const appKey = sys.appId;
       if (!appKey) return;
       try {
         const data = await this.pvuvip.getPvUvIpSurvey(appKey, beginTime, endTime);
@@ -60,7 +60,7 @@ export class WebPvuvipTaskService {
 
   private async groupData(datas: SystemDocument[], type: number, beginTime: Date, endTime: Date, createTime: Date) {
     for (const sys of datas) {
-      const appKey = sys.appKey;
+      const appKey = sys.appId;
       if (!appKey) continue;
       await this.savePvUvIpData(appKey, createTime, type, beginTime, endTime);
     }

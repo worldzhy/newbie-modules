@@ -101,12 +101,12 @@ export class JobsService implements OnModuleInit {
     const workers = Array.from({ length: Math.min(concurrency, systems.length) }, async () => {
       while (nextIndex < systems.length) {
         const system = systems[nextIndex++];
-        if (!system?.appKey) continue;
+        if (!system?.appId) continue;
         try {
           await this.evaluateSystem(system, windowStart, windowEnd, windowMs);
         } catch (error) {
           this.logger.error(
-            `Threshold alert evaluation failed for system ${system.appKey}: ${this.getErrorMessage(error)}`,
+            `Threshold alert evaluation failed for system ${system.appId}: ${this.getErrorMessage(error)}`,
           );
         }
       }
@@ -116,15 +116,15 @@ export class JobsService implements OnModuleInit {
 
   private async evaluateSystem(system: SystemDocument, windowStart: Date, windowEnd: Date, windowMs: number) {
     const base = {
-      appKey: system.appKey,
-      systemName: system.systemName || system.appKey,
+      appKey: system.appId,
+      systemName: system.systemName || system.appId,
       projectId: system.projectId,
       windowMs,
       windowStartedAt: windowStart.toISOString(),
     };
 
     await this.runSignal("slow pages", async () => {
-      const pageModel = this.models.WebPage(system.appKey);
+      const pageModel = this.models.WebPage(system.appId);
       const match = { createTime: { $gte: windowStart, $lt: windowEnd }, speedType: 2 };
       const [count, topRows] = await Promise.all([
         pageModel.countDocuments(match),
@@ -151,7 +151,7 @@ export class JobsService implements OnModuleInit {
     });
 
     await this.runSignal("slow first paints", async () => {
-      const pageModel = this.models.WebPage(system.appKey);
+      const pageModel = this.models.WebPage(system.appId);
       const paintThresholdMs = (system.slowWhiteTime ?? 2) * 1000;
       const match = { createTime: { $gte: windowStart, $lt: windowEnd }, whiteTime: { $gte: paintThresholdMs } };
       const [count, topRows] = await Promise.all([
@@ -189,7 +189,7 @@ export class JobsService implements OnModuleInit {
       { category: "css", types: ["link", "css"], thresholdSeconds: system.slowCssTime ?? 2 },
       { category: "img", types: ["img"], thresholdSeconds: system.slowImgTime ?? 2 },
     ];
-    const resourceModel = this.models.WebResource(system.appKey);
+    const resourceModel = this.models.WebResource(system.appId);
     for (const { category, types, thresholdSeconds } of categories) {
       await this.runSignal(`slow ${category} resources`, async () => {
         const match = { createTime: { $gte: windowStart, $lt: windowEnd }, type: { $in: types } };
@@ -220,7 +220,7 @@ export class JobsService implements OnModuleInit {
     }
 
     await this.runSignal("slow ajax", async () => {
-      const ajaxModel = await this.clickhouse.WebAjax(system.appKey);
+      const ajaxModel = await this.clickhouse.WebAjax(system.appId);
       const thresholdMs = (system.slowAjaxTime ?? 2) * 1000;
       const timeFilter = this.buildClickHouseTimeFilter(windowStart, windowEnd);
       const filter = `${timeFilter.where} AND duration >= {thresholdMs:UInt32}`;
@@ -251,7 +251,7 @@ export class JobsService implements OnModuleInit {
     });
 
     await this.runSignal("js error spike", async () => {
-      const errorModel = await this.clickhouse.WebError(system.appKey);
+      const errorModel = await this.clickhouse.WebError(system.appId);
       const timeFilter = this.buildClickHouseTimeFilter(windowStart, windowEnd);
       // Count both errors and distinct identified visitors. Anonymous
       // traffic (empty markUser) cannot be attributed, so the user gate only
@@ -292,7 +292,7 @@ export class JobsService implements OnModuleInit {
     // window. A fingerprint that persists is already "known" one minute
     // later, so it never re-alerts.
     await this.runSignal("js-error-first-seen", async () => {
-      const errorModel = await this.clickhouse.WebError(system.appKey);
+      const errorModel = await this.clickhouse.WebError(system.appId);
       const timeFilter = this.buildClickHouseTimeFilter(windowStart, windowEnd);
       const groups = await errorModel.find({
         where: timeFilter.where,
@@ -348,7 +348,7 @@ export class JobsService implements OnModuleInit {
       this.eventEmitter.emit(WEB_THRESHOLD_ALERT_EVENT, event);
     } catch (error) {
       this.logger.error(
-        `Failed to emit ${WEB_THRESHOLD_ALERT_EVENT} for system ${event.appKey} (${event.signal}): ${this.getErrorMessage(error)}`,
+        `Failed to emit ${WEB_THRESHOLD_ALERT_EVENT} for system ${event.appId} (${event.signal}): ${this.getErrorMessage(error)}`,
       );
     }
   }

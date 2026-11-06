@@ -35,7 +35,7 @@ export class PvuvipService {
     const result = data.map(async (item) => {
       const obj = JSON.parse(JSON.stringify(item));
       if (item.createTime) {
-        const num = await this.dayReportNum.getDayFromMongo(item.appKey, item.createTime, item.createTime);
+        const num = await this.dayReportNum.getDayFromMongo(item.appId, item.createTime, item.createTime);
         obj.num = num?.num;
       }
       return obj;
@@ -123,7 +123,7 @@ export class PvuvipService {
   async savePvUvIpData(appKey: string, endTime: Date, type: number, pvuvipdata: Record<string, unknown>) {
     const pvuvipModel = this.models.WebPvuvip();
     const pvuvip = new pvuvipModel();
-    pvuvip.appKey = appKey;
+    pvuvip.appId = appKey;
     pvuvip.pv = Number(pvuvipdata.pv) || 0;
     pvuvip.uv = Number(pvuvipdata.uv) || 0;
     pvuvip.ip = Number(pvuvipdata.ip) || 0;
