@@ -348,7 +348,7 @@ export class JobsService implements OnModuleInit {
       this.eventEmitter.emit(WEB_THRESHOLD_ALERT_EVENT, event);
     } catch (error) {
       this.logger.error(
-        `Failed to emit ${WEB_THRESHOLD_ALERT_EVENT} for system ${event.appId} (${event.signal}): ${this.getErrorMessage(error)}`,
+        `Failed to emit ${WEB_THRESHOLD_ALERT_EVENT} for system ${event.appKey} (${event.signal}): ${this.getErrorMessage(error)}`,
       );
     }
   }

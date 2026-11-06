@@ -100,12 +100,12 @@ export class SiteService {
     const result = await this.models
       .System()
       .findOneAndUpdate(
-        { appKey: body.appId },
+        { appId: body.appKey },
         { $set: { projectId: body.projectId, systemName: body.systemName, type: "web" } },
         { upsert: true, new: true },
       )
       .exec();
-    await this.updateSiteNodeCache(body.appId);
+    await this.updateSiteNodeCache(body.appKey);
     return result;
   }
 
