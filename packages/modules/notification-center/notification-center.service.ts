@@ -183,8 +183,14 @@ export class NotificationCenterService {
       return { id: "", deduplicated: false, dropped: true };
     }
 
-    const title = renderTemplate(declared.titleTemplate, input.context);
-    const detail = declared.detailTemplate ? renderTemplate(declared.detailTemplate, input.context) : null;
+    // ADR-051: resolved-phase notifications prefer the declaration's resolved
+    // template overrides so a recovered alert reads "…recovered" instead of
+    // rendering the firing template with a zero count.
+    const resolved = input.status === "resolved";
+    const titleTemplate = (resolved && declared.resolvedTitleTemplate) || declared.titleTemplate;
+    const detailTemplate = (resolved && declared.resolvedDetailTemplate) || declared.detailTemplate;
+    const title = renderTemplate(titleTemplate, input.context);
+    const detail = detailTemplate ? renderTemplate(detailTemplate, input.context) : null;
 
     const data = {
       notificationKey: input.notificationKey,

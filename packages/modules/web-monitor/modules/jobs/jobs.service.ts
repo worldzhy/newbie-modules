@@ -107,8 +107,23 @@ export class JobsService implements OnModuleInit {
   private static readonly ALERT_STATE_TTL_SECONDS = 2 * 60 * 60;
 
   async evaluateThresholdAlerts() {
-    const acquired = await this.redisLock(RedisKeys.ALERT_EVALUATION_TASK_LOCK, WEB_MONITOR_CONFIG.alertTaskLockTime);
-    if (!acquired) return;
+    // ADR-051 fail-open: without Redis (not configured, or down mid-run) there
+    // is no cross-instance lock and no lifecycle state. Evaluation still runs;
+    // each signal degrades to firing every window and the notification
+    // center's minute-bucket deduplication limits the repeat rate — alerts
+    // must never go silent during a Redis outage.
+    if (this.redis.isConfigured()) {
+      let acquired = false;
+      try {
+        acquired = await this.redisLock(RedisKeys.ALERT_EVALUATION_TASK_LOCK, WEB_MONITOR_CONFIG.alertTaskLockTime);
+      } catch (error) {
+        this.logger.error(
+          `Alert evaluation lock failed (Redis error), proceeding without it: ${this.getErrorMessage(error)}`,
+        );
+        acquired = true;
+      }
+      if (!acquired) return;
+    }
 
     let systems: SystemDocument[];
     try {
@@ -486,56 +501,77 @@ export class JobsService implements OnModuleInit {
   /**
    * Returns true when a firing notification should be emitted now. Records the
    * fire timestamp so later windows inside the cooldown are suppressed. Fails
-   * open (never suppress) when Redis is unavailable.
+   * open when Redis is not configured or its commands fail: the alert fires
+   * and downstream minute-bucket deduplication limits the repeat rate, so a
+   * Redis outage never silences alerts.
    */
   private async shouldFire(key: string): Promise<boolean> {
     if (!this.redis.isConfigured()) return true;
     const client = this.redis.getClient();
     const now = Date.now();
-    const raw = await client.get(key);
-    if (raw) {
-      const state = JSON.parse(raw) as AlertState;
-      if (now - new Date(state.lastFiredAt).getTime() < JobsService.ALERT_COOLDOWN_MS) {
-        // Inside cooldown: keep the state alive, do not re-notify.
+    try {
+      const raw = await client.get(key);
+      if (raw) {
+        const state = JSON.parse(raw) as AlertState;
+        if (now - new Date(state.lastFiredAt).getTime() < JobsService.ALERT_COOLDOWN_MS) {
+          // Inside cooldown: keep the state alive, do not re-notify.
+          state.lastFiredAt = new Date(now).toISOString();
+          state.cleanWindows = 0;
+          await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
+          return false;
+        }
+        // Cooldown elapsed: re-ignite. Reachable only after an evaluation gap
+        // >= cooldown while the state key survives (TTL 2h) — a continuously
+        // breaching signal refreshes lastFiredAt every window above and never
+        // reaches this branch.
         state.lastFiredAt = new Date(now).toISOString();
         state.cleanWindows = 0;
         await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
-        return false;
+        return true;
       }
-      // Cooldown elapsed: re-ignite.
-      state.lastFiredAt = new Date(now).toISOString();
-      state.cleanWindows = 0;
+      const state: AlertState = {
+        status: "firing",
+        firstFiredAt: new Date(now).toISOString(),
+        lastFiredAt: new Date(now).toISOString(),
+        cleanWindows: 0,
+      };
       await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
       return true;
+    } catch (error) {
+      this.logger.warn(
+        `Alert state read/write failed for ${key}, firing without cooldown: ${this.getErrorMessage(error)}`,
+      );
+      return true;
     }
-    const state: AlertState = {
-      status: "firing",
-      firstFiredAt: new Date(now).toISOString(),
-      lastFiredAt: new Date(now).toISOString(),
-      cleanWindows: 0,
-    };
-    await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
-    return true;
   }
 
   /**
    * Called on a clean window. Returns true when the signal has stayed clean for
    * ALERT_RESOLVED_WINDOWS consecutive windows, in which case the caller emits
-   * a resolved notification and the state key is deleted.
+   * a resolved notification and the state key is deleted. Fails closed when
+   * Redis is unavailable: never claim "resolved" while the firing state cannot
+   * be confirmed.
    */
   private async resolveIfClean(key: string): Promise<boolean> {
     if (!this.redis.isConfigured()) return false;
     const client = this.redis.getClient();
-    const raw = await client.get(key);
-    if (!raw) return false;
-    const state = JSON.parse(raw) as AlertState;
-    state.cleanWindows += 1;
-    if (state.cleanWindows >= JobsService.ALERT_RESOLVED_WINDOWS) {
-      await client.del(key);
-      return true;
+    try {
+      const raw = await client.get(key);
+      if (!raw) return false;
+      const state = JSON.parse(raw) as AlertState;
+      state.cleanWindows += 1;
+      if (state.cleanWindows >= JobsService.ALERT_RESOLVED_WINDOWS) {
+        await client.del(key);
+        return true;
+      }
+      await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
+      return false;
+    } catch (error) {
+      this.logger.warn(
+        `Alert state read/write failed for ${key}, skipping recovery check: ${this.getErrorMessage(error)}`,
+      );
+      return false;
     }
-    await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
-    return false;
   }
 
   private buildClickHouseTimeFilter(

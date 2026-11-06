@@ -42,3 +42,32 @@ test("cooldown and recovery constants are declared", () => {
   assert.ok(SERVICE_SOURCE.includes("ALERT_RESOLVED_WINDOWS"));
   assert.ok(SERVICE_SOURCE.includes("alert-state:"));
 });
+
+function methodBody(source: string, signature: string, nextSignature: string): string {
+  const start = source.indexOf(signature);
+  const end = source.indexOf(nextSignature);
+  assert.ok(start !== -1 && end > start, `${signature} must exist before ${nextSignature}`);
+  return source.slice(start, end);
+}
+
+test("shouldFire fails open on Redis failure; resolveIfClean fails closed", () => {
+  // ADR-051: a Redis outage must never silence alerts, and must never claim
+  // "resolved" while the firing state cannot be confirmed.
+  const shouldFire = methodBody(SERVICE_SOURCE, "private async shouldFire(", "private async resolveIfClean(");
+  assert.ok(shouldFire.includes("catch"), "shouldFire must guard Redis commands with try/catch");
+  assert.ok(shouldFire.includes("firing without cooldown"), "shouldFire must log its fail-open path");
+
+  const resolveIfClean = methodBody(
+    SERVICE_SOURCE,
+    "private async resolveIfClean(",
+    "private buildClickHouseTimeFilter(",
+  );
+  assert.ok(resolveIfClean.includes("catch"), "resolveIfClean must guard Redis commands with try/catch");
+  assert.ok(resolveIfClean.includes("skipping recovery check"), "resolveIfClean must log its fail-closed path");
+});
+
+test("evaluation proceeds without the Redis lock when Redis fails", () => {
+  const entry = methodBody(SERVICE_SOURCE, "async evaluateThresholdAlerts()", "private async evaluateSystem(");
+  assert.ok(entry.includes("this.redis.isConfigured()"), "the lock must be skipped when Redis is not configured");
+  assert.ok(entry.includes("proceeding without it"), "lock failure must degrade to lock-free evaluation");
+});
