@@ -405,7 +405,8 @@ export class WebReportTaskService {
     };
     for (const appKey of Object.keys(buckets.appAjaxs)) {
       const rows = buckets.appAjaxs[appKey];
-      if (rows.length) await flush(`ajax:${appKey}`, appKey, async () => (await this.ch.WebAjax(appKey)).insertMany(rows));
+      if (rows.length)
+        await flush(`ajax:${appKey}`, appKey, async () => (await this.ch.WebAjax(appKey)).insertMany(rows));
     }
     for (const appKey of Object.keys(buckets.appErrors)) {
       const rows = buckets.appErrors[appKey];
@@ -429,7 +430,8 @@ export class WebReportTaskService {
     }
     for (const appKey of Object.keys(buckets.appResources)) {
       const rows = buckets.appResources[appKey];
-      if (rows.length) await flush(`resource:${appKey}`, appKey, () => this.models.WebResource(appKey).insertMany(rows));
+      if (rows.length)
+        await flush(`resource:${appKey}`, appKey, () => this.models.WebResource(appKey).insertMany(rows));
     }
     for (const appKey of Object.keys(buckets.appCustoms)) {
       const rows = buckets.appCustoms[appKey];
