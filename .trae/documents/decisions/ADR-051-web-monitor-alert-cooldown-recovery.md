@@ -2,6 +2,7 @@
 
 状态：已采纳
 日期：2026-11-06
+修订：2026-11-07 — phase value renamed `resolved` → `recovered` for terminology consistency (registry commit da48678); 正文中的 "resolved 通知" 即现 "recovered 通知"，正文不改。
 
 > 归属：本仓（治理 `web-monitor` 模块告警状态机与 `notification-center` 通知模型字段，两者均为 registry 模块）。前置 ADR：ADR-050（错误来源分级，已采纳）。
 
