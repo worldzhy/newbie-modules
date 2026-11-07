@@ -44,6 +44,42 @@ function octokitStatus(error: unknown): number | undefined {
   return (error as { status?: number }).status;
 }
 
+/** The subset of a release row the "latest per module" selection needs. */
+export interface ReleaseOrderingRow {
+  moduleKey: string;
+  sourceCommit: string;
+  committedAt: Date | null;
+  publishedAt: Date;
+}
+
+/**
+ * Pick one release per module: the newest commit wins, `publishedAt` breaks
+ * ties between undated rows, and `sourceCommit` keeps the result deterministic
+ * when both timestamps match.
+ */
+export function pickLatestReleases<T extends ReleaseOrderingRow>(rows: T[]): T[] {
+  const byKey = new Map<string, T>();
+  for (const row of rows) {
+    const current = byKey.get(row.moduleKey);
+    if (!current || isNewerRelease(row, current)) byKey.set(row.moduleKey, row);
+  }
+  return [...byKey.values()].sort((a, b) => a.moduleKey.localeCompare(b.moduleKey));
+}
+
+function isNewerRelease(candidate: ReleaseOrderingRow, current: ReleaseOrderingRow): boolean {
+  if (candidate.committedAt && current.committedAt) {
+    const delta = candidate.committedAt.getTime() - current.committedAt.getTime();
+    if (delta !== 0) return delta > 0;
+    return candidate.sourceCommit > current.sourceCommit;
+  }
+  // A dated row always beats a legacy row without a commit date.
+  if (candidate.committedAt) return true;
+  if (current.committedAt) return false;
+  const delta = candidate.publishedAt.getTime() - current.publishedAt.getTime();
+  if (delta !== 0) return delta > 0;
+  return candidate.sourceCommit > current.sourceCommit;
+}
+
 /**
  * Registry catalog management: ingestion from the GitHub push webhook plus an
  * operator-triggered sync (local development / missed deliveries). The Prisma
@@ -104,12 +140,18 @@ export class ModuleHubReleaseService {
     return row;
   }
 
-  /** Latest release per module key. */
+  /**
+   * Latest release per module key, chosen by commit date.
+   *
+   * The selection happens in memory on purpose: `distinct` + `publishedAt`
+   * ordering would let a late-arriving older webhook delivery (retry, manual
+   * replay) shadow a newer release and silently suppress upgrade hints
+   * (R23-04). `publishedAt` stays the fallback for rows ingested before
+   * `committedAt` existed.
+   */
   async getCatalog(): Promise<HubModuleRelease[]> {
-    return this.prisma.hubModuleRelease.findMany({
-      distinct: ["moduleKey"],
-      orderBy: [{ moduleKey: "asc" }, { publishedAt: "desc" }],
-    });
+    const rows = await this.prisma.hubModuleRelease.findMany({ orderBy: { moduleKey: "asc" } });
+    return pickLatestReleases(rows);
   }
 
   /** Full release history of one module. */
@@ -161,8 +203,15 @@ export class ModuleHubReleaseService {
    * module. "Latest" is the last commit that touched the module directory
    * (not the branch HEAD) so the catalog stays a per-module release history:
    * a module is only recorded again when its own files change.
+   *
+   * A cold catalog costs two GitHub calls per module, so a single transient
+   * failure — or the anonymous rate limit — must not abort the whole run: each
+   * module is isolated, failures are reported back, and the idempotent upsert
+   * makes the next run fill the gaps (R23-02).
    */
-  async syncCatalogFromRegistry(trigger: IngestTrigger): Promise<{ headCommit: string; ingested: string[] }> {
+  async syncCatalogFromRegistry(
+    trigger: IngestTrigger,
+  ): Promise<{ headCommit: string; ingested: string[]; failed: string[] }> {
     const { owner, repo } = this.registryRepo;
     const { data: commits } = await this.octokit.repos.listCommits({ owner, repo, per_page: 1 });
     const headCommit = commits[0]?.sha;
@@ -186,20 +235,26 @@ export class ModuleHubReleaseService {
     }
 
     const ingested: string[] = [];
+    const failed: string[] = [];
     for (const key of keys) {
-      const last = await this.getLastCommitForModule(key);
-      if (!last) continue;
-      const existing = await this.prisma.hubModuleRelease.findUnique({
-        where: { moduleKey_sourceCommit: { moduleKey: key, sourceCommit: last.sha } },
-        select: { id: true, committedAt: true },
-      });
-      if (existing?.committedAt) continue;
-      const manifest = await this.fetchManifestAtCommit(key, last.sha);
-      if (!manifest) continue;
-      await this.ingestRelease(key, last.sha, manifest, trigger, last.committedAt);
-      ingested.push(key);
+      try {
+        const last = await this.getLastCommitForModule(key);
+        if (!last) continue;
+        const existing = await this.prisma.hubModuleRelease.findUnique({
+          where: { moduleKey_sourceCommit: { moduleKey: key, sourceCommit: last.sha } },
+          select: { id: true, committedAt: true },
+        });
+        if (existing?.committedAt) continue;
+        const manifest = await this.fetchManifestAtCommit(key, last.sha);
+        if (!manifest) continue;
+        await this.ingestRelease(key, last.sha, manifest, trigger, last.committedAt);
+        ingested.push(key);
+      } catch (error: unknown) {
+        failed.push(key);
+        this.logger.warn(`registry catalog sync failed for ${key}: ${(error as Error).message}`);
+      }
     }
-    return { headCommit, ingested };
+    return { headCommit, ingested, failed };
   }
 
   /** Last commit touching one module directory, with its commit date. */

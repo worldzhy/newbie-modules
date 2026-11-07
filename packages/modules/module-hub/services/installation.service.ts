@@ -192,6 +192,29 @@ export function annotateUpdateAvailability(snapshot: unknown, latestByKey: Map<s
   });
 }
 
+/** How much of the upgrade hint the hub could actually compute. */
+export interface HintCoverage {
+  total: number;
+  dated: number;
+  catalogued: number;
+}
+
+/**
+ * Coverage of the read-time upgrade hint, so a "no module is behind" answer can
+ * be told apart from "the hub could not resolve pin dates / has no catalog".
+ * Without this the hint degrades silently: an invalid registry token or an
+ * empty catalog looks exactly like a fully up-to-date installation (R23-01).
+ */
+export function summarizeHintCoverage(snapshot: unknown, latestByKey: Map<string, LatestRelease>): HintCoverage {
+  if (!Array.isArray(snapshot)) return { total: 0, dated: 0, catalogued: 0 };
+  const modules = (snapshot as SnapshotModule[]).filter((module) => module && typeof module.key === "string");
+  return {
+    total: modules.length,
+    dated: modules.filter((module) => Boolean(module.sourceCommittedAt)).length,
+    catalogued: modules.filter((module) => latestByKey.has(module.key)).length,
+  };
+}
+
 /**
  * Installation registry. One token = one installation instance; the host
  * pre-creates rows and distributes the plaintext report token out of band,
@@ -327,6 +350,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
       targetSpec,
       reportedAt: row.lastSeenAt ?? null,
       comparison: compareTargetWithSnapshot(targetSpec, actual),
+      hint: summarizeHintCoverage(row.modulesSnapshot, latestByKey),
     };
   }
 
