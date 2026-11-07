@@ -75,6 +75,10 @@ model HubModuleRelease {
   sourceCommit String @db.VarChar(64)
   // The newbie.module.json manifest at that commit.
   manifest Json @db.JsonB
+  // Commit date of `sourceCommit` (GitHub), used for the read-time "is the
+  // installed pin older than the latest release" check. Null on rows ingested
+  // before the column existed.
+  committedAt DateTime?
 
   publishedAt DateTime @default(now())
 

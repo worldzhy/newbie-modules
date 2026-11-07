@@ -26,6 +26,7 @@ interface ManifestShape {
 /** Subset of the GitHub push webhook payload consumed by this service. */
 interface GithubPushPayload {
   after?: string;
+  head_commit?: { timestamp?: string };
   commits?: { added?: string[]; modified?: string[] }[];
 }
 
@@ -52,6 +53,8 @@ function octokitStatus(error: unknown): number | undefined {
 export class ModuleHubReleaseService {
   private readonly logger = new Logger(ModuleHubReleaseService.name);
   private readonly octokit: Octokit;
+  /** Commit sha -> commit date; null means "looked up and unavailable". */
+  private readonly commitDates = new Map<string, Date | null>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -78,11 +81,18 @@ export class ModuleHubReleaseService {
     sourceCommit: string,
     manifest: ManifestShape,
     trigger: IngestTrigger = WEBHOOK_TRIGGER,
+    committedAt?: Date | null,
   ): Promise<HubModuleRelease> {
     const row = await this.prisma.hubModuleRelease.upsert({
       where: { moduleKey_sourceCommit: { moduleKey, sourceCommit } },
-      update: {},
-      create: { moduleKey, sourceCommit, manifest: manifest as Prisma.InputJsonValue },
+      // Backfill the commit date on rows ingested before it was recorded.
+      update: committedAt ? { committedAt } : {},
+      create: {
+        moduleKey,
+        sourceCommit,
+        manifest: manifest as Prisma.InputJsonValue,
+        committedAt: committedAt ?? null,
+      },
     });
     await this.auditLogService.record(RELEASE_INGEST_EVENT, {
       resourceType: RELEASE_RESOURCE_TYPE,
@@ -136,19 +146,21 @@ export class ModuleHubReleaseService {
     }
 
     const ingested: string[] = [];
+    const headCommittedAt = payload.head_commit?.timestamp ? new Date(payload.head_commit.timestamp) : null;
     for (const key of keys) {
       const manifest = await this.fetchManifestAtCommit(key, headCommit);
       if (!manifest) continue; // module directory removed at this commit
-      await this.ingestRelease(key, headCommit, manifest);
+      await this.ingestRelease(key, headCommit, manifest, WEBHOOK_TRIGGER, headCommittedAt);
       ingested.push(key);
     }
     return { ingested };
   }
 
   /**
-   * Operator-triggered sync: diff the registry HEAD tree against the catalog
-   * and ingest any (module, headCommit) pairs not seen yet. Repairs a missed
-   * webhook delivery through the same idempotent upsert.
+   * Operator-triggered sync: ingest the latest release of every registry
+   * module. "Latest" is the last commit that touched the module directory
+   * (not the branch HEAD) so the catalog stays a per-module release history:
+   * a module is only recorded again when its own files change.
    */
   async syncCatalogFromRegistry(trigger: IngestTrigger): Promise<{ headCommit: string; ingested: string[] }> {
     const { owner, repo } = this.registryRepo;
@@ -175,17 +187,62 @@ export class ModuleHubReleaseService {
 
     const ingested: string[] = [];
     for (const key of keys) {
+      const last = await this.getLastCommitForModule(key);
+      if (!last) continue;
       const existing = await this.prisma.hubModuleRelease.findUnique({
-        where: { moduleKey_sourceCommit: { moduleKey: key, sourceCommit: headCommit } },
-        select: { id: true },
+        where: { moduleKey_sourceCommit: { moduleKey: key, sourceCommit: last.sha } },
+        select: { id: true, committedAt: true },
       });
-      if (existing) continue;
-      const manifest = await this.fetchManifestAtCommit(key, headCommit);
+      if (existing?.committedAt) continue;
+      const manifest = await this.fetchManifestAtCommit(key, last.sha);
       if (!manifest) continue;
-      await this.ingestRelease(key, headCommit, manifest, trigger);
+      await this.ingestRelease(key, last.sha, manifest, trigger, last.committedAt);
       ingested.push(key);
     }
     return { headCommit, ingested };
+  }
+
+  /** Last commit touching one module directory, with its commit date. */
+  private async getLastCommitForModule(moduleKey: string): Promise<{ sha: string; committedAt: Date } | null> {
+    const { owner, repo } = this.registryRepo;
+    const { data } = await this.octokit.repos.listCommits({
+      owner,
+      repo,
+      path: `${REGISTRY_MODULES_PREFIX}${moduleKey}`,
+      per_page: 1,
+    });
+    const commit = data[0];
+    const sha = commit?.sha;
+    if (!sha) return null;
+    // The list response always carries the commit metadata; fall back to a
+    // dedicated lookup only for malformed payloads.
+    const rawDate = commit?.commit?.committer?.date ?? commit?.commit?.author?.date;
+    const committedAt = rawDate ? new Date(rawDate) : await this.resolveCommitDate(sha);
+    return committedAt ? { sha, committedAt } : null;
+  }
+
+  /**
+   * Commit date for an arbitrary registry commit (per-process cache). Used to
+   * stamp the pin dates carried by an installation's report; a missing date
+   * simply disables the upgrade check for that module.
+   */
+  async resolveCommitDate(sha: string): Promise<Date | null> {
+    const cached = this.commitDates.get(sha);
+    if (cached !== undefined) return cached;
+    const { owner, repo } = this.registryRepo;
+    let resolved: Date | null = null;
+    try {
+      const { data } = await this.octokit.repos.getCommit({ owner, repo, ref: sha });
+      const rawDate = data.commit.committer?.date ?? data.commit.author?.date;
+      resolved = rawDate ? new Date(rawDate) : null;
+    } catch (error: unknown) {
+      const status = octokitStatus(error);
+      if (status !== 404 && status !== 422) {
+        this.logger.warn(`registry commit ${sha} lookup failed: ${(error as Error).message}`);
+      }
+    }
+    this.commitDates.set(sha, resolved);
+    return resolved;
   }
 
   private async fetchManifestAtCommit(moduleKey: string, commit: string): Promise<ManifestShape | null> {

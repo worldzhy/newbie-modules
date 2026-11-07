@@ -12,6 +12,7 @@ import {
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
+import { ModuleHubReleaseService } from "./release.service";
 
 /** An installation reports every 60s; three missed intervals marks it offline (design §4.2). */
 export const ONLINE_THRESHOLD_SECONDS = 180;
@@ -60,6 +61,8 @@ interface SnapshotModule {
   key: string;
   version?: string | null;
   sourceCommit?: string | null;
+  /** Commit date of `sourceCommit`, stamped by the hub when a full report lands. */
+  sourceCommittedAt?: string | null;
   installed?: boolean;
   hasSchema?: boolean;
   missingEnv?: string[];
@@ -159,6 +162,36 @@ export function compareTargetWithSnapshot(
   return { converged, entries };
 }
 
+/** Latest catalogued release of one module, as needed by the upgrade check. */
+interface LatestRelease {
+  sourceCommit: string;
+  committedAt: Date | null;
+}
+
+/**
+ * Read-time "is the installed pin behind the registry" check (design §4.1).
+ *
+ * The runtime reporter deliberately omits `updateAvailable` (the CLI owns that
+ * computation), so the hub derives it from its release catalog. A plain
+ * "commit differs" comparison would flag every module whose pin points at a
+ * later branch HEAD that merely happened to post-date the module's own last
+ * change, therefore a module only counts as upgradeable when the latest
+ * release's commit date is provably newer than the pin's commit date. Modules
+ * with an unknown pin date stay quiet.
+ */
+export function annotateUpdateAvailability(snapshot: unknown, latestByKey: Map<string, LatestRelease>): unknown {
+  if (!Array.isArray(snapshot)) return snapshot;
+  return (snapshot as SnapshotModule[]).map((module) => {
+    const latest = latestByKey.get(module.key);
+    let updateAvailable = module.updateAvailable === true;
+    if (!updateAvailable && latest && module.sourceCommit && latest.sourceCommit !== module.sourceCommit) {
+      const pinnedAt = module.sourceCommittedAt ? new Date(module.sourceCommittedAt) : null;
+      updateAvailable = Boolean(pinnedAt && latest.committedAt && latest.committedAt.getTime() > pinnedAt.getTime());
+    }
+    return { ...module, updateAvailable };
+  });
+}
+
 /**
  * Installation registry. One token = one installation instance; the host
  * pre-creates rows and distributes the plaintext report token out of band,
@@ -179,6 +212,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
+    private readonly releases: ModuleHubReleaseService,
   ) {
     this.credentials = prismaInstallationCredentialStore<ModuleHubInstallationDraft, ModuleHubInstallation>(
       this.prisma.moduleHubInstallation,
@@ -279,16 +313,20 @@ export class ModuleHubInstallationService implements InstallationResolver {
   /**
    * Latest module snapshot reported by the instance (`newbie status --json`
    * modules[]) plus the read-time "target vs actual" comparison against the
-   * stored targetSpec (design §4.1).
+   * stored targetSpec (design §4.1). Each entry is also stamped with the
+   * derived `updateAvailable` flag against the registry release catalog.
    */
   async getModules(id: string) {
     const row = await this.getOrThrow(id);
     const targetSpec = (row.targetSpec as Record<string, unknown> | null) ?? null;
+    const catalog = await this.releases.getCatalog();
+    const latestByKey = new Map(catalog.map((release) => [release.moduleKey, release]));
+    const actual = annotateUpdateAvailability(row.modulesSnapshot, latestByKey);
     return {
-      actual: (row.modulesSnapshot as unknown[] | null) ?? null,
+      actual,
       targetSpec,
       reportedAt: row.lastSeenAt ?? null,
-      comparison: compareTargetWithSnapshot(targetSpec, row.modulesSnapshot),
+      comparison: compareTargetWithSnapshot(targetSpec, actual),
     };
   }
 
@@ -346,6 +384,33 @@ export class ModuleHubInstallationService implements InstallationResolver {
   }
 
   /**
+   * Stamp every snapshot entry with the commit date of its pin. The read-time
+   * upgrade check needs it to distinguish "a newer release exists" from "the
+   * pin already contains the module's latest change but sits on a later HEAD".
+   * Best-effort: an unresolved commit leaves the entry untouched and only
+   * disables the upgrade hint for that module.
+   */
+  private async withPinCommitDates(modules: Array<Record<string, unknown>>): Promise<Array<Record<string, unknown>>> {
+    const pins = [
+      ...new Set(
+        modules
+          .map((module) => (typeof module.sourceCommit === "string" ? module.sourceCommit : null))
+          .filter((pin): pin is string => Boolean(pin)),
+      ),
+    ];
+    if (pins.length === 0) return modules;
+
+    const dates = new Map<string, Date | null>();
+    await Promise.all(pins.map(async (pin) => dates.set(pin, await this.releases.resolveCommitDate(pin))));
+
+    return modules.map((module) => {
+      const pin = typeof module.sourceCommit === "string" ? module.sourceCommit : null;
+      const committedAt = pin ? dates.get(pin) : null;
+      return committedAt ? { ...module, sourceCommittedAt: committedAt.toISOString() } : module;
+    });
+  }
+
+  /**
    * Self-registration of runtime facts on every report (design doc §4.2).
    * - kind="ping": only refreshes lastSeenAt.
    * - kind="full": writes firstSeenAt once (COALESCE) and refreshes all
@@ -376,7 +441,8 @@ export class ModuleHubInstallationService implements InstallationResolver {
       return;
     }
     // kind === "full": refresh all runtime fact columns + modulesSnapshot.
-    const modulesJson = facts.modules ? JSON.stringify(facts.modules) : null;
+    const modules = facts.modules ? await this.withPinCommitDates(facts.modules) : null;
+    const modulesJson = modules ? JSON.stringify(modules) : null;
     await this.prisma.$executeRaw`
       UPDATE "module/module-hub"."ModuleHubInstallation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
