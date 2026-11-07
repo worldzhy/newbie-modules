@@ -21,13 +21,15 @@ missed webhook delivery). Both share the same idempotent upsert.
 
 ## Environment Variables
 
-All three are declared in `newbie.module.json` (`requires.config` + `requires.env`), so `newbie modules apply` renders them into the consumer's config block and `.env.example`.
+This module declares **no** variables in `newbie.module.json`, so `newbie modules apply` adds nothing to the consumer's `.env.example` or config block. Every setting below is optional and read from the environment at runtime (compose passes `.env` through).
 
-| Variable                           | Required                                | Description                                                                                                  |
-| ---------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `MODULE_HUB_GITHUB_WEBHOOK_SECRET` | For webhook                             | GitHub webhook HMAC secret                                                                                   |
-| `MODULE_HUB_REGISTRY_REPO`         | No (default: `worldzhy/newbie-modules`) | Registry repository read by the manual catalog sync                                                          |
-| `MODULE_HUB_REGISTRY_REPO_TOKEN`   | Recommended                             | GitHub API token; a cold catalog sync costs ~2 calls per module and the anonymous quota (60/h) is not enough |
+| Variable                           | Required                                | Description                                                                                                               |
+| ---------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `MODULE_HUB_REGISTRY_REPO_TOKEN`   | No (falls back to `GITHUB_AUTH`)        | GitHub token for catalog sync; the anonymous quota (60/h) is not enough for a cold sync (~2 calls per module)             |
+| `MODULE_HUB_REGISTRY_REPO`         | No (default: `worldzhy/newbie-modules`) | Registry repository read by the catalog sync                                                                              |
+| `MODULE_HUB_GITHUB_WEBHOOK_SECRET` | No (webhook disabled when unset)        | GitHub webhook HMAC secret; without it webhook deliveries are rejected and the daily cron sync is the only ingestion path |
+
+By default the sync reuses the host's existing `GITHUB_AUTH` (the `github` module's PAT). GitHub App credentials cannot read a repository outside the app's installation, so an App-only host should set `MODULE_HUB_REGISTRY_REPO_TOKEN` explicitly or accept the anonymous rate limit.
 
 ## Upgrade Hints
 

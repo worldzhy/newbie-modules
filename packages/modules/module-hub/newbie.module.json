@@ -8,20 +8,6 @@
   },
   "requires": {
     "modules": ["audit", "security"],
-    "config": {
-      "module-hub": {
-        "registryRepo": "process.env.MODULE_HUB_REGISTRY_REPO",
-        "registryRepoToken": "process.env.MODULE_HUB_REGISTRY_REPO_TOKEN",
-        "webhookSecret": "process.env.MODULE_HUB_GITHUB_WEBHOOK_SECRET"
-      }
-    },
-    "env": {
-      "MODULE_HUB_REGISTRY_REPO": {
-        "example": "worldzhy/newbie-modules"
-      },
-      "MODULE_HUB_REGISTRY_REPO_TOKEN": "",
-      "MODULE_HUB_GITHUB_WEBHOOK_SECRET": ""
-    },
     "dependencies": {
       "@octokit/rest": "latest",
       "@devbie/module-hub-cli": "^1.0.2"

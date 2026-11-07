@@ -97,10 +97,13 @@ export class ModuleHubReleaseService {
     private readonly config: ConfigService,
     private readonly auditLogService: AuditLogService,
   ) {
-    // The registry repository is public; the optional token only raises the
-    // GitHub rate limit (or unlocks a private registry mirror).
+    // The registry repository is public; a token only raises the GitHub rate
+    // limit (or unlocks a private registry mirror). Fall back to the host's
+    // existing GitHub credential so consumers do not configure the same PAT
+    // twice; an unauthenticated client still works for a public registry.
+    const auth = this.config.get<string>("MODULE_HUB_REGISTRY_REPO_TOKEN") || this.config.get<string>("GITHUB_AUTH");
     this.octokit = new Octokit({
-      auth: this.config.get<string>("MODULE_HUB_REGISTRY_REPO_TOKEN"),
+      auth,
       userAgent: "newbie-module-hub",
     });
   }
