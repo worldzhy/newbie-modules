@@ -1,36 +1,30 @@
 # newbie.bitbucket
 
-Bitbucket Cloud API wrapper module. Provides the repository surface security-evaluation needs (URL classification and file reads), with dual-mode authentication. Hosts install it and inject `BitbucketService`.
+Bitbucket Cloud API wrapper module. Provides the repository surface security-evaluation needs (URL classification and file reads). Hosts install it and inject `BitbucketService`.
 
-## Authentication (dual mode)
+## Authentication
 
-The bearer token is resolved per request, in priority order:
+Single mode: a static **workspace access token** used as the Bearer credential on every request. Create it under the target workspace's settings (Workspace settings → Security → Access tokens) with the `Repositories: Read` scope.
 
-1. **Workspace access token mode**: when `accessToken` is present, it is used directly.
-2. **OAuth consumer mode**: when `clientId` + `clientSecret` are present, a workspace access token is minted from `https://bitbucket.org/site/oauth2/access_token` and cached until expiry (minus a 60s safety margin).
-
-When neither is present, `BitbucketNotConfiguredError` is thrown by any API call instead of surfacing a bare auth failure. Use `isConfigured()` for an upfront check.
+When the token is absent, `BitbucketNotConfiguredError` is thrown by any API call instead of surfacing a bare auth failure. Use `isConfigured()` for an upfront check.
 
 ## env
 
-| env                       | Required                  | Description                                      |
-| ------------------------- | ------------------------- | ------------------------------------------------ |
-| `BITBUCKET_WORKSPACE`     | Yes                       | Workspace slug used to log the configured target |
-| `BITBUCKET_ACCESS_TOKEN`  | Optional in consumer mode | Static workspace access token                    |
-| `BITBUCKET_CLIENT_ID`     | Optional in token mode    | OAuth consumer key                               |
-| `BITBUCKET_CLIENT_SECRET` | Optional in token mode    | OAuth consumer secret                            |
+| env                      | Required | Description                                                 |
+| ------------------------ | -------- | ----------------------------------------------------------- |
+| `BITBUCKET_ACCESS_TOKEN` | Yes      | Workspace access token (Bearer, `Repositories: Read` scope) |
 
-`isConfigured()` is true when the workspace plus either the access token or the consumer pair are present.
+`isConfigured()` is true when the access token is present. The workspace is not configured separately: every API call addresses the workspace parsed from the repository URL.
 
 ## Methods
 
 | Method                                  | Semantics                                                                                                                                                                    |
 | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `isConfigured()`                        | Whether enough credentials exist (workspace + access token, or workspace + OAuth consumer pair)                                                                              |
+| `isConfigured()`                        | Whether an access token exists                                                                                                                                               |
 | `parseBitbucketUrl(url)`                | Parse `https://bitbucket.org/<workspace>/<repo>` and `git@bitbucket.org:<workspace>/<repo>` (with or without `.git`/trailing slash) into `{workspace, repo}`; null otherwise |
 | `getFileContent(workspace, repo, path)` | Read a UTF-8 text file at HEAD; null on 404, other API failures throw. Path segments are URL-encoded individually                                                            |
 
-`BitbucketNotConfiguredError` is thrown by any API method when the service was constructed without credentials, so an unconfigured deployment fails fast with a meaningful error.
+`BitbucketNotConfiguredError` is thrown by any API method when the service was constructed without a token, so an unconfigured deployment fails fast with a meaningful error.
 
 ## Out of scope
 

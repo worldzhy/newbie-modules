@@ -48,7 +48,7 @@ model ModuleHubInstallation {
   //   missingEnv, updateAvailable, drift?}]
   modulesSnapshot Json?
 
-  // Desired module set marked by host users, in modules.json spec shape.
+  // Desired module set marked by host users, in newbie-modules.json spec shape.
   // Pure data for read-time "target vs actual" display — NOT an execution
   // channel: the hub never dispatches it.
   targetSpec Json?

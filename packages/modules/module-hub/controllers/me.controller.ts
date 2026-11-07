@@ -12,7 +12,7 @@ import { ModuleHubInstallationService } from "../services/installation.service";
  * Same credential as `ReportController`: the token is resolved to one
  * installation by `InstallationAuth`, so `me` can only ever mean that
  * installation. It exists so operators and CI can compare a deployment
- * against the local `modules.json` (`newbie module-hub verify`) without a host
+ * against the local `newbie-modules.json` (`newbie module-hub verify`) without a host
  * user session; listing any installation by id stays on the
  * host-authenticated `InstallationController`.
  *

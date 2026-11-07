@@ -8,43 +8,33 @@ import { ConfigService } from "@nestjs/config";
  */
 export class BitbucketNotConfiguredError extends Error {
   constructor() {
-    super("Bitbucket credentials are not configured (no workspace access token nor OAuth consumer)");
+    super("Bitbucket access token is not configured");
     this.name = "BitbucketNotConfiguredError";
   }
 }
 
 const BITBUCKET_API_BASE = "https://api.bitbucket.org/2.0";
-const BITBUCKET_TOKEN_URL = "https://bitbucket.org/site/oauth2/access_token";
 
 @Injectable()
 export class BitbucketService {
   private readonly logger = new Logger(BitbucketService.name);
 
-  private readonly workspace?: string;
   private readonly accessToken?: string;
-  private readonly clientId?: string;
-  private readonly clientSecret?: string;
-
-  /** Cached workspace access token (minted from the OAuth consumer) + expiry. */
-  private mintedToken?: { token: string; expiresAt: number };
 
   constructor(private readonly config: ConfigService) {
     const bitbucket = this.config.getOrThrow("modules.bitbucket");
-    this.workspace = bitbucket.workspace;
     this.accessToken = bitbucket.accessToken;
-    this.clientId = bitbucket.clientId;
-    this.clientSecret = bitbucket.clientSecret;
 
-    if (this.workspace && (this.accessToken || (this.clientId && this.clientSecret))) {
-      this.logger.log(`Bitbucket service configured for workspace "${this.workspace}"`);
+    if (this.accessToken) {
+      this.logger.log("Bitbucket service configured (workspace access token)");
     } else {
-      this.logger.warn("Bitbucket credentials not configured");
+      this.logger.warn("Bitbucket access token not configured");
     }
   }
 
-  /** Whether enough credentials are present to call the Bitbucket API. */
+  /** Whether a workspace access token is present to call the Bitbucket API. */
   isConfigured(): boolean {
-    return Boolean(this.workspace && (this.accessToken || (this.clientId && this.clientSecret)));
+    return Boolean(this.accessToken);
   }
 
   /**
@@ -66,62 +56,18 @@ export class BitbucketService {
    * credential stays visible instead of reading as "no material".
    */
   async getFileContent(workspace: string, repo: string, path: string): Promise<string | null> {
-    const token = await this.bearerToken();
+    if (!this.accessToken) throw new BitbucketNotConfiguredError();
     const encodedPath = path
       .split("/")
       .map((segment) => encodeURIComponent(segment))
       .join("/");
     const url = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repo)}/src/HEAD/${encodedPath}`;
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${this.accessToken}` } });
     if (response.status === 404) return null;
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       throw new Error(`Bitbucket API ${response.status} for ${url}: ${text.slice(0, 300)}`);
     }
     return response.text();
-  }
-
-  // --- HTTP helpers ------------------------------------------------------
-
-  /**
-   * Resolves the bearer token: a static workspace access token when provided,
-   * otherwise a token minted from the OAuth consumer (cached until expiry).
-   */
-  private async bearerToken(): Promise<string> {
-    if (this.accessToken) return this.accessToken;
-    if (this.clientId && this.clientSecret) {
-      if (this.mintedToken && this.mintedToken.expiresAt > Date.now() + 60_000) {
-        return this.mintedToken.token;
-      }
-      const token = await this.mintWorkspaceToken();
-      this.mintedToken = token;
-      return token.token;
-    }
-    throw new BitbucketNotConfiguredError();
-  }
-
-  private async mintWorkspaceToken(): Promise<{ token: string; expiresAt: number }> {
-    const credentials = Buffer.from(`${this.clientId}:${this.clientSecret}`).toString("base64");
-    const body = new URLSearchParams({
-      grant_type: "urn:bitbucket:oauth2:workspace_access_token",
-      workspace: this.workspace ?? "",
-    });
-    const response = await fetch(BITBUCKET_TOKEN_URL, {
-      method: "POST",
-      headers: {
-        Authorization: `Basic ${credentials}`,
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: body.toString(),
-    });
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`Bitbucket token mint ${response.status}: ${text.slice(0, 300)}`);
-    }
-    const data = (await response.json()) as { access_token: string; expires_in: number };
-    return {
-      token: data.access_token,
-      expiresAt: Date.now() + data.expires_in * 1000,
-    };
   }
 }
