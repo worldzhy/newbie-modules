@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { pickLatestReleases } from "./release.service";
+import { pickLatestReleases, ModuleHubReleaseService } from "./release.service";
 
 /**
  * Regression guard for R23-04: the catalog must pick the newest release by
@@ -65,4 +65,43 @@ test("identical timestamps resolve deterministically by commit sha", () => {
 
   assert.equal(pickLatestReleases([second, first])[0].sourceCommit, "bbb");
   assert.equal(pickLatestReleases([first, second])[0].sourceCommit, "bbb");
+});
+
+test("one failing module does not abort the catalog sync", async () => {
+  const service = new ModuleHubReleaseService(
+    { hubModuleRelease: { findUnique: async () => null } } as any,
+    { get: () => undefined } as any,
+    {} as any,
+  );
+  (service as any).octokit = {
+    repos: { listCommits: async () => ({ data: [{ sha: "head-1" }] }) },
+    git: {
+      getTree: async () => ({
+        data: {
+          truncated: false,
+          tree: [
+            { path: "packages/modules/alpha/newbie.module.json" },
+            { path: "packages/modules/broken/newbie.module.json" },
+          ],
+        },
+      }),
+    },
+  };
+  (service as any).getLastCommitForModule = async (key: string) => {
+    if (key === "broken") throw Object.assign(new Error("rate limited"), { status: 403 });
+    return { sha: "alpha-1", committedAt: new Date("2026-11-01T00:00:00.000Z") };
+  };
+  (service as any).fetchManifestAtCommit = async () => ({ key: "alpha" });
+  const ingested: string[] = [];
+  (service as any).ingestRelease = async (key: string) => {
+    ingested.push(key);
+    return {};
+  };
+
+  const result = await service.syncCatalogFromRegistry({ actorType: "system", actorId: "test" } as any);
+
+  assert.deepEqual(ingested, ["alpha"]);
+  assert.deepEqual(result.ingested, ["alpha"]);
+  assert.deepEqual(result.failed, ["broken"]);
+  assert.equal(result.headCommit, "head-1");
 });
