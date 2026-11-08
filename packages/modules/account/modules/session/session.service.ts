@@ -53,7 +53,7 @@ export class SessionService {
         refreshTokenHash: this.tokenService.hashToken(refreshToken),
         previousRefreshTokenHash: null,
         rotatedAt: null,
-        refreshTokenNext: null,
+        refreshTokenNextSealed: null,
         ipAddress: params.ipAddress,
         city: location?.city?.names?.en,
         region: location?.subdivisions?.pop()?.names?.en,
@@ -91,7 +91,7 @@ export class SessionService {
         accessToken: newAccessToken,
         refreshTokenHash: newHash,
         previousRefreshTokenHash: tokenHash,
-        refreshTokenNext: newRefreshToken,
+        refreshTokenNextSealed: this.tokenService.sealToken(newRefreshToken),
         rotatedAt: new Date(),
       },
     });
@@ -116,8 +116,15 @@ export class SessionService {
       Date.now() - rotatedSession.rotatedAt.getTime() < REFRESH_IDEMPOTENCY_WINDOW_MS
     ) {
       // Idempotent replay: the caller is retrying the same rotation. Return the
-      // token pair we already minted.
-      return { ...rotatedSession, refreshToken: rotatedSession.refreshTokenNext as string };
+      // token pair we already minted, unsealing the credential held for exactly
+      // this window.
+      if (!rotatedSession.refreshTokenNextSealed) {
+        throw new UnauthorizedException(SESSION_NOT_FOUND);
+      }
+      return {
+        ...rotatedSession,
+        refreshToken: this.tokenService.openSealedToken(rotatedSession.refreshTokenNextSealed),
+      };
     }
 
     // [step 4] Genuine reuse (or a token from a session long-since rotated).

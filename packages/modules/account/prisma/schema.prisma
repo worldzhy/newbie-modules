@@ -192,9 +192,11 @@ model Session {
   previousRefreshTokenHash String?  @unique
   // Timestamp of the last successful rotation; bounds the idempotency window.
   rotatedAt               DateTime?
-  // Plaintext of the freshly minted refresh token, retained only for the
-  // idempotency window so a retried refresh returns the same token pair.
-  refreshTokenNext        String?
+  // AES-256-GCM sealed form of the freshly minted refresh token, retained only
+  // for the idempotency window so a retried refresh returns the same token
+  // pair. Sealed at rest by TokenService — a database read never yields a
+  // usable credential (nightwatch-backend ADR-034, R20-11).
+  refreshTokenNextSealed String?
   ipAddress       String
   userAgent       String?
   city            String?

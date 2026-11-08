@@ -10,10 +10,11 @@ import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audi
 
 /**
  * Columns a session API may return. A Session row also holds the live access
- * token, the current and previous refresh-token hashes, and the plaintext
- * `refreshTokenNext` retained for the idempotency window; selecting the row
- * wholesale would hand those credentials to the caller. Every endpoint below
- * projects through this select so token material never leaves the database.
+ * token, the current and previous refresh-token hashes, and the sealed
+ * `refreshTokenNextSealed` retained for the idempotency window; selecting the
+ * row wholesale would hand those credentials to the caller. Every endpoint
+ * below projects through this select so token material never leaves the
+ * database.
  */
 const SESSION_PUBLIC_SELECT = {
   id: true,

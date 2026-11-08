@@ -25,7 +25,7 @@ function buildServices() {
       refreshTokenHash: hash("old-refresh"),
       previousRefreshTokenHash: null,
       rotatedAt: null,
-      refreshTokenNext: null,
+      refreshTokenNextSealed: null,
     },
   };
 
@@ -62,6 +62,9 @@ function buildServices() {
     signUserAccessToken: () => "new-access",
     signUserRefreshToken: () => "new-refresh",
     hashToken: hash,
+    // Mirrors the real service: the value at rest is not the raw credential.
+    sealToken: (token: string) => `sealed:${token}`,
+    openSealedToken: (sealed: string) => sealed.replace(/^sealed:/, ""),
   };
 
   const auditLogService: any = { record: async () => {} };
@@ -78,6 +81,8 @@ test("refresh rotates tokens via CAS and returns the new raw refresh token", asy
   // The old hash is now the previous hash; the new hash is current.
   assert.equal(db[1].refreshTokenHash, hash("new-refresh"));
   assert.equal(db[1].previousRefreshTokenHash, hash("old-refresh"));
+  assert.equal(db[1].refreshTokenNextSealed, "sealed:new-refresh");
+  assert.notEqual(db[1].refreshTokenNextSealed, "new-refresh", "the raw token must not be stored");
   assert.ok(db[1].rotatedAt);
 });
 
