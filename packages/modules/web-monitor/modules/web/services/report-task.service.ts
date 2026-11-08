@@ -211,7 +211,7 @@ export class WebReportTaskService {
     // Invalid duration falls back to 0 for the speed-type threshold only — the
     // actual row write skips the field so Mongo $avg doesn't average in 0.
     let duration = Math.floor(Math.abs((rawDuration ?? 0) as number));
-    if (duration > 60000) duration = 60000;
+    if (duration > MAX_DURATION_MS) duration = MAX_DURATION_MS;
     if (item.type === "link" || item.type === "css") slowTime = (system.slowCssTime || 2) * 1000;
     else if (item.type === "script") slowTime = (system.slowJsTime || 2) * 1000;
     else if (item.type === "img") slowTime = (system.slowImgTime || 2) * 1000;
