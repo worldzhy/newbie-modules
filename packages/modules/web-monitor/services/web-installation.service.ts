@@ -12,11 +12,15 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import {
+  DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
+  withDerivedOnlineState,
+} from "@modules/security/installation/installation-presence";
 
 import { func } from "../shared/utils";
 
 /** Reports flush near-continuously; three minutes without one marks stale. */
-export const ONLINE_THRESHOLD_SECONDS = 180;
+export const ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS;
 
 /** Audit resource type for installation credential events. */
 const AUDIT_RESOURCE_TYPE = "web-monitor-installation";
@@ -59,12 +63,7 @@ export class WebInstallationService {
   private withDerivedState<T extends { revokedAt: Date | null; lastSeenAt: Date | null; tokenHash: string }>(
     row: T,
   ): Omit<T, "tokenHash"> & { online: boolean } {
-    const online =
-      !row.revokedAt &&
-      row.lastSeenAt != null &&
-      Date.now() - new Date(row.lastSeenAt).getTime() <= ONLINE_THRESHOLD_SECONDS * 1000;
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, online };
+    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
   }
 
   /**

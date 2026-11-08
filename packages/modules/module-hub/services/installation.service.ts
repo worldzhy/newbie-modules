@@ -11,28 +11,17 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import {
+  DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
+  InstallationPresence,
+  isInstallationOnline,
+  withDerivedOnlineState,
+} from "@modules/security/installation/installation-presence";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 import { ModuleHubReleaseService } from "./release.service";
 
 /** An installation reports every 60s; three missed intervals marks it offline (design §4.2). */
-export const ONLINE_THRESHOLD_SECONDS = 180;
-
-/**
- * Presence of the installations sharing one externalRef, normalized for the
- * platform-side per-facility dashboards. Several rows can share a ref (rotation
- * history, multiple instances):
- * - `enrolled` — at least one non-revoked installation exists.
- * - `online` — a non-revoked installation reported within the online window.
- * - `lastSeenAt` — newest report time across the non-revoked installations
- *   (null until the first contact).
- * - `revokedOnly` — rows exist but every one is revoked.
- */
-export interface InstallationPresence {
-  enrolled: boolean;
-  online: boolean;
-  lastSeenAt: Date | null;
-  revokedOnly: boolean;
-}
+export const ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS;
 
 /**
  * Module-hub audit events that are NOT part of the shared credential
@@ -248,12 +237,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
   }
 
   private withDerivedState(row: ModuleHubInstallation) {
-    const online =
-      !row.revokedAt &&
-      row.lastSeenAt != null &&
-      Date.now() - new Date(row.lastSeenAt).getTime() <= ONLINE_THRESHOLD_SECONDS * 1000;
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, online };
+    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
   }
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
@@ -294,7 +278,6 @@ export class ModuleHubInstallationService implements InstallationResolver {
       where: { externalRef: { in: externalRefs } },
       select: { externalRef: true, lastSeenAt: true, revokedAt: true },
     });
-    const onlineThresholdMs = ONLINE_THRESHOLD_SECONDS * 1000;
     const now = Date.now();
     const presenceByRef = new Map<string, InstallationPresence>();
     for (const externalRef of externalRefs) {
@@ -309,7 +292,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
         if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
           lastSeenAt = row.lastSeenAt;
         }
-        if (row.lastSeenAt != null && now - row.lastSeenAt.getTime() <= onlineThresholdMs) {
+        if (row.lastSeenAt != null && isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
         }
       }

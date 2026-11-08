@@ -12,12 +12,16 @@ import {
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 import {
+  DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
+  withDerivedOnlineState,
+} from "@modules/security/installation/installation-presence";
+import {
   CreateWorkEvaluationInstallationRequestDto,
   WorkEvaluationInstallationCredentialResponseDto,
 } from "./work-evaluation.dto";
 
 /** An installation agent that has not reported for this long is shown as offline. */
-export const WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS = 180;
+export const WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS;
 
 /** Database schema for the work-evaluation module (mirrors prisma @@schema). */
 const WORK_EVALUATION_SCHEMA = "module/work-evaluation";
@@ -63,12 +67,7 @@ export class WorkEvaluationInstallationService {
   }
 
   private withDerivedState(row: WorkEvaluationInstallation) {
-    const online =
-      !row.revokedAt &&
-      row.lastSeenAt != null &&
-      Date.now() - new Date(row.lastSeenAt).getTime() <= WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS * 1000;
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, online };
+    return withDerivedOnlineState(row, WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS);
   }
 
   /** Enroll an installation. The plaintext token is returned ONCE. */

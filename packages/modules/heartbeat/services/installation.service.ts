@@ -11,6 +11,11 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import {
+  InstallationPresence,
+  isInstallationOnline,
+  withDerivedOnlineState,
+} from "@modules/security/installation/installation-presence";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** Requested interval between client pings; echoed back in the ping response. */
@@ -28,23 +33,6 @@ const AUDIT_RESOURCE_TYPE = "heartbeat-installation";
 interface HeartbeatInstallationDraft {
   label: string;
   externalRef: string | null;
-}
-
-/**
- * Presence of the installations sharing one externalRef, normalized for the
- * platform-side per-facility dashboards. Several rows can share a ref (rotation
- * history, multiple instances):
- * - `enrolled` — at least one non-revoked installation exists.
- * - `online` — a non-revoked installation pinged within the online window.
- * - `lastSeenAt` — newest ping across the non-revoked installations
- *   (null until the first contact).
- * - `revokedOnly` — rows exist but every one is revoked.
- */
-export interface InstallationPresence {
-  enrolled: boolean;
-  online: boolean;
-  lastSeenAt: Date | null;
-  revokedOnly: boolean;
 }
 
 /**
@@ -151,7 +139,7 @@ export class HeartbeatInstallationService implements InstallationResolver {
         if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
           lastSeenAt = row.lastSeenAt;
         }
-        if (row.lastSeenAt != null && now - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS) {
+        if (row.lastSeenAt != null && isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
         }
       }
@@ -263,11 +251,6 @@ export class HeartbeatInstallationService implements InstallationResolver {
   }
 
   private withDerivedState(row: HeartbeatInstallation) {
-    const online =
-      !row.revokedAt &&
-      row.lastSeenAt != null &&
-      Date.now() - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS;
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, online };
+    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
   }
 }
