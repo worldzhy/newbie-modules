@@ -5,32 +5,18 @@ import {
   isInstallationOnline,
   withDerivedOnlineState,
 } from "./installation-presence";
-import { ONLINE_THRESHOLD_SECONDS as HEARTBEAT_ONLINE_THRESHOLD_SECONDS } from "../../heartbeat/services/installation.service";
-import { ONLINE_THRESHOLD_SECONDS as HEALTH_ONLINE_THRESHOLD_SECONDS } from "../../health/services/installation.service";
-import { ONLINE_THRESHOLD_SECONDS as BACKEND_MONITOR_ONLINE_THRESHOLD_SECONDS } from "../../backend-monitor/services/monitor-installation.service";
-import { ONLINE_THRESHOLD_SECONDS as MODULE_HUB_ONLINE_THRESHOLD_SECONDS } from "../../module-hub/services/installation.service";
-import { ONLINE_THRESHOLD_SECONDS as WEB_MONITOR_ONLINE_THRESHOLD_SECONDS } from "../../web-monitor/services/web-installation.service";
-import { WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS } from "../../work-evaluation/work-evaluation-installation.service";
 
 /**
- * The online window is intentionally NOT uniform (ADR-019 consolidation).
+ * Shared presence primitives (ADR-019).
  *
- * Heartbeat and health ask their controllers to ping every 30s, so three missed
- * intervals is 90s. The other collectors report roughly once a minute and keep
- * the shared 180s default. Pinning the split here stops a future "unify the
- * thresholds" cleanup from silently changing when a facility flips offline.
+ * The online window is deliberately NOT uniform and is owned by each collector:
+ * heartbeat and health pass 90s (30s ping * 3), the roughly-once-a-minute
+ * collectors pass the 180s default. Those per-call-site assertions live in the
+ * owning feature modules so this package stays self-contained (its manifest
+ * only requires "redis"); here we only pin the helper's own contract.
  */
 describe("installation presence online windows", () => {
-  it("keeps heartbeat/health at interval * 3 (90s)", () => {
-    assert.equal(HEARTBEAT_ONLINE_THRESHOLD_SECONDS, 90);
-    assert.equal(HEALTH_ONLINE_THRESHOLD_SECONDS, 90);
-  });
-
-  it("keeps the other collectors on the shared 180s default", () => {
-    assert.equal(BACKEND_MONITOR_ONLINE_THRESHOLD_SECONDS, DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS);
-    assert.equal(MODULE_HUB_ONLINE_THRESHOLD_SECONDS, DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS);
-    assert.equal(WEB_MONITOR_ONLINE_THRESHOLD_SECONDS, DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS);
-    assert.equal(WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS, DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS);
+  it("defaults the window to 180 seconds", () => {
     assert.equal(DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS, 180);
   });
 
