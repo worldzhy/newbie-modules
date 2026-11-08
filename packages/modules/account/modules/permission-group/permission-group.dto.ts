@@ -11,10 +11,21 @@ import {
   IsOptional,
   IsString,
   Length,
+  Matches,
   Min,
   ValidateNested,
 } from "class-validator";
 import { Type } from "class-transformer";
+
+/**
+ * Frontend route paths are stored verbatim and later used as header-nav
+ * navigation targets, so they must stay same-origin: "/"-rooted, not
+ * protocol-relative, no backslash (browsers fold `/\evil.com` into
+ * `//evil.com`), and no C0 control characters (WHATWG URL parsing strips
+ * them, turning `/\n/evil.com` into `//evil.com`). Mirrors the frontend
+ * `isSafeInternalPath` predicate.
+ */
+export const SAFE_ROUTE_PATH_PATTERN = /^\/(?!\/)[^\\\u0000-\u001f\u007f]*$/;
 
 export class CreatePermissionGroupDto {
   @ApiProperty({ type: String, minLength: 1, maxLength: 128 })
@@ -32,6 +43,7 @@ export class CreatePermissionGroupDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 128)
+  @Matches(SAFE_ROUTE_PATH_PATTERN, { message: "routePath must be a same-origin path" })
   routePath!: string;
 
   @ApiProperty({ enum: NavPlacement, description: "Where the group surfaces in the application chrome." })
@@ -82,6 +94,7 @@ export class UpdatePermissionGroupDto {
   @IsString()
   @IsNotEmpty()
   @Length(1, 128)
+  @Matches(SAFE_ROUTE_PATH_PATTERN, { message: "routePath must be a same-origin path" })
   @IsOptional()
   routePath?: string;
 
