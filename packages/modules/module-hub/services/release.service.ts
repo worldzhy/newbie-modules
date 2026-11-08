@@ -1,10 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { Octokit } from "@octokit/rest";
 import { HubModuleRelease, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { decodeBase64Utf8, octokitStatus } from "@devbie/newbie/utilities/octokit.util";
+import { octokitStatus } from "@devbie/newbie/utilities/octokit.util";
 import { AuditActorType, AuditLogService } from "@modules/audit/audit-log.service";
+import { GitHubService } from "@modules/github/github.service";
 
 /** Registry module directory prefix inside the registry monorepo. */
 const REGISTRY_MODULES_PREFIX = "packages/modules/";
@@ -84,7 +84,6 @@ function isNewerRelease(candidate: ReleaseOrderingRow, current: ReleaseOrderingR
 @Injectable()
 export class ModuleHubReleaseService {
   private readonly logger = new Logger(ModuleHubReleaseService.name);
-  private readonly octokit: Octokit;
   /** Commit sha -> commit date; null means "looked up and unavailable". */
   private readonly commitDates = new Map<string, Date | null>();
 
@@ -92,17 +91,8 @@ export class ModuleHubReleaseService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly auditLogService: AuditLogService,
-  ) {
-    // The registry repository is public; a token only raises the GitHub rate
-    // limit (or unlocks a private registry mirror). Fall back to the host's
-    // existing GitHub credential so consumers do not configure the same PAT
-    // twice; an unauthenticated client still works for a public registry.
-    const auth = this.config.get<string>("MODULE_HUB_REGISTRY_REPO_TOKEN") || this.config.get<string>("GITHUB_AUTH");
-    this.octokit = new Octokit({
-      auth,
-      userAgent: "newbie-module-hub",
-    });
-  }
+    private readonly github: GitHubService,
+  ) {}
 
   private get registryRepo(): { owner: string; repo: string } {
     const fullName = this.config.get<string>("MODULE_HUB_REGISTRY_REPO") ?? "worldzhy/newbie-modules";
@@ -212,23 +202,21 @@ export class ModuleHubReleaseService {
     trigger: IngestTrigger,
   ): Promise<{ headCommit: string; ingested: string[]; failed: string[] }> {
     const { owner, repo } = this.registryRepo;
-    const { data: commits } = await this.octokit.repos.listCommits({ owner, repo, per_page: 1 });
-    const headCommit = commits[0]?.sha;
+    const headCommits = await this.github.listCommits(owner, repo, { perPage: 1 });
+    const headCommit = headCommits[0]?.sha;
     if (!headCommit) {
       throw new Error(`registry catalog sync: no commits found for ${owner}/${repo}`);
     }
-    const { data: tree } = await this.octokit.git.getTree({
-      owner,
-      repo,
-      tree_sha: headCommit,
-      recursive: "true",
-    });
+    const tree = await this.github.getTree(owner, repo, headCommit, true);
+    if (!tree) {
+      throw new Error(`registry catalog sync: no tree readable for ${owner}/${repo}@${headCommit}`);
+    }
     if (tree.truncated) {
       this.logger.warn(`registry tree ${owner}/${repo}@${headCommit} is truncated; some modules may be missed`);
     }
 
     const keys = new Set<string>();
-    for (const node of tree.tree) {
+    for (const node of tree.entries) {
       const match = node.path ? /^packages\/modules\/([^/]+)\/newbie\.module\.json$/.exec(node.path) : null;
       if (match) keys.add(match[1]);
     }
@@ -259,20 +247,16 @@ export class ModuleHubReleaseService {
   /** Last commit touching one module directory, with its commit date. */
   private async getLastCommitForModule(moduleKey: string): Promise<{ sha: string; committedAt: Date } | null> {
     const { owner, repo } = this.registryRepo;
-    const { data } = await this.octokit.repos.listCommits({
-      owner,
-      repo,
+    const commits = await this.github.listCommits(owner, repo, {
       path: `${REGISTRY_MODULES_PREFIX}${moduleKey}`,
-      per_page: 1,
+      perPage: 1,
     });
-    const commit = data[0];
-    const sha = commit?.sha;
-    if (!sha) return null;
-    // The list response always carries the commit metadata; fall back to a
+    const commit = commits[0];
+    if (!commit) return null;
+    // The list response normally carries the commit metadata; fall back to a
     // dedicated lookup only for malformed payloads.
-    const rawDate = commit?.commit?.committer?.date ?? commit?.commit?.author?.date;
-    const committedAt = rawDate ? new Date(rawDate) : await this.resolveCommitDate(sha);
-    return committedAt ? { sha, committedAt } : null;
+    const committedAt = commit.committedAt ?? (await this.resolveCommitDate(commit.sha));
+    return committedAt ? { sha: commit.sha, committedAt } : null;
   }
 
   /**
@@ -286,9 +270,8 @@ export class ModuleHubReleaseService {
     const { owner, repo } = this.registryRepo;
     let resolved: Date | null = null;
     try {
-      const { data } = await this.octokit.repos.getCommit({ owner, repo, ref: sha });
-      const rawDate = data.commit.committer?.date ?? data.commit.author?.date;
-      resolved = rawDate ? new Date(rawDate) : null;
+      const commit = await this.github.getCommit(owner, repo, sha);
+      resolved = commit?.committedAt ?? null;
     } catch (error: unknown) {
       const status = octokitStatus(error);
       if (status !== 404 && status !== 422) {
@@ -301,19 +284,13 @@ export class ModuleHubReleaseService {
 
   private async fetchManifestAtCommit(moduleKey: string, commit: string): Promise<ManifestShape | null> {
     const { owner, repo } = this.registryRepo;
-    try {
-      const { data } = await this.octokit.repos.getContent({
-        owner,
-        repo,
-        path: `${REGISTRY_MODULES_PREFIX}${moduleKey}/${MODULE_MANIFEST_FILE}`,
-        ref: commit,
-      });
-      // The contents API returns an array for directories; we only read files.
-      if (Array.isArray(data) || data.type !== "file") return null;
-      return JSON.parse(decodeBase64Utf8(data.content)) as ManifestShape;
-    } catch (error: unknown) {
-      if (octokitStatus(error) === 404) return null;
-      throw error;
-    }
+    const content = await this.github.getFileContent(
+      owner,
+      repo,
+      `${REGISTRY_MODULES_PREFIX}${moduleKey}/${MODULE_MANIFEST_FILE}`,
+      commit,
+    );
+    if (content === null) return null;
+    return JSON.parse(content) as ManifestShape;
   }
 }

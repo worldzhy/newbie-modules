@@ -68,25 +68,24 @@ test("identical timestamps resolve deterministically by commit sha", () => {
 });
 
 test("one failing module does not abort the catalog sync", async () => {
+  const github = {
+    listCommits: async () => [{ sha: "head-1" }],
+    getTree: async () => ({
+      truncated: false,
+      entries: [
+        { path: "packages/modules/alpha/newbie.module.json" },
+        { path: "packages/modules/broken/newbie.module.json" },
+      ],
+    }),
+    getCommit: async () => null,
+    getFileContent: async () => null,
+  };
   const service = new ModuleHubReleaseService(
     { hubModuleRelease: { findUnique: async () => null } } as any,
     { get: () => undefined } as any,
     {} as any,
+    github as any,
   );
-  (service as any).octokit = {
-    repos: { listCommits: async () => ({ data: [{ sha: "head-1" }] }) },
-    git: {
-      getTree: async () => ({
-        data: {
-          truncated: false,
-          tree: [
-            { path: "packages/modules/alpha/newbie.module.json" },
-            { path: "packages/modules/broken/newbie.module.json" },
-          ],
-        },
-      }),
-    },
-  };
   (service as any).getLastCommitForModule = async (key: string) => {
     if (key === "broken") throw Object.assign(new Error("rate limited"), { status: 403 });
     return { sha: "alpha-1", committedAt: new Date("2026-11-01T00:00:00.000Z") };
