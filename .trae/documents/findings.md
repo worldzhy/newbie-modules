@@ -200,3 +200,17 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 - R21-02 withdrawn：未上线环境数据；分钟桶保证 dedup key 唯一性不受 `:resolved:` 残留影响；数据随下次清库消失，不做迁移。
 - R21-03 fixed：registry `d469238`（drop 分支补 debug 日志）+ 宿主装配 `f930bce`。报告中行号引用 `:181-184` 系凭记忆重构所致偏差，实际 drop 分支在 `:184-186`，此处已更正。
 - R21-04 fixed：宿主 `9961dc8`（url-check/heartbeat 恢复通知补 `status:"recovered"` + `recoveredAt`）。验证边界：tsc+eslint 绿、build 绿、重启健康检查正常；两调用点复用既有 center 落库路径（其 recovered 相位已由 round21 E2E 证据覆盖），R21-03 的 debug 日志行无独立运行时探针。
+
+## round26（2026-11-08，scope=`modules: [url-check]`：功能测试与验证，报告在本仓 `.trae/documents/expert-review-2026-11-08-round26.md`）
+
+锚点：newbie-modules `93a4797`（3 新增测试文件）/ nightwatch-backend `bbb0b34`（4 新增测试文件）/ nightwatch-frontend `ae6b3e1`（5 dirty，均在 url-check 域外）。结论摘要：新增 38 用例全绿（url-check 相关 52/52，全仓 759/759），tsc/eslint/prettier 绿；SSRF 双层防线与状态机事务性均有 executed 证据；发现 1 个 P1（时间显示偏移）与 2 个 P2。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R26-01 | newbie-modules + nightwatch-frontend | `checkedAt` 以 ClickHouse UTC 原样串（无 `T`/`Z`）下发，前端 dayjs 按本地时区解析 → 检查时间早显 8 小时 | P1 | live | 任意登录项目查看者 | open |
+| R26-02 | nightwatch-backend | 恢复通知在 `downSince=""` 时 `minuteBucket` 抛 RangeError 被 catch 吞掉，通知永久丢失（脏数据前置） | P2 | live | 需脏数据 | open |
+| R26-03 | newbie-modules | IPv4-mapped 公网地址（如 `[::ffff:8.8.8.8]`）归一后按未知地址拦截，与注释"由内嵌 IPv4 判定"不符（fail-closed） | P2 | live | 任意登录用户 | open |
+| R26-04 | newbie-modules | 观察：`Number.parseInt("12abc")` 容错为 12，进入 limit 计算 | P2 | live | 任意登录用户 | open（不单独立项） |
+
+处置：修复不在本会话（评审只读边界），修复项已入 backlog 并引用上述 ID。
+| R26-05 | newbie-modules | 域外新发现：`npm run format:check` 在 dev 已红（`message-tracker/sst/` 5 个 tracked 文件未格式化），CI `ci.yml:26` 即该命令，格式门禁失效 | P2 | source | N/A | open |

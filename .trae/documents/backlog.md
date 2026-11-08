@@ -42,3 +42,12 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 
 
+
+## url-check 评审 round26 未修项（2026-11-08）
+
+报告：`.trae/documents/expert-review-2026-11-08-round26.md`；台账：同目录 `findings.md`。
+
+- [ ] `[R26-01]` **（P1）** `listCheckResults` 返回的 `checkedAt` 是 ClickHouse UTC 原样串（`2026-11-08 11:52:00.080`），前端 `url-check/page.tsx` 用 dayjs 当本地时间解析，整列早显 8 小时。修：服务端输出 ISO-8601 带 `Z`（查询投影或 `listCheckResults` 内归一），补接口级断言。
+- [ ] `[R26-02]` **（P2）** 宿主 `onRecovered` 在 `downSince=""` 时 dedup 桶抛 RangeError 被吞，恢复通知丢失；脏数据前置。修：`downSince` 缺失时用固定桶或跳过 dedup。
+- [ ] `[R26-03]` **（P2）** `isBlockedAddress` 的 `::ffff:` 分支对 URL 归一后的十六进制形式（`::ffff:808:808`）失效，公网 IPv4-mapped 地址被误拦；修：补十六进制内嵌 IPv4 判定，或订正注释口径。
+- [ ] `[R26-05]` **（P2，域外）** registry `npm run format:check` 在 dev 上已红：`packages/modules/message-tracker/sst/` 下 5 个 tracked 文件（含 `.sst/platform/src/*.ts`、`provider-lock.json`）未格式化，而 CI `ci.yml:26` 正是该命令。修：把这些 vendor/生成文件加入 `.prettierignore`，或按 canonical 配置格式化（需先确认 sst 目录是否应随包发布）。
