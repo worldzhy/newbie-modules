@@ -52,4 +52,4 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 > 来源：本会话对 credentialRef 交付（registry `c87ad2c` / backend `842e62e` / frontend `a08edde`）的评审；5 条问题经 2 个独立探针确认。问题 1、2 属宿主层，见 nightwatch-backend backlog 同日条目。
 
-- [ ] `[SE-CRED-03]` **unevaluable 桶不覆盖悬空引用（minor，建议只补文档）**：`packages/modules/security-evaluation/reporting/security-evaluation-report.service.ts` L100-105 仅判 `!subject.credentialRef`；模块对引用不透明、无法解析绑定是否存在。结论：不改代码——provider 只枚举 live binding，悬空引用属退役 subject 的瞬态，run 时会以 subject 级失败暴露。若要固化，在 ADR-039 或 report 注释写明"悬空引用 = run-time skipped，不是 unevaluable"。
+- [x] `[SE-CRED-03]` **unevaluable 桶不覆盖悬空引用（minor，建议只补文档）**：`packages/modules/security-evaluation/reporting/security-evaluation-report.service.ts` L100-105 仅判 `!subject.credentialRef`；模块对引用不透明、无法解析绑定是否存在。结论：不改代码——provider 只枚举 live binding，悬空引用属退役 subject 的瞬态，run 时会以 subject 级失败暴露。若要固化，在 ADR-039 或 report 注释写明"悬空引用 = run-time skipped，不是 unevaluable"。**fixed（2026-11-09，`b48d9bf`）**：报告注释已写明 dangling ref 与 unevaluable 的分工。
