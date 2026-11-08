@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { OWNER_KEY } from "./require-owner.decorator";
+import { FORBIDDEN_FOREIGN_RESOURCE } from "./authorization.constants";
 import { AccessTokenParsed } from "../security.interface";
 
 /**
@@ -50,6 +51,6 @@ export class OwnershipGuard implements CanActivate {
       return true;
     }
 
-    throw new ForbiddenException("You can only access your own resources.");
+    throw new ForbiddenException(FORBIDDEN_FOREIGN_RESOURCE);
   }
 }

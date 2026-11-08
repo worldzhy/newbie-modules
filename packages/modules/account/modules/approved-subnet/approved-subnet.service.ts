@@ -10,6 +10,7 @@ import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 import { GeolocationService } from "@modules/audit/helpers/geolocation.service";
 import { computeSubnetHmac } from "../../helpers/subnet-hmac";
 import { compareHash, generateHash } from "@devbie/newbie/utilities/common.util";
+import { FORBIDDEN_FOREIGN_RESOURCE } from "@modules/security/authorization/authorization.constants";
 
 @Injectable()
 export class ApprovedSubnetService {
@@ -55,7 +56,7 @@ export class ApprovedSubnetService {
     });
     if (!approvedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
     // Defense in depth: the route guard already performed this same check.
-    if (approvedSubnet.userId !== userId) throw new ForbiddenException("You can only access your own resources.");
+    if (approvedSubnet.userId !== userId) throw new ForbiddenException(FORBIDDEN_FOREIGN_RESOURCE);
     return expose<ApprovedSubnet>(approvedSubnet);
   }
 
@@ -64,7 +65,7 @@ export class ApprovedSubnetService {
       where: { id },
     });
     if (!approvedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
-    if (approvedSubnet.userId !== userId) throw new ForbiddenException("You can only access your own resources.");
+    if (approvedSubnet.userId !== userId) throw new ForbiddenException(FORBIDDEN_FOREIGN_RESOURCE);
     const deletedSubnet = await this.prisma.approvedSubnet.delete({
       where: { id },
     });

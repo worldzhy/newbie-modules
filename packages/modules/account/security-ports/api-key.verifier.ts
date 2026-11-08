@@ -51,7 +51,10 @@ export class AccountApiKeyVerifier implements ApiKeyVerifier {
 
     // Restrictions are evaluated after the secret match, so a caller without
     // the credential cannot learn which addresses/origins the key allows.
-    // Empty (or malformed-only) lists mean "no restriction" (R20-10).
+    // Empty (or malformed-only) lists mean "no restriction" (R20-10). The IP
+    // list is the network control; the referrer/origin list is a browser-side
+    // misuse deterrent (both headers are client-set and forgeable), not an
+    // access control.
     const ipRestrictions = normalizeRestrictions(apiKey.ipRestrictions);
     if (ipRestrictions.length > 0 && !matchesIpRestriction(context?.ipAddress, ipRestrictions)) {
       throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);

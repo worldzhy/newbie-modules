@@ -198,7 +198,10 @@ export class EvaluationFindingService {
           ...(query.runId ? { lastSeenRunId: query.runId } : {}),
           ...(query.evaluationKey ? { evaluationKey: query.evaluationKey } : {}),
           ...(query.status ? { status: query.status } : {}),
-          ...(query.severity ? { severity: query.severity } : {}),
+          // Read path goes through the same vocabulary mapping as writes: the
+          // two literals are equal today, but a renamed enum member must not
+          // turn a filter into a silent no-match.
+          ...(query.severity ? { severity: toPersistedSeverity(query.severity) } : {}),
           ...(query.scopeType || query.scopeId
             ? {
                 subject: {

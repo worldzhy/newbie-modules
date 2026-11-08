@@ -7,13 +7,22 @@ export class CreateApiKeyDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ type: String, isArray: true })
+  @ApiPropertyOptional({
+    type: String,
+    isArray: true,
+    description: "Allowed caller addresses or CIDR blocks. Enforced by the API key verifier.",
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   ipRestrictions?: string[];
 
-  @ApiPropertyOptional({ type: String, isArray: true })
+  @ApiPropertyOptional({
+    type: String,
+    isArray: true,
+    description:
+      "Allowed Origin/Referer values. Browser-misuse deterrent only: both headers are client-set and forgeable, so this is not an access control.",
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
@@ -26,13 +35,22 @@ export class UpdateApiKeyDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ type: String, isArray: true })
+  @ApiPropertyOptional({
+    type: String,
+    isArray: true,
+    description: "Allowed caller addresses or CIDR blocks. Enforced by the API key verifier.",
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   ipRestrictions?: string[];
 
-  @ApiPropertyOptional({ type: String, isArray: true })
+  @ApiPropertyOptional({
+    type: String,
+    isArray: true,
+    description:
+      "Allowed Origin/Referer values. Browser-misuse deterrent only: both headers are client-set and forgeable, so this is not an access control.",
+  })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
@@ -45,13 +63,22 @@ export class ReplaceApiKeyDto {
   @IsNotEmpty()
   description!: string;
 
-  @ApiProperty({ type: String, isArray: true })
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    description: "Allowed caller addresses or CIDR blocks. Enforced by the API key verifier.",
+  })
   @IsArray()
   @IsString({ each: true })
   @IsNotEmpty()
   ipRestrictions!: string[];
 
-  @ApiProperty({ type: String, isArray: true })
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    description:
+      "Allowed Origin/Referer values. Browser-misuse deterrent only: both headers are client-set and forgeable, so this is not an access control.",
+  })
   @IsArray()
   @IsString({ each: true })
   @IsNotEmpty()

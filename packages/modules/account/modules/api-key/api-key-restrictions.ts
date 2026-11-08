@@ -56,6 +56,12 @@ export function matchesIpRestriction(clientIp: string | undefined, entries: stri
  * a full origin ("https://app.example.com", compared exactly), a hostname
  * ("app.example.com"), or a wildcard hostname ("*.example.com", which matches
  * subdomains but not the bare domain).
+ *
+ * This is not an access control. Origin and Referer are set by the client and
+ * any non-browser caller can forge or omit them; the check only stops a leaked
+ * key from being pasted into a third-party page or used by a browser client
+ * from an unexpected site. Do not treat it as a substitute for IP restrictions
+ * or for revoking the key.
  */
 export function matchesReferrerRestriction(
   origin: string | undefined,

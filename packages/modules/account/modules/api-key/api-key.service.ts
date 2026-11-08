@@ -6,6 +6,7 @@ import { generateRandomString } from "@devbie/newbie/utilities/random.util";
 import { generateHash } from "@devbie/newbie/utilities/common.util";
 import { Expose, expose } from "../../helpers/expose";
 import { AuditLogService, AuditEvent } from "@modules/audit/audit-log.service";
+import { FORBIDDEN_FOREIGN_RESOURCE } from "@modules/security/authorization/authorization.constants";
 
 type ApiKeyListQuery = {
   skip?: number;
@@ -97,7 +98,7 @@ export class ApiKeyService {
       where: { id },
     });
     if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (apiKey.userId !== userId) throw new ForbiddenException("You can only access your own resources.");
+    if (apiKey.userId !== userId) throw new ForbiddenException(FORBIDDEN_FOREIGN_RESOURCE);
     return apiKey;
   }
 
