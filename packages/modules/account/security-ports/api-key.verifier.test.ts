@@ -83,3 +83,97 @@ test("rejects an unknown key without touching the user table", async () => {
   );
   assert.equal(calls.user, 0);
 });
+
+/**
+ * Restriction wiring (round 27, P2-2). api-key-restrictions.test.ts covers the
+ * pure matchers, but nothing proved verify() actually consults the stored
+ * columns: deleting both branches left the suite green. These cases call the
+ * verifier with a request context, the way ApiKeyStrategy does.
+ */
+
+test("accepts a key whose IP restriction covers the caller", async () => {
+  const apiKey = {
+    id: 1,
+    key: KEY,
+    secret: await generateHash(SECRET),
+    userId: "user-1",
+    ipRestrictions: ["203.0.113.0/24"],
+  };
+  const { verifier } = buildVerifier(apiKey, { status: UserStatus.ACTIVE });
+
+  assert.equal(await verifier.verify(KEY, SECRET, { ipAddress: "203.0.113.9" }), true);
+});
+
+test("rejects a key used from outside its IP restriction", async () => {
+  const apiKey = {
+    id: 1,
+    key: KEY,
+    secret: await generateHash(SECRET),
+    userId: "user-1",
+    ipRestrictions: ["203.0.113.0/24"],
+  };
+  const { verifier } = buildVerifier(apiKey, { status: UserStatus.ACTIVE });
+
+  await assert.rejects(
+    verifier.verify(KEY, SECRET, { ipAddress: "198.51.100.7" }),
+    (error: unknown) => error instanceof UnauthorizedException && error.message === UNAUTHORIZED_RESOURCE,
+  );
+});
+
+test("rejects a restricted key when the caller supplies no context", async () => {
+  const apiKey = {
+    id: 1,
+    key: KEY,
+    secret: await generateHash(SECRET),
+    userId: "user-1",
+    ipRestrictions: ["203.0.113.0/24"],
+  };
+  const { verifier } = buildVerifier(apiKey, { status: UserStatus.ACTIVE });
+
+  await assert.rejects(
+    verifier.verify(KEY, SECRET),
+    (error: unknown) => error instanceof UnauthorizedException && error.message === UNAUTHORIZED_RESOURCE,
+  );
+});
+
+test("accepts a key whose referrer restriction matches the origin", async () => {
+  const apiKey = {
+    id: 1,
+    key: KEY,
+    secret: await generateHash(SECRET),
+    userId: "user-1",
+    referrerRestrictions: ["https://app.example.com"],
+  };
+  const { verifier } = buildVerifier(apiKey, { status: UserStatus.ACTIVE });
+
+  assert.equal(await verifier.verify(KEY, SECRET, { origin: "https://app.example.com" }), true);
+});
+
+test("accepts a key matched through the referer when Origin is absent", async () => {
+  const apiKey = {
+    id: 1,
+    key: KEY,
+    secret: await generateHash(SECRET),
+    userId: "user-1",
+    referrerRestrictions: ["app.example.com"],
+  };
+  const { verifier } = buildVerifier(apiKey, { status: UserStatus.ACTIVE });
+
+  assert.equal(await verifier.verify(KEY, SECRET, { referrer: "https://app.example.com/dashboard" }), true);
+});
+
+test("rejects a key used from a foreign origin", async () => {
+  const apiKey = {
+    id: 1,
+    key: KEY,
+    secret: await generateHash(SECRET),
+    userId: "user-1",
+    referrerRestrictions: ["https://app.example.com"],
+  };
+  const { verifier } = buildVerifier(apiKey, { status: UserStatus.ACTIVE });
+
+  await assert.rejects(
+    verifier.verify(KEY, SECRET, { origin: "https://evil.example.com" }),
+    (error: unknown) => error instanceof UnauthorizedException && error.message === UNAUTHORIZED_RESOURCE,
+  );
+});
