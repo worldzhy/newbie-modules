@@ -35,6 +35,10 @@ export class ApiKeyStrategy extends PassportStrategy(Strategy, "custom.api-key")
       );
     }
 
-    return this.apiKeyVerifier.verify(key, secret);
+    return this.apiKeyVerifier.verify(key, secret, {
+      ipAddress: req.ip,
+      origin: req.headers.origin,
+      referrer: req.headers.referer,
+    });
   }
 }
