@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from "class-validator";
+import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
 import { EvaluationFindingSeverity, EvaluationFindingStatus, EvaluationRunStatus } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
@@ -47,6 +47,8 @@ export class IngestSecurityEvaluationSubjectRequestDto {
   })
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
   credentialRef?: string;
 
   @ApiProperty({ description: 'Opaque provenance type, e.g. "project"' })
