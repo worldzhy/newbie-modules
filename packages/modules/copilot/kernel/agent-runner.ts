@@ -22,6 +22,7 @@ import type { SkillEnvelope, SkillExecution } from "./skill-registry";
 import { SkillRegistry } from "./skill-registry";
 import type { SkillResultKind } from "./skill";
 import { buildSystemPrompt, type PromptSectionProvider } from "./system-prompt";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 const RESULT_SUMMARY_LIMIT = 140;
 
@@ -314,7 +315,7 @@ export class AgentRunner {
       this.registry.logError("Copilot run failed with an internal error", {
         requestId: context.requestId,
         conversationId: context.conversationId,
-        error: error instanceof Error ? error.message : String(error),
+        error: getErrorMessage(error),
       });
       yield failedEvent(context.requestId, "internal", "The agent failed unexpectedly. Please try again.");
     }

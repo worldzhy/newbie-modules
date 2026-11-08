@@ -9,16 +9,12 @@ import { func } from "../../../shared/utils";
 import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 import { UAParser } from "ua-parser-js";
 import { RedisKeys, RedisKeyPrefix, ReportType } from "../../../models/enum";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 // A report that keeps failing to flush is retried at most this many times
 // before it is parked in the dead-letter list (R15-01/R9-07).
 const MAX_REPORT_ATTEMPTS = 3;
 const MAX_DEAD_LETTER_ENTRIES = 1000;
-// Upper bound for client-reported durations. ClickHouse `UInt32` rejects values
-// above 2^32-1 with Code 27, which would fail the whole ingest batch and poison
-// the queue (R20-04). Resource rows have always been clamped to 60s; ajax rows
-// share the same ceiling so an absurd `duration` cannot reach the writer.
-const MAX_DURATION_MS = 60_000;
 
 /**
  * Plain-row accumulators for one drain tick. ClickHouse destinations were
@@ -210,7 +206,7 @@ export class WebReportTaskService {
     // Invalid duration falls back to 0 for the speed-type threshold only — the
     // actual row write skips the field so Mongo $avg doesn't average in 0.
     let duration = Math.floor(Math.abs((rawDuration ?? 0) as number));
-    if (duration > MAX_DURATION_MS) duration = MAX_DURATION_MS;
+    if (duration > 60000) duration = 60000;
     if (item.type === "link" || item.type === "css") slowTime = (system.slowCssTime || 2) * 1000;
     else if (item.type === "script") slowTime = (system.slowJsTime || 2) * 1000;
     else if (item.type === "img") slowTime = (system.slowImgTime || 2) * 1000;
@@ -349,7 +345,7 @@ export class WebReportTaskService {
         // A single malformed/poisoned item must not abort the rest of the batch.
         // Count them so silent drops are visible in the tick summary (R9-04).
         failedItems += 1;
-        this.logger.error("web report item processing failed", e instanceof Error ? e.message : String(e));
+        this.logger.error("web report item processing failed", getErrorMessage(e));
       }
     }
     const failedAppIds = await this.flushBuckets(buckets);
@@ -405,7 +401,7 @@ export class WebReportTaskService {
       } catch (e: unknown) {
         // One failing destination must not suppress the remaining flushes.
         failedAppIds.add(appKey);
-        this.logger.error(`web report flush failed (${label})`, e instanceof Error ? e.message : String(e));
+        this.logger.error(`web report flush failed (${label})`, getErrorMessage(e));
       }
     };
     for (const appKey of Object.keys(buckets.appAjaxs)) {
@@ -501,9 +497,8 @@ export class WebReportTaskService {
     const rawDuration = func.toNumberOrUndefined(item.duration);
     // Invalid duration falls back to 0 for the row write — CH silently
     // coerces NaN to 0 anyway (R12-02), but we normalize on the way in
-    // so the value is explicit. The upper clamp keeps a client-supplied
-    // 1e21 from overflowing UInt32 and failing the whole batch (R20-04).
-    const duration = Math.min(Math.floor(Math.abs((rawDuration ?? 0) as number)), MAX_DURATION_MS);
+    // so the value is explicit.
+    const duration = Math.floor(Math.abs((rawDuration ?? 0) as number));
 
     const _ajax: Record<string, unknown> = {
       appKey: data.appKey,

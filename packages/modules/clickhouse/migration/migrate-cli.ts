@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { getMigrationStatus, runMigrations, type ClickHouseMigrationConfig } from "./migration-runner";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /**
  * Deployment/standalone frontend for the ClickHouse migration engine.
@@ -107,7 +108,7 @@ if (require.main === module) {
   runMigrateCli(process.argv.slice(2), { cwd: process.cwd() })
     .then((exitCode) => process.exit(exitCode))
     .catch((error: unknown) => {
-      console.error(`[clickhouse-migrate] ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`[clickhouse-migrate] ${getErrorMessage(error)}`);
       process.exit(1);
     });
 }

@@ -32,6 +32,7 @@ import {
   UpdateNotificationCenterSettingDto,
 } from "./notification-center.dto";
 import { NotificationRegistryService } from "./notification-registry.service";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 // Upper bound for the unresolved push-failure admin listing (R5-P2-07).
 const MAX_UNRESOLVED_PUSH_FAILURES = 200;
@@ -269,7 +270,7 @@ export class NotificationCenterService {
       // crash, etc.). The NotificationRecord is already persisted at this
       // point; record a generic failure row so the orphan is visible instead
       // of silently disappearing.
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getErrorMessage(error);
       await this.recordFailure(recordId, "__adapter__", `Push adapter failed: ${message}`);
       return;
     }
@@ -329,7 +330,7 @@ export class NotificationCenterService {
       // Surface it as a single synthetic failure so the diagnostic toast shows
       // something actionable instead of a generic 500. Do NOT persist this row —
       // testPush is a diagnostic tool and its results must not mix with real delivery records.
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getErrorMessage(error);
       return {
         succeeded: 0,
         failed: 1,

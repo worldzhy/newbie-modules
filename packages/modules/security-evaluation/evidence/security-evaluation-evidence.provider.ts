@@ -38,6 +38,7 @@ import {
 import { buildSecurityEvaluationIntelReRankRequest } from "../judgment/intel/security-evaluation-intel-request";
 import { SECURITY_EVALUATION_INTEL_LLM_SCOPE } from "../judgment/intel/security-evaluation-intel-re-ranker";
 import { RepositoryAccess, securityEvaluationRepositoryAccessToken } from "../ports/repository-access.port";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 interface ResolvedLockfile {
   path: string;
@@ -273,9 +274,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     try {
       packages = parsePackageLock(lockfile.content);
     } catch (error) {
-      throw new BadRequestException(
-        `${lockfile.path} could not be parsed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      throw new BadRequestException(`${lockfile.path} could not be parsed: ${getErrorMessage(error)}`);
     }
     if (packages.length === 0) {
       throw new BadRequestException(

@@ -11,6 +11,7 @@ import {
   type UrlCheckDownEvent,
   type UrlCheckRecoveredEvent,
 } from "./url-check.events";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 // Global check parameters: 60s cadence is owned by the host's scheduled job;
 // the remaining defaults live here so consumers can tweak them without a new
@@ -98,9 +99,7 @@ export class UrlCheckProbeService {
           try {
             await this.checkTarget(target);
           } catch (error) {
-            this.logger.error(
-              `Check cycle failed for target ${target.id}: ${error instanceof Error ? error.message : String(error)}`,
-            );
+            this.logger.error(`Check cycle failed for target ${target.id}: ${getErrorMessage(error)}`);
           }
         }),
       );
@@ -155,7 +154,7 @@ export class UrlCheckProbeService {
         isUp: false,
         statusCode: null,
         durationMs: Date.now() - startedAt,
-        error: (error instanceof Error ? error.message : String(error)).slice(0, 1000),
+        error: getErrorMessage(error).slice(0, 1000),
       };
     }
   }
@@ -181,11 +180,7 @@ export class UrlCheckProbeService {
     } catch (error) {
       // Result history must not block state transitions; the row is lost but
       // the alert path stays correct.
-      this.logger.error(
-        `Failed to record check result for target ${target.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.error(`Failed to record check result for target ${target.id}: ${getErrorMessage(error)}`);
     }
   }
 
@@ -256,11 +251,7 @@ export class UrlCheckProbeService {
       };
       this.eventEmitter.emit(URL_CHECK_DOWN_EVENT, event);
     } catch (error) {
-      this.logger.error(
-        `Failed to emit url-check.down for target ${target.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.error(`Failed to emit url-check.down for target ${target.id}: ${getErrorMessage(error)}`);
     }
   }
 
@@ -278,11 +269,7 @@ export class UrlCheckProbeService {
       };
       this.eventEmitter.emit(URL_CHECK_RECOVERED_EVENT, event);
     } catch (error) {
-      this.logger.error(
-        `Failed to emit url-check.recovered for target ${target.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.error(`Failed to emit url-check.recovered for target ${target.id}: ${getErrorMessage(error)}`);
     }
   }
 }

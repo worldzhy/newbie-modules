@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from "@ne
 import { ChatModelResolver } from "../chat-model.resolver";
 import { LlmConnectionService, type LlmConnectionRecord } from "./llm-connection.service";
 import { ModelCallError } from "../chat-model.port";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /**
  * Periodically probes every LLM connection so each status snapshot reflects
@@ -30,7 +31,7 @@ export class ModelStatusProbeService implements OnModuleInit, OnModuleDestroy {
   onModuleInit(): void {
     this.timer = setInterval(() => {
       this.probeNow().catch((err: unknown) => {
-        this.logger.warn(`Model status probe failed: ${err instanceof Error ? err.message : String(err)}`);
+        this.logger.warn(`Model status probe failed: ${getErrorMessage(err)}`);
       });
     }, this.intervalMs);
   }
@@ -63,7 +64,7 @@ export class ModelStatusProbeService implements OnModuleInit, OnModuleDestroy {
           if (!(error instanceof ModelCallError)) {
             this.logger.warn(
               `Model status probe for connection ${connection.id} (${connection.provider}/${connection.model}) ` +
-                `hit an unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+                `hit an unexpected error: ${getErrorMessage(error)}`,
             );
           }
         }

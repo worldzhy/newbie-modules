@@ -5,6 +5,7 @@ import { PvuvipService } from "./pvuvip.service";
 import { func, mapWithConcurrency } from "../../../shared/utils";
 import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 import { SystemDocument } from "../../../models/mongo/system.schema";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 function cronMinuteInterval(cronExp: string) {
   const m = cronExp.split(" ")[1] || "*/2";
@@ -43,7 +44,7 @@ export class WebPvuvipTaskService {
         const data = await this.pvuvip.getPvUvIpSurvey(appKey, beginTime, endTime);
         await this.pvuvip.savePvUvIpData(appKey, endTime, 1, data);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getErrorMessage(error);
         this.logger.error(`Pvuvip minute task failed for site ${appKey}: ${message}`);
       }
     });

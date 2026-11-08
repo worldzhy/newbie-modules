@@ -26,6 +26,7 @@ import {
   parseJudgmentOutput,
 } from "./work-evaluation-judgment.prompt";
 import { WorkEvaluationJudgmentRunState, WorkEvaluationJudgmentTools } from "./work-evaluation-judgment.tools";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 type PhaseName = keyof WorkEvaluationPhaseBudget;
 type PhaseStopReason = "token-budget" | "time-limit" | "tool-round-limit";
@@ -297,7 +298,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
         role: "tool",
         toolCallId: call.id,
         toolName: call.name,
-        toolResult: error instanceof Error ? error.message : String(error),
+        toolResult: getErrorMessage(error),
         toolError: true,
       };
     }

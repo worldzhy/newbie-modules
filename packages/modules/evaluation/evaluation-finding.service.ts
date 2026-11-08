@@ -13,6 +13,7 @@ import { EvaluationProviderRegistry } from "./evaluation-provider.registry";
 import { EvaluationFindingCandidate } from "./ports/evaluation.contracts";
 import { EvaluationFindingChangedEvent } from "./ports/observer.port";
 import { validateJudgment } from "./evaluation-invariants";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 export interface ListEvaluationFindingsInput {
   /** Omitted lists findings across subjects (narrowed by scope or run when given). */
@@ -341,7 +342,7 @@ export class EvaluationFindingService {
       await observer.onFindingChanged(event);
     } catch (error) {
       this.logger.warn(
-        `EvaluationObserver.onFindingChanged failed for finding ${event.findingId}: ${describeError(error)}`,
+        `EvaluationObserver.onFindingChanged failed for finding ${event.findingId}: ${getErrorMessage(error)}`,
       );
     }
   }
@@ -352,8 +353,4 @@ function isUniqueViolation(error: unknown): boolean {
   const { code, message } = error as { code?: unknown; message?: unknown };
   if (code === "P2002") return true;
   return typeof message === "string" && message.includes("EvaluationFinding_subjectId_evaluationKey_fingerprint_key");
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

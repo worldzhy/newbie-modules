@@ -7,6 +7,7 @@ import {
   SourceKnowledgeItem,
 } from "./adapters/source-adapter.port";
 import { DEFAULT_MAX_ITEMS_PER_SOURCE, DEFAULT_RETENTION_DAYS } from "./security-evaluation-knowledge.constants";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /** How many upserts run in parallel per batch. */
 const UPSERT_BATCH_SIZE = 20;
@@ -56,9 +57,7 @@ export class SecurityEvaluationKnowledgeService {
         const items = await adapter.fetchLatest(since);
         all.push(...items);
       } catch (error) {
-        this.logger.error(
-          `Source adapter ${adapter.source} failed: ${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.logger.error(`Source adapter ${adapter.source} failed: ${getErrorMessage(error)}`);
       }
     }
     return all;
@@ -79,9 +78,7 @@ export class SecurityEvaluationKnowledgeService {
           touched += 1;
         } else {
           this.logger.warn(
-            `Skipping item ${batch[index].source}/${batch[index].externalId}: ${
-              result.reason instanceof Error ? result.reason.message : String(result.reason)
-            }`,
+            `Skipping item ${batch[index].source}/${batch[index].externalId}: ${getErrorMessage(result.reason)}`,
           );
         }
       }

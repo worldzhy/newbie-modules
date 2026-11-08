@@ -4,6 +4,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EventCatalogService } from "./event-catalog.service";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 const RETENTION_DAYS_KEY = "modules.event-emitter.retentionDays";
 
@@ -41,7 +42,7 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
   private readonly recordEmission = (event: string | string[], payload: unknown) => {
     const eventKey = Array.isArray(event) ? event.join(".") : String(event);
     this.record(eventKey, payload).catch((error) => {
-      this.logger.error(`Failed to record emission of ${eventKey}: ${this.getErrorMessage(error)}`);
+      this.logger.error(`Failed to record emission of ${eventKey}: ${getErrorMessage(error)}`);
     });
   };
 
@@ -155,9 +156,5 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
     } catch {
       return { serializationError: "Payload is not JSON-serializable" };
     }
-  }
-
-  private getErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
   }
 }

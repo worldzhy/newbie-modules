@@ -8,6 +8,7 @@ import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 import https from "https";
 import { RedisKeyPrefix } from "../../../models/enum";
 import { WebEnvironmentDocument } from "../../../models/mongo/web/web-environment.schema";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 interface TencentIpResponse {
   status: number;
@@ -61,7 +62,7 @@ export class WebIpTaskService {
         await this.redis.getClient().set(`${RedisKeyPrefix.IP_TASK_BEGIN_TIME}${appKey}`, new Date().toString());
       }
     } catch (err) {
-      this.logger.error("saveWebGetIpDatasByOne failed", err instanceof Error ? err.message : String(err));
+      this.logger.error("saveWebGetIpDatasByOne failed", getErrorMessage(err));
     }
   }
 

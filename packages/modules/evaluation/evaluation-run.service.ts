@@ -14,6 +14,7 @@ import { ACTIVE_RUN_STATUSES } from "./evaluation.constants";
 import { EvaluationProviderRegistry } from "./evaluation-provider.registry";
 import { EvaluationSubjectRef } from "./ports/evaluation.contracts";
 import { toSubjectRef } from "./evaluation-subject.service";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /**
  * Runner tuning, bound by the host when the defaults do not fit. Bind the
@@ -346,5 +347,5 @@ function describeError(error: unknown): string {
     const response = error.getResponse();
     return typeof response === "string" ? response : JSON.stringify(response);
   }
-  return error instanceof Error ? error.message : String(error);
+  return getErrorMessage(error);
 }

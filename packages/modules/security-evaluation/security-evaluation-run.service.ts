@@ -5,6 +5,7 @@ import { EvaluationResultService, ListEvaluationResultsInput } from "@modules/ev
 import { EvaluationRunService, ListEvaluationRunsInput } from "@modules/evaluation/evaluation-run.service";
 import { EvaluationRunnerService } from "@modules/evaluation/evaluation-runner.service";
 import type { StartEvaluationRunInput } from "@modules/evaluation/evaluation-run.service";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 export interface StartSecurityEvaluationRunInput extends Omit<StartEvaluationRunInput, "subjectId"> {
   subjectId: string;
@@ -36,9 +37,7 @@ export class SecurityEvaluationRunService {
     // decided by the port bindings, not by a guard here.
     const run = await this.runner.open(input);
     void this.runner.execute(run).catch((error: unknown) => {
-      this.logger.error(
-        `Evaluation run ${run.id} for subject ${input.subjectId} failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Evaluation run ${run.id} for subject ${input.subjectId} failed: ${getErrorMessage(error)}`);
     });
   }
 
