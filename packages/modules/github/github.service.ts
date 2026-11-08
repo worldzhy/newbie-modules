@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Octokit } from "@octokit/rest";
 import { createAppAuth } from "@octokit/auth-app";
+import { delay } from "@devbie/newbie/utilities/delay.util";
 
 /**
  * Thrown by any API method when the service was constructed without
@@ -26,10 +27,6 @@ export class RepoNameConflictError extends Error {
     super(`Repository ${org}/${name} already exists and is not owned by this provisioning`);
     this.name = "RepoNameConflictError";
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // Octokit HTTP errors (RequestError) carry a numeric `status`. Extract it
@@ -200,7 +197,7 @@ export class GitHubService {
     // 3. generate is async (202); contents may 404 briefly. Wait for it so
     //    upsertEnvExample can run immediately after.
     for (let i = 0; i < 3; i++) {
-      await sleep(2000);
+      await delay(2000);
       try {
         await this.client().repos.get({ owner: org, repo: name });
         break;
