@@ -6,6 +6,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import anonymize from "ip-anonymize";
 import { APPROVED_SUBNET_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
 import { Expose, expose } from "../../helpers/expose";
+import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 import { GeolocationService } from "@modules/audit/helpers/geolocation.service";
 import { computeSubnetHmac } from "../../helpers/subnet-hmac";
 import { compareHash, generateHash } from "@devbie/newbie/utilities/common.util";
@@ -17,6 +18,7 @@ export class ApprovedSubnetService {
   constructor(
     private prisma: PrismaService,
     private geolocationService: GeolocationService,
+    private auditLogService: AuditLogService,
     config: ConfigService,
   ) {
     // Fall back to the framework token secret so the feature works with no
@@ -66,6 +68,12 @@ export class ApprovedSubnetService {
     const deletedSubnet = await this.prisma.approvedSubnet.delete({
       where: { id },
     });
+    await this.auditLogService.record(AuditEvent.APPROVED_SUBNET_DELETED, {
+      actorId: userId,
+      resourceType: "approved-subnet",
+      resourceId: String(deletedSubnet.id),
+      detail: { subnetHmac: deletedSubnet.subnetHmac },
+    });
     return expose<ApprovedSubnet>(deletedSubnet);
   }
 
@@ -100,6 +108,13 @@ export class ApprovedSubnetService {
         timezone: location?.location?.time_zone,
         countryCode: location?.country?.iso_code,
       },
+    });
+    await this.auditLogService.record(AuditEvent.APPROVED_SUBNET_APPROVED, {
+      actorId: userId,
+      resourceType: "approved-subnet",
+      resourceId: String(approvedSubnet.id),
+      ipAddress,
+      detail: { subnetHmac, countryCode: approvedSubnet.countryCode },
     });
     return expose<ApprovedSubnet>(approvedSubnet);
   }
