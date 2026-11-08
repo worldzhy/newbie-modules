@@ -207,10 +207,16 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 
 | ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| R26-01 | newbie-modules + nightwatch-frontend | `checkedAt` 以 ClickHouse UTC 原样串（无 `T`/`Z`）下发，前端 dayjs 按本地时区解析 → 检查时间早显 8 小时 | P1 | live | 任意登录项目查看者 | open |
-| R26-02 | nightwatch-backend | 恢复通知在 `downSince=""` 时 `minuteBucket` 抛 RangeError 被 catch 吞掉，通知永久丢失（脏数据前置） | P2 | live | 需脏数据 | open |
-| R26-03 | newbie-modules | IPv4-mapped 公网地址（如 `[::ffff:8.8.8.8]`）归一后按未知地址拦截，与注释"由内嵌 IPv4 判定"不符（fail-closed） | P2 | live | 任意登录用户 | open |
+| R26-01 | newbie-modules + nightwatch-frontend | `checkedAt` 以 ClickHouse UTC 原样串（无 `T`/`Z`）下发，前端 dayjs 按本地时区解析 → 检查时间早显 8 小时 | P1 | live | 任意登录项目查看者 | fixed |
+| R26-02 | nightwatch-backend | 恢复通知在 `downSince=""` 时 `minuteBucket` 抛 RangeError 被 catch 吞掉，通知永久丢失（脏数据前置） | P2 | live | 需脏数据 | fixed |
+| R26-03 | newbie-modules | IPv4-mapped 公网地址（如 `[::ffff:8.8.8.8]`）归一后按未知地址拦截，与注释"由内嵌 IPv4 判定"不符（fail-closed） | P2 | live | 任意登录用户 | fixed |
 | R26-04 | newbie-modules | 观察：`Number.parseInt("12abc")` 容错为 12，进入 limit 计算 | P2 | live | 任意登录用户 | open（不单独立项） |
+| R26-05 | newbie-modules | 域外新发现：`npm run format:check` 在 dev 已红（`message-tracker/sst/` 5 个 tracked 文件未格式化），CI `ci.yml:26` 即该命令，格式门禁失效 | P2 | source | N/A | fixed |
 
-处置：修复不在本会话（评审只读边界），修复项已入 backlog 并引用上述 ID。
-| R26-05 | newbie-modules | 域外新发现：`npm run format:check` 在 dev 已红（`message-tracker/sst/` 5 个 tracked 文件未格式化），CI `ci.yml:26` 即该命令，格式门禁失效 | P2 | source | N/A | open |
+处置（2026-11-08，用户授权「执行吧」）：
+
+- R26-01 fixed：registry `ca83ab1` / 宿主 `ed0b920`（`listCheckResults` 把 `YYYY-MM-DD HH:MM:SS.mmm` 归一为 ISO-8601 UTC，DTO `checkedAt` 改为 `string`）；前端 `682be56` 同步 apits 注释。运行时取证：真实 ClickHouse 行经接口返回 `2026-11-08T12:08:00.079Z`。
+- R26-02 fixed：`ed0b920`（`minuteBucket` 对缺失/非法时间戳回落固定桶 `unknown`），新增断言 `downSince=""` 时 recovery 通知仍投递一次。
+- R26-03 fixed：`ca83ab1` / `ed0b920`（`isBlockedAddress` 对 `::ffff:<hex>` 重建内嵌 IPv4 后再判私网），新增 `public-url.test.ts` 两组正反例。
+- R26-05 fixed：`ca83ab1`（`.prettierignore` 增加 `**/.sst`），registry `npm run format:check` 转绿。
+- 验证边界：backend `npm test` 762/762、`tsc --noEmit`、改动文件 eslint、`format:check` 全绿；模块 registry↔宿主 `diff -rq` 为空；后端 build + 重启后 `/` 200、Swagger `checkedAt` 描述已更新；宿主 `newbie-modules.json` 已 re-pin 到 `ca83ab1`（`0a78ae1`）。
