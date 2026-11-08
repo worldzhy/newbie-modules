@@ -100,6 +100,12 @@ export class SecurityEvaluationReportService {
     // The aws-account kind is evaluated through a host credential registered
     // at ingest; a subject without the pointer is unevaluable until the host
     // re-submits it with one.
+    //
+    // `unevaluable` means strictly "never bound at ingest". A *dangling*
+    // reference (pointer present, target credential since deleted) is not
+    // counted here: collection resolves the pointer at run time, fails to find
+    // the credential, and accounts the subject in that run's skipped bucket
+    // (SE-CRED-03).
     const unevaluable = subjects.filter(
       (subject) => subject.kind === SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT && !subject.credentialRef,
     ).length;
