@@ -1,10 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "@generated/prisma/client";
 import { ApprovedSubnet } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import anonymize from "ip-anonymize";
-import { APPROVED_SUBNET_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
+import { APPROVED_SUBNET_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { Expose, expose } from "../../helpers/expose";
 import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 import { GeolocationService } from "@modules/audit/helpers/geolocation.service";
@@ -55,7 +55,7 @@ export class ApprovedSubnetService {
     });
     if (!approvedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
     // Defense in depth: the route guard already performed this same check.
-    if (approvedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    if (approvedSubnet.userId !== userId) throw new ForbiddenException("You can only access your own resources.");
     return expose<ApprovedSubnet>(approvedSubnet);
   }
 
@@ -64,7 +64,7 @@ export class ApprovedSubnetService {
       where: { id },
     });
     if (!approvedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
-    if (approvedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    if (approvedSubnet.userId !== userId) throw new ForbiddenException("You can only access your own resources.");
     const deletedSubnet = await this.prisma.approvedSubnet.delete({
       where: { id },
     });

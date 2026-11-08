@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { ApiKey, Prisma } from "@generated/prisma/client";
-import { API_KEY_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
+import { API_KEY_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { generateRandomString } from "@devbie/newbie/utilities/random.util";
 import { generateHash } from "@devbie/newbie/utilities/common.util";
@@ -97,7 +97,7 @@ export class ApiKeyService {
       where: { id },
     });
     if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (apiKey.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    if (apiKey.userId !== userId) throw new ForbiddenException("You can only access your own resources.");
     return apiKey;
   }
 
