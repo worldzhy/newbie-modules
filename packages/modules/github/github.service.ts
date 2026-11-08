@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { Octokit } from "@octokit/rest";
 import { createAppAuth } from "@octokit/auth-app";
 import { delay } from "@devbie/newbie/utilities/delay.util";
+import { decodeBase64Utf8, octokitStatus } from "@devbie/newbie/utilities/octokit.util";
 
 /**
  * Thrown by any API method when the service was constructed without
@@ -27,12 +28,6 @@ export class RepoNameConflictError extends Error {
     super(`Repository ${org}/${name} already exists and is not owned by this provisioning`);
     this.name = "RepoNameConflictError";
   }
-}
-
-// Octokit HTTP errors (RequestError) carry a numeric `status`. Extract it
-// from an unknown thrown value without a bare `any` cast.
-function octokitStatus(error: unknown): number | undefined {
-  return (error as { status?: number }).status;
 }
 
 // Extract the env-var key from a placeholder line. Accepts:
@@ -233,7 +228,7 @@ export class GitHubService {
       if (Array.isArray(data) || data.type !== "file") {
         return null;
       }
-      return { content: Buffer.from(data.content, "base64").toString("utf-8"), sha: data.sha };
+      return { content: decodeBase64Utf8(data.content), sha: data.sha };
     } catch (e: unknown) {
       if (octokitStatus(e) === 404) return null;
       throw e;

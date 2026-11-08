@@ -3,6 +3,7 @@ import { ConfigService } from "@nestjs/config";
 import { Octokit } from "@octokit/rest";
 import { HubModuleRelease, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { decodeBase64Utf8, octokitStatus } from "@devbie/newbie/utilities/octokit.util";
 import { AuditActorType, AuditLogService } from "@modules/audit/audit-log.service";
 
 /** Registry module directory prefix inside the registry monorepo. */
@@ -38,11 +39,6 @@ interface IngestTrigger {
 
 /** Default trigger for the webhook ingestion path. */
 const WEBHOOK_TRIGGER: IngestTrigger = { actorType: AuditActorType.SYSTEM, actorId: "webhook" };
-
-// Octokit request errors carry a numeric `status`.
-function octokitStatus(error: unknown): number | undefined {
-  return (error as { status?: number }).status;
-}
 
 /** The subset of a release row the "latest per module" selection needs. */
 export interface ReleaseOrderingRow {
@@ -314,7 +310,7 @@ export class ModuleHubReleaseService {
       });
       // The contents API returns an array for directories; we only read files.
       if (Array.isArray(data) || data.type !== "file") return null;
-      return JSON.parse(Buffer.from(data.content, "base64").toString("utf-8")) as ManifestShape;
+      return JSON.parse(decodeBase64Utf8(data.content)) as ManifestShape;
     } catch (error: unknown) {
       if (octokitStatus(error) === 404) return null;
       throw error;
