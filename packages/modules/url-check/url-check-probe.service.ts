@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
+import { toClickHouseDateTime } from "@modules/clickhouse/clickhouse-datetime.util";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { assertPublicHttpUrl, assertPubliclyResolvable } from "./public-url";
@@ -44,11 +45,6 @@ interface TargetRow {
   consecutiveSuccesses: number;
   isAlertOpen: boolean;
   alertOpenedAt: Date | null;
-}
-
-/** Formats a JS Date to a ClickHouse DateTime64 string (UTC). */
-function toClickHouseDate(date: Date): string {
-  return date.toISOString().replace("T", " ").replace("Z", "");
 }
 
 /**
@@ -177,7 +173,7 @@ export class UrlCheckProbeService {
             status_code: outcome.statusCode,
             duration_ms: outcome.durationMs,
             error: outcome.error,
-            checked_at: toClickHouseDate(checkedAt),
+            checked_at: toClickHouseDateTime(checkedAt),
           },
         ],
         format: "JSONEachRow",
