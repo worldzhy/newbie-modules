@@ -1,16 +1,14 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import {
-  EvaluationFinding,
-  EvaluationFindingSeverity,
-  EvaluationFindingStatus,
-  EvaluationRun,
-  Prisma,
-} from "@generated/prisma/client";
+import { EvaluationFinding, EvaluationFindingStatus, EvaluationRun, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { EvaluationCriteriaService } from "./evaluation-criteria.service";
 import { EvaluationProviderRegistry } from "./evaluation-provider.registry";
-import { EvaluationFindingCandidate } from "./ports/evaluation.contracts";
+import { toPersistedSeverity } from "./evaluation-severity.mapping";
+import type {
+  EvaluationFindingCandidate,
+  EvaluationFindingSeverity as FindingSeverity,
+} from "./ports/evaluation.contracts";
 import { EvaluationFindingChangedEvent } from "./ports/observer.port";
 import { validateJudgment } from "./evaluation-invariants";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
@@ -27,7 +25,7 @@ export interface ListEvaluationFindingsInput {
   runId?: string;
   evaluationKey?: string;
   status?: EvaluationFindingStatus;
-  severity?: EvaluationFindingSeverity;
+  severity?: FindingSeverity;
   page?: number;
   pageSize?: number;
 }
@@ -239,7 +237,7 @@ export class EvaluationFindingService {
           evaluationKey,
           fingerprint: candidate.fingerprint,
           criterionKey: candidate.criterionKey,
-          severity: candidate.severity,
+          severity: toPersistedSeverity(candidate.severity),
           status: EvaluationFindingStatus.OPEN,
           title: candidate.title,
           detail: candidate.detail,
@@ -283,7 +281,7 @@ export class EvaluationFindingService {
     const reopened = existing.status === EvaluationFindingStatus.RESOLVED;
     const observation = {
       criterionKey: candidate.criterionKey,
-      severity: candidate.severity,
+      severity: toPersistedSeverity(candidate.severity),
       title: candidate.title,
       detail: candidate.detail,
       metadata: candidate.metadata as Prisma.InputJsonValue | undefined,

@@ -4,13 +4,17 @@
  *
  * Everything here is feature-neutral and host-neutral: no host vocabulary. A
  * feature describes its subjects, evidence and judgments in these shapes; the
- * skeleton stores them and enforces the invariants. The finding-severity
- * vocabulary is the persisted Prisma enum so there is a single definition.
+ * skeleton stores them and enforces the invariants.
  */
 
-import type { EvaluationFindingSeverity } from "@generated/prisma/client";
-
-export type { EvaluationFindingSeverity };
+/**
+ * The finding-severity vocabulary (ADR-020 D4). This union is the type source
+ * of truth: features and the judgment layer name severities without touching
+ * persistence. The stored Prisma enum mirrors these values; the evaluation
+ * module maps between the two at the Prisma boundary
+ * (evaluation-severity.mapping.ts) and a test asserts they cannot drift.
+ */
+export type EvaluationFindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 /** The host-assigned coordinate that bounds a subject listing (ADR-020 D1). */
 export interface EvaluationScope {

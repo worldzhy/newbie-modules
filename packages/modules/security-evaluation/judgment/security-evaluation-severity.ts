@@ -1,4 +1,4 @@
-import type { EvaluationFindingSeverity } from "@generated/prisma/client";
+import type { EvaluationFindingSeverity } from "@modules/evaluation/ports/evaluation.contracts";
 
 /** Severity values accepted by the evaluation skeleton (ADR-020 D2). */
 export type SecurityEvaluationFindingSeverity = EvaluationFindingSeverity;
