@@ -99,7 +99,7 @@ export interface NotifyInput {
    * endpoint. Internal job callers omit it because they act on behalf of the
    * platform and target projects directly.
    */
-  visibleProjectIds?: string[] | "all";
+  visibleProjectIds?: string[];
 }
 
 export interface NotifyResult {
@@ -371,7 +371,7 @@ export class NotificationCenterService {
 
   async list(
     userId: string,
-    visibleProjectIds: string[] | "all",
+    visibleProjectIds: string[],
     query: ListNotificationsRequestDto,
   ): Promise<ListNotificationsResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
@@ -409,7 +409,7 @@ export class NotificationCenterService {
     return result as unknown as ListNotificationsResponseDto;
   }
 
-  async unreadCount(userId: string, visibleProjectIds: string[] | "all"): Promise<UnreadCountResponseDto> {
+  async unreadCount(userId: string, visibleProjectIds: string[]): Promise<UnreadCountResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
     const count = await this.prisma.notificationRecord.count({
       where: {
@@ -421,11 +421,7 @@ export class NotificationCenterService {
     return { count };
   }
 
-  async markRead(
-    userId: string,
-    id: string,
-    visibleProjectIds: string[] | "all",
-  ): Promise<MarkNotificationReadResponseDto> {
+  async markRead(userId: string, id: string, visibleProjectIds: string[]): Promise<MarkNotificationReadResponseDto> {
     // Scope the lookup exactly like list/unreadCount: a record outside the
     // caller's visible projects must read as not-found, not be marked read.
     const record = await this.prisma.notificationRecord.findFirst({
@@ -442,7 +438,7 @@ export class NotificationCenterService {
     return { read: true };
   }
 
-  async markAllRead(userId: string, visibleProjectIds: string[] | "all"): Promise<MarkAllNotificationsReadResponseDto> {
+  async markAllRead(userId: string, visibleProjectIds: string[]): Promise<MarkAllNotificationsReadResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
     const unread = await this.prisma.notificationRecord.findMany({
       where: {
@@ -517,18 +513,15 @@ export class NotificationCenterService {
   /**
    * Project-scoped rows are visible only to members of that project. System
    * rows (projectId = null) stay platform-wide. The caller's scope is resolved
-   * by the controller and passed in; "all" is the host saying "every project".
+   * by the controller and passed in; an empty scope keeps only system rows.
    */
-  private buildProjectVisibilityWhere(visible: string[] | "all"): Prisma.NotificationRecordWhereInput | undefined {
-    if (visible === "all") {
-      return undefined;
-    }
+  private buildProjectVisibilityWhere(visible: string[]): Prisma.NotificationRecordWhereInput {
     return { OR: [{ projectId: null }, { projectId: { in: visible } }] };
   }
 
   // Reject a client-supplied projectId that the caller cannot see.
-  private assertProjectVisible(visible: string[] | "all", projectId: string): void {
-    if (visible === "all" || visible.includes(projectId)) return;
+  private assertProjectVisible(visible: string[], projectId: string): void {
+    if (visible.includes(projectId)) return;
     throw new ForbiddenException(`Project not visible to the caller: ${projectId}`);
   }
 

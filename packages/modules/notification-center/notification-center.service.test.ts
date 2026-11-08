@@ -50,3 +50,13 @@ test("notify stays platform-wide when no scope is supplied by the caller", async
   await assert.rejects(service.notify({ notificationKey: "k", projectId: "p9" }), NotFoundException);
   assert.equal(state.settingQueried, true);
 });
+
+test("an empty resolved scope rejects every project instead of widening to all", async () => {
+  const state = { settingQueried: false };
+  const service = newService(state);
+  await assert.rejects(
+    service.notify({ notificationKey: "k", projectId: "p1", visibleProjectIds: [] }),
+    ForbiddenException,
+  );
+  assert.equal(state.settingQueried, false);
+});

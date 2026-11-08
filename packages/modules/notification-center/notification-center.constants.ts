@@ -37,8 +37,8 @@ export const NOTIFICATION_PUSH_PORT = "NOTIFICATION_PUSH_PORT";
 export const NOTIFICATION_VISIBILITY_PORT = "NOTIFICATION_VISIBILITY_PORT";
 
 export interface NotificationVisibilityPort {
-  /** Return "all" when the user may see notifications of every project. */
-  visibleProjectIds(userId: string): Promise<string[] | "all">;
+  /** Project ids the caller is a member of. An empty array means "none". */
+  visibleProjectIds(userId: string): Promise<string[]>;
 }
 
 // Postgres unique violation code, used to treat concurrent declaration of the
