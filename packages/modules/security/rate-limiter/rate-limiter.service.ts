@@ -17,6 +17,9 @@ export interface RateLimiterStore {
   delete(key: string): Promise<unknown>;
 }
 
+/** How often a degraded limiter re-tries Redis instead of the local bucket. */
+const DEFAULT_RECOVERY_PROBE_INTERVAL_MS = 30_000;
+
 function createRedisStore(redisService: RedisService, options: RateLimiterOptions): RateLimiterStore | null {
   return redisService.isConfigured()
     ? new RateLimiterRedis({ storeClient: redisService.getClient(), ...options })
@@ -29,17 +32,32 @@ function createRedisStore(redisService: RedisService, options: RateLimiterOption
  *
  * The Redis connection is created with `enableOfflineQueue: false`, so a blip
  * rejects commands immediately. Rather than letting that rejection reach the
- * global filter as a 500, a failure logs once per instance and the operation
- * fails open.
+ * global filter as a 500 — or disabling enforcement for the whole outage — the
+ * first rejection demotes the instance to its in-memory bucket, which keeps
+ * enforcing the same quota locally. Every `recoveryProbeIntervalMs` the
+ * instance retries Redis; a successful probe promotes it back (dropping the
+ * local counters) with both transitions logged.
+ *
+ * Trade-off: while degraded the quota is per process instead of shared, the
+ * local bucket starts empty, and the pre-outage counters are not carried over.
+ * A multi-instance outage therefore admits up to points * instances attempts
+ * instead of one global budget, which is still bounded.
  */
 export class RateLimiter {
   private readonly logger: Logger;
-  private readonly primary: RateLimiterStore;
+  private fallback: RateLimiterStore;
   private degraded = false;
+  private nextProbeAt = 0;
 
-  constructor(options: RateLimiterOptions, primary: RateLimiterStore | null, context = RateLimiter.name) {
+  constructor(
+    private readonly options: RateLimiterOptions,
+    private readonly primary: RateLimiterStore | null,
+    context = RateLimiter.name,
+    private readonly recoveryProbeIntervalMs = DEFAULT_RECOVERY_PROBE_INTERVAL_MS,
+    fallback?: RateLimiterStore,
+  ) {
     this.logger = new Logger(context);
-    this.primary = primary ?? new RateLimiterMemory(options);
+    this.fallback = fallback ?? new RateLimiterMemory(options);
   }
 
   /** Build a limiter backed by the shared Redis connection when configured. */
@@ -48,14 +66,16 @@ export class RateLimiter {
   }
 
   async isAllowed(key: string): Promise<boolean> {
-    try {
-      const res = await this.primary.get(key);
-      this.recovered();
-      return !res ? true : res.remainingPoints > 0;
-    } catch (error) {
-      this.degradedTo(error);
-      return true;
+    if (this.shouldUsePrimary()) {
+      try {
+        const res = await this.primary!.get(key);
+        this.recovered();
+        return !res ? true : res.remainingPoints > 0;
+      } catch (error) {
+        this.degradedTo(error);
+      }
     }
+    return this.isAllowedLocally(key);
   }
 
   /**
@@ -64,16 +84,17 @@ export class RateLimiter {
    * same resilience behaviour.
    */
   async spend(key: string): Promise<number> {
-    try {
-      const res = await this.primary.consume(key);
-      this.recovered();
-      return res.remainingPoints;
-    } catch (error) {
-      this.degradedTo(error);
-      // The backend cannot be read, so the spent point is unknown; report an
-      // unbounded budget rather than inventing a value.
-      return Number.POSITIVE_INFINITY;
+    if (this.shouldUsePrimary()) {
+      try {
+        const res = await this.primary!.consume(key);
+        this.recovered();
+        return res.remainingPoints;
+      } catch (error) {
+        this.degradedTo(error);
+      }
     }
+    const res = await this.fallback.consume(key);
+    return res.remainingPoints;
   }
 
   async increment(key: string): Promise<void> {
@@ -81,26 +102,43 @@ export class RateLimiter {
   }
 
   async delete(key: string): Promise<void> {
-    try {
-      await this.primary.delete(key);
-      this.recovered();
-    } catch (error) {
-      this.degradedTo(error);
+    if (this.shouldUsePrimary()) {
+      try {
+        await this.primary!.delete(key);
+        this.recovered();
+      } catch (error) {
+        this.degradedTo(error);
+      }
     }
+    await this.fallback.delete(key);
+  }
+
+  private async isAllowedLocally(key: string): Promise<boolean> {
+    const res = await this.fallback.get(key);
+    return !res ? true : res.remainingPoints > 0;
+  }
+
+  private shouldUsePrimary(): boolean {
+    return this.primary !== null && (!this.degraded || Date.now() >= this.nextProbeAt);
   }
 
   private degradedTo(error: unknown): void {
+    this.nextProbeAt = Date.now() + this.recoveryProbeIntervalMs;
     if (this.degraded) return;
     this.degraded = true;
     this.logger.warn(
-      `Rate limiter backend unavailable; allowing requests until it recovers: ${getErrorMessage(error)}`,
+      `Rate limiter backend unavailable; enforcing this instance's limits with the in-memory bucket until it recovers: ${getErrorMessage(error)}`,
     );
   }
 
   private recovered(): void {
     if (!this.degraded) return;
     this.degraded = false;
-    this.logger.log("Rate limiter backend recovered; enforcing limits again.");
+    this.nextProbeAt = 0;
+    // Redis is authoritative again: drop the locally gathered counters so a
+    // later outage cannot inherit an already-spent local budget.
+    this.fallback = new RateLimiterMemory(this.options);
+    this.logger.log("Rate limiter backend recovered; enforcing limits on the shared Redis buckets again.");
   }
 }
 
