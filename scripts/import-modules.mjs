@@ -192,7 +192,6 @@ const MODULES = [
     settings: false,
   },
   { key: "tencent-cos", file: "tencent-cos", className: "TencentCosModule" },
-  { key: "webhook", file: "webhook", className: "WebhookModule" },
   {
     key: "workflow",
     file: "workflow",
