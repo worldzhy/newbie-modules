@@ -10,6 +10,7 @@ import {
 import { EvaluationRun, EvaluationRunStatus, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
+import { ACTIVE_RUN_STATUSES } from "./evaluation.constants";
 import { EvaluationProviderRegistry } from "./evaluation-provider.registry";
 import { EvaluationSubjectRef } from "./ports/evaluation.contracts";
 import { toSubjectRef } from "./evaluation-subject.service";
@@ -60,8 +61,6 @@ export const STALE_RUN_ERROR = "Run abandoned: no progress within the timeout wi
 export function formatRunError(error: unknown): string {
   return describeError(error).slice(0, MAX_ERROR_LENGTH);
 }
-
-const ACTIVE_STATUSES: EvaluationRunStatus[] = [EvaluationRunStatus.QUEUED, EvaluationRunStatus.RUNNING];
 
 export interface StartEvaluationRunInput {
   subjectId: string;
@@ -163,7 +162,7 @@ export class EvaluationRunService {
   /** Terminal success. The result row is written before this is called. */
   async markSucceeded(id: string): Promise<void> {
     const updated = await this.prisma.evaluationRun.updateMany({
-      where: { id, status: { in: ACTIVE_STATUSES } },
+      where: { id, status: { in: ACTIVE_RUN_STATUSES } },
       data: { status: EvaluationRunStatus.SUCCEEDED, finishedAt: new Date() },
     });
     if (updated.count === 0) await this.assertStillActive(id, "succeeded");
@@ -172,7 +171,7 @@ export class EvaluationRunService {
   /** Terminal failure; the reason is what the caller sees in the run history. */
   async markFailed(id: string, error: unknown): Promise<void> {
     const updated = await this.prisma.evaluationRun.updateMany({
-      where: { id, status: { in: ACTIVE_STATUSES } },
+      where: { id, status: { in: ACTIVE_RUN_STATUSES } },
       data: {
         status: EvaluationRunStatus.FAILED,
         error: formatRunError(error),
@@ -197,7 +196,7 @@ export class EvaluationRunService {
   /** Heartbeat: prove the process is alive without touching the state machine. */
   async touch(id: string): Promise<void> {
     await this.prisma.evaluationRun.updateMany({
-      where: { id, status: { in: ACTIVE_STATUSES } },
+      where: { id, status: { in: ACTIVE_RUN_STATUSES } },
       data: { updatedAt: new Date() },
     });
   }
@@ -211,7 +210,7 @@ export class EvaluationRunService {
   async assertActive(id: string, startedAt: Date | null): Promise<void> {
     const run = await this.prisma.evaluationRun.findUnique({ where: { id } });
     if (!run) throw new NotFoundException(`Evaluation run ${id} not found`);
-    if (!ACTIVE_STATUSES.includes(run.status)) {
+    if (!ACTIVE_RUN_STATUSES.includes(run.status)) {
       throw new ConflictException(
         `Evaluation run ${id} is no longer active (status ${run.status}) — superseded or reaped as stale`,
       );
@@ -305,13 +304,13 @@ export class EvaluationRunService {
   async reapStaleRuns(): Promise<EvaluationRun[]> {
     const cutoff = new Date(Date.now() - this.staleRunTimeoutMs);
     const candidates = await this.prisma.evaluationRun.findMany({
-      where: { status: { in: ACTIVE_STATUSES }, updatedAt: { lt: cutoff } },
+      where: { status: { in: ACTIVE_RUN_STATUSES }, updatedAt: { lt: cutoff } },
     });
     const reaped: EvaluationRun[] = [];
     for (const candidate of candidates) {
       const finishedAt = new Date();
       const updated = await this.prisma.evaluationRun.updateMany({
-        where: { id: candidate.id, status: { in: ACTIVE_STATUSES }, updatedAt: candidate.updatedAt },
+        where: { id: candidate.id, status: { in: ACTIVE_RUN_STATUSES }, updatedAt: candidate.updatedAt },
         data: { status: EvaluationRunStatus.FAILED, error: STALE_RUN_ERROR, finishedAt },
       });
       if (updated.count === 1) {
