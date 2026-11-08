@@ -8,6 +8,11 @@
   },
   "requires": {
     "modules": ["security"],
+    "config": {
+      "aws-identity": {
+        "platformAccountId": "process.env.AWS_PLATFORM_ACCOUNT_ID"
+      }
+    },
     "env": {
       "AWS_PLATFORM_ACCOUNT_ID": ""
     },

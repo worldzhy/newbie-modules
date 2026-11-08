@@ -7,6 +7,7 @@ import {
   Injectable,
   Logger,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCrossAccountBinding } from "@generated/prisma/client";
@@ -60,7 +61,10 @@ export class AwsCredentialsService {
   private readonly defaultCredentialsProvider: AwsCredentialsProvider = defaultProvider();
   private defaultIdentityPromise: Promise<string | null> | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Host default credentials (SDK default credential chain). All default
@@ -486,12 +490,15 @@ export class AwsCredentialsService {
   }
 
   private async resolveDefaultAccountId(): Promise<string | null> {
-    // The platform account ID is a static value. Prefer an explicit env var so
-    // the backend does not need AWS credentials (or a successful STS call) just
-    // to know its own account ID. Falls back to sts:GetCallerIdentity when unset.
-    const fromEnv = process.env.AWS_PLATFORM_ACCOUNT_ID?.trim();
-    if (fromEnv) {
-      return fromEnv;
+    // The platform account ID is a static value. Prefer an explicit config
+    // value so the backend does not need AWS credentials (or a successful STS
+    // call) just to know its own account ID. Falls back to
+    // sts:GetCallerIdentity when unset.
+    const fromConfig = this.configService
+      .get<{ platformAccountId?: string }>("modules.aws-identity")
+      ?.platformAccountId?.trim();
+    if (fromConfig) {
+      return fromConfig;
     }
     if (!this.defaultIdentityPromise) {
       this.defaultIdentityPromise = getDefaultCallerIdentity(this.defaultCredentialsProvider)
