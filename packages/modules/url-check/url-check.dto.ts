@@ -155,8 +155,11 @@ export class UrlCheckResultDto {
   @ApiProperty({ description: "Failure detail; empty on success and on HTTP >= 400" })
   error!: string;
 
-  @ApiProperty({ description: "When the probe ran (ISO)", type: Date })
-  checkedAt!: Date;
+  @ApiProperty({
+    description: "When the probe ran (ISO-8601, UTC)",
+    example: "2026-11-08T11:52:00.080Z",
+  })
+  checkedAt!: string;
 }
 
 export class DeleteUrlCheckTargetResponseDto {

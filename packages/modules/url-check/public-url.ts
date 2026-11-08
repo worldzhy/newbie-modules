@@ -66,10 +66,22 @@ export function isBlockedAddress(rawAddress: string): boolean {
     const normalized = rawAddress.toLowerCase();
     if (normalized === "::" || normalized === "::1") return true;
     // IPv4-mapped IPv6 ("::ffff:127.0.0.1") is judged by the embedded IPv4.
-    // Both the compressed and the expanded form occur in the wild.
     for (const prefix of ["::ffff:", "0:0:0:0:0:ffff:"]) {
       if (normalized.startsWith(prefix)) {
-        return isBlockedAddress(normalized.slice(prefix.length));
+        const embedded = normalized.slice(prefix.length);
+        if (isIP(embedded) === 4) return isBlockedAddress(embedded);
+        // WHATWG URL rewrites a dotted mapped address into hex
+        // ("::ffff:127.0.0.1" becomes "::ffff:7f00:1"), so reconstruct the
+        // embedded IPv4 from the trailing two hextets before judging it.
+        const hextets = embedded.split(":");
+        if (hextets.length === 2) {
+          const high = parseInt(hextets[0] || "0", 16);
+          const low = parseInt(hextets[1] || "0", 16);
+          if (Number.isInteger(high) && Number.isInteger(low)) {
+            return isBlockedAddress(`${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`);
+          }
+        }
+        return true;
       }
     }
     const firstHextet = parseInt(normalized.split(":")[0] || "0", 16);

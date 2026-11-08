@@ -2,5 +2,7 @@ dist
 .next
 coverage
 node_modules
+# SST platform scaffolding generated at deploy time
+**/.sst
 # Agent working documents (Chinese by policy); never shipped with packages
 .trae

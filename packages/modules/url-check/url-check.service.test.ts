@@ -419,15 +419,20 @@ test("listCheckResults applies the default limit and clamps oversized/zero/negat
   }
 });
 
-test("listCheckResults binds the target id as a typed query parameter", async () => {
+test("listCheckResults binds the target id and returns the UTC timestamp as ISO-8601", async () => {
   const harness = createHarness({
     targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
   });
-  harness.queueClickhouseRows([{ isUp: true, statusCode: 200, durationMs: 12, error: "", checkedAt: "x" }]);
+  // Exactly what ClickHouse JSONEachRow emits for DateTime64(3, 'UTC').
+  harness.queueClickhouseRows([
+    { isUp: true, statusCode: 200, durationMs: 12, error: "", checkedAt: "2026-11-08 11:52:00.080" },
+  ]);
 
   const rows = await harness.service.listCheckResults(TARGET_ID);
 
   assert.equal(rows.length, 1);
+  assert.equal(rows[0].checkedAt, "2026-11-08T11:52:00.080Z");
+  assert.equal(new Date(rows[0].checkedAt).toISOString(), "2026-11-08T11:52:00.080Z");
   const { query, query_params } = harness.queries[0];
   assert.match(query, /FROM url_check_results/);
   assert.match(query, /WHERE target_id = \{targetId: UUID\}/);

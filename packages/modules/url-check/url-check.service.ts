@@ -19,6 +19,9 @@ const MAX_RESULT_LIMIT = 200;
 
 type StatsWindow = "24h" | "7d" | "30d";
 
+/** ClickHouse JSONEachRow shape of a probe row, before API-side normalization. */
+type RawCheckResultRow = Omit<UrlCheckResultDto, "checkedAt"> & { checkedAt: string };
+
 const STATS_WINDOW_HOURS: Record<StatsWindow, number> = { "24h": 24, "7d": 168, "30d": 720 };
 
 // Bucket granularity per window, aiming at roughly 24-30 chart points. The
@@ -126,7 +129,14 @@ export class UrlCheckService {
       query_params: { targetId, limit },
       format: "JSONEachRow",
     });
-    return (await result.json()) as UrlCheckResultDto[];
+    const rows = (await result.json()) as RawCheckResultRow[];
+    // ClickHouse JSONEachRow renders DateTime64 as "YYYY-MM-DD HH:MM:SS.mmm"
+    // in UTC. The API contract is ISO-8601, so the wire value must carry T/Z —
+    // otherwise consumers parse it as local time and shift the clock.
+    return rows.map((row) => ({
+      ...row,
+      checkedAt: new Date(`${row.checkedAt.replace(" ", "T")}Z`).toISOString(),
+    }));
   }
 
   /** Outage incidents of one target, newest first. */
