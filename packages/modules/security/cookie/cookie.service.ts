@@ -10,6 +10,11 @@ export enum CookieName {
   GOOGLE_OAUTH_STATE = "googleOAuthState",
   // Short-lived state binding the Lark OAuth start and callback requests.
   LARK_OAUTH_STATE = "larkOAuthState",
+  // Nonce echoed in the final redirect's URL hash and verified by the frontend
+  // landing page, binding the handed-over session to this browser.
+  OAUTH_CALLBACK_PROOF = "oauthCallbackProof",
+  // Post-login destination carried across the OAuth handshake.
+  OAUTH_REDIRECT_URL = "oauthRedirectUrl",
 }
 
 @Injectable()
@@ -47,8 +52,42 @@ export class CookieService {
     };
   }
 
-  /** Expire the state cookie once the OAuth callback has been verified. */
-  clearOAuthState(name: CookieName, response: Response) {
+  /**
+   * Build the proof cookie for the last hop of an OAuth handshake. The callback
+   * mints a random value, stores it here and echoes it in the redirect hash; the
+   * frontend adopts the session only when the two match. A callback URL replayed
+   * from another browser (login CSRF) carries a proof that this browser never
+   * received. The cookie must be readable by the frontend, so it is not
+   * httpOnly; the value is single-use and grants nothing by itself.
+   */
+  generateForOAuthCallbackProof(proof: string) {
+    return {
+      name: CookieName.OAUTH_CALLBACK_PROOF,
+      value: proof,
+      options: {
+        ...this.defaultCookieOptions(),
+        httpOnly: false,
+        sameSite: "lax" as const,
+        maxAge: 10 * 60 * 1000,
+      },
+    };
+  }
+
+  /** Build the cookie holding where to send the user after a successful login. */
+  generateForOAuthRedirect(redirectUrl: string) {
+    return {
+      name: CookieName.OAUTH_REDIRECT_URL,
+      value: redirectUrl,
+      options: {
+        ...this.defaultCookieOptions(),
+        sameSite: "lax" as const,
+        maxAge: 10 * 60 * 1000,
+      },
+    };
+  }
+
+  /** Expire a single-use OAuth cookie once it has been consumed. */
+  clearOAuthCookie(name: CookieName, response: Response) {
     response.cookie(name, "", {
       ...this.defaultCookieOptions(),
       sameSite: "lax" as const,

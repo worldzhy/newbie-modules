@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { GuardType } from "../guard.types";
 import { CookieName, CookieService } from "../../cookie/cookie.service";
+import { isSafeRedirectPath } from "../../cookie/redirect-path";
 
 @Injectable()
 export class GoogleAuthGuard extends AuthGuard(GuardType.GOOGLE) {
@@ -27,7 +28,7 @@ export class GoogleAuthGuard extends AuthGuard(GuardType.GOOGLE) {
       }
       // State verified — consume the single-use cookie so the handshake
       // cannot be replayed. A failed verification keeps the cookie intact.
-      this.cookieService.clearOAuthState(CookieName.GOOGLE_OAUTH_STATE, response);
+      this.cookieService.clearOAuthCookie(CookieName.GOOGLE_OAUTH_STATE, response);
     }
 
     return super.canActivate(context);
@@ -49,6 +50,19 @@ export class GoogleAuthGuard extends AuthGuard(GuardType.GOOGLE) {
     const state = randomUUID();
     const stateCookie = this.cookieService.generateForOAuthState(CookieName.GOOGLE_OAUTH_STATE, state);
     response.cookie(stateCookie.name, stateCookie.value, stateCookie.options);
+
+    // Remember where the user was before being bounced to login so the callback
+    // can send them back there. Only same-origin relative paths are stored;
+    // a handshake started without one clears any stale destination left by an
+    // earlier attempt.
+    const redirectUrl = request.query.redirectUrl;
+    if (isSafeRedirectPath(redirectUrl)) {
+      const redirectCookie = this.cookieService.generateForOAuthRedirect(redirectUrl);
+      response.cookie(redirectCookie.name, redirectCookie.value, redirectCookie.options);
+    } else {
+      this.cookieService.clearOAuthCookie(CookieName.OAUTH_REDIRECT_URL, response);
+    }
+
     return { state, session: false };
   }
 
