@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, Inject, Param, Post, Put, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
@@ -6,6 +6,7 @@ import { RequireOwner } from "@modules/security/authorization/require-owner.deco
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { NotificationCenterService, NotifyInput, NotifyResult } from "./notification-center.service";
 import { NotificationSettingService } from "./notification-setting.service";
+import { NOTIFICATION_VISIBILITY_PORT, NotificationVisibilityPort } from "./notification-center.constants";
 import {
   ListNotificationsRequestDto,
   ListNotificationsResponseDto,
@@ -33,6 +34,8 @@ export class NotificationCenterController {
   constructor(
     private readonly notificationCenter: NotificationCenterService,
     private readonly notificationSettings: NotificationSettingService,
+    @Inject(NOTIFICATION_VISIBILITY_PORT)
+    private readonly projectVisibility: NotificationVisibilityPort,
   ) {}
 
   // --- Notification delivery ----------------------------------------------
@@ -41,8 +44,13 @@ export class NotificationCenterController {
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.NotificationRecord)
   @ApiOperation({ summary: "Deliver a notification from a registered notification" })
   @ApiResponse({ status: 201, type: NotifyResultDto })
-  notify(@Req() req: AuthenticatedRequest, @Body() body: NotifyDto): Promise<NotifyResult> {
-    return this.notificationCenter.notify({ ...body, actorUserId: req.user.userId } as NotifyInput);
+  async notify(@Req() req: AuthenticatedRequest, @Body() body: NotifyDto): Promise<NotifyResult> {
+    // Permission is resolved here: the service only receives the scope. Skipped
+    // for platform-scoped deliveries that carry no projectId.
+    const visibleProjectIds = body.projectId
+      ? await this.projectVisibility.visibleProjectIds(req.user.userId)
+      : undefined;
+    return this.notificationCenter.notify({ ...body, visibleProjectIds } as NotifyInput);
   }
 
   // --- Notification reads -------------------------------------------------
@@ -51,38 +59,42 @@ export class NotificationCenterController {
   @RequireOwner()
   @ApiOperation({ summary: "List notifications for the current user (newest first)" })
   @ApiResponse({ status: 200, type: ListNotificationsResponseDto })
-  list(
+  async list(
     @Req() req: AuthenticatedRequest,
     @Query() query: ListNotificationsRequestDto,
   ): Promise<ListNotificationsResponseDto> {
-    return this.notificationCenter.list(req.user.userId, query);
+    const visibleProjectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    return this.notificationCenter.list(req.user.userId, visibleProjectIds, query);
   }
 
   @Get("notifications/unread-count")
   @RequireOwner()
   @ApiOperation({ summary: "Count unread notifications for the current user" })
   @ApiResponse({ status: 200, type: UnreadCountResponseDto })
-  unreadCount(@Req() req: AuthenticatedRequest): Promise<UnreadCountResponseDto> {
-    return this.notificationCenter.unreadCount(req.user.userId);
+  async unreadCount(@Req() req: AuthenticatedRequest): Promise<UnreadCountResponseDto> {
+    const visibleProjectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    return this.notificationCenter.unreadCount(req.user.userId, visibleProjectIds);
   }
 
   @Post("notifications/:id/read")
   @RequireOwner()
   @ApiOperation({ summary: "Mark one notification as read for the current user" })
   @ApiResponse({ status: 200, type: MarkNotificationReadResponseDto })
-  markRead(
+  async markRead(
     @Req() req: AuthenticatedRequest,
     @Param() params: CommonGetByStringIdRequestDto,
   ): Promise<MarkNotificationReadResponseDto> {
-    return this.notificationCenter.markRead(req.user.userId, params.id);
+    const visibleProjectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    return this.notificationCenter.markRead(req.user.userId, params.id, visibleProjectIds);
   }
 
   @Post("notifications/read-all")
   @RequireOwner()
   @ApiOperation({ summary: "Mark every visible notification as read for the current user" })
   @ApiResponse({ status: 200, type: MarkAllNotificationsReadResponseDto })
-  markAllRead(@Req() req: AuthenticatedRequest): Promise<MarkAllNotificationsReadResponseDto> {
-    return this.notificationCenter.markAllRead(req.user.userId);
+  async markAllRead(@Req() req: AuthenticatedRequest): Promise<MarkAllNotificationsReadResponseDto> {
+    const visibleProjectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    return this.notificationCenter.markAllRead(req.user.userId, visibleProjectIds);
   }
 
   // --- Per-notification settings -------------------------------------------

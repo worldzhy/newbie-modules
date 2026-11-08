@@ -14,8 +14,6 @@ import {
   DEFAULT_MINIMUM_SEVERITY,
   DEFAULT_PUSH_ENABLED,
   NOTIFICATION_PUSH_PORT,
-  NOTIFICATION_VISIBILITY_PORT,
-  NotificationVisibilityPort,
   PG_UNIQUE_VIOLATION,
   SEVERITIES,
   SEVERITY_LEVEL,
@@ -97,10 +95,11 @@ export interface NotifyInput {
    */
   recoveredAt?: Date;
   /**
-   * Caller identity for the HTTP delivery endpoint. Set only by the controller;
-   * internal job callers omit it because they act on behalf of the platform.
+   * Project scope resolved by the calling controller for the HTTP delivery
+   * endpoint. Internal job callers omit it because they act on behalf of the
+   * platform and target projects directly.
    */
-  actorUserId?: string;
+  visibleProjectIds?: string[] | "all";
 }
 
 export interface NotifyResult {
@@ -140,9 +139,6 @@ export class NotificationCenterService {
     @Optional()
     @Inject(NOTIFICATION_PUSH_PORT)
     private readonly pushPort?: NotificationPushPort,
-    @Optional()
-    @Inject(NOTIFICATION_VISIBILITY_PORT)
-    private readonly visibilityPort?: NotificationVisibilityPort,
   ) {}
 
   // --- Delivery ------------------------------------------------------------
@@ -164,8 +160,8 @@ export class NotificationCenterService {
     // The HTTP delivery endpoint accepts a client-supplied projectId: it must
     // be the caller's own project, otherwise a permission holder could inject
     // notifications into an unrelated project (R5-P2-02).
-    if (input.actorUserId && input.projectId) {
-      await this.assertProjectVisible(input.actorUserId, input.projectId);
+    if (input.projectId && input.visibleProjectIds) {
+      this.assertProjectVisible(input.visibleProjectIds, input.projectId);
     }
     // Links are rendered as an anchor in the frontend; only site-relative
     // paths and http(s) URLs are allowed so a stored `javascript:` link can
@@ -373,9 +369,13 @@ export class NotificationCenterService {
 
   // --- Notification reads --------------------------------------------------
 
-  async list(userId: string, query: ListNotificationsRequestDto): Promise<ListNotificationsResponseDto> {
+  async list(
+    userId: string,
+    visibleProjectIds: string[] | "all",
+    query: ListNotificationsRequestDto,
+  ): Promise<ListNotificationsResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
-    const projectVisibility = await this.buildProjectVisibilityWhere(userId);
+    const projectVisibility = this.buildProjectVisibilityWhere(visibleProjectIds);
     const unreadOnly = query.unreadOnly === "true";
     const notificationKeys = query.notificationKeys
       ?.split(",")
@@ -409,23 +409,27 @@ export class NotificationCenterService {
     return result as unknown as ListNotificationsResponseDto;
   }
 
-  async unreadCount(userId: string): Promise<UnreadCountResponseDto> {
+  async unreadCount(userId: string, visibleProjectIds: string[] | "all"): Promise<UnreadCountResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
     const count = await this.prisma.notificationRecord.count({
       where: {
         createdAt: { gte: visibleSince },
-        ...(await this.buildProjectVisibilityWhere(userId)),
+        ...this.buildProjectVisibilityWhere(visibleProjectIds),
         receipts: { none: { userId } },
       },
     });
     return { count };
   }
 
-  async markRead(userId: string, id: string): Promise<MarkNotificationReadResponseDto> {
+  async markRead(
+    userId: string,
+    id: string,
+    visibleProjectIds: string[] | "all",
+  ): Promise<MarkNotificationReadResponseDto> {
     // Scope the lookup exactly like list/unreadCount: a record outside the
     // caller's visible projects must read as not-found, not be marked read.
     const record = await this.prisma.notificationRecord.findFirst({
-      where: { id, ...(await this.buildProjectVisibilityWhere(userId)) },
+      where: { id, ...this.buildProjectVisibilityWhere(visibleProjectIds) },
     });
     if (!record) {
       throw new NotFoundException(`Notification not found: ${id}`);
@@ -438,12 +442,12 @@ export class NotificationCenterService {
     return { read: true };
   }
 
-  async markAllRead(userId: string): Promise<MarkAllNotificationsReadResponseDto> {
+  async markAllRead(userId: string, visibleProjectIds: string[] | "all"): Promise<MarkAllNotificationsReadResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
     const unread = await this.prisma.notificationRecord.findMany({
       where: {
         createdAt: { gte: visibleSince },
-        ...(await this.buildProjectVisibilityWhere(userId)),
+        ...this.buildProjectVisibilityWhere(visibleProjectIds),
         receipts: { none: { userId } },
       },
       select: { id: true },
@@ -512,26 +516,18 @@ export class NotificationCenterService {
 
   /**
    * Project-scoped rows are visible only to members of that project. System
-   * rows (projectId = null) stay platform-wide. When the host supplies no
-   * visibility port, records remain platform-wide (legacy behavior for hosts
-   * that do not scope notifications by project).
+   * rows (projectId = null) stay platform-wide. The caller's scope is resolved
+   * by the controller and passed in; "all" is the host saying "every project".
    */
-  private async buildProjectVisibilityWhere(userId: string): Promise<Prisma.NotificationRecordWhereInput | undefined> {
-    if (!this.visibilityPort) {
-      return undefined;
-    }
-    const visible = await this.visibilityPort.visibleProjectIds(userId);
+  private buildProjectVisibilityWhere(visible: string[] | "all"): Prisma.NotificationRecordWhereInput | undefined {
     if (visible === "all") {
       return undefined;
     }
     return { OR: [{ projectId: null }, { projectId: { in: visible } }] };
   }
 
-  // Reject a client-supplied projectId that the caller cannot see. Hosts without
-  // a visibility port keep the legacy platform-wide behavior.
-  private async assertProjectVisible(userId: string, projectId: string): Promise<void> {
-    if (!this.visibilityPort) return;
-    const visible = await this.visibilityPort.visibleProjectIds(userId);
+  // Reject a client-supplied projectId that the caller cannot see.
+  private assertProjectVisible(visible: string[] | "all", projectId: string): void {
     if (visible === "all" || visible.includes(projectId)) return;
     throw new ForbiddenException(`Project not visible to the caller: ${projectId}`);
   }
