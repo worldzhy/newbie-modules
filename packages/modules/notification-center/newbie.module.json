@@ -7,6 +7,6 @@
     "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
-    "modules": ["security"]
+    "modules": ["security", "evaluation"]
   }
 }
