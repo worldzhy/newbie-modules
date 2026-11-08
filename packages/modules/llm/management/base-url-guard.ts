@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { promises as dns } from "node:dns";
 import { BlockList, isIP } from "node:net";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /**
  * SSRF guard for administrator-supplied LLM endpoints (R20-37). The base URL
@@ -73,9 +74,7 @@ export async function assertSafeBaseUrl(rawUrl: string): Promise<void> {
   try {
     addresses = await dns.lookup(hostname, { all: true });
   } catch (error) {
-    throw new BadRequestException(
-      `LLM base URL host cannot be resolved: ${hostname} (${error instanceof Error ? error.message : String(error)})`,
-    );
+    throw new BadRequestException(`LLM base URL host cannot be resolved: ${hostname} (${getErrorMessage(error)})`);
   }
   const blocked = addresses.find(({ address }) => !isPublicAddress(address));
   if (blocked) {

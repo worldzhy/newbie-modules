@@ -4,6 +4,8 @@
  * fake Redis instead of a text assertion over the service source (R20-09).
  */
 
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
+
 /** Stored lifecycle state for one alert identity (appKey + signal). */
 export interface AlertState {
   status: "firing";
@@ -82,7 +84,7 @@ export class AlertStateMachine {
       await client.set(key, JSON.stringify(state), "EX", ALERT_STATE_TTL_SECONDS);
       return true;
     } catch (error) {
-      this.logger.warn(`Alert state read/write failed for ${key}, firing without cooldown: ${messageOf(error)}`);
+      this.logger.warn(`Alert state read/write failed for ${key}, firing without cooldown: ${getErrorMessage(error)}`);
       return true;
     }
   }
@@ -108,12 +110,8 @@ export class AlertStateMachine {
       await client.set(key, JSON.stringify(state), "EX", ALERT_STATE_TTL_SECONDS);
       return false;
     } catch (error) {
-      this.logger.warn(`Alert state read/write failed for ${key}, skipping recovery check: ${messageOf(error)}`);
+      this.logger.warn(`Alert state read/write failed for ${key}, skipping recovery check: ${getErrorMessage(error)}`);
       return false;
     }
   }
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
