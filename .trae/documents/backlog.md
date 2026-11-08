@@ -51,3 +51,9 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 - [ ] `[R26-02]` **（P2）** 宿主 `onRecovered` 在 `downSince=""` 时 dedup 桶抛 RangeError 被吞，恢复通知丢失；脏数据前置。修：`downSince` 缺失时用固定桶或跳过 dedup。
 - [ ] `[R26-03]` **（P2）** `isBlockedAddress` 的 `::ffff:` 分支对 URL 归一后的十六进制形式（`::ffff:808:808`）失效，公网 IPv4-mapped 地址被误拦；修：补十六进制内嵌 IPv4 判定，或订正注释口径。
 - [ ] `[R26-05]` **（P2，域外）** registry `npm run format:check` 在 dev 上已红：`packages/modules/message-tracker/sst/` 下 5 个 tracked 文件（含 `.sst/platform/src/*.ts`、`provider-lock.json`）未格式化，而 CI `ci.yml:26` 正是该命令。修：把这些 vendor/生成文件加入 `.prettierignore`，或按 canonical 配置格式化（需先确认 sst 目录是否应随包发布）。
+
+## 安全评审 round27 P3（2026-11-08，registry）
+
+> 来源：devbie `.trae/documents/expert-review-2026-11-08-round27.md`（R25 修复批次复核）。
+
+- [ ] `[R27-02]` **permission-group `SAFE_ROUTE_PATH_PATTERN` 零单测**：给 Create/Update 双 DTO 加 class-validator 用例——`//evil.com`、`/\evil.com`、`/a\nb`、`/a\tb`、`/a\rb`、`/a\0b` 拒绝，`/projects`、`/` 接受；与 frontend `safe-path.test.ts` 共用同一张向量表，防三份实现再次漂移（R25-01 的根因）。
