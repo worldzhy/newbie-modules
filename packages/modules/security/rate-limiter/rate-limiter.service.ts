@@ -1,5 +1,6 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { RateLimiterMemory, RateLimiterRedis } from "rate-limiter-flexible";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 import { RedisService } from "@modules/redis/redis.service";
 import { SECURITY_RATE_LIMITER } from "../security-config.constants";
 
@@ -15,6 +16,8 @@ abstract class RateLimiterService {
   private limiter: RateLimiterMemory | RateLimiterRedis;
   private points: number;
   private duration: number;
+  private readonly logger = new Logger(RateLimiterService.name);
+  private degraded = false;
 
   constructor(redis: RedisService, limiterType: LimiterType) {
     switch (limiterType) {
@@ -53,17 +56,51 @@ abstract class RateLimiterService {
   }
 
   async isAllowed(key: string): Promise<boolean> {
-    const res = await this.limiter.get(key);
-    // If there are no previous attempts, allow. Otherwise, check if there are remaining points.
-    return !res ? true : res.remainingPoints > 0;
+    try {
+      const res = await this.limiter.get(key);
+      this.markHealthy();
+      // If there are no previous attempts, allow. Otherwise, check if there are remaining points.
+      return !res ? true : res.remainingPoints > 0;
+    } catch (error) {
+      // Fail open: the shared Redis connection is a fast-fail one
+      // (enableOfflineQueue: false), so an outage would otherwise turn every
+      // login/TOTP/installation request into a 500. Availability wins here;
+      // the degradation is reported once per outage.
+      this.markDegraded("isAllowed", error);
+      return true;
+    }
   }
 
   async increment(key: string): Promise<void> {
-    await this.limiter.consume(key);
+    try {
+      await this.limiter.consume(key);
+      this.markHealthy();
+    } catch (error) {
+      this.markDegraded("increment", error);
+    }
   }
 
   async delete(key: string): Promise<void> {
-    await this.limiter.delete(key);
+    try {
+      await this.limiter.delete(key);
+      this.markHealthy();
+    } catch (error) {
+      this.markDegraded("delete", error);
+    }
+  }
+
+  private markDegraded(operation: string, error: unknown): void {
+    if (this.degraded) return;
+    this.degraded = true;
+    this.logger.warn(
+      `Rate limiter backend unavailable during ${operation}; allowing requests until it recovers: ${getErrorMessage(error)}`,
+    );
+  }
+
+  private markHealthy(): void {
+    if (!this.degraded) return;
+    this.degraded = false;
+    this.logger.log("Rate limiter backend recovered; enforcing limits again.");
   }
 }
 
