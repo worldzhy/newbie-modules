@@ -63,6 +63,52 @@ interface RepoFile {
   sha: string;
 }
 
+/** One commit as surfaced by the read-only repository accessors. */
+export interface RepositoryCommit {
+  sha: string;
+  message: string;
+  authorName: string | null;
+  authorEmail: string | null;
+  /** Committer date, falling back to the author date; null when GitHub omits both. */
+  committedAt: Date | null;
+}
+
+/** One node of a Git tree. */
+export interface RepositoryTreeEntry {
+  path: string;
+  /** Git object type: `blob` (file), `tree` (directory) or `commit` (submodule). */
+  type: string;
+  sha: string;
+  size: number | null;
+}
+
+/** A Git tree plus GitHub's truncation flag (very large trees are cut off). */
+export interface RepositoryTree {
+  entries: RepositoryTreeEntry[];
+  truncated: boolean;
+}
+
+/** The subset of a GitHub commit payload these accessors read. */
+interface GitHubCommitPayload {
+  sha: string;
+  commit?: {
+    message?: string;
+    author?: { name?: string | null; email?: string | null; date?: string | null } | null;
+    committer?: { date?: string | null } | null;
+  } | null;
+}
+
+function toRepositoryCommit(payload: GitHubCommitPayload): RepositoryCommit {
+  const rawDate = payload.commit?.committer?.date ?? payload.commit?.author?.date;
+  return {
+    sha: payload.sha,
+    message: payload.commit?.message ?? "",
+    authorName: payload.commit?.author?.name ?? null,
+    authorEmail: payload.commit?.author?.email ?? null,
+    committedAt: rawDate ? new Date(rawDate) : null,
+  };
+}
+
 @Injectable()
 export class GitHubService {
   private logger = new Logger(GitHubService.name);
@@ -207,12 +253,14 @@ export class GitHubService {
   }
 
   /**
-   * Read a UTF-8 text file from a repository (default branch). Returns null
-   * when the path does not exist or is not a regular file (404 / directory).
-   * Used by dep-scan to fetch lockfiles from application repositories.
+   * Read a UTF-8 text file from a repository. Defaults to the default branch;
+   * `ref` reads a branch, tag or commit sha instead. Returns null when the
+   * path does not exist or is not a regular file (404 / directory).
+   * Used by dep-scan to fetch lockfiles and by the module hub to read the
+   * registry manifest at a pinned commit.
    */
-  async getFileContent(owner: string, repo: string, path: string): Promise<string | null> {
-    const file = await this.readTextFile(owner, repo, path);
+  async getFileContent(owner: string, repo: string, path: string, ref?: string): Promise<string | null> {
+    const file = await this.readTextFile(owner, repo, path, ref);
     return file ? file.content : null;
   }
 
@@ -221,14 +269,78 @@ export class GitHubService {
    * Contents API for an update). Returns null when the path does not exist
    * (404) or is not a regular file.
    */
-  private async readTextFile(owner: string, repo: string, path: string): Promise<RepoFile | null> {
+  private async readTextFile(owner: string, repo: string, path: string, ref?: string): Promise<RepoFile | null> {
     try {
-      const { data } = await this.client().repos.getContent({ owner, repo, path });
+      const { data } = await this.client().repos.getContent({ owner, repo, path, ...(ref ? { ref } : {}) });
       // Content API returns an array for directories; we only care about files.
       if (Array.isArray(data) || data.type !== "file") {
         return null;
       }
       return { content: decodeBase64Utf8(data.content), sha: data.sha };
+    } catch (e: unknown) {
+      if (octokitStatus(e) === 404) return null;
+      throw e;
+    }
+  }
+
+  /**
+   * List commits reachable from the default branch, newest first. `options.path`
+   * narrows the list to commits touching that path; `options.perPage` caps the
+   * response. Returns an empty list on 404 (nothing readable), matching the
+   * "missing material" semantics of `getFileContent`; other failures throw.
+   */
+  async listCommits(
+    owner: string,
+    repo: string,
+    options: { path?: string; perPage?: number } = {},
+  ): Promise<RepositoryCommit[]> {
+    try {
+      const { data } = await this.client().repos.listCommits({
+        owner,
+        repo,
+        ...(options.path ? { path: options.path } : {}),
+        ...(options.perPage ? { per_page: options.perPage } : {}),
+      });
+      return data.map((entry) => toRepositoryCommit(entry));
+    } catch (e: unknown) {
+      if (octokitStatus(e) === 404) return [];
+      throw e;
+    }
+  }
+
+  /**
+   * Read the Git tree at `ref` (branch, tag or commit sha). `recursive` walks
+   * subdirectories. Returns null on 404 (unknown repo/ref); other failures
+   * throw. Check `truncated` before treating the result as complete.
+   */
+  async getTree(owner: string, repo: string, ref: string, recursive = false): Promise<RepositoryTree | null> {
+    try {
+      const { data } = await this.client().git.getTree({
+        owner,
+        repo,
+        tree_sha: ref,
+        ...(recursive ? { recursive: "true" } : {}),
+      });
+      return {
+        truncated: data.truncated ?? false,
+        entries: data.tree.map((node) => ({
+          path: node.path ?? "",
+          type: node.type ?? "",
+          sha: node.sha ?? "",
+          size: node.size ?? null,
+        })),
+      };
+    } catch (e: unknown) {
+      if (octokitStatus(e) === 404) return null;
+      throw e;
+    }
+  }
+
+  /** Read one commit's metadata. Returns null on 404 (unknown repo/ref); other failures throw. */
+  async getCommit(owner: string, repo: string, ref: string): Promise<RepositoryCommit | null> {
+    try {
+      const { data } = await this.client().repos.getCommit({ owner, repo, ref });
+      return toRepositoryCommit(data);
     } catch (e: unknown) {
       if (octokitStatus(e) === 404) return null;
       throw e;

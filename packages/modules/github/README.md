@@ -1,6 +1,6 @@
 # newbie.github
 
-GitHub API wrapper module. Provides dual-mode authentication and the common methods needed for repository orchestration (create repo / write `.env.example` / delete repo). Hosts (e.g. the repository provisioning service in nightwatch-backend) install it and inject `GitHubService`.
+GitHub API wrapper module. Provides dual-mode authentication, the common methods needed for repository orchestration (create repo / write `.env.example` / delete repo), and a read-only repository access layer (file at ref / commits / tree). Hosts (e.g. the repository provisioning service and the module hub in nightwatch-backend) install it and inject `GitHubService`.
 
 ## Authentication (dual mode)
 
@@ -26,6 +26,10 @@ When neither is present, no Octokit client is constructed and a warning is logge
 | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `isConfigured()`                                              | Whether enough credentials exist for orchestration (the App triplet or a PAT)                                                                                                                                                                             |
 | `getOrCreateRepo(org, name, tplOwner, tplRepo, description?)` | Idempotent repo creation: GET 200 skips; 404 generates from the template (private:true); 422 throws `RepoNameConflictError`. After generate returns 202, retries 3 times internally (2s each) until the repo is readable. Returns `{cloneUrl, generated}` |
+| `getFileContent(owner, repo, path, ref?)`                     | UTF-8 text file at `ref` (default branch when omitted); null on 404 or when the path is a directory. Used by dep-scan and by the module hub reading a manifest at a pinned commit                                                                         |
+| `listCommits(owner, repo, { path?, perPage? })`               | Commits reachable from the default branch, newest first: `{sha, message, authorName, authorEmail, committedAt}[]`; `path` narrows to commits touching that path. Empty list on 404, other failures throw                                                  |
+| `getTree(owner, repo, ref, recursive?)`                       | Git tree at a branch/tag/sha: `{entries: {path, type, sha, size}[], truncated}`. `recursive` walks subdirectories. Null on 404; check `truncated` before treating the result as complete                                                                  |
+| `getCommit(owner, repo, ref)`                                 | One commit's metadata in the same shape as `listCommits` items. Null on 404                                                                                                                                                                               |
 | `upsertEnvExample(org, repo, placeholderLines)`               | Idempotently writes `.env.example`: GET fetches sha + current content, dedupes by env-var key, appends only missing placeholder lines (comment format, no real values), PUT with sha; 404 creates. **Does not overwrite template content**                |
 | `deleteRepo(org, repo)`                                       | best-effort repo deletion; 404 is ignored. Used for teardown cleanup                                                                                                                                                                                      |
 
