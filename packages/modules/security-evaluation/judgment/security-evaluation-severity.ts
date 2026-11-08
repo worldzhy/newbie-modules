@@ -1,5 +1,7 @@
+import type { EvaluationFindingSeverity } from "@generated/prisma/client";
+
 /** Severity values accepted by the evaluation skeleton (ADR-020 D2). */
-export type SecurityEvaluationFindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type SecurityEvaluationFindingSeverity = EvaluationFindingSeverity;
 
 /** Where a severity value came from; "unknown" means the record carried none. */
 export type SecurityEvaluationSeveritySource = "database_specific" | "unknown";

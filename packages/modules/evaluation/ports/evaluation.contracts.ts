@@ -2,10 +2,15 @@
  * Value shapes shared by the four evaluation ports (ADR-020 D4) and by the
  * services that persist them.
  *
- * Everything here is feature-neutral and host-neutral: no Prisma types, no
- * host vocabulary. A feature describes its subjects, evidence and judgments in
- * these shapes; the skeleton stores them and enforces the invariants.
+ * Everything here is feature-neutral and host-neutral: no host vocabulary. A
+ * feature describes its subjects, evidence and judgments in these shapes; the
+ * skeleton stores them and enforces the invariants. The finding-severity
+ * vocabulary is the persisted Prisma enum so there is a single definition.
  */
+
+import type { EvaluationFindingSeverity } from "@generated/prisma/client";
+
+export type { EvaluationFindingSeverity };
 
 /** The host-assigned coordinate that bounds a subject listing (ADR-020 D1). */
 export interface EvaluationScope {
@@ -118,8 +123,6 @@ export interface EvaluationVerdict {
   rationale: string;
   unresolved?: string[];
 }
-
-export type EvaluationFindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 /** A finding candidate is the product of an ASSERTION criterion (ADR-020 D2). */
 export interface EvaluationFindingCandidate {
