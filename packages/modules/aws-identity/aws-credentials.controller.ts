@@ -41,6 +41,22 @@ export class AwsCredentialsController {
     return await this.service.upsertProjectCredential(projectId, body);
   }
 
+  @Post(":projectId/rebind")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding)
+  @ApiOperation({ summary: "Start a two-phase replacement of the cross-account identity" })
+  @ApiResponse({ status: 200, type: AwsCrossAccountBindingResponseDto })
+  async rebindProjectCredential(@Param("projectId") projectId: string) {
+    return await this.service.rebindProjectCredential(projectId);
+  }
+
+  @Delete(":projectId/rebind")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding)
+  @ApiOperation({ summary: "Cancel a pending cross-account identity replacement" })
+  @ApiResponse({ status: 200, type: AwsCrossAccountBindingResponseDto })
+  async cancelRebind(@Param("projectId") projectId: string) {
+    return await this.service.cancelRebind(projectId);
+  }
+
   @Post(":projectId/verify")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding)
   @ApiOperation({ summary: "Verify the cross-account role via STS AssumeRole + GetCallerIdentity" })

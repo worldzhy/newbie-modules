@@ -11,22 +11,29 @@
 // bootstrap (the external ID has been generated but the role ARN has not
 // been saved yet).
 //
+// Replacing the identity is a two-phase operation: while a rebind is in
+// progress, pendingExternalId holds the external ID of the candidate
+// identity and the active identity keeps serving. The pending value is
+// promoted (and the old external ID retired) only after the candidate role
+// has been assumed successfully.
+//
 // projectId is the host scope ID (a project id / tenant id / ...). It is
 // intentionally a plain column without a foreign key or a Prisma relation:
 // this module never reads host tables and can be assembled into any host
 // application. A missing host scope row simply means "not configured".
 model AwsCrossAccountBinding {
-  id             String    @id @default(uuid()) @db.Uuid
-  projectId      String    @unique @db.Uuid
-  roleArn        String?   @unique
-  externalId     String    @unique
-  awsAccountId   String?
-  roleName       String?
-  defaultRegion  String?
-  regions        String[]
-  lastVerifiedAt DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                String    @id @default(uuid()) @db.Uuid
+  projectId         String    @unique @db.Uuid
+  roleArn           String?   @unique
+  externalId        String    @unique
+  pendingExternalId String?
+  awsAccountId      String?
+  roleName          String?
+  defaultRegion     String?
+  regions           String[]
+  lastVerifiedAt    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   @@schema("module/aws-identity")
 }
