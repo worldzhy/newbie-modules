@@ -39,7 +39,7 @@ test("the state machine owns the cooldown and recovery constants", () => {
   const stateSource = readFileSync(join(__dirname, "alert-state.ts"), "utf8");
   assert.ok(stateSource.includes("ALERT_COOLDOWN_MS"));
   assert.ok(stateSource.includes("ALERT_RECOVERY_WINDOWS"));
-  assert.ok(SERVICE_SOURCE.includes("alert-state:"));
+  assert.ok(SERVICE_SOURCE.includes("new AlertStateMachine(this.redis, this.logger)"));
 });
 
 function methodBody(source: string, signature: string, nextSignature: string): string {
