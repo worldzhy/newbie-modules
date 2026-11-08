@@ -141,7 +141,6 @@ export class JobsService implements OnModuleInit {
     const base = {
       appKey: system.appKey,
       systemName: system.systemName || system.appKey,
-      projectId: system.projectId,
       windowMs,
       windowStartedAt: windowStart.toISOString(),
     };

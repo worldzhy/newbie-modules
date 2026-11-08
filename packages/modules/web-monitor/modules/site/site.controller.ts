@@ -19,19 +19,6 @@ export class SiteController {
     private readonly projectVisibility: ProjectVisibleIdsResolver,
   ) {}
 
-  @Post("/add")
-  @RequirePermission(PermissionAction.Create, "WebMonitorSite")
-  @ApiOperation({ summary: "Add a new monitoring system" })
-  @ApiResponse({ type: Object })
-  async addNewSite(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const projectId = pickRequestId(req, "projectId");
-    if (!projectId) {
-      throw new BadRequestException("projectId is required");
-    }
-    const res = await this.site.saveSiteData({ ...body, projectId });
-    return res;
-  }
-
   @Post("/update")
   @RequirePermission(PermissionAction.Update, "WebMonitorSite")
   @ApiOperation({ summary: "Update a monitoring system (with project membership gate)" })

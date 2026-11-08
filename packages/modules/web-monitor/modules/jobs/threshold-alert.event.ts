@@ -27,7 +27,6 @@ export interface WebThresholdAlertEvent {
   /** System partition key (browser SDK appKey). */
   appKey: string;
   systemName: string;
-  projectId?: string;
   signal: WebThresholdAlertSignal;
   /** Lifecycle phase; defaults to firing when omitted. */
   phase?: WebThresholdAlertPhase;
@@ -61,7 +60,6 @@ const WEB_THRESHOLD_ALERT = defineEvent<WebThresholdAlertEvent>({
   payloadExample: {
     appKey: "storefront-web",
     systemName: "Storefront Web",
-    projectId: "00000000-0000-0000-0000-000000000000",
     signal: "slow-page",
     severity: "high",
     count: 12,

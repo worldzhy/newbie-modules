@@ -11,46 +11,6 @@ export class SiteService {
     private readonly nodeCache: NodeCacheService,
   ) {}
 
-  async saveSiteData(body: Record<string, unknown>) {
-    const type = typeof body.type === "string" ? body.type : undefined;
-    if (!body.projectId) return func.errResult({ desc: "A new system must belong to a project" });
-    if (!body.systemDomain && type === "web")
-      return func.errResult({ desc: "Add system: system domain must not be empty" });
-    if (!body.systemName) return func.errResult({ desc: "Add system: system name must not be empty" });
-
-    if (type === "web") {
-      const search = await this.models
-        .System()
-        .findOne({ systemDomain: String(body.systemDomain) })
-        .exec();
-      if (search && search.systemDomain) return func.errResult({ desc: "Add system: system already exists" });
-    }
-
-    // The appKey is a storage partition key and must never be caller-supplied:
-    // mint it here. The installation-sync path (upsertSiteForWebMonitor)
-    // backfills it from the credential's immutable appKey instead.
-    const appKey = func.randomString(7).slice(0, 7);
-    const SystemModel = this.models.System();
-    const system = new SystemModel();
-    system.projectId = String(body.projectId);
-    system.systemDomain = typeof body.systemDomain === "string" ? body.systemDomain : "";
-    system.systemName = String(body.systemName);
-    system.type = type || "web";
-    system.appKey = appKey;
-    system.userId = [typeof body.token === "string" ? body.token : ""];
-    system.createTime = new Date();
-    system.slowPageTime = Number(body.slowPageTime) || 5;
-    system.slowWhiteTime = Number(body.slowWhiteTime) || 2;
-    system.slowJsTime = Number(body.slowJsTime) || 2;
-    system.slowCssTime = Number(body.slowCssTime) || 2;
-    system.slowImgTime = Number(body.slowImgTime) || 2;
-    system.slowAjaxTime = Number(body.slowAjaxTime) || 2;
-
-    const result = await system.save();
-    await this.updateSiteNodeCache(appKey);
-    return func.result({ data: result });
-  }
-
   async updateSiteData(appKey: string, body: Record<string, unknown>) {
     const update = {
       $set: {
@@ -81,12 +41,12 @@ export class SiteService {
    * stays in Mongo); appKey equals the installation's immutable appKey.
    * Idempotent by appKey so it can be safely retried after credential issuance.
    */
-  async upsertSiteForWebMonitor(body: { appKey: string; projectId: string; systemName: string }) {
+  async upsertSiteForWebMonitor(body: { appKey: string; systemName: string }) {
     const result = await this.models
       .System()
       .findOneAndUpdate(
         { appKey: body.appKey },
-        { $set: { projectId: body.projectId, systemName: body.systemName, type: "web" } },
+        { $set: { systemName: body.systemName, type: "web" } },
         { upsert: true, new: true },
       )
       .exec();
