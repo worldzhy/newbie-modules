@@ -89,7 +89,7 @@ export class AwsSecretsManagerService {
 
   async getSecret(projectId: string, name: string, region?: string) {
     const { client, region: resolvedRegion } = await this.getProjectContext(projectId, region);
-    const entry = await this.callAws(() => client.send(new DescribeSecretCommand({ SecretId: name })));
+    const entry = await this.describeManagedSecret(client, name);
     return this.toSecretResponse(entry, resolvedRegion);
   }
 
@@ -99,6 +99,9 @@ export class AwsSecretsManagerService {
     region?: string,
   ): Promise<{ name: string; secretValue: SecretValuePayload; valueType: SecretValueType }> {
     const { client } = await this.getProjectContext(projectId, region);
+    // The project credential may see secrets provisioned outside this plane;
+    // only rows this module created (carrying `devbie:managed`) are readable.
+    await this.describeManagedSecret(client, name);
     const response = await this.callAws(() =>
       client.send(new GetSecretValueCommand({ SecretId: name, VersionStage: "AWSCURRENT" })),
     );
@@ -163,6 +166,7 @@ export class AwsSecretsManagerService {
     data: { secretValue?: SecretValuePayload; description?: string; type?: SecretType; region?: string },
   ) {
     const { client, region } = await this.getProjectContext(projectId, data.region);
+    await this.describeManagedSecret(client, name);
 
     if (data.secretValue !== undefined || data.description !== undefined) {
       await this.callAws(() =>
@@ -191,6 +195,7 @@ export class AwsSecretsManagerService {
 
   async deleteSecret(projectId: string, name: string, region?: string) {
     const { client } = await this.getProjectContext(projectId, region);
+    await this.describeManagedSecret(client, name);
     // A 30-day recovery window is kept; recreating the same name inside the
     // window surfaces the AWS name-collision error unchanged.
     await this.callAws(() =>
@@ -202,12 +207,14 @@ export class AwsSecretsManagerService {
   /** Trigger an immediate rotation using the existing rotation configuration. */
   async rotateSecret(projectId: string, name: string, region?: string) {
     const { client } = await this.getProjectContext(projectId, region);
+    await this.describeManagedSecret(client, name);
     await this.callAws(() => client.send(new RotateSecretCommand({ SecretId: name })));
     return this.getSecret(projectId, name, region);
   }
 
   async setRotation(projectId: string, name: string, data: { isEnabled: boolean; days?: number; region?: string }) {
     const { client, region } = await this.getProjectContext(projectId, data.region);
+    await this.describeManagedSecret(client, name);
 
     if (data.isEnabled) {
       const lambdaArn = await this.getRotationLambdaArn(projectId);
@@ -299,6 +306,22 @@ export class AwsSecretsManagerService {
       throw new NotFoundException(`Project not found: ${projectId}`);
     }
     return project.awsSecretsManagerRotationLambdaArn;
+  }
+
+  /**
+   * The module only owns secrets it created. AWS permissions of a project
+   * credential may reach unrelated secrets in the same account, so every
+   * by-name read/write first proves the `devbie:managed` tag. An unmanaged
+   * secret is reported as not found — the caller has no business knowing it
+   * exists.
+   */
+  private async describeManagedSecret(client: SecretsManagerClient, name: string) {
+    const entry = await this.callAws(() => client.send(new DescribeSecretCommand({ SecretId: name })));
+    const managed = entry.Tags?.some((tag) => tag.Key === MANAGED_TAG_KEY && tag.Value === "true") ?? false;
+    if (!managed) {
+      throw new NotFoundException("Secret not found in AWS Secrets Manager");
+    }
+    return entry;
   }
 
   private toSecretResponse(entry: SecretListEntry, region: string) {
