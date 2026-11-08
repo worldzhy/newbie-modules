@@ -5,20 +5,13 @@ import type {
   EvaluationVerdict,
 } from "@modules/evaluation/ports/evaluation.contracts";
 import type { EvaluationJudgment } from "@modules/evaluation/ports/judgment.port";
+import { SEVERITY_RANK } from "@modules/evaluation/evaluation-severity.util";
 
 /** One mechanism's judgment, tagged with the mechanism name that produced it. */
 export interface SecurityEvaluationJudgmentPart {
   mechanismName: string;
   judgment: EvaluationJudgment;
 }
-
-const SEVERITY_RANK: Record<EvaluationFindingSeverity, number> = {
-  INFO: 0,
-  LOW: 1,
-  MEDIUM: 2,
-  HIGH: 3,
-  CRITICAL: 4,
-};
 
 function higherSeverity(a: EvaluationFindingSeverity, b: EvaluationFindingSeverity): EvaluationFindingSeverity {
   return SEVERITY_RANK[a] >= SEVERITY_RANK[b] ? a : b;

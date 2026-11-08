@@ -8,6 +8,7 @@ import type {
   EvaluationFindingCandidate,
   EvaluationVerdict,
 } from "./ports/evaluation.contracts";
+import { isSeverity } from "./evaluation-severity.util";
 
 /**
  * The executable form of ADR-020 D5. Every rule here is pure so it can be
@@ -225,7 +226,6 @@ function validateBucket(name: string, bucket: EvaluationCoverageBucket): string[
  * 400 here, not a database error at insert time.
  */
 const CONFIDENCES = new Set(["high", "medium", "low"]);
-const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 
 export function validateJudgment(input: {
   criteria: readonly EvaluationCriterionRef[];
@@ -283,7 +283,7 @@ export function validateJudgment(input: {
     if (!finding.fingerprint) {
       problems.push(`finding for ${finding.criterionKey} has an empty fingerprint`);
     }
-    if (!SEVERITIES.has(finding.severity)) {
+    if (!isSeverity(finding.severity)) {
       problems.push(`finding ${finding.fingerprint} has an unknown severity "${finding.severity}"`);
     }
     const identity = `${finding.criterionKey}/${finding.fingerprint}`;
