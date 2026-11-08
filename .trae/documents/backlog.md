@@ -46,5 +46,4 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 ## 安全评审 round27 P3（2026-11-08，registry）
 
 > 来源：devbie `.trae/documents/expert-review-2026-11-08-round27.md`（R25 修复批次复核）。
-
-- [ ] `[R27-02]` **permission-group `SAFE_ROUTE_PATH_PATTERN` 零单测**：给 Create/Update 双 DTO 加 class-validator 用例——`//evil.com`、`/\evil.com`、`/a\nb`、`/a\tb`、`/a\rb`、`/a\0b` 拒绝，`/projects`、`/` 接受；与 frontend `safe-path.test.ts` 共用同一张向量表，防三份实现再次漂移（R25-01 的根因）。
+> R27-02 已于 `4817d10` 修复：`permission-group.dto.test.ts` 用前端同一张向量表断言 Create/Update DTO，装配进 backend 后 5/5 通过。
