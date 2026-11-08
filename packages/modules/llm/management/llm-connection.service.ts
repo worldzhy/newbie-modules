@@ -11,6 +11,7 @@ import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { CreateLlmConnectionDto, LlmConnectionResponseDto, UpdateLlmConnectionDto } from "./llm-connection.dto";
 import { decryptApiKey, encryptApiKey, fingerprintApiKey, isEncryptedApiKey } from "./llm-api-key";
+import { assertSafeBaseUrl } from "./base-url-guard";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /**
@@ -144,6 +145,9 @@ export class LlmConnectionService {
 
   async create(dto: CreateLlmConnectionDto): Promise<LlmConnectionResponseDto> {
     const baseUrl = normalizeBaseUrl(dto.baseUrl ?? "");
+    if (baseUrl) {
+      await assertSafeBaseUrl(baseUrl);
+    }
     const apiKeyFingerprint = fingerprintApiKey(dto.apiKey);
     await this.requireEndpointAvailable(baseUrl, dto.apiKey, apiKeyFingerprint);
 
@@ -178,7 +182,12 @@ export class LlmConnectionService {
     if (dto.name !== undefined) changes.name = dto.name;
     if (dto.provider !== undefined) changes.provider = dto.provider;
     if (dto.model !== undefined) changes.model = dto.model;
-    if (dto.baseUrl !== undefined) changes.baseUrl = normalizeBaseUrl(dto.baseUrl);
+    if (dto.baseUrl !== undefined) {
+      changes.baseUrl = normalizeBaseUrl(dto.baseUrl);
+      if (changes.baseUrl) {
+        await assertSafeBaseUrl(changes.baseUrl);
+      }
+    }
     if (dto.apiKey !== undefined && dto.apiKey !== maskApiKey(existing.apiKey)) {
       changes.apiKey = dto.apiKey;
     }
