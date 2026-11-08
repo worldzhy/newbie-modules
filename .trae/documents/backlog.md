@@ -26,7 +26,7 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 ## 技术债（已在 ADR 登记，未落地）
 
-- [ ] `[ADR-053 2026-11-08]` **aws-identity HTTP/服务层词根 credential → cross-account-binding（已拍板，执行暂缓）**：路由 `/aws-credentials/projects/:projectId` → `/aws-cross-account-bindings/projects/:projectId`；文件/类 `aws-credentials.*` / `AwsCredentials*` → `aws-cross-account-bindings.*` / `AwsCrossAccountBindings*`；`awsBindingCredentialRef` → `awsBindingRef`（引用串字面量 `"aws-binding:<id>"` 不变）；宿主 wire 字段 `hasAwsCredential` → `hasAwsCrossAccountBinding`；前端 settings tab（文件/组件/tab value/i18n key）与 7 处 queryKey 跟随，tab 文案改 "Cross-Account Role"/"跨账户角色"；运行时凭证材料层（`AwsCredentialsProvider` / `AwsTemporaryCredentials` / `resolveProjectCredential` / `AwsCloudwatchCredentialService`）不动。链路：registry 改名 → 装配 → apits 重生成 → 前端收敛 → 三仓提交。2026-11-08 用户拍板次级决策 1/2 均改、先不执行。
+（暂无）
 
 ## security-evaluation 评审 round4 未修项（2026-10-31）
 

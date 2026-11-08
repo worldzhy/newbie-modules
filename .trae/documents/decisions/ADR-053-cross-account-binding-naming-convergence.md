@@ -1,6 +1,6 @@
 # ADR-053: aws-identity 的 HTTP 与服务层词根由 credential 收敛为 cross-account-binding
 
-状态：已采纳（2026-11-08 用户拍板：词根收敛 + 精度选 cross-account-binding；次级决策 1/2 均改；执行暂缓，登记于本仓 backlog）
+状态：已采纳并已执行（2026-11-08 用户拍板：词根收敛 + 精度选 cross-account-binding；次级决策 1/2 均改。2026-11-09 执行：registry 改名 `7410b86`，nightwatch-backend 装配 + 宿主层收敛，nightwatch-frontend apits + tab/queryKey/i18n/wire 字段跟随，E2E 新路由 200 / 旧路由 404）
 日期：2026-11-08
 关联：ADR-052（跨账户绑定的身份两阶段原子替换；本 ADR 将其 binding 词汇延伸到 HTTP/服务层）；nightwatch-backend `.trae/documents/aws-identity-decouple_plan.md`（其"仅统一单复数、保留 credential 词根"的命名选择由本 ADR 取代）；nightwatch-frontend ADR-004（凭证设置引导 UX，引用的路由路径随本决策过期，ADR 快照正文不改）
 
