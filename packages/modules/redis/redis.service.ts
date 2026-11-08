@@ -10,9 +10,10 @@ const REDIS_DB = 0;
 // fail after this timeout instead of waiting for a reconnect that may never
 // come (R20-31). Offline queueing is disabled for the same reason — a command
 // issued while disconnected rejects immediately. Consumers own the outcome:
-// the security rate limiters catch the rejection and fail open with a single
-// warning per outage (availability over enforcement), while best-effort
-// features degrade to their in-memory path.
+// the security rate limiters demote to a per-process in-memory bucket, warn
+// once per limiter instance, and probe Redis every 30s to switch back; the
+// recovery line is only logged if that instance is called again afterwards.
+// Best-effort features degrade to their in-memory path.
 const REDIS_COMMAND_TIMEOUT_MS = 5_000;
 const REDIS_MAX_RETRIES_PER_REQUEST = 1;
 
