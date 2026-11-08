@@ -1,10 +1,8 @@
 import { Injectable, UnauthorizedException } from "@nestjs/common";
 
+import { InstallationTouchThrottle } from "@modules/security/installation/installation-touch-throttle";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 import { WebInstallationService } from "./web-installation.service";
-
-/** Minimum interval between liveness UPDATEs for one installation. */
-const TOUCH_THROTTLE_MS = 30_000;
 
 export interface ResolvedWebToken {
   installationId: string;
@@ -33,7 +31,7 @@ export class WebTokenResolver implements InstallationResolver {
   /** sendBeacon cannot set headers, so the body token IS the standard (ADR-016 documented exception). */
   readonly bodyTokenField = "token";
 
-  private readonly lastTouchAt = new Map<string, number>();
+  private readonly touchThrottle = new InstallationTouchThrottle();
 
   constructor(private readonly installations: WebInstallationService) {}
 
@@ -49,12 +47,8 @@ export class WebTokenResolver implements InstallationResolver {
     return { installationId: installation.id, appKey: installation.appKey };
   }
 
-  /** Throttled liveness touch, at most once per TOUCH_THROTTLE_MS. */
+  /** Throttled liveness touch, at most once per throttle interval. */
   async touchOnReport(installationId: string): Promise<void> {
-    const nowMs = Date.now();
-    const last = this.lastTouchAt.get(installationId) ?? 0;
-    if (nowMs - last < TOUCH_THROTTLE_MS) return;
-    await this.installations.touchOnReport(installationId);
-    this.lastTouchAt.set(installationId, nowMs);
+    await this.touchThrottle.runIfDue(installationId, () => this.installations.touchOnReport(installationId));
   }
 }
