@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { PROJECT_VISIBLE_IDS_RESOLVER, ProjectVisibleIdsResolver } from "../../shared/project-visible-ids.port";
 import { isValidAppKey } from "../../shared/utils";
 
 /**
@@ -13,23 +14,22 @@ import { isValidAppKey } from "../../shared/utils";
  */
 @Injectable()
 export class WebMonitorAccessService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(PROJECT_VISIBLE_IDS_RESOLVER)
+    private readonly projectVisibility: ProjectVisibleIdsResolver,
+  ) {}
 
   /**
    * Resolve the storage partition key for a management-side query.
    * Throws NotFoundException when the installation is not enrolled for the
    * given projectId/applicationId pair; throws ForbiddenException when the
-   * caller has no ProjectMember row for projectId.
+   * caller has no access to projectId.
    */
   async resolveAppKey(projectId: string, applicationId: string, currentUserId: string): Promise<string> {
-    // 1. Membership gate — reuse the same check pattern as site.service.userProjectIds.
-    const membership = await this.prisma.projectMember.findFirst({
-      where: {
-        userId: currentUserId,
-        projectId,
-      },
-    });
-    if (!membership) {
+    // 1. Membership gate — the host port resolves the caller's projects.
+    const projectIds = await this.projectVisibility.visibleProjectIds(currentUserId);
+    if (!projectIds.includes(projectId)) {
       throw new ForbiddenException("Caller is not a member of the target project");
     }
 

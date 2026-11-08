@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Inject, Injectable } from "@nestjs/common";
 import { DeleteResult } from "mongodb";
-import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
+import { PROJECT_VISIBLE_IDS_RESOLVER, ProjectVisibleIdsResolver } from "../../shared/project-visible-ids.port";
 import { func } from "../../shared/utils";
 
 @Injectable()
@@ -10,16 +10,13 @@ export class SiteService {
   constructor(
     private readonly models: WebMonitorModelsService,
     private readonly nodeCache: NodeCacheService,
-    private readonly prisma: PrismaService,
+    @Inject(PROJECT_VISIBLE_IDS_RESOLVER)
+    private readonly projectVisibility: ProjectVisibleIdsResolver,
   ) {}
 
   /** Project IDs the caller is a member of. Empty means "no projects". */
   private async userProjectIds(userId: string): Promise<string[]> {
-    const rows = await this.prisma.projectMember.findMany({
-      where: { userId },
-      select: { projectId: true },
-    });
-    return rows.map((r) => r.projectId);
+    return this.projectVisibility.visibleProjectIds(userId);
   }
 
   async saveSiteData(body: Record<string, unknown>) {
