@@ -1,39 +1,33 @@
-import { Inject, Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
+import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { PROJECT_VISIBLE_IDS_RESOLVER, ProjectVisibleIdsResolver } from "../../shared/project-visible-ids.port";
 import { isValidAppKey } from "../../shared/utils";
 
 /**
- * Resolves an appKey for management-side web-monitor queries and enforces
- * that the caller has membership in the target project.
+ * Resolves an appKey for management-side web-monitor queries.
  *
  * This module intentionally never trusts an appKey carried in a request —
  * the caller supplies projectId + applicationId (both UUIDs from the host
- * URL path) and we derive the appKey from the installation registry, then
- * confirm the current user is a member of the project before returning it.
+ * URL path) and we derive the appKey from the installation registry.
+ *
+ * Permission is resolved by the calling controller, which passes the caller's
+ * visible project ids in. This service only validates the given project against
+ * that already-resolved scope; it never sees a user id or a role.
  */
 @Injectable()
 export class WebMonitorAccessService {
-  constructor(
-    private readonly prisma: PrismaService,
-    @Inject(PROJECT_VISIBLE_IDS_RESOLVER)
-    private readonly projectVisibility: ProjectVisibleIdsResolver,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Resolve the storage partition key for a management-side query.
-   * Throws NotFoundException when the installation is not enrolled for the
-   * given projectId/applicationId pair; throws ForbiddenException when the
-   * caller has no access to projectId.
+   * Throws ForbiddenException when projectId is outside the caller's resolved
+   * scope; throws NotFoundException when the installation is not enrolled for
+   * the given projectId/applicationId pair.
    */
-  async resolveAppKey(projectId: string, applicationId: string, currentUserId: string): Promise<string> {
-    // 1. Membership gate — the host port resolves the caller's projects.
-    const projectIds = await this.projectVisibility.visibleProjectIds(currentUserId);
+  async resolveAppKey(projectIds: string[], projectId: string, applicationId: string): Promise<string> {
     if (!projectIds.includes(projectId)) {
       throw new ForbiddenException("Caller is not a member of the target project");
     }
 
-    // 2. Installation lookup by the host-mapping tag.
     const externalRef = `${projectId}/${applicationId}`;
     const installation = await this.prisma.webMonitorInstallation.findFirst({
       where: { externalRef },

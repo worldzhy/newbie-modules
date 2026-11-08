@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Query, Req } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { ResourceService } from "./services/resource.service";
@@ -6,6 +6,7 @@ import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { WebMonitorAccessService } from "./web-monitor-access.service";
+import { PROJECT_VISIBLE_IDS_RESOLVER, ProjectVisibleIdsResolver } from "../../shared/project-visible-ids.port";
 
 @ApiTags("Frontend Monitor / Web / Resource")
 @Controller("/web-monitor/resource")
@@ -13,6 +14,8 @@ export class ResourceController {
   constructor(
     private readonly resourceSrv: ResourceService,
     private readonly access: WebMonitorAccessService,
+    @Inject(PROJECT_VISIBLE_IDS_RESOLVER)
+    private readonly projectVisibility: ProjectVisibleIdsResolver,
   ) {}
 
   @RequirePermission(PermissionAction.Get, "WebMonitorSite")
@@ -23,7 +26,8 @@ export class ResourceController {
     const { projectId, applicationId, url, type = 1, pageNo = 1, pageSize = 15, beginTime, endTime } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     if (!url) throw new BadRequestException("url is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const result = await this.resourceSrv.getResourceForType(
       appKey,
       String(url),
@@ -43,7 +47,8 @@ export class ResourceController {
   async getAverageResourceList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
     const { projectId, applicationId } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const resolved = { ...q, appKey: appKey };
     const result = await this.resourceSrv.getAverageResourceList(resolved);
     return func.result({ data: result });
@@ -57,7 +62,8 @@ export class ResourceController {
     const { projectId, applicationId, url, beginTime, endTime } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     if (!url) throw new BadRequestException("url is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const result = await this.resourceSrv.getOneResourceAvg(
       appKey,
       String(url),
@@ -75,7 +81,8 @@ export class ResourceController {
     const { projectId, applicationId, url, pageNo = 1, pageSize = 15, beginTime, endTime } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     if (!url) throw new BadRequestException("url is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const result = await this.resourceSrv.getOneResourceList(
       appKey,
       String(url),
@@ -95,7 +102,8 @@ export class ResourceController {
     const { projectId, applicationId, id } = q;
     if (!id) throw new BadRequestException("id is required");
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const row = await this.resourceSrv.getOneResourceDetail(appKey, String(id));
     return func.result({ data: row || {} });
   }

@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Query, Req } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { WebMonitorAnalysisService } from "./services/analysis.service";
@@ -12,6 +12,7 @@ import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { WebMonitorAccessService } from "./web-monitor-access.service";
+import { PROJECT_VISIBLE_IDS_RESOLVER, ProjectVisibleIdsResolver } from "../../shared/project-visible-ids.port";
 
 @ApiTags("Frontend Monitor / Web / Analysis")
 @Controller("/web-monitor/analysis")
@@ -19,6 +20,8 @@ export class WebMonitorAnalysisController {
   constructor(
     private readonly analysisService: WebMonitorAnalysisService,
     private readonly access: WebMonitorAccessService,
+    @Inject(PROJECT_VISIBLE_IDS_RESOLVER)
+    private readonly projectVisibility: ProjectVisibleIdsResolver,
   ) {}
 
   @RequirePermission(PermissionAction.Get, "WebMonitorSite")
@@ -28,7 +31,8 @@ export class WebMonitorAnalysisController {
   async getAnalysislist(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
     const { projectId, applicationId, beginTime, endTime, uid, phone } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const result = await this.analysisService.getAnalysislist(
       appKey,
       beginTime as string | undefined,
@@ -46,7 +50,8 @@ export class WebMonitorAnalysisController {
     const { projectId, applicationId, markUser } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     if (!markUser) throw new BadRequestException("markUser is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const result = await this.analysisService.getAnalysisOneList(appKey, String(markUser));
     return func.result({ data: result });
   }
@@ -58,7 +63,8 @@ export class WebMonitorAnalysisController {
   async getTopDatas(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
     const { projectId, applicationId, beginTime, endTime } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const data = await this.analysisService.getTopDatas(
       appKey,
       beginTime as string | undefined,
@@ -74,7 +80,8 @@ export class WebMonitorAnalysisController {
   async getProvinceCount(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
     const { projectId, applicationId, beginTime, endTime } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const result = await this.analysisService.getProvinceCount(
       appKey,
       beginTime as string | undefined,

@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Query, Req } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
@@ -11,6 +11,7 @@ import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { WebMonitorAccessService } from "./web-monitor-access.service";
+import { PROJECT_VISIBLE_IDS_RESOLVER, ProjectVisibleIdsResolver } from "../../shared/project-visible-ids.port";
 
 @ApiTags("Frontend Monitor / Web / PvUvIp")
 @Controller("/web-monitor/pvuvip")
@@ -21,6 +22,8 @@ export class PvuvipController {
     private readonly pvuvipSrv: PvuvipService,
     private readonly dayReportNum: DayReportNumService,
     private readonly access: WebMonitorAccessService,
+    @Inject(PROJECT_VISIBLE_IDS_RESOLVER)
+    private readonly projectVisibility: ProjectVisibleIdsResolver,
   ) {
     this.cfg = this.configService.get("modules.web-monitor") || {};
   }
@@ -32,7 +35,8 @@ export class PvuvipController {
   async getPvUvIpSurveyToday(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
     const { projectId, applicationId } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
@@ -55,7 +59,8 @@ export class PvuvipController {
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     if (!beginTime) throw new BadRequestException("beginTime is required");
     if (!endTime) throw new BadRequestException("endTime is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const result = await this.pvuvipSrv.getPvUvIpSurveyOne(appKey, func.toDate(beginTime), func.toDate(endTime));
     return func.result({ data: result });
   }
@@ -69,7 +74,8 @@ export class PvuvipController {
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     if (!beginTime) throw new BadRequestException("beginTime is required");
     if (!endTime) throw new BadRequestException("endTime is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const rows = await this.pvuvipSrv.getHistoryPvUvIplistByRange(
       appKey,
       new Date(Number(beginTime)),
@@ -85,7 +91,8 @@ export class PvuvipController {
   async getPvUvIpList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
     const { projectId, applicationId, beginTime, endTime } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
@@ -103,7 +110,8 @@ export class PvuvipController {
   async getPvUvIpOne(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
     const { projectId, applicationId, beginTime, endTime } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     interval.prev();
     let et: Date;

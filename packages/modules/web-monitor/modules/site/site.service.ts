@@ -1,8 +1,7 @@
-import { Inject, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { DeleteResult } from "mongodb";
 import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
-import { PROJECT_VISIBLE_IDS_RESOLVER, ProjectVisibleIdsResolver } from "../../shared/project-visible-ids.port";
 import { func } from "../../shared/utils";
 
 @Injectable()
@@ -10,14 +9,7 @@ export class SiteService {
   constructor(
     private readonly models: WebMonitorModelsService,
     private readonly nodeCache: NodeCacheService,
-    @Inject(PROJECT_VISIBLE_IDS_RESOLVER)
-    private readonly projectVisibility: ProjectVisibleIdsResolver,
   ) {}
-
-  /** Project IDs the caller is a member of. Empty means "no projects". */
-  private async userProjectIds(userId: string): Promise<string[]> {
-    return this.projectVisibility.visibleProjectIds(userId);
-  }
 
   async saveSiteData(body: Record<string, unknown>) {
     const type = typeof body.type === "string" ? body.type : undefined;
@@ -107,19 +99,16 @@ export class SiteService {
     return await this.models.System().findOne({ appKey: appKey }).exec();
   }
 
-  async getSitesForUserId(query: Record<string, unknown>, userId: string) {
+  /**
+   * List systems inside an already-resolved project scope. Permission is the
+   * caller's concern: this service never sees a user or derives visibility.
+   */
+  async getSitesInProjects(query: Record<string, unknown>, projectIds: string[]) {
     const { systemName, type, projectId } = query;
     const param: Record<string, unknown> = {};
     if (systemName) param.systemName = new RegExp(func.escapeRegExp(systemName));
     if (type) param.type = type;
-    const projectIds = await this.userProjectIds(userId);
-    // Restrict to the caller's projects; an explicit projectId filter is honoured
-    // only when it is one of the caller's own projects.
-    if (projectId && projectIds.includes(String(projectId))) {
-      param.projectId = projectId;
-    } else {
-      param.projectId = { $in: projectIds };
-    }
+    param.projectId = projectId ? String(projectId) : { $in: projectIds };
     return (await this.models.System().find(param).exec()) || [];
   }
 
@@ -142,9 +131,8 @@ export class SiteService {
     return (await this.models.System().find({ type: "web" }).exec()) || [];
   }
 
-  /** List web sites belonging to projects the caller is a member of. */
-  async getWebSiteListForUser(userId: string) {
-    const projectIds = await this.userProjectIds(userId);
+  /** List web sites inside an already-resolved project scope. */
+  async getWebSiteListInProjects(projectIds: string[]) {
     return (
       (await this.models
         .System()

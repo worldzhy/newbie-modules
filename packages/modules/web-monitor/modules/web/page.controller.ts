@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Query, Req } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func } from "../../shared/utils";
 import { PageService } from "./services/page.service";
@@ -12,6 +12,7 @@ import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { WebMonitorAccessService } from "./web-monitor-access.service";
+import { PROJECT_VISIBLE_IDS_RESOLVER, ProjectVisibleIdsResolver } from "../../shared/project-visible-ids.port";
 
 @ApiTags("Frontend Monitor / Web / Pages")
 @Controller("/web-monitor/pages")
@@ -19,6 +20,8 @@ export class PageController {
   constructor(
     private readonly pageSrv: PageService,
     private readonly access: WebMonitorAccessService,
+    @Inject(PROJECT_VISIBLE_IDS_RESOLVER)
+    private readonly projectVisibility: ProjectVisibleIdsResolver,
   ) {}
 
   @RequirePermission(PermissionAction.Get, "WebMonitorSite")
@@ -28,7 +31,8 @@ export class PageController {
   async getAveragePageList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
     const { projectId, applicationId } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const resolved = { ...q, appKey: appKey };
     const result = await this.pageSrv.getAveragePageList(resolved);
     return func.result({ data: result });
@@ -45,7 +49,8 @@ export class PageController {
     if (func.toDate(endTime).getTime() - func.toDate(beginTime).getTime() > 60000 * 60) {
       throw new BadRequestException("the interval between beginTime and endTime must not exceed one hour");
     }
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const resolved = { ...q, appKey: appKey };
     const data = await this.pageSrv.getRealTimeAveragePageList(resolved);
     return func.result({ data });
@@ -59,7 +64,8 @@ export class PageController {
     const { projectId, applicationId, url } = q;
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
     if (!url) throw new BadRequestException("url is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const resolved = { ...q, appKey: appKey };
     const result = await this.pageSrv.getOnePageList(resolved);
     return func.result({ data: result });
@@ -73,7 +79,8 @@ export class PageController {
     const { projectId, applicationId, id } = q;
     if (!id) throw new BadRequestException("id is required");
     if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
     const row = await this.pageSrv.getPageDetails(appKey, String(id));
     return func.result({ data: row || {} });
   }
