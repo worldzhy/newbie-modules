@@ -3,7 +3,8 @@ import { ConfigService } from "@nestjs/config";
 import { Octokit } from "@octokit/rest";
 import { createAppAuth } from "@octokit/auth-app";
 import { delay } from "@devbie/newbie/utilities/delay.util";
-import { decodeBase64Utf8, octokitStatus } from "@devbie/newbie/utilities/octokit.util";
+import { base64ToUtf8 } from "@devbie/newbie/utilities/base64.util";
+import { getErrorStatus } from "./error-status";
 
 /**
  * Thrown by any API method when the service was constructed without
@@ -214,7 +215,7 @@ export class GitHubService {
       const { data } = await this.client().repos.get({ owner: org, repo: name });
       return { cloneUrl: data.clone_url, generated: false };
     } catch (e: unknown) {
-      if (octokitStatus(e) !== 404) throw e;
+      if (getErrorStatus(e) !== 404) throw e;
     }
 
     // 2. Generate from template. 422 here means the name is taken by a repo
@@ -231,7 +232,7 @@ export class GitHubService {
       });
       gen = resp.data;
     } catch (e: unknown) {
-      if (octokitStatus(e) === 422) throw new RepoNameConflictError(org, name);
+      if (getErrorStatus(e) === 422) throw new RepoNameConflictError(org, name);
       throw e;
     }
 
@@ -243,7 +244,7 @@ export class GitHubService {
         await this.client().repos.get({ owner: org, repo: name });
         break;
       } catch (e: unknown) {
-        if (octokitStatus(e) !== 404) throw e;
+        if (getErrorStatus(e) !== 404) throw e;
         if (i === 2) {
           this.logger.warn(`Repo ${org}/${name} not ready after 3 retries, continuing anyway`);
         }
@@ -276,9 +277,9 @@ export class GitHubService {
       if (Array.isArray(data) || data.type !== "file") {
         return null;
       }
-      return { content: decodeBase64Utf8(data.content), sha: data.sha };
+      return { content: base64ToUtf8(data.content), sha: data.sha };
     } catch (e: unknown) {
-      if (octokitStatus(e) === 404) return null;
+      if (getErrorStatus(e) === 404) return null;
       throw e;
     }
   }
@@ -303,7 +304,7 @@ export class GitHubService {
       });
       return data.map((entry) => toRepositoryCommit(entry));
     } catch (e: unknown) {
-      if (octokitStatus(e) === 404) return [];
+      if (getErrorStatus(e) === 404) return [];
       throw e;
     }
   }
@@ -331,7 +332,7 @@ export class GitHubService {
         })),
       };
     } catch (e: unknown) {
-      if (octokitStatus(e) === 404) return null;
+      if (getErrorStatus(e) === 404) return null;
       throw e;
     }
   }
@@ -342,7 +343,7 @@ export class GitHubService {
       const { data } = await this.client().repos.getCommit({ owner, repo, ref });
       return toRepositoryCommit(data);
     } catch (e: unknown) {
-      if (octokitStatus(e) === 404) return null;
+      if (getErrorStatus(e) === 404) return null;
       throw e;
     }
   }
@@ -481,7 +482,7 @@ export class GitHubService {
     try {
       await this.client().repos.delete({ owner: org, repo });
     } catch (e: unknown) {
-      if (octokitStatus(e) !== 404) throw e;
+      if (getErrorStatus(e) !== 404) throw e;
     }
   }
 }

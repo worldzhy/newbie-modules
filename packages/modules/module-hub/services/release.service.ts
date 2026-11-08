@@ -2,9 +2,9 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { HubModuleRelease, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { octokitStatus } from "@devbie/newbie/utilities/octokit.util";
 import { AuditActorType, AuditLogService } from "@modules/audit/audit-log.service";
 import { GitHubService } from "@modules/github/github.service";
+import { getErrorStatus } from "@modules/github/error-status";
 
 /** Registry module directory prefix inside the registry monorepo. */
 const REGISTRY_MODULES_PREFIX = "packages/modules/";
@@ -273,7 +273,7 @@ export class ModuleHubReleaseService {
       const commit = await this.github.getCommit(owner, repo, sha);
       resolved = commit?.committedAt ?? null;
     } catch (error: unknown) {
-      const status = octokitStatus(error);
+      const status = getErrorStatus(error);
       if (status !== 404 && status !== 422) {
         this.logger.warn(`registry commit ${sha} lookup failed: ${(error as Error).message}`);
       }
