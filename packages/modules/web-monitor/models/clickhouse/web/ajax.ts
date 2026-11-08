@@ -8,6 +8,9 @@ export default function WebAjax(clickhouse: ClickHouseService, dbName: string) {
   const schema = {
     tableName: ClickHouseTablePrefix.WEB_AJAX,
     schema: {
+      // DateTime is an unsigned 32-bit epoch-seconds column: instants before
+      // 1970 or after 2106-02-07 are silently clamped by the writer, not
+      // rejected. See the range caveat in shared/utils.ts (R20-32).
       createTime: { type: ClickHouseDataType.DateTime, default: Date.now }, // Created time
       url: { type: ClickHouseDataType.String }, // AJAX URL
       method: { type: ClickHouseDataType.LowCardinality(ClickHouseDataType.String) }, // Request method
