@@ -5,8 +5,11 @@ import type { EvaluationFindingSeverity } from "./ports/evaluation.contracts";
  * notification layer (ADR-020 D4).
  *
  * The contract union is the type source of truth; this tuple is its runtime
- * form. Keep the two aligned: a value added to one must be added to the other,
- * and evaluation-severity.mapping.test.ts already pins the persisted mirror.
+ * form. `satisfies` alone only checks that every tuple member belongs to the
+ * union, so dropping one (e.g. "INFO") would still compile. The
+ * SeverityTupleIsExhaustive assertion below closes the other direction, and
+ * evaluation-severity.mapping.test.ts pins both sets against the persisted
+ * mirror at runtime.
  */
 export const SEVERITIES = [
   "INFO",
@@ -15,6 +18,15 @@ export const SEVERITIES = [
   "HIGH",
   "CRITICAL",
 ] as const satisfies readonly EvaluationFindingSeverity[];
+
+/**
+ * Bidirectional guard: assigning a union member the tuple omits to a
+ * `never`-constrained parameter fails to compile. Deleting "INFO" from
+ * SEVERITIES makes this type alias an error instead of silently shrinking the
+ * runtime vocabulary that isSeverity() and SEVERITY_RANK depend on.
+ */
+type AssertNever<T extends never> = T;
+export type SeverityTupleIsExhaustive = AssertNever<Exclude<EvaluationFindingSeverity, (typeof SEVERITIES)[number]>>;
 
 /** Ordinal rank for threshold and merge comparisons; CRITICAL is highest. */
 export const SEVERITY_RANK: Record<EvaluationFindingSeverity, number> = {
