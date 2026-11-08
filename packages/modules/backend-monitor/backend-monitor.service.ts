@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, PayloadTooLargeException } from "@nestjs/common";
 import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
+import { toClickHouseDateTime } from "@modules/clickhouse/clickhouse-datetime.util";
 import { computeErrorFingerprint } from "./error-fingerprint.util";
 import { MonitorTokenResolver, ResolvedMonitorToken } from "./monitor-token.resolver";
 import {
@@ -65,11 +66,6 @@ export interface ErrorLogRow {
   ip: string;
   user_agent: string;
   occurred_at: string;
-}
-
-/** Formats a JS Date to a ClickHouse DateTime64 string (UTC). */
-function toClickHouseDate(date: Date): string {
-  return date.toISOString().replace("T", " ").replace("Z", "");
 }
 
 @Injectable()
@@ -160,8 +156,8 @@ export class BackendMonitorService {
       path: event.path,
       method: event.method.toUpperCase(),
       status_code: event.statusCode,
-      request_at: toClickHouseDate(safeRequestAt),
-      response_at: toClickHouseDate(safeResponseAt),
+      request_at: toClickHouseDateTime(safeRequestAt),
+      response_at: toClickHouseDateTime(safeResponseAt),
       duration_ms: durationMs,
       env,
       instance_id: instanceId,
@@ -200,7 +196,7 @@ export class BackendMonitorService {
       app_version: appVersion,
       ip: event.ip ?? "",
       user_agent: event.userAgent ?? "",
-      occurred_at: toClickHouseDate(safeOccurredAt),
+      occurred_at: toClickHouseDateTime(safeOccurredAt),
     };
   }
 
