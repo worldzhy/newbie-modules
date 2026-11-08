@@ -14,6 +14,11 @@ import { RedisKeys, RedisKeyPrefix, ReportType } from "../../../models/enum";
 // before it is parked in the dead-letter list (R15-01/R9-07).
 const MAX_REPORT_ATTEMPTS = 3;
 const MAX_DEAD_LETTER_ENTRIES = 1000;
+// Upper bound for client-reported durations. ClickHouse `UInt32` rejects values
+// above 2^32-1 with Code 27, which would fail the whole ingest batch and poison
+// the queue (R20-04). Resource rows have always been clamped to 60s; ajax rows
+// share the same ceiling so an absurd `duration` cannot reach the writer.
+const MAX_DURATION_MS = 60_000;
 
 /**
  * Plain-row accumulators for one drain tick. ClickHouse destinations were
@@ -205,7 +210,7 @@ export class WebReportTaskService {
     // Invalid duration falls back to 0 for the speed-type threshold only — the
     // actual row write skips the field so Mongo $avg doesn't average in 0.
     let duration = Math.floor(Math.abs((rawDuration ?? 0) as number));
-    if (duration > 60000) duration = 60000;
+    if (duration > MAX_DURATION_MS) duration = MAX_DURATION_MS;
     if (item.type === "link" || item.type === "css") slowTime = (system.slowCssTime || 2) * 1000;
     else if (item.type === "script") slowTime = (system.slowJsTime || 2) * 1000;
     else if (item.type === "img") slowTime = (system.slowImgTime || 2) * 1000;
@@ -496,8 +501,9 @@ export class WebReportTaskService {
     const rawDuration = func.toNumberOrUndefined(item.duration);
     // Invalid duration falls back to 0 for the row write — CH silently
     // coerces NaN to 0 anyway (R12-02), but we normalize on the way in
-    // so the value is explicit.
-    const duration = Math.floor(Math.abs((rawDuration ?? 0) as number));
+    // so the value is explicit. The upper clamp keeps a client-supplied
+    // 1e21 from overflowing UInt32 and failing the whole batch (R20-04).
+    const duration = Math.min(Math.floor(Math.abs((rawDuration ?? 0) as number)), MAX_DURATION_MS);
 
     const _ajax: Record<string, unknown> = {
       appKey: data.appKey,
