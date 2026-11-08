@@ -4,6 +4,106 @@ import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 import { RedisService } from "@modules/redis/redis.service";
 import { SECURITY_RATE_LIMITER } from "../security-config.constants";
 
+export interface RateLimiterOptions {
+  keyPrefix: string;
+  points: number;
+  duration: number;
+}
+
+/** The subset of rate-limiter-flexible's API this module depends on. */
+export interface RateLimiterStore {
+  get(key: string): Promise<{ remainingPoints: number } | null>;
+  consume(key: string): Promise<{ remainingPoints: number }>;
+  delete(key: string): Promise<unknown>;
+}
+
+function createRedisStore(redisService: RedisService, options: RateLimiterOptions): RateLimiterStore | null {
+  return redisService.isConfigured()
+    ? new RateLimiterRedis({ storeClient: redisService.getClient(), ...options })
+    : null;
+}
+
+/**
+ * Rate limiter shared by the security providers and by feature modules that
+ * need their own quota (e.g. verification-code attempts).
+ *
+ * The Redis connection is created with `enableOfflineQueue: false`, so a blip
+ * rejects commands immediately. Rather than letting that rejection reach the
+ * global filter as a 500, a failure logs once per instance and the operation
+ * fails open.
+ */
+export class RateLimiter {
+  private readonly logger: Logger;
+  private readonly primary: RateLimiterStore;
+  private degraded = false;
+
+  constructor(options: RateLimiterOptions, primary: RateLimiterStore | null, context = RateLimiter.name) {
+    this.logger = new Logger(context);
+    this.primary = primary ?? new RateLimiterMemory(options);
+  }
+
+  /** Build a limiter backed by the shared Redis connection when configured. */
+  static fromRedis(redisService: RedisService, options: RateLimiterOptions, context: string): RateLimiter {
+    return new RateLimiter(options, createRedisStore(redisService, options), context);
+  }
+
+  async isAllowed(key: string): Promise<boolean> {
+    try {
+      const res = await this.primary.get(key);
+      this.recovered();
+      return !res ? true : res.remainingPoints > 0;
+    } catch (error) {
+      this.degradedTo(error);
+      return true;
+    }
+  }
+
+  /**
+   * Spend one point and report the remaining allowance. The verification-code
+   * flow uses this instead of a separate limiter instance so both share the
+   * same resilience behaviour.
+   */
+  async spend(key: string): Promise<number> {
+    try {
+      const res = await this.primary.consume(key);
+      this.recovered();
+      return res.remainingPoints;
+    } catch (error) {
+      this.degradedTo(error);
+      // The backend cannot be read, so the spent point is unknown; report an
+      // unbounded budget rather than inventing a value.
+      return Number.POSITIVE_INFINITY;
+    }
+  }
+
+  async increment(key: string): Promise<void> {
+    await this.spend(key);
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      await this.primary.delete(key);
+      this.recovered();
+    } catch (error) {
+      this.degradedTo(error);
+    }
+  }
+
+  private degradedTo(error: unknown): void {
+    if (this.degraded) return;
+    this.degraded = true;
+    this.logger.warn(
+      `Rate limiter backend unavailable; allowing requests until it recovers: ${getErrorMessage(error)}`,
+    );
+  }
+
+  private recovered(): void {
+    if (!this.degraded) return;
+    this.degraded = false;
+    this.logger.log("Rate limiter backend recovered; enforcing limits again.");
+  }
+}
+
 enum LimiterType {
   IP_ACCESS = "ip-access",
   IP_LOGIN = "ip-login",
@@ -12,95 +112,38 @@ enum LimiterType {
   TOTP_LOGIN = "totp-login",
 }
 
-abstract class RateLimiterService {
-  private limiter: RateLimiterMemory | RateLimiterRedis;
-  private points: number;
-  private duration: number;
-  private readonly logger = new Logger(RateLimiterService.name);
-  private degraded = false;
+const LIMITER_LIMITS: Record<LimiterType, { points: number; duration: number }> = {
+  [LimiterType.IP_ACCESS]: {
+    points: SECURITY_RATE_LIMITER.ipAccessLimiter.points,
+    duration: SECURITY_RATE_LIMITER.ipAccessLimiter.durationSeconds,
+  },
+  [LimiterType.IP_LOGIN]: {
+    points: SECURITY_RATE_LIMITER.ipLoginLimiter.points,
+    duration: SECURITY_RATE_LIMITER.ipLoginLimiter.durationSeconds,
+  },
+  [LimiterType.USER_LOGIN]: {
+    points: SECURITY_RATE_LIMITER.userLoginLimiter.points,
+    duration: SECURITY_RATE_LIMITER.userLoginLimiter.durationSeconds,
+  },
+  [LimiterType.INSTALLATION]: {
+    points: SECURITY_RATE_LIMITER.installationLimiter.points,
+    duration: SECURITY_RATE_LIMITER.installationLimiter.durationSeconds,
+  },
+  [LimiterType.TOTP_LOGIN]: {
+    points: SECURITY_RATE_LIMITER.totpLoginLimiter.points,
+    duration: SECURITY_RATE_LIMITER.totpLoginLimiter.durationSeconds,
+  },
+};
 
-  constructor(redis: RedisService, limiterType: LimiterType) {
-    switch (limiterType) {
-      case LimiterType.IP_ACCESS:
-        this.points = SECURITY_RATE_LIMITER.ipAccessLimiter.points;
-        this.duration = SECURITY_RATE_LIMITER.ipAccessLimiter.durationSeconds;
-        break;
-      case LimiterType.IP_LOGIN:
-        this.points = SECURITY_RATE_LIMITER.ipLoginLimiter.points;
-        this.duration = SECURITY_RATE_LIMITER.ipLoginLimiter.durationSeconds;
-        break;
-      case LimiterType.USER_LOGIN:
-        this.points = SECURITY_RATE_LIMITER.userLoginLimiter.points;
-        this.duration = SECURITY_RATE_LIMITER.userLoginLimiter.durationSeconds;
-        break;
-      case LimiterType.INSTALLATION:
-        this.points = SECURITY_RATE_LIMITER.installationLimiter.points;
-        this.duration = SECURITY_RATE_LIMITER.installationLimiter.durationSeconds;
-        break;
-      case LimiterType.TOTP_LOGIN:
-        this.points = SECURITY_RATE_LIMITER.totpLoginLimiter.points;
-        this.duration = SECURITY_RATE_LIMITER.totpLoginLimiter.durationSeconds;
-        break;
-    }
-
-    const options = {
-      keyPrefix: limiterType + "-",
-      points: this.points,
-      duration: this.duration,
-    };
-    // All limiters share the single connection owned by the redis foundation
-    // module; rate-limiter-flexible isolates them via keyPrefix.
-    this.limiter = redis.isConfigured()
-      ? new RateLimiterRedis({ storeClient: redis.getClient(), ...options })
-      : new RateLimiterMemory(options);
-  }
-
-  async isAllowed(key: string): Promise<boolean> {
-    try {
-      const res = await this.limiter.get(key);
-      this.markHealthy();
-      // If there are no previous attempts, allow. Otherwise, check if there are remaining points.
-      return !res ? true : res.remainingPoints > 0;
-    } catch (error) {
-      // Fail open: the shared Redis connection is a fast-fail one
-      // (enableOfflineQueue: false), so an outage would otherwise turn every
-      // login/TOTP/installation request into a 500. Availability wins here;
-      // the degradation is reported once per outage.
-      this.markDegraded("isAllowed", error);
-      return true;
-    }
-  }
-
-  async increment(key: string): Promise<void> {
-    try {
-      await this.limiter.consume(key);
-      this.markHealthy();
-    } catch (error) {
-      this.markDegraded("increment", error);
-    }
-  }
-
-  async delete(key: string): Promise<void> {
-    try {
-      await this.limiter.delete(key);
-      this.markHealthy();
-    } catch (error) {
-      this.markDegraded("delete", error);
-    }
-  }
-
-  private markDegraded(operation: string, error: unknown): void {
-    if (this.degraded) return;
-    this.degraded = true;
-    this.logger.warn(
-      `Rate limiter backend unavailable during ${operation}; allowing requests until it recovers: ${getErrorMessage(error)}`,
-    );
-  }
-
-  private markHealthy(): void {
-    if (!this.degraded) return;
-    this.degraded = false;
-    this.logger.log("Rate limiter backend recovered; enforcing limits again.");
+/**
+ * Security-owned buckets. The window comes from the security config, so these
+ * providers stay thin wrappers over the shared limiter.
+ */
+abstract class RateLimiterService extends RateLimiter {
+  constructor(redisService: RedisService, limiterType: LimiterType) {
+    const limits = LIMITER_LIMITS[limiterType];
+    const options = { keyPrefix: limiterType + "-", points: limits.points, duration: limits.duration };
+    super(options, createRedisStore(redisService, options), `RateLimiter(${limiterType})`);
   }
 }
 

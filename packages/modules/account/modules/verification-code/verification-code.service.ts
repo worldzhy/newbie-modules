@@ -4,8 +4,8 @@ import { Prisma, VerificationCode, VerificationCodeStatus, VerificationCodeUse }
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { currentPlusMinutes } from "@devbie/newbie/utilities/datetime.util";
 import { generateRandomNumbers } from "@devbie/newbie/utilities/common.util";
-import { RateLimiterMemory, RateLimiterRedis } from "rate-limiter-flexible";
 import { RedisService } from "@modules/redis/redis.service";
+import { RateLimiter } from "@modules/security/rate-limiter/rate-limiter.service";
 
 /** A verification code is bound to either an email address or a phone number. */
 type VerificationCodeTarget = { email: string } | { phone: string };
@@ -14,7 +14,7 @@ type VerificationCodeTarget = { email: string } | { phone: string };
 export class VerificationCodeService {
   public timeoutMinutes: number; // The verification code will be invalid after x minutes.
   public resendMinutes: number; // The verification code can be resend after y minute.
-  private attemptLimiter: RateLimiterMemory | RateLimiterRedis;
+  private attemptLimiter: RateLimiter;
 
   constructor(
     private readonly config: ConfigService,
@@ -27,17 +27,18 @@ export class VerificationCodeService {
 
     // Bound the number of wrong codes accepted against one target, otherwise
     // the 6-digit code could be brute forced online within its validity window.
-    const limiterOptions = {
-      keyPrefix: "verification-code-attempt-",
-      points: maxAttempts,
-      duration: this.timeoutMinutes * 60,
-    };
-    this.attemptLimiter = this.redis.isConfigured()
-      ? new RateLimiterRedis({
-          storeClient: this.redis.getClient(),
-          ...limiterOptions,
-        })
-      : new RateLimiterMemory(limiterOptions);
+    // Reuses the security module's resilient limiter instead of building a
+    // second RateLimiterRedis: a Redis blip must not turn login/reset into 500s,
+    // and the attempt budget must keep being enforced from the local bucket.
+    this.attemptLimiter = RateLimiter.fromRedis(
+      this.redis,
+      {
+        keyPrefix: "verification-code-attempt-",
+        points: maxAttempts,
+        duration: this.timeoutMinutes * 60,
+      },
+      VerificationCodeService.name,
+    );
   }
 
   async generateForEmail(email: string, use: VerificationCodeUse): Promise<VerificationCode> {
@@ -174,21 +175,21 @@ export class VerificationCodeService {
 
   /** Reject before any lookup once the wrong-attempt budget for this target is spent. */
   private async assertAttemptBudget(target: VerificationCodeTarget, use: VerificationCodeUse): Promise<void> {
-    const previousAttempts = await this.attemptLimiter.get(this.attemptKey(target, use));
-    if (previousAttempts !== null && previousAttempts.remainingPoints <= 0) {
+    const allowed = await this.attemptLimiter.isAllowed(this.attemptKey(target, use));
+    if (!allowed) {
       await this.inactivate(target, use);
       throw this.codeAttemptsExhaustedException();
     }
   }
 
   /**
-   * Spend one wrong-attempt. penalty() records the failure without rejecting
-   * at the threshold, so the caller still gets a normal "invalid code" answer
-   * on the fifth miss; the next request is what fails closed via get().
+   * Spend one wrong-attempt. spend() records the failure without rejecting at
+   * the threshold, so the caller still gets a normal "invalid code" answer on
+   * the fifth miss; the next request is what fails closed via isAllowed().
    */
   private async recordFailedAttempt(target: VerificationCodeTarget, use: VerificationCodeUse): Promise<void> {
-    const attemptRecord = await this.attemptLimiter.penalty(this.attemptKey(target, use));
-    if (attemptRecord.remainingPoints <= 0) {
+    const remainingPoints = await this.attemptLimiter.spend(this.attemptKey(target, use));
+    if (remainingPoints <= 0) {
       await this.inactivate(target, use);
     }
   }
