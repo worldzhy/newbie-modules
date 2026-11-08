@@ -8,6 +8,9 @@
   },
   "requires": {
     "modules": ["security"],
+    "env": {
+      "AWS_PLATFORM_ACCOUNT_ID": ""
+    },
     "dependencies": {
       "@aws-sdk/client-sts": "latest",
       "@aws-sdk/credential-provider-node": "latest"
