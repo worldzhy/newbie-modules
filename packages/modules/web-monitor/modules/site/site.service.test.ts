@@ -18,34 +18,34 @@ function newService(captured: Filter[]): SiteService {
   return new SiteService(models as never, {} as never);
 }
 
-test("getSitesInProjects scopes the query to the given project ids", async () => {
+test("getSitesInAppKeys scopes the query to the given appKeys", async () => {
   const captured: Filter[] = [];
-  await newService(captured).getSitesInProjects({}, ["p1", "p2"]);
-  assert.deepEqual(captured[0], { projectId: { $in: ["p1", "p2"] } });
+  await newService(captured).getSitesInAppKeys({}, ["abc1234", "def5678"]);
+  assert.deepEqual(captured[0], { appKey: { $in: ["abc1234", "def5678"] } });
 });
 
-test("getSitesInProjects keeps an explicit projectId filter when the caller passes one", async () => {
+test("getSitesInAppKeys keeps an explicit appKey filter when the caller passes one", async () => {
   const captured: Filter[] = [];
-  await newService(captured).getSitesInProjects({ projectId: "p2" }, ["p1", "p2"]);
-  assert.deepEqual(captured[0], { projectId: "p2" });
+  await newService(captured).getSitesInAppKeys({ appKey: "def5678" }, ["abc1234", "def5678"]);
+  assert.deepEqual(captured[0], { appKey: "def5678" });
 });
 
-test("getSitesInProjects keeps the text filters alongside the scope", async () => {
+test("getSitesInAppKeys keeps the text filters alongside the scope", async () => {
   const captured: Filter[] = [];
-  await newService(captured).getSitesInProjects({ systemName: "api", type: "web" }, ["p1"]);
+  await newService(captured).getSitesInAppKeys({ systemName: "api", type: "web" }, ["abc1234"]);
   assert.equal(captured[0].type, "web");
   assert.ok(captured[0].systemName instanceof RegExp);
-  assert.deepEqual(captured[0].projectId, { $in: ["p1"] });
+  assert.deepEqual(captured[0].appKey, { $in: ["abc1234"] });
 });
 
-test("getWebSiteListInProjects scopes web sites to the given project ids", async () => {
+test("getWebSiteListInAppKeys scopes web sites to the given appKeys", async () => {
   const captured: Filter[] = [];
-  await newService(captured).getWebSiteListInProjects(["p1"]);
-  assert.deepEqual(captured[0], { type: "web", projectId: { $in: ["p1"] } });
+  await newService(captured).getWebSiteListInAppKeys(["abc1234"]);
+  assert.deepEqual(captured[0], { type: "web", appKey: { $in: ["abc1234"] } });
 });
 
 test("an empty scope matches nothing", async () => {
   const captured: Filter[] = [];
-  await newService(captured).getWebSiteListInProjects([]);
-  assert.deepEqual(captured[0], { type: "web", projectId: { $in: [] } });
+  await newService(captured).getWebSiteListInAppKeys([]);
+  assert.deepEqual(captured[0], { type: "web", appKey: { $in: [] } });
 });

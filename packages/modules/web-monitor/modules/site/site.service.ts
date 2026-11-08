@@ -60,15 +60,17 @@ export class SiteService {
   }
 
   /**
-   * List systems inside an already-resolved project scope. Permission is the
-   * caller's concern: this service never sees a user or derives visibility.
+   * List systems inside an already-resolved appKey scope. Visibility is the
+   * caller's concern: this service never sees a user or resolves a project.
    */
-  async getSitesInProjects(query: Record<string, unknown>, projectIds: string[]) {
-    const { systemName, type, projectId } = query;
+  async getSitesInAppKeys(query: Record<string, unknown>, appKeys: string[]) {
+    const { systemName, type, appKey } = query;
     const param: Record<string, unknown> = {};
     if (systemName) param.systemName = new RegExp(func.escapeRegExp(systemName));
     if (type) param.type = type;
-    param.projectId = projectId ? String(projectId) : { $in: projectIds };
+    // The controller has already proven an explicit appKey is in scope, so it is
+    // used as-is; otherwise the query is limited to the whole resolved scope.
+    param.appKey = appKey ? String(appKey) : { $in: appKeys };
     return (await this.models.System().find(param).exec()) || [];
   }
 
@@ -91,12 +93,12 @@ export class SiteService {
     return (await this.models.System().find({ type: "web" }).exec()) || [];
   }
 
-  /** List web sites inside an already-resolved project scope. */
-  async getWebSiteListInProjects(projectIds: string[]) {
+  /** List web sites inside an already-resolved appKey scope. */
+  async getWebSiteListInAppKeys(appKeys: string[]) {
     return (
       (await this.models
         .System()
-        .find({ type: "web", projectId: { $in: projectIds } })
+        .find({ type: "web", appKey: { $in: appKeys } })
         .exec()) || []
     );
   }

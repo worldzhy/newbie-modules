@@ -7,7 +7,7 @@ import { WebMonitorSiteResponseDto } from "./site.dto";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { WebMonitorAccessService } from "../web/web-monitor-access.service";
-import { PROJECT_VISIBLE_IDS_RESOLVER, ProjectVisibleIdsResolver } from "../../shared/project-visible-ids.port";
+import { VISIBLE_APP_KEYS_RESOLVER, VisibleAppKeysResolver } from "../../shared/visible-app-keys.port";
 
 @ApiTags("Frontend Monitor / System")
 @Controller("/web-monitor/system")
@@ -15,25 +15,19 @@ export class SiteController {
   constructor(
     private readonly site: SiteService,
     private readonly access: WebMonitorAccessService,
-    @Inject(PROJECT_VISIBLE_IDS_RESOLVER)
-    private readonly projectVisibility: ProjectVisibleIdsResolver,
+    @Inject(VISIBLE_APP_KEYS_RESOLVER)
+    private readonly projectVisibility: VisibleAppKeysResolver,
   ) {}
 
   @Post("/update")
   @RequirePermission(PermissionAction.Update, "WebMonitorSite")
-  @ApiOperation({ summary: "Update a monitoring system (with project membership gate)" })
+  @ApiOperation({ summary: "Update a monitoring system (with membership gate)" })
   @ApiResponse({ type: Object })
   async updateSite(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const projectId = pickRequestId(req, "projectId");
-    const applicationId = pickRequestId(req, "applicationId");
-    if (!projectId || !applicationId) {
-      throw new BadRequestException("projectId and applicationId are required");
-    }
-    // The partition key must never come from the request body: derive it from
-    // the installation registered for this project/application pair so a
-    // caller cannot target another tenant's site by supplying their appKey.
-    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
-    const appKey = await this.access.resolveAppKey(projectIds, projectId, applicationId);
+    // The partition key is scoped by the host, never trusted from the body:
+    // a caller outside the appKey's visible scope gets a uniform 403.
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const res = await this.site.updateSiteData(appKey, body);
     return res;
   }
@@ -43,26 +37,22 @@ export class SiteController {
   @ApiOperation({ summary: "Get systems for a user" })
   @ApiResponse({ type: WebMonitorSiteResponseDto, isArray: true })
   async getSites(@Query() query: Record<string, unknown>, @Req() req: UserRequest) {
-    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
-    // Current behavior (pending the explicit-vs-silent decision): an explicit
-    // projectId outside the caller's scope is ignored, not rejected.
-    const requested = typeof query.projectId === "string" ? query.projectId : undefined;
-    const scopedQuery = requested && !projectIds.includes(requested) ? { ...query, projectId: undefined } : query;
-    const result = await this.site.getSitesInProjects(scopedQuery, projectIds);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    // An explicit appKey outside the caller's scope is rejected (uniform 403),
+    // never silently dropped: the list must not answer a question it filtered.
+    const requested = pickRequestId(req, "appKey");
+    if (requested) this.access.assertVisibleAppKey(appKeys, requested);
+    const result = await this.site.getSitesInAppKeys(query, appKeys);
     return func.result({ data: result });
   }
 
   @Get("/getSystemForId")
   @RequirePermission(PermissionAction.Get, "WebMonitorSite")
-  @ApiOperation({ summary: "Get system by applicationId (with project membership gate)" })
+  @ApiOperation({ summary: "Get system by appKey (with membership gate)" })
   @ApiResponse({ type: WebMonitorSiteResponseDto })
   async getSiteForId(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId } = q;
-    if (!projectId || !applicationId) {
-      throw new BadRequestException("projectId and applicationId are required");
-    }
-    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
-    const appKey = await this.access.resolveAppKey(projectIds, String(projectId), String(applicationId));
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const result = await this.site.getSiteForDb(appKey);
     return func.result({ data: result });
   }
@@ -72,8 +62,8 @@ export class SiteController {
   @ApiOperation({ summary: "Get web system list" })
   @ApiResponse({ type: WebMonitorSiteResponseDto, isArray: true })
   async getWebSiteList(@Req() req: UserRequest) {
-    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
-    const result = await this.site.getWebSiteListInProjects(projectIds);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const result = await this.site.getWebSiteListInAppKeys(appKeys);
     return func.result({ data: result });
   }
 
@@ -82,15 +72,10 @@ export class SiteController {
   @ApiOperation({ summary: "Delete a user from a system" })
   @ApiResponse({ type: Object })
   async deleteWebSiteUser(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const projectId = pickRequestId(req, "projectId");
-    const applicationId = pickRequestId(req, "applicationId");
     const userToken = body.userToken;
-    if (!projectId || !applicationId) {
-      throw new BadRequestException("projectId and applicationId are required");
-    }
     if (!userToken) throw new BadRequestException("Delete a user from the system: userToken is required");
-    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
-    const appKey = await this.access.resolveAppKey(projectIds, projectId, applicationId);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const result = await this.site.deleteWebSiteUser(appKey, String(userToken));
     return func.result({ data: result });
   }
@@ -100,32 +85,22 @@ export class SiteController {
   @ApiOperation({ summary: "Add a user to a system" })
   @ApiResponse({ type: Object })
   async addWebSiteUser(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const projectId = pickRequestId(req, "projectId");
-    const applicationId = pickRequestId(req, "applicationId");
     const userToken = body.userToken;
-    if (!projectId || !applicationId) {
-      throw new BadRequestException("projectId and applicationId are required");
-    }
     if (!userToken) throw new BadRequestException("Add a user to the system: userToken is required");
-    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
-    const appKey = await this.access.resolveAppKey(projectIds, projectId, applicationId);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const result = await this.site.addWebSiteUser(appKey, String(userToken));
     return func.result({ data: result });
   }
 
   @Post("/deleteSystem")
   @RequirePermission(PermissionAction.Delete, "WebMonitorSite")
-  @ApiOperation({ summary: "Delete a system (with project membership gate)" })
+  @ApiOperation({ summary: "Delete a system (with membership gate)" })
   @ApiResponse({ type: Object })
   async deleteSite(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const projectId = pickRequestId(req, "projectId");
-    const applicationId = pickRequestId(req, "applicationId");
     const type = body.type;
-    if (!projectId || !applicationId) {
-      throw new BadRequestException("projectId and applicationId are required");
-    }
-    const projectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
-    const appKey = await this.access.resolveAppKey(projectIds, projectId, applicationId);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const result = await this.site.deleteSite(appKey, String(type));
     return func.result({ data: result });
   }
