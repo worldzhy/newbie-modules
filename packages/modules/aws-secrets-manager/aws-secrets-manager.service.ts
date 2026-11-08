@@ -8,7 +8,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 import {
   CancelRotateSecretCommand,
   CreateSecretCommand,
@@ -62,7 +62,7 @@ export class AwsSecretsManagerService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly credentialService: AwsCredentialsService,
+    private readonly credentialService: AwsCrossAccountBindingsService,
   ) {}
 
   /**

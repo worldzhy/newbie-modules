@@ -13,7 +13,7 @@ import { promises as fs } from "fs";
 import { join } from "path";
 import { marked } from "marked";
 import { render } from "mustache";
-import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 
 @Injectable()
 export class AwsSesService {
@@ -23,7 +23,7 @@ export class AwsSesService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly credentials: AwsCredentialsService,
+    private readonly credentials: AwsCrossAccountBindingsService,
   ) {
     const config = this.configService.getOrThrow<{
       region: string;

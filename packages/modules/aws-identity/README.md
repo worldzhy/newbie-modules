@@ -47,12 +47,12 @@ All routes are scoped by host scope id; request/response shape is stable
 across host applications:
 
 ```
-GET    /aws-credentials/projects/:projectId
-POST   /aws-credentials/projects/:projectId/bootstrap
-PUT    /aws-credentials/projects/:projectId
-POST   /aws-credentials/projects/:projectId/rebind
-DELETE /aws-credentials/projects/:projectId/rebind
-POST   /aws-credentials/projects/:projectId/verify
-POST   /aws-credentials/projects/:projectId/rotate-external-id
-DELETE /aws-credentials/projects/:projectId
+GET    /aws-cross-account-bindings/projects/:projectId
+POST   /aws-cross-account-bindings/projects/:projectId/bootstrap
+PUT    /aws-cross-account-bindings/projects/:projectId
+POST   /aws-cross-account-bindings/projects/:projectId/rebind
+DELETE /aws-cross-account-bindings/projects/:projectId/rebind
+POST   /aws-cross-account-bindings/projects/:projectId/verify
+POST   /aws-cross-account-bindings/projects/:projectId/rotate-external-id
+DELETE /aws-cross-account-bindings/projects/:projectId
 ```

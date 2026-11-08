@@ -1,11 +1,11 @@
 import { Global, Module } from "@nestjs/common";
-import { AwsCredentialsController } from "./aws-credentials.controller";
-import { AwsCredentialsService } from "./aws-credentials.service";
+import { AwsCrossAccountBindingsController } from "./aws-cross-account-bindings.controller";
+import { AwsCrossAccountBindingsService } from "./aws-cross-account-bindings.service";
 
 @Global()
 @Module({
-  controllers: [AwsCredentialsController],
-  providers: [AwsCredentialsService],
-  exports: [AwsCredentialsService],
+  controllers: [AwsCrossAccountBindingsController],
+  providers: [AwsCrossAccountBindingsService],
+  exports: [AwsCrossAccountBindingsService],
 })
 export class AwsIdentityModule {}

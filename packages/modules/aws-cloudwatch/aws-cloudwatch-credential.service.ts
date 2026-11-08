@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 import type { AwsCredentialsProvider } from "@modules/aws-identity/aws-sts.helper";
 
 export interface ResolvedCloudwatchCredential {
@@ -17,7 +17,7 @@ export interface ResolvedCloudwatchCredential {
  */
 @Injectable()
 export class AwsCloudwatchCredentialService {
-  constructor(private readonly credentialService: AwsCredentialsService) {}
+  constructor(private readonly credentialService: AwsCrossAccountBindingsService) {}
 
   async resolve(projectId: string): Promise<ResolvedCloudwatchCredential> {
     const credential = await this.credentialService.resolveProjectCredential(projectId);

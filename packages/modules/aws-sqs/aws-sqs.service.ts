@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { SQSClient, SendMessageCommand, GetQueueAttributesCommand, QueueAttributeName } from "@aws-sdk/client-sqs";
 import { ConfigService } from "@nestjs/config";
-import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 
 @Injectable()
 export class AwsSqsService {
@@ -10,7 +10,7 @@ export class AwsSqsService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly credentials: AwsCredentialsService,
+    private readonly credentials: AwsCrossAccountBindingsService,
   ) {
     const config = this.configService.getOrThrow<{
       region: string;

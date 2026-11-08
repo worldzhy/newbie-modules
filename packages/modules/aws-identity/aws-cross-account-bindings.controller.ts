@@ -2,18 +2,18 @@ import { Body, Controller, Delete, Get, Param, Post, Put } from "@nestjs/common"
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
-import { AwsCredentialsService } from "./aws-credentials.service";
+import { AwsCrossAccountBindingsService } from "./aws-cross-account-bindings.service";
 import {
   AwsCrossAccountBindingResponseDto,
   UpsertAwsCrossAccountBindingDto,
   VerifyAwsCrossAccountBindingResponseDto,
-} from "./aws-credentials.dto";
+} from "./aws-cross-account-bindings.dto";
 
-@ApiTags("AWS Credential")
+@ApiTags("AWS Cross-Account Binding")
 @ApiBearerAuth()
-@Controller("aws-credentials/projects")
-export class AwsCredentialsController {
-  constructor(private readonly service: AwsCredentialsService) {}
+@Controller("aws-cross-account-bindings/projects")
+export class AwsCrossAccountBindingsController {
+  constructor(private readonly service: AwsCrossAccountBindingsService) {}
 
   @Get(":projectId")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsCrossAccountBinding)

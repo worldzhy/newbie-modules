@@ -11,7 +11,7 @@ import { ConfigService } from "@nestjs/config";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCrossAccountBinding } from "@generated/prisma/client";
-import { UpsertAwsCrossAccountBindingDto } from "./aws-credentials.dto";
+import { UpsertAwsCrossAccountBindingDto } from "./aws-cross-account-bindings.dto";
 import {
   assumeRole,
   AwsCallerIdentity,
@@ -37,7 +37,7 @@ const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
 export const AWS_BINDING_CREDENTIAL_REF_PREFIX = "aws-binding:";
 
 /** Format the opaque credential reference naming one cross-account binding. */
-export function awsBindingCredentialRef(bindingId: string): string {
+export function awsBindingRef(bindingId: string): string {
   return `${AWS_BINDING_CREDENTIAL_REF_PREFIX}${bindingId}`;
 }
 
@@ -63,8 +63,8 @@ interface AssumedSession {
 }
 
 @Injectable()
-export class AwsCredentialsService {
-  private readonly logger = new Logger(AwsCredentialsService.name);
+export class AwsCrossAccountBindingsService {
+  private readonly logger = new Logger(AwsCrossAccountBindingsService.name);
   private readonly sessionCache = new Map<string, Promise<AssumedSession>>();
   /**
    * Single host-default credential source shared by every default-plane
@@ -376,7 +376,7 @@ export class AwsCredentialsService {
 
   /**
    * Resolve a binding through its opaque credential reference
-   * (`"aws-binding:<id>"`, see awsBindingCredentialRef). Consumers register the
+   * (`"aws-binding:<id>"`, see awsBindingRef). Consumers register the
    * reference once and resolve it here on every use; a reference whose binding
    * or role no longer exists throws, which the caller surfaces as-is.
    */
