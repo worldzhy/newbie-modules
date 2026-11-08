@@ -50,10 +50,15 @@ export class EvaluationSubjectService {
         subjectKey: descriptor.subjectKey,
         displayName: descriptor.displayName,
         metadata: descriptor.metadata as Prisma.InputJsonValue | undefined,
+        credentialRef: descriptor.credentialRef ?? null,
       },
       update: {
         displayName: descriptor.displayName,
         metadata: descriptor.metadata as Prisma.InputJsonValue | undefined,
+        // A re-registration refreshes the pointer (the credential it names may
+        // have been recreated); a submission that omits it never clears the
+        // stored value.
+        ...(descriptor.credentialRef !== undefined ? { credentialRef: descriptor.credentialRef } : {}),
       },
     });
   }
@@ -103,6 +108,7 @@ export function toSubjectRef(subject: {
   scopeId: string;
   subjectKey: string;
   displayName: string;
+  credentialRef?: string | null;
 }): EvaluationSubjectRef {
   return {
     id: subject.id,
@@ -111,5 +117,6 @@ export function toSubjectRef(subject: {
     scopeId: subject.scopeId,
     subjectKey: subject.subjectKey,
     displayName: subject.displayName,
+    credentialRef: subject.credentialRef ?? null,
   };
 }

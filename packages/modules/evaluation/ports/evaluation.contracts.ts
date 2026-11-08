@@ -16,6 +16,12 @@ export interface EvaluationScope {
 /**
  * A subject as its feature describes it. `subjectKey` is the feature's stable
  * natural identity inside the scope — the skeleton never derives it.
+ *
+ * `credentialRef` is an opaque pointer to host-held credentials, captured at
+ * registration time when evaluating the subject requires them. The skeleton
+ * stores it verbatim and threads it onto the subject ref; resolving it is the
+ * host's business, and omitting it on a later submission never clears a
+ * previously stored value.
  */
 export interface EvaluationSubjectDescriptor {
   kind: string;
@@ -24,6 +30,7 @@ export interface EvaluationSubjectDescriptor {
   subjectKey: string;
   displayName: string;
   metadata?: Record<string, unknown>;
+  credentialRef?: string | null;
 }
 
 /** A stored subject, detached from Prisma. */
@@ -34,6 +41,8 @@ export interface EvaluationSubjectRef {
   scopeId: string;
   subjectKey: string;
   displayName: string;
+  /** Opaque host-side credential pointer registered at ingest; null when none. */
+  credentialRef?: string | null;
 }
 
 /** A published criteria version, detached from Prisma. */

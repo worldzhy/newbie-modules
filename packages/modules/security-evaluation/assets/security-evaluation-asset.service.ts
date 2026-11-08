@@ -24,6 +24,14 @@ export interface IngestSecurityEvaluationSubjectInput {
   metadata?: Record<string, unknown>;
   sourceType: string;
   sourceId: string;
+  /**
+   * Opaque pointer to the host credentials this subject is evaluated with
+   * (e.g. `"aws-binding:<id>"` for an aws-account subject). Captured here —
+   * the registration point — so evidence collection never has to rediscover
+   * credentials through provenance. The module stores it verbatim and never
+   * resolves it.
+   */
+  credentialRef?: string | null;
 }
 
 export interface IngestSecurityEvaluationSubjectResult {
@@ -93,6 +101,7 @@ export class SecurityEvaluationAssetService {
         subjectKey: submission.subjectKey,
         displayName: submission.displayName,
         metadata: submission.metadata,
+        credentialRef: submission.credentialRef,
       });
       const asset = await this.getOrCreateAsset(toSubjectRef(subject));
       const now = new Date();

@@ -28,6 +28,19 @@ const REFRESH_SAFETY_WINDOW_MS = 5 * 60 * 1000;
 /** Fallback lifetime when STS omits an expiration (it never does in practice). */
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
 
+/**
+ * Credential-reference vocabulary: other modules point at a binding through an
+ * opaque `"aws-binding:<id>"` string captured at their own registration time,
+ * so resolving a subject to its credentials never requires rediscovering the
+ * binding through the host's domain objects.
+ */
+export const AWS_BINDING_CREDENTIAL_REF_PREFIX = "aws-binding:";
+
+/** Format the opaque credential reference naming one cross-account binding. */
+export function awsBindingCredentialRef(bindingId: string): string {
+  return `${AWS_BINDING_CREDENTIAL_REF_PREFIX}${bindingId}`;
+}
+
 export interface ResolvedAwsCredentials {
   bindingId: string;
   roleArn: string;
@@ -358,10 +371,34 @@ export class AwsCredentialsService {
     if (!binding?.roleArn) {
       throw new BadRequestException("AWS cross-account role is not configured for this host scope");
     }
+    return this.toResolvedCredentials(binding);
+  }
+
+  /**
+   * Resolve a binding through its opaque credential reference
+   * (`"aws-binding:<id>"`, see awsBindingCredentialRef). Consumers register the
+   * reference once and resolve it here on every use; a reference whose binding
+   * or role no longer exists throws, which the caller surfaces as-is.
+   */
+  async resolveCredentialByRef(credentialRef: string): Promise<ResolvedAwsCredentials> {
+    if (!credentialRef.startsWith(AWS_BINDING_CREDENTIAL_REF_PREFIX)) {
+      throw new BadRequestException(`Unsupported AWS credential reference "${credentialRef}"`);
+    }
+    const bindingId = credentialRef.slice(AWS_BINDING_CREDENTIAL_REF_PREFIX.length);
+    const binding = await this.prisma.awsCrossAccountBinding.findUnique({ where: { id: bindingId } });
+    if (!binding?.roleArn) {
+      throw new BadRequestException(
+        `AWS credential reference "${credentialRef}" does not resolve to a configured cross-account role`,
+      );
+    }
+    return this.toResolvedCredentials(binding);
+  }
+
+  private toResolvedCredentials(binding: AwsCrossAccountBinding): ResolvedAwsCredentials {
     const regions = binding.regions?.length ? binding.regions : [DEFAULT_REGION];
     return {
       bindingId: binding.id,
-      roleArn: binding.roleArn,
+      roleArn: binding.roleArn!,
       awsAccountId: binding.awsAccountId,
       roleName: binding.roleName,
       defaultRegion: binding.defaultRegion || regions[0],

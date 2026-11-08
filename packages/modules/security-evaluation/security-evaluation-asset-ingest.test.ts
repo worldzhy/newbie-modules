@@ -21,6 +21,7 @@ interface FakeSubjectRow {
   subjectKey: string;
   displayName: string;
   metadata: Record<string, unknown> | undefined;
+  credentialRef: string | null;
 }
 
 interface FakeAssetRow {
@@ -57,7 +58,7 @@ function fakePrisma() {
           };
         };
         create: Omit<FakeSubjectRow, "id">;
-        update: { displayName: string; metadata: Record<string, unknown> | undefined };
+        update: { displayName: string; metadata: Record<string, unknown> | undefined; credentialRef?: string | null };
       }) => {
         const key = args.where.kind_scopeType_scopeId_subjectKey;
         const existing = subjects.find(
@@ -70,6 +71,11 @@ function fakePrisma() {
         if (existing) {
           existing.displayName = args.update.displayName;
           existing.metadata = args.update.metadata;
+          // Mirrors EvaluationSubjectService: an omitted ref never clears the
+          // stored one; an explicit value (including null) overwrites.
+          if (args.update.credentialRef !== undefined) {
+            existing.credentialRef = args.update.credentialRef;
+          }
           return existing;
         }
         const created: FakeSubjectRow = { id: `subject-${nextId++}`, ...args.create };
@@ -139,6 +145,7 @@ function fakeSubjectService(prisma: PrismaService) {
       subjectKey: string;
       displayName: string;
       metadata?: Record<string, unknown>;
+      credentialRef?: string | null;
     }) => {
       const { evaluationSubject } = prisma as unknown as {
         evaluationSubject: { upsert: (args: unknown) => Promise<FakeSubjectRow> };
@@ -152,8 +159,12 @@ function fakeSubjectService(prisma: PrismaService) {
             subjectKey: descriptor.subjectKey,
           },
         },
-        create: descriptor,
-        update: { displayName: descriptor.displayName, metadata: descriptor.metadata },
+        create: { ...descriptor, credentialRef: descriptor.credentialRef ?? null },
+        update: {
+          displayName: descriptor.displayName,
+          metadata: descriptor.metadata,
+          ...(descriptor.credentialRef !== undefined ? { credentialRef: descriptor.credentialRef } : {}),
+        },
       });
     },
   };
@@ -222,4 +233,35 @@ test("distinct subject keys stay distinct; source filter resolves them", async (
   ]);
   assert.deepEqual(await service.listSubjectIdsBySource({ scopeId: "p-2" }), [fake.subjects[2].id]);
   assert.deepEqual(await service.listSubjectIdsBySource({ scopeType: "project", scopeId: "missing" }), []);
+});
+
+test("ingest registers the credential reference; a re-registration refreshes it, an omitted one keeps it", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  const submission = {
+    kind: "aws-account",
+    subjectKey: "123456789012",
+    displayName: "acct",
+    sourceType: "project",
+    sourceId: "p-1",
+    credentialRef: "aws-binding:binding-1",
+  };
+  await service.ingest([submission]);
+  assert.equal(fake.subjects[0].credentialRef, "aws-binding:binding-1");
+
+  // The binding was recreated: the new registration overwrites the pointer.
+  await service.ingest([{ ...submission, credentialRef: "aws-binding:binding-2" }]);
+  assert.equal(fake.subjects.length, 1);
+  assert.equal(fake.subjects[0].credentialRef, "aws-binding:binding-2");
+
+  // A submission without the field (e.g. a repository ingest) never clears it.
+  await service.ingest([
+    { kind: "repository", subjectKey: "repo-1", displayName: "o/r", sourceType: "project", sourceId: "p-1" },
+  ]);
+  assert.equal(fake.subjects[1].credentialRef, null);
+  await service.ingest([
+    { kind: "repository", subjectKey: "repo-1", displayName: "o/r", sourceType: "project", sourceId: "p-1" },
+  ]);
+  assert.equal(fake.subjects[0].credentialRef, "aws-binding:binding-2");
 });

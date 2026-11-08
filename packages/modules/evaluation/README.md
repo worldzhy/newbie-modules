@@ -12,7 +12,10 @@ One concept, one word.
 - **subject** (`EvaluationSubject`) — the thing being evaluated. `kind` is
   feature-defined (`work`, `repository`, `cloud-resource`), `subjectKey` is the
   feature's stable natural identity inside the host's `scopeType` / `scopeId`
-  coordinate. The coordinate is a plain scalar with no foreign key.
+  coordinate. The coordinate is a plain scalar with no foreign key. A feature
+  whose evaluation needs host-held credentials may register an opaque
+  `credentialRef` on the subject at ingest; the skeleton stores and threads it
+  verbatim and never resolves it.
 - **criteria version** (`EvaluationRuleSetVersion`) — a frozen set of
   criteria. Drafts are editable; publishing is one-way. Runs only reference
   published versions.

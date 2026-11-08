@@ -12,7 +12,7 @@ lands in a later slice on the same run and finding lifecycle.
 
 | Term           | Meaning                                                                                                                                                                                                                                                                                                                                        |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subject        | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; the coordinate is the module's `platform` constant (ADR-039) — projects are provenance, not scope.                                                                                                                                                            |
+| Subject        | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; the coordinate is the module's `platform` constant (ADR-039) — projects are provenance, not scope. Subjects of kinds that need host credentials carry an opaque `credentialRef` registered at ingest.                                                         |
 | Asset          | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state knowledge items.                                                                                                                                                                                                   |
 | Knowledge item | `SecurityEvaluationAwsConfigKnowledgeItem` / `SecurityEvaluationNpmPackageKnowledgeItem`: something observed about an asset right now (`type`, `key`, small intrinsic `value`); `SecurityEvaluationThreatKnowledgeItem` is the world-scoped intel sibling. Items are upserted, never deleted here; history lives in the archived run manifest. |
 | Criteria       | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                                                                                                                                                    |
@@ -24,11 +24,17 @@ lands in a later slice on the same run and finding lifecycle.
 - `repository` — evidence is the repository's `package-lock.json`.
 - `aws-account` — evidence is the account's configuration knowledge, collected
   through the host-bound `AwsConfigAccess` port. Nightwatch maps one
-  configured `awsCrossAccountBinding` to one subject.
+  configured `awsCrossAccountBinding` to one subject and registers the
+  binding's credential reference (`aws-binding:<id>`) on the subject at ingest;
+  evidence collection resolves exactly that reference, never a derived one.
 
 Hosts declare subjects by calling `POST /security-evaluation/subjects/sync` with
 one subject and the source that supplied it (`sourceType` / `sourceId`, opaque
-strings). The module upserts the platform-level subject, materialises its asset
+strings). Kinds whose evaluation needs host credentials (today: `aws-account`)
+also carry a `credentialRef` — an opaque pointer the module stores verbatim and
+threads to the evidence port; it is captured at this registration point so
+collection never rediscovers credentials through provenance. The module upserts
+the platform-level subject, materialises its asset
 and records a `SecurityEvaluationAssetSource` row; a second project referencing
 the same repository adds provenance instead of a second subject. Ingest is
 upsert-only: a subject that disappears from the host is not deleted, because
@@ -85,7 +91,10 @@ The host must bind two more ports, owned by this module:
 
 `RepositoryAccess.getFile(subject, path)` returns a file at the repository root
 or `null`. `AwsConfigAccess.collect(subject)` returns raw
-configuration knowledge items plus per-type failures — never judged conclusions.
+configuration knowledge items plus per-type failures — never judged conclusions —
+and resolves its credentials from `subject.credentialRef` directly. A subject
+of kind `aws-account` without a registered credential reference is unevaluable:
+the module fails the run with a stable error instead of attempting collection.
 Nightwatch implements them with its `github` and `aws-identity` modules. An
 unbound port is a wiring error: the run fails instead of reporting a vacuously
 clean result.
@@ -106,6 +115,13 @@ Every run records the skeleton's three buckets:
 An unreadable lockfile, an unsupported lockfile format, a lockfile resolving
 zero packages, or a cloud account whose knowledge all failed to collect fails the
 run. An empty evaluated set must never surface as a clean result.
+
+The report adds one asset-level bucket beside the per-result buckets:
+
+- `unevaluable` — assets whose subject kind requires a registered credential
+  reference (`aws-account`) and none is stored, so no run over them can collect
+  evidence at all. Surfacing them separately keeps an un-integrated subject
+  from reading as coverage.
 
 ## Scheduling
 
