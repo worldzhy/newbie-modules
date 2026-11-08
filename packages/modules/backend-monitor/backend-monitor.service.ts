@@ -16,6 +16,11 @@ const ALLOWED_REQUEST_SORT_FIELDS = new Set(["path", "method", "status_code", "d
 /** Allowed sort fields for error logs. */
 const ALLOWED_ERROR_SORT_FIELDS = new Set(["type", "message", "path", "status_code", "occurred_at"]);
 
+/** ClickHouse ORDER BY direction for a validated query sort order. */
+function orderDirection(sortOrder: "asc" | "desc" | undefined): "ASC" | "DESC" {
+  return sortOrder === "asc" ? "ASC" : "DESC";
+}
+
 /** Accepted client-clock skew into the past. */
 const MAX_PAST_SKEW_MS = 60 * 60 * 1000; // 1 hour
 /** Accepted client-clock skew into the future. */
@@ -215,7 +220,7 @@ export class BackendMonitorService {
     pagination: { page: number; pageSize: number; countOfCurrentPage: number; countOfTotal: number };
   }> {
     const safeField = ALLOWED_REQUEST_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "request_at";
-    const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
+    const safeOrder = orderDirection(query.sortOrder);
     const keyword = query.keyword ? `%${query.keyword}%` : "%";
     const { page = 0, pageSize = 20 } = query;
 
@@ -271,7 +276,7 @@ export class BackendMonitorService {
     pagination: { page: number; pageSize: number; countOfCurrentPage: number; countOfTotal: number };
   }> {
     const safeField = ALLOWED_ERROR_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "occurred_at";
-    const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
+    const safeOrder = orderDirection(query.sortOrder);
     const keyword = query.keyword ? `%${query.keyword}%` : "%";
     const { page = 0, pageSize = 20 } = query;
 
