@@ -72,7 +72,6 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 > 来源：devbie `.trae/documents/expert-review-2026-11-09-round30.md`；台账见 devbie `findings.md` round30 节与同目录 `findings.md` 引用行。
 
-- [ ] `[R30-04]` **url-check IPv6 SSRF 谓词补 `::/96` + `64:ff9b::/96`（P2，本仓为真源）**：`packages/modules/url-check/public-url.ts:65-91` 仅覆盖 `::ffff:` 映射，裸 IPv4-compatible（`::7f00:1`）与 NAT64（`64:ff9b::7f00:1`）双层校验均放行；R29-08 已为 llm guard 修复同款缺口（`::7f00:1` 实测全拒），两份实现谓词漂移。修复后与 nightwatch-backend 装配侧同步（diff 为空），并按 R29-08 方式跑 dist 级探针独立验证。
 - [ ] `[R30-02 待拍板]` ClickHouseModel 原始插值面收敛（P3，真源在本仓 `packages/modules/clickhouse/clickhouse.model.ts:41,62-72`）：待拍板加标识符白名单入口（API 层）或仅 API 约束注释（文档层）。
 
 ## round31 backlog 核对入账（2026-11-09，plan scope）
