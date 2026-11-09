@@ -72,7 +72,7 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 > 来源：devbie `.trae/documents/expert-review-2026-11-09-round30.md`；台账见 devbie `findings.md` round30 节与同目录 `findings.md` 引用行。
 
-- [x] `[R30-02 已关闭 2026-11-09]` ClickHouseModel 原始插值面收敛 — **取证后判定无需动作**：全仓 grep 零处调用 `model.delete()`（死方法）；5 处 `model.find({ where })` caller 全部使用 `{name:Type}` 占位符 + `queryParams` 绑定，无一直接插值用户值；types.ts 注释已文档约束。白名单 API 为过度设计（`select: "count() as total"`、`toStartOfHour(createTime)` 非简单标识符，无法白名单）。delete 死方法可后续独立 PR 删除。
+- [x] `[R30-02 已关闭 2026-11-09]` ClickHouseModel 原始插值面收敛 — **取证后判定无需动作**：find() 与 delete() 均提供 `queryParams` 占位符绑定（`{name:Type}` 语法），types.ts 已文档约束，当前所有 caller 均走安全路径；delete() 是框架公共 API（JSDoc + service.ts 文档已承诺），nightwatch-backend 零调用只是宿主暂态，其他宿主或未来 retention/cleanup 功能可能用到。标识符白名单 API 为过度设计（`select: "count() as total"`、`toStartOfHour()` 表达式非简单列名，无法白名单）。
 
 ## round31 backlog 核对入账（2026-11-09，plan scope）
 
