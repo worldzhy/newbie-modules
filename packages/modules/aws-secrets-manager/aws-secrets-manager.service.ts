@@ -334,37 +334,19 @@ export class AwsSecretsManagerService {
       }
     }
 
-    // Skip the AWS write if nothing actually changed — avoids needlessly
-    // rotating the secret version, and avoids creating an empty group just
-    // because callers issued `merge({}, [])` after a no-op revocation.
+    // Skip the AWS update when nothing changed and the group already exists —
+    // avoids needlessly rotating the secret version. A non-existent group is
+    // always created (empty env map if no set values were supplied).
     const setChanged = params.set ? !Object.entries(params.set).every(([k, v]) => currentEnv[k] === v) : false;
     const removedAny = (params.remove?.length ?? 0) > 0 && (params.remove as string[]).some((k) => k in currentEnv);
     const anyChange = setChanged || removedAny;
-    if (!existing && !anyChange) {
-      return {
-        groupName,
-        arn: null,
-        exists: false,
-        env: {},
-        lastChangedAt: null,
-        createdAt: null,
-      };
-    }
-    if (existing && !anyChange) {
-      return this.getEnvGroup(params.projectId, params.groupId, region);
-    }
 
-    const payload = this.buildGroupDocument(nextEnv, rotation);
-    if (existing) {
-      await this.callAws(() =>
-        client.send(
-          new UpdateSecretCommand({
-            SecretId: groupName,
-            SecretString: JSON.stringify(payload),
-          }),
-        ),
-      );
-    } else {
+    // If the group doesn't exist yet, always create it — every application must
+    // have a group on creation (ADR-005 §4), even if no platform-managed vars
+    // are being set. A no-op merge against a non-existent group creates an
+    // empty env map and exits with arn/metadata populated.
+    if (!existing) {
+      const payload = this.buildGroupDocument(nextEnv, undefined);
       await this.callAws(() =>
         client.send(
           new CreateSecretCommand({
@@ -377,7 +359,22 @@ export class AwsSecretsManagerService {
           }),
         ),
       );
+      return this.getEnvGroup(params.projectId, params.groupId, region);
     }
+
+    if (!anyChange) {
+      return this.getEnvGroup(params.projectId, params.groupId, region);
+    }
+
+    const payload = this.buildGroupDocument(nextEnv, rotation);
+    await this.callAws(() =>
+      client.send(
+        new UpdateSecretCommand({
+          SecretId: groupName,
+          SecretString: JSON.stringify(payload),
+        }),
+      ),
+    );
 
     return this.getEnvGroup(params.projectId, params.groupId, region);
   }
