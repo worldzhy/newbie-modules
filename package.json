@@ -10,7 +10,7 @@
     "import": "node scripts/import-modules.mjs",
     "lint": "eslint \"packages/**/*.ts\"",
     "lint:fix": "eslint \"packages/**/*.ts\" --fix",
-    "test:web-monitor": "node --import tsx --test \"packages/modules/web-monitor/modules/jobs/*.test.ts\"",
+    "test:web-monitor": "node --import tsx --test packages/modules/web-monitor/modules/jobs/alert-lifecycle.test.ts packages/modules/web-monitor/modules/jobs/error-source.test.ts",
     "prepare": "command -v git >/dev/null 2>&1 && git config core.hooksPath .githooks || true"
   },
   "devDependencies": {
