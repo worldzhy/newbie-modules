@@ -151,7 +151,7 @@ export class AwsSecretsManagerController {
 
   @Get("groups/:groupId/env")
   @RequirePermission(PermissionAction.Get, "AwsSecretsManagerSecret")
-  @ApiOperation({ summary: "Get one application's env group (decrypted map)" })
+  @ApiOperation({ summary: "Get one application's env group (custom values + platform key names)" })
   @ApiResponse({ type: EnvGroupResponseDto })
   async getEnvGroup(
     @Req() request: UserRequest,
@@ -165,7 +165,11 @@ export class AwsSecretsManagerController {
       groupName,
       { projectId: query.projectId, groupId, region: query.region },
       () => this.secretsService.getEnvGroup(query.projectId, groupId, query.region),
-      (result) => ({ exists: result.exists, variableCount: Object.keys(result.env).length }),
+      (result) => ({
+        exists: result.exists,
+        customVariableCount: Object.keys(result.customEnv).length,
+        platformVariableCount: result.platformKeys.length,
+      }),
     );
   }
 
@@ -183,7 +187,7 @@ export class AwsSecretsManagerController {
       request,
       SECRET_AUDIT_EVENTS.ENV_GROUP_UPDATED,
       groupName,
-      { projectId: body.projectId, groupId, region: body.region, variableNames: Object.keys(body.env) },
+      { projectId: body.projectId, groupId, region: body.region, variableNames: Object.keys(body.customEnv) },
       () => this.secretsService.updateEnvGroup({ ...body, groupId }),
     );
   }

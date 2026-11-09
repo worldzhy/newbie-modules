@@ -32,8 +32,18 @@ export type SecretValueType = (typeof SECRET_VALUE_TYPES)[number];
  */
 export const ENV_GROUP_NAME_PREFIX = "nw";
 export const ENV_GROUP_NAME_SUFFIX = "env";
-/** Field inside the group JSON that carries the flat, injectable env map. */
-export const ENV_GROUP_ENV_FIELD = "env";
+/**
+ * Field inside the group JSON carrying the user-owned env map. It is the only
+ * field the PUT path writes; a PUT never mutates platform-owned or reserved
+ * fields.
+ */
+export const ENV_GROUP_CUSTOM_ENV_FIELD = "customEnv";
+/**
+ * Field inside the group JSON carrying platform-owned variables (installation
+ * tokens/endpoints). Only {@link AwsSecretsManagerService.mergePlatformEnvVars}
+ * writes it. Values are never returned over HTTP — reads expose key names only.
+ */
+export const ENV_GROUP_PLATFORM_FIELD = "__platform";
 /**
  * Reserved key describing the rotation recipe (ADR-005 §5). It is preserved
  * verbatim on every group write and is not exposed as an env variable.

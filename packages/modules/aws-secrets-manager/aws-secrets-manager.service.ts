@@ -24,7 +24,8 @@ import {
 } from "@aws-sdk/client-secrets-manager";
 import type { DescribeSecretResponse, SecretListEntry } from "@aws-sdk/client-secrets-manager";
 import {
-  ENV_GROUP_ENV_FIELD,
+  ENV_GROUP_CUSTOM_ENV_FIELD,
+  ENV_GROUP_PLATFORM_FIELD,
   ENV_GROUP_ROTATION_FIELD,
   MANAGED_TAG_KEY,
   SECRET_TYPE_TAG_KEY,
@@ -58,7 +59,10 @@ export interface EnvGroupSnapshot {
   groupName: string;
   arn: string | null;
   exists: boolean;
-  env: Record<string, string>;
+  /** User-owned variables, written only through the PUT endpoint. */
+  customEnv: Record<string, string>;
+  /** Platform-owned variable names; values are never surfaced over HTTP. */
+  platformKeys: string[];
   lastChangedAt: Date | null;
   createdAt: Date | null;
 }
@@ -222,9 +226,10 @@ export class AwsSecretsManagerService {
 
   /**
    * Read one application's env group. A missing secret is reported as
-   * `exists: false` with an empty map so the page can render the create form;
+   * `exists: false` with empty values so the page can render the create form;
    * a secret at the composed name that this plane does not own stays 404
-   * (same existence-hiding rule as by-name reads).
+   * (same existence-hiding rule as by-name reads). Platform values are never
+   * returned — only their names, so the UI can list read-only entries.
    */
   async getEnvGroup(projectId: string, groupId: string, region?: string): Promise<EnvGroupSnapshot> {
     const groupName = envGroupSecretName(projectId, groupId);
@@ -235,7 +240,15 @@ export class AwsSecretsManagerService {
       entry = await this.callAws(() => client.send(new DescribeSecretCommand({ SecretId: groupName })));
     } catch (error) {
       if (error instanceof HttpException && error.getStatus() === 404) {
-        return { groupName, arn: null, exists: false, env: {}, lastChangedAt: null, createdAt: null };
+        return {
+          groupName,
+          arn: null,
+          exists: false,
+          customEnv: {},
+          platformKeys: [],
+          lastChangedAt: null,
+          createdAt: null,
+        };
       }
       throw error;
     }
@@ -246,21 +259,26 @@ export class AwsSecretsManagerService {
       groupName,
       arn: entry.ARN ?? null,
       exists: true,
-      env: document.env,
+      customEnv: document.customEnv,
+      platformKeys: Object.keys(document.platform),
       lastChangedAt: entry.LastChangedDate ?? null,
       createdAt: entry.CreatedDate ?? null,
     };
   }
 
   /**
-   * Replace the group's env map atomically (create on first save). Reserved
-   * keys such as `__rotation` are carried over untouched, so future rotation
-   * tooling keeps working without this write path knowing about it.
+   * Replace the group's user-owned env map atomically (create on first save).
+   * Platform-owned (`__platform`) and reserved (`__rotation`) fields are carried
+   * over untouched, so credential rotation and future rotation tooling keep
+   * working without this write path knowing about them. Custom keys that
+   * shadow a platform key are rejected: the deployment contract flattens
+   * `{ ...platform, ...customEnv }`, so a shadowing key would silently override
+   * a platform credential.
    */
   async updateEnvGroup(params: {
     projectId: string;
     groupId: string;
-    env: Record<string, string>;
+    customEnv: Record<string, string>;
     region?: string;
   }): Promise<EnvGroupSnapshot> {
     const groupName = envGroupSecretName(params.projectId, params.groupId);
@@ -269,7 +287,8 @@ export class AwsSecretsManagerService {
 
     if (existing) {
       const document = await this.readGroupDocument(client, groupName);
-      const payload = this.buildGroupDocument(params.env, document.rotation);
+      this.assertNoPlatformCollision(params.customEnv, document.platform);
+      const payload = this.buildGroupDocument(params.customEnv, document.platform, document.rotation);
       await this.callAws(() =>
         client.send(
           new UpdateSecretCommand({
@@ -279,7 +298,7 @@ export class AwsSecretsManagerService {
         ),
       );
     } else {
-      const payload = this.buildGroupDocument(params.env, undefined);
+      const payload = this.buildGroupDocument(params.customEnv, {}, undefined);
       await this.callAws(() =>
         client.send(
           new CreateSecretCommand({
@@ -298,12 +317,13 @@ export class AwsSecretsManagerService {
   }
 
   /**
-   * Merge platform-managed variables (installations tokens/endpoints) into the
-   * env group without touching custom user variables. `set` keys overwrite
-   * existing values; `remove` keys are deleted from the env map. The reserved
-   * `__rotation` field is always preserved. This is the single write path for
-   * installation credential issuance/rotation — callers never touch the full
-   * env map, only the platform-owned keys.
+   * Merge platform-managed variables (installation tokens/endpoints) into the
+   * group's `__platform` field without touching custom user variables. `set`
+   * keys overwrite existing platform values; `remove` keys are deleted from the
+   * platform map. The `customEnv` and reserved `__rotation` fields are always
+   * preserved. This is the single write path for installation credential
+   * issuance/rotation — callers never touch the full group document, only the
+   * platform-owned keys.
    */
   async mergePlatformEnvVars(params: {
     projectId: string;
@@ -316,37 +336,40 @@ export class AwsSecretsManagerService {
     const { client, region } = await this.getProjectContext(params.projectId, params.region);
     const existing = await this.describeOptionalManagedSecret(client, groupName);
 
-    let currentEnv: Record<string, string> = {};
+    let currentPlatform: Record<string, string> = {};
+    let customEnv: Record<string, string> = {};
     let rotation: unknown;
     if (existing) {
       const document = await this.readGroupDocument(client, groupName);
-      currentEnv = document.env;
+      customEnv = document.customEnv;
+      currentPlatform = document.platform;
       rotation = document.rotation;
     }
 
-    const nextEnv = { ...currentEnv };
+    const nextPlatform = { ...currentPlatform };
     if (params.set) {
-      Object.assign(nextEnv, params.set);
+      Object.assign(nextPlatform, params.set);
     }
     if (params.remove?.length) {
       for (const key of params.remove) {
-        delete nextEnv[key];
+        delete nextPlatform[key];
       }
     }
 
     // Skip the AWS update when nothing changed and the group already exists —
     // avoids needlessly rotating the secret version. A non-existent group is
-    // always created (empty env map if no set values were supplied).
-    const setChanged = params.set ? !Object.entries(params.set).every(([k, v]) => currentEnv[k] === v) : false;
-    const removedAny = (params.remove?.length ?? 0) > 0 && (params.remove as string[]).some((k) => k in currentEnv);
+    // always created (empty maps if no set values were supplied).
+    const setChanged = params.set ? !Object.entries(params.set).every(([k, v]) => currentPlatform[k] === v) : false;
+    const removedAny =
+      (params.remove?.length ?? 0) > 0 && (params.remove as string[]).some((k) => k in currentPlatform);
     const anyChange = setChanged || removedAny;
 
     // If the group doesn't exist yet, always create it — every application must
     // have a group on creation (ADR-005 §4), even if no platform-managed vars
     // are being set. A no-op merge against a non-existent group creates an
-    // empty env map and exits with arn/metadata populated.
+    // empty platform map and exits with arn/metadata populated.
     if (!existing) {
-      const payload = this.buildGroupDocument(nextEnv, undefined);
+      const payload = this.buildGroupDocument(customEnv, nextPlatform, undefined);
       await this.callAws(() =>
         client.send(
           new CreateSecretCommand({
@@ -366,7 +389,7 @@ export class AwsSecretsManagerService {
       return this.getEnvGroup(params.projectId, params.groupId, region);
     }
 
-    const payload = this.buildGroupDocument(nextEnv, rotation);
+    const payload = this.buildGroupDocument(customEnv, nextPlatform, rotation);
     await this.callAws(() =>
       client.send(
         new UpdateSecretCommand({
@@ -543,20 +566,23 @@ export class AwsSecretsManagerService {
   }
 
   /**
-   * Parse a group secret into its injectable env map plus the reserved
-   * `__rotation` recipe. The group uses `{ "env": { "<KEY>": "<value>" }, ... }`;
-   * malformed documents are rejected rather than silently coerced.
+   * Parse a group secret into its user-owned map, platform-owned map and the
+   * reserved `__rotation` recipe. The document shape is
+   * `{ "customEnv": {...}, "__platform": {...}, "__rotation": {...} }`;
+   * malformed documents are rejected rather than silently coerced. A document
+   * written before the `customEnv`/`__platform` split (flat `env`) is treated
+   * as empty — there is deliberately no migration reader for it.
    */
   private async readGroupDocument(
     client: SecretsManagerClient,
     name: string,
-  ): Promise<{ env: Record<string, string>; rotation?: unknown }> {
+  ): Promise<{ customEnv: Record<string, string>; platform: Record<string, string>; rotation?: unknown }> {
     const response = await this.callAws(() =>
       client.send(new GetSecretValueCommand({ SecretId: name, VersionStage: "AWSCURRENT" })),
     );
     const raw = response.SecretString;
     if (raw === undefined) {
-      return { env: {} };
+      return { customEnv: {}, platform: {} };
     }
 
     let parsed: unknown;
@@ -570,29 +596,63 @@ export class AwsSecretsManagerService {
     }
 
     const document = parsed as Record<string, unknown>;
-    const rotation = document[ENV_GROUP_ROTATION_FIELD];
-    const env = document[ENV_GROUP_ENV_FIELD];
-    if (env === undefined) {
-      return { env: {}, rotation };
+    return {
+      customEnv: this.readStringMap(document[ENV_GROUP_CUSTOM_ENV_FIELD], ENV_GROUP_CUSTOM_ENV_FIELD),
+      platform: this.readStringMap(document[ENV_GROUP_PLATFORM_FIELD], ENV_GROUP_PLATFORM_FIELD),
+      rotation: document[ENV_GROUP_ROTATION_FIELD],
+    };
+  }
+
+  /** Normalize one flat `string → string` group field; `undefined` maps to `{}`. */
+  private readStringMap(value: unknown, field: string): Record<string, string> {
+    if (value === undefined) {
+      return {};
     }
-    if (typeof env !== "object" || env === null || Array.isArray(env)) {
-      throw new BadRequestException("Env group secret has an unexpected env field");
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      throw new BadRequestException(`Env group secret has an unexpected ${field} field`);
     }
 
     const normalized: Record<string, string> = {};
-    for (const [key, value] of Object.entries(env)) {
-      if (typeof value !== "string") {
-        throw new BadRequestException("Env group secret contains a non-string value");
+    for (const [key, entry] of Object.entries(value)) {
+      if (typeof entry !== "string") {
+        throw new BadRequestException(`Env group secret contains a non-string value in ${field}`);
       }
-      normalized[key] = value;
+      normalized[key] = entry;
     }
-    return { env: normalized, rotation };
+    return normalized;
   }
 
-  private buildGroupDocument(env: Record<string, string>, rotation: unknown): Record<string, unknown> {
-    return rotation === undefined
-      ? { [ENV_GROUP_ENV_FIELD]: env }
-      : { [ENV_GROUP_ENV_FIELD]: env, [ENV_GROUP_ROTATION_FIELD]: rotation };
+  /**
+   * Reject custom keys that collide with platform-owned keys. The deployment
+   * contract flattens `{ ...platform, ...customEnv }`; allowing a collision
+   * would let a user-supplied value silently override a platform credential.
+   */
+  private assertNoPlatformCollision(customEnv: Record<string, string>, platform: Record<string, string>): void {
+    const collisions = Object.keys(customEnv).filter((key) => key in platform);
+    if (collisions.length > 0) {
+      // Key names are non-sensitive; values are never included.
+      throw new ConflictException(`Custom env keys shadow platform-managed keys: ${collisions.sort().join(", ")}`);
+    }
+  }
+
+  /**
+   * Build the group JSON with the three owned fields. `customEnv` and
+   * `__platform` are always written (empty maps included); `__rotation` is
+   * written only when present.
+   */
+  private buildGroupDocument(
+    customEnv: Record<string, string>,
+    platform: Record<string, string>,
+    rotation: unknown,
+  ): Record<string, unknown> {
+    const document: Record<string, unknown> = {
+      [ENV_GROUP_CUSTOM_ENV_FIELD]: customEnv,
+      [ENV_GROUP_PLATFORM_FIELD]: platform,
+    };
+    if (rotation !== undefined) {
+      document[ENV_GROUP_ROTATION_FIELD] = rotation;
+    }
+    return document;
   }
 
   private toSecretResponse(entry: SecretListEntry, region: string) {

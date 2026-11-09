@@ -267,7 +267,7 @@ export class DeleteSecretResponseDto {
 /**
  * Accepts a flat map of shell-style variable names to string values. Arrays,
  * nested objects and non-string values are rejected; the group JSON contract
- * keeps `env` directly injectable by a deployment process.
+ * keeps `customEnv` directly injectable by a deployment process.
  */
 export function IsEnvVarMap(validationOptions?: ValidationOptions): PropertyDecorator {
   return ValidateBy(
@@ -309,13 +309,15 @@ export class UpdateEnvGroupDto {
 
   // eslint-disable-next-line @darraghor/nestjs-typed/validated-non-primitive-property-needs-type-decorator -- flat map enforced by IsEnvVarMap()
   @ApiProperty({
-    description: "Complete env map for this group; replaces the previous map atomically",
+    description:
+      "Complete custom env map for this group; replaces the previous customEnv atomically. " +
+      "Keys already owned by the platform are rejected with 409",
     type: "object",
     additionalProperties: { type: "string" },
   })
   @IsDefined()
   @IsEnvVarMap()
-  env!: Record<string, string>;
+  customEnv!: Record<string, string>;
 
   @ApiPropertyOptional({ description: "AWS region override (defaults to the credential default region)" })
   @IsOptional()
@@ -338,11 +340,18 @@ export class EnvGroupResponseDto {
   exists!: boolean;
 
   @ApiProperty({
-    description: "Flat env map; empty when the group does not exist yet",
+    description: "User-owned flat env map (`customEnv` field); empty when the group does not exist yet",
     type: "object",
     additionalProperties: { type: "string" },
   })
-  env!: Record<string, string>;
+  customEnv!: Record<string, string>;
+
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    description: "Names of platform-owned variables (`__platform` field); values are never returned",
+  })
+  platformKeys!: string[];
 
   @ApiPropertyOptional({ type: Date, nullable: true })
   lastChangedAt?: Date | null;
