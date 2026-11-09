@@ -3,20 +3,20 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { GetWatchedRDSInstancesMetricRequestDto } from "./rds-instance.dto";
 import { MetricData } from "../aws-cloudwatch.interface";
 import { AwsCloudwatchService } from "../aws-cloudwatch.service";
-import { AwsCloudwatchCredentialService } from "../aws-cloudwatch-credential.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 import dayjs from "dayjs";
 
 @Injectable()
 export class RdsMetricService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cloudwatchCredential: AwsCloudwatchCredentialService,
+    private readonly bindings: AwsCrossAccountBindingsService,
     private readonly cloudwatchService: AwsCloudwatchService,
   ) {}
 
   async getWatchedInstancesMetric(data: GetWatchedRDSInstancesMetricRequestDto) {
     const { projectId, startTime, endTime, period, metricName, statistics } = data;
-    const { regions, credentials } = await this.cloudwatchCredential.resolve(projectId);
+    const { regions, credentials } = await this.bindings.resolveProjectCredential(projectId);
     const watchedInstances = await this.prisma.rdsInstance.findMany({
       where: { projectId, isWatching: true },
       orderBy: { createdAt: "asc" },

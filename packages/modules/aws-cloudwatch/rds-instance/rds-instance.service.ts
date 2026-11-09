@@ -1,13 +1,13 @@
 import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { DescribeDBInstancesCommand, RDSClient } from "@aws-sdk/client-rds";
-import { AwsCloudwatchCredentialService } from "../aws-cloudwatch-credential.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 
 @Injectable()
 export class RdsInstanceService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cloudwatchCredential: AwsCloudwatchCredentialService,
+    private readonly bindings: AwsCrossAccountBindingsService,
   ) {}
 
   async listRDSInstances(params: { projectId: string; status?: string; isWatching?: boolean }) {
@@ -19,7 +19,7 @@ export class RdsInstanceService {
   }
 
   async fetchRDSInstances(projectId: string) {
-    const { credentials, regions } = await this.cloudwatchCredential.resolve(projectId);
+    const { credentials, regions } = await this.bindings.resolveProjectCredential(projectId);
     const rdsInstances: {
       instanceId: string;
       name: string;
