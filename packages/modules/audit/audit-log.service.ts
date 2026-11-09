@@ -4,7 +4,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { UAParser } from "ua-parser-js";
 import { GeolocationService } from "./helpers/geolocation.service";
 import { AuditContextService } from "./audit-context.service";
-import { AuditLogQueryDto } from "./audit-log.dto";
+import type { AuditLogQueryDto } from "./audit-log.dto";
 
 /** Kind of identity an audit row is attributed to. */
 export const AuditActorType = {
