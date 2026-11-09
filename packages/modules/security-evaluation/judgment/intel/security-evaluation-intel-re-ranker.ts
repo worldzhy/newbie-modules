@@ -3,6 +3,7 @@ import { ChatModelResolver } from "@modules/llm/chat-model.resolver";
 import { ChatModelPort } from "@modules/llm/chat-model.port";
 import { buildSecurityEvaluationIntelReRankRequest } from "./security-evaluation-intel-request";
 import { SecurityEvaluationScopeEntity } from "./security-evaluation-scope-entities.port";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /** LLM scope bound to the security-evaluation INTEL match connection. */
 export const SECURITY_EVALUATION_INTEL_LLM_SCOPE = "security-evaluation-intel";
@@ -85,11 +86,7 @@ export class SecurityEvaluationIntelReRanker {
     try {
       chatModel = await this.resolver.resolve(SECURITY_EVALUATION_INTEL_LLM_SCOPE);
     } catch (error) {
-      this.logger.warn(
-        `Cannot resolve LLM scope "${SECURITY_EVALUATION_INTEL_LLM_SCOPE}": ${
-          error instanceof Error ? error.message : String(error)
-        }.`,
-      );
+      this.logger.warn(`Cannot resolve LLM scope "${SECURITY_EVALUATION_INTEL_LLM_SCOPE}": ${getErrorMessage(error)}.`);
       return {
         kind: "unavailable",
         entityMatches: entities.map((e) => ({ entity: e.value, matched: false, evidence: null })),
@@ -114,7 +111,7 @@ export class SecurityEvaluationIntelReRanker {
       const verdict = this.parseVerdict(result.text, request.signature);
       return this.enforceHardConstraint(verdict, entities);
     } catch (error) {
-      this.logger.warn(`LLM re-rank failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.warn(`LLM re-rank failed: ${getErrorMessage(error)}`);
       return {
         kind: "unavailable",
         entityMatches: entities.map((e) => ({ entity: e.value, matched: false, evidence: null })),

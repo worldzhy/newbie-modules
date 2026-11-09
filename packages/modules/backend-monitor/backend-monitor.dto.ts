@@ -16,6 +16,9 @@ import {
 import { Type } from "class-transformer";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
+/** Allowed values for the sort direction, shared by both log list queries. */
+const SORT_ORDERS = ["asc", "desc"] as const;
+
 /**
  * Maximum number of events accepted per array in a single ingest batch.
  * Beyond this the client must split the batch; the server responds 413.
@@ -253,7 +256,7 @@ export class ListBackendMonitorRequestLogsRequestDto extends CommonListRequestDt
   @ApiPropertyOptional({ description: "Sort direction: asc | desc" })
   @IsOptional()
   @IsString()
-  @IsIn(["asc", "desc"])
+  @IsIn(SORT_ORDERS)
   sortOrder?: "asc" | "desc";
 }
 
@@ -283,7 +286,7 @@ export class ListBackendMonitorErrorLogsRequestDto extends CommonListRequestDto 
   @ApiPropertyOptional({ description: "Sort direction: asc | desc" })
   @IsOptional()
   @IsString()
-  @IsIn(["asc", "desc"])
+  @IsIn(SORT_ORDERS)
   sortOrder?: "asc" | "desc";
 }
 

@@ -7,9 +7,8 @@
     "newbieCli": "module-hub"
   },
   "requires": {
-    "modules": ["audit", "security"],
+    "modules": ["audit", "github", "security"],
     "dependencies": {
-      "@octokit/rest": "latest",
       "@devbie/module-hub-cli": "^1.0.2"
     }
   }

@@ -134,6 +134,12 @@ model EvaluationCriterion {
 /// The object being evaluated (ADR-020 D1). Identity is feature-defined through
 /// `subjectKey`; the host assigns meaning to `scopeType` / `scopeId`, which are
 /// plain scalars with no foreign key — this module knows no host entity.
+///
+/// `credentialRef` is an opaque pointer the feature may register at ingest time
+/// when evaluating the subject requires host-held credentials (e.g. a cloud
+/// account binding). The skeleton stores and returns it verbatim; it never
+/// parses, resolves or dereferences it, and it plays no role in subject
+/// identity, provenance or authorization.
 model EvaluationSubject {
   id String @id @default(uuid()) @db.Uuid
 
@@ -142,6 +148,9 @@ model EvaluationSubject {
   scopeId     String @db.VarChar(128)
   subjectKey  String @db.VarChar(255)
   displayName String @db.VarChar(255)
+
+  // Opaque host-side credential pointer; feature-defined, never resolved here
+  credentialRef String? @db.VarChar(255)
 
   metadata Json? @db.JsonB
 

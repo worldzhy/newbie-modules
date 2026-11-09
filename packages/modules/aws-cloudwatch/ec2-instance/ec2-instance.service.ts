@@ -2,13 +2,13 @@ import { HttpException, HttpStatus, Injectable } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { DescribeInstancesCommand, EC2Client } from "@aws-sdk/client-ec2";
 import { Prisma } from "@generated/prisma/client";
-import { AwsCloudwatchCredentialService } from "../aws-cloudwatch-credential.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 
 @Injectable()
 export class Ec2InstanceService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly cloudwatchCredential: AwsCloudwatchCredentialService,
+    private readonly bindings: AwsCrossAccountBindingsService,
   ) {}
 
   async listEC2Instances(params: { projectId: string; status?: string; isWatching?: boolean }) {
@@ -20,7 +20,7 @@ export class Ec2InstanceService {
   }
 
   async fetchEC2Instances(projectId: string) {
-    const { credentials, regions } = await this.cloudwatchCredential.resolve(projectId);
+    const { credentials, regions } = await this.bindings.resolveProjectCredential(projectId);
     const ec2InstanceCreateManyInputs: Prisma.Ec2InstanceCreateManyInput[] = [];
 
     for (let i = 0; i < regions.length; i++) {

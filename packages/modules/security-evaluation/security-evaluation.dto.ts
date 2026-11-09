@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID } from "class-validator";
+import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
 import { EvaluationFindingSeverity, EvaluationFindingStatus, EvaluationRunStatus } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
@@ -40,6 +40,16 @@ export class IngestSecurityEvaluationSubjectRequestDto {
   @IsOptional()
   @IsObject()
   metadata?: Record<string, unknown>;
+
+  @ApiPropertyOptional({
+    description:
+      "Opaque pointer to the host credentials this subject is evaluated with (required for aws-account); stored verbatim, never resolved by the module",
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  credentialRef?: string;
 
   @ApiProperty({ description: 'Opaque provenance type, e.g. "project"' })
   @IsString()
@@ -335,6 +345,8 @@ export class SecurityEvaluationReportCoverageDto {
   @ApiProperty({ description: "Manifest material no rule of this evaluationKey consumed (ADR-037 D7)" })
   unconsumed!: number;
   @ApiProperty({ description: "Assets that have at least one archived result" }) assetsWithResult!: number;
+  @ApiProperty({ description: "Assets whose subject kind requires a credential reference that is not registered" })
+  unevaluable!: number;
 }
 
 export class SecurityEvaluationReportTopFindingDto {

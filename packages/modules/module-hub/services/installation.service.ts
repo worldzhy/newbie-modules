@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { ModuleHubInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
@@ -11,28 +11,18 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
+import {
+  DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
+  InstallationPresence,
+  isInstallationOnline,
+  withDerivedOnlineState,
+} from "@modules/security/installation/installation-presence";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 import { ModuleHubReleaseService } from "./release.service";
 
 /** An installation reports every 60s; three missed intervals marks it offline (design §4.2). */
-export const ONLINE_THRESHOLD_SECONDS = 180;
-
-/**
- * Presence of the installations sharing one externalRef, normalized for the
- * platform-side per-facility dashboards. Several rows can share a ref (rotation
- * history, multiple instances):
- * - `enrolled` — at least one non-revoked installation exists.
- * - `online` — a non-revoked installation reported within the online window.
- * - `lastSeenAt` — newest report time across the non-revoked installations
- *   (null until the first contact).
- * - `revokedOnly` — rows exist but every one is revoked.
- */
-export interface InstallationPresence {
-  enrolled: boolean;
-  online: boolean;
-  lastSeenAt: Date | null;
-  revokedOnly: boolean;
-}
+export const ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS;
 
 /**
  * Module-hub audit events that are NOT part of the shared credential
@@ -222,7 +212,10 @@ export function summarizeHintCoverage(snapshot: unknown, latestByKey: Map<string
  * report (process-start hook, design §5.1).
  */
 @Injectable()
-export class ModuleHubInstallationService implements InstallationResolver {
+export class ModuleHubInstallationService
+  extends BaseInstallationService<ModuleHubInstallation>
+  implements InstallationResolver
+{
   readonly kind = "module-hub";
   /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
   readonly legacyHeader = "x-module-hub-token";
@@ -230,13 +223,14 @@ export class ModuleHubInstallationService implements InstallationResolver {
   // Credential mechanism comes from security (ADR-019); this class only adapts
   // its table and projects the domain state.
   private readonly credentials: InstallationCredentialStore<ModuleHubInstallationDraft, ModuleHubInstallation>;
-  private readonly tokenVerifier: InstallationTokenVerifier<ModuleHubInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<ModuleHubInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
     private readonly releases: ModuleHubReleaseService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<ModuleHubInstallationDraft, ModuleHubInstallation>(
       this.prisma.moduleHubInstallation,
     );
@@ -248,12 +242,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
   }
 
   private withDerivedState(row: ModuleHubInstallation) {
-    const online =
-      !row.revokedAt &&
-      row.lastSeenAt != null &&
-      Date.now() - new Date(row.lastSeenAt).getTime() <= ONLINE_THRESHOLD_SECONDS * 1000;
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, online };
+    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
   }
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
@@ -294,7 +283,6 @@ export class ModuleHubInstallationService implements InstallationResolver {
       where: { externalRef: { in: externalRefs } },
       select: { externalRef: true, lastSeenAt: true, revokedAt: true },
     });
-    const onlineThresholdMs = ONLINE_THRESHOLD_SECONDS * 1000;
     const now = Date.now();
     const presenceByRef = new Map<string, InstallationPresence>();
     for (const externalRef of externalRefs) {
@@ -309,7 +297,7 @@ export class ModuleHubInstallationService implements InstallationResolver {
         if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
           lastSeenAt = row.lastSeenAt;
         }
-        if (row.lastSeenAt != null && now - row.lastSeenAt.getTime() <= onlineThresholdMs) {
+        if (row.lastSeenAt != null && isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
         }
       }
@@ -387,24 +375,6 @@ export class ModuleHubInstallationService implements InstallationResolver {
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
     return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
-  }
-
-  /** Token-only authentication for the report endpoint. */
-  async resolveByToken(token: string) {
-    return this.tokenVerifier.verify(token);
-  }
-
-  /**
-   * InstallationResolver port (ADR-016): authenticate a report token for the
-   * InstallationAuthGuard. Throws UnauthorizedException for unknown or
-   * revoked tokens so the two cases stay indistinguishable.
-   */
-  async resolve(token: string): Promise<ModuleHubInstallation> {
-    const installation = await this.resolveByToken(token);
-    if (!installation) {
-      throw new UnauthorizedException("Invalid or revoked installation token.");
-    }
-    return installation;
   }
 
   /**

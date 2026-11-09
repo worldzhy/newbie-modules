@@ -1,18 +1,17 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import {
-  EvaluationFinding,
-  EvaluationFindingSeverity,
-  EvaluationFindingStatus,
-  EvaluationRun,
-  Prisma,
-} from "@generated/prisma/client";
+import { EvaluationFinding, EvaluationFindingStatus, EvaluationRun, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { EvaluationCriteriaService } from "./evaluation-criteria.service";
 import { EvaluationProviderRegistry } from "./evaluation-provider.registry";
-import { EvaluationFindingCandidate } from "./ports/evaluation.contracts";
+import { toPersistedSeverity } from "./evaluation-severity.mapping";
+import type {
+  EvaluationFindingCandidate,
+  EvaluationFindingSeverity as FindingSeverity,
+} from "./ports/evaluation.contracts";
 import { EvaluationFindingChangedEvent } from "./ports/observer.port";
 import { validateJudgment } from "./evaluation-invariants";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 export interface ListEvaluationFindingsInput {
   /** Omitted lists findings across subjects (narrowed by scope or run when given). */
@@ -26,7 +25,7 @@ export interface ListEvaluationFindingsInput {
   runId?: string;
   evaluationKey?: string;
   status?: EvaluationFindingStatus;
-  severity?: EvaluationFindingSeverity;
+  severity?: FindingSeverity;
   page?: number;
   pageSize?: number;
 }
@@ -199,7 +198,10 @@ export class EvaluationFindingService {
           ...(query.runId ? { lastSeenRunId: query.runId } : {}),
           ...(query.evaluationKey ? { evaluationKey: query.evaluationKey } : {}),
           ...(query.status ? { status: query.status } : {}),
-          ...(query.severity ? { severity: query.severity } : {}),
+          // Read path goes through the same vocabulary mapping as writes: the
+          // two literals are equal today, but a renamed enum member must not
+          // turn a filter into a silent no-match.
+          ...(query.severity ? { severity: toPersistedSeverity(query.severity) } : {}),
           ...(query.scopeType || query.scopeId
             ? {
                 subject: {
@@ -238,7 +240,7 @@ export class EvaluationFindingService {
           evaluationKey,
           fingerprint: candidate.fingerprint,
           criterionKey: candidate.criterionKey,
-          severity: candidate.severity,
+          severity: toPersistedSeverity(candidate.severity),
           status: EvaluationFindingStatus.OPEN,
           title: candidate.title,
           detail: candidate.detail,
@@ -282,7 +284,7 @@ export class EvaluationFindingService {
     const reopened = existing.status === EvaluationFindingStatus.RESOLVED;
     const observation = {
       criterionKey: candidate.criterionKey,
-      severity: candidate.severity,
+      severity: toPersistedSeverity(candidate.severity),
       title: candidate.title,
       detail: candidate.detail,
       metadata: candidate.metadata as Prisma.InputJsonValue | undefined,
@@ -341,7 +343,7 @@ export class EvaluationFindingService {
       await observer.onFindingChanged(event);
     } catch (error) {
       this.logger.warn(
-        `EvaluationObserver.onFindingChanged failed for finding ${event.findingId}: ${describeError(error)}`,
+        `EvaluationObserver.onFindingChanged failed for finding ${event.findingId}: ${getErrorMessage(error)}`,
       );
     }
   }
@@ -352,8 +354,4 @@ function isUniqueViolation(error: unknown): boolean {
   const { code, message } = error as { code?: unknown; message?: unknown };
   if (code === "P2002") return true;
   return typeof message === "string" && message.includes("EvaluationFinding_subjectId_evaluationKey_fingerprint_key");
-}
-
-function describeError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

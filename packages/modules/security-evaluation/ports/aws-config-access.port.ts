@@ -9,6 +9,13 @@ import type { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.
  * made by the aws-config judgment against the criteria version. The host owns
  * credentials and SDK access; a deployment without cloud accounts simply does
  * not bind the token (assembly error, like the skeleton's own SPI ports).
+ *
+ * Credential resolution is explicit: `subject.credentialRef` is the opaque
+ * pointer the host registered at ingest time, and the implementation resolves
+ * it directly (e.g. to its aws-identity binding). The module rejects subjects
+ * without a credential reference before this port is ever called, and the
+ * port must never fall back to deriving credentials from provenance or any
+ * other subject attribute.
  */
 export const securityEvaluationAwsConfigAccessToken = "SECURITY_EVALUATION_AWS_CONFIG_ACCESS";
 

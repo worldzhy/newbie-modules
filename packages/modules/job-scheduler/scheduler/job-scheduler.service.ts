@@ -13,6 +13,7 @@ import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { JobHandlerRegistryService, JobHandler } from "./handler-registry.service";
 import { JOB_RUN_FAILED_EVENT, type JobRunFailedEvent } from "../job-scheduler.events";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 const RECONCILE_INTERVAL_MS = 30_000;
 const CRON_JOB_NAME_PREFIX = "job-scheduler:";
@@ -63,7 +64,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     await this.reconcile();
     this.reconcileTimer = setInterval(() => {
       this.reconcile().catch((error) => {
-        this.logger.error(`Schedule reconcile failed: ${this.getErrorMessage(error)}`);
+        this.logger.error(`Schedule reconcile failed: ${getErrorMessage(error)}`);
       });
     }, RECONCILE_INTERVAL_MS);
   }
@@ -222,7 +223,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       new CronJob(cronExpr, () => {}, null, false, timezone);
     } catch (error) {
       throw new BadRequestException(
-        `Invalid cron expression or timezone: "${cronExpr}" (${timezone}) — ${this.getErrorMessage(error)}`,
+        `Invalid cron expression or timezone: "${cronExpr}" (${timezone}) — ${getErrorMessage(error)}`,
       );
     }
   }
@@ -232,7 +233,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       schedule.cronExpr,
       () => {
         this.executeSchedule(schedule, "schedule").catch((error) => {
-          this.logger.error(`Schedule ${schedule.key} failed unexpectedly: ${this.getErrorMessage(error)}`);
+          this.logger.error(`Schedule ${schedule.key} failed unexpectedly: ${getErrorMessage(error)}`);
         });
       },
       null,
@@ -295,7 +296,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       });
     } catch (error) {
       const finishedAt = new Date();
-      const errorMessage = this.getErrorMessage(error);
+      const errorMessage = getErrorMessage(error);
       const durationMs = finishedAt.getTime() - startedAt.getTime();
       this.logger.error(`Schedule ${schedule.key} ${trigger} run failed after ${durationMs}ms: ${errorMessage}`);
       const failedRun = await this.prisma.jobRun.update({
@@ -323,7 +324,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
         } satisfies JobRunFailedEvent);
       } catch (listenerError) {
         this.logger.error(
-          `Failed to emit ${JOB_RUN_FAILED_EVENT} for run ${run.id}: ${this.getErrorMessage(listenerError)}`,
+          `Failed to emit ${JOB_RUN_FAILED_EVENT} for run ${run.id}: ${getErrorMessage(listenerError)}`,
         );
       }
       return failedRun;
@@ -334,9 +335,5 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
 
   private cronJobName(key: string): string {
     return `${CRON_JOB_NAME_PREFIX}${key}`;
-  }
-
-  private getErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
   }
 }

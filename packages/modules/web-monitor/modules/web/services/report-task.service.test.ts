@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { ConfigService } from "@nestjs/config";
 import { ReportType } from "../../../models/enum";
 import { WebReportTaskService } from "./report-task.service";
 
@@ -33,14 +32,13 @@ function emptyBuckets() {
 }
 
 function buildService() {
-  const config = { get: () => ({}) } as unknown as ConfigService;
   const redis = {} as never;
   const site = {
     getSiteForAppId: async () => ({ appKey: VALID_APP_KEY, slowPageTime: 5 }),
   } as never;
   const models = {} as never;
   const ch = {} as never;
-  return new WebReportTaskService(config, redis, site, models, ch);
+  return new WebReportTaskService(redis, site, models, ch);
 }
 
 type DrainResult = string | null;
@@ -296,6 +294,23 @@ test("poison bodySize on ajax row is skipped instead of cast to NaN", async () =
   assert.ok(ajaxs.length > 0, "an ajax row must be emitted");
   const a = ajaxs[0];
   assert.ok(!("bodySize" in a), "poison ajax bodySize must be absent from the row");
+});
+
+test("ajax duration above the writer ceiling is clamped, not passed through (R20-04)", async () => {
+  const buckets = emptyBuckets();
+  await drain(
+    buildService(),
+    {
+      appKey: VALID_APP_KEY,
+      type: ReportType.AjaxPerf,
+      url: "https://example.com/a",
+      resourceList: [{ type: "fetch", name: "https://example.com/x", duration: 1e21 }],
+    },
+    buckets,
+  );
+  const ajaxs = collectAjaxRows(buckets);
+  assert.equal(ajaxs.length, 1, "an out-of-range duration must not drop or poison the row");
+  assert.equal(ajaxs[0].duration, 60_000, "UInt32-overflowing duration is clamped to the 60s ceiling");
 });
 
 test("valid numeric strings still coerce correctly", async () => {

@@ -18,8 +18,9 @@ const SUBJECT: EvaluationSubjectRef = {
   kind: "aws-account",
   scopeType: "project",
   scopeId: "22222222-2222-4222-8222-222222222222",
-  subjectKey: "binding-1",
+  subjectKey: "123456789012",
   displayName: "123456789012",
+  credentialRef: "aws-binding:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
 };
 
 const VERSION: EvaluationRuleSetVersionRef = {
@@ -105,4 +106,18 @@ test("a subject whose items all failed to collect is a failed run, not a clean o
 test("an unbound AwsConfigAccess is a wiring error", async () => {
   const provider = new SecurityEvaluationAwsConfigEvidenceProvider(stubAssets());
   await assert.rejects(provider.collect(SUBJECT, VERSION), /No AwsConfigAccess is bound/);
+});
+
+test("a subject without a credential reference is unevaluable and never reaches the port", async () => {
+  let portCalls = 0;
+  const access: AwsConfigAccess = {
+    collect: async () => {
+      portCalls += 1;
+      return { items: [], failures: [] };
+    },
+  };
+  const provider = new SecurityEvaluationAwsConfigEvidenceProvider(stubAssets(), access);
+  const { credentialRef: _omitted, ...withoutRef } = SUBJECT;
+  await assert.rejects(provider.collect(withoutRef, VERSION), /unevaluable: no credential reference is registered/);
+  assert.equal(portCalls, 0);
 });

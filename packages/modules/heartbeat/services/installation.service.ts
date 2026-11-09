@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { HeartbeatInstallation } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
@@ -11,6 +11,12 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
+import {
+  InstallationPresence,
+  isInstallationOnline,
+  withDerivedOnlineState,
+} from "@modules/security/installation/installation-presence";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** Requested interval between client pings; echoed back in the ping response. */
@@ -31,29 +37,15 @@ interface HeartbeatInstallationDraft {
 }
 
 /**
- * Presence of the installations sharing one externalRef, normalized for the
- * platform-side per-facility dashboards. Several rows can share a ref (rotation
- * history, multiple instances):
- * - `enrolled` — at least one non-revoked installation exists.
- * - `online` — a non-revoked installation pinged within the online window.
- * - `lastSeenAt` — newest ping across the non-revoked installations
- *   (null until the first contact).
- * - `revokedOnly` — rows exist but every one is revoked.
- */
-export interface InstallationPresence {
-  enrolled: boolean;
-  online: boolean;
-  lastSeenAt: Date | null;
-  revokedOnly: boolean;
-}
-
-/**
  * Installation registry for the heartbeat module. One token = one deployment
  * endpoint; the host pre-creates rows and distributes the plaintext token out
  * of band, and the running process touches lastSeenAt on every ping.
  */
 @Injectable()
-export class HeartbeatInstallationService implements InstallationResolver {
+export class HeartbeatInstallationService
+  extends BaseInstallationService<HeartbeatInstallation>
+  implements InstallationResolver
+{
   readonly kind = "heartbeat";
   /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
   readonly legacyHeader = "x-heartbeat-token";
@@ -61,12 +53,13 @@ export class HeartbeatInstallationService implements InstallationResolver {
   // Credential mechanism comes from security (ADR-019); this class only adapts
   // its table and projects the domain state.
   private readonly credentials: InstallationCredentialStore<HeartbeatInstallationDraft, HeartbeatInstallation>;
-  private readonly tokenVerifier: InstallationTokenVerifier<HeartbeatInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<HeartbeatInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<HeartbeatInstallationDraft, HeartbeatInstallation>(
       this.prisma.heartbeatInstallation,
     );
@@ -151,7 +144,7 @@ export class HeartbeatInstallationService implements InstallationResolver {
         if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
           lastSeenAt = row.lastSeenAt;
         }
-        if (row.lastSeenAt != null && now - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS) {
+        if (row.lastSeenAt != null && isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
         }
       }
@@ -207,27 +200,6 @@ export class HeartbeatInstallationService implements InstallationResolver {
   // -------------------------------------------------------------------------
 
   /**
-   * Look up a non-revoked installation by its plaintext token. Unknown and
-   * revoked tokens both return null so the two cases stay indistinguishable.
-   */
-  async resolveByToken(token: string): Promise<HeartbeatInstallation | null> {
-    return this.tokenVerifier.verify(token);
-  }
-
-  /**
-   * InstallationResolver port (ADR-016): authenticate a report token for the
-   * InstallationAuthGuard. Throws UnauthorizedException for unknown or
-   * revoked tokens.
-   */
-  async resolve(token: string): Promise<HeartbeatInstallation> {
-    const installation = await this.resolveByToken(token);
-    if (!installation) {
-      throw new UnauthorizedException("Invalid or revoked installation token.");
-    }
-    return installation;
-  }
-
-  /**
    * Advance liveness for an already-authenticated installation in a single
    * round trip. Authentication happens upstream in the InstallationAuthGuard
    * (ADR-016). firstSeenAt is written exactly once (COALESCE), lastSeenAt
@@ -263,11 +235,6 @@ export class HeartbeatInstallationService implements InstallationResolver {
   }
 
   private withDerivedState(row: HeartbeatInstallation) {
-    const online =
-      !row.revokedAt &&
-      row.lastSeenAt != null &&
-      Date.now() - row.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS;
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, online };
+    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
   }
 }

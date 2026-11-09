@@ -1,65 +1,31 @@
-import { Injectable, NotFoundException, ForbiddenException } from "@nestjs/common";
-import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { isValidAppKey } from "../../shared/utils";
+import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
+import { assertAppKey } from "../../shared/utils";
 
 /**
- * Resolves an appKey for management-side web-monitor queries and enforces
- * that the caller has membership in the target project.
+ * Controller-side gate for management queries.
  *
- * This module intentionally never trusts an appKey carried in a request —
- * the caller supplies projectId + applicationId (both UUIDs from the host
- * URL path) and we derive the appKey from the installation registry, then
- * confirm the current user is a member of the project before returning it.
+ * The module never trusts an appKey blindly: controllers resolve the caller's
+ * visible appKeys through the host port, then pass both the resolved scope and
+ * the requested key here. This service only compares them — it never sees a
+ * user id, a role, or a project id, and it performs no lookup of its own, so a
+ * miss cannot be told apart from a key that does not exist.
  */
 @Injectable()
 export class WebMonitorAccessService {
-  constructor(private readonly prisma: PrismaService) {}
-
   /**
-   * Resolve the storage partition key for a management-side query.
-   * Throws NotFoundException when the installation is not enrolled for the
-   * given projectId/applicationId pair; throws ForbiddenException when the
-   * caller has no ProjectMember row for projectId.
+   * Validate the requested appKey and assert it is inside the resolved scope.
+   * Malformed input is a 400 (a shape error, not an existence signal); anything
+   * outside the scope — including an empty scope or a revoked installation,
+   * which never enters the scope — is a uniform 403.
    */
-  async resolveAppKey(projectId: string, applicationId: string, currentUserId: string): Promise<string> {
-    // 1. Membership gate — reuse the same check pattern as site.service.userProjectIds.
-    const membership = await this.prisma.projectMember.findFirst({
-      where: {
-        userId: currentUserId,
-        projectId,
-      },
-    });
-    if (!membership) {
-      throw new ForbiddenException("Caller is not a member of the target project");
+  assertVisibleAppKey(visibleAppKeys: string[], requested: unknown): string {
+    if (typeof requested !== "string" || !requested) {
+      throw new BadRequestException("appKey is required");
     }
-
-    // 2. Installation lookup by the host-mapping tag.
-    const externalRef = `${projectId}/${applicationId}`;
-    const installation = await this.prisma.webMonitorInstallation.findFirst({
-      where: { externalRef },
-    });
-    if (!installation || !installation.appKey) {
-      throw new NotFoundException(
-        `No web-monitor installation enrolled for project ${projectId} / application ${applicationId}`,
-      );
+    const appKey = assertAppKey(requested);
+    if (!visibleAppKeys.includes(appKey)) {
+      throw new ForbiddenException("appKey is outside the caller's visible scope");
     }
-    if (installation.revokedAt != null) {
-      throw new ForbiddenException("Web-monitor installation is revoked");
-    }
-
-    return installation.appKey;
-  }
-
-  /**
-   * Assertion helper — if something downstream ever needs to confirm a
-   * resolved appKey still matches the partition-key format, call this.
-   * The default path does not need it because we derive appKey from the
-   * installation registry, which is the same generator that produces it.
-   */
-  assertAppKeyLike(value: unknown): string {
-    if (!isValidAppKey(value)) {
-      throw new ForbiddenException("Internal invariant: resolved appKey failed format check");
-    }
-    return value as string;
+    return appKey;
   }
 }

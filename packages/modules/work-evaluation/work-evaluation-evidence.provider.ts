@@ -11,6 +11,7 @@ import {
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 import { requirePeriodId } from "./work-evaluation-run-config";
 import { WorkEvaluationSessionStore } from "./work-evaluation-session.store";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /**
  * WorkEvaluationEvidenceProvider — the EvidenceProvider for subject kind
@@ -147,7 +148,7 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
     try {
       counts = await this.sessionStore.countMessagesBySession(sessions.map((session) => session.id));
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getErrorMessage(error);
       this.logger.warn(`Transcript availability check failed in ClickHouse: ${message}`);
       const items = sessions.map((session) => `session:${session.id}`).sort();
       return {

@@ -5,6 +5,7 @@ import { EvaluationEvidenceItem } from "@modules/evaluation/ports/evaluation.con
 import { WorkEvaluationEvidenceService } from "./work-evaluation-evidence.service";
 import { WorkEvaluationSessionStore } from "./work-evaluation-session.store";
 import { createDrillRedactor, redactDeep } from "./work-evaluation-redaction";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /** Upper bound for one tool result, so a single drill-down cannot blow the window. */
 const MAX_TOOL_RESULT_CHARS = 20_000;
@@ -219,7 +220,7 @@ export class WorkEvaluationJudgmentTools {
         contentTruncated: document.content.length > MAX_TOOL_RESULT_CHARS,
       };
     } catch (error) {
-      return { error: error instanceof Error ? error.message : String(error) };
+      return { error: getErrorMessage(error) };
     }
   }
 }

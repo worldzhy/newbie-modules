@@ -1,7 +1,12 @@
 // ClickHouse column data types used by table schemas.
 export const ClickHouseDataType = {
   String: "String",
-  DateTime: "DateTime",
+  // UTC is declared explicitly instead of relying on the server's timezone
+  // setting (usually "UTC" by convention, never enforced). Without it a server
+  // configured for another zone silently reinterprets every inserted instant,
+  // and alert queries that convert Shanghai wall-clock bounds would be off by
+  // the offset (R20-33).
+  DateTime: "DateTime('UTC')",
   UInt16: "UInt16",
   UInt32: "UInt32",
   Int32: "Int32",

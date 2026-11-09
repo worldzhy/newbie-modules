@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
-import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
@@ -23,27 +22,17 @@ import {
   WebThresholdAlertSignal,
 } from "./threshold-alert.event";
 import { FIRST_SEEN_SOURCE_FILTER, SPIKE_SOURCE_FILTER } from "./error-source";
+import { AlertStateMachine } from "./alert-state";
 import * as os from "os";
-
-/**
- * Redis-stored lifecycle state for one alert identity (appKey + signal, plus
- * optional category/fingerprint). ADR-051.
- */
-interface AlertState {
-  status: "firing";
-  firstFiredAt: string;
-  lastFiredAt: string;
-  cleanWindows: number;
-}
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 @Injectable()
 export class JobsService implements OnModuleInit {
-  private cfg: Record<string, unknown>;
   private readonly logger = new Logger(JobsService.name);
+  private readonly alertState: AlertStateMachine;
 
   constructor(
     private readonly redis: RedisService,
-    private readonly configService: ConfigService,
     private readonly site: SiteService,
     private readonly nodeCache: NodeCacheService,
     private readonly dayReportNum: DayReportNumService,
@@ -55,7 +44,7 @@ export class JobsService implements OnModuleInit {
     private readonly clickhouse: WebMonitorClickHouseService,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    this.cfg = this.configService.get("modules.web-monitor") || {};
+    this.alertState = new AlertStateMachine(this.redis, this.logger);
   }
 
   // Periodic scheduling lives in the consumer's application layer
@@ -96,16 +85,6 @@ export class JobsService implements OnModuleInit {
   private static readonly NEW_ERROR_LIMIT = 3;
   private static readonly TOP_ITEMS_LIMIT = 3;
 
-  // Alert lifecycle (ADR-051): a firing notification is suppressed inside the
-  // cooldown window; a signal that stays clean for N consecutive windows fires
-  // one recovered notification and clears its state. These constants will move
-  // to per-site configuration in the upcoming threshold-configurability ADR.
-  private static readonly ALERT_COOLDOWN_MS = 60 * 60 * 1000;
-  private static readonly ALERT_RECOVERY_WINDOWS = 2;
-  // State TTL comfortably exceeds the cooldown so a slow-bleeding signal keeps
-  // its state between evaluations, but not forever.
-  private static readonly ALERT_STATE_TTL_SECONDS = 2 * 60 * 60;
-
   async evaluateThresholdAlerts() {
     // ADR-051 fail-open: without Redis (not configured, or down mid-run) there
     // is no cross-instance lock and no lifecycle state. Evaluation still runs;
@@ -118,7 +97,7 @@ export class JobsService implements OnModuleInit {
         acquired = await this.redisLock(RedisKeys.ALERT_EVALUATION_TASK_LOCK, WEB_MONITOR_CONFIG.alertTaskLockTime);
       } catch (error) {
         this.logger.error(
-          `Alert evaluation lock failed (Redis error), proceeding without it: ${this.getErrorMessage(error)}`,
+          `Alert evaluation lock failed (Redis error), proceeding without it: ${getErrorMessage(error)}`,
         );
         acquired = true;
       }
@@ -129,7 +108,7 @@ export class JobsService implements OnModuleInit {
     try {
       systems = await this.site.getWebSiteList();
     } catch (error) {
-      this.logger.error(`Threshold alert evaluation failed to load systems: ${this.getErrorMessage(error)}`);
+      this.logger.error(`Threshold alert evaluation failed to load systems: ${getErrorMessage(error)}`);
       return;
     }
 
@@ -147,9 +126,7 @@ export class JobsService implements OnModuleInit {
         try {
           await this.evaluateSystem(system, windowStart, windowEnd, windowMs);
         } catch (error) {
-          this.logger.error(
-            `Threshold alert evaluation failed for system ${system.appKey}: ${this.getErrorMessage(error)}`,
-          );
+          this.logger.error(`Threshold alert evaluation failed for system ${system.appKey}: ${getErrorMessage(error)}`);
         }
       }
     });
@@ -160,7 +137,6 @@ export class JobsService implements OnModuleInit {
     const base = {
       appKey: system.appKey,
       systemName: system.systemName || system.appKey,
-      projectId: system.projectId,
       windowMs,
       windowStartedAt: windowStart.toISOString(),
     };
@@ -179,7 +155,7 @@ export class JobsService implements OnModuleInit {
       ]);
       if (count >= JobsService.MIN_SLOW_PAGE_COUNT) {
         const key = this.alertStateKey(base.appKey, "slow-page");
-        if (await this.shouldFire(key)) {
+        if (await this.alertState.shouldFire(key)) {
           this.emitAlert({
             ...base,
             signal: "slow-page",
@@ -193,7 +169,7 @@ export class JobsService implements OnModuleInit {
             ),
           });
         }
-      } else if (await this.recoverIfClean(this.alertStateKey(base.appKey, "slow-page"))) {
+      } else if (await this.alertState.recoverIfClean(this.alertStateKey(base.appKey, "slow-page"))) {
         this.emitAlert({
           ...base,
           signal: "slow-page",
@@ -221,7 +197,7 @@ export class JobsService implements OnModuleInit {
       ]);
       if (count >= JobsService.MIN_SLOW_FIRST_PAINT_COUNT) {
         const key = this.alertStateKey(base.appKey, "slow-first-paint");
-        if (await this.shouldFire(key)) {
+        if (await this.alertState.shouldFire(key)) {
           this.emitAlert({
             ...base,
             signal: "slow-first-paint",
@@ -235,7 +211,7 @@ export class JobsService implements OnModuleInit {
             ),
           });
         }
-      } else if (await this.recoverIfClean(this.alertStateKey(base.appKey, "slow-first-paint"))) {
+      } else if (await this.alertState.recoverIfClean(this.alertStateKey(base.appKey, "slow-first-paint"))) {
         this.emitAlert({
           ...base,
           signal: "slow-first-paint",
@@ -259,9 +235,9 @@ export class JobsService implements OnModuleInit {
       { category: "css", types: ["link", "css"], thresholdSeconds: system.slowCssTime ?? 2 },
       { category: "img", types: ["img"], thresholdSeconds: system.slowImgTime ?? 2 },
     ];
-    const resourceModel = this.models.WebResource(system.appKey);
     for (const { category, types, thresholdSeconds } of categories) {
       await this.runSignal(`slow ${category} resources`, async () => {
+        const resourceModel = this.models.WebResource(system.appKey);
         const match = { createTime: { $gte: windowStart, $lt: windowEnd }, type: { $in: types } };
         const [count, topRows] = await Promise.all([
           resourceModel.countDocuments(match),
@@ -274,7 +250,7 @@ export class JobsService implements OnModuleInit {
         ]);
         if (count >= JobsService.MIN_SLOW_RESOURCE_COUNT) {
           const key = this.alertStateKey(base.appKey, "slow-resource", category);
-          if (await this.shouldFire(key)) {
+          if (await this.alertState.shouldFire(key)) {
             this.emitAlert({
               ...base,
               signal: "slow-resource",
@@ -289,7 +265,7 @@ export class JobsService implements OnModuleInit {
               ),
             });
           }
-        } else if (await this.recoverIfClean(this.alertStateKey(base.appKey, "slow-resource", category))) {
+        } else if (await this.alertState.recoverIfClean(this.alertStateKey(base.appKey, "slow-resource", category))) {
           this.emitAlert({
             ...base,
             signal: "slow-resource",
@@ -322,7 +298,7 @@ export class JobsService implements OnModuleInit {
           queryParams,
         });
         const key = this.alertStateKey(base.appKey, "slow-ajax");
-        if (await this.shouldFire(key)) {
+        if (await this.alertState.shouldFire(key)) {
           this.emitAlert({
             ...base,
             signal: "slow-ajax",
@@ -336,7 +312,7 @@ export class JobsService implements OnModuleInit {
             ),
           });
         }
-      } else if (await this.recoverIfClean(this.alertStateKey(base.appKey, "slow-ajax"))) {
+      } else if (await this.alertState.recoverIfClean(this.alertStateKey(base.appKey, "slow-ajax"))) {
         this.emitAlert({
           ...base,
           signal: "slow-ajax",
@@ -376,7 +352,7 @@ export class JobsService implements OnModuleInit {
           limit: JobsService.TOP_ITEMS_LIMIT,
           queryParams: timeFilter.queryParams,
         });
-        if (await this.shouldFire(key)) {
+        if (await this.alertState.shouldFire(key)) {
           this.emitAlert({
             ...base,
             signal: "js-error-spike",
@@ -390,7 +366,7 @@ export class JobsService implements OnModuleInit {
             ),
           });
         }
-      } else if (await this.recoverIfClean(key)) {
+      } else if (await this.alertState.recoverIfClean(key)) {
         this.emitAlert({
           ...base,
           signal: "js-error-spike",
@@ -439,7 +415,7 @@ export class JobsService implements OnModuleInit {
         // "new error" signal has no level to recover from. The state key
         // TTL-expires when the fingerprint stops recurring.
         const key = this.alertStateKey(base.appKey, "js-error-first-seen", undefined, fingerprint);
-        if (await this.shouldFire(key)) {
+        if (await this.alertState.shouldFire(key)) {
           this.emitAlert({
             ...base,
             signal: "js-error-first-seen",
@@ -466,7 +442,7 @@ export class JobsService implements OnModuleInit {
     } catch (error) {
       // One failing signal (e.g. a not-yet-created per-app table) must not
       // suppress the remaining signals for the same system.
-      this.logger.warn(`Threshold alert signal "${name}" failed: ${this.getErrorMessage(error)}`);
+      this.logger.warn(`Threshold alert signal "${name}" failed: ${getErrorMessage(error)}`);
     }
   }
 
@@ -475,7 +451,7 @@ export class JobsService implements OnModuleInit {
       this.eventEmitter.emit(WEB_THRESHOLD_ALERT_EVENT, event);
     } catch (error) {
       this.logger.error(
-        `Failed to emit ${WEB_THRESHOLD_ALERT_EVENT} for system ${event.appKey} (${event.signal}): ${this.getErrorMessage(error)}`,
+        `Failed to emit ${WEB_THRESHOLD_ALERT_EVENT} for system ${event.appKey} (${event.signal}): ${getErrorMessage(error)}`,
       );
     }
   }
@@ -496,82 +472,6 @@ export class JobsService implements OnModuleInit {
     if (category) key += `:${category}`;
     if (fingerprint) key += `:${fingerprint}`;
     return key;
-  }
-
-  /**
-   * Returns true when a firing notification should be emitted now. Records the
-   * fire timestamp so later windows inside the cooldown are suppressed. Fails
-   * open when Redis is not configured or its commands fail: the alert fires
-   * and downstream minute-bucket deduplication limits the repeat rate, so a
-   * Redis outage never silences alerts.
-   */
-  private async shouldFire(key: string): Promise<boolean> {
-    if (!this.redis.isConfigured()) return true;
-    const client = this.redis.getClient();
-    const now = Date.now();
-    try {
-      const raw = await client.get(key);
-      if (raw) {
-        const state = JSON.parse(raw) as AlertState;
-        if (now - new Date(state.lastFiredAt).getTime() < JobsService.ALERT_COOLDOWN_MS) {
-          // Inside cooldown: keep the state alive, do not re-notify.
-          state.lastFiredAt = new Date(now).toISOString();
-          state.cleanWindows = 0;
-          await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
-          return false;
-        }
-        // Cooldown elapsed: re-ignite. Reachable only after an evaluation gap
-        // >= cooldown while the state key survives (TTL 2h) — a continuously
-        // breaching signal refreshes lastFiredAt every window above and never
-        // reaches this branch.
-        state.lastFiredAt = new Date(now).toISOString();
-        state.cleanWindows = 0;
-        await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
-        return true;
-      }
-      const state: AlertState = {
-        status: "firing",
-        firstFiredAt: new Date(now).toISOString(),
-        lastFiredAt: new Date(now).toISOString(),
-        cleanWindows: 0,
-      };
-      await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
-      return true;
-    } catch (error) {
-      this.logger.warn(
-        `Alert state read/write failed for ${key}, firing without cooldown: ${this.getErrorMessage(error)}`,
-      );
-      return true;
-    }
-  }
-
-  /**
-   * Called on a clean window. Returns true when the signal has stayed clean for
-   * ALERT_RECOVERY_WINDOWS consecutive windows, in which case the caller emits
-   * a recovered notification and the state key is deleted. Fails closed when
-   * Redis is unavailable: never claim "recovered" while the firing state cannot
-   * be confirmed.
-   */
-  private async recoverIfClean(key: string): Promise<boolean> {
-    if (!this.redis.isConfigured()) return false;
-    const client = this.redis.getClient();
-    try {
-      const raw = await client.get(key);
-      if (!raw) return false;
-      const state = JSON.parse(raw) as AlertState;
-      state.cleanWindows += 1;
-      if (state.cleanWindows >= JobsService.ALERT_RECOVERY_WINDOWS) {
-        await client.del(key);
-        return true;
-      }
-      await client.set(key, JSON.stringify(state), "EX", JobsService.ALERT_STATE_TTL_SECONDS);
-      return false;
-    } catch (error) {
-      this.logger.warn(
-        `Alert state read/write failed for ${key}, skipping recovery check: ${this.getErrorMessage(error)}`,
-      );
-      return false;
-    }
   }
 
   private buildClickHouseTimeFilter(
@@ -613,10 +513,6 @@ export class JobsService implements OnModuleInit {
     return new Date(date.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 19).replace("T", " ");
   }
 
-  private getErrorMessage(error: unknown): string {
-    return error instanceof Error ? error.message : String(error);
-  }
-
   /** First non-internal IPv4 address of this host, used as a Redis lock holder tag. */
   private localAddress(): string {
     for (const infos of Object.values(os.networkInterfaces())) {
@@ -654,7 +550,7 @@ export class JobsService implements OnModuleInit {
       const systems = await this.site.getSiteList();
       this.nodeCache.updateAllSiteCache(systems);
     } catch (e) {
-      this.logger.error("IO error: failed to update cached appKey info", e instanceof Error ? e.message : String(e));
+      this.logger.error("IO error: failed to update cached appKey info", getErrorMessage(e));
     }
   }
 
@@ -687,7 +583,7 @@ export class JobsService implements OnModuleInit {
     try {
       if (WEB_MONITOR_CONFIG.is_web_consume_task_run) await this.consumeWebQueue();
     } catch (e) {
-      this.logger.error("Consumer queue exception", e instanceof Error ? e.message : String(e));
+      this.logger.error("Consumer queue exception", getErrorMessage(e));
     }
     // Can later be split into a standalone cron job if needed
   }

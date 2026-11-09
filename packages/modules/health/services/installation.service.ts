@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { HealthInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
@@ -11,6 +11,9 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
+import { InstallationPresence, isInstallationOnline } from "@modules/security/installation/installation-presence";
+import { LivenessState, worseLivenessState } from "@modules/security/installation/liveness-state";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** Requested interval between client snapshots; echoed back in the response. */
@@ -30,9 +33,6 @@ interface HealthInstallationDraft {
   externalRef: string | null;
 }
 
-/** Derived health state of an installation. */
-export type HealthState = "unknown" | "healthy" | "degraded" | "offline";
-
 /** One failing dependency indicator from the latest snapshot. */
 export interface HealthDownIndicator {
   name: string;
@@ -45,27 +45,9 @@ export interface HealthDownIndicator {
  * in the latest snapshot (empty for every state except "degraded").
  */
 export interface HealthLivenessSnapshot {
-  state: HealthState;
+  state: LivenessState;
   lastSnapshotAt: Date | null;
   downIndicators: HealthDownIndicator[];
-}
-
-/**
- * Presence of the installations sharing one externalRef, normalized for the
- * platform-side per-facility dashboards. Several rows can share a ref (rotation
- * history, multiple instances):
- * - `enrolled` — at least one non-revoked installation exists.
- * - `online` — a non-revoked installation's latest snapshot is healthy or
- *   degraded (i.e. the process is reporting within the online window).
- * - `lastSeenAt` — newest snapshot time across the non-revoked installations
- *   (null until the first contact).
- * - `revokedOnly` — rows exist but every one is revoked.
- */
-export interface InstallationPresence {
-  enrolled: boolean;
-  online: boolean;
-  lastSeenAt: Date | null;
-  revokedOnly: boolean;
 }
 
 /**
@@ -79,7 +61,10 @@ export interface InstallationPresence {
  * (unknown / healthy / degraded / offline) at read time.
  */
 @Injectable()
-export class HealthInstallationService implements InstallationResolver {
+export class HealthInstallationService
+  extends BaseInstallationService<HealthInstallation>
+  implements InstallationResolver
+{
   readonly kind = "health";
   /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
   readonly legacyHeader = "x-health-token";
@@ -87,12 +72,13 @@ export class HealthInstallationService implements InstallationResolver {
   // Credential mechanism comes from security (ADR-019); this class only adapts
   // its table and projects the domain state.
   private readonly credentials: InstallationCredentialStore<HealthInstallationDraft, HealthInstallation>;
-  private readonly tokenVerifier: InstallationTokenVerifier<HealthInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<HealthInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<HealthInstallationDraft, HealthInstallation>(
       this.prisma.healthInstallation,
     );
@@ -176,7 +162,7 @@ export class HealthInstallationService implements InstallationResolver {
         lastSnapshotAt: row.lastSnapshotAt,
         // Indicator detail is only meaningful while the process is reporting;
         // an offline process's stale info must not masquerade as live faults.
-        downIndicators: state === "degraded" ? this.extractDownIndicators(row.lastSnapshotInfo) : [],
+        downIndicators: state === LivenessState.DEGRADED ? this.extractDownIndicators(row.lastSnapshotInfo) : [],
       };
       const prev = snapshots.get(row.externalRef);
       if (!prev) {
@@ -185,7 +171,7 @@ export class HealthInstallationService implements InstallationResolver {
       }
       // Worst state wins across installations; on a tie the newer snapshot
       // carries the more current indicators.
-      const worse = this.worseState(prev.state, state);
+      const worse = worseLivenessState(prev.state, state);
       if (worse === state && worse !== prev.state) {
         snapshots.set(row.externalRef, candidate);
       } else if (
@@ -231,8 +217,7 @@ export class HealthInstallationService implements InstallationResolver {
         if (row.lastSnapshotAt && (!lastSeenAt || row.lastSnapshotAt > lastSeenAt)) {
           lastSeenAt = row.lastSnapshotAt;
         }
-        const state = this.deriveState(row.lastSnapshotAt, row.lastSnapshotStatus);
-        if (state === "healthy" || state === "degraded") {
+        if (isInstallationOnline(row.lastSnapshotAt, ONLINE_THRESHOLD_SECONDS)) {
           online = true;
         }
       }
@@ -257,7 +242,7 @@ export class HealthInstallationService implements InstallationResolver {
       env: string | null;
       instanceId: string | null;
       appVersion: string | null;
-      state: HealthState;
+      state: LivenessState;
       lastSnapshotAt: Date | null;
       lastSnapshotStatus: string | null;
       lastSnapshotInfo: unknown;
@@ -294,29 +279,6 @@ export class HealthInstallationService implements InstallationResolver {
    * Look up a non-revoked installation by its plaintext token. Unknown and
    * revoked tokens both return null so the two cases stay indistinguishable.
    */
-  async resolveByToken(token: string): Promise<HealthInstallation | null> {
-    return this.tokenVerifier.verify(token);
-  }
-
-  /**
-   * InstallationResolver port (ADR-016): authenticate a report token for the
-   * InstallationAuthGuard. Throws UnauthorizedException for unknown or
-   * revoked tokens.
-   */
-  async resolve(token: string): Promise<HealthInstallation> {
-    const installation = await this.resolveByToken(token);
-    if (!installation) {
-      throw new UnauthorizedException("Invalid or revoked installation token.");
-    }
-    return installation;
-  }
-
-  /**
-   * Record a dependency snapshot for an already-authenticated installation in
-   * a single round trip. Authentication happens upstream in the
-   * InstallationAuthGuard (ADR-016). firstSeenAt is written exactly once
-   * (COALESCE); the lastSnapshot* columns always advance.
-   */
   async recordSnapshot(
     installationId: string,
     facts: {
@@ -347,16 +309,10 @@ export class HealthInstallationService implements InstallationResolver {
   // Helpers
   // -------------------------------------------------------------------------
 
-  private deriveState(lastSnapshotAt: Date | null, lastSnapshotStatus: string | null): HealthState {
-    if (!lastSnapshotAt) return "unknown";
-    const stale = Date.now() - lastSnapshotAt.getTime() > ONLINE_THRESHOLD_MILLISECONDS;
-    if (stale) return "offline";
-    return lastSnapshotStatus === "ok" ? "healthy" : "degraded";
-  }
-
-  private worseState(a: HealthState, b: HealthState): HealthState {
-    const order: Record<HealthState, number> = { unknown: 0, healthy: 1, degraded: 2, offline: 3 };
-    return order[a] >= order[b] ? a : b;
+  private deriveState(lastSnapshotAt: Date | null, lastSnapshotStatus: string | null): LivenessState {
+    if (!lastSnapshotAt) return LivenessState.UNKNOWN;
+    if (!isInstallationOnline(lastSnapshotAt, ONLINE_THRESHOLD_SECONDS)) return LivenessState.OFFLINE;
+    return lastSnapshotStatus === "ok" ? LivenessState.HEALTHY : LivenessState.DEGRADED;
   }
 
   /**

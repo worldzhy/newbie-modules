@@ -2,6 +2,10 @@ import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { Octokit } from "@octokit/rest";
 import { createAppAuth } from "@octokit/auth-app";
+import { delay } from "@devbie/newbie/utilities/delay.util";
+import { base64ToUtf8 } from "@devbie/newbie/utilities/base64.util";
+import { parseRepositorySlug } from "@devbie/newbie/utilities/repository-url.util";
+import { getErrorStatus } from "./error-status";
 
 /**
  * Thrown by any API method when the service was constructed without
@@ -26,16 +30,6 @@ export class RepoNameConflictError extends Error {
     super(`Repository ${org}/${name} already exists and is not owned by this provisioning`);
     this.name = "RepoNameConflictError";
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// Octokit HTTP errors (RequestError) carry a numeric `status`. Extract it
-// from an unknown thrown value without a bare `any` cast.
-function octokitStatus(error: unknown): number | undefined {
-  return (error as { status?: number }).status;
 }
 
 // Extract the env-var key from a placeholder line. Accepts:
@@ -69,6 +63,52 @@ const USER_AGENT = "newbie";
 interface RepoFile {
   content: string;
   sha: string;
+}
+
+/** One commit as surfaced by the read-only repository accessors. */
+export interface RepositoryCommit {
+  sha: string;
+  message: string;
+  authorName: string | null;
+  authorEmail: string | null;
+  /** Committer date, falling back to the author date; null when GitHub omits both. */
+  committedAt: Date | null;
+}
+
+/** One node of a Git tree. */
+export interface RepositoryTreeEntry {
+  path: string;
+  /** Git object type: `blob` (file), `tree` (directory) or `commit` (submodule). */
+  type: string;
+  sha: string;
+  size: number | null;
+}
+
+/** A Git tree plus GitHub's truncation flag (very large trees are cut off). */
+export interface RepositoryTree {
+  entries: RepositoryTreeEntry[];
+  truncated: boolean;
+}
+
+/** The subset of a GitHub commit payload these accessors read. */
+interface GitHubCommitPayload {
+  sha: string;
+  commit?: {
+    message?: string;
+    author?: { name?: string | null; email?: string | null; date?: string | null } | null;
+    committer?: { date?: string | null } | null;
+  } | null;
+}
+
+function toRepositoryCommit(payload: GitHubCommitPayload): RepositoryCommit {
+  const rawDate = payload.commit?.committer?.date ?? payload.commit?.author?.date;
+  return {
+    sha: payload.sha,
+    message: payload.commit?.message ?? "",
+    authorName: payload.commit?.author?.name ?? null,
+    authorEmail: payload.commit?.author?.email ?? null,
+    committedAt: rawDate ? new Date(rawDate) : null,
+  };
 }
 
 @Injectable()
@@ -150,9 +190,10 @@ export class GitHubService {
    * Single parsing entry point for template URLs, provisioning and dep-scan.
    */
   parseGitHubUrl(url: string): { owner: string; repo: string } | null {
-    const match = url.trim().match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
-    if (!match) return null;
-    return { owner: match[1], repo: match[2] };
+    const slug = parseRepositorySlug(url);
+    if (!slug) return null;
+    if (!/github\.com/.test(url)) return null;
+    return slug;
   }
 
   /**
@@ -176,7 +217,7 @@ export class GitHubService {
       const { data } = await this.client().repos.get({ owner: org, repo: name });
       return { cloneUrl: data.clone_url, generated: false };
     } catch (e: unknown) {
-      if (octokitStatus(e) !== 404) throw e;
+      if (getErrorStatus(e) !== 404) throw e;
     }
 
     // 2. Generate from template. 422 here means the name is taken by a repo
@@ -193,19 +234,19 @@ export class GitHubService {
       });
       gen = resp.data;
     } catch (e: unknown) {
-      if (octokitStatus(e) === 422) throw new RepoNameConflictError(org, name);
+      if (getErrorStatus(e) === 422) throw new RepoNameConflictError(org, name);
       throw e;
     }
 
     // 3. generate is async (202); contents may 404 briefly. Wait for it so
     //    upsertEnvExample can run immediately after.
     for (let i = 0; i < 3; i++) {
-      await sleep(2000);
+      await delay(2000);
       try {
         await this.client().repos.get({ owner: org, repo: name });
         break;
       } catch (e: unknown) {
-        if (octokitStatus(e) !== 404) throw e;
+        if (getErrorStatus(e) !== 404) throw e;
         if (i === 2) {
           this.logger.warn(`Repo ${org}/${name} not ready after 3 retries, continuing anyway`);
         }
@@ -215,12 +256,14 @@ export class GitHubService {
   }
 
   /**
-   * Read a UTF-8 text file from a repository (default branch). Returns null
-   * when the path does not exist or is not a regular file (404 / directory).
-   * Used by dep-scan to fetch lockfiles from application repositories.
+   * Read a UTF-8 text file from a repository. Defaults to the default branch;
+   * `ref` reads a branch, tag or commit sha instead. Returns null when the
+   * path does not exist or is not a regular file (404 / directory).
+   * Used by dep-scan to fetch lockfiles and by the module hub to read the
+   * registry manifest at a pinned commit.
    */
-  async getFileContent(owner: string, repo: string, path: string): Promise<string | null> {
-    const file = await this.readTextFile(owner, repo, path);
+  async getFileContent(owner: string, repo: string, path: string, ref?: string): Promise<string | null> {
+    const file = await this.readTextFile(owner, repo, path, ref);
     return file ? file.content : null;
   }
 
@@ -229,16 +272,80 @@ export class GitHubService {
    * Contents API for an update). Returns null when the path does not exist
    * (404) or is not a regular file.
    */
-  private async readTextFile(owner: string, repo: string, path: string): Promise<RepoFile | null> {
+  private async readTextFile(owner: string, repo: string, path: string, ref?: string): Promise<RepoFile | null> {
     try {
-      const { data } = await this.client().repos.getContent({ owner, repo, path });
+      const { data } = await this.client().repos.getContent({ owner, repo, path, ...(ref ? { ref } : {}) });
       // Content API returns an array for directories; we only care about files.
       if (Array.isArray(data) || data.type !== "file") {
         return null;
       }
-      return { content: Buffer.from(data.content, "base64").toString("utf-8"), sha: data.sha };
+      return { content: base64ToUtf8(data.content), sha: data.sha };
     } catch (e: unknown) {
-      if (octokitStatus(e) === 404) return null;
+      if (getErrorStatus(e) === 404) return null;
+      throw e;
+    }
+  }
+
+  /**
+   * List commits reachable from the default branch, newest first. `options.path`
+   * narrows the list to commits touching that path; `options.perPage` caps the
+   * response. Returns an empty list on 404 (nothing readable), matching the
+   * "missing material" semantics of `getFileContent`; other failures throw.
+   */
+  async listCommits(
+    owner: string,
+    repo: string,
+    options: { path?: string; perPage?: number } = {},
+  ): Promise<RepositoryCommit[]> {
+    try {
+      const { data } = await this.client().repos.listCommits({
+        owner,
+        repo,
+        ...(options.path ? { path: options.path } : {}),
+        ...(options.perPage ? { per_page: options.perPage } : {}),
+      });
+      return data.map((entry) => toRepositoryCommit(entry));
+    } catch (e: unknown) {
+      if (getErrorStatus(e) === 404) return [];
+      throw e;
+    }
+  }
+
+  /**
+   * Read the Git tree at `ref` (branch, tag or commit sha). `recursive` walks
+   * subdirectories. Returns null on 404 (unknown repo/ref); other failures
+   * throw. Check `truncated` before treating the result as complete.
+   */
+  async getTree(owner: string, repo: string, ref: string, recursive = false): Promise<RepositoryTree | null> {
+    try {
+      const { data } = await this.client().git.getTree({
+        owner,
+        repo,
+        tree_sha: ref,
+        ...(recursive ? { recursive: "true" } : {}),
+      });
+      return {
+        truncated: data.truncated ?? false,
+        entries: data.tree.map((node) => ({
+          path: node.path ?? "",
+          type: node.type ?? "",
+          sha: node.sha ?? "",
+          size: node.size ?? null,
+        })),
+      };
+    } catch (e: unknown) {
+      if (getErrorStatus(e) === 404) return null;
+      throw e;
+    }
+  }
+
+  /** Read one commit's metadata. Returns null on 404 (unknown repo/ref); other failures throw. */
+  async getCommit(owner: string, repo: string, ref: string): Promise<RepositoryCommit | null> {
+    try {
+      const { data } = await this.client().repos.getCommit({ owner, repo, ref });
+      return toRepositoryCommit(data);
+    } catch (e: unknown) {
+      if (getErrorStatus(e) === 404) return null;
       throw e;
     }
   }
@@ -377,7 +484,7 @@ export class GitHubService {
     try {
       await this.client().repos.delete({ owner: org, repo });
     } catch (e: unknown) {
-      if (octokitStatus(e) !== 404) throw e;
+      if (getErrorStatus(e) !== 404) throw e;
     }
   }
 }

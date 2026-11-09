@@ -1,12 +1,13 @@
-import { BadRequestException, Body, Controller, Get, Post, Query, Req } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Inject, Post, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction } from "@generated/prisma/client";
-import { func } from "../../shared/utils";
+import { func, pickRequestId } from "../../shared/utils";
 import { WebCustomService } from "./services/custom.service";
 import { ListWebMonitorCustomAveragesResponseDto, ListWebMonitorCustomFiltersResponseDto } from "./custom.dto";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { WebMonitorAccessService } from "./web-monitor-access.service";
+import { VISIBLE_APP_KEYS_RESOLVER, VisibleAppKeysResolver } from "../../shared/visible-app-keys.port";
 
 @ApiTags("Frontend Monitor / Web / Custom")
 @Controller("/web-monitor/custom")
@@ -14,6 +15,8 @@ export class CustomController {
   constructor(
     private readonly webCustom: WebCustomService,
     private readonly access: WebMonitorAccessService,
+    @Inject(VISIBLE_APP_KEYS_RESOLVER)
+    private readonly projectVisibility: VisibleAppKeysResolver,
   ) {}
 
   @Get("/getCustomFilterList")
@@ -21,9 +24,8 @@ export class CustomController {
   @ApiOperation({ summary: "Get custom filter list" })
   @ApiResponse({ type: ListWebMonitorCustomFiltersResponseDto })
   async getCustomFilterList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId } = q;
-    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const result = await this.webCustom.getCustomFilterList(appKey);
     return func.result({ data: result });
   }
@@ -33,11 +35,11 @@ export class CustomController {
   @ApiOperation({ summary: "Add a custom filter" })
   @ApiResponse({ type: Boolean })
   async addCustomFilter(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId, filterKey, filterDesc } = body;
-    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    const { filterKey, filterDesc } = body;
     if (!filterKey) throw new BadRequestException("filterKey is required");
     if (!filterDesc) throw new BadRequestException("filterDesc is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const ok = await this.webCustom.addCustomFilter(appKey, filterKey as string, filterDesc as string);
     return func.result({ data: ok });
   }
@@ -47,10 +49,10 @@ export class CustomController {
   @ApiOperation({ summary: "Delete a custom filter" })
   @ApiResponse({ type: Boolean })
   async delCustomFilter(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId, _id } = body;
-    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    const { _id } = body;
     if (!_id) throw new BadRequestException("_id is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const ok = await this.webCustom.delCustomFilter(appKey, _id as string);
     return func.result({ data: ok });
   }
@@ -60,9 +62,9 @@ export class CustomController {
   @ApiOperation({ summary: "Get average custom category list" })
   @ApiResponse({ type: ListWebMonitorCustomAveragesResponseDto })
   async getAverageCustomList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId, pageNo = 1, pageSize = 15, beginTime, endTime, customName, customFilter } = q;
-    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const { pageNo = 1, pageSize = 15, beginTime, endTime, customName, customFilter } = q;
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const result = await this.webCustom.getAverageCustomList(
       appKey,
       Number(pageNo),

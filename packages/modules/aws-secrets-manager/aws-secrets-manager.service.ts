@@ -6,9 +6,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 import {
   CancelRotateSecretCommand,
   CreateSecretCommand,
@@ -21,13 +22,16 @@ import {
   TagResourceCommand,
   UpdateSecretCommand,
 } from "@aws-sdk/client-secrets-manager";
-import type { SecretListEntry } from "@aws-sdk/client-secrets-manager";
+import type { DescribeSecretResponse, SecretListEntry } from "@aws-sdk/client-secrets-manager";
 import {
+  ENV_GROUP_ENV_FIELD,
+  ENV_GROUP_ROTATION_FIELD,
   MANAGED_TAG_KEY,
   SECRET_TYPE_TAG_KEY,
   SECRET_TYPES,
   SecretType,
   SecretValueType,
+  envGroupSecretName,
 } from "./aws-secrets-manager.types";
 import { DEFAULT_LIST_PAGE_SIZE } from "./aws-secrets-manager.dto";
 import type { SecretValuePayload } from "./aws-secrets-manager.dto";
@@ -49,6 +53,16 @@ interface CachedClient {
   expiresAt: number;
 }
 
+/** One application's env group as read from AWS (no local mirror). */
+export interface EnvGroupSnapshot {
+  groupName: string;
+  arn: string | null;
+  exists: boolean;
+  env: Record<string, string>;
+  lastChangedAt: Date | null;
+  createdAt: Date | null;
+}
+
 /**
  * Stateless read-through proxy over AWS Secrets Manager. AWS is the single
  * source of truth: no local table mirrors secret metadata. Project scoping
@@ -62,7 +76,7 @@ export class AwsSecretsManagerService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly credentialService: AwsCredentialsService,
+    private readonly credentialService: AwsCrossAccountBindingsService,
   ) {}
 
   /**
@@ -89,7 +103,7 @@ export class AwsSecretsManagerService {
 
   async getSecret(projectId: string, name: string, region?: string) {
     const { client, region: resolvedRegion } = await this.getProjectContext(projectId, region);
-    const entry = await this.callAws(() => client.send(new DescribeSecretCommand({ SecretId: name })));
+    const entry = await this.describeManagedSecret(client, name);
     return this.toSecretResponse(entry, resolvedRegion);
   }
 
@@ -99,6 +113,9 @@ export class AwsSecretsManagerService {
     region?: string,
   ): Promise<{ name: string; secretValue: SecretValuePayload; valueType: SecretValueType }> {
     const { client } = await this.getProjectContext(projectId, region);
+    // The project credential may see secrets provisioned outside this plane;
+    // only rows this module created (carrying `devbie:managed`) are readable.
+    await this.describeManagedSecret(client, name);
     const response = await this.callAws(() =>
       client.send(new GetSecretValueCommand({ SecretId: name, VersionStage: "AWSCURRENT" })),
     );
@@ -163,6 +180,7 @@ export class AwsSecretsManagerService {
     data: { secretValue?: SecretValuePayload; description?: string; type?: SecretType; region?: string },
   ) {
     const { client, region } = await this.getProjectContext(projectId, data.region);
+    await this.describeManagedSecret(client, name);
 
     if (data.secretValue !== undefined || data.description !== undefined) {
       await this.callAws(() =>
@@ -191,6 +209,7 @@ export class AwsSecretsManagerService {
 
   async deleteSecret(projectId: string, name: string, region?: string) {
     const { client } = await this.getProjectContext(projectId, region);
+    await this.describeManagedSecret(client, name);
     // A 30-day recovery window is kept; recreating the same name inside the
     // window surfaces the AWS name-collision error unchanged.
     await this.callAws(() =>
@@ -199,15 +218,188 @@ export class AwsSecretsManagerService {
     return { name };
   }
 
+  // --- Env group (one application = one group secret) ---
+
+  /**
+   * Read one application's env group. A missing secret is reported as
+   * `exists: false` with an empty map so the page can render the create form;
+   * a secret at the composed name that this plane does not own stays 404
+   * (same existence-hiding rule as by-name reads).
+   */
+  async getEnvGroup(projectId: string, groupId: string, region?: string): Promise<EnvGroupSnapshot> {
+    const groupName = envGroupSecretName(projectId, groupId);
+    const { client } = await this.getProjectContext(projectId, region);
+
+    let entry: DescribeSecretResponse;
+    try {
+      entry = await this.callAws(() => client.send(new DescribeSecretCommand({ SecretId: groupName })));
+    } catch (error) {
+      if (error instanceof HttpException && error.getStatus() === 404) {
+        return { groupName, arn: null, exists: false, env: {}, lastChangedAt: null, createdAt: null };
+      }
+      throw error;
+    }
+    this.assertManaged(entry);
+
+    const document = await this.readGroupDocument(client, groupName);
+    return {
+      groupName,
+      arn: entry.ARN ?? null,
+      exists: true,
+      env: document.env,
+      lastChangedAt: entry.LastChangedDate ?? null,
+      createdAt: entry.CreatedDate ?? null,
+    };
+  }
+
+  /**
+   * Replace the group's env map atomically (create on first save). Reserved
+   * keys such as `__rotation` are carried over untouched, so future rotation
+   * tooling keeps working without this write path knowing about it.
+   */
+  async updateEnvGroup(params: {
+    projectId: string;
+    groupId: string;
+    env: Record<string, string>;
+    region?: string;
+  }): Promise<EnvGroupSnapshot> {
+    const groupName = envGroupSecretName(params.projectId, params.groupId);
+    const { client, region } = await this.getProjectContext(params.projectId, params.region);
+    const existing = await this.describeOptionalManagedSecret(client, groupName);
+
+    if (existing) {
+      const document = await this.readGroupDocument(client, groupName);
+      const payload = this.buildGroupDocument(params.env, document.rotation);
+      await this.callAws(() =>
+        client.send(
+          new UpdateSecretCommand({
+            SecretId: groupName,
+            SecretString: JSON.stringify(payload),
+          }),
+        ),
+      );
+    } else {
+      const payload = this.buildGroupDocument(params.env, undefined);
+      await this.callAws(() =>
+        client.send(
+          new CreateSecretCommand({
+            Name: groupName,
+            SecretString: JSON.stringify(payload),
+            Tags: [
+              { Key: MANAGED_TAG_KEY, Value: "true" },
+              { Key: SECRET_TYPE_TAG_KEY, Value: "GENERIC_SECRET" },
+            ],
+          }),
+        ),
+      );
+    }
+
+    return this.getEnvGroup(params.projectId, params.groupId, region);
+  }
+
+  /**
+   * Merge platform-managed variables (installations tokens/endpoints) into the
+   * env group without touching custom user variables. `set` keys overwrite
+   * existing values; `remove` keys are deleted from the env map. The reserved
+   * `__rotation` field is always preserved. This is the single write path for
+   * installation credential issuance/rotation — callers never touch the full
+   * env map, only the platform-owned keys.
+   */
+  async mergePlatformEnvVars(params: {
+    projectId: string;
+    groupId: string;
+    set?: Record<string, string>;
+    remove?: string[];
+    region?: string;
+  }): Promise<EnvGroupSnapshot> {
+    const groupName = envGroupSecretName(params.projectId, params.groupId);
+    const { client, region } = await this.getProjectContext(params.projectId, params.region);
+    const existing = await this.describeOptionalManagedSecret(client, groupName);
+
+    let currentEnv: Record<string, string> = {};
+    let rotation: unknown;
+    if (existing) {
+      const document = await this.readGroupDocument(client, groupName);
+      currentEnv = document.env;
+      rotation = document.rotation;
+    }
+
+    const nextEnv = { ...currentEnv };
+    if (params.set) {
+      Object.assign(nextEnv, params.set);
+    }
+    if (params.remove?.length) {
+      for (const key of params.remove) {
+        delete nextEnv[key];
+      }
+    }
+
+    // Skip the AWS update when nothing changed and the group already exists —
+    // avoids needlessly rotating the secret version. A non-existent group is
+    // always created (empty env map if no set values were supplied).
+    const setChanged = params.set ? !Object.entries(params.set).every(([k, v]) => currentEnv[k] === v) : false;
+    const removedAny = (params.remove?.length ?? 0) > 0 && (params.remove as string[]).some((k) => k in currentEnv);
+    const anyChange = setChanged || removedAny;
+
+    // If the group doesn't exist yet, always create it — every application must
+    // have a group on creation (ADR-005 §4), even if no platform-managed vars
+    // are being set. A no-op merge against a non-existent group creates an
+    // empty env map and exits with arn/metadata populated.
+    if (!existing) {
+      const payload = this.buildGroupDocument(nextEnv, undefined);
+      await this.callAws(() =>
+        client.send(
+          new CreateSecretCommand({
+            Name: groupName,
+            SecretString: JSON.stringify(payload),
+            Tags: [
+              { Key: MANAGED_TAG_KEY, Value: "true" },
+              { Key: SECRET_TYPE_TAG_KEY, Value: "GENERIC_SECRET" },
+            ],
+          }),
+        ),
+      );
+      return this.getEnvGroup(params.projectId, params.groupId, region);
+    }
+
+    if (!anyChange) {
+      return this.getEnvGroup(params.projectId, params.groupId, region);
+    }
+
+    const payload = this.buildGroupDocument(nextEnv, rotation);
+    await this.callAws(() =>
+      client.send(
+        new UpdateSecretCommand({
+          SecretId: groupName,
+          SecretString: JSON.stringify(payload),
+        }),
+      ),
+    );
+
+    return this.getEnvGroup(params.projectId, params.groupId, region);
+  }
+
+  async deleteEnvGroup(projectId: string, groupId: string, region?: string) {
+    const groupName = envGroupSecretName(projectId, groupId);
+    const { client } = await this.getProjectContext(projectId, region);
+    await this.describeManagedSecret(client, groupName);
+    await this.callAws(() =>
+      client.send(new DeleteSecretCommand({ SecretId: groupName, RecoveryWindowInDays: DELETE_RECOVERY_WINDOW_DAYS })),
+    );
+    return { groupName };
+  }
+
   /** Trigger an immediate rotation using the existing rotation configuration. */
   async rotateSecret(projectId: string, name: string, region?: string) {
     const { client } = await this.getProjectContext(projectId, region);
+    await this.describeManagedSecret(client, name);
     await this.callAws(() => client.send(new RotateSecretCommand({ SecretId: name })));
     return this.getSecret(projectId, name, region);
   }
 
   async setRotation(projectId: string, name: string, data: { isEnabled: boolean; days?: number; region?: string }) {
     const { client, region } = await this.getProjectContext(projectId, data.region);
+    await this.describeManagedSecret(client, name);
 
     if (data.isEnabled) {
       const lambdaArn = await this.getRotationLambdaArn(projectId);
@@ -301,6 +493,108 @@ export class AwsSecretsManagerService {
     return project.awsSecretsManagerRotationLambdaArn;
   }
 
+  /**
+   * The module only owns secrets it created. AWS permissions of a project
+   * credential may reach unrelated secrets in the same account, so every
+   * by-name read/write first proves the `devbie:managed` tag. An unmanaged
+   * secret is reported as not found — the caller has no business knowing it
+   * exists.
+   */
+  private async describeManagedSecret(client: SecretsManagerClient, name: string) {
+    const entry = await this.callAws(() => client.send(new DescribeSecretCommand({ SecretId: name })));
+    this.assertManaged(entry);
+    return entry;
+  }
+
+  /**
+   * Like {@link describeManagedSecret}, but an absent secret returns undefined
+   * so the caller can create it on first write. A secret that exists but was
+   * not created by this plane is still rejected as not found.
+   */
+  private async describeOptionalManagedSecret(
+    client: SecretsManagerClient,
+    name: string,
+  ): Promise<DescribeSecretResponse | undefined> {
+    let entry: DescribeSecretResponse;
+    try {
+      entry = await client.send(new DescribeSecretCommand({ SecretId: name }));
+    } catch (error) {
+      if (this.isAwsNotFound(error)) {
+        return undefined;
+      }
+      throw this.toHttpException(error);
+    }
+    this.assertManaged(entry);
+    return entry;
+  }
+
+  /** Reject entries that do not carry the `devbie:managed` ownership tag. */
+  private assertManaged(entry: DescribeSecretResponse): void {
+    const managed = entry.Tags?.some((tag) => tag.Key === MANAGED_TAG_KEY && tag.Value === "true") ?? false;
+    if (!managed) {
+      throw new NotFoundException("Secret not found in AWS Secrets Manager");
+    }
+  }
+
+  private isAwsNotFound(error: unknown): boolean {
+    return (
+      typeof error === "object" && error !== null && (error as { name?: string }).name === "ResourceNotFoundException"
+    );
+  }
+
+  /**
+   * Parse a group secret into its injectable env map plus the reserved
+   * `__rotation` recipe. The group uses `{ "env": { "<KEY>": "<value>" }, ... }`;
+   * malformed documents are rejected rather than silently coerced.
+   */
+  private async readGroupDocument(
+    client: SecretsManagerClient,
+    name: string,
+  ): Promise<{ env: Record<string, string>; rotation?: unknown }> {
+    const response = await this.callAws(() =>
+      client.send(new GetSecretValueCommand({ SecretId: name, VersionStage: "AWSCURRENT" })),
+    );
+    const raw = response.SecretString;
+    if (raw === undefined) {
+      return { env: {} };
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new BadRequestException("Env group secret is not valid JSON");
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new BadRequestException("Env group secret is not a JSON object");
+    }
+
+    const document = parsed as Record<string, unknown>;
+    const rotation = document[ENV_GROUP_ROTATION_FIELD];
+    const env = document[ENV_GROUP_ENV_FIELD];
+    if (env === undefined) {
+      return { env: {}, rotation };
+    }
+    if (typeof env !== "object" || env === null || Array.isArray(env)) {
+      throw new BadRequestException("Env group secret has an unexpected env field");
+    }
+
+    const normalized: Record<string, string> = {};
+    for (const [key, value] of Object.entries(env)) {
+      if (typeof value !== "string") {
+        throw new BadRequestException("Env group secret contains a non-string value");
+      }
+      normalized[key] = value;
+    }
+    return { env: normalized, rotation };
+  }
+
+  private buildGroupDocument(env: Record<string, string>, rotation: unknown): Record<string, unknown> {
+    return rotation === undefined
+      ? { [ENV_GROUP_ENV_FIELD]: env }
+      : { [ENV_GROUP_ENV_FIELD]: env, [ENV_GROUP_ROTATION_FIELD]: rotation };
+  }
+
   private toSecretResponse(entry: SecretListEntry, region: string) {
     const type = entry.Tags?.find((tag) => tag.Key === SECRET_TYPE_TAG_KEY)?.Value ?? null;
     return {
@@ -341,6 +635,12 @@ export class AwsSecretsManagerService {
       case "InvalidRequestException":
       case "ValidationException":
         return new BadRequestException("Invalid request for AWS Secrets Manager");
+      case "TimeoutError":
+      case "NetworkingError":
+      case "ETIMEDOUT":
+      case "ECONNRESET":
+      case "EPIPE":
+        return new ServiceUnavailableException("AWS Secrets Manager is temporarily unavailable");
       default:
         return new BadGatewayException("AWS Secrets Manager request failed");
     }

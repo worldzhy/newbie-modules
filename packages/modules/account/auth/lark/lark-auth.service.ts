@@ -10,6 +10,7 @@ import { recordLoginFailure } from "@modules/account/auth/login-audit";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { LoginResult } from "@modules/account/account.interface";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 const FEISHU_AUTHORIZE_URL = "https://accounts.feishu.cn/open-apis/authen/v1/authorize";
 
@@ -133,7 +134,7 @@ export class LarkAuthService {
         phone: data.mobile || undefined,
       };
     } catch (error) {
-      this.logger.error(`Lark OAuth exchange failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`Lark OAuth exchange failed: ${getErrorMessage(error)}`);
       return null;
     }
   }

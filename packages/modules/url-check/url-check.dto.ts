@@ -9,15 +9,15 @@ const HTTP_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
 // --- Request DTOs ---
 
 export class ListUrlCheckTargetsRequestDto {
-  @ApiProperty({ description: "Owning project ID" })
+  @ApiProperty({ description: "Owning group ID" })
   @IsUUID()
-  projectId!: string;
+  groupId!: string;
 }
 
 export class CreateUrlCheckTargetDto {
-  @ApiProperty({ description: "Owning project ID" })
+  @ApiProperty({ description: "Owning group ID" })
   @IsUUID()
-  projectId!: string;
+  groupId!: string;
 
   @ApiProperty({ description: "Display name of the monitored target" })
   @IsNotEmpty()
@@ -71,8 +71,8 @@ export class UrlCheckTargetDto {
   @ApiProperty({ description: "Target ID (uuid)" })
   id!: string;
 
-  @ApiProperty({ description: "Owning project ID" })
-  projectId!: string;
+  @ApiProperty({ description: "Owning group ID" })
+  groupId!: string;
 
   @ApiProperty({ description: "Display name of the monitored target" })
   name!: string;
@@ -155,8 +155,11 @@ export class UrlCheckResultDto {
   @ApiProperty({ description: "Failure detail; empty on success and on HTTP >= 400" })
   error!: string;
 
-  @ApiProperty({ description: "When the probe ran (ISO)", type: Date })
-  checkedAt!: Date;
+  @ApiProperty({
+    description: "When the probe ran (ISO-8601, UTC)",
+    example: "2026-11-08T11:52:00.080Z",
+  })
+  checkedAt!: string;
 }
 
 export class DeleteUrlCheckTargetResponseDto {

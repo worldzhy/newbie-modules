@@ -14,6 +14,7 @@ import {
   type SkillResultKind,
 } from "./skill";
 import type { ToolSpecification } from "@modules/llm/chat-model.port";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /** Minimal logging seam so the kernel never imports NestJS logging types. */
 export interface KernelLogger {
@@ -360,7 +361,7 @@ export class SkillRegistry {
       }
       this.logger.error(`Copilot skill "${name}" failed`, {
         requestId: context.requestId,
-        error: error instanceof Error ? error.message : String(error),
+        error: getErrorMessage(error),
       });
       // The raw message (Prisma/ClickHouse/Lark SDK text) stays in the server
       // log. Feeding it back would hand the model internals it cannot act on

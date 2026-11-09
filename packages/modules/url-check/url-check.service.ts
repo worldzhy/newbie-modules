@@ -1,8 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Inject, Injectable, NotFoundException } from "@nestjs/common";
 import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { assertPublicHttpUrl } from "./public-url";
+import { urlCheckGroupPolicyToken, type UrlCheckGroupPolicy } from "./ports/group-policy.port";
 import {
   CreateUrlCheckTargetDto,
   DeleteUrlCheckTargetResponseDto,
@@ -19,6 +20,9 @@ const MAX_RESULT_LIMIT = 200;
 
 type StatsWindow = "24h" | "7d" | "30d";
 
+/** ClickHouse JSONEachRow shape of a probe row, before API-side normalization. */
+type RawCheckResultRow = Omit<UrlCheckResultDto, "checkedAt"> & { checkedAt: string };
+
 const STATS_WINDOW_HOURS: Record<StatsWindow, number> = { "24h": 24, "7d": 168, "30d": 720 };
 
 // Bucket granularity per window, aiming at roughly 24-30 chart points. The
@@ -31,30 +35,34 @@ const STATS_BUCKET_EXPRESSION: Record<StatsWindow, string> = {
 };
 
 /**
- * Admin-side store for url-check targets: project-owned CRUD in Postgres plus
+ * Admin-side store for url-check targets: group-owned CRUD in Postgres plus
  * read access to the raw check results in ClickHouse. Probe execution and the
- * alert state machine live in UrlCheckProbeService.
+ * alert state machine live in UrlCheckProbeService. Which groups may own
+ * targets is host policy, injected via UrlCheckGroupPolicy.
  */
 @Injectable()
 export class UrlCheckService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly clickhouse: ClickHouseService,
+    @Inject(urlCheckGroupPolicyToken)
+    private readonly groupPolicy: UrlCheckGroupPolicy,
   ) {}
 
-  list(projectId: string) {
+  list(groupIds: string[]) {
     return this.prisma.urlCheckTarget.findMany({
-      where: { projectId },
+      where: { groupId: { in: groupIds } },
       orderBy: { createdAt: "desc" },
     });
   }
 
   async create(body: CreateUrlCheckTargetDto, createdByUserId: string) {
     assertPublicHttpUrl(body.url);
-    await this.assertProject(body.projectId);
+    await this.assertGroup(body.groupId);
+    await this.groupPolicy.assertAttachable(body.groupId);
     return this.prisma.urlCheckTarget.create({
       data: {
-        projectId: body.projectId,
+        groupId: body.groupId,
         name: body.name,
         url: body.url,
         createdByUserId,
@@ -126,7 +134,14 @@ export class UrlCheckService {
       query_params: { targetId, limit },
       format: "JSONEachRow",
     });
-    return (await result.json()) as UrlCheckResultDto[];
+    const rows = (await result.json()) as RawCheckResultRow[];
+    // ClickHouse JSONEachRow renders DateTime64 as "YYYY-MM-DD HH:MM:SS.mmm"
+    // in UTC. The API contract is ISO-8601, so the wire value must carry T/Z —
+    // otherwise consumers parse it as local time and shift the clock.
+    return rows.map((row) => ({
+      ...row,
+      checkedAt: new Date(`${row.checkedAt.replace(" ", "T")}Z`).toISOString(),
+    }));
   }
 
   /** Outage incidents of one target, newest first. */
@@ -211,10 +226,10 @@ export class UrlCheckService {
     };
   }
 
-  private async assertProject(projectId: string): Promise<void> {
-    const project = await this.prisma.project.findUnique({ where: { id: projectId }, select: { id: true } });
-    if (!project) {
-      throw new NotFoundException(`Project not found: ${projectId}`);
+  private async assertGroup(groupId: string): Promise<void> {
+    const group = await this.prisma.application.findUnique({ where: { id: groupId }, select: { id: true } });
+    if (!group) {
+      throw new NotFoundException(`URL check group not found: ${groupId}`);
     }
   }
 }

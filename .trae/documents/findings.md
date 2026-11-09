@@ -26,8 +26,8 @@
 | -------- | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------ | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | R5-P2-01 | newbie-modules                      | notification `markRead` 不校验可见性（任意 notification id 可写回执 + 存在性 oracle）                                                               | P2     | artifact           | 任意登录用户                   | fixed（`51821c4`，`findFirst` + 项目可见性条件）                                                                                                  |
 | R5-P2-02 | newbie-modules                      | notification `notify` 平台级写入口不校验 `projectId` 归属；读写 DTO 契约不对称（`projectId` 读侧 `@IsUUID`、写侧仅 `@IsString`，`link` 无协议约束） | P2     | artifact           | OPERATOR/ADMIN                 | fixed（`51821c4`，`assertProjectVisible` + `isSafeNotificationLink`；控制器注入 `actorUserId`）                                                   |
-| R5-P2-03 | newbie-modules                      | `api-key.verifier` 从不执行 `ipRestrictions`/`referrerRestrictions`，也不校验 owner 状态（宿主暂未启用该通道）                                      | P2     | artifact           | API key 持有者（启用后）       | **partial（2026-11-04）**：owner ACTIVE 校验已进入 `AccountApiKeyVerifier.verify`（`59ff47c`）；仍缺 `ipRestrictions`/`referrerRestrictions` 执行 |
-| R5-P2-04 | newbie-modules                      | webhook 模块无权限/团队归属校验，`isSafeUrl` 不解析 DNS、不复检重定向，出站无 timeout（未装配）                                                     | P2     | source             | 任意登录用户（装配后）         | open                                                                                                                                              |
+| R5-P2-03 | newbie-modules                      | `api-key.verifier` 从不执行 `ipRestrictions`/`referrerRestrictions`，也不校验 owner 状态（宿主暂未启用该通道）                                      | P2     | artifact           | API key 持有者（启用后）       | **fixed（2026-11-09，`c88ea94`）**：`api-key-restrictions.ts` 强制 IP/referrer 校验并接进 `api-key.verifier`/`api-key.strategy`，58 行测试；owner ACTIVE 校验沿用 `59ff47c` |
+| R5-P2-04 | newbie-modules                      | webhook 模块无权限/团队归属校验，`isSafeUrl` 不解析 DNS、不复检重定向，出站无 timeout（未装配）                                                     | P2     | source             | 任意登录用户（装配后）         | removed（2026-11-09，`3ef7089`）：模块已从 registry 删除。依据：宿主 `newbie-modules.json` 无该 key、`src/modules/webhook` 与 Prisma 模型均不存在、registry 内零调用方（`triggerWebhook` 无调用方、无模块依赖它），且其遗留安全债（无 guard、`teamId` 取自路径、无投递日志）在保留模块期间无法收口 |
 | R5-P2-05 | newbie-modules                      | web-monitor `systemName` 直接编译为正则（项目范围已收敛，仅 ReDoS）                                                                                 | P2     | artifact           | MEMBER/OPERATOR                | fixed（`51821c4`，`func.escapeRegExp`；同一提交覆盖 custom/page/resource/site 四处）                                                              |
 | R5-P2-06 | newbie-modules                      | security-evaluation 报告 `latestResultsBySubject` 无界查询（全量载入再按 key 去重）                                                                 | P2     | artifact           | OPERATOR/ADMIN                 | fixed（`51821c4`，`count × 2 + aggregate(_max lastSeenAt)`；结果集加 `distinct`）                                                                 |
 | R5-P2-07 | newbie-modules                      | notification push-failures 无分页，随累积行数无界返回                                                                                               | P2     | artifact           | OPERATOR/ADMIN                 | fixed（`51821c4`，`take: 200` 上限）                                                                                                              |
@@ -51,11 +51,11 @@ W1 落地（2026-11-03）：`d78bf84` security 拒绝公开/过短签名密钥�
 
 | ID    | 仓                                  | 标题                                                                                   | 严重度 | 暴露面          | 可达性                         | 状态                                                                                                                                                                                                     |
 | ----- | ----------------------------------- | -------------------------------------------------------------------------------------- | ------ | --------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R6-09 | newbie-modules                      | verdict cache 缺实体集/模型版本维度，`not-relevant` 仅靠 7 天 TTL 失效                 | P2     | live            | OPERATOR 变更实体后 INTEL 运行 | open                                                                                                                                                                                                     |
+| R6-09 | newbie-modules                      | verdict cache 缺实体集/模型版本维度，`not-relevant` 仅靠 7 天 TTL 失效                 | P2     | live            | OPERATOR 变更实体后 INTEL 运行 | fixed（2026-11-04 W10）：内容寻址单签名；`e3bdc11` + `3008b10` + `597ba64`，宿主 `5252e38` |                                                                                                                                                                                                   |
 | R6-10 | newbie-modules / nightwatch-backend | shortcut 更新 DTO 的 `ValidateIf` 可跳过 http(s) 白名单，危险 scheme 可落库            | P2     | artifact / live | 项目 EDITOR                    | fixed（2026-11-04）：`26247a3`+`ca2ba33`；update 校验合并后的有效 type/content，非法 scheme 400、缺行 404，自带 8 例                                                                                     |
 | R6-11 | newbie-modules                      | event-emitter 保留期配置用 `config.env` 形状，`apply` 未渲染到宿主 env；单条无上限清理 | P2     | artifact        | 运维                           | fixed（2026-11-04）：`0f191c0`；env 提升到 manifest 顶层，宿主 `.env`/`.env.example` 实测命中；无上限清理按既有注释的摊还设计保留                                                                        |
 | R6-12 | newbie-modules / nightwatch-backend | account 组织键分支 schema 不可达、测试用非法数据；`CACHE_APIKEY_LRU_SIZE` 死配置残留   | P2     | artifact / ops  | 文档与测试                     | fixed（初段，2026-11-04）：`66fa30d`；注释/测试与 schema 对齐，`deploy/env.template` 死键删除；组织专属键去留待决策。复核更正（2026-11-04）：宿主 `.env` 两行死键曾被误装配（main 快照）重新渲染，仍待删 |
-| R6-13 | newbie-modules / nightwatch-backend | web-monitor 历史 appId 被新白名单击穿（存量读 400、ingest 整批丢弃）                   | P2     | live            | 已认证 WebMonitor 用户         | open（未上线，限于开发数据）；盘点（2026-11-04）：本地安装 1 行、Mongo 17 个分区键全部合规，0 行需 backfill                                                                                              |
+| R6-13 | newbie-modules / nightwatch-backend | web-monitor 历史 appId 被新白名单击穿（存量读 400、ingest 整批丢弃）                   | P2     | live            | 已认证 WebMonitor 用户         | fixed（2026-11-06）：管理端 appId 请求边界整体移除；registry `77e2922` + `d38d56c` + `da995d4`，backend `d34d537` + `663cc38` + `fba94cf`，frontend `de3f60e` + `8a000bb`（盘点：本地 1 行、Mongo 17 分区键合规，0 行需 backfill） |
 | R6-14 | newbie-modules                      | registry CI `modules lint` 仍钉 1.14.5，落后已发布 1.15.0                              | P2     | source / CI     | 所有 registry PR               | fixed（2026-11-04）：`2d9ea7b` 钉到 `@devbie/newbie-cli@1.15.0`                                                                                                                                          |
 
 复核取证：registry 与宿主 34 个模块 `diff -rq` 零差异；registry 模块单测无法在 registry 仓独立运行（`tsx` 未声明为 devDependency，`ERR_MODULE_NOT_FOUND`），相关用例改由宿主副本执行并通过。
@@ -116,7 +116,7 @@ C 层草案判定：现状主张 C1–C4 与支撑论证 P4 成立；方案主�
 | R15-05 | newbie-modules                      | aws-cloudformation `stack/stack.controller.ts:63`、`environment/environment.controller.ts:36` 以 `Prisma.*UncheckedCreateInput` 作 `@Body`（role-gated）                                                                           | P2     | artifact        | 具 Create 权限                  | fixed（`51821c4`：三个显式 DTO，删手写必填检查）                                              |
 | R13-03 | newbie-modules                      | 模块代码直读 `process.env` 且 manifest 未声明：tencent-cos `STORE_PATH`（未装配，同时违反准入标准）、account `ENVIRONMENT`（live）；`modules apply` 永不渲染进 `.env.example`                                                      | P2     | artifact / live | 部署时缺键                      | fixed（`51821c4` + 设计更正 `7974ac6`：`ENVIRONMENT` 保持框架级键、account 按宿主键读取，不再占 `account.*` 命名空间；tencent-cos 仅补声明） |
 
-carry-over 更新（2026-11-06）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转 fixed（见各轮表）；R5-P2-01/02/05/06/07 转 fixed；仍 open：R5-P2-03 partial、R5-P2-04（webhook 未装配）、R6-13（裁定未执行）、R3-25。
+carry-over 更新（2026-11-09）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转 fixed（见各轮表）；R5-P2-01/02/03/05/06/07 转 fixed；R6-13 转 fixed。round30 复核订正（2026-11-09）：R5-P2-04 已随模块删除记 removed（`3ef7089`，见 `:30`），不再 open；R3-25 open 引用失真——前端测试现况 12 文件/109 用例全绿，按 round30 裁决关闭该引用。本注记自此无 open 项。
 
 误报剔除：R12-01 CH 侧毒丸向量（探针反驳）；registry CI pin 滞后（已升 1.18.0）。详见 devbie round15 报告 §7。
 
@@ -200,3 +200,40 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 - R21-02 withdrawn：未上线环境数据；分钟桶保证 dedup key 唯一性不受 `:resolved:` 残留影响；数据随下次清库消失，不做迁移。
 - R21-03 fixed：registry `d469238`（drop 分支补 debug 日志）+ 宿主装配 `f930bce`。报告中行号引用 `:181-184` 系凭记忆重构所致偏差，实际 drop 分支在 `:184-186`，此处已更正。
 - R21-04 fixed：宿主 `9961dc8`（url-check/heartbeat 恢复通知补 `status:"recovered"` + `recoveredAt`）。验证边界：tsc+eslint 绿、build 绿、重启健康检查正常；两调用点复用既有 center 落库路径（其 recovered 相位已由 round21 E2E 证据覆盖），R21-03 的 debug 日志行无独立运行时探针。
+
+## round26（2026-11-08，scope=`modules: [url-check]`：功能测试与验证，报告在本仓 `.trae/documents/expert-review-2026-11-08-round26.md`）
+
+锚点：newbie-modules `93a4797`（3 新增测试文件）/ nightwatch-backend `bbb0b34`（4 新增测试文件）/ nightwatch-frontend `ae6b3e1`（5 dirty，均在 url-check 域外）。结论摘要：新增 38 用例全绿（url-check 相关 52/52，全仓 759/759），tsc/eslint/prettier 绿；SSRF 双层防线与状态机事务性均有 executed 证据；发现 1 个 P1（时间显示偏移）与 2 个 P2。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R26-01 | newbie-modules + nightwatch-frontend | `checkedAt` 以 ClickHouse UTC 原样串（无 `T`/`Z`）下发，前端 dayjs 按本地时区解析 → 检查时间早显 8 小时 | P1 | live | 任意登录项目查看者 | fixed |
+| R26-02 | nightwatch-backend | 恢复通知在 `downSince=""` 时 `minuteBucket` 抛 RangeError 被 catch 吞掉，通知永久丢失（脏数据前置） | P2 | live | 需脏数据 | fixed |
+| R26-03 | newbie-modules | IPv4-mapped 公网地址（如 `[::ffff:8.8.8.8]`）归一后按未知地址拦截，与注释"由内嵌 IPv4 判定"不符（fail-closed） | P2 | live | 任意登录用户 | fixed |
+| R26-04 | newbie-modules | 观察：`Number.parseInt("12abc")` 容错为 12，进入 limit 计算 | P2 | live | 任意登录用户 | open（不单独立项） |
+| R26-05 | newbie-modules | 域外新发现：`npm run format:check` 在 dev 已红（`message-tracker/sst/` 5 个 tracked 文件未格式化），CI `ci.yml:26` 即该命令，格式门禁失效 | P2 | source | N/A | fixed |
+
+处置（2026-11-08，用户授权「执行吧」）：
+
+- R26-01 fixed：registry `ca83ab1` / 宿主 `ed0b920`（`listCheckResults` 把 `YYYY-MM-DD HH:MM:SS.mmm` 归一为 ISO-8601 UTC，DTO `checkedAt` 改为 `string`）；前端 `682be56` 同步 apits 注释。运行时取证：真实 ClickHouse 行经接口返回 `2026-11-08T12:08:00.079Z`。
+- R26-02 fixed：`ed0b920`（`minuteBucket` 对缺失/非法时间戳回落固定桶 `unknown`），新增断言 `downSince=""` 时 recovery 通知仍投递一次。
+- R26-03 fixed：`ca83ab1` / `ed0b920`（`isBlockedAddress` 对 `::ffff:<hex>` 重建内嵌 IPv4 后再判私网），新增 `public-url.test.ts` 两组正反例。
+- R26-05 fixed：`ca83ab1`（`.prettierignore` 增加 `**/.sst`），registry `npm run format:check` 转绿。
+- 验证边界：backend `npm test` 762/762、`tsc --noEmit`、改动文件 eslint、`format:check` 全绿；模块 registry↔宿主 `diff -rq` 为空；后端 build + 重启后 `/` 200、Swagger `checkedAt` 描述已更新；宿主 `newbie-modules.json` 已 re-pin 到 `ca83ab1`（`0a78ae1`）。
+
+## round29（2026-11-09，scope=`workspace`，报告在 devbie `.trae/documents/expert-review-2026-11-09-round29.md`）
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R29-02 | newbie-modules | `RateLimiter.spend` 把配额拒绝（rate-limiter-flexible 以 `RateLimiterRes` reject，非 Error）误判为 Redis 故障进 `degradedTo`，误报 "backend unavailable" 且 30s 降级窗口内本地空桶重置配额（verification-code 以 spend 作配额判定，无需并发即触发） | P1 | live | 任意登录用户 | fixed（2026-11-09，registry `93035fb` / 宿主装配 `67eee17`）：catch 内判别配额形状（`'remainingPoints' in error`）按配额语义返回剩余点数、不进降级，fallback 桶同样处理；补 2 例回归测试（修复前红 2/绿 5、修复后绿 7），运行时探针 10×400 后 429 且日志零 "backend unavailable" |
+| R29-04 | newbie-modules | web-monitor `ip-task.service.ts:133` `getErrorMessage` 收敛漏网：`err instanceof Error ? err.message : err`（fallback 非 `String()`） | P3 | live | — | fixed（2026-11-09，registry `ef00afb` / 宿主装配 `47a9e82`）：改走 `getErrorMessage(err)`（同文件已 import） |
+| R29-05 | newbie-modules | 权限分层新规的严格读法：service 层基于已解析范围抛 403（web-monitor-access.service.ts:28、notification-center assertProjectVisible）属 fail-closed 合规，但与 site.controller getSites "静默忽略 projectId" 语义不统一，建议拒绝路径统一上移 controller | P3 | live | — | fixed（2026-11-09，`e44088c` + `2eab430`）：web-monitor 改为按可见 appKeys 授权，`getSysForUserId` 显式传无权 appKey 直接 403（不再静默忽略），`projectId` 过滤路径整体移除；service 层检查保留为纵深（用户裁定方案 A）。运行时冒烟：无权 appKey 403、不带 appKey 200；notification-center 交付接口传他人 projectId 403 |
+| R29-06 | newbie-modules | notification-center README 只写 `NOTIFICATION_PUSH_PORT`，9634316 后 `NOTIFICATION_VISIBILITY_PORT` 变为必需（不绑定启动失败），文档缺口 | P3 | docs | — | fixed（2026-11-09，registry `ef00afb`）：Concepts 增 `NotificationVisibilityPort`（required，无 `@Optional`），Configuration 段说明两端口必需/可选差异 |
+| R29-07 | newbie-modules | approved-subnet.service.ts:57/59、api-key.service.ts:100/101 存在性探测残留：不存在 404、他人资源 403，可区分行存在性（数字 ID 可枚举），与 20bf920 统一 403 目标矛盾 | P3 | live | — | fixed（2026-11-09，registry `ef00afb` / 宿主装配 `47a9e82`）：改 `findFirst({ id, userId })`，缺失与他人资源同为 403 同文案；运行时冒烟 api-keys/approved-subnets 不存在 id 均 403 |
+| R29-08 | newbie-modules | llm `base-url-guard.ts:37` SSRF 谓词小缺口：裸 IPv4-compatible `::7f00:1` 不在 BLOCKED；NAT64 `64:ff9b::/96` 未列（现代栈不路由，可利用性低） | P3 | live | — | fixed（2026-11-09，registry `ef00afb` / 宿主装配 `47a9e82`）：BLOCKED 增 `::/96` 与 `64:ff9b::/96`；dist 实测 `::7f00:1`、`64:ff9b::7f00:1`、`::ffff:127.0.0.1` 全拒、公网域名放行 |
+
+## round30（2026-11-09，scope=`workspace`，报告在 devbie `.trae/documents/expert-review-2026-11-09-round30.md`）
+
+本轮无涉及 registry 源码的 finding。台账订正项 R30-01（P2，docs）登记于 devbie findings.md round30 节，涉及本仓两点：①本文件 `:30`（R5-P2-04 removed）与 `:119`（carry-over 注记仍称 open）自相矛盾，需订正；②R3-25 open 引用失真（正文条目已不在本台账，前端测试缺口已被后续轮次覆盖）。装配一致性 34/34 diff 空、模块分层新规则零违规（9 处 ForbiddenException 逐点判定合规）。
+
+R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30` 口径统一（R5-P2-04 removed，不再 open）；② R3-25 open 引用按 round30 裁决关闭（前端 12 文件/109 用例全绿）。devbie 侧同步关闭 R28-06/R28-08 并删除 backlog R3-25 引用。

@@ -16,7 +16,7 @@ import {
   CompleteMultipartUploadCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 
 /** Pagination defaults mirroring @devbie/newbie's Prisma list extension. */
 const DEFAULT_PAGE_SIZE = 20;
@@ -59,7 +59,7 @@ export class AwsS3Service {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly credentials: AwsCredentialsService,
+    private readonly credentials: AwsCrossAccountBindingsService,
   ) {
     this.bucket = this.config.getOrThrow<string>("modules.aws-s3.bucket");
     this.region = this.config.getOrThrow<string>("modules.aws-s3.region");

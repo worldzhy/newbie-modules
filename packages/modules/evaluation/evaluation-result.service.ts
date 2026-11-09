@@ -1,7 +1,8 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
-import { EvaluationResultReviewStatus, EvaluationRunStatus, Prisma } from "@generated/prisma/client";
+import { EvaluationResultReviewStatus, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
+import { ACTIVE_RUN_STATUSES } from "./evaluation.constants";
 import { EvaluationCriteriaService } from "./evaluation-criteria.service";
 import { EvaluationCoverageStats, EvaluationEvidenceItem, EvaluationVerdict } from "./ports/evaluation.contracts";
 import { hashManifest, validateCoverageStats, validateJudgment } from "./evaluation-invariants";
@@ -28,8 +29,6 @@ const RESULT_SELECT = {
   reviewNote: true,
   createdAt: true,
 } satisfies Prisma.EvaluationResultSelect;
-
-const ACTIVE_STATUSES: EvaluationRunStatus[] = [EvaluationRunStatus.QUEUED, EvaluationRunStatus.RUNNING];
 
 export interface CreateEvaluationResultInput {
   runId: string;
@@ -73,7 +72,7 @@ export class EvaluationResultService {
   async createResult(input: CreateEvaluationResultInput) {
     const run = await this.prisma.evaluationRun.findUnique({ where: { id: input.runId } });
     if (!run) throw new NotFoundException(`Evaluation run ${input.runId} not found`);
-    if (!ACTIVE_STATUSES.includes(run.status)) {
+    if (!ACTIVE_RUN_STATUSES.includes(run.status)) {
       throw new ConflictException(`Evaluation run ${input.runId} already finished as ${run.status}`);
     }
 

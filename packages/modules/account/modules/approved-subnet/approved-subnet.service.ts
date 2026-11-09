@@ -1,14 +1,15 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import type { Prisma } from "@generated/prisma/client";
 import { ApprovedSubnet } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import anonymize from "ip-anonymize";
-import { APPROVED_SUBNET_NOT_FOUND, UNAUTHORIZED_RESOURCE } from "@devbie/newbie/exceptions/errors.constants";
 import { Expose, expose } from "../../helpers/expose";
+import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 import { GeolocationService } from "@modules/audit/helpers/geolocation.service";
 import { computeSubnetHmac } from "../../helpers/subnet-hmac";
 import { compareHash, generateHash } from "@devbie/newbie/utilities/common.util";
+import { FORBIDDEN_FOREIGN_RESOURCE } from "@modules/security/authorization/authorization.constants";
 
 @Injectable()
 export class ApprovedSubnetService {
@@ -17,6 +18,7 @@ export class ApprovedSubnetService {
   constructor(
     private prisma: PrismaService,
     private geolocationService: GeolocationService,
+    private auditLogService: AuditLogService,
     config: ConfigService,
   ) {
     // Fall back to the framework token secret so the feature works with no
@@ -48,23 +50,28 @@ export class ApprovedSubnetService {
   }
 
   async getApprovedSubnet(userId: string, id: number): Promise<Expose<ApprovedSubnet>> {
-    const approvedSubnet = await this.prisma.approvedSubnet.findUnique({
-      where: { id },
+    // Scoped lookup: a missing row and another user's row answer identically,
+    // so the numeric id cannot be used to probe for row existence.
+    const approvedSubnet = await this.prisma.approvedSubnet.findFirst({
+      where: { id, userId },
     });
-    if (!approvedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
-    // Defense in depth: the route guard already performed this same check.
-    if (approvedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    if (!approvedSubnet) throw new ForbiddenException(FORBIDDEN_FOREIGN_RESOURCE);
     return expose<ApprovedSubnet>(approvedSubnet);
   }
 
   async deleteApprovedSubnet(userId: string, id: number): Promise<Expose<ApprovedSubnet>> {
-    const approvedSubnet = await this.prisma.approvedSubnet.findUnique({
-      where: { id },
+    const approvedSubnet = await this.prisma.approvedSubnet.findFirst({
+      where: { id, userId },
     });
-    if (!approvedSubnet) throw new NotFoundException(APPROVED_SUBNET_NOT_FOUND);
-    if (approvedSubnet.userId !== userId) throw new UnauthorizedException(UNAUTHORIZED_RESOURCE);
+    if (!approvedSubnet) throw new ForbiddenException(FORBIDDEN_FOREIGN_RESOURCE);
     const deletedSubnet = await this.prisma.approvedSubnet.delete({
       where: { id },
+    });
+    await this.auditLogService.record(AuditEvent.APPROVED_SUBNET_DELETED, {
+      actorId: userId,
+      resourceType: "approved-subnet",
+      resourceId: String(deletedSubnet.id),
+      detail: { subnetHmac: deletedSubnet.subnetHmac },
     });
     return expose<ApprovedSubnet>(deletedSubnet);
   }
@@ -100,6 +107,13 @@ export class ApprovedSubnetService {
         timezone: location?.location?.time_zone,
         countryCode: location?.country?.iso_code,
       },
+    });
+    await this.auditLogService.record(AuditEvent.APPROVED_SUBNET_APPROVED, {
+      actorId: userId,
+      resourceType: "approved-subnet",
+      resourceId: String(approvedSubnet.id),
+      ipAddress,
+      detail: { subnetHmac, countryCode: approvedSubnet.countryCode },
     });
     return expose<ApprovedSubnet>(approvedSubnet);
   }

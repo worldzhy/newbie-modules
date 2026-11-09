@@ -11,6 +11,7 @@
 import type { Command } from "commander";
 
 import { runMigrateCli } from "../migration/migrate-cli";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 export function register(parent: Command, options: { cwd: string }): void {
   const run = (command: string) => (): Promise<void> =>
@@ -19,7 +20,7 @@ export function register(parent: Command, options: { cwd: string }): void {
         if (exitCode !== 0) process.exitCode = exitCode;
       })
       .catch((error: unknown) => {
-        console.error(`[clickhouse-migrate] ${error instanceof Error ? error.message : String(error)}`);
+        console.error(`[clickhouse-migrate] ${getErrorMessage(error)}`);
         process.exitCode = 1;
       });
 

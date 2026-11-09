@@ -17,6 +17,9 @@ type OctokitMethods = {
   "repos.getContent": (args: any) => Promise<any>;
   "repos.createOrUpdateFileContents": (args: any) => Promise<any>;
   "repos.delete": (args: any) => Promise<any>;
+  "repos.listCommits": (args: any) => Promise<any>;
+  "repos.getCommit": (args: any) => Promise<any>;
+  "git.getTree": (args: any) => Promise<any>;
 };
 
 function makeOctokitMock(handlers: Partial<OctokitMethods>) {
@@ -38,6 +41,11 @@ function makeOctokitMock(handlers: Partial<OctokitMethods>) {
         handlers["repos.createOrUpdateFileContents"],
       ),
       delete: wrap("repos.delete", handlers["repos.delete"]),
+      listCommits: wrap("repos.listCommits", handlers["repos.listCommits"]),
+      getCommit: wrap("repos.getCommit", handlers["repos.getCommit"]),
+    },
+    git: {
+      getTree: wrap("git.getTree", handlers["git.getTree"]),
     },
   };
 }
@@ -106,6 +114,9 @@ describe("GitHubService without credentials", () => {
       service.getFileContent("o", "r", "package-lock.json"),
       (e: any) => e instanceof GitHubNotConfiguredError,
     );
+    await assert.rejects(service.listCommits("o", "r"), (e: any) => e instanceof GitHubNotConfiguredError);
+    await assert.rejects(service.getTree("o", "r", "main"), (e: any) => e instanceof GitHubNotConfiguredError);
+    await assert.rejects(service.getCommit("o", "r", "main"), (e: any) => e instanceof GitHubNotConfiguredError);
   });
 
   it("keeps credential-free helpers usable (buildCloneUrl, parseGitHubUrl)", () => {
@@ -173,6 +184,225 @@ describe("GitHubService.parseGitHubUrl", () => {
     assert.equal(service.parseGitHubUrl("https://github.com/acme/atlas-api/tree/main"), null);
     assert.equal(service.parseGitHubUrl("not a url"), null);
     assert.equal(service.parseGitHubUrl(""), null);
+  });
+});
+
+describe("GitHubService.getFileContent", () => {
+  const encodeFile = (text: string) => ({
+    data: { type: "file", content: Buffer.from(text).toString("base64"), sha: "blob-1" },
+  });
+
+  it("reads the default branch when no ref is given (existing call shape unchanged)", async () => {
+    const m = makeOctokitMock({ "repos.getContent": async () => encodeFile("hello") });
+    const service = makeService(m);
+    assert.equal(await service.getFileContent("o", "r", "a.txt"), "hello");
+    assert.equal("ref" in m.calls["repos.getContent"][0][0], false);
+  });
+
+  it("forwards an explicit ref to the contents API", async () => {
+    const m = makeOctokitMock({ "repos.getContent": async () => encodeFile("pinned") });
+    const service = makeService(m);
+    assert.equal(await service.getFileContent("o", "r", "a.txt", "abc123"), "pinned");
+    assert.equal(m.calls["repos.getContent"][0][0].ref, "abc123");
+  });
+
+  it("returns null for a directory payload and for 404", async () => {
+    const directory = makeService(
+      makeOctokitMock({ "repos.getContent": async () => ({ data: [{ type: "file", path: "a.txt" }] }) }),
+    );
+    assert.equal(await directory.getFileContent("o", "r", "dir"), null);
+
+    const missing = makeService(
+      makeOctokitMock({
+        "repos.getContent": async () => {
+          throw httpError(404);
+        },
+      }),
+    );
+    assert.equal(await missing.getFileContent("o", "r", "a.txt"), null);
+  });
+
+  it("rethrows non-404 errors", async () => {
+    const m = makeOctokitMock({
+      "repos.getContent": async () => {
+        throw httpError(403);
+      },
+    });
+    const service = makeService(m);
+    await assert.rejects(service.getFileContent("o", "r", "a.txt"), (e: any) => e.status === 403);
+  });
+});
+
+describe("GitHubService.listCommits", () => {
+  function commitPayload(sha: string): any {
+    return {
+      sha,
+      commit: {
+        message: `message ${sha}`,
+        author: { name: "Ada", email: "ada@example.com", date: "2026-11-01T00:00:00Z" },
+        committer: { date: "2026-11-02T00:00:00Z" },
+      },
+    };
+  }
+
+  it("maps commit metadata and forwards path/perPage", async () => {
+    const m = makeOctokitMock({ "repos.listCommits": async () => ({ data: [commitPayload("sha-1")] }) });
+    const service = makeService(m);
+
+    const commits = await service.listCommits("o", "r", { path: "packages/modules/alpha", perPage: 1 });
+
+    assert.deepEqual(commits, [
+      {
+        sha: "sha-1",
+        message: "message sha-1",
+        authorName: "Ada",
+        authorEmail: "ada@example.com",
+        committedAt: new Date("2026-11-02T00:00:00Z"),
+      },
+    ]);
+    const arg = m.calls["repos.listCommits"][0][0];
+    assert.equal(arg.path, "packages/modules/alpha");
+    assert.equal(arg.per_page, 1);
+  });
+
+  it("omits optional parameters and falls back to the author date", async () => {
+    const payload = commitPayload("sha-2");
+    payload.commit.committer = null;
+    const m = makeOctokitMock({ "repos.listCommits": async () => ({ data: [payload] }) });
+    const service = makeService(m);
+
+    const commits = await service.listCommits("o", "r");
+
+    assert.equal(commits[0].committedAt?.toISOString(), "2026-11-01T00:00:00.000Z");
+    const arg = m.calls["repos.listCommits"][0][0];
+    assert.equal("path" in arg, false);
+    assert.equal("per_page" in arg, false);
+  });
+
+  it("returns an empty list on 404 and rethrows other errors", async () => {
+    const notFound = makeService(
+      makeOctokitMock({
+        "repos.listCommits": async () => {
+          throw httpError(404);
+        },
+      }),
+    );
+    assert.deepEqual(await notFound.listCommits("o", "r"), []);
+
+    const forbidden = makeService(
+      makeOctokitMock({
+        "repos.listCommits": async () => {
+          throw httpError(403);
+        },
+      }),
+    );
+    await assert.rejects(forbidden.listCommits("o", "r"), (e: any) => e.status === 403);
+  });
+});
+
+describe("GitHubService.getTree", () => {
+  it("maps entries, reports truncation and forwards recursive", async () => {
+    const m = makeOctokitMock({
+      "git.getTree": async () => ({
+        data: {
+          truncated: true,
+          tree: [
+            { path: "packages/modules/alpha/newbie.module.json", type: "blob", sha: "b-1", size: 42 },
+            { path: "packages/modules/alpha", type: "tree", sha: "t-1" },
+          ],
+        },
+      }),
+    });
+    const service = makeService(m);
+
+    const tree = await service.getTree("o", "r", "head-1", true);
+
+    assert.deepEqual(tree, {
+      truncated: true,
+      entries: [
+        { path: "packages/modules/alpha/newbie.module.json", type: "blob", sha: "b-1", size: 42 },
+        { path: "packages/modules/alpha", type: "tree", sha: "t-1", size: null },
+      ],
+    });
+    assert.equal(m.calls["git.getTree"][0][0].recursive, "true");
+    assert.equal(m.calls["git.getTree"][0][0].tree_sha, "head-1");
+  });
+
+  it("omits recursive by default and returns null on 404", async () => {
+    const m = makeOctokitMock({
+      "git.getTree": async () => ({ data: { truncated: false, tree: [] } }),
+    });
+    const service = makeService(m);
+    assert.deepEqual(await service.getTree("o", "r", "main"), { truncated: false, entries: [] });
+    assert.equal("recursive" in m.calls["git.getTree"][0][0], false);
+
+    const missing = makeService(
+      makeOctokitMock({
+        "git.getTree": async () => {
+          throw httpError(404);
+        },
+      }),
+    );
+    assert.equal(await missing.getTree("o", "r", "nope"), null);
+  });
+
+  it("rethrows non-404 errors", async () => {
+    const m = makeOctokitMock({
+      "git.getTree": async () => {
+        throw httpError(500);
+      },
+    });
+    const service = makeService(m);
+    await assert.rejects(service.getTree("o", "r", "main"), (e: any) => e.status === 500);
+  });
+});
+
+describe("GitHubService.getCommit", () => {
+  it("maps one commit's metadata", async () => {
+    const m = makeOctokitMock({
+      "repos.getCommit": async () => ({
+        data: {
+          sha: "sha-9",
+          commit: {
+            message: "fix: something",
+            author: { name: "Ada", email: "ada@example.com", date: "2026-11-01T00:00:00Z" },
+            committer: { date: "2026-11-03T00:00:00Z" },
+          },
+        },
+      }),
+    });
+    const service = makeService(m);
+
+    const commit = await service.getCommit("o", "r", "sha-9");
+
+    assert.deepEqual(commit, {
+      sha: "sha-9",
+      message: "fix: something",
+      authorName: "Ada",
+      authorEmail: "ada@example.com",
+      committedAt: new Date("2026-11-03T00:00:00Z"),
+    });
+    assert.equal(m.calls["repos.getCommit"][0][0].ref, "sha-9");
+  });
+
+  it("returns null on 404 and rethrows other errors", async () => {
+    const notFound = makeService(
+      makeOctokitMock({
+        "repos.getCommit": async () => {
+          throw httpError(404);
+        },
+      }),
+    );
+    assert.equal(await notFound.getCommit("o", "r", "nope"), null);
+
+    const forbidden = makeService(
+      makeOctokitMock({
+        "repos.getCommit": async () => {
+          throw httpError(403);
+        },
+      }),
+    );
+    await assert.rejects(forbidden.getCommit("o", "r", "main"), (e: any) => e.status === 403);
   });
 });
 

@@ -17,7 +17,7 @@ const TARGET_ID = "11111111-1111-4111-8111-111111111111";
 
 interface FakeTargetRow {
   id: string;
-  projectId: string;
+  groupId: string;
   name: string;
   url: string;
   isActive: boolean;
@@ -61,7 +61,7 @@ afterEach(() => {
 function createHarness(targetOverrides: Partial<FakeTargetRow> = {}, seedIncidents: FakeIncidentRow[] = []) {
   const dbTarget: FakeTargetRow = {
     id: TARGET_ID,
-    projectId: "22222222-2222-4222-8222-222222222222",
+    groupId: "22222222-2222-4222-8222-222222222222",
     name: "Example",
     url: PROBE_URL,
     isActive: true,
@@ -163,6 +163,7 @@ test("the third consecutive failure opens an alert and its incident", async () =
   // The event carries everything the host needs to route an alarm.
   const payload = harness.emitted[0].payload;
   assert.equal(payload.targetId, TARGET_ID);
+  assert.equal(payload.groupId, "22222222-2222-4222-8222-222222222222");
   assert.equal(payload.url, PROBE_URL);
   assert.equal(payload.consecutiveFailures, 3);
   assert.equal(typeof payload.downSince, "string");

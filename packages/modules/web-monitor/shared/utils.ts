@@ -126,6 +126,12 @@ export const func = {
   // which would make every store write fail and requeue the raw item forever.
   // A digits-only string is an epoch timestamp, not a date string: parsing it
   // with `Date` would silently fall back to now (R10-02).
+  //
+  // Range caveat (R20-32): ClickHouse DateTime is an unsigned 32-bit
+  // epoch-seconds column bounded by 1970-01-01 and 2106-02-07. Values outside
+  // that range are silently clamped by the writer, not rejected — a 1900 date
+  // lands on 1970-01-01, a 2107 date on 2106-02-07. No application-level
+  // guard exists or is planned; treat out-of-range dates as a display concern.
   toDateOrNow(value: unknown) {
     const date =
       value instanceof Date
@@ -176,18 +182,22 @@ export const func = {
   },
   decryptPhone(str: unknown) {
     if (typeof str !== "string") return str;
-    let t = "";
-    return str
-      .split("")
-      .map((item) => {
-        t += item;
-        if (t.length === 2) {
-          const r = decryptP[t];
-          t = "";
-          return r;
-        }
-      })
-      .join("");
+    const out: string[] = [];
+    let pair = "";
+    for (const item of str.split("")) {
+      pair += item;
+      if (pair.length === 2) {
+        const digit = decryptP[pair];
+        pair = "";
+        // An unknown pair means the payload is not a valid encoded phone: fail
+        // the whole value instead of returning a silently truncated number.
+        if (digit === undefined) return undefined;
+        out.push(String(digit));
+      }
+    }
+    // A dangling odd character can never form a pair, so the value is invalid.
+    if (pair.length) return undefined;
+    return out.join("");
   },
   setMatchTime(query: Record<string, unknown>, $match: Record<string, unknown>) {
     const createTime: Record<string, unknown> = {};

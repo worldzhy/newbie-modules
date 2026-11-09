@@ -5,8 +5,8 @@ export class ListSessionsRequestDto extends CommonListRequestDto {}
 
 /**
  * Response DTO for a single Session record. Credential columns (access token,
- * refresh-token hashes and `refreshTokenNext`) are excluded at the query layer
- * by SESSION_PUBLIC_SELECT and are intentionally absent here.
+ * refresh-token hashes and `refreshTokenNextSealed`) are excluded at the query
+ * layer by SESSION_PUBLIC_SELECT and are intentionally absent here.
  */
 export class SessionResponseDto {
   @ApiProperty({ type: Number })

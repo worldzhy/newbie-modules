@@ -1,19 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { PipelineStage } from "mongoose";
 import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
-import { ConfigService } from "@nestjs/config";
 import { func } from "../../../shared/utils";
 import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 
 @Injectable()
 export class PageService {
-  private cfg: Record<string, unknown>;
-  constructor(
-    private readonly models: WebMonitorModelsService,
-    private readonly config: ConfigService,
-  ) {
-    this.cfg = this.config.get("modules.web-monitor") || {};
-  }
+  constructor(private readonly models: WebMonitorModelsService) {}
 
   async getAveragePageList(query: Record<string, unknown>) {
     const { appKey, type = "", pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
@@ -109,6 +102,7 @@ export class PageService {
     const appKey = String(rawAppId);
     const match: Record<string, unknown> = { isFirstIn: true };
     if (type) match.speedType = Number(type);
+    func.setMatchTime(query, match);
     const _querys = this.getSpaceTime(beginTime, endTime, 60000);
     const result = await this.models
       .WebPage(appKey)
@@ -174,16 +168,7 @@ export class PageService {
   }
 
   async getOnePageList(query: Record<string, unknown>) {
-    const {
-      appKey: rawAppId,
-      type,
-      pageNo = 1,
-      pageSize = WEB_MONITOR_CONFIG.pageSize,
-      url,
-      isFirstIn,
-      beginTime,
-      endTime,
-    } = query;
+    const { appKey: rawAppId, type, pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
     const appKey = String(rawAppId);
     const match: Record<string, unknown> = { url };
     if (isFirstIn !== undefined && isFirstIn !== "") {
@@ -195,11 +180,7 @@ export class PageService {
       }
     }
     if (type) match.speedType = Number(type);
-    if (beginTime && endTime)
-      match.createTime = {
-        $gte: func.toDate(beginTime),
-        $lte: func.toDate(endTime),
-      };
+    func.setMatchTime(query, match);
     const count = await this.models.WebPage(appKey).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models
       .WebPage(appKey)

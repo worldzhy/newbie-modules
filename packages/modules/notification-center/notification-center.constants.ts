@@ -1,14 +1,17 @@
-export const SEVERITIES = ["critical", "high", "medium", "low", "info"] as const;
+import type { EvaluationFindingSeverity } from "@modules/evaluation/ports/evaluation.contracts";
+import { SEVERITIES as EVALUATION_SEVERITIES, SEVERITY_RANK } from "@modules/evaluation/evaluation-severity.util";
+
+/** Lower-case notification vocabulary derived from the shared evaluation set. */
+export type NotificationSeverity = Lowercase<EvaluationFindingSeverity>;
+export const SEVERITIES: NotificationSeverity[] = EVALUATION_SEVERITIES.map(
+  (severity) => severity.toLowerCase() as NotificationSeverity,
+);
 
 // Severity ranking for threshold comparisons; info is treated as the
 // weakest signal so it never pushes an alert on its own.
-export const SEVERITY_LEVEL: Record<string, number> = {
-  critical: 4,
-  high: 3,
-  medium: 2,
-  low: 1,
-  info: 0,
-};
+export const SEVERITY_LEVEL: Record<string, number> = Object.fromEntries(
+  EVALUATION_SEVERITIES.map((severity) => [severity.toLowerCase(), SEVERITY_RANK[severity]]),
+);
 
 export const CENTER_SETTING_SINGLETON_ID = 1;
 export const DEFAULT_PUSH_ENABLED = false;
@@ -34,8 +37,8 @@ export const NOTIFICATION_PUSH_PORT = "NOTIFICATION_PUSH_PORT";
 export const NOTIFICATION_VISIBILITY_PORT = "NOTIFICATION_VISIBILITY_PORT";
 
 export interface NotificationVisibilityPort {
-  /** Return "all" when the user may see notifications of every project. */
-  visibleProjectIds(userId: string): Promise<string[] | "all">;
+  /** Project ids the caller is a member of. An empty array means "none". */
+  visibleProjectIds(userId: string): Promise<string[]>;
 }
 
 // Postgres unique violation code, used to treat concurrent declaration of the

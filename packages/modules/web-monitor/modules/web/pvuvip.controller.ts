@@ -1,8 +1,7 @@
-import { BadRequestException, Controller, Get, Query, Req } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { ConfigService } from "@nestjs/config";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
-import { func } from "../../shared/utils";
+import { func, pickRequestId } from "../../shared/utils";
 import { WEB_MONITOR_CONFIG } from "../../shared/web-monitor-config";
 import { PvuvipService } from "./services/pvuvip.service";
 import { WebMonitorPvUvIpResponseDto } from "./pvuvip.dto";
@@ -11,28 +10,26 @@ import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { WebMonitorAccessService } from "./web-monitor-access.service";
+import { VISIBLE_APP_KEYS_RESOLVER, VisibleAppKeysResolver } from "../../shared/visible-app-keys.port";
 
 @ApiTags("Frontend Monitor / Web / PvUvIp")
 @Controller("/web-monitor/pvuvip")
 export class PvuvipController {
-  private cfg: Record<string, unknown>;
   constructor(
-    private readonly configService: ConfigService,
     private readonly pvuvipSrv: PvuvipService,
     private readonly dayReportNum: DayReportNumService,
     private readonly access: WebMonitorAccessService,
-  ) {
-    this.cfg = this.configService.get("modules.web-monitor") || {};
-  }
+    @Inject(VISIBLE_APP_KEYS_RESOLVER)
+    private readonly projectVisibility: VisibleAppKeysResolver,
+  ) {}
 
   @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getPvUvIpSurveyToday")
   @ApiOperation({ summary: "Get today's PV/UV/IP survey" })
   @ApiResponse({ type: Object })
   async getPvUvIpSurveyToday(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId } = q;
-    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
@@ -51,11 +48,11 @@ export class PvuvipController {
   @ApiOperation({ summary: "Get PV/UV/IP survey for a time range" })
   @ApiResponse({ type: WebMonitorPvUvIpResponseDto })
   async getPvUvIpSurveyOne(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId, beginTime, endTime } = q;
-    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    const { beginTime, endTime } = q;
     if (!beginTime) throw new BadRequestException("beginTime is required");
     if (!endTime) throw new BadRequestException("endTime is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const result = await this.pvuvipSrv.getPvUvIpSurveyOne(appKey, func.toDate(beginTime), func.toDate(endTime));
     return func.result({ data: result });
   }
@@ -65,11 +62,11 @@ export class PvuvipController {
   @ApiOperation({ summary: "Get history PV/UV/IP list" })
   @ApiResponse({ type: WebMonitorPvUvIpResponseDto, isArray: true })
   async getHistoryPvUvIplist(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId, beginTime, endTime } = q;
-    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
+    const { beginTime, endTime } = q;
     if (!beginTime) throw new BadRequestException("beginTime is required");
     if (!endTime) throw new BadRequestException("endTime is required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const rows = await this.pvuvipSrv.getHistoryPvUvIplistByRange(
       appKey,
       new Date(Number(beginTime)),
@@ -83,9 +80,9 @@ export class PvuvipController {
   @ApiOperation({ summary: "Get PV/UV/IP data list" })
   @ApiResponse({ type: Object })
   async getPvUvIpList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId, beginTime, endTime } = q;
-    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const { beginTime, endTime } = q;
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
@@ -101,9 +98,9 @@ export class PvuvipController {
   @ApiOperation({ summary: "Get single PV/UV/IP survey" })
   @ApiResponse({ type: Object })
   async getPvUvIpOne(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { projectId, applicationId, beginTime, endTime } = q;
-    if (!projectId || !applicationId) throw new BadRequestException("projectId and applicationId are required");
-    const appKey = await this.access.resolveAppKey(String(projectId), String(applicationId), req.user.userId);
+    const { beginTime, endTime } = q;
+    const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
+    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
     const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     interval.prev();
     let et: Date;

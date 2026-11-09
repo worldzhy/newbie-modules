@@ -2,10 +2,19 @@
  * Value shapes shared by the four evaluation ports (ADR-020 D4) and by the
  * services that persist them.
  *
- * Everything here is feature-neutral and host-neutral: no Prisma types, no
- * host vocabulary. A feature describes its subjects, evidence and judgments in
- * these shapes; the skeleton stores them and enforces the invariants.
+ * Everything here is feature-neutral and host-neutral: no host vocabulary. A
+ * feature describes its subjects, evidence and judgments in these shapes; the
+ * skeleton stores them and enforces the invariants.
  */
+
+/**
+ * The finding-severity vocabulary (ADR-020 D4). This union is the type source
+ * of truth: features and the judgment layer name severities without touching
+ * persistence. The stored Prisma enum mirrors these values; the evaluation
+ * module maps between the two at the Prisma boundary
+ * (evaluation-severity.mapping.ts) and a test asserts they cannot drift.
+ */
+export type EvaluationFindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 /** The host-assigned coordinate that bounds a subject listing (ADR-020 D1). */
 export interface EvaluationScope {
@@ -16,6 +25,12 @@ export interface EvaluationScope {
 /**
  * A subject as its feature describes it. `subjectKey` is the feature's stable
  * natural identity inside the scope — the skeleton never derives it.
+ *
+ * `credentialRef` is an opaque pointer to host-held credentials, captured at
+ * registration time when evaluating the subject requires them. The skeleton
+ * stores it verbatim and threads it onto the subject ref; resolving it is the
+ * host's business, and omitting it on a later submission never clears a
+ * previously stored value.
  */
 export interface EvaluationSubjectDescriptor {
   kind: string;
@@ -24,6 +39,7 @@ export interface EvaluationSubjectDescriptor {
   subjectKey: string;
   displayName: string;
   metadata?: Record<string, unknown>;
+  credentialRef?: string | null;
 }
 
 /** A stored subject, detached from Prisma. */
@@ -34,6 +50,8 @@ export interface EvaluationSubjectRef {
   scopeId: string;
   subjectKey: string;
   displayName: string;
+  /** Opaque host-side credential pointer registered at ingest; null when none. */
+  credentialRef?: string | null;
 }
 
 /** A published criteria version, detached from Prisma. */
@@ -109,8 +127,6 @@ export interface EvaluationVerdict {
   rationale: string;
   unresolved?: string[];
 }
-
-export type EvaluationFindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 /** A finding candidate is the product of an ASSERTION criterion (ADR-020 D2). */
 export interface EvaluationFindingCandidate {

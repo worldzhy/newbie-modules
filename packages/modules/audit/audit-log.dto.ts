@@ -2,9 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 import { CommonListResponseDto } from "@devbie/newbie/common.dto";
+import { AuditResult } from "./audit-log.service";
 
-/** Allowed values for the result filter; mirrors AuditResult in audit-log.service. */
-const RESULT_VALUES = ["success", "failure"] as const;
+/** Allowed values for the result filter; derived from AuditResult in audit-log.service. */
+const RESULT_VALUES = Object.values(AuditResult);
 
 /** Upper bound for a single page so callers cannot pull the whole table at once. */
 const MAX_PAGE_SIZE = 100;

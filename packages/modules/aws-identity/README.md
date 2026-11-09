@@ -26,10 +26,20 @@ host tables and can be assembled into any host application. One binding row
 per host scope; a row may briefly exist with a null `roleArn` after
 bootstrap (external ID generated, role ARN not saved yet).
 
+Active identity and draft identity are separate: `externalId` belongs to
+the identity currently assumed, `pendingExternalId` (nullable) belongs to a
+candidate that has not been verified yet. The active identity keeps
+serving while a replacement is being prepared, and the old external ID
+retires with the old role so its trust policy no longer matches.
+
 Typical setup flow: bootstrap (external ID generated) -> customer pastes
 the external ID into the role trust policy -> save role ARN (verified with
 a live AssumeRole before persisting) -> use verify / rotate-external-id /
-delete.
+delete. Changing the role ARN later is a two-phase replacement: `rebind`
+generates the candidate external ID for the new role's trust policy, the
+`PUT` promotes it only after a successful AssumeRole, and the whole
+identity value object (role ARN, external ID, account id, role name)
+changes in one write.
 
 ## HTTP surface
 
@@ -37,10 +47,12 @@ All routes are scoped by host scope id; request/response shape is stable
 across host applications:
 
 ```
-GET    /aws-credentials/projects/:projectId
-POST   /aws-credentials/projects/:projectId/bootstrap
-PUT    /aws-credentials/projects/:projectId
-POST   /aws-credentials/projects/:projectId/verify
-POST   /aws-credentials/projects/:projectId/rotate-external-id
-DELETE /aws-credentials/projects/:projectId
+GET    /aws-cross-account-bindings/projects/:projectId
+POST   /aws-cross-account-bindings/projects/:projectId/bootstrap
+PUT    /aws-cross-account-bindings/projects/:projectId
+POST   /aws-cross-account-bindings/projects/:projectId/rebind
+DELETE /aws-cross-account-bindings/projects/:projectId/rebind
+POST   /aws-cross-account-bindings/projects/:projectId/verify
+POST   /aws-cross-account-bindings/projects/:projectId/rotate-external-id
+DELETE /aws-cross-account-bindings/projects/:projectId
 ```

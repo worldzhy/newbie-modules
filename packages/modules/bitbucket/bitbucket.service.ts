@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { parseRepositorySlug } from "@devbie/newbie/utilities/repository-url.util";
 
 /**
  * Thrown when the service has no usable credentials. Callers should gate on
@@ -14,6 +15,9 @@ export class BitbucketNotConfiguredError extends Error {
 }
 
 const BITBUCKET_API_BASE = "https://api.bitbucket.org/2.0";
+
+/** Outbound fetch budget; matches the 30s convention for external vendor APIs (jdy). */
+const BITBUCKET_FETCH_TIMEOUT_MS = 30_000;
 
 @Injectable()
 export class BitbucketService {
@@ -45,9 +49,10 @@ export class BitbucketService {
    * Returns null for anything else (non-Bitbucket hosts, deeper paths, garbage).
    */
   parseBitbucketUrl(url: string): { workspace: string; repo: string } | null {
-    const match = url.trim().match(/bitbucket\.org[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
-    if (!match) return null;
-    return { workspace: match[1], repo: match[2] };
+    const slug = parseRepositorySlug(url);
+    if (!slug) return null;
+    if (!/bitbucket\.org/.test(url)) return null;
+    return { workspace: slug.owner, repo: slug.repo };
   }
 
   /**
@@ -62,7 +67,10 @@ export class BitbucketService {
       .map((segment) => encodeURIComponent(segment))
       .join("/");
     const url = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repo)}/src/HEAD/${encodedPath}`;
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${this.accessToken}` } });
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      signal: AbortSignal.timeout(BITBUCKET_FETCH_TIMEOUT_MS),
+    });
     if (response.status === 404) return null;
     if (!response.ok) {
       const text = await response.text().catch(() => "");

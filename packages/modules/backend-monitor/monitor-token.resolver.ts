@@ -1,11 +1,9 @@
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 
+import { InstallationTouchThrottle } from "@modules/security/installation/installation-touch-throttle";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 import { MonitorApplicationRefResolver, monitorApplicationRefResolverToken } from "./ports/application-ref.resolver";
 import { MonitorInstallationService } from "./services/monitor-installation.service";
-
-/** Minimum interval between liveness/fact UPDATEs for one installation. */
-const TOUCH_THROTTLE_MS = 30_000;
 
 export interface ResolvedMonitorToken {
   installationId: string;
@@ -40,7 +38,7 @@ export class MonitorTokenResolver implements InstallationResolver {
   /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
   readonly legacyHeader = "x-backend-monitor-token";
 
-  private readonly lastTouchAt = new Map<string, number>();
+  private readonly touchThrottle = new InstallationTouchThrottle();
 
   constructor(
     private readonly installations: MonitorInstallationService,
@@ -64,12 +62,8 @@ export class MonitorTokenResolver implements InstallationResolver {
     return { installationId: installation.id, applicationId };
   }
 
-  /** Throttled liveness/fact refresh, at most once per TOUCH_THROTTLE_MS. */
+  /** Throttled liveness/fact refresh, at most once per throttle interval. */
   async touchOnIngest(installationId: string, facts: IngestFacts): Promise<void> {
-    const nowMs = Date.now();
-    const last = this.lastTouchAt.get(installationId) ?? 0;
-    if (nowMs - last < TOUCH_THROTTLE_MS) return;
-    await this.installations.touchOnIngest(installationId, facts);
-    this.lastTouchAt.set(installationId, nowMs);
+    await this.touchThrottle.runIfDue(installationId, () => this.installations.touchOnIngest(installationId, facts));
   }
 }

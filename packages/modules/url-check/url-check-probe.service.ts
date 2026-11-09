@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
+import { toClickHouseDateTime } from "@modules/clickhouse/clickhouse-datetime.util";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { assertPublicHttpUrl, assertPubliclyResolvable } from "./public-url";
@@ -10,6 +11,7 @@ import {
   type UrlCheckDownEvent,
   type UrlCheckRecoveredEvent,
 } from "./url-check.events";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 // Global check parameters: 60s cadence is owned by the host's scheduled job;
 // the remaining defaults live here so consumers can tweak them without a new
@@ -37,18 +39,13 @@ interface ProbeOutcome {
 
 interface TargetRow {
   id: string;
-  projectId: string;
+  groupId: string;
   name: string;
   url: string;
   consecutiveFailures: number;
   consecutiveSuccesses: number;
   isAlertOpen: boolean;
   alertOpenedAt: Date | null;
-}
-
-/** Formats a JS Date to a ClickHouse DateTime64 string (UTC). */
-function toClickHouseDate(date: Date): string {
-  return date.toISOString().replace("T", " ").replace("Z", "");
 }
 
 /**
@@ -85,7 +82,7 @@ export class UrlCheckProbeService {
       where: { isActive: true },
       select: {
         id: true,
-        projectId: true,
+        groupId: true,
         name: true,
         url: true,
         consecutiveFailures: true,
@@ -102,9 +99,7 @@ export class UrlCheckProbeService {
           try {
             await this.checkTarget(target);
           } catch (error) {
-            this.logger.error(
-              `Check cycle failed for target ${target.id}: ${error instanceof Error ? error.message : String(error)}`,
-            );
+            this.logger.error(`Check cycle failed for target ${target.id}: ${getErrorMessage(error)}`);
           }
         }),
       );
@@ -159,7 +154,7 @@ export class UrlCheckProbeService {
         isUp: false,
         statusCode: null,
         durationMs: Date.now() - startedAt,
-        error: (error instanceof Error ? error.message : String(error)).slice(0, 1000),
+        error: getErrorMessage(error).slice(0, 1000),
       };
     }
   }
@@ -171,13 +166,13 @@ export class UrlCheckProbeService {
         values: [
           {
             target_id: target.id,
-            project_id: target.projectId,
+            group_id: target.groupId,
             url: target.url,
             is_up: outcome.isUp,
             status_code: outcome.statusCode,
             duration_ms: outcome.durationMs,
             error: outcome.error,
-            checked_at: toClickHouseDate(checkedAt),
+            checked_at: toClickHouseDateTime(checkedAt),
           },
         ],
         format: "JSONEachRow",
@@ -185,11 +180,7 @@ export class UrlCheckProbeService {
     } catch (error) {
       // Result history must not block state transitions; the row is lost but
       // the alert path stays correct.
-      this.logger.error(
-        `Failed to record check result for target ${target.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.error(`Failed to record check result for target ${target.id}: ${getErrorMessage(error)}`);
     }
   }
 
@@ -251,7 +242,7 @@ export class UrlCheckProbeService {
     try {
       const event: UrlCheckDownEvent = {
         targetId: target.id,
-        projectId: target.projectId,
+        groupId: target.groupId,
         name: target.name,
         url: target.url,
         error: outcome.error || (outcome.statusCode !== null ? `HTTP ${outcome.statusCode}` : ""),
@@ -260,11 +251,7 @@ export class UrlCheckProbeService {
       };
       this.eventEmitter.emit(URL_CHECK_DOWN_EVENT, event);
     } catch (error) {
-      this.logger.error(
-        `Failed to emit url-check.down for target ${target.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.error(`Failed to emit url-check.down for target ${target.id}: ${getErrorMessage(error)}`);
     }
   }
 
@@ -273,7 +260,7 @@ export class UrlCheckProbeService {
     try {
       const event: UrlCheckRecoveredEvent = {
         targetId: target.id,
-        projectId: target.projectId,
+        groupId: target.groupId,
         name: target.name,
         url: target.url,
         downSince: openedAt ? openedAt.toISOString() : "",
@@ -282,11 +269,7 @@ export class UrlCheckProbeService {
       };
       this.eventEmitter.emit(URL_CHECK_RECOVERED_EVENT, event);
     } catch (error) {
-      this.logger.error(
-        `Failed to emit url-check.recovered for target ${target.id}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
+      this.logger.error(`Failed to emit url-check.recovered for target ${target.id}: ${getErrorMessage(error)}`);
     }
   }
 }

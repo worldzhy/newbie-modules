@@ -6,13 +6,13 @@ export function expose<T>(item: T): Expose<T> {
   if (record.password) record.hasPassword = true;
   delete record.password;
   // Session rows carry live credentials: the access token, the current and
-  // previous refresh-token hashes, and the plaintext of the freshest refresh
-  // token held for the idempotency window. None may be serialized to clients.
+  // previous refresh-token hashes, and the sealed next refresh token held for
+  // the idempotency window. None may be serialized to clients.
   delete record.accessToken;
   delete record.refreshToken;
   delete record.refreshTokenHash;
   delete record.previousRefreshTokenHash;
-  delete record.refreshTokenNext;
+  delete record.refreshTokenNextSealed;
   // API key secrets are stored hashed and must never be serialized to clients.
   delete record.secret;
   // User secret columns: the active and pending TOTP secrets plus the WeChat
@@ -38,5 +38,5 @@ export type Expose<T> = Omit<
   | "refreshToken"
   | "refreshTokenHash"
   | "previousRefreshTokenHash"
-  | "refreshTokenNext"
+  | "refreshTokenNextSealed"
 >;

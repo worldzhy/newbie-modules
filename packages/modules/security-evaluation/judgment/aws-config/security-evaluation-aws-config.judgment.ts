@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { isSeverity } from "@modules/evaluation/evaluation-severity.util";
 import type { EvaluationFindingCandidate } from "@modules/evaluation/ports/evaluation.contracts";
 import type { EvaluationJudgment, JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
@@ -18,7 +19,6 @@ import {
 
 const MAX_TITLE_LENGTH = 500;
 const MAX_DETAIL_LENGTH = 4000;
-const SEVERITIES = new Set(["INFO", "LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 
 /**
  * aws-config judgment — collected account configuration items against the
@@ -105,7 +105,5 @@ export class SecurityEvaluationAwsConfigJudgment implements SecurityEvaluationJu
 
 function readSeverity(metadata: Record<string, unknown> | null | undefined): SecurityEvaluationFindingSeverity | null {
   const severity = metadata?.severity;
-  return typeof severity === "string" && SEVERITIES.has(severity)
-    ? (severity as SecurityEvaluationFindingSeverity)
-    : null;
+  return isSeverity(severity) ? severity : null;
 }

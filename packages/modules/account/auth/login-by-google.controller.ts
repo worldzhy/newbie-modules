@@ -1,9 +1,12 @@
 import { Controller, Get, Ip, Req, Res } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { ApiFoundResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { GuardByGoogle } from "@modules/security/authentication/google-oauth/google.decorator";
 import { GoogleUserResDto } from "@modules/security/authentication/google-oauth/dto/google-user.dto";
+import { CookieName, CookieService } from "@modules/security/cookie/cookie.service";
+import { isSafeRedirectPath } from "@modules/security/cookie/redirect-path";
 import { AuthService } from "@modules/account/auth/auth.service";
 
 /**
@@ -22,6 +25,7 @@ export class LoginByGoogleController {
   constructor(
     private readonly authService: AuthService,
     private readonly config: ConfigService,
+    private readonly cookieService: CookieService,
   ) {}
 
   @ApiFoundResponse({ description: "Redirect to the Google authorization page." })
@@ -54,18 +58,34 @@ export class LoginByGoogleController {
 
     const frontendUrl = this.config.getOrThrow<string>("framework.app.frontendUrl");
 
+    // Mint the last-hop proof: it is stored as a readable cookie and echoed in
+    // the redirect hash, so the frontend only adopts a session that was minted
+    // in this browser (a callback URL replayed from elsewhere cannot match).
+    const proof = randomUUID();
+    const proofCookie = this.cookieService.generateForOAuthCallbackProof(proof);
+    response.cookie(proofCookie.name, proofCookie.value, proofCookie.options);
+
+    // The destination was stored when the handshake started; it is single-use.
+    const redirectUrl = request.cookies?.[CookieName.OAUTH_REDIRECT_URL];
+    this.cookieService.clearOAuthCookie(CookieName.OAUTH_REDIRECT_URL, response);
+
     // A TOTP-enabled account receives the MFA challenge instead of a session;
     // the client completes login at /auth/login-by-totp via the dedicated page.
     if ("totpToken" in loginResult) {
-      response.redirect(
-        `${frontendUrl}/account/login/totp-callback#totpToken=${encodeURIComponent(loginResult.totpToken)}`,
-      );
+      const params = new URLSearchParams({ totpToken: loginResult.totpToken, proof });
+      if (isSafeRedirectPath(redirectUrl)) params.set("redirectUrl", redirectUrl);
+      response.redirect(`${frontendUrl}/account/login/totp-callback#${params.toString()}`);
       return;
     }
 
     // Redirect to the frontend landing page; the token travels in the URL hash
     // fragment, which browsers never send to servers and never write to logs.
-    const hash = `#token=${encodeURIComponent(loginResult.token)}&expiresIn=${loginResult.tokenExpiresInSeconds}`;
-    response.redirect(`${frontendUrl}/account/login/google-callback${hash}`);
+    const params = new URLSearchParams({
+      token: loginResult.token,
+      expiresIn: String(loginResult.tokenExpiresInSeconds),
+      proof,
+    });
+    if (isSafeRedirectPath(redirectUrl)) params.set("redirectUrl", redirectUrl);
+    response.redirect(`${frontendUrl}/account/login/google-callback#${params.toString()}`);
   }
 }

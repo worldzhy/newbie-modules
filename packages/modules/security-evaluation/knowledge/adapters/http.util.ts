@@ -1,3 +1,4 @@
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 /**
  * Thin fetch wrapper shared by all source adapters.
  *
@@ -43,11 +44,7 @@ export async function fetchJson<T>(
     if (error instanceof Error && error.name === "AbortError") {
       throw new SourceHttpError(source, 0, `${source} request timed out after ${timeoutMs}ms.`);
     }
-    throw new SourceHttpError(
-      source,
-      0,
-      `${source} request failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new SourceHttpError(source, 0, `${source} request failed: ${getErrorMessage(error)}`);
   } finally {
     clearTimeout(timer);
   }
@@ -72,11 +69,7 @@ export async function fetchText(
     if (error instanceof Error && error.name === "AbortError") {
       throw new SourceHttpError(source, 0, `${source} request timed out after ${timeoutMs}ms.`);
     }
-    throw new SourceHttpError(
-      source,
-      0,
-      `${source} request failed: ${error instanceof Error ? error.message : String(error)}`,
-    );
+    throw new SourceHttpError(source, 0, `${source} request failed: ${getErrorMessage(error)}`);
   } finally {
     clearTimeout(timer);
   }

@@ -1,9 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { BadGatewayException, BadRequestException, HttpException, Injectable, Logger } from "@nestjs/common";
+import {
+  BadGatewayException,
+  BadRequestException,
+  ConflictException,
+  HttpException,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCrossAccountBinding } from "@generated/prisma/client";
-import { UpsertAwsCrossAccountBindingDto } from "./aws-credentials.dto";
+import { UpsertAwsCrossAccountBindingDto } from "./aws-cross-account-bindings.dto";
 import {
   assumeRole,
   AwsCallerIdentity,
@@ -19,6 +27,19 @@ const SESSION_NAME_PREFIX = "nightwatch-";
 const REFRESH_SAFETY_WINDOW_MS = 5 * 60 * 1000;
 /** Fallback lifetime when STS omits an expiration (it never does in practice). */
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
+
+/**
+ * Credential-reference vocabulary: other modules point at a binding through an
+ * opaque `"aws-binding:<id>"` string captured at their own registration time,
+ * so resolving a subject to its credentials never requires rediscovering the
+ * binding through the host's domain objects.
+ */
+export const AWS_BINDING_CREDENTIAL_REF_PREFIX = "aws-binding:";
+
+/** Format the opaque credential reference naming one cross-account binding. */
+export function awsBindingRef(bindingId: string): string {
+  return `${AWS_BINDING_CREDENTIAL_REF_PREFIX}${bindingId}`;
+}
 
 export interface ResolvedAwsCredentials {
   bindingId: string;
@@ -42,8 +63,8 @@ interface AssumedSession {
 }
 
 @Injectable()
-export class AwsCredentialsService {
-  private readonly logger = new Logger(AwsCredentialsService.name);
+export class AwsCrossAccountBindingsService {
+  private readonly logger = new Logger(AwsCrossAccountBindingsService.name);
   private readonly sessionCache = new Map<string, Promise<AssumedSession>>();
   /**
    * Single host-default credential source shared by every default-plane
@@ -53,7 +74,10 @@ export class AwsCredentialsService {
   private readonly defaultCredentialsProvider: AwsCredentialsProvider = defaultProvider();
   private defaultIdentityPromise: Promise<string | null> | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {}
 
   /**
    * Host default credentials (SDK default credential chain). All default
@@ -81,6 +105,23 @@ export class AwsCredentialsService {
 
   async upsertProjectCredential(projectId: string, dto: UpsertAwsCrossAccountBindingDto) {
     const binding = await this.updateBinding(projectId, dto);
+    return this.serialize(projectId, binding, await this.resolveDefaultAccountId());
+  }
+
+  /**
+   * Start a two-phase identity replacement. The active identity keeps
+   * serving while a pending external ID awaits the candidate role, so a
+   * configuration change never leaves the host scope without credentials.
+   * Idempotent: an open draft is returned as-is.
+   */
+  async rebindProjectCredential(projectId: string) {
+    const binding = await this.startRebind(projectId);
+    return this.serialize(projectId, binding, await this.resolveDefaultAccountId());
+  }
+
+  /** Abandon a pending identity replacement; the active identity is unaffected. */
+  async cancelRebind(projectId: string) {
+    const binding = await this.cancelPendingRebind(projectId);
     return this.serialize(projectId, binding, await this.resolveDefaultAccountId());
   }
 
@@ -132,6 +173,22 @@ export class AwsCredentialsService {
     });
   }
 
+  /**
+   * Save the binding. Changing the identity is an atomic replacement, not a
+   * field edit:
+   *
+   * - no active identity (roleArn null) => this is first access; the
+   *   bootstrap external ID is the draft the role trust policy already uses.
+   * - roleArn unchanged => only the usage scope changes: no probe, no
+   *   rotation, and any open rebind draft is abandoned.
+   * - roleArn differs => a rebind draft must exist (POST :scopeId/rebind);
+   *   the candidate is probed with the pending external ID and only a
+   *   successful probe replaces the whole identity value object.
+   *
+   * The old external ID always retires with the old role, which is what
+   * revokes the previous trust policy: it is no longer matched by any
+   * request the platform makes.
+   */
   private async updateBinding(
     projectId: string,
     dto: UpsertAwsCrossAccountBindingDto,
@@ -139,31 +196,66 @@ export class AwsCredentialsService {
     const existing = await this.getBindingByProjectId(projectId);
 
     const roleArn = dto.roleArn.trim();
-    const regions = dto.regions?.length
+    // Regions are usage scope, not identity: an explicit list wins, an omitted
+    // list keeps what is stored, and a new binding starts from the default
+    // region. An explicitly empty list never reaches here (the DTO rejects it).
+    const regions = dto.regions
       ? dto.regions.map((region) => this.normalizeRegion(region))
       : existing?.regions?.length
         ? existing.regions
         : [DEFAULT_REGION];
-    const defaultRegion = this.normalizeRegion(dto.defaultRegion || existing?.defaultRegion || regions[0]);
-    const externalId = existing?.externalId || randomUUID();
 
-    // Verify trust before persisting: a role ARN that cannot be assumed is
-    // rejected outright instead of leaving an unusable configured binding.
+    // The default region must be one the binding is actually allowed to use;
+    // otherwise callers that omit a region would operate outside the list.
+    const requestedDefault = dto.defaultRegion ? this.normalizeRegion(dto.defaultRegion) : null;
+    if (requestedDefault && !regions.includes(requestedDefault)) {
+      throw new BadRequestException("Default region must be one of the configured regions");
+    }
+    const storedDefault = existing?.defaultRegion ? this.normalizeRegion(existing.defaultRegion) : null;
+    const defaultRegion =
+      requestedDefault || (storedDefault && regions.includes(storedDefault) ? storedDefault : regions[0]);
+
+    // Identity unchanged: this is a scope edit. Re-probing STS would couple a
+    // region edit to STS availability (and to unrelated credential outages),
+    // and leaving a draft open would keep the UI in "rebinding" for an
+    // identity the user just re-confirmed.
+    if (existing?.roleArn && existing.roleArn === roleArn) {
+      return this.prisma.awsCrossAccountBinding.update({
+        where: { id: existing.id },
+        data: { defaultRegion, regions, pendingExternalId: null },
+      });
+    }
+
+    // First access probes with the bootstrap draft; a replacement probes with
+    // the pending draft. There is no third source of external IDs.
+    const probeExternalId = existing?.roleArn ? existing.pendingExternalId : existing?.externalId || randomUUID();
+    if (!probeExternalId) {
+      throw new BadRequestException(
+        "A pending external ID is required before the role ARN can change; start a rebind first",
+      );
+    }
+
+    await this.assertRoleArnAvailable(projectId, roleArn);
+
     const identity = await this.verifyRoleAssumption({
       roleArn,
-      externalId,
+      externalId: probeExternalId,
       defaultRegion,
       sessionName: this.buildProbeSessionName(projectId),
     });
 
+    // One write replaces the identity value object, promotes the pending
+    // external ID and clears the draft, so no mixed-generation row is ever
+    // observable.
     const binding = existing
       ? await this.prisma.awsCrossAccountBinding.update({
           where: { id: existing.id },
           data: {
             roleArn,
-            externalId,
-            awsAccountId: identity.accountId || existing.awsAccountId,
-            roleName: identity.iamUserName || existing.roleName,
+            externalId: probeExternalId,
+            pendingExternalId: null,
+            awsAccountId: identity.accountId ?? null,
+            roleName: identity.iamUserName ?? null,
             defaultRegion,
             regions,
             lastVerifiedAt: new Date(),
@@ -173,9 +265,9 @@ export class AwsCredentialsService {
           data: {
             projectId,
             roleArn,
-            externalId,
-            awsAccountId: identity.accountId,
-            roleName: identity.iamUserName,
+            externalId: probeExternalId,
+            awsAccountId: identity.accountId ?? null,
+            roleName: identity.iamUserName ?? null,
             defaultRegion,
             regions,
             lastVerifiedAt: new Date(),
@@ -184,6 +276,48 @@ export class AwsCredentialsService {
 
     this.invalidateSession(binding.id);
     return binding;
+  }
+
+  /**
+   * A role ARN identifies one role in one customer account; binding it to a
+   * second host scope would make the unique constraint surface as a 500.
+   */
+  private async assertRoleArnAvailable(projectId: string, roleArn: string): Promise<void> {
+    const conflict = await this.prisma.awsCrossAccountBinding.findFirst({
+      where: { roleArn, projectId: { not: projectId } },
+      select: { projectId: true },
+    });
+    if (conflict) {
+      throw new ConflictException("This role ARN is already bound to another host scope");
+    }
+  }
+
+  private async startRebind(projectId: string): Promise<AwsCrossAccountBinding> {
+    const existing = await this.getBindingByProjectId(projectId);
+    if (!existing?.roleArn) {
+      throw new BadRequestException("AWS cross-account role is not configured for this host scope");
+    }
+    if (existing.pendingExternalId) {
+      return existing;
+    }
+    return this.prisma.awsCrossAccountBinding.update({
+      where: { id: existing.id },
+      data: { pendingExternalId: randomUUID() },
+    });
+  }
+
+  private async cancelPendingRebind(projectId: string): Promise<AwsCrossAccountBinding> {
+    const existing = await this.getBindingByProjectId(projectId);
+    if (!existing) {
+      throw new BadRequestException("AWS cross-account binding is not bootstrapped");
+    }
+    if (!existing.pendingExternalId) {
+      return existing;
+    }
+    return this.prisma.awsCrossAccountBinding.update({
+      where: { id: existing.id },
+      data: { pendingExternalId: null },
+    });
   }
 
   private async verifyBinding(projectId: string): Promise<{
@@ -237,10 +371,34 @@ export class AwsCredentialsService {
     if (!binding?.roleArn) {
       throw new BadRequestException("AWS cross-account role is not configured for this host scope");
     }
+    return this.toResolvedCredentials(binding);
+  }
+
+  /**
+   * Resolve a binding through its opaque credential reference
+   * (`"aws-binding:<id>"`, see awsBindingRef). Consumers register the
+   * reference once and resolve it here on every use; a reference whose binding
+   * or role no longer exists throws, which the caller surfaces as-is.
+   */
+  async resolveCredentialByRef(credentialRef: string): Promise<ResolvedAwsCredentials> {
+    if (!credentialRef.startsWith(AWS_BINDING_CREDENTIAL_REF_PREFIX)) {
+      throw new BadRequestException(`Unsupported AWS credential reference "${credentialRef}"`);
+    }
+    const bindingId = credentialRef.slice(AWS_BINDING_CREDENTIAL_REF_PREFIX.length);
+    const binding = await this.prisma.awsCrossAccountBinding.findUnique({ where: { id: bindingId } });
+    if (!binding?.roleArn) {
+      throw new BadRequestException(
+        `AWS credential reference "${credentialRef}" does not resolve to a configured cross-account role`,
+      );
+    }
+    return this.toResolvedCredentials(binding);
+  }
+
+  private toResolvedCredentials(binding: AwsCrossAccountBinding): ResolvedAwsCredentials {
     const regions = binding.regions?.length ? binding.regions : [DEFAULT_REGION];
     return {
       bindingId: binding.id,
-      roleArn: binding.roleArn,
+      roleArn: binding.roleArn!,
       awsAccountId: binding.awsAccountId,
       roleName: binding.roleName,
       defaultRegion: binding.defaultRegion || regions[0],
@@ -369,6 +527,16 @@ export class AwsCredentialsService {
   }
 
   private async resolveDefaultAccountId(): Promise<string | null> {
+    // The platform account ID is a static value. Prefer an explicit config
+    // value so the backend does not need AWS credentials (or a successful STS
+    // call) just to know its own account ID. Falls back to
+    // sts:GetCallerIdentity when unset.
+    const fromConfig = this.configService
+      .get<{ platformAccountId?: string }>("modules.aws-identity")
+      ?.platformAccountId?.trim();
+    if (fromConfig) {
+      return fromConfig;
+    }
     if (!this.defaultIdentityPromise) {
       this.defaultIdentityPromise = getDefaultCallerIdentity(this.defaultCredentialsProvider)
         .then((identity) => identity.accountId)
@@ -399,6 +567,7 @@ export class AwsCredentialsService {
         id: binding.id,
         roleArn: binding.roleArn,
         externalId: binding.externalId,
+        pendingExternalId: binding.pendingExternalId,
         awsAccountId: binding.awsAccountId,
         roleName: binding.roleName,
         defaultRegion: binding.defaultRegion,

@@ -7,7 +7,10 @@ export class EnvironmentService {
 
   async getDataGroupBy(type: number, url: string, appKey: string, beginTime?: string, endTime?: string) {
     const match: Record<string, unknown> = { url };
-    if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
+    const createTime: Record<string, unknown> = {};
+    if (beginTime) createTime.$gte = new Date(beginTime);
+    if (endTime) createTime.$lte = new Date(endTime);
+    if (Object.keys(createTime).length) match.createTime = createTime;
     const group_id = {
       url: "$url",
       city: `${type === 1 ? "$city" : ""}`,

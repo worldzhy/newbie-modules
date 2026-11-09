@@ -20,6 +20,7 @@ import {
   SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
   SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK,
 } from "../judgment/aws-config/security-evaluation-aws-config.rulebook";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 interface CriterionSeed {
   criterionKey: string;
@@ -58,7 +59,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
 
   onModuleInit(): void {
     void this.seedMissingBaselines().catch((error: unknown) => {
-      this.logger.warn(`Criteria baselines not seeded yet: ${describe(error)}`);
+      this.logger.warn(`Criteria baselines not seeded yet: ${getErrorMessage(error)}`);
     });
   }
 
@@ -222,8 +223,4 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
 
 function isUniqueViolation(error: unknown): boolean {
   return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "P2002";
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

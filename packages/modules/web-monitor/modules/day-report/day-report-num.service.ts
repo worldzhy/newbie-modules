@@ -1,21 +1,16 @@
 import { Injectable } from "@nestjs/common";
 import { WebMonitorModelsService } from "../../models/mongo/web-monitor-models.service";
 import { RedisService } from "@modules/redis/redis.service";
-import { ConfigService } from "@nestjs/config";
 import dayjs from "dayjs";
 import { func } from "../../shared/utils";
 import { RedisKeyPrefix } from "../../models/enum";
 
 @Injectable()
 export class DayReportNumService {
-  private cfg: Record<string, unknown>;
   constructor(
     private readonly models: WebMonitorModelsService,
     private readonly redis: RedisService,
-    private readonly configService: ConfigService,
-  ) {
-    this.cfg = this.configService.get("modules.web-monitor") || {};
-  }
+  ) {}
 
   async numCountTask() {
     const date = new Date(new Date().getTime() - 86400000);

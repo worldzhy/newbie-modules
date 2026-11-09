@@ -23,13 +23,12 @@ missed webhook delivery). Both share the same idempotent upsert.
 
 This module declares **no** variables in `newbie.module.json`, so `newbie modules apply` adds nothing to the consumer's `.env.example` or config block. Every setting below is optional and read from the environment at runtime (compose passes `.env` through).
 
+The catalog sync reads GitHub through the `github` module, so a configured GitHub credential is a **required dependency of installing module-hub, not an option**. This module declares `github` under `requires.modules`, and the host must provide `GITHUB_AUTH` (or the App triplet). A host without a credential fails the sync; there is no anonymous fallback.
+
 | Variable                           | Required                                | Description                                                                                                               |
 | ---------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `MODULE_HUB_REGISTRY_REPO_TOKEN`   | No (falls back to `GITHUB_AUTH`)        | GitHub token for catalog sync; the anonymous quota (60/h) is not enough for a cold sync (~2 calls per module)             |
 | `MODULE_HUB_REGISTRY_REPO`         | No (default: `worldzhy/newbie-modules`) | Registry repository read by the catalog sync                                                                              |
 | `MODULE_HUB_GITHUB_WEBHOOK_SECRET` | No (webhook disabled when unset)        | GitHub webhook HMAC secret; without it webhook deliveries are rejected and the daily cron sync is the only ingestion path |
-
-By default the sync reuses the host's existing `GITHUB_AUTH` (the `github` module's PAT). GitHub App credentials cannot read a repository outside the app's installation, so an App-only host should set `MODULE_HUB_REGISTRY_REPO_TOKEN` explicitly or accept the anonymous rate limit.
 
 ## Upgrade Hints
 

@@ -12,11 +12,16 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
+import {
+  DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
+  withDerivedOnlineState,
+} from "@modules/security/installation/installation-presence";
 
 import { func } from "../shared/utils";
 
 /** Reports flush near-continuously; three minutes without one marks stale. */
-export const ONLINE_THRESHOLD_SECONDS = 180;
+export const ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS;
 
 /** Audit resource type for installation credential events. */
 const AUDIT_RESOURCE_TYPE = "web-monitor-installation";
@@ -38,14 +43,15 @@ interface WebInstallationDraft {
  * identity.
  */
 @Injectable()
-export class WebInstallationService {
+export class WebInstallationService extends BaseInstallationService<WebMonitorInstallation> {
   private readonly credentials: InstallationCredentialStore<WebInstallationDraft, WebMonitorInstallation>;
-  private readonly tokenVerifier: InstallationTokenVerifier<WebMonitorInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<WebMonitorInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<WebInstallationDraft, WebMonitorInstallation>(
       this.prisma.webMonitorInstallation,
     );
@@ -59,12 +65,7 @@ export class WebInstallationService {
   private withDerivedState<T extends { revokedAt: Date | null; lastSeenAt: Date | null; tokenHash: string }>(
     row: T,
   ): Omit<T, "tokenHash"> & { online: boolean } {
-    const online =
-      !row.revokedAt &&
-      row.lastSeenAt != null &&
-      Date.now() - new Date(row.lastSeenAt).getTime() <= ONLINE_THRESHOLD_SECONDS * 1000;
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, online };
+    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
   }
 
   /**
@@ -125,11 +126,6 @@ export class WebInstallationService {
   async unrevoke(id: string, actor?: string) {
     await this.getOrThrow(id);
     return restoreInstallationCredential(this.credentials, id, this.credentialAudit(actor));
-  }
-
-  /** Token-only authentication for the report endpoint. */
-  async resolveByToken(token: string) {
-    return this.tokenVerifier.verify(token);
   }
 
   /**

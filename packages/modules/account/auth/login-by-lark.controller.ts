@@ -5,6 +5,7 @@ import { randomUUID } from "crypto";
 import { Request, Response } from "express";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 import { CookieName, CookieService } from "@modules/security/cookie/cookie.service";
+import { isSafeRedirectPath } from "@modules/security/cookie/redirect-path";
 import { LarkAuthService } from "@modules/account/auth/lark/lark-auth.service";
 
 /**
@@ -32,10 +33,23 @@ export class LoginByLarkController {
   @NoGuard()
   @Get("login-by-lark")
   @ApiOperation({ summary: "Initiate Feishu OAuth login (redirects to Feishu)" })
-  async signinWithLark(@Res() response: Response): Promise<void> {
+  async signinWithLark(@Req() request: Request, @Res() response: Response): Promise<void> {
     const state = randomUUID();
     const stateCookie = this.cookieService.generateForOAuthState(CookieName.LARK_OAUTH_STATE, state);
     response.cookie(stateCookie.name, stateCookie.value, stateCookie.options);
+
+    // Remember where the user was before being bounced to login so the callback
+    // can send them back there. Only same-origin relative paths are stored;
+    // a handshake started without one clears any stale destination left by an
+    // earlier attempt.
+    const redirectUrl = request.query.redirectUrl;
+    if (isSafeRedirectPath(redirectUrl)) {
+      const redirectCookie = this.cookieService.generateForOAuthRedirect(redirectUrl);
+      response.cookie(redirectCookie.name, redirectCookie.value, redirectCookie.options);
+    } else {
+      this.cookieService.clearOAuthCookie(CookieName.OAUTH_REDIRECT_URL, response);
+    }
+
     response.redirect(this.larkAuthService.buildAuthorizeUrl(state));
   }
 
@@ -65,7 +79,7 @@ export class LoginByLarkController {
 
     // State verified — consume the single-use cookie so the handshake cannot
     // be replayed. A failed verification keeps the cookie intact.
-    this.cookieService.clearOAuthState(CookieName.LARK_OAUTH_STATE, response);
+    this.cookieService.clearOAuthCookie(CookieName.LARK_OAUTH_STATE, response);
 
     const userInfo = await this.larkAuthService.exchangeCodeForUserInfo(code);
     if (!userInfo) {
@@ -86,16 +100,32 @@ export class LoginByLarkController {
 
     const frontendUrl = this.config.getOrThrow<string>("framework.app.frontendUrl");
 
+    // Mint the last-hop proof: it is stored as a readable cookie and echoed in
+    // the redirect hash, so the frontend only adopts a session that was minted
+    // in this browser (a callback URL replayed from elsewhere cannot match).
+    const proof = randomUUID();
+    const proofCookie = this.cookieService.generateForOAuthCallbackProof(proof);
+    response.cookie(proofCookie.name, proofCookie.value, proofCookie.options);
+
+    // The destination was stored when the handshake started; it is single-use.
+    const redirectUrl = request.cookies?.[CookieName.OAUTH_REDIRECT_URL];
+    this.cookieService.clearOAuthCookie(CookieName.OAUTH_REDIRECT_URL, response);
+
     // A TOTP-enabled account receives the MFA challenge instead of a session;
     // the client completes login at /auth/login-by-totp via the dedicated page.
     if ("totpToken" in loginResult) {
-      response.redirect(
-        `${frontendUrl}/account/login/totp-callback#totpToken=${encodeURIComponent(loginResult.totpToken)}`,
-      );
+      const params = new URLSearchParams({ totpToken: loginResult.totpToken, proof });
+      if (isSafeRedirectPath(redirectUrl)) params.set("redirectUrl", redirectUrl);
+      response.redirect(`${frontendUrl}/account/login/totp-callback#${params.toString()}`);
       return;
     }
 
-    const hash = `#token=${encodeURIComponent(loginResult.token)}&expiresIn=${loginResult.tokenExpiresInSeconds}`;
-    response.redirect(`${frontendUrl}/account/login/lark-callback${hash}`);
+    const params = new URLSearchParams({
+      token: loginResult.token,
+      expiresIn: String(loginResult.tokenExpiresInSeconds),
+      proof,
+    });
+    if (isSafeRedirectPath(redirectUrl)) params.set("redirectUrl", redirectUrl);
+    response.redirect(`${frontendUrl}/account/login/lark-callback#${params.toString()}`);
   }
 }

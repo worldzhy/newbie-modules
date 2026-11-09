@@ -23,6 +23,13 @@ export class AwsCrossAccountBindingDto {
   externalId!: string;
 
   @ApiPropertyOptional({
+    description:
+      "External ID of the candidate identity while a rebind is in progress; the active identity keeps serving until it is replaced",
+    type: String,
+  })
+  pendingExternalId?: string | null;
+
+  @ApiPropertyOptional({
     description: "Customer AWS account ID resolved via STS after assuming the role",
     type: String,
   })

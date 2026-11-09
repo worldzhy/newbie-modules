@@ -1,10 +1,10 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { PvuvipService } from "./pvuvip.service";
 import { func, mapWithConcurrency } from "../../../shared/utils";
 import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 import { SystemDocument } from "../../../models/mongo/system.schema";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 function cronMinuteInterval(cronExp: string) {
   const m = cronExp.split(" ")[1] || "*/2";
@@ -15,15 +15,11 @@ function cronMinuteInterval(cronExp: string) {
 
 @Injectable()
 export class WebPvuvipTaskService {
-  private cfg: Record<string, unknown>;
   private readonly logger = new Logger(WebPvuvipTaskService.name);
   constructor(
-    private readonly config: ConfigService,
     private readonly site: SiteService,
     private readonly pvuvip: PvuvipService,
-  ) {
-    this.cfg = this.config.get("modules.web-monitor") || {};
-  }
+  ) {}
 
   async getWebPvUvIpByMinute() {
     const between = cronMinuteInterval(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
@@ -43,7 +39,7 @@ export class WebPvuvipTaskService {
         const data = await this.pvuvip.getPvUvIpSurvey(appKey, beginTime, endTime);
         await this.pvuvip.savePvUvIpData(appKey, endTime, 1, data);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = getErrorMessage(error);
         this.logger.error(`Pvuvip minute task failed for site ${appKey}: ${message}`);
       }
     });

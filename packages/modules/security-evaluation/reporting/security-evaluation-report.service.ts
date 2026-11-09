@@ -5,6 +5,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS,
   SECURITY_EVALUATION_REPORT_TREND_WEEKS,
+  SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KINDS,
 } from "../security-evaluation.constants";
 import { deriveUrgencyRank, type SecurityEvaluationUrgency } from "../judgment/security-evaluation-urgency";
@@ -49,6 +50,12 @@ export interface SecurityEvaluationReport {
     skipped: number;
     unconsumed: number;
     assetsWithResult: number;
+    /**
+     * Assets that cannot be evaluated at all right now: their subject kind
+     * requires a registered credential reference and none is stored. Surfaced
+     * as its own bucket so an un-integrated subject never reads as coverage.
+     */
+    unevaluable: number;
   };
   findings: {
     open: number;
@@ -83,13 +90,25 @@ export class SecurityEvaluationReportService {
    * the filter matched nothing.
    */
   async getReport(subjectIdsFilter: readonly string[] | null): Promise<SecurityEvaluationReport> {
-    const subjects = subjectIdsFilter
-      ? subjectIdsFilter.map((id) => ({ id }))
-      : await this.prisma.evaluationSubject.findMany({
-          where: { kind: { in: [...SECURITY_EVALUATION_SUBJECT_KINDS] } },
-          select: { id: true },
-        });
+    const subjects = await this.prisma.evaluationSubject.findMany({
+      where: subjectIdsFilter
+        ? { id: { in: [...subjectIdsFilter] } }
+        : { kind: { in: [...SECURITY_EVALUATION_SUBJECT_KINDS] } },
+      select: { id: true, kind: true, credentialRef: true },
+    });
     const subjectIds = subjects.map((subject) => subject.id);
+    // The aws-account kind is evaluated through a host credential registered
+    // at ingest; a subject without the pointer is unevaluable until the host
+    // re-submits it with one.
+    //
+    // `unevaluable` means strictly "never bound at ingest". A *dangling*
+    // reference (pointer present, target credential since deleted) is not
+    // counted here: collection resolves the pointer at run time, fails to find
+    // the credential, and accounts the subject in that run's skipped bucket
+    // (SE-CRED-03).
+    const unevaluable = subjects.filter(
+      (subject) => subject.kind === SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT && !subject.credentialRef,
+    ).length;
     const now = new Date();
     const staleBefore = new Date(now.getTime() - SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS * DAY_MS);
 
@@ -115,6 +134,7 @@ export class SecurityEvaluationReportService {
       skipped: 0,
       unconsumed: 0,
       assetsWithResult: latestResults.size,
+      unevaluable,
     };
     for (const byAxis of latestResults.values()) {
       for (const stats of byAxis.values()) {

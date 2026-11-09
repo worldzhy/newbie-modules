@@ -9,7 +9,7 @@ import {
   PutSuppressedDestinationCommand,
   SuppressionListReason,
 } from "@aws-sdk/client-sesv2";
-import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 
 @Injectable()
 export class AwsSesSuppressionListService {
@@ -17,7 +17,7 @@ export class AwsSesSuppressionListService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly credentials: AwsCredentialsService,
+    private readonly credentials: AwsCrossAccountBindingsService,
   ) {
     const config = this.configService.getOrThrow<{
       region: string;

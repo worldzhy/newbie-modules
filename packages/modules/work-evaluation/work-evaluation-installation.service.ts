@@ -11,13 +11,18 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
+import {
+  DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
+  withDerivedOnlineState,
+} from "@modules/security/installation/installation-presence";
 import {
   CreateWorkEvaluationInstallationRequestDto,
   WorkEvaluationInstallationCredentialResponseDto,
 } from "./work-evaluation.dto";
 
 /** An installation agent that has not reported for this long is shown as offline. */
-export const WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS = 180;
+export const WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS;
 
 /** Database schema for the work-evaluation module (mirrors prisma @@schema). */
 const WORK_EVALUATION_SCHEMA = "module/work-evaluation";
@@ -41,17 +46,18 @@ interface WorkEvaluationInstallationDraft {
  * cannot write evidence for another member.
  */
 @Injectable()
-export class WorkEvaluationInstallationService {
+export class WorkEvaluationInstallationService extends BaseInstallationService<WorkEvaluationInstallation> {
   private readonly credentials: InstallationCredentialStore<
     WorkEvaluationInstallationDraft,
     WorkEvaluationInstallation
   >;
-  private readonly tokenVerifier: InstallationTokenVerifier<WorkEvaluationInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<WorkEvaluationInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<WorkEvaluationInstallationDraft, WorkEvaluationInstallation>(
       this.prisma.workEvaluationInstallation,
     );
@@ -63,12 +69,7 @@ export class WorkEvaluationInstallationService {
   }
 
   private withDerivedState(row: WorkEvaluationInstallation) {
-    const online =
-      !row.revokedAt &&
-      row.lastSeenAt != null &&
-      Date.now() - new Date(row.lastSeenAt).getTime() <= WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS * 1000;
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, online };
+    return withDerivedOnlineState(row, WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS);
   }
 
   /** Enroll an installation. The plaintext token is returned ONCE. */
@@ -120,11 +121,6 @@ export class WorkEvaluationInstallationService {
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
     return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
-  }
-
-  /** Token-only authentication for the ingest endpoints. */
-  async resolveByToken(token: string) {
-    return this.tokenVerifier.verify(token);
   }
 
   /**

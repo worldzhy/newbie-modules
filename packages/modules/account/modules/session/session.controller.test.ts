@@ -5,8 +5,8 @@ import { SessionController } from "./session.controller";
 /**
  * Behavior tests for SessionController credential hygiene: every session
  * endpoint must project through SESSION_PUBLIC_SELECT, so the live access
- * token, the refresh-token hashes and the plaintext `refreshTokenNext` never
- * reach the client even though they live on the same row.
+ * token, the refresh-token hashes and the sealed `refreshTokenNextSealed`
+ * never reach the client even though they live on the same row.
  */
 
 /** Full row as Prisma would return it when no `select` is supplied. */
@@ -15,7 +15,7 @@ const ROW = {
   accessToken: "live-access-jwt",
   refreshTokenHash: "hash-current",
   previousRefreshTokenHash: "hash-previous",
-  refreshTokenNext: "plaintext-next-refresh",
+  refreshTokenNextSealed: "v1.sealed-next-refresh",
   rotatedAt: new Date("2026-10-01T00:00:00Z"),
   ipAddress: "10.0.0.1",
   userAgent: "Mozilla/5.0",
@@ -35,7 +35,7 @@ const CREDENTIAL_KEYS = [
   "refreshToken",
   "refreshTokenHash",
   "previousRefreshTokenHash",
-  "refreshTokenNext",
+  "refreshTokenNextSealed",
   "rotatedAt",
 ];
 

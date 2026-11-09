@@ -46,6 +46,15 @@ export class SecurityEvaluationAwsConfigEvidenceProvider implements EvidenceProv
       );
     }
 
+    // The credential pointer is registered at ingest time; a subject without
+    // one is unevaluable — a stable, queryable failure, never a silent skip
+    // and never a discovery attempt through provenance.
+    if (!subject.credentialRef) {
+      throw new BadRequestException(
+        `Subject ${subject.id} ("${subject.displayName}") is unevaluable: no credential reference is registered for kind "${subject.kind}"; the host must re-submit the subject with a credentialRef.`,
+      );
+    }
+
     const asset = await this.assets.getOrCreateAsset(subject);
     const observedAt = new Date();
     const collection = await access.collect(subject);

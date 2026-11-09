@@ -34,6 +34,7 @@ import { EvaluationSubjectService, toSubjectRef } from "./evaluation-subject.ser
 import { EvaluationRuleSetVersionRef } from "./ports/evaluation.contracts";
 import { EvaluationRunFinishedEvent } from "./ports/observer.port";
 import { composeCoverageStats } from "./evaluation-invariants";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 export interface EvaluationRunOutcome {
   runId: string;
@@ -122,7 +123,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
         });
       }
     } catch (error) {
-      this.logger.warn(`Stale-run sweep failed; the next interval tick retries: ${describe(error)}`);
+      this.logger.warn(`Stale-run sweep failed; the next interval tick retries: ${getErrorMessage(error)}`);
     } finally {
       this.reapInFlight = false;
     }
@@ -154,7 +155,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
 
     const heartbeat = setInterval(() => {
       this.runs.touch(running.id).catch((error: unknown) => {
-        this.logger.warn(`Heartbeat for evaluation run ${running.id} failed: ${describe(error)}`);
+        this.logger.warn(`Heartbeat for evaluation run ${running.id} failed: ${getErrorMessage(error)}`);
       });
     }, this.options.heartbeatIntervalMs ?? DEFAULT_EVALUATION_RUN_OPTIONS.heartbeatIntervalMs);
     heartbeat.unref();
@@ -274,7 +275,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
     try {
       await observer.onRunFinished(event);
     } catch (error) {
-      this.logger.warn(`EvaluationObserver.onRunFinished failed for run ${event.runId}: ${describe(error)}`);
+      this.logger.warn(`EvaluationObserver.onRunFinished failed for run ${event.runId}: ${getErrorMessage(error)}`);
     }
   }
 
@@ -304,7 +305,9 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
         status: "SUCCEEDED",
       } satisfies EvaluationRunSucceededEvent);
     } catch (error) {
-      this.logger.warn(`Terminal event for evaluation run ${running.id} could not be published: ${describe(error)}`);
+      this.logger.warn(
+        `Terminal event for evaluation run ${running.id} could not be published: ${getErrorMessage(error)}`,
+      );
     }
   }
 
@@ -325,8 +328,4 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
       evaluationKey: version.evaluationKey,
     };
   }
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

@@ -4,7 +4,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { UAParser } from "ua-parser-js";
 import { GeolocationService } from "./helpers/geolocation.service";
 import { AuditContextService } from "./audit-context.service";
-import { AuditLogQueryDto } from "./audit-log.dto";
+import type { AuditLogQueryDto } from "./audit-log.dto";
 
 /** Kind of identity an audit row is attributed to. */
 export const AuditActorType = {
@@ -34,6 +34,8 @@ export const AuditEvent = {
   API_KEY_CREATED: "api-key.created",
   API_KEY_UPDATED: "api-key.updated",
   API_KEY_DELETED: "api-key.deleted",
+  APPROVED_SUBNET_APPROVED: "approved-subnet.approved",
+  APPROVED_SUBNET_DELETED: "approved-subnet.deleted",
   SESSION_REVOKED: "session.revoked",
   MFA_ENABLED: "mfa.enabled",
   MFA_REBOUND: "mfa.rebound",

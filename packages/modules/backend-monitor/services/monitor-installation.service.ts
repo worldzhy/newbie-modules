@@ -11,26 +11,16 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
+import {
+  DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
+  InstallationPresence,
+  isInstallationOnline,
+  withDerivedOnlineState,
+} from "@modules/security/installation/installation-presence";
 
 /** Probes flush roughly every 5s; three minutes without a batch marks stale. */
-export const ONLINE_THRESHOLD_SECONDS = 180;
-
-/**
- * Presence of the installations sharing one externalRef, normalized for the
- * platform-side per-facility dashboards. Several rows can share a ref (rotation
- * history, multiple instances):
- * - `enrolled` — at least one non-revoked installation exists.
- * - `online` — a non-revoked installation ingested within the online window.
- * - `lastSeenAt` — newest ingest time across the non-revoked installations
- *   (null until the first contact).
- * - `revokedOnly` — rows exist but every one is revoked.
- */
-export interface InstallationPresence {
-  enrolled: boolean;
-  online: boolean;
-  lastSeenAt: Date | null;
-  revokedOnly: boolean;
-}
+export const ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS;
 
 /** Audit resource type for installation credential events. */
 const AUDIT_RESOURCE_TYPE = "backend-monitor-installation";
@@ -52,17 +42,18 @@ interface BackendMonitorInstallationDraft {
  * (ADR-019); this class only adapts the table and projects domain state.
  */
 @Injectable()
-export class MonitorInstallationService {
+export class MonitorInstallationService extends BaseInstallationService<BackendMonitorInstallation> {
   private readonly credentials: InstallationCredentialStore<
     BackendMonitorInstallationDraft,
     BackendMonitorInstallation
   >;
-  private readonly tokenVerifier: InstallationTokenVerifier<BackendMonitorInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<BackendMonitorInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<BackendMonitorInstallationDraft, BackendMonitorInstallation>(
       this.prisma.backendMonitorInstallation,
     );
@@ -74,12 +65,7 @@ export class MonitorInstallationService {
   }
 
   private withDerivedState(row: BackendMonitorInstallation) {
-    const online =
-      !row.revokedAt &&
-      row.lastSeenAt != null &&
-      Date.now() - new Date(row.lastSeenAt).getTime() <= ONLINE_THRESHOLD_SECONDS * 1000;
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, online };
+    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
   }
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
@@ -121,7 +107,6 @@ export class MonitorInstallationService {
       where: { externalRef: { in: externalRefs } },
       select: { externalRef: true, lastSeenAt: true, revokedAt: true },
     });
-    const onlineThresholdMs = ONLINE_THRESHOLD_SECONDS * 1000;
     const now = Date.now();
     const presenceByRef = new Map<string, InstallationPresence>();
     for (const externalRef of externalRefs) {
@@ -136,7 +121,7 @@ export class MonitorInstallationService {
         if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
           lastSeenAt = row.lastSeenAt;
         }
-        if (row.lastSeenAt != null && now - row.lastSeenAt.getTime() <= onlineThresholdMs) {
+        if (row.lastSeenAt != null && isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
         }
       }
@@ -170,11 +155,6 @@ export class MonitorInstallationService {
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
     return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
-  }
-
-  /** Token-only authentication for the ingest endpoint. */
-  async resolveByToken(token: string) {
-    return this.tokenVerifier.verify(token);
   }
 
   /**

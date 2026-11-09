@@ -7,7 +7,7 @@ import {
   SendTextMessageCommandOutput,
 } from "@aws-sdk/client-pinpoint-sms-voice-v2";
 import { SendTextMessageParams } from "./aws-sms.interface";
-import { AwsCredentialsService } from "@modules/aws-identity/aws-credentials.service";
+import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 
 @Injectable()
 export class AwsSmsService {
@@ -16,7 +16,7 @@ export class AwsSmsService {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly credentials: AwsCredentialsService,
+    private readonly credentials: AwsCrossAccountBindingsService,
   ) {
     const config = this.configService.getOrThrow<{
       region: string;

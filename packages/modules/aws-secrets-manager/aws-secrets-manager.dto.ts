@@ -14,7 +14,16 @@ import {
   ValidateBy,
   ValidationOptions,
 } from "class-validator";
-import { SECRET_TYPES, SECRET_VALUE_TYPES, SecretType, SecretValueType } from "./aws-secrets-manager.types";
+import {
+  ENV_GROUP_MAX_VARS,
+  ENV_VAR_KEY_MAX_LENGTH,
+  ENV_VAR_KEY_PATTERN,
+  ENV_VAR_VALUE_MAX_LENGTH,
+  SECRET_TYPES,
+  SECRET_VALUE_TYPES,
+  SecretType,
+  SecretValueType,
+} from "./aws-secrets-manager.types";
 
 /** Default/maximum page size mirrors the AWS ListSecrets MaxResults ceiling. */
 export const DEFAULT_LIST_PAGE_SIZE = 100;
@@ -251,4 +260,98 @@ export class GetSecretValueResponseDto {
 export class DeleteSecretResponseDto {
   @ApiProperty({ description: "Name of the deleted secret" })
   name!: string;
+}
+
+// ─── Env group (one application = one group secret) ───────────────────────────
+
+/**
+ * Accepts a flat map of shell-style variable names to string values. Arrays,
+ * nested objects and non-string values are rejected; the group JSON contract
+ * keeps `env` directly injectable by a deployment process.
+ */
+export function IsEnvVarMap(validationOptions?: ValidationOptions): PropertyDecorator {
+  return ValidateBy(
+    {
+      name: "isEnvVarMap",
+      validator: {
+        validate: (value: unknown): boolean => {
+          if (typeof value !== "object" || value === null || Array.isArray(value)) {
+            return false;
+          }
+          const entries = Object.entries(value);
+          if (entries.length > ENV_GROUP_MAX_VARS) {
+            return false;
+          }
+          return entries.every(([key, val]) => {
+            return (
+              key.length <= ENV_VAR_KEY_MAX_LENGTH &&
+              ENV_VAR_KEY_PATTERN.test(key) &&
+              typeof val === "string" &&
+              val.length <= ENV_VAR_VALUE_MAX_LENGTH
+            );
+          });
+        },
+        defaultMessage: buildMessage(
+          (eachPrefix) =>
+            `${eachPrefix}$property must be a flat map of valid variable names to string values ` +
+            `(max ${ENV_GROUP_MAX_VARS} entries)`,
+        ),
+      },
+    },
+    validationOptions,
+  );
+}
+
+export class UpdateEnvGroupDto {
+  @ApiProperty({ description: "Project ID (resolves the AWS credential and region)" })
+  @IsString()
+  projectId!: string;
+
+  // eslint-disable-next-line @darraghor/nestjs-typed/validated-non-primitive-property-needs-type-decorator -- flat map enforced by IsEnvVarMap()
+  @ApiProperty({
+    description: "Complete env map for this group; replaces the previous map atomically",
+    type: "object",
+    additionalProperties: { type: "string" },
+  })
+  @IsDefined()
+  @IsEnvVarMap()
+  env!: Record<string, string>;
+
+  @ApiPropertyOptional({ description: "AWS region override (defaults to the credential default region)" })
+  @IsOptional()
+  @IsString()
+  region?: string;
+}
+
+export class EnvGroupResponseDto {
+  @ApiProperty({ description: "Composed secret name: nw/<projectId>/<groupId>/env" })
+  groupName!: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: "Secret ARN; null when the group does not exist yet",
+  })
+  arn?: string | null;
+
+  @ApiProperty({ description: "Whether the group secret exists in AWS Secrets Manager" })
+  exists!: boolean;
+
+  @ApiProperty({
+    description: "Flat env map; empty when the group does not exist yet",
+    type: "object",
+    additionalProperties: { type: "string" },
+  })
+  env!: Record<string, string>;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  lastChangedAt?: Date | null;
+
+  @ApiPropertyOptional({ type: Date, nullable: true })
+  createdAt?: Date | null;
+}
+
+export class DeleteEnvGroupResponseDto {
+  @ApiProperty({ description: "Composed secret name that was deleted" })
+  groupName!: string;
 }

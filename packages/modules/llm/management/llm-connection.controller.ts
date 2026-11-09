@@ -12,6 +12,8 @@ import {
   UpdateLlmConnectionDto,
 } from "./llm-connection.dto";
 import { LlmConnectionService } from "./llm-connection.service";
+import { assertSafeBaseUrl } from "./base-url-guard";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 const TEST_TIMEOUT_MS = 15_000;
 
@@ -78,6 +80,11 @@ export class LlmConnectionController {
     // row. A masked apiKey echo (edit form left untouched) is resolved to the
     // stored key via `id`.
     const apiKey = await this.connections.resolveTestApiKey(dto.id, dto.apiKey);
+    // The test probe is a server-side request to a value that is not persisted
+    // yet, so it must pass the same SSRF guard as create/update (R20-37).
+    if (dto.baseUrl) {
+      await assertSafeBaseUrl(dto.baseUrl);
+    }
     const port = this.resolver.createDraftPort({
       provider: dto.provider,
       model: dto.model,
@@ -95,7 +102,7 @@ export class LlmConnectionController {
       if (error instanceof ModelCallError) {
         return { success: false, message: testFailureMessage(error) };
       }
-      const message = error instanceof Error ? error.message : String(error);
+      const message = getErrorMessage(error);
       return { success: false, message };
     }
   }

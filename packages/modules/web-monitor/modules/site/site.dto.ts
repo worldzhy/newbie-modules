@@ -11,9 +11,6 @@ export class WebMonitorSiteResponseDto {
   @ApiProperty({ type: String, description: "System domain" })
   systemDomain!: string;
 
-  @ApiProperty({ type: String, description: "Owning Nightwatch project ID" })
-  projectId!: string;
-
   @ApiProperty({ type: String, description: "System display name" })
   systemName!: string;
 

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, PayloadTooLargeException } from "@nestjs/common";
 import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
+import { toClickHouseDateTime } from "@modules/clickhouse/clickhouse-datetime.util";
 import { computeErrorFingerprint } from "./error-fingerprint.util";
 import { MonitorTokenResolver, ResolvedMonitorToken } from "./monitor-token.resolver";
 import {
@@ -15,6 +16,11 @@ import {
 const ALLOWED_REQUEST_SORT_FIELDS = new Set(["path", "method", "status_code", "duration_ms", "request_at"]);
 /** Allowed sort fields for error logs. */
 const ALLOWED_ERROR_SORT_FIELDS = new Set(["type", "message", "path", "status_code", "occurred_at"]);
+
+/** ClickHouse ORDER BY direction for a validated query sort order. */
+function orderDirection(sortOrder: "asc" | "desc" | undefined): "ASC" | "DESC" {
+  return sortOrder === "asc" ? "ASC" : "DESC";
+}
 
 /** Accepted client-clock skew into the past. */
 const MAX_PAST_SKEW_MS = 60 * 60 * 1000; // 1 hour
@@ -60,11 +66,6 @@ export interface ErrorLogRow {
   ip: string;
   user_agent: string;
   occurred_at: string;
-}
-
-/** Formats a JS Date to a ClickHouse DateTime64 string (UTC). */
-function toClickHouseDate(date: Date): string {
-  return date.toISOString().replace("T", " ").replace("Z", "");
 }
 
 @Injectable()
@@ -155,8 +156,8 @@ export class BackendMonitorService {
       path: event.path,
       method: event.method.toUpperCase(),
       status_code: event.statusCode,
-      request_at: toClickHouseDate(safeRequestAt),
-      response_at: toClickHouseDate(safeResponseAt),
+      request_at: toClickHouseDateTime(safeRequestAt),
+      response_at: toClickHouseDateTime(safeResponseAt),
       duration_ms: durationMs,
       env,
       instance_id: instanceId,
@@ -195,7 +196,7 @@ export class BackendMonitorService {
       app_version: appVersion,
       ip: event.ip ?? "",
       user_agent: event.userAgent ?? "",
-      occurred_at: toClickHouseDate(safeOccurredAt),
+      occurred_at: toClickHouseDateTime(safeOccurredAt),
     };
   }
 
@@ -215,7 +216,7 @@ export class BackendMonitorService {
     pagination: { page: number; pageSize: number; countOfCurrentPage: number; countOfTotal: number };
   }> {
     const safeField = ALLOWED_REQUEST_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "request_at";
-    const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
+    const safeOrder = orderDirection(query.sortOrder);
     const keyword = query.keyword ? `%${query.keyword}%` : "%";
     const { page = 0, pageSize = 20 } = query;
 
@@ -271,7 +272,7 @@ export class BackendMonitorService {
     pagination: { page: number; pageSize: number; countOfCurrentPage: number; countOfTotal: number };
   }> {
     const safeField = ALLOWED_ERROR_SORT_FIELDS.has(query.sortField ?? "") ? query.sortField! : "occurred_at";
-    const safeOrder = query.sortOrder === "asc" ? "ASC" : "DESC";
+    const safeOrder = orderDirection(query.sortOrder);
     const keyword = query.keyword ? `%${query.keyword}%` : "%";
     const { page = 0, pageSize = 20 } = query;
 

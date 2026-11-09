@@ -23,6 +23,35 @@ export const SECRET_VALUE_TYPES = ["json", "text", "binary"] as const;
 
 export type SecretValueType = (typeof SECRET_VALUE_TYPES)[number];
 
+/**
+ * Env group contract (ADR-005 §4): one application owns exactly one secret
+ * holding its environment variables. The secret name encodes the project and
+ * the host grouping entity (groupId = host application id), so the AWS account
+ * itself enforces project isolation while the group id stays an opaque owner
+ * reference the module never interprets.
+ */
+export const ENV_GROUP_NAME_PREFIX = "nw";
+export const ENV_GROUP_NAME_SUFFIX = "env";
+/** Field inside the group JSON that carries the flat, injectable env map. */
+export const ENV_GROUP_ENV_FIELD = "env";
+/**
+ * Reserved key describing the rotation recipe (ADR-005 §5). It is preserved
+ * verbatim on every group write and is not exposed as an env variable.
+ */
+export const ENV_GROUP_ROTATION_FIELD = "__rotation";
+
+/** Composed secret name: nw/<projectId>/<groupId>/env. */
+export function envGroupSecretName(projectId: string, groupId: string): string {
+  return `${ENV_GROUP_NAME_PREFIX}/${projectId}/${groupId}/${ENV_GROUP_NAME_SUFFIX}`;
+}
+
+/** Shell-style variable name accepted inside a group. */
+export const ENV_VAR_KEY_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+export const ENV_VAR_KEY_MAX_LENGTH = 128;
+export const ENV_VAR_VALUE_MAX_LENGTH = 4096;
+/** Upper bound on variables per group (Secrets Manager 64 KB SecretString limit guard). */
+export const ENV_GROUP_MAX_VARS = 200;
+
 /** Audit resourceType carried by every secret audit row. */
 export const SECRET_AUDIT_RESOURCE_TYPE = "secret";
 
@@ -38,4 +67,7 @@ export const SECRET_AUDIT_EVENTS = {
   DELETED: "secret.deleted",
   ROTATED: "secret.rotated",
   ROTATION_CONFIGURED: "secret.rotation_configured",
+  ENV_GROUP_READ: "env_group.value_read",
+  ENV_GROUP_UPDATED: "env_group.updated",
+  ENV_GROUP_DELETED: "env_group.deleted",
 } as const;
