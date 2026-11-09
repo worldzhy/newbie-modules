@@ -1,5 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { parseRepositorySlug } from "@devbie/newbie/utilities/repository-url.util";
 
 /**
  * Thrown when the service has no usable credentials. Callers should gate on
@@ -45,9 +46,10 @@ export class BitbucketService {
    * Returns null for anything else (non-Bitbucket hosts, deeper paths, garbage).
    */
   parseBitbucketUrl(url: string): { workspace: string; repo: string } | null {
-    const match = url.trim().match(/bitbucket\.org[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
-    if (!match) return null;
-    return { workspace: match[1], repo: match[2] };
+    const slug = parseRepositorySlug(url);
+    if (!slug) return null;
+    if (!/bitbucket\.org/.test(url)) return null;
+    return { workspace: slug.owner, repo: slug.repo };
   }
 
   /**

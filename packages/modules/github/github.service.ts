@@ -4,6 +4,7 @@ import { Octokit } from "@octokit/rest";
 import { createAppAuth } from "@octokit/auth-app";
 import { delay } from "@devbie/newbie/utilities/delay.util";
 import { base64ToUtf8 } from "@devbie/newbie/utilities/base64.util";
+import { parseRepositorySlug } from "@devbie/newbie/utilities/repository-url.util";
 import { getErrorStatus } from "./error-status";
 
 /**
@@ -189,9 +190,10 @@ export class GitHubService {
    * Single parsing entry point for template URLs, provisioning and dep-scan.
    */
   parseGitHubUrl(url: string): { owner: string; repo: string } | null {
-    const match = url.trim().match(/github\.com[/:]([^/]+)\/([^/]+?)(?:\.git)?\/?$/i);
-    if (!match) return null;
-    return { owner: match[1], repo: match[2] };
+    const slug = parseRepositorySlug(url);
+    if (!slug) return null;
+    if (!/github\.com/.test(url)) return null;
+    return slug;
   }
 
   /**
