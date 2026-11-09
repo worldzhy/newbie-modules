@@ -116,7 +116,7 @@ C 层草案判定：现状主张 C1–C4 与支撑论证 P4 成立；方案主�
 | R15-05 | newbie-modules                      | aws-cloudformation `stack/stack.controller.ts:63`、`environment/environment.controller.ts:36` 以 `Prisma.*UncheckedCreateInput` 作 `@Body`（role-gated）                                                                           | P2     | artifact        | 具 Create 权限                  | fixed（`51821c4`：三个显式 DTO，删手写必填检查）                                              |
 | R13-03 | newbie-modules                      | 模块代码直读 `process.env` 且 manifest 未声明：tencent-cos `STORE_PATH`（未装配，同时违反准入标准）、account `ENVIRONMENT`（live）；`modules apply` 永不渲染进 `.env.example`                                                      | P2     | artifact / live | 部署时缺键                      | fixed（`51821c4` + 设计更正 `7974ac6`：`ENVIRONMENT` 保持框架级键、account 按宿主键读取，不再占 `account.*` 命名空间；tencent-cos 仅补声明） |
 
-carry-over 更新（2026-11-09）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转 fixed（见各轮表）；R5-P2-01/02/03/05/06/07 转 fixed；R6-13 转 fixed；仍 open：R5-P2-04（授权归属校验，DNS/超时已随 `cb6b068` 修）、R3-25。
+carry-over 更新（2026-11-09）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转 fixed（见各轮表）；R5-P2-01/02/03/05/06/07 转 fixed；R6-13 转 fixed。round30 复核订正（2026-11-09）：R5-P2-04 已随模块删除记 removed（`3ef7089`，见 `:30`），不再 open；R3-25 open 引用失真——前端测试现况 12 文件/109 用例全绿，按 round30 裁决关闭该引用。本注记自此无 open 项。
 
 误报剔除：R12-01 CH 侧毒丸向量（探针反驳）；registry CI pin 滞后（已升 1.18.0）。详见 devbie round15 报告 §7。
 
@@ -235,3 +235,5 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 ## round30（2026-11-09，scope=`workspace`，报告在 devbie `.trae/documents/expert-review-2026-11-09-round30.md`）
 
 本轮无涉及 registry 源码的 finding。台账订正项 R30-01（P2，docs）登记于 devbie findings.md round30 节，涉及本仓两点：①本文件 `:30`（R5-P2-04 removed）与 `:119`（carry-over 注记仍称 open）自相矛盾，需订正；②R3-25 open 引用失真（正文条目已不在本台账，前端测试缺口已被后续轮次覆盖）。装配一致性 34/34 diff 空、模块分层新规则零违规（9 处 ForbiddenException 逐点判定合规）。
+
+R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30` 口径统一（R5-P2-04 removed，不再 open）；② R3-25 open 引用按 round30 裁决关闭（前端 12 文件/109 用例全绿）。devbie 侧同步关闭 R28-06/R28-08 并删除 backlog R3-25 引用。
