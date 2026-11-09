@@ -44,9 +44,6 @@ export class WebReportController {
     let query: Record<string, unknown>;
     try {
       query = typeof body === "string" ? JSON.parse(body) : body;
-      if (req.headers["content-type"] && req.headers["content-type"].includes("text/plain")) {
-        query = JSON.parse(body as string);
-      }
     } catch {
       throw new BadRequestException("Invalid report payload");
     }

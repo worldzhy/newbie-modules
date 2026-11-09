@@ -35,11 +35,13 @@ export class WebCustomService {
     if (!id) throw new Error("Delete filter: _id must not be empty");
     if (!appKey) throw new Error("Delete filter: appKey must not be empty");
     const model = this.models.WebCustomFilter(appKey);
+    let existing: unknown;
     try {
-      await model.findOne({ _id: id }).exec();
+      existing = await model.findOne({ _id: id }).exec();
     } catch {
       throw new Error("Delete filter: _id does not exist");
     }
+    if (!existing) throw new Error("Delete filter: _id does not exist");
     try {
       await model.deleteOne({ _id: id }).exec();
       return true;

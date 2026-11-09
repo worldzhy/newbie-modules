@@ -65,7 +65,7 @@ test("getResourceForType scopes the match to url and a numeric speedType", async
   assert.deepEqual(pipelines[0][0].$match, { url: "/a.png", speedType: 4 });
 });
 
-test("getResourceForType applies the time range only when both bounds are given", async () => {
+test("getResourceForType applies each time bound independently", async () => {
   const both = newService();
   await both.service.getResourceForType("k", "/a", 1, 1, 15, "2026-11-01T00:00:00.000Z", "2026-11-02T00:00:00.000Z");
   const createTime = both.counts[0].createTime as { $gte: Date; $lte: Date };
@@ -74,7 +74,9 @@ test("getResourceForType applies the time range only when both bounds are given"
 
   const beginOnly = newService();
   await beginOnly.service.getResourceForType("k", "/a", 1, 1, 15, "2026-11-01T00:00:00.000Z");
-  assert.equal(beginOnly.counts[0].createTime, undefined, "a single bound must not become a half-range");
+  const halfRange = beginOnly.counts[0].createTime as { $gte: Date; $lte?: Date };
+  assert.equal(halfRange.$gte.toISOString(), "2026-11-01T00:00:00.000Z");
+  assert.equal(halfRange.$lte, undefined, "a lone begin bound must not become a two-sided range");
 });
 
 test("getResourceForType orders by recency inside skip/limit pagination", async () => {

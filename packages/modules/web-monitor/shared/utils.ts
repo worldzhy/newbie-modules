@@ -182,18 +182,22 @@ export const func = {
   },
   decryptPhone(str: unknown) {
     if (typeof str !== "string") return str;
-    let t = "";
-    return str
-      .split("")
-      .map((item) => {
-        t += item;
-        if (t.length === 2) {
-          const r = decryptP[t];
-          t = "";
-          return r;
-        }
-      })
-      .join("");
+    const out: string[] = [];
+    let pair = "";
+    for (const item of str.split("")) {
+      pair += item;
+      if (pair.length === 2) {
+        const digit = decryptP[pair];
+        pair = "";
+        // An unknown pair means the payload is not a valid encoded phone: fail
+        // the whole value instead of returning a silently truncated number.
+        if (digit === undefined) return undefined;
+        out.push(String(digit));
+      }
+    }
+    // A dangling odd character can never form a pair, so the value is invalid.
+    if (pair.length) return undefined;
+    return out.join("");
   },
   setMatchTime(query: Record<string, unknown>, $match: Record<string, unknown>) {
     const createTime: Record<string, unknown> = {};

@@ -136,11 +136,10 @@ test("getAverageErrorList spreads each aggregated row into its own _id", async (
   assert.deepEqual(row._id, { resourceUrl: "/a", count: 2 });
 });
 
-test("getAverageErrorList pins current behavior around absent filters", async () => {
-  // Documents current behavior, quirks included: a lone type filter still
-  // emits the IN clause; omitting type leaves where undefined but keeps the
-  // empty groupBy and the leading-comma select (suspected source bug, pinned
-  // as-is).
+test("getAverageErrorList omits grouping when no type filter is given", async () => {
+  // A lone type filter still emits the IN clause; omitting type keeps where
+  // undefined and drops the grouping entirely so the select list has no
+  // leading comma (valid ClickHouse SQL).
   const withType = newService();
   await withType.service.getAverageErrorList({ appKey: "k", type: "log" });
   const typedList = listQuery(withType.finds);
@@ -151,8 +150,8 @@ test("getAverageErrorList pins current behavior around absent filters", async ()
   await bare.service.getAverageErrorList({ appKey: "k" });
   const bareList = listQuery(bare.finds);
   assert.equal(bareList.where, undefined);
-  assert.equal(bareList.groupBy, "");
-  assert.match(String(bareList.select), /^, MAX\(createTime\)/);
+  assert.equal(bareList.groupBy, undefined);
+  assert.match(String(bareList.select), /^MAX\(createTime\)/);
 });
 
 test("getOneErrorList matches url, name, status and type exactly", async () => {

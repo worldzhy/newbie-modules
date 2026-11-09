@@ -221,9 +221,9 @@ test("decryptPhone passes non-strings through untouched", () => {
   assert.equal(func.decryptPhone(undefined), undefined);
 });
 
-test("decryptPhone drops unknown pairs and trailing odd characters", () => {
-  assert.equal(func.decryptPhone("QRzz"), "0");
-  assert.equal(func.decryptPhone("QRi"), "0");
+test("decryptPhone rejects unknown pairs and trailing odd characters", () => {
+  assert.equal(func.decryptPhone("QRzz"), undefined);
+  assert.equal(func.decryptPhone("QRi"), undefined);
 });
 
 test("setMatchTime maps beginTime and endTime onto $match.createTime", () => {

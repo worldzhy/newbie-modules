@@ -167,7 +167,7 @@ test("getPvUvIpSurveyOne reads the today's count from Redis when the range cover
   const { service, redisCalls, mongoCalls } = buildService({ findOneRow: doc, todayNum: "42" });
   const begin = new Date(Date.now() - 3_600_000);
   const end = new Date(Date.now() + 3_600_000);
-  const result = await service.getPvUvIpSurveyOne(APP_KEY, begin, end);
+  const result = (await service.getPvUvIpSurveyOne(APP_KEY, begin, end)) as unknown as Record<string, unknown>;
   assert.equal(result.num, "42");
   assert.equal(result.pv, 5);
   assert.equal(redisCalls[0].today, new Date(func.format(new Date(), "yyyy/MM/dd")).getTime());
@@ -179,7 +179,7 @@ test("getPvUvIpSurveyOne reads the day report from Mongo for a past range", asyn
   const { service, redisCalls, mongoCalls } = buildService({ findOneRow: doc, dayNum: { num: 7 } });
   const begin = new Date(2020, 0, 10, 0, 0, 0);
   const end = new Date(2020, 0, 10, 23, 59, 59);
-  const result = await service.getPvUvIpSurveyOne(APP_KEY, begin, end);
+  const result = (await service.getPvUvIpSurveyOne(APP_KEY, begin, end)) as unknown as Record<string, unknown>;
   assert.equal(result.num, 7);
   assert.equal(redisCalls.length, 0);
   assert.deepEqual(mongoCalls[0], { appKey: APP_KEY, begin, end });
@@ -188,7 +188,11 @@ test("getPvUvIpSurveyOne reads the day report from Mongo for a past range", asyn
 test("getPvUvIpSurveyOne defaults a missing day report to 0", async () => {
   const doc = { toObject: () => ({ appKey: APP_KEY }) };
   const { service } = buildService({ findOneRow: doc, dayNum: null });
-  const result = await service.getPvUvIpSurveyOne(APP_KEY, new Date(2020, 0, 10), new Date(2020, 0, 10, 23, 59, 59));
+  const result = (await service.getPvUvIpSurveyOne(
+    APP_KEY,
+    new Date(2020, 0, 10),
+    new Date(2020, 0, 10, 23, 59, 59),
+  )) as unknown as Record<string, unknown>;
   assert.equal(result.num, 0);
 });
 

@@ -147,7 +147,7 @@ test("getAveragePageList maps beginTime/endTime onto createTime and coerces the 
   assert.equal(createTime.$lte.toISOString(), "2026-11-02T00:00:00.000Z");
 });
 
-test("getRealTimeAveragePageList always matches first-in page loads", async () => {
+test("getRealTimeAveragePageList matches first-in page loads inside the time window", async () => {
   const { service, pipelines } = newService();
   await service.getRealTimeAveragePageList({
     appKey: "k",
@@ -155,7 +155,12 @@ test("getRealTimeAveragePageList always matches first-in page loads", async () =
     beginTime: "2026-11-05T00:00:00.000Z",
     endTime: "2026-11-05T00:01:00.000Z",
   });
-  assert.deepEqual(pipelines[0][0].$match, { isFirstIn: true, speedType: 4 });
+  const match = pipelines[0][0].$match as Record<string, unknown>;
+  assert.equal(match.isFirstIn, true);
+  assert.equal(match.speedType, 4);
+  const createTime = match.createTime as { $gte: Date; $lte: Date };
+  assert.equal(createTime.$gte.toISOString(), "2026-11-05T00:00:00.000Z");
+  assert.equal(createTime.$lte.toISOString(), "2026-11-05T00:01:00.000Z");
 });
 
 test("getRealTimeAveragePageList returns one zero-filled bucket per minute", async () => {
@@ -220,7 +225,7 @@ test("getOnePageList maps the isFirstIn representations", async () => {
   assert.equal(bool.counts[0].isFirstIn, true);
 });
 
-test("getOnePageList applies the time range only when both bounds are given", async () => {
+test("getOnePageList applies each time bound independently", async () => {
   const both = newService();
   await both.service.getOnePageList({
     appKey: "k",
@@ -234,7 +239,9 @@ test("getOnePageList applies the time range only when both bounds are given", as
 
   const beginOnly = newService();
   await beginOnly.service.getOnePageList({ appKey: "k", url: "/a", beginTime: "2026-11-01T00:00:00.000Z" });
-  assert.equal(beginOnly.counts[0].createTime, undefined, "a single bound must not become a half-range");
+  const halfRange = beginOnly.counts[0].createTime as { $gte: Date; $lte?: Date };
+  assert.equal(halfRange.$gte.toISOString(), "2026-11-01T00:00:00.000Z");
+  assert.equal(halfRange.$lte, undefined, "a lone begin bound must not become a two-sided range");
 });
 
 test("getOnePageList paginates raw rows by recency", async () => {

@@ -24,7 +24,7 @@ export class ResourceService {
     endTime?: string,
   ) {
     const match: Record<string, unknown> = { url, speedType: Number(speedType) };
-    if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
+    func.setMatchTime({ beginTime, endTime }, match);
     const count = await this.models.WebResource(appKey).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models
       .WebResource(appKey)
@@ -78,7 +78,7 @@ export class ResourceService {
 
   async getOneResourceAvg(appKey: string, url: string, beginTime?: string, endTime?: string) {
     const match: Record<string, unknown> = { name: url };
-    if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
+    func.setMatchTime({ beginTime, endTime }, match);
     const rows = await this.models
       .WebResource(appKey)
       .aggregate([
@@ -99,7 +99,7 @@ export class ResourceService {
     endTime?: string,
   ) {
     const match: Record<string, unknown> = { name: url };
-    if (beginTime && endTime) match.createTime = { $gte: new Date(beginTime), $lte: new Date(endTime) };
+    func.setMatchTime({ beginTime, endTime }, match);
     const count = await this.models.WebResource(appKey).count(match).read("secondaryPreferred").exec();
     const dataList = await this.models
       .WebResource(appKey)

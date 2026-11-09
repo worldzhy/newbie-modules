@@ -239,9 +239,9 @@ export class JobsService implements OnModuleInit {
       { category: "css", types: ["link", "css"], thresholdSeconds: system.slowCssTime ?? 2 },
       { category: "img", types: ["img"], thresholdSeconds: system.slowImgTime ?? 2 },
     ];
-    const resourceModel = this.models.WebResource(system.appKey);
     for (const { category, types, thresholdSeconds } of categories) {
       await this.runSignal(`slow ${category} resources`, async () => {
+        const resourceModel = this.models.WebResource(system.appKey);
         const match = { createTime: { $gte: windowStart, $lt: windowEnd }, type: { $in: types } };
         const [count, topRows] = await Promise.all([
           resourceModel.countDocuments(match),

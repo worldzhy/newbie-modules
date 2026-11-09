@@ -36,7 +36,7 @@ export class PvuvipService {
       const obj = JSON.parse(JSON.stringify(item));
       if (item.createTime) {
         const num = await this.dayReportNum.getDayFromMongo(item.appKey, item.createTime, item.createTime);
-        obj.num = num?.num;
+        obj.num = num?.num ?? 0;
       }
       return obj;
     });

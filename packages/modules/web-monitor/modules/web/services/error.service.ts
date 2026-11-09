@@ -76,11 +76,20 @@ export class ErrorService {
     else if (type === "bussiness-ajax|bussiness-fetch") groupBy = "resourceUrl,status,type";
     else if (type === "log") groupBy = "resourceUrl,type";
 
-    const countQuery = model.find([{ where, groupBy, select: "COUNT()", queryParams }, { select: "count() as total" }]);
+    // An absent or unrecognized type leaves groupBy empty; an empty grouping
+    // prefix would emit a leading comma in the select list (invalid SQL) and an
+    // empty GROUP BY clause, so the aggregate degrades to one ungrouped row.
+    const listSelect = groupBy
+      ? `${groupBy}, MAX(createTime) AS lastCreateTime,COUNT() AS count,COUNT(DISTINCT markUser) AS userNum,groupArray(msg)[1] AS lastMsg`
+      : "MAX(createTime) AS lastCreateTime,COUNT() AS count,COUNT(DISTINCT markUser) AS userNum,groupArray(msg)[1] AS lastMsg";
+    const countQuery = model.find([
+      { where, groupBy: groupBy || undefined, select: "COUNT()", queryParams },
+      { select: "count() as total" },
+    ]);
     const listQuery = model.find({
       where,
-      select: `${groupBy}, MAX(createTime) AS lastCreateTime,COUNT() AS count,COUNT(DISTINCT markUser) AS userNum,groupArray(msg)[1] AS lastMsg`,
-      groupBy,
+      select: listSelect,
+      groupBy: groupBy || undefined,
       limit: Number(pageSize),
       skip: (pageNo - 1) * Number(pageSize),
       orderBy: "count DESC",

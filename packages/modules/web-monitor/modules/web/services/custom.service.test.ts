@@ -167,6 +167,11 @@ test("delCustomFilter maps a lookup failure to a not-exist error", async () => {
   await assert.rejects(service.delCustomFilter("app1", "bad-id"), { message: "Delete filter: _id does not exist" });
 });
 
+test("delCustomFilter rejects a missing document", async () => {
+  const { service } = buildService({ findOneResult: null });
+  await assert.rejects(service.delCustomFilter("app1", "id1"), { message: "Delete filter: _id does not exist" });
+});
+
 test("delCustomFilter maps a delete failure to a deletion-failed error", async () => {
   const { service } = buildService({ findOneResult: { _id: "id1" }, deleteOneError: new Error("write concern") });
   await assert.rejects(service.delCustomFilter("app1", "id1"), { message: "Delete filter: deletion failed" });

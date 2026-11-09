@@ -132,7 +132,7 @@ test("numCountTask folds yesterday's counters into Mongo and clears them", async
 
 test("getDayFromMongo queries the day range with a minimal projection", async () => {
   const h = harness({ dayRow: { num: 5, dayTime: new Date("2026-11-03 00:00:00") } });
-  const row = (await h.service.getDayFromMongo("APP1", "2026-11-01", "2026-11-09")) as Row;
+  const row = (await h.service.getDayFromMongo("APP1", "2026-11-01", "2026-11-09")) as unknown as Row;
   assert.equal(row.num, 5);
   assert.deepEqual(h.readModes, ["secondaryPreferred"]);
   assert.equal(h.findOneCalls.length, 1);

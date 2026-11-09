@@ -77,11 +77,13 @@ test("the pipeline matches the url, sorts by count descending, and caps at 10 ro
   assert.deepEqual(result, [{ _id: {}, count: 3 }]);
 });
 
-test("a createTime bound is only added when both beginTime and endTime are given", async () => {
+test("each createTime bound is applied independently", async () => {
   const { service, calls } = buildService();
   await service.getDataGroupBy(1, "u", "app1", "2026-01-01T00:00:00.000Z");
   let match = calls[0].pipeline[0].$match as Record<string, unknown>;
-  assert.ok(!("createTime" in match), "a single-sided bound must not produce a createTime filter");
+  const beginOnly = match.createTime as { $gte: Date; $lte?: Date };
+  assert.equal(beginOnly.$gte.toISOString(), "2026-01-01T00:00:00.000Z");
+  assert.equal(beginOnly.$lte, undefined, "a lone begin bound must not become a two-sided range");
   await service.getDataGroupBy(1, "u", "app1", "2026-01-01T00:00:00.000Z", "2026-01-02T00:00:00.000Z");
   match = calls[1].pipeline[0].$match as Record<string, unknown>;
   assert.deepEqual(match.createTime, {

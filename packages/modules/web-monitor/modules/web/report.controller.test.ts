@@ -121,13 +121,12 @@ test("rejects a payload that parses to a non-object", async () => {
   assert.equal(h.lpushCalls.length, 0);
 });
 
-test("an object body under a text/plain content type cannot be re-parsed and is rejected", async () => {
+test("an object body under a text/plain content type is accepted as-is", async () => {
   const h = harness();
   const headers = { "content-type": "text/plain" };
-  await assert.rejects(
-    () => h.controller.webReport(req(headers) as never, headers, { type: "PagePerf" } as never),
-    (error) => error instanceof BadRequestException && error.message === "Invalid report payload",
-  );
+  const result = await h.controller.webReport(req(headers) as never, headers, { type: "PagePerf" } as never);
+  assert.equal(result, "ok");
+  assert.equal(lastPayload(h).type, "PagePerf");
 });
 
 test("a client-supplied appKey is overwritten by the token's appKey", async () => {
@@ -141,7 +140,7 @@ test("a client-supplied appKey is overwritten by the token's appKey", async () =
 
 test("the client ip resolves from x-real-ip, then the x-forwarded-for first hop, then the socket ip", async () => {
   const withRealIp = harness();
-  let headers = { "x-real-ip": "1.1.1.1" };
+  let headers: Record<string, string> = { "x-real-ip": "1.1.1.1" };
   await withRealIp.controller.webReport(req(headers) as never, headers, {} as never);
   assert.equal(lastPayload(withRealIp).ip, "1.1.1.1");
 
