@@ -5,9 +5,8 @@ import type {
   EvaluationEvidenceItem,
   EvaluationFindingCandidate,
   EvaluationFindingSeverity,
-  EvaluationJudgment,
 } from "@modules/evaluation/ports/evaluation.contracts";
-import type { JudgmentInput } from "@modules/evaluation/ports/judgment.port";
+import type { EvaluationJudgment, JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
 import {
   SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET,
