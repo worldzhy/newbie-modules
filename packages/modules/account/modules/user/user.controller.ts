@@ -52,10 +52,11 @@ export class UserController {
   async createUser(@Body() body: CreateUserDto, @Req() request: UserRequest) {
     const { roles, ...scalarFields } = body;
 
-    // A caller may only hand out roles it already holds; otherwise a custom
-    // role that merely carries "Create User" could mint an ADMIN account.
+    // A caller may only hand out roles whose permissions it already holds;
+    // otherwise a custom role that merely carries "Create User" could mint an
+    // ADMIN account.
     if (roles && roles.length > 0) {
-      this.assertGrantableRoles(roles, request.user.roles ?? []);
+      await this.assertGrantableRoles(roles, request.user.roles ?? []);
     }
 
     // Resolve role names to Role rows for the UserRole join table.
@@ -206,7 +207,7 @@ export class UserController {
         );
       }
 
-      this.assertGrantableRoles(roles, callerRoles);
+      await this.assertGrantableRoles(roles, callerRoles);
 
       const roleRows = await this.prisma.role.findMany({
         where: { name: { in: roles } },
@@ -321,11 +322,70 @@ export class UserController {
     return updated;
   }
 
-  /** Reject any role the caller does not hold, so permissions cannot be escalated. */
-  private assertGrantableRoles(requested: string[], callerRoles: string[]): void {
-    const missing = requested.filter((name) => !callerRoles.includes(name));
-    if (missing.length > 0) {
-      throw new ForbiddenException(`You cannot grant roles you do not hold: ${missing.join(", ")}.`);
+  /**
+   * A caller may only hand out permissions it already holds, so a custom role
+   * that merely carries "Create User" cannot mint an ADMIN account.
+   *
+   * The comparison is over effective permission atoms — the same union the
+   * permission authorizer evaluates (Role → Permission ∪ Role →
+   * RolePermissionGroup → PermissionGroup → PermissionGroupPermission) — not
+   * over role names. Atoms express the actual security property ("you cannot
+   * grant what you do not have") and stay correct for the superuser role, which
+   * holds every atom through the derived "All" group without holding every role.
+   */
+  private async assertGrantableRoles(requested: string[], callerRoles: string[]): Promise<void> {
+    if (requested.length === 0) return;
+
+    const roleNames = [...new Set([...requested, ...callerRoles])];
+    const roles = await this.prisma.role.findMany({
+      where: { name: { in: roleNames } },
+      select: {
+        name: true,
+        permissions: { select: { action: true, resource: true } },
+        rolePermissionGroups: {
+          select: {
+            permissionGroup: {
+              select: { permissions: { select: { action: true, resource: true } } },
+            },
+          },
+        },
+      },
+    });
+
+    const atomsByRole = new Map<string, Set<string>>();
+    for (const role of roles) {
+      const atoms = new Set<string>();
+      for (const permission of role.permissions) {
+        atoms.add(`${permission.action}:${permission.resource}`);
+      }
+      for (const binding of role.rolePermissionGroups) {
+        for (const permission of binding.permissionGroup.permissions) {
+          atoms.add(`${permission.action}:${permission.resource}`);
+        }
+      }
+      atomsByRole.set(role.name, atoms);
+    }
+
+    const callerAtoms = new Set<string>();
+    for (const name of callerRoles) {
+      for (const atom of atomsByRole.get(name) ?? []) callerAtoms.add(atom);
+    }
+
+    const ungrantable = requested.filter((name) => {
+      const atoms = atomsByRole.get(name);
+      // An unknown role is not a role the caller holds either; reject it here
+      // rather than silently creating the user without it.
+      if (!atoms) return true;
+      for (const atom of atoms) {
+        if (!callerAtoms.has(atom)) return true;
+      }
+      return false;
+    });
+
+    if (ungrantable.length > 0) {
+      throw new ForbiddenException(
+        `You cannot grant roles whose permissions you do not hold: ${ungrantable.join(", ")}.`,
+      );
     }
   }
 
