@@ -231,3 +231,7 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 | R29-06 | newbie-modules | notification-center README 只写 `NOTIFICATION_PUSH_PORT`，9634316 后 `NOTIFICATION_VISIBILITY_PORT` 变为必需（不绑定启动失败），文档缺口 | P3 | docs | — | fixed（2026-11-09，registry `ef00afb`）：Concepts 增 `NotificationVisibilityPort`（required，无 `@Optional`），Configuration 段说明两端口必需/可选差异 |
 | R29-07 | newbie-modules | approved-subnet.service.ts:57/59、api-key.service.ts:100/101 存在性探测残留：不存在 404、他人资源 403，可区分行存在性（数字 ID 可枚举），与 20bf920 统一 403 目标矛盾 | P3 | live | — | fixed（2026-11-09，registry `ef00afb` / 宿主装配 `47a9e82`）：改 `findFirst({ id, userId })`，缺失与他人资源同为 403 同文案；运行时冒烟 api-keys/approved-subnets 不存在 id 均 403 |
 | R29-08 | newbie-modules | llm `base-url-guard.ts:37` SSRF 谓词小缺口：裸 IPv4-compatible `::7f00:1` 不在 BLOCKED；NAT64 `64:ff9b::/96` 未列（现代栈不路由，可利用性低） | P3 | live | — | fixed（2026-11-09，registry `ef00afb` / 宿主装配 `47a9e82`）：BLOCKED 增 `::/96` 与 `64:ff9b::/96`；dist 实测 `::7f00:1`、`64:ff9b::7f00:1`、`::ffff:127.0.0.1` 全拒、公网域名放行 |
+
+## round30（2026-11-09，scope=`workspace`，报告在 devbie `.trae/documents/expert-review-2026-11-09-round30.md`）
+
+本轮无涉及 registry 源码的 finding。台账订正项 R30-01（P2，docs）登记于 devbie findings.md round30 节，涉及本仓两点：①本文件 `:30`（R5-P2-04 removed）与 `:119`（carry-over 注记仍称 open）自相矛盾，需订正；②R3-25 open 引用失真（正文条目已不在本台账，前端测试缺口已被后续轮次覆盖）。装配一致性 34/34 diff 空、模块分层新规则零违规（9 处 ForbiddenException 逐点判定合规）。

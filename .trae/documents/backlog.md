@@ -67,3 +67,19 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 - [ ] `models/mongo/web-monitor-models.service.ts`（集合命名契约）无法单测：tsx 运行时不发 emitDecoratorMetadata，Mongoose schema 模块在测试中无法加载（`@Prop` 抛 CannotDetermineTypeError）；`import "reflect-metadata"` 与 `--tsconfig` 均无效，`mock.module` 需实验 flag 不能进 `npm test`。若未来切换测试运行时（如 ts-node/vitest 编译模式），可补回该文件测试。
 - [ ] `services/web-token.resolver.ts` throttle 间隔到期后再次触达的方向未覆盖：`InstallationTouchThrottle` 实例私有且时钟取 `Date.now()`，不改源码注入时钟则不可达。
 - [ ] `report.controller` consume 关闭分支（`is_web_consume_task_run`）不可测：`web-monitor-config.ts` 为代码常量不可注入。
+
+## round30 评审入账（2026-11-09，workspace scope）
+
+> 来源：devbie `.trae/documents/expert-review-2026-11-09-round30.md`；台账见 devbie `findings.md` round30 节与同目录 `findings.md` 引用行。
+
+- [ ] `[R30-04]` **url-check IPv6 SSRF 谓词补 `::/96` + `64:ff9b::/96`（P2，本仓为真源）**：`packages/modules/url-check/public-url.ts:65-91` 仅覆盖 `::ffff:` 映射，裸 IPv4-compatible（`::7f00:1`）与 NAT64（`64:ff9b::7f00:1`）双层校验均放行；R29-08 已为 llm guard 修复同款缺口（`::7f00:1` 实测全拒），两份实现谓词漂移。修复后与 nightwatch-backend 装配侧同步（diff 为空），并按 R29-08 方式跑 dist 级探针独立验证。
+- [ ] `[R30-01]` **本仓 findings.md 台账订正（P2，docs）**：`:30`（R5-P2-04 removed，webhook 模块 2026-11-09 删除）与 `:119`（carry-over 注记仍称 open）自相矛盾，统一为 removed；R3-25 open 引用同步裁决关闭（前端测试现况 12 文件/109 用例全绿）。
+- [ ] `[R30-02 待拍板]` ClickHouseModel 原始插值面收敛（P3，真源在本仓 `packages/modules/clickhouse/clickhouse.model.ts:41,62-72`）：待拍板加标识符白名单入口（API 层）或仅 API 约束注释（文档层）。
+
+## round31 backlog 核对入账（2026-11-09，plan scope）
+
+> 来源：devbie `.trae/documents/expert-review-2026-11-09-round31.md`（scope = 6 份 backlog 的声明清单）。
+
+- [ ] `[R31-13]` **本文件 `:17`「registry 唯一 package-lock」计数不实（P3）**：实测 2 个（仓根 + `packages/modules/message-tracker/sst/`，`find -name package-lock.json -not -path '*/node_modules/*'`）；改为「根与 sst 各一」。
+- [ ] `[R31-17]` **本文件 `:25`「`modules.config.ts` 49 处 process.env」计数不实（P3）**：实测 46（`grep -c 'process.env' nightwatch-backend/src/modules/modules.config.ts`）；「无 fallback」部分成立。
+- [x] `[R31-20 备注]` `:41` event-emitter「默认 30 天」表述偏松：代码为 `getOrThrow`（未配置抛错），30 仅 `.env` 与 manifest `example`，非代码默认。
