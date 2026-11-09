@@ -53,3 +53,24 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 > 来源：本会话对 credentialRef 交付（registry `c87ad2c` / backend `842e62e` / frontend `a08edde`）的评审；5 条问题经 2 个独立探针确认。问题 1、2 属宿主层，见 nightwatch-backend backlog 同日条目。
 
 - [x] `[SE-CRED-03]` **unevaluable 桶不覆盖悬空引用（minor，建议只补文档）**：`packages/modules/security-evaluation/reporting/security-evaluation-report.service.ts` L100-105 仅判 `!subject.credentialRef`；模块对引用不透明、无法解析绑定是否存在。结论：不改代码——provider 只枚举 live binding，悬空引用属退役 subject 的瞬态，run 时会以 subject 级失败暴露。若要固化，在 ADR-039 或 report 注释写明"悬空引用 = run-time skipped，不是 unevaluable"。**fixed（2026-11-09，`b48d9bf`）**：报告注释已写明 dangling ref 与 unevaluable 的分工。
+
+
+## web-monitor 行为测试补写中发现的疑似源码缺陷（2026-11-09 入账）
+
+> 来源：web-monitor 全功能行为测试补写（registry `54fb7d5` / backend `11442d6`，278 例全绿）。各代理沿源码取证，均为"测试已固化现状、源码未动"的疑似项，待用户逐条拍板是否修复。
+
+- [ ] `modules/web/services/error.service.ts` `getAverageErrorList`：type 为空或不在五种已知值时 groupBy 残留 `""`，聚合 select 以 `, MAX(createTime)...` 前导逗号开头，形成畸形 SQL，无兜底。
+- [ ] `modules/web/services/page.service.ts` `getRealTimeAveragePageList`：beginTime/endTime 从不进入 `$match`，聚合无条件扫全表再按分钟分桶，时间窗只用于产桶不用于过滤。
+- [ ] 时间界口径不一致：`resource.service`（getResourceForType/getOneResourceAvg/getOneResourceList）与 `page.service`（getOnePageList）、`environment.service`（getDataGroupBy）要求 begin+end 双边才生效、单边静默丢弃；`analysis.service`/`custom.service`/`resource.service.getAverageResourceList` 支持单边。建议统一。
+- [ ] `modules/web/services/custom.service.ts` `delCustomFilter`：`findOne` 返回 null（文档不存在）时不报错，继续 `deleteOne` 并返回 true——"不存在"语义只在 findOne 抛错时触发。
+- [ ] `modules/web/services/pvuvip.service.ts` `getHistoryPvUvIplist`：无日报时 `num` 为 `undefined`，而 `getHistoryPvUvIplistByRange` 默认 0，口径不一致。
+- [ ] `modules/web/services/analysis.service.ts`：构造中读取的 `this.cfg` 从未使用（top limit 走代码常量 `top_alalysis_size.web`）。
+- [ ] `modules/jobs/jobs.service.ts` L242：`WebResource(appKey)` 在 `runSignal` 保护之外，抛错会中止该系统后续所有 signal（仅靠 per-system catch 兜底），与其余 signal 的隔离粒度不一致。
+- [ ] `modules/web/report.controller.ts`：对象体 + `content-type: text/plain` 会被 `JSON.parse("[object Object]")` 拒绝为 400（测试已钉为现状合约）；sendBeacon 场景体恒为字符串，正常路径不受影响。
+- [ ] `shared/utils.ts` `decryptPhone`：未知字符对/奇数尾字符被静默丢弃，产生错位/截断的解码结果（测试已固化现状，是否属缺陷待确认）。
+
+## web-monitor 测试覆盖已知缺口（2026-11-09 入账）
+
+- [ ] `models/mongo/web-monitor-models.service.ts`（集合命名契约）无法单测：tsx 运行时不发 emitDecoratorMetadata，Mongoose schema 模块在测试中无法加载（`@Prop` 抛 CannotDetermineTypeError）；`import "reflect-metadata"` 与 `--tsconfig` 均无效，`mock.module` 需实验 flag 不能进 `npm test`。若未来切换测试运行时（如 ts-node/vitest 编译模式），可补回该文件测试。
+- [ ] `services/web-token.resolver.ts` throttle 间隔到期后再次触达的方向未覆盖：`InstallationTouchThrottle` 实例私有且时钟取 `Date.now()`，不改源码注入时钟则不可达。
+- [ ] `report.controller` consume 关闭分支（`is_web_consume_task_run`）不可测：`web-monitor-config.ts` 为代码常量不可注入。
