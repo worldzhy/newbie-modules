@@ -9,6 +9,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 import { GetChatHistoryRequestDto, SendTextDto, SendCardDto, UpdateCardDto } from "./lark.dto";
 import { decryptLarkEvent } from "./lark-event.util";
 import { parseMessage, resolveSenderOpenId } from "./lark-message-parser";
@@ -155,7 +156,7 @@ export class LarkService {
       }
       return res.data;
     } catch (error) {
-      this.logger.error("Error fetching chat history", error);
+      this.logger.error(`Error fetching chat history: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -185,7 +186,7 @@ export class LarkService {
       try {
         decrypted = decryptLarkEvent(encryptKey, body.encrypt);
       } catch (error) {
-        this.logger.error("Failed to decrypt Lark webhook event", error);
+        this.logger.error(`Failed to decrypt Lark webhook event: ${getErrorMessage(error)}`);
         return { code: 0, msg: "success" };
       }
       return this.handleWebhook(decrypted as LarkWebhookBody);
@@ -227,7 +228,7 @@ export class LarkService {
           });
           if (result) return result;
         } catch (error) {
-          this.logger.error("Error processing card action", error);
+          this.logger.error(`Error processing card action: ${getErrorMessage(error)}`);
         }
       }
       return { code: 0, msg: "success" };
@@ -267,7 +268,7 @@ export class LarkService {
           messageId: message.message_id,
         });
       } catch (error) {
-        this.logger.error("Error processing message from webhook", error);
+        this.logger.error(`Error processing message from webhook: ${getErrorMessage(error)}`);
       }
     }
 
@@ -338,7 +339,7 @@ export class LarkService {
         });
         return result ?? undefined;
       } catch (error) {
-        this.logger.error("Error processing card action", error);
+        this.logger.error(`Error processing card action: ${getErrorMessage(error)}`);
       }
     }
     return undefined;
@@ -382,7 +383,7 @@ export class LarkService {
       }
       return res.data;
     } catch (error) {
-      this.logger.error("Error sending text message", error);
+      this.logger.error(`Error sending text message: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -405,7 +406,7 @@ export class LarkService {
       }
       return res.data;
     } catch (error) {
-      this.logger.error("Error sending card message", error);
+      this.logger.error(`Error sending card message: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -428,7 +429,7 @@ export class LarkService {
       }
       return res.data;
     } catch (error) {
-      this.logger.error("Error updating card message", error);
+      this.logger.error(`Error updating card message: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -444,7 +445,7 @@ export class LarkService {
       }
       return res.data?.items?.[0];
     } catch (error) {
-      this.logger.error(`Error fetching message content for ID: ${messageId}`, error);
+      this.logger.error(`Error fetching message content for ID: ${messageId}: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -475,7 +476,7 @@ export class LarkService {
       }
       return members;
     } catch (error) {
-      this.logger.error(`Error fetching members for chat ID: ${chatId}`, error);
+      this.logger.error(`Error fetching members for chat ID: ${chatId}: ${getErrorMessage(error)}`);
       throw error;
     }
   }
@@ -513,7 +514,7 @@ export class LarkService {
       }
       return chats;
     } catch (error) {
-      this.logger.error("Error listing bot chats", error);
+      this.logger.error(`Error listing bot chats: ${getErrorMessage(error)}`);
       throw error;
     }
   }

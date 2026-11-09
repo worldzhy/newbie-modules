@@ -1,6 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
+import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 import { LarkService } from "./lark.service";
 
 /**
@@ -73,7 +74,9 @@ export class LarkWebSocketService implements OnModuleInit, OnModuleDestroy {
                 messageId: message.message_id,
               });
             } catch (error) {
-              this.logger.error(`[WebSocket] Error dispatching message ${message.message_id}`, error);
+              this.logger.error(
+                `[WebSocket] Error dispatching message ${message.message_id}: ${getErrorMessage(error)}`,
+              );
             }
           },
           "card.action.trigger": async (data) => {
@@ -98,7 +101,7 @@ export class LarkWebSocketService implements OnModuleInit, OnModuleDestroy {
 
       this.logger.log("Lark WebSocket Client started successfully.");
     } catch (error) {
-      this.logger.error("Failed to start Lark WebSocket Client", error);
+      this.logger.error(`Failed to start Lark WebSocket Client: ${getErrorMessage(error)}`);
     }
   }
 
