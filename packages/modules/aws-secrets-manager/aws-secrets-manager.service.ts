@@ -6,6 +6,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
@@ -296,6 +297,91 @@ export class AwsSecretsManagerService {
     return this.getEnvGroup(params.projectId, params.groupId, region);
   }
 
+  /**
+   * Merge platform-managed variables (installations tokens/endpoints) into the
+   * env group without touching custom user variables. `set` keys overwrite
+   * existing values; `remove` keys are deleted from the env map. The reserved
+   * `__rotation` field is always preserved. This is the single write path for
+   * installation credential issuance/rotation — callers never touch the full
+   * env map, only the platform-owned keys.
+   */
+  async mergePlatformEnvVars(params: {
+    projectId: string;
+    groupId: string;
+    set?: Record<string, string>;
+    remove?: string[];
+    region?: string;
+  }): Promise<EnvGroupSnapshot> {
+    const groupName = envGroupSecretName(params.projectId, params.groupId);
+    const { client, region } = await this.getProjectContext(params.projectId, params.region);
+    const existing = await this.describeOptionalManagedSecret(client, groupName);
+
+    let currentEnv: Record<string, string> = {};
+    let rotation: unknown;
+    if (existing) {
+      const document = await this.readGroupDocument(client, groupName);
+      currentEnv = document.env;
+      rotation = document.rotation;
+    }
+
+    const nextEnv = { ...currentEnv };
+    if (params.set) {
+      Object.assign(nextEnv, params.set);
+    }
+    if (params.remove?.length) {
+      for (const key of params.remove) {
+        delete nextEnv[key];
+      }
+    }
+
+    // Skip the AWS write if nothing actually changed — avoids needlessly
+    // rotating the secret version, and avoids creating an empty group just
+    // because callers issued `merge({}, [])` after a no-op revocation.
+    const setChanged = params.set ? !Object.entries(params.set).every(([k, v]) => currentEnv[k] === v) : false;
+    const removedAny = (params.remove?.length ?? 0) > 0 && (params.remove as string[]).some((k) => k in currentEnv);
+    const anyChange = setChanged || removedAny;
+    if (!existing && !anyChange) {
+      return {
+        groupName,
+        arn: null,
+        exists: false,
+        env: {},
+        lastChangedAt: null,
+        createdAt: null,
+      };
+    }
+    if (existing && !anyChange) {
+      return this.getEnvGroup(params.projectId, params.groupId, region);
+    }
+
+    const payload = this.buildGroupDocument(nextEnv, rotation);
+    if (existing) {
+      await this.callAws(() =>
+        client.send(
+          new UpdateSecretCommand({
+            SecretId: groupName,
+            SecretString: JSON.stringify(payload),
+          }),
+        ),
+      );
+    } else {
+      await this.callAws(() =>
+        client.send(
+          new CreateSecretCommand({
+            Name: groupName,
+            SecretString: JSON.stringify(payload),
+            Tags: [
+              { Key: MANAGED_TAG_KEY, Value: "true" },
+              { Key: SECRET_TYPE_TAG_KEY, Value: "GENERIC_SECRET" },
+            ],
+          }),
+        ),
+      );
+    }
+
+    return this.getEnvGroup(params.projectId, params.groupId, region);
+  }
+
   async deleteEnvGroup(projectId: string, groupId: string, region?: string) {
     const groupName = envGroupSecretName(projectId, groupId);
     const { client } = await this.getProjectContext(projectId, region);
@@ -552,6 +638,12 @@ export class AwsSecretsManagerService {
       case "InvalidRequestException":
       case "ValidationException":
         return new BadRequestException("Invalid request for AWS Secrets Manager");
+      case "TimeoutError":
+      case "NetworkingError":
+      case "ETIMEDOUT":
+      case "ECONNRESET":
+      case "EPIPE":
+        return new ServiceUnavailableException("AWS Secrets Manager is temporarily unavailable");
       default:
         return new BadGatewayException("AWS Secrets Manager request failed");
     }
