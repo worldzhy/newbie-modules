@@ -8,6 +8,7 @@ import { mergeJudgments } from "./judgment/security-evaluation-judgment-merge";
 import { SecurityEvaluationJudgmentService } from "./judgment/security-evaluation-judgment.service";
 import {
   SECURITY_EVALUATION_MECHANISM_NAME_AWS_CONFIG,
+  SECURITY_EVALUATION_MECHANISM_NAME_CODE_LLM,
   SECURITY_EVALUATION_MECHANISM_NAME_DEPENDENCY,
   SECURITY_EVALUATION_MECHANISM_NAME_INTEL,
   type SecurityEvaluationJudgmentMechanism,
@@ -19,6 +20,7 @@ import {
 import {
   SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
   SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+  SECURITY_EVALUATION_KEY_CODE_SCAN,
   SECURITY_EVALUATION_KEY_NPM_OSV,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
 } from "./security-evaluation.constants";
@@ -62,6 +64,7 @@ const ALL_MECHANISMS: readonly SecurityEvaluationJudgmentMechanism[] = [
   fakeMechanism(SECURITY_EVALUATION_MECHANISM_NAME_DEPENDENCY),
   fakeMechanism(SECURITY_EVALUATION_MECHANISM_NAME_AWS_CONFIG),
   fakeMechanism(SECURITY_EVALUATION_MECHANISM_NAME_INTEL),
+  fakeMechanism(SECURITY_EVALUATION_MECHANISM_NAME_CODE_LLM),
 ];
 
 test("registry: every key declares at least one uniquely named mechanism", () => {
@@ -70,6 +73,7 @@ test("registry: every key declares at least one uniquely named mechanism", () =>
     SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     SECURITY_EVALUATION_KEY_THREAT_INTEL,
+    SECURITY_EVALUATION_KEY_CODE_SCAN,
   ];
   assert.deepEqual(Object.keys(SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY).sort(), [...expectedKeys].sort());
 
@@ -84,6 +88,9 @@ test("registry: every key declares at least one uniquely named mechanism", () =>
   ]);
   assert.deepEqual(SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY[SECURITY_EVALUATION_KEY_AWS_CUSTOM], [
     SECURITY_EVALUATION_MECHANISM_NAME_AWS_CONFIG,
+  ]);
+  assert.deepEqual(SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY[SECURITY_EVALUATION_KEY_CODE_SCAN], [
+    SECURITY_EVALUATION_MECHANISM_NAME_CODE_LLM,
   ]);
 });
 

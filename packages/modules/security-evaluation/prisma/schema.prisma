@@ -199,3 +199,45 @@ model SecurityEvaluationThreatVerdictCache {
   @@index([verdict, updatedAt])
   @@schema("module/security-evaluation")
 }
+
+/// Bipolar verdict cache for CODE_SCAN LLM judgment (ADR-054): positive AND
+/// negative per-file verdicts are cached, keyed by the full judgment identity
+/// (subject, criterion, path, content hash, model, prompt version, ruleset
+/// version). Unlike the INTEL cache — where only "not-relevant" is reusable
+/// because a feed item is one-shot — a source file persists across runs, so a
+/// positive verdict is reusable too; replaying it keeps finding identities
+/// deterministic across runs and shields files skipped by a later run's
+/// budget from the absent-finding reaper.
+///
+/// `unavailable` verdicts are never written (ADR-045 bottom line). Rows older
+/// than the declared codeScanVerdictCacheTtlDays are misses: content or
+/// version changes already invalidate the key, so the TTL only forces a
+/// long-unchanged file to be re-judged against model drift.
+///
+/// `findings` holds the structured finding entries the cached call produced
+/// for this one criterion (usually an empty array) — one row per criterion of
+/// the ruleset, all sharing the call's `inputSignature`.
+model SecurityEvaluationCodeScanVerdictCache {
+  id             String   @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId      String   @db.Uuid
+  criterionKey   String   @db.VarChar(128)
+  // Repository-root relative path of the judged file.
+  path           String   @db.VarChar(1024)
+  // SHA-256 of the full file content the verdict describes.
+  contentHash    String   @db.VarChar(64)
+  modelId        String   @db.VarChar(255)
+  // SHA-256 of the system prompt bytes; editing the prompt invalidates rows.
+  promptVersion  String   @db.VarChar(64)
+  ruleSetVersion String   @db.VarChar(32)
+  // Finding entries of this criterion from the cached call (JSON array).
+  findings       Json     @db.JsonB
+  // Content address of the exact request that produced this verdict.
+  inputSignature String?  @db.VarChar(64)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([subjectId, criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion], name: "codeScanVerdictIdentity")
+  @@index([subjectId, updatedAt])
+  @@schema("module/security-evaluation")
+}

@@ -14,8 +14,9 @@ const TTL_DAYS_KEY = "modules.security-evaluation.ttlDays";
 /// Validates the TTL days resolved from the assembler's bare env mapping
 /// (ADR-033): the value must be a declared positive integer — there is no
 /// built-in fallback, so a host that forgets it fails to boot instead of
-/// silently expiring on a guessed window.
-function requirePositiveInteger(value: number, name: string): number {
+/// silently expiring on a guessed window. Shared by the module's TTL-gated
+/// caches (intel negative cache, code-scan verdict cache).
+export function requirePositiveInteger(value: number, name: string): number {
   if (!Number.isInteger(value) || value <= 0) {
     throw new Error(`${name} must be a positive integer; received '${value}'.`);
   }

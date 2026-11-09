@@ -7,10 +7,12 @@ import { SecurityEvaluationCriteriaProvider } from "./criteria/security-evaluati
 import {
   SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,
   SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION,
+  SECURITY_EVALUATION_CODE_SCAN_RULE_SET_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_RULE_SET_VERSION,
   SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
   SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
   SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+  SECURITY_EVALUATION_KEY_CODE_SCAN,
   SECURITY_EVALUATION_KEY_NPM_OSV,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
@@ -49,6 +51,9 @@ function createProvider() {
     seedIntelligenceBaseline: async () => {
       calls.push("intel");
     },
+    seedCodeScanBaseline: async () => {
+      calls.push("code-scan");
+    },
   };
   // The provider only uses the baseline methods.
   const provider = new SecurityEvaluationCriteriaProvider(seed as never);
@@ -75,6 +80,18 @@ test("repository subject switches to threat-intel when requested", async () => {
     version: SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
   });
   assert.deepEqual(calls, ["intel"]);
+});
+
+test("repository subject switches to code-scan only when explicitly requested (ADR-054)", async () => {
+  const { provider, calls } = createProvider();
+  const selection = await provider.selectVersion(subject(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY), {
+    evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+  });
+  assert.deepEqual(selection, {
+    evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+    version: SECURITY_EVALUATION_CODE_SCAN_RULE_SET_VERSION,
+  });
+  assert.deepEqual(calls, ["code-scan"]);
 });
 
 test("aws-account subject defaults to the CIS benchmark evaluationKey", async () => {
