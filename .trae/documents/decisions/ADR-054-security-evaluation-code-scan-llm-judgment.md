@@ -1,7 +1,8 @@
 # ADR-054: security-evaluation 新增 code-scan——AI 全量代码审查作为单一 LLM 判定机制
 
-状态：提议中
+状态：已采纳
 日期：2026-11-10
+更新：2026-11-10 — 用户拍板采纳；条款 6 verdict 缓存 TTL 契约同日补入（f95ca31）。
 
 > 设计前置证据：expert-review round 27（用户"AI 全量扫码很简单"主张评审）与 round 28（最小方案评审），见 `.trae/documents/expert-review-2026-11-10-round27.md`、`expert-review-2026-11-10-round28.md`。本 ADR 的决策点全部来自 round 28 的四项必须修复结论。
 
