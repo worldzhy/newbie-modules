@@ -78,6 +78,6 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 > 来源：devbie `.trae/documents/expert-review-2026-11-09-round31.md`（scope = 6 份 backlog 的声明清单）。
 
-- [x] `[R31-13]` **本文件 `:17`「registry 唯一 package-lock」计数不实（P3）**：实测 2 个（仓根 + `packages/modules/message-tracker/sst/`，`find -name package-lock.json -not -path '*/node_modules/*'`）。**fixed（2026-11-09）**：`mission-tracker` 条目改为「根与 sst 各一」。
+- [x] `[R31-13]` **本文件 `:17`「registry 唯一 package-lock」计数不实（P3）**：实测 2 个（仓根 + `packages/modules/message-tracker/sst/`，`find -name package-lock.json -not -path '*/node_modules/*'`）。**fixed（2026-11-09）**：`message-tracker` 条目改为「根与 sst 各一」（round32 复核订正错名）。
 - [x] `[R31-17]` **本文件 `:25`「`modules.config.ts` 49 处 process.env」计数不实（P3）**：**fixed（2026-11-09）**：实测 46（`grep -c 'process.env' nightwatch-backend/src/modules/modules.config.ts`），行内已改为 46；「无 fallback」部分成立。
 - [x] `[R31-20 备注]` `:41` event-emitter「默认 30 天」表述偏松：代码为 `getOrThrow`（未配置抛错），30 仅 `.env` 与 manifest `example`，非代码默认。
