@@ -72,6 +72,38 @@ describe("rate limiter Redis degradation", () => {
     assert.equal(await limiter.isAllowed("k"), false);
   });
 
+  it("treats an over-quota answer as quota, not as a backend failure (R29-02)", async () => {
+    const calls = { get: 0, consume: 0 };
+    const store: RateLimiterStore = {
+      async get() {
+        calls.get += 1;
+        return { remainingPoints: 0 };
+      },
+      async consume() {
+        calls.consume += 1;
+        // rate-limiter-flexible rejects with a RateLimiterRes data carrier, not an Error.
+        throw { remainingPoints: -1, msBeforeNext: 5000, consumedPoints: 3, isFirstInDuration: false };
+      },
+      async delete() {},
+    };
+    const limiter = new RateLimiter({ keyPrefix: "test-", points: 2, duration: 60 }, store, "test", 0);
+
+    assert.equal(await limiter.spend("k"), -1, "the rejected remaining allowance is reported, not swallowed");
+    // A misread degradation would reopen an empty local bucket and answer true.
+    assert.equal(await limiter.isAllowed("k"), false, "the quota keeps holding against the primary");
+    assert.equal(calls.consume, 1);
+    assert.equal(calls.get, 1, "the limiter never demoted itself to the local bucket");
+  });
+
+  it("reports an exhausted local bucket instead of throwing (R29-02)", async () => {
+    const limiter = new RateLimiter({ keyPrefix: "test-", points: 1, duration: 60 }, null, "test");
+
+    assert.equal(await limiter.spend("k"), 0);
+    const remaining = await limiter.spend("k");
+    assert.ok(remaining <= 0, "an over-quota spend resolves with the remaining allowance");
+    assert.equal(await limiter.isAllowed("k"), false);
+  });
+
   it("switches back to Redis once a probe succeeds", async () => {
     const { store, calls, state } = flakyStore(5);
     const limiter = new RateLimiter({ keyPrefix: "test-", points: 5, duration: 60 }, store, "test", 0);

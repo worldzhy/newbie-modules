@@ -20,6 +20,22 @@ export interface RateLimiterStore {
 /** How often a degraded limiter re-tries Redis instead of the local bucket. */
 const DEFAULT_RECOVERY_PROBE_INTERVAL_MS = 30_000;
 
+/**
+ * rate-limiter-flexible signals "over quota" by rejecting with RateLimiterRes
+ * — a plain data carrier, not an Error. That rejection is the quota working,
+ * not a backend failure, so it must never demote the limiter to the local
+ * bucket (R29-02). Duck-typed: the consumer may resolve a different copy of
+ * the library, so instanceof is not reliable across package boundaries.
+ */
+function isQuotaRejection(error: unknown): error is { remainingPoints: number } {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "remainingPoints" in error &&
+    typeof (error as { remainingPoints?: unknown }).remainingPoints === "number"
+  );
+}
+
 function createRedisStore(redisService: RedisService, options: RateLimiterOptions): RateLimiterStore | null {
   return redisService.isConfigured()
     ? new RateLimiterRedis({ storeClient: redisService.getClient(), ...options })
@@ -90,11 +106,22 @@ export class RateLimiter {
         this.recovered();
         return res.remainingPoints;
       } catch (error) {
+        if (isQuotaRejection(error)) {
+          // A quota answer also proves the backend is reachable, so a probe
+          // through this path promotes the limiter back to the primary.
+          this.recovered();
+          return error.remainingPoints;
+        }
         this.degradedTo(error);
       }
     }
-    const res = await this.fallback.consume(key);
-    return res.remainingPoints;
+    try {
+      const res = await this.fallback.consume(key);
+      return res.remainingPoints;
+    } catch (error) {
+      if (isQuotaRejection(error)) return error.remainingPoints;
+      throw error;
+    }
   }
 
   async increment(key: string): Promise<void> {
