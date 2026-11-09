@@ -1,6 +1,5 @@
 import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { ConfigService } from "@nestjs/config";
 import { DayReportNumService } from "@modules/web-monitor/modules/day-report/day-report-num.service";
 import { func, pickRequestId } from "../../shared/utils";
 import { WEB_MONITOR_CONFIG } from "../../shared/web-monitor-config";
@@ -16,17 +15,13 @@ import { VISIBLE_APP_KEYS_RESOLVER, VisibleAppKeysResolver } from "../../shared/
 @ApiTags("Frontend Monitor / Web / PvUvIp")
 @Controller("/web-monitor/pvuvip")
 export class PvuvipController {
-  private cfg: Record<string, unknown>;
   constructor(
-    private readonly configService: ConfigService,
     private readonly pvuvipSrv: PvuvipService,
     private readonly dayReportNum: DayReportNumService,
     private readonly access: WebMonitorAccessService,
     @Inject(VISIBLE_APP_KEYS_RESOLVER)
     private readonly projectVisibility: VisibleAppKeysResolver,
-  ) {
-    this.cfg = this.configService.get("modules.web-monitor") || {};
-  }
+  ) {}
 
   @RequirePermission(PermissionAction.Get, "WebMonitorSite")
   @Get("/getPvUvIpSurveyToday")

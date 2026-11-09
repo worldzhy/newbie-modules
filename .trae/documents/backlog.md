@@ -59,7 +59,7 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 > 来源：web-monitor 全功能行为测试补写（registry `54fb7d5` / backend `11442d6`，278 例全绿）。裁决：用户批准 spec `.trae/documents/web-monitor-defect-adjudication-spec.md`（执行清单 `web-monitor-defect-adjudication-tasks.md`）。D1-D5、D7-D9 取选项 A 修复（registry `fc330c6` / backend `34ddf32`）：消费仓 build 通过、279 例全绿、两侧 `diff -rq` 为空。
 
-- [x] **`[D6 已清理 2026-11-09]`** 死 cfg：`analysis`/`error`/`page`/`resource`/`jobs`/`report-task`/`ajax`/`pvuvip-task` 共 9 个 service 构造中 `this.cfg` 未使用（limit 走 `WEB_MONITOR_CONFIG`）。裁决 C 撤回（非缺陷但属 DI 样板噪音），构造参数 + `private cfg` 字段 + ConfigService import 一并删除；宿主装配产物与 9 个对应 .test.ts mock 同步更新；registry 与宿主 diff 为空。提交：registry `5e1e2c7` + host TBD。
+- [x] **`[D6 已清理 2026-11-09]`** 死 cfg：`analysis`/`error`/`page`/`resource`/`jobs`/`report-task`/`ajax`/`pvuvip-task` 共 9 个 service + `pvuvip.controller` 构造中 `this.cfg` 未使用（limit 走 `WEB_MONITOR_CONFIG`）。裁决 C 撤回（非缺陷但属 DI 样板噪音），构造参数 + `private cfg` 字段 + ConfigService import 一并删除；宿主装配产物与 9 个对应 .test.ts mock 同步更新；registry 与宿主 diff 为空。提交：registry `d914dbd` + host `bae7014` + controller 补漏 registry TBD / host TBD。
 
 
 ## web-monitor 测试覆盖已知缺口（2026-11-09 入账）
