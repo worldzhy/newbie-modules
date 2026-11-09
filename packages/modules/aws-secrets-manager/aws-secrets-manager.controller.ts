@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Put, Query, Req } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
 import { AuditLogService, AuditResult } from "@modules/audit/audit-log.service";
 import { PermissionAction } from "@generated/prisma/client";
@@ -6,17 +6,20 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { UserRequest } from "@modules/security/security.interface";
 import {
   CreateSecretDto,
+  DeleteEnvGroupResponseDto,
   DeleteSecretResponseDto,
+  EnvGroupResponseDto,
   GetSecretRequestDto,
   GetSecretValueResponseDto,
   ListSecretsRequestDto,
   ListSecretsResponseDto,
   SecretResponseDto,
   SetRotationRequestDto,
+  UpdateEnvGroupDto,
   UpdateSecretDto,
 } from "./aws-secrets-manager.dto";
 import { AwsSecretsManagerService } from "./aws-secrets-manager.service";
-import { SECRET_AUDIT_EVENTS, SECRET_AUDIT_RESOURCE_TYPE } from "./aws-secrets-manager.types";
+import { SECRET_AUDIT_EVENTS, SECRET_AUDIT_RESOURCE_TYPE, envGroupSecretName } from "./aws-secrets-manager.types";
 
 @ApiTags("AWS Secrets Manager")
 @ApiBearerAuth()
@@ -141,6 +144,66 @@ export class AwsSecretsManagerController {
         ...(body.days !== undefined ? { days: body.days } : {}),
       },
       () => this.secretsService.setRotation(body.projectId, name, body),
+    );
+  }
+
+  // --- Env group (one application = one group secret) ---
+
+  @Get("groups/:groupId/env")
+  @RequirePermission(PermissionAction.Get, "AwsSecretsManagerSecret")
+  @ApiOperation({ summary: "Get one application's env group (decrypted map)" })
+  @ApiResponse({ type: EnvGroupResponseDto })
+  async getEnvGroup(
+    @Req() request: UserRequest,
+    @Param("groupId") groupId: string,
+    @Query() query: GetSecretRequestDto,
+  ) {
+    const groupName = envGroupSecretName(query.projectId, groupId);
+    return await this.runWithAudit(
+      request,
+      SECRET_AUDIT_EVENTS.ENV_GROUP_READ,
+      groupName,
+      { projectId: query.projectId, groupId, region: query.region },
+      () => this.secretsService.getEnvGroup(query.projectId, groupId, query.region),
+      (result) => ({ exists: result.exists, variableCount: Object.keys(result.env).length }),
+    );
+  }
+
+  @Put("groups/:groupId/env")
+  @RequirePermission(PermissionAction.Update, "AwsSecretsManagerSecret")
+  @ApiOperation({ summary: "Replace one application's env group (create on first save)" })
+  @ApiResponse({ type: EnvGroupResponseDto })
+  async updateEnvGroup(
+    @Req() request: UserRequest,
+    @Param("groupId") groupId: string,
+    @Body() body: UpdateEnvGroupDto,
+  ) {
+    const groupName = envGroupSecretName(body.projectId, groupId);
+    return await this.runWithAudit(
+      request,
+      SECRET_AUDIT_EVENTS.ENV_GROUP_UPDATED,
+      groupName,
+      { projectId: body.projectId, groupId, region: body.region, variableNames: Object.keys(body.env) },
+      () => this.secretsService.updateEnvGroup({ ...body, groupId }),
+    );
+  }
+
+  @Delete("groups/:groupId/env")
+  @RequirePermission(PermissionAction.Delete, "AwsSecretsManagerSecret")
+  @ApiOperation({ summary: "Delete one application's env group (30-day recovery window)" })
+  @ApiResponse({ type: DeleteEnvGroupResponseDto })
+  async deleteEnvGroup(
+    @Req() request: UserRequest,
+    @Param("groupId") groupId: string,
+    @Query() query: GetSecretRequestDto,
+  ) {
+    const groupName = envGroupSecretName(query.projectId, groupId);
+    return await this.runWithAudit(
+      request,
+      SECRET_AUDIT_EVENTS.ENV_GROUP_DELETED,
+      groupName,
+      { projectId: query.projectId, groupId, region: query.region },
+      () => this.secretsService.deleteEnvGroup(query.projectId, groupId, query.region),
     );
   }
 

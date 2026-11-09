@@ -21,13 +21,16 @@ import {
   TagResourceCommand,
   UpdateSecretCommand,
 } from "@aws-sdk/client-secrets-manager";
-import type { SecretListEntry } from "@aws-sdk/client-secrets-manager";
+import type { DescribeSecretResponse, SecretListEntry } from "@aws-sdk/client-secrets-manager";
 import {
+  ENV_GROUP_ENV_FIELD,
+  ENV_GROUP_ROTATION_FIELD,
   MANAGED_TAG_KEY,
   SECRET_TYPE_TAG_KEY,
   SECRET_TYPES,
   SecretType,
   SecretValueType,
+  envGroupSecretName,
 } from "./aws-secrets-manager.types";
 import { DEFAULT_LIST_PAGE_SIZE } from "./aws-secrets-manager.dto";
 import type { SecretValuePayload } from "./aws-secrets-manager.dto";
@@ -47,6 +50,16 @@ interface ProjectContext {
 interface CachedClient {
   client: SecretsManagerClient;
   expiresAt: number;
+}
+
+/** One application's env group as read from AWS (no local mirror). */
+export interface EnvGroupSnapshot {
+  groupName: string;
+  arn: string | null;
+  exists: boolean;
+  env: Record<string, string>;
+  lastChangedAt: Date | null;
+  createdAt: Date | null;
 }
 
 /**
@@ -204,6 +217,95 @@ export class AwsSecretsManagerService {
     return { name };
   }
 
+  // --- Env group (one application = one group secret) ---
+
+  /**
+   * Read one application's env group. A missing secret is reported as
+   * `exists: false` with an empty map so the page can render the create form;
+   * a secret at the composed name that this plane does not own stays 404
+   * (same existence-hiding rule as by-name reads).
+   */
+  async getEnvGroup(projectId: string, groupId: string, region?: string): Promise<EnvGroupSnapshot> {
+    const groupName = envGroupSecretName(projectId, groupId);
+    const { client } = await this.getProjectContext(projectId, region);
+
+    let entry: DescribeSecretResponse;
+    try {
+      entry = await this.callAws(() => client.send(new DescribeSecretCommand({ SecretId: groupName })));
+    } catch (error) {
+      if (error instanceof HttpException && error.getStatus() === 404) {
+        return { groupName, arn: null, exists: false, env: {}, lastChangedAt: null, createdAt: null };
+      }
+      throw error;
+    }
+    this.assertManaged(entry);
+
+    const document = await this.readGroupDocument(client, groupName);
+    return {
+      groupName,
+      arn: entry.ARN ?? null,
+      exists: true,
+      env: document.env,
+      lastChangedAt: entry.LastChangedDate ?? null,
+      createdAt: entry.CreatedDate ?? null,
+    };
+  }
+
+  /**
+   * Replace the group's env map atomically (create on first save). Reserved
+   * keys such as `__rotation` are carried over untouched, so future rotation
+   * tooling keeps working without this write path knowing about it.
+   */
+  async updateEnvGroup(params: {
+    projectId: string;
+    groupId: string;
+    env: Record<string, string>;
+    region?: string;
+  }): Promise<EnvGroupSnapshot> {
+    const groupName = envGroupSecretName(params.projectId, params.groupId);
+    const { client, region } = await this.getProjectContext(params.projectId, params.region);
+    const existing = await this.describeOptionalManagedSecret(client, groupName);
+
+    if (existing) {
+      const document = await this.readGroupDocument(client, groupName);
+      const payload = this.buildGroupDocument(params.env, document.rotation);
+      await this.callAws(() =>
+        client.send(
+          new UpdateSecretCommand({
+            SecretId: groupName,
+            SecretString: JSON.stringify(payload),
+          }),
+        ),
+      );
+    } else {
+      const payload = this.buildGroupDocument(params.env, undefined);
+      await this.callAws(() =>
+        client.send(
+          new CreateSecretCommand({
+            Name: groupName,
+            SecretString: JSON.stringify(payload),
+            Tags: [
+              { Key: MANAGED_TAG_KEY, Value: "true" },
+              { Key: SECRET_TYPE_TAG_KEY, Value: "GENERIC_SECRET" },
+            ],
+          }),
+        ),
+      );
+    }
+
+    return this.getEnvGroup(params.projectId, params.groupId, region);
+  }
+
+  async deleteEnvGroup(projectId: string, groupId: string, region?: string) {
+    const groupName = envGroupSecretName(projectId, groupId);
+    const { client } = await this.getProjectContext(projectId, region);
+    await this.describeManagedSecret(client, groupName);
+    await this.callAws(() =>
+      client.send(new DeleteSecretCommand({ SecretId: groupName, RecoveryWindowInDays: DELETE_RECOVERY_WINDOW_DAYS })),
+    );
+    return { groupName };
+  }
+
   /** Trigger an immediate rotation using the existing rotation configuration. */
   async rotateSecret(projectId: string, name: string, region?: string) {
     const { client } = await this.getProjectContext(projectId, region);
@@ -317,11 +419,97 @@ export class AwsSecretsManagerService {
    */
   private async describeManagedSecret(client: SecretsManagerClient, name: string) {
     const entry = await this.callAws(() => client.send(new DescribeSecretCommand({ SecretId: name })));
+    this.assertManaged(entry);
+    return entry;
+  }
+
+  /**
+   * Like {@link describeManagedSecret}, but an absent secret returns undefined
+   * so the caller can create it on first write. A secret that exists but was
+   * not created by this plane is still rejected as not found.
+   */
+  private async describeOptionalManagedSecret(
+    client: SecretsManagerClient,
+    name: string,
+  ): Promise<DescribeSecretResponse | undefined> {
+    let entry: DescribeSecretResponse;
+    try {
+      entry = await client.send(new DescribeSecretCommand({ SecretId: name }));
+    } catch (error) {
+      if (this.isAwsNotFound(error)) {
+        return undefined;
+      }
+      throw this.toHttpException(error);
+    }
+    this.assertManaged(entry);
+    return entry;
+  }
+
+  /** Reject entries that do not carry the `devbie:managed` ownership tag. */
+  private assertManaged(entry: DescribeSecretResponse): void {
     const managed = entry.Tags?.some((tag) => tag.Key === MANAGED_TAG_KEY && tag.Value === "true") ?? false;
     if (!managed) {
       throw new NotFoundException("Secret not found in AWS Secrets Manager");
     }
-    return entry;
+  }
+
+  private isAwsNotFound(error: unknown): boolean {
+    return (
+      typeof error === "object" && error !== null && (error as { name?: string }).name === "ResourceNotFoundException"
+    );
+  }
+
+  /**
+   * Parse a group secret into its injectable env map plus the reserved
+   * `__rotation` recipe. The group uses `{ "env": { "<KEY>": "<value>" }, ... }`;
+   * malformed documents are rejected rather than silently coerced.
+   */
+  private async readGroupDocument(
+    client: SecretsManagerClient,
+    name: string,
+  ): Promise<{ env: Record<string, string>; rotation?: unknown }> {
+    const response = await this.callAws(() =>
+      client.send(new GetSecretValueCommand({ SecretId: name, VersionStage: "AWSCURRENT" })),
+    );
+    const raw = response.SecretString;
+    if (raw === undefined) {
+      return { env: {} };
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      throw new BadRequestException("Env group secret is not valid JSON");
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new BadRequestException("Env group secret is not a JSON object");
+    }
+
+    const document = parsed as Record<string, unknown>;
+    const rotation = document[ENV_GROUP_ROTATION_FIELD];
+    const env = document[ENV_GROUP_ENV_FIELD];
+    if (env === undefined) {
+      return { env: {}, rotation };
+    }
+    if (typeof env !== "object" || env === null || Array.isArray(env)) {
+      throw new BadRequestException("Env group secret has an unexpected env field");
+    }
+
+    const normalized: Record<string, string> = {};
+    for (const [key, value] of Object.entries(env)) {
+      if (typeof value !== "string") {
+        throw new BadRequestException("Env group secret contains a non-string value");
+      }
+      normalized[key] = value;
+    }
+    return { env: normalized, rotation };
+  }
+
+  private buildGroupDocument(env: Record<string, string>, rotation: unknown): Record<string, unknown> {
+    return rotation === undefined
+      ? { [ENV_GROUP_ENV_FIELD]: env }
+      : { [ENV_GROUP_ENV_FIELD]: env, [ENV_GROUP_ROTATION_FIELD]: rotation };
   }
 
   private toSecretResponse(entry: SecretListEntry, region: string) {

@@ -27,6 +27,29 @@ All routes live under `/aws-secrets-manager/secrets` and are keyed by secret **n
 
 Secret names must match `^[a-zA-Z0-9_+=.@-]{1,512}$` (no slash — the name is a URL path parameter).
 
+## Env groups (one application = one secret)
+
+ADR-005 §4 defines an application-scoped env group: one application owns one secret named `nw/<projectId>/<groupId>/env`, where `groupId` is the host application id passed by the caller (the module treats it as an opaque owner reference and never interprets it). The value is a single JSON document:
+
+```json
+{
+  "env": { "APP_ENV": "production", "DB_PASS": "..." },
+  "__rotation": { "engine": "postgres", "passwordKey": "DB_PASS" }
+}
+```
+
+- `env` is a flat `string → string` map and is the **deployment contract**: a process injects it directly (e.g. `Object.entries(env)`).
+- `__rotation` is the reserved rotation recipe from ADR-005 §5. Every group write preserves it verbatim; it is never exposed as an env variable.
+- No local table mirrors the group: `CreatedDate` / `LastChangedDate` come from AWS.
+
+| Method | Path                                               | Purpose                                                   |
+| ------ | -------------------------------------------------- | --------------------------------------------------------- |
+| GET    | `/aws-secrets-manager/secrets/groups/:groupId/env` | Read the decrypted map; `exists: false` when it is absent |
+| PUT    | `/aws-secrets-manager/secrets/groups/:groupId/env` | Replace the whole map atomically (creates on first save)  |
+| DELETE | `/aws-secrets-manager/secrets/groups/:groupId/env` | Delete with a 30-day recovery window                      |
+
+`GET` and `DELETE` take `projectId` as a query parameter; `PUT` takes `{ projectId, env, region? }` as the body. Group rotation (`__rotation`-aware Lambda) is deferred; the by-name rotation endpoints still target individual secrets.
+
 ## Pagination
 
 The list endpoint uses AWS-native cursor pagination (there is no total count — AWS cannot return one without a full scan):
@@ -59,6 +82,9 @@ All sensitive operations write business audit rows through the audit module's `A
 | `secret.deleted`             | delete secret                       |
 | `secret.rotated`             | immediate rotation                  |
 | `secret.rotation_configured` | enable / disable automatic rotation |
+| `env_group.value_read`       | GET group env map                   |
+| `env_group.updated`          | PUT group env map                   |
+| `env_group.deleted`          | DELETE group                        |
 
 The mutating and value-read routes emit their own business audit events for every outcome, which is why they pass the audit coverage detector without any generic HTTP audit row. Detail payloads contain only projectId, region, type, changed field **names**, enabled/days, `valueType`, or a failure `reason`/`statusCode` — **never secret values or raw AWS error messages**. List and metadata reads are not audited.
 
