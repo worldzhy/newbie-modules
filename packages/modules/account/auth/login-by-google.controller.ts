@@ -7,7 +7,8 @@ import { GuardByGoogle } from "@modules/security/authentication/google-oauth/goo
 import { GoogleUserResDto } from "@modules/security/authentication/google-oauth/dto/google-user.dto";
 import { CookieName, CookieService } from "@modules/security/cookie/cookie.service";
 import { isSafeRedirectPath } from "@modules/security/cookie/redirect-path";
-import { AuthService } from "@modules/account/auth/auth.service";
+import { AuthService, PendingApprovalException } from "@modules/account/auth/auth.service";
+import { LoginResult } from "@modules/account/account.interface";
 
 /**
  * Google OAuth login endpoints.
@@ -48,15 +49,27 @@ export class LoginByGoogleController {
     @Res() response: Response,
     @Ip() ipAddress: string,
   ): Promise<void> {
-    const loginResult = await this.authService.loginByGoogle({
-      email: request.user.email,
-      displayName: request.user.displayName,
-      ipAddress,
-      userAgent: request.headers["user-agent"] ?? "",
-      response,
-    });
-
     const frontendUrl = this.config.getOrThrow<string>("framework.app.frontendUrl");
+
+    let loginResult: LoginResult;
+    try {
+      loginResult = await this.authService.loginByGoogle({
+        email: request.user.email,
+        displayName: request.user.displayName,
+        ipAddress,
+        userAgent: request.headers["user-agent"] ?? "",
+        response,
+      });
+    } catch (error) {
+      // A first-time Google identity is provisioned as PENDING_APPROVAL and
+      // the shared issuance exit refuses it. Send the browser back to the
+      // login page with a notice instead of an error page.
+      if (error instanceof PendingApprovalException) {
+        response.redirect(`${frontendUrl}/account/login?pendingApproval=1`);
+        return;
+      }
+      throw error;
+    }
 
     // Mint the last-hop proof: it is stored as a readable cookie and echoed in
     // the redirect hash, so the frontend only adopts a session that was minted

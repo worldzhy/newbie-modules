@@ -7,6 +7,8 @@ import { NoGuard } from "@modules/security/authentication/public/public.decorato
 import { CookieName, CookieService } from "@modules/security/cookie/cookie.service";
 import { isSafeRedirectPath } from "@modules/security/cookie/redirect-path";
 import { LarkAuthService } from "@modules/account/auth/lark/lark-auth.service";
+import { PendingApprovalException } from "@modules/account/auth/auth.service";
+import { LoginResult } from "@modules/account/account.interface";
 
 /**
  * Feishu/Lark OAuth login endpoints.
@@ -86,19 +88,31 @@ export class LoginByLarkController {
       throw new BadRequestException("Failed to fetch the Feishu user profile. Please try again.");
     }
 
-    const loginResult = await this.larkAuthService.loginByLark({
-      openId: userInfo.openId,
-      unionId: userInfo.unionId,
-      email: userInfo.email,
-      phone: userInfo.phone,
-      displayName: userInfo.name,
-      avatarUrl: userInfo.avatarUrl,
-      ipAddress,
-      userAgent: request.headers["user-agent"] ?? "",
-      response,
-    });
-
     const frontendUrl = this.config.getOrThrow<string>("framework.app.frontendUrl");
+
+    let loginResult: LoginResult;
+    try {
+      loginResult = await this.larkAuthService.loginByLark({
+        openId: userInfo.openId,
+        unionId: userInfo.unionId,
+        email: userInfo.email,
+        phone: userInfo.phone,
+        displayName: userInfo.name,
+        avatarUrl: userInfo.avatarUrl,
+        ipAddress,
+        userAgent: request.headers["user-agent"] ?? "",
+        response,
+      });
+    } catch (error) {
+      // A first-time Lark identity is provisioned as PENDING_APPROVAL and the
+      // shared issuance exit refuses it. Send the browser back to the login
+      // page with an approval notice instead of an error page.
+      if (error instanceof PendingApprovalException) {
+        response.redirect(`${frontendUrl}/account/login?pendingApproval=1`);
+        return;
+      }
+      throw error;
+    }
 
     // Mint the last-hop proof: it is stored as a readable cookie and echoed in
     // the redirect hash, so the frontend only adopts a session that was minted

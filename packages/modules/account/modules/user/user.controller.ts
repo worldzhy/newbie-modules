@@ -89,13 +89,14 @@ export class UserController {
   @ApiOperation({ summary: "Get users with pagination and filters" })
   @ApiResponse({ type: ListUsersResponseDto })
   async list(@Query() query: ListUsersRequestDto) {
-    const { page, pageSize, name, roles } = query;
+    const { page, pageSize, name, roles, status } = query;
 
-    // [step 1] Construct where argument. Every filter is optional; in
-    // particular roles only narrows the list when at least one value is
-    // given, so callers without the filter see every user.
+    // [step 1] Construct where argument. Every filter is optional and the
+    // filters narrow jointly (AND): e.g. the approval queue is
+    // status=PENDING_APPROVAL combined with a name search, so matching on
+    // either condition alone would leak unrelated rows into the queue.
     let where: Prisma.UserWhereInput | undefined;
-    const whereConditions: object[] = [];
+    const whereConditions: Prisma.UserWhereInput[] = [];
 
     if (name) {
       const trimmedName = name.trim();
@@ -108,8 +109,12 @@ export class UserController {
       whereConditions.push({ roles: { some: { role: { name: { in: roles } } } } });
     }
 
+    if (status) {
+      whereConditions.push({ status });
+    }
+
     if (whereConditions.length > 1) {
-      where = { OR: whereConditions };
+      where = { AND: whereConditions };
     } else if (whereConditions.length === 1) {
       where = whereConditions[0];
     } else {

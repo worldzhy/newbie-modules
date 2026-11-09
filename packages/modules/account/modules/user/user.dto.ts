@@ -406,6 +406,15 @@ export class ListUsersRequestDto extends CommonListRequestDto {
   @IsArray()
   @IsString({ each: true })
   roles?: string[];
+
+  @ApiPropertyOptional({
+    enum: UserStatus,
+    description:
+      "Filter by account status; omit for no status filtering (e.g. PENDING_APPROVAL for the approval queue)",
+  })
+  @IsOptional()
+  @IsEnum(UserStatus)
+  status?: UserStatus;
 }
 
 /**
