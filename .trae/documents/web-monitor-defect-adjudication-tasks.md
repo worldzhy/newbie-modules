@@ -4,7 +4,7 @@
 
 ## Phase 0 — 拍板入账
 
-- [ ] 0.1 记录 D1-D9 每条最终裁决（修 A/B/C 或不修）到 registry backlog 对应条目。
+- [x] 0.1 记录 D1-D9 每条最终裁决（修 A/B/C 或不修）到 registry backlog 对应条目。
 - [x] 0.2 仅对"修"的条目建立代码改动清单（文件 + 行 + 测试文件）。
 
 ## Phase 1 — registry 源码与钉点测试
@@ -34,7 +34,7 @@
 ## Phase 4 — 格式与提交
 
 - [x] 4.1 `format:check`（registry 与 backend 各自 web-monitor 目录）通过。
-- [ ] 4.2 registry：显式路径暂存 + 英文提交信息 + push（credential helper 单命令注入）。
-- [ ] 4.3 backend：仅暂存 `src/modules/web-monitor` 改动，避开另一会话的未跟踪文件与 `src/application/authorization/scope-resolvers.ts`；提交 + push。
-- [ ] 4.4 `ls-remote` 核对两个远端 dev 头与本地一致。
-- [ ] 4.5 更新 registry backlog：已修条目删除，未修条目保留裁决结论。
+- [x] 4.2 registry：显式路径暂存 + 英文提交信息 + push（credential helper 单命令注入）。→ `fc330c6`
+- [x] 4.3 backend：仅暂存 `src/modules/web-monitor` 改动，避开另一会话的未跟踪文件与 `src/application/authorization/scope-resolvers.ts`；提交 + push。→ `34ddf32`
+- [x] 4.4 `ls-remote` 核对两个远端 dev 头与本地一致（推送后远端已含 `fc330c6` / `34ddf32`；本地随后又被并行会话推进）。
+- [x] 4.5 更新 registry backlog：已修条目删除，未修条目保留裁决结论。

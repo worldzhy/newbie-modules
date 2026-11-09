@@ -55,19 +55,12 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 - [x] `[SE-CRED-03]` **unevaluable 桶不覆盖悬空引用（minor，建议只补文档）**：`packages/modules/security-evaluation/reporting/security-evaluation-report.service.ts` L100-105 仅判 `!subject.credentialRef`；模块对引用不透明、无法解析绑定是否存在。结论：不改代码——provider 只枚举 live binding，悬空引用属退役 subject 的瞬态，run 时会以 subject 级失败暴露。若要固化，在 ADR-039 或 report 注释写明"悬空引用 = run-time skipped，不是 unevaluable"。**fixed（2026-11-09，`b48d9bf`）**：报告注释已写明 dangling ref 与 unevaluable 的分工。
 
 
-## web-monitor 行为测试补写中发现的疑似源码缺陷（2026-11-09 入账）
+## web-monitor 疑似源码缺陷（2026-11-09 入账，同日裁决关闭）
 
-> 来源：web-monitor 全功能行为测试补写（registry `54fb7d5` / backend `11442d6`，278 例全绿）。各代理沿源码取证，均为"测试已固化现状、源码未动"的疑似项，待用户逐条拍板是否修复。
+> 来源：web-monitor 全功能行为测试补写（registry `54fb7d5` / backend `11442d6`，278 例全绿）。裁决：用户批准 spec `.trae/documents/web-monitor-defect-adjudication-spec.md`（执行清单 `web-monitor-defect-adjudication-tasks.md`）。D1-D5、D7-D9 取选项 A 修复（registry `fc330c6` / backend `34ddf32`）：消费仓 build 通过、279 例全绿、两侧 `diff -rq` 为空。
 
-- [ ] `modules/web/services/error.service.ts` `getAverageErrorList`：type 为空或不在五种已知值时 groupBy 残留 `""`，聚合 select 以 `, MAX(createTime)...` 前导逗号开头，形成畸形 SQL，无兜底。
-- [ ] `modules/web/services/page.service.ts` `getRealTimeAveragePageList`：beginTime/endTime 从不进入 `$match`，聚合无条件扫全表再按分钟分桶，时间窗只用于产桶不用于过滤。
-- [ ] 时间界口径不一致：`resource.service`（getResourceForType/getOneResourceAvg/getOneResourceList）与 `page.service`（getOnePageList）、`environment.service`（getDataGroupBy）要求 begin+end 双边才生效、单边静默丢弃；`analysis.service`/`custom.service`/`resource.service.getAverageResourceList` 支持单边。建议统一。
-- [ ] `modules/web/services/custom.service.ts` `delCustomFilter`：`findOne` 返回 null（文档不存在）时不报错，继续 `deleteOne` 并返回 true——"不存在"语义只在 findOne 抛错时触发。
-- [ ] `modules/web/services/pvuvip.service.ts` `getHistoryPvUvIplist`：无日报时 `num` 为 `undefined`，而 `getHistoryPvUvIplistByRange` 默认 0，口径不一致。
-- [ ] `modules/web/services/analysis.service.ts`：构造中读取的 `this.cfg` 从未使用（top limit 走代码常量 `top_alalysis_size.web`）。
-- [ ] `modules/jobs/jobs.service.ts` L242：`WebResource(appKey)` 在 `runSignal` 保护之外，抛错会中止该系统后续所有 signal（仅靠 per-system catch 兜底），与其余 signal 的隔离粒度不一致。
-- [ ] `modules/web/report.controller.ts`：对象体 + `content-type: text/plain` 会被 `JSON.parse("[object Object]")` 拒绝为 400（测试已钉为现状合约）；sendBeacon 场景体恒为字符串，正常路径不受影响。
-- [ ] `shared/utils.ts` `decryptPhone`：未知字符对/奇数尾字符被静默丢弃，产生错位/截断的解码结果（测试已固化现状，是否属缺陷待确认）。
+- [ ] `[D6 保持现状 2026-11-09]` 死 cfg：`analysis.service`、`error.service`、`page.service`、`resource.service`、`jobs.service`、`report-task.service`、`ajax.service`、`pvuvip-task.service`、`pvuvip.controller` 构造中读取的 `this.cfg` 均未使用（limit 走 `WEB_MONITOR_CONFIG` 常量）。裁决 C：非缺陷、无行为影响；若后续批量清理 DI 与测试夹具时统一处理。
+
 
 ## web-monitor 测试覆盖已知缺口（2026-11-09 入账）
 
