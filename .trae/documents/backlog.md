@@ -14,7 +14,7 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 ## 暂不做（条件触发后再启动）
 
-- [ ] `[2026-11-05 设计讨论，未拍板]` **message-tracker 重构方向（挂起，待后续讨论拍板）**：现状为 NestJS 模块 + 完整 SST serverless app 混装（`packages/modules/message-tracker/sst/`，Lambda 裸 SQL 直写宿主库、独立 DB_* 配置，registry 唯一 package-lock + 99 条告警均出于此），装配后不可用。已讨论的候选方向：A. worker 折进 backend 进程（发送复用 aws-ses/aws-sms，异步复用 queue 模块，SES/SMS → SNS HTTPS 验签回调写 Prisma；删除 sst/、infrastructure/cloudformation、MESSAGE_TRACKER_SQS_*）；B. 保留 Lambda 但升级为独立 service 产物 + 强制回调宿主 API 写库。关键判据：消息量是否需要独立于 API 扩缩容。附：manifest 当前 `layer: "capability"`，按 2026-11-05 用户定位应为 `feature`，落地时一并订正。配套框架契约见 devbie backlog 同日期条目。
+- [ ] `[2026-11-05 设计讨论，未拍板]` **message-tracker 重构方向（挂起，待后续讨论拍板）**：现状为 NestJS 模块 + 完整 SST serverless app 混装（`packages/modules/message-tracker/sst/`，Lambda 裸 SQL 直写宿主库、独立 DB_* 配置，registry 根与 `sst/` 各一份 package-lock + 99 条告警均出于此），装配后不可用。已讨论的候选方向：A. worker 折进 backend 进程（发送复用 aws-ses/aws-sms，异步复用 queue 模块，SES/SMS → SNS HTTPS 验签回调写 Prisma；删除 sst/、infrastructure/cloudformation、MESSAGE_TRACKER_SQS_*）；B. 保留 Lambda 但升级为独立 service 产物 + 强制回调宿主 API 写库。关键判据：消息量是否需要独立于 API 扩缩容。附：manifest 当前 `layer: "capability"`，按 2026-11-05 用户定位应为 `feature`，落地时一并订正。配套框架契约见 devbie backlog 同日期条目。
 - [ ] `[R19-08 观察项 2026-11-06]` **js-error-first-seen 每指纹一个 Redis key**：key 形态 `web-monitor:alert-state:<appKey>:js-error-first-seen:<fingerprint>`，指纹基数随错误种类增长，TTL 2h 自然过期。当前规模无风险；高基数应用下的 key 数量与内存占用应在后续"阈值配置化"ADR 中一并审视（届时可评估指纹分桶/采样）。
 - [ ] `[2026-11-05 设计讨论，未拍板]` **feature 模块 AWS 资源统一标准（挂起，待后续讨论拍板）**：拟在 manifest 增加 `infrastructure` 字段（CFN 模板路径、参数、outputs、账号级 prerequisites 只检查不创建），模板随模块同仓存放；已拍板的边界：不为此单开新仓库，Lambda/ECS 等外部运行时不进模块（另立 service 产物）。runner 与部署链契约见 devbie backlog 同日期条目。落地前先出 ADR（本仓写 manifest 契约）。
 
@@ -22,7 +22,7 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 ## 装配配置字面量（2026-11-06 清理：条目过时，修复已在现仓）
 
-> 2026-11-06 取证：registry 所有 manifest 的 `requires.config` 值全为纯 `process.env.XXX` 字符串（零 fallback 表达式）；CLI `assemble/modules.ts#L77-86 assertUnwrappableExpressions` reject 含引号内 fallback 的表达式（如 `process.env.X || 'fallback'`）；渲染产物 `modules.config.ts` 中 49 处 process.env 无一处被引号包裹——全是真实 TS 表达式。backlog 原条目描述"10 个 manifest 共 14 处 `|| '默认值'`"是 ADR-033 落地前的历史残留，现已闭环。
+> 2026-11-06 取证：registry 所有 manifest 的 `requires.config` 值全为纯 `process.env.XXX` 字符串（零 fallback 表达式）；CLI `assemble/modules.ts#L77-86 assertUnwrappableExpressions` reject 含引号内 fallback 的表达式（如 `process.env.X || 'fallback'`）；渲染产物 `modules.config.ts` 中 46 处 process.env 无一处被引号包裹——全是真实 TS 表达式（2026-11-09 实测 46）。backlog 原条目描述"10 个 manifest 共 14 处 `|| '默认值'`"是 ADR-033 落地前的历史残留，现已闭环。
 
 ## 技术债（已在 ADR 登记，未落地）
 
@@ -78,6 +78,6 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 > 来源：devbie `.trae/documents/expert-review-2026-11-09-round31.md`（scope = 6 份 backlog 的声明清单）。
 
-- [ ] `[R31-13]` **本文件 `:17`「registry 唯一 package-lock」计数不实（P3）**：实测 2 个（仓根 + `packages/modules/message-tracker/sst/`，`find -name package-lock.json -not -path '*/node_modules/*'`）；改为「根与 sst 各一」。
-- [ ] `[R31-17]` **本文件 `:25`「`modules.config.ts` 49 处 process.env」计数不实（P3）**：实测 46（`grep -c 'process.env' nightwatch-backend/src/modules/modules.config.ts`）；「无 fallback」部分成立。
+- [x] `[R31-13]` **本文件 `:17`「registry 唯一 package-lock」计数不实（P3）**：实测 2 个（仓根 + `packages/modules/message-tracker/sst/`，`find -name package-lock.json -not -path '*/node_modules/*'`）。**fixed（2026-11-09）**：`mission-tracker` 条目改为「根与 sst 各一」。
+- [x] `[R31-17]` **本文件 `:25`「`modules.config.ts` 49 处 process.env」计数不实（P3）**：**fixed（2026-11-09）**：实测 46（`grep -c 'process.env' nightwatch-backend/src/modules/modules.config.ts`），行内已改为 46；「无 fallback」部分成立。
 - [x] `[R31-20 备注]` `:41` event-emitter「默认 30 天」表述偏松：代码为 `getOrThrow`（未配置抛错），30 仅 `.env` 与 manifest `example`，非代码默认。
