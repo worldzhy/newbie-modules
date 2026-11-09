@@ -16,6 +16,9 @@ export class BitbucketNotConfiguredError extends Error {
 
 const BITBUCKET_API_BASE = "https://api.bitbucket.org/2.0";
 
+/** Outbound fetch budget; matches the 30s convention for external vendor APIs (jdy). */
+const BITBUCKET_FETCH_TIMEOUT_MS = 30_000;
+
 @Injectable()
 export class BitbucketService {
   private readonly logger = new Logger(BitbucketService.name);
@@ -64,7 +67,10 @@ export class BitbucketService {
       .map((segment) => encodeURIComponent(segment))
       .join("/");
     const url = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repo)}/src/HEAD/${encodedPath}`;
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${this.accessToken}` } });
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      signal: AbortSignal.timeout(BITBUCKET_FETCH_TIMEOUT_MS),
+    });
     if (response.status === 404) return null;
     if (!response.ok) {
       const text = await response.text().catch(() => "");
