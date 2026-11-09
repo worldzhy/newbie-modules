@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { UserStatus } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { TokenService } from "@modules/security/token/token.service";
@@ -28,11 +29,14 @@ export class WechatAuthService {
         data: { wechatOpenId: openId },
       });
     } else {
-      // Create new user if not exists
+      // Create new user if not exists. A first-time WeChat identity is
+      // self-provisioned and must wait for administrator approval; the shared
+      // issuance exit rejects PENDING_APPROVAL so no session is created here.
       user = await this.prisma.user.create({
         data: {
           phone,
           wechatOpenId: openId,
+          status: UserStatus.PENDING_APPROVAL,
         },
       });
     }

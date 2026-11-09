@@ -29,26 +29,30 @@ Secret names must match `^[a-zA-Z0-9_+=.@-]{1,512}$` (no slash — the name is a
 
 ## Env groups (one application = one secret)
 
-ADR-005 §4 defines an application-scoped env group: one application owns one secret named `nw/<projectId>/<groupId>/env`, where `groupId` is the host application id passed by the caller (the module treats it as an opaque owner reference and never interprets it). The value is a single JSON document:
+ADR-005 §4 defines an application-scoped env group: one application owns one secret named `nw/<projectId>/<groupId>/env`, where `groupId` is the host application id passed by the caller (the module treats it as an opaque owner reference and never interprets it). The value is a single JSON document split by ownership:
 
 ```json
 {
-  "env": { "APP_ENV": "production", "DB_PASS": "..." },
+  "customEnv": { "APP_ENV": "production", "DB_PASS": "..." },
+  "__platform": { "NW_HEALTH_TOKEN": "...", "NW_HEALTH_ENDPOINT": "..." },
   "__rotation": { "engine": "postgres", "passwordKey": "DB_PASS" }
 }
 ```
 
-- `env` is a flat `string → string` map and is the **deployment contract**: a process injects it directly (e.g. `Object.entries(env)`).
+- `customEnv` is the user-owned flat `string → string` map. It is the **only** field the PUT endpoint writes; the GET response returns it verbatim.
+- `__platform` is platform-owned (installation tokens/endpoints) and is written **only** by `AwsSecretsManagerService.mergePlatformEnvVars`. The HTTP read path returns just its key names (`platformKeys`), never its values.
 - `__rotation` is the reserved rotation recipe from ADR-005 §5. Every group write preserves it verbatim; it is never exposed as an env variable.
+- **Deployment contract (documented, not implemented here):** a deployment flattens `{ ...__platform, ...customEnv }` into the process environment. Because PUT rejects custom keys that already exist in `__platform` (409), a collision cannot silently override a platform credential.
+- Platform keys are namespaced with `NW_` (e.g. `NW_HEALTH_TOKEN`), since runtime-injected variables cannot use the build-time-only `NEXT_PUBLIC_` prefix and bare names collide with ordinary application variables.
 - No local table mirrors the group: `CreatedDate` / `LastChangedDate` come from AWS.
 
-| Method | Path                                               | Purpose                                                   |
-| ------ | -------------------------------------------------- | --------------------------------------------------------- |
-| GET    | `/aws-secrets-manager/secrets/groups/:groupId/env` | Read the decrypted map; `exists: false` when it is absent |
-| PUT    | `/aws-secrets-manager/secrets/groups/:groupId/env` | Replace the whole map atomically (creates on first save)  |
-| DELETE | `/aws-secrets-manager/secrets/groups/:groupId/env` | Delete with a 30-day recovery window                      |
+| Method | Path                                               | Purpose                                                              |
+| ------ | -------------------------------------------------- | -------------------------------------------------------------------- |
+| GET    | `/aws-secrets-manager/secrets/groups/:groupId/env` | Read `customEnv` + `platformKeys`; `exists: false` when it is absent |
+| PUT    | `/aws-secrets-manager/secrets/groups/:groupId/env` | Replace `customEnv` atomically (creates on first save)               |
+| DELETE | `/aws-secrets-manager/secrets/groups/:groupId/env` | Delete with a 30-day recovery window                                 |
 
-`GET` and `DELETE` take `projectId` as a query parameter; `PUT` takes `{ projectId, env, region? }` as the body. Group rotation (`__rotation`-aware Lambda) is deferred; the by-name rotation endpoints still target individual secrets.
+`GET` and `DELETE` take `projectId` as a query parameter; `PUT` takes `{ projectId, customEnv, region? }` as the body. Group rotation (`__rotation`-aware Lambda) is deferred; the by-name rotation endpoints still target individual secrets.
 
 ## Pagination
 

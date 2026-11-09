@@ -206,6 +206,10 @@ export class LarkAuthService {
           uiAvatarsUrl,
           email: email || undefined,
           phone: phone || undefined,
+          // A first-time Lark identity is self-provisioned and must wait for
+          // administrator approval; no session is issued for this account
+          // until an administrator accepts it in the IAM console.
+          status: UserStatus.PENDING_APPROVAL,
           emails: email ? { create: { email, isVerified: true } } : undefined,
         },
       });

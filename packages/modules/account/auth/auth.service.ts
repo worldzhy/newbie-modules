@@ -35,6 +35,17 @@ import { AwsSesService } from "@modules/aws-ses/aws-ses.service";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
 import anonymize from "ip-anonymize";
 
+/**
+ * Rejection for a self-service account that exists but has not been approved by
+ * an administrator yet. Subclasses ForbiddenException because it is an account
+ * state failure (ADR-001), and carries a message actionable for the user.
+ */
+export class PendingApprovalException extends ForbiddenException {
+  constructor() {
+    super("Your account is pending administrator approval.");
+  }
+}
+
 @Injectable()
 export class AuthService {
   private appFrontendUrl: string;
@@ -97,6 +108,44 @@ export class AuthService {
     response?: Response;
     mfaVerified?: boolean;
   }): Promise<IssuedLoginSession> {
+    // [step 0] Account-state gate. Self-service channels (password sign-up and
+    // first Google/Lark/WeChat login) provision accounts as PENDING_APPROVAL,
+    // and no session may exist before an administrator accepts them. This sits
+    // at the shared exit so the rule holds for every channel instead of only
+    // the ones that remember to pre-check; INACTIVE is re-checked here for the
+    // channels (WeChat) that do not pre-check it.
+    const account = await this.prisma.user.findUnique({
+      where: { id: params.userId },
+      select: { status: true },
+    });
+    if (!account) {
+      await recordLoginFailure(this.auditLogService, {
+        actorId: params.userId,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        detail: { reason: "user_not_found" },
+      });
+      throw new NotFoundException(USER_NOT_FOUND);
+    }
+    if (account.status === UserStatus.PENDING_APPROVAL) {
+      await recordLoginFailure(this.auditLogService, {
+        actorId: params.userId,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        detail: { reason: "pending_approval" },
+      });
+      throw new PendingApprovalException();
+    }
+    if (account.status === UserStatus.INACTIVE) {
+      await recordLoginFailure(this.auditLogService, {
+        actorId: params.userId,
+        ipAddress: params.ipAddress,
+        userAgent: params.userAgent,
+        detail: { reason: "inactive_user" },
+      });
+      throw new ForbiddenException("The account is not active.");
+    }
+
     // [step 1] Account-level TOTP gate. Sitting in the single issuance exit, it
     // protects every login channel; the client completes the challenge through
     // /auth/login-by-totp before any session exists.
@@ -171,10 +220,14 @@ export class AuthService {
     });
 
     // Create user. Default role assignment is a host concern (see ADR-040).
+    // Self-service sign-up never grants access on its own: the account starts
+    // PENDING_APPROVAL and an administrator accepts or rejects it in the IAM
+    // console. No session is issued by this endpoint either way.
     const user = await this.prisma.user.create({
       data: {
         ...data,
         email,
+        status: UserStatus.PENDING_APPROVAL,
         emails: { create: { email } },
         uiAvatarsUrl,
       },
@@ -336,6 +389,9 @@ export class AuthService {
           email,
           name: params.displayName || null,
           uiAvatarsUrl,
+          // A first-time Google identity is self-provisioned and must wait for
+          // administrator approval, like every other self-service channel.
+          status: UserStatus.PENDING_APPROVAL,
           emails: { create: { email, isVerified: true } },
         },
       });
