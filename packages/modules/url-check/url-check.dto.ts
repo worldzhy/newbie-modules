@@ -9,15 +9,15 @@ const HTTP_URL_PATTERN = /^https?:\/\/[^\s]+$/i;
 // --- Request DTOs ---
 
 export class ListUrlCheckTargetsRequestDto {
-  @ApiProperty({ description: "Owning project ID" })
+  @ApiProperty({ description: "Owning group ID" })
   @IsUUID()
-  projectId!: string;
+  groupId!: string;
 }
 
 export class CreateUrlCheckTargetDto {
-  @ApiProperty({ description: "Owning project ID" })
+  @ApiProperty({ description: "Owning group ID" })
   @IsUUID()
-  projectId!: string;
+  groupId!: string;
 
   @ApiProperty({ description: "Display name of the monitored target" })
   @IsNotEmpty()
@@ -71,8 +71,8 @@ export class UrlCheckTargetDto {
   @ApiProperty({ description: "Target ID (uuid)" })
   id!: string;
 
-  @ApiProperty({ description: "Owning project ID" })
-  projectId!: string;
+  @ApiProperty({ description: "Owning group ID" })
+  groupId!: string;
 
   @ApiProperty({ description: "Display name of the monitored target" })
   name!: string;

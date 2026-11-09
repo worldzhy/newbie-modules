@@ -39,7 +39,7 @@ interface ProbeOutcome {
 
 interface TargetRow {
   id: string;
-  projectId: string;
+  groupId: string;
   name: string;
   url: string;
   consecutiveFailures: number;
@@ -82,7 +82,7 @@ export class UrlCheckProbeService {
       where: { isActive: true },
       select: {
         id: true,
-        projectId: true,
+        groupId: true,
         name: true,
         url: true,
         consecutiveFailures: true,
@@ -166,7 +166,7 @@ export class UrlCheckProbeService {
         values: [
           {
             target_id: target.id,
-            project_id: target.projectId,
+            group_id: target.groupId,
             url: target.url,
             is_up: outcome.isUp,
             status_code: outcome.statusCode,
@@ -242,7 +242,7 @@ export class UrlCheckProbeService {
     try {
       const event: UrlCheckDownEvent = {
         targetId: target.id,
-        projectId: target.projectId,
+        groupId: target.groupId,
         name: target.name,
         url: target.url,
         error: outcome.error || (outcome.statusCode !== null ? `HTTP ${outcome.statusCode}` : ""),
@@ -260,7 +260,7 @@ export class UrlCheckProbeService {
     try {
       const event: UrlCheckRecoveredEvent = {
         targetId: target.id,
-        projectId: target.projectId,
+        groupId: target.groupId,
         name: target.name,
         url: target.url,
         downSince: openedAt ? openedAt.toISOString() : "",

@@ -9,7 +9,7 @@ export const URL_CHECK_RECOVERED_EVENT = "url-check.recovered";
 /** Fired when a target crosses into an alert-open state. */
 export interface UrlCheckDownEvent {
   targetId: string;
-  projectId: string;
+  groupId: string;
   name: string;
   url: string;
   error: string;
@@ -20,7 +20,7 @@ export interface UrlCheckDownEvent {
 /** Fired when a target recovers from an open alert. */
 export interface UrlCheckRecoveredEvent {
   targetId: string;
-  projectId: string;
+  groupId: string;
   name: string;
   url: string;
   downSince: string; // ISO timestamp, empty when the alert's openAt is null
@@ -34,7 +34,7 @@ const URL_CHECK_DOWN = defineEvent<UrlCheckDownEvent>({
   description: "Emitted when a target crosses into an alert-open state after consecutive probe failures.",
   payloadExample: {
     targetId: "ckv1a2b3c4d5e6f7g8h9i0j1",
-    projectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
+    groupId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
     name: "Marketing site",
     url: "https://example.com/health",
     error: "HTTP 503",
@@ -49,7 +49,7 @@ const URL_CHECK_RECOVERED = defineEvent<UrlCheckRecoveredEvent>({
   description: "Emitted when a target recovers from an open alert after consecutive probe successes.",
   payloadExample: {
     targetId: "ckv1a2b3c4d5e6f7g8h9i0j1",
-    projectId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
+    groupId: "8f02d95a-b027-4f7d-bc37-3749d2739b34",
     name: "Marketing site",
     url: "https://example.com/health",
     downSince: "2026-01-01T00:00:00.000Z",

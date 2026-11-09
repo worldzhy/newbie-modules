@@ -24,7 +24,7 @@ import {
  * declares no scope keys. The host lists `UrlCheckTarget` in
  * HOST_SCOPED_RESOURCES and registers resolvers in priority order — the
  * target-id resolver maps single-target routes to their owning project, and
- * the project resolver covers collection routes that carry projectId.
+ * the group resolver covers collection routes that carry groupId.
  */
 @ApiTags("url-check")
 @ApiBearerAuth()
@@ -34,10 +34,10 @@ export class UrlCheckController {
 
   @Get()
   @RequirePermission(PermissionAction.List, Prisma.ModelName.UrlCheckTarget)
-  @ApiOperation({ summary: "List URL check targets of a project" })
+  @ApiOperation({ summary: "List URL check targets of a group" })
   @ApiOkResponse({ type: UrlCheckTargetDto, isArray: true })
   async list(@Query() query: ListUrlCheckTargetsRequestDto): Promise<UrlCheckTargetDto[]> {
-    return this.urlCheck.list(query.projectId);
+    return this.urlCheck.list([query.groupId]);
   }
 
   @Post()

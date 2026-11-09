@@ -13,14 +13,14 @@ import { UrlCheckService } from "./url-check.service";
  * through its real implementation; only the stores are faked.
  */
 
-const PROJECT_ID = "22222222-2222-4222-8222-222222222222";
-const OTHER_PROJECT_ID = "33333333-3333-4333-8333-333333333333";
+const GROUP_ID = "22222222-2222-4222-8222-222222222222";
+const OTHER_GROUP_ID = "33333333-3333-4333-8333-333333333333";
 const TARGET_ID = "11111111-1111-4111-8111-111111111111";
 const PUBLIC_URL = "https://example.com/health";
 
 interface TargetRow {
   id: string;
-  projectId: string;
+  groupId: string;
   name: string;
   url: string;
   isActive: boolean;
@@ -45,10 +45,12 @@ interface IncidentRow {
   peakConsecutiveFailures: number;
 }
 
-type SeedTarget = Pick<TargetRow, "id" | "projectId" | "name" | "url"> & Partial<TargetRow>;
+type SeedTarget = Pick<TargetRow, "id" | "groupId" | "name" | "url"> & Partial<TargetRow>;
 
-function createHarness(seed: { projects?: string[]; targets?: SeedTarget[]; incidents?: IncidentRow[] } = {}) {
-  const projects = new Set(seed.projects ?? [PROJECT_ID]);
+function createHarness(
+  seed: { groups?: string[]; targets?: SeedTarget[]; incidents?: IncidentRow[]; policyError?: Error } = {},
+) {
+  const groups = new Set(seed.groups ?? [GROUP_ID]);
   const targets: TargetRow[] = (seed.targets ?? []).map((target, index) => ({
     isActive: true,
     consecutiveFailures: 0,
@@ -65,7 +67,8 @@ function createHarness(seed: { projects?: string[]; targets?: SeedTarget[]; inci
   }));
   const incidents: IncidentRow[] = (seed.incidents ?? []).map((incident) => ({ ...incident }));
   const counters = {
-    projectLookups: 0,
+    groupLookups: 0,
+    policyChecks: 0,
     targetCreates: 0,
     targetDeletes: 0,
     transactions: 0,
@@ -80,9 +83,9 @@ function createHarness(seed: { projects?: string[]; targets?: SeedTarget[]; inci
   const findTarget = (id: string) => targets.find((target) => target.id === id);
 
   const targetStore = {
-    findMany: async ({ where }: { where: { projectId?: string } }) =>
+    findMany: async ({ where }: { where: { groupId?: { in: string[] } } }) =>
       targets
-        .filter((target) => (where.projectId ? target.projectId === where.projectId : true))
+        .filter((target) => (where.groupId ? where.groupId.in.includes(target.groupId) : true))
         .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
         .map((target) => ({ ...target })),
     findUnique: async ({ where }: { where: { id: string } }) => {
@@ -165,10 +168,10 @@ function createHarness(seed: { projects?: string[]; targets?: SeedTarget[]; inci
   const tx = { urlCheckTarget: targetStore, urlCheckIncident: incidentStore };
 
   const prisma = {
-    project: {
+    application: {
       findUnique: async ({ where }: { where: { id: string } }) => {
-        counters.projectLookups += 1;
-        return projects.has(where.id) ? { id: where.id } : null;
+        counters.groupLookups += 1;
+        return groups.has(where.id) ? { id: where.id } : null;
       },
     },
     urlCheckTarget: targetStore,
@@ -194,7 +197,19 @@ function createHarness(seed: { projects?: string[]; targets?: SeedTarget[]; inci
     },
   };
 
-  const service = new UrlCheckService(prisma as unknown as PrismaService, clickhouse as unknown as ClickHouseService);
+  const groupPolicy = {
+    assertAttachable: async (groupId: string) => {
+      counters.policyChecks += 1;
+      assert.equal(groupId, GROUP_ID);
+      if (seed.policyError) throw seed.policyError;
+    },
+  };
+
+  const service = new UrlCheckService(
+    prisma as unknown as PrismaService,
+    clickhouse as unknown as ClickHouseService,
+    groupPolicy,
+  );
 
   return {
     service,
@@ -212,14 +227,14 @@ test("create rejects a non-public URL before touching the database", async () =>
 
   await assert.rejects(
     harness.service.create(
-      { projectId: PROJECT_ID, name: "Metadata", url: "http://169.254.169.254/latest/meta-data" },
+      { groupId: GROUP_ID, name: "Metadata", url: "http://169.254.169.254/latest/meta-data" },
       "user",
     ),
     /not a public address/,
   );
 
-  // Fail-fast ordering: neither the project lookup nor the insert may run.
-  assert.equal(harness.counters.projectLookups, 0);
+  // Fail-fast ordering: neither the group lookup nor the insert may run.
+  assert.equal(harness.counters.groupLookups, 0);
   assert.equal(harness.counters.targetCreates, 0);
 });
 
@@ -227,62 +242,75 @@ test("create rejects non-http schemes at the service boundary", async () => {
   const harness = createHarness();
 
   await assert.rejects(
-    harness.service.create({ projectId: PROJECT_ID, name: "Script", url: "javascript:alert(1)" }, "user"),
+    harness.service.create({ groupId: GROUP_ID, name: "Script", url: "javascript:alert(1)" }, "user"),
     /Only http\(s\) URLs/,
   );
   await assert.rejects(
-    harness.service.create({ projectId: PROJECT_ID, name: "Bad", url: "not a url" }, "user"),
+    harness.service.create({ groupId: GROUP_ID, name: "Bad", url: "not a url" }, "user"),
     /Invalid URL/,
   );
   await assert.rejects(
-    harness.service.create({ projectId: PROJECT_ID, name: "Loopback", url: "http://[::1]/" }, "user"),
+    harness.service.create({ groupId: GROUP_ID, name: "Loopback", url: "http://[::1]/" }, "user"),
     /not a public address/,
   );
   assert.equal(harness.counters.targetCreates, 0);
 });
 
-test("create rejects an unknown project without writing the target", async () => {
-  const harness = createHarness({ projects: [] });
+test("create rejects an unknown group without writing the target", async () => {
+  const harness = createHarness({ groups: [] });
 
   await assert.rejects(
-    harness.service.create({ projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }, "user"),
+    harness.service.create({ groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }, "user"),
     (error: unknown) => error instanceof Error && error.name === "NotFoundException",
   );
+  assert.equal(harness.counters.targetCreates, 0);
+  assert.equal(harness.counters.policyChecks, 0);
+});
+
+test("create stops when the host group policy rejects the group", async () => {
+  const harness = createHarness({ policyError: new Error("group type not eligible") });
+
+  await assert.rejects(
+    harness.service.create({ groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }, "user"),
+    /group type not eligible/,
+  );
+  assert.equal(harness.counters.groupLookups, 1);
+  assert.equal(harness.counters.policyChecks, 1);
   assert.equal(harness.counters.targetCreates, 0);
 });
 
 test("create persists the validated target with the creator id", async () => {
   const harness = createHarness();
 
-  const created = await harness.service.create({ projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }, "user-1");
+  const created = await harness.service.create({ groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }, "user-1");
 
-  assert.equal(created.projectId, PROJECT_ID);
+  assert.equal(created.groupId, GROUP_ID);
   assert.equal(created.url, PUBLIC_URL);
   assert.equal(created.createdByUserId, "user-1");
   assert.equal(harness.targets.length, 1);
   assert.equal(harness.counters.writesOutsideTransaction, 1);
 });
 
-test("list returns only the requested project's targets, newest first", async () => {
+test("list returns only the requested groups' targets, newest first", async () => {
   const harness = createHarness({
     targets: [
       {
         id: TARGET_ID,
-        projectId: PROJECT_ID,
+        groupId: GROUP_ID,
         name: "Older",
         url: PUBLIC_URL,
         createdAt: new Date(Date.UTC(2026, 0, 1)),
       },
       {
         id: "11111111-1111-4111-8111-111111111112",
-        projectId: PROJECT_ID,
+        groupId: GROUP_ID,
         name: "Newer",
         url: PUBLIC_URL,
         createdAt: new Date(Date.UTC(2026, 0, 2)),
       },
       {
         id: "11111111-1111-4111-8111-111111111113",
-        projectId: OTHER_PROJECT_ID,
+        groupId: OTHER_GROUP_ID,
         name: "Foreign",
         url: PUBLIC_URL,
         createdAt: new Date(Date.UTC(2026, 0, 3)),
@@ -290,7 +318,7 @@ test("list returns only the requested project's targets, newest first", async ()
     ],
   });
 
-  const rows = await harness.service.list(PROJECT_ID);
+  const rows = await harness.service.list([GROUP_ID]);
 
   assert.deepEqual(
     rows.map((row) => row.name),
@@ -300,7 +328,7 @@ test("list returns only the requested project's targets, newest first", async ()
 
 test("update rejects re-pointing to a blocked address and leaves the row untouched", async () => {
   const harness = createHarness({
-    targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+    targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
   });
 
   await assert.rejects(
@@ -328,7 +356,7 @@ test("pausing an alerting target closes the alert and its incident in one transa
     targets: [
       {
         id: TARGET_ID,
-        projectId: PROJECT_ID,
+        groupId: GROUP_ID,
         name: "Health",
         url: PUBLIC_URL,
         isAlertOpen: true,
@@ -362,7 +390,7 @@ test("pausing an alerting target closes the alert and its incident in one transa
 
 test("pausing a healthy target performs no incident write", async () => {
   const harness = createHarness({
-    targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+    targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
     incidents: [
       {
         id: "incident-1",
@@ -390,7 +418,7 @@ test("delete rejects an unknown target and removes an existing one", async () =>
   assert.equal(empty.counters.targetDeletes, 0);
 
   const harness = createHarness({
-    targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+    targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
   });
   assert.deepEqual(await harness.service.delete(TARGET_ID), { success: true });
   assert.equal(harness.targets.length, 0);
@@ -408,7 +436,7 @@ test("listCheckResults applies the default limit and clamps oversized/zero/negat
 
   for (const { limit, expected } of cases) {
     const harness = createHarness({
-      targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+      targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
     });
     harness.queueClickhouseRows([]);
 
@@ -421,7 +449,7 @@ test("listCheckResults applies the default limit and clamps oversized/zero/negat
 
 test("listCheckResults binds the target id and returns the UTC timestamp as ISO-8601", async () => {
   const harness = createHarness({
-    targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+    targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
   });
   // Exactly what ClickHouse JSONEachRow emits for DateTime64(3, 'UTC').
   harness.queueClickhouseRows([
@@ -451,7 +479,7 @@ test("listCheckResults refuses an unknown target without querying ClickHouse", a
 
 test("listIncidents returns newest first and honours the limit", async () => {
   const harness = createHarness({
-    targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+    targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
     incidents: [
       {
         id: "old",
@@ -487,7 +515,7 @@ test("listIncidents returns newest first and honours the limit", async () => {
 
 test("getStats reports nulls and the 24h default when no probe data exists", async () => {
   const harness = createHarness({
-    targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+    targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
   });
   harness.queueClickhouseRows([], []);
 
@@ -504,7 +532,7 @@ test("getStats reports nulls and the 24h default when no probe data exists", asy
 
 test("getStats computes the availability ratio and rounds the mean outage", async () => {
   const harness = createHarness({
-    targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+    targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
     incidents: [
       {
         id: "incident-1",
@@ -557,7 +585,7 @@ test("getStats maps each window to its bucket expression and time span", async (
 
   for (const { requested, hours, bucket } of cases) {
     const harness = createHarness({
-      targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+      targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
     });
     harness.queueClickhouseRows([], []);
 
@@ -571,7 +599,7 @@ test("getStats maps each window to its bucket expression and time span", async (
 
 test("getStats scopes the MTTR window to the selected trailing window", async () => {
   const harness = createHarness({
-    targets: [{ id: TARGET_ID, projectId: PROJECT_ID, name: "Health", url: PUBLIC_URL }],
+    targets: [{ id: TARGET_ID, groupId: GROUP_ID, name: "Health", url: PUBLIC_URL }],
   });
   harness.queueClickhouseRows([], []);
   const startedAt = Date.now();

@@ -10,7 +10,7 @@ import { CreateUrlCheckTargetDto, UpdateUrlCheckTargetDto, UrlCheckTargetStatsRe
  * never reach Postgres even if a caller bypasses the UI.
  */
 
-const PROJECT_ID = "22222222-2222-4222-8222-222222222222";
+const GROUP_ID = "22222222-2222-4222-8222-222222222222";
 
 async function violations<T extends object>(instance: T): Promise<Array<{ property: string; value: string }>> {
   const errors = await validate(instance);
@@ -25,7 +25,7 @@ function createTarget(payload: Record<string, unknown>): CreateUrlCheckTargetDto
 
 test("create rejects non-http(s) and whitespace-bearing URLs", async () => {
   for (const url of ["javascript:alert(1)", "ftp://example.com/file", "https://example.com/a b", ""]) {
-    const found = await violations(createTarget({ projectId: PROJECT_ID, name: "Target", url }));
+    const found = await violations(createTarget({ groupId: GROUP_ID, name: "Target", url }));
     assert.ok(found.length >= 1, url);
     assert.ok(
       found.every((entry) => entry.property === "url"),
@@ -36,20 +36,20 @@ test("create rejects non-http(s) and whitespace-bearing URLs", async () => {
 
 test("create accepts an uppercase http(s) scheme", async () => {
   const found = await violations(
-    createTarget({ projectId: PROJECT_ID, name: "Target", url: "HTTPS://EXAMPLE.COM/health" }),
+    createTarget({ groupId: GROUP_ID, name: "Target", url: "HTTPS://EXAMPLE.COM/health" }),
   );
   assert.deepEqual(found, []);
 });
 
 test("create enforces the uuid, name and url length bounds", async () => {
   const found = await violations(
-    createTarget({ projectId: "not-a-uuid", name: "a".repeat(256), url: `https://example.com/${"a".repeat(2048)}` }),
+    createTarget({ groupId: "not-a-uuid", name: "a".repeat(256), url: `https://example.com/${"a".repeat(2048)}` }),
   );
-  assert.deepEqual(found.map((entry) => entry.property).sort(), ["name", "projectId", "url"]);
+  assert.deepEqual(found.map((entry) => entry.property).sort(), ["groupId", "name", "url"]);
 
   const withinBounds = await violations(
     createTarget({
-      projectId: PROJECT_ID,
+      groupId: GROUP_ID,
       name: "a".repeat(255),
       url: `https://example.com/${"a".repeat(2027)}`,
     }),

@@ -19,7 +19,7 @@ const PROBE_URL = "http://198.51.100.10/health";
 
 interface FakeTarget {
   id: string;
-  projectId: string;
+  groupId: string;
   name: string;
   url: string;
   isActive: boolean;
@@ -34,7 +34,7 @@ interface FakeTarget {
 
 interface InsertedRow {
   target_id: string;
-  project_id: string;
+  group_id: string;
   url: string;
   is_up: boolean;
   status_code: number | null;
@@ -51,7 +51,7 @@ interface EmittedEvent {
 function makeTarget(index: number, overrides: Partial<FakeTarget> = {}): FakeTarget {
   return {
     id: `11111111-1111-4111-8111-1111111111${String(index).padStart(2, "0")}`,
-    projectId: "22222222-2222-4222-8222-222222222222",
+    groupId: "22222222-2222-4222-8222-222222222222",
     name: `Target ${index}`,
     url: PROBE_URL,
     isActive: true,

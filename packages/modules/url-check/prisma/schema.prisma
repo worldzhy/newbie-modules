@@ -6,15 +6,16 @@
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 // One external URL probed on a fixed cadence (ADR-022). Targets are
-// project-owned; check parameters (60s interval, 10s timeout, HTTP < 400
+// group-owned: groupId stores the id of the host grouping entity the probe
+// attaches to; check parameters (60s interval, 10s timeout, HTTP < 400
 // = up) are global defaults, not per-target settings. The failure counter
 // and alert-open flag drive the down/recovered notification state machine:
 // an outage alert opens at 3 consecutive failures and closes on the first
-// success afterwards. Cross-schema FK to the host application.Project (same
-// pattern as ProjectMember → module/account.User).
+// success afterwards. Cross-schema FK to the host application.Application
+// (same pattern as ProjectMember → module/account.User).
 model UrlCheckTarget {
   id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId             String    @db.Uuid
+  groupId               String    @db.Uuid
   name                  String    @db.VarChar(255)
   url                   String    @db.VarChar(2048)
   isActive              Boolean   @default(true)
@@ -31,10 +32,10 @@ model UrlCheckTarget {
   createdByUserId       String?   @db.Uuid
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
-  project               Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  application           Application @relation(fields: [groupId], references: [id], onDelete: Cascade)
   incidents             UrlCheckIncident[]
 
-  @@index([projectId])
+  @@index([groupId])
   @@index([isActive])
   @@schema("module/url-check")
 }

@@ -22,7 +22,7 @@ import { isIP } from "node:net";
  * There is an inherent TOCTOU window between this lookup and the DNS lookup
  * performed by fetch itself (DNS rebinding). Closing it would require pinning
  * the connection to the validated address, which fetch cannot express for
- * https; the residual risk is accepted for an authenticated, project-scoped
+ * https; the residual risk is accepted for an authenticated, group-scoped
  * feature.
  */
 
