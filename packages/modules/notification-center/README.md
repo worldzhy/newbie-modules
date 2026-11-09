@@ -8,7 +8,8 @@ Platform notification center. Business modules declare notifications in code, th
 - **NotificationSetting** (database): one row per registered notification key, owning the runtime-editable delivery fields (`defaultSeverity`, `isPushEnabled`) plus the declared `scope`. `NotificationSettingService` reconciles declarations on application bootstrap: missing rows are created, existing rows are never overridden.
 - **NotificationRecord** (database): one platform-wide row per delivered notification event. Per-user read state lives in `NotificationReceipt`, so fan-out needs no writes: a missing receipt simply means "unread" for that user.
 - **NotificationCenterSetting** (database): singleton row (fixed id) with center-wide switches: the `isPushEnabled` master switch and the `minimumSeverity` floor. In-app recording is the base layer and is always on; every notification below the severity floor is persisted regardless of push delivery.
-- **NotificationPushPort** (host-provided): the push adapter interface (`pushSystemText(text)`). The host implements it with its chat platform and its system-chat bindings, and registers it under the `NOTIFICATION_PUSH_PORT` injection token. Without an adapter the center still records notifications; only push delivery is skipped.
+- **NotificationPushPort** (host-provided, optional): the push adapter interface (`pushSystemText(text)`). The host implements it with its chat platform and its system-chat bindings, and registers it under the `NOTIFICATION_PUSH_PORT` injection token. Without an adapter the center still records notifications; only push delivery is skipped.
+- **NotificationVisibilityPort** (host-provided, required): the project-membership adapter interface (`visibleProjectIds(userId)`), registered under the `NOTIFICATION_VISIBILITY_PORT` injection token. Notification records are platform-wide rows, so the host supplies this port to keep project-scoped reads and deliveries scoped to their members. The controller injects it without `@Optional`: a host that forgets to bind it fails at startup instead of exposing every project's notifications.
 
 ## Delivery flow
 
@@ -29,4 +30,4 @@ Platform notification center. Business modules declare notifications in code, th
 
 ## Configuration
 
-No new env vars. Absolute links in push messages reuse the host's existing `APP_FRONTEND_URL`.
+No new env vars. Both ports above are Nest injection tokens bound by the host application: `NOTIFICATION_VISIBILITY_PORT` is mandatory (startup fails without it) and `NOTIFICATION_PUSH_PORT` is optional (only push delivery is skipped). Absolute links in push messages reuse the host's existing `APP_FRONTEND_URL`.

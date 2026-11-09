@@ -130,7 +130,7 @@ export class WebIpTaskService {
       }
       return {};
     } catch (err) {
-      this.logger.error(`Tencent API call error: ${err instanceof Error ? err.message : err}`);
+      this.logger.error(`Tencent API call error: ${getErrorMessage(err)}`);
       return {};
     }
   }

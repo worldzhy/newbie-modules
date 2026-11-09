@@ -32,6 +32,10 @@ BLOCKED.addAddress("::", "ipv6");
 BLOCKED.addAddress("::1", "ipv6");
 BLOCKED.addSubnet("fe80::", 10, "ipv6");
 BLOCKED.addSubnet("fc00::", 7, "ipv6");
+// IPv4-compatible (::/96) and NAT64 (64:ff9b::/96) forms embed an IPv4
+// address the ::ffff: strip above does not reach, e.g. ::7f00:1.
+BLOCKED.addSubnet("::", 96, "ipv6");
+BLOCKED.addSubnet("64:ff9b::", 96, "ipv6");
 
 function isPublicAddress(rawAddress: string): boolean {
   const address = rawAddress.trim().replace(/^::ffff:/i, "");

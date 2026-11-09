@@ -1,6 +1,5 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { ApiKey, Prisma } from "@generated/prisma/client";
-import { API_KEY_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { generateRandomString } from "@devbie/newbie/utilities/random.util";
 import { generateHash } from "@devbie/newbie/utilities/common.util";
@@ -94,11 +93,12 @@ export class ApiKeyService {
   }
 
   private async getOwnedApiKey(userId: string, id: number): Promise<ApiKey> {
-    const apiKey = await this.prisma.apiKey.findUnique({
-      where: { id },
+    // Scoped lookup: a missing row and another user's row answer identically,
+    // so the numeric id cannot be used to probe for row existence.
+    const apiKey = await this.prisma.apiKey.findFirst({
+      where: { id, userId },
     });
-    if (!apiKey) throw new NotFoundException(API_KEY_NOT_FOUND);
-    if (apiKey.userId !== userId) throw new ForbiddenException(FORBIDDEN_FOREIGN_RESOURCE);
+    if (!apiKey) throw new ForbiddenException(FORBIDDEN_FOREIGN_RESOURCE);
     return apiKey;
   }
 
