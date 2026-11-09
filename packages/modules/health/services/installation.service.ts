@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { HealthInstallation, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
@@ -11,6 +11,7 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
 import { InstallationPresence, isInstallationOnline } from "@modules/security/installation/installation-presence";
 import { LivenessState, worseLivenessState } from "@modules/security/installation/liveness-state";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
@@ -60,7 +61,10 @@ export interface HealthLivenessSnapshot {
  * (unknown / healthy / degraded / offline) at read time.
  */
 @Injectable()
-export class HealthInstallationService implements InstallationResolver {
+export class HealthInstallationService
+  extends BaseInstallationService<HealthInstallation>
+  implements InstallationResolver
+{
   readonly kind = "health";
   /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
   readonly legacyHeader = "x-health-token";
@@ -68,12 +72,13 @@ export class HealthInstallationService implements InstallationResolver {
   // Credential mechanism comes from security (ADR-019); this class only adapts
   // its table and projects the domain state.
   private readonly credentials: InstallationCredentialStore<HealthInstallationDraft, HealthInstallation>;
-  private readonly tokenVerifier: InstallationTokenVerifier<HealthInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<HealthInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<HealthInstallationDraft, HealthInstallation>(
       this.prisma.healthInstallation,
     );
@@ -273,29 +278,6 @@ export class HealthInstallationService implements InstallationResolver {
   /**
    * Look up a non-revoked installation by its plaintext token. Unknown and
    * revoked tokens both return null so the two cases stay indistinguishable.
-   */
-  async resolveByToken(token: string): Promise<HealthInstallation | null> {
-    return this.tokenVerifier.verify(token);
-  }
-
-  /**
-   * InstallationResolver port (ADR-016): authenticate a report token for the
-   * InstallationAuthGuard. Throws UnauthorizedException for unknown or
-   * revoked tokens.
-   */
-  async resolve(token: string): Promise<HealthInstallation> {
-    const installation = await this.resolveByToken(token);
-    if (!installation) {
-      throw new UnauthorizedException("Invalid or revoked installation token.");
-    }
-    return installation;
-  }
-
-  /**
-   * Record a dependency snapshot for an already-authenticated installation in
-   * a single round trip. Authentication happens upstream in the
-   * InstallationAuthGuard (ADR-016). firstSeenAt is written exactly once
-   * (COALESCE); the lastSnapshot* columns always advance.
    */
   async recordSnapshot(
     installationId: string,

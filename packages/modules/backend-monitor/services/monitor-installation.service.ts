@@ -11,6 +11,7 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
 import {
   DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
   InstallationPresence,
@@ -41,17 +42,18 @@ interface BackendMonitorInstallationDraft {
  * (ADR-019); this class only adapts the table and projects domain state.
  */
 @Injectable()
-export class MonitorInstallationService {
+export class MonitorInstallationService extends BaseInstallationService<BackendMonitorInstallation> {
   private readonly credentials: InstallationCredentialStore<
     BackendMonitorInstallationDraft,
     BackendMonitorInstallation
   >;
-  private readonly tokenVerifier: InstallationTokenVerifier<BackendMonitorInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<BackendMonitorInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<BackendMonitorInstallationDraft, BackendMonitorInstallation>(
       this.prisma.backendMonitorInstallation,
     );
@@ -153,11 +155,6 @@ export class MonitorInstallationService {
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
     return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
-  }
-
-  /** Token-only authentication for the ingest endpoint. */
-  async resolveByToken(token: string) {
-    return this.tokenVerifier.verify(token);
   }
 
   /**

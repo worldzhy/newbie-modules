@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, UnauthorizedException } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { HeartbeatInstallation } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
@@ -11,6 +11,7 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
 import {
   InstallationPresence,
   isInstallationOnline,
@@ -41,7 +42,10 @@ interface HeartbeatInstallationDraft {
  * of band, and the running process touches lastSeenAt on every ping.
  */
 @Injectable()
-export class HeartbeatInstallationService implements InstallationResolver {
+export class HeartbeatInstallationService
+  extends BaseInstallationService<HeartbeatInstallation>
+  implements InstallationResolver
+{
   readonly kind = "heartbeat";
   /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
   readonly legacyHeader = "x-heartbeat-token";
@@ -49,12 +53,13 @@ export class HeartbeatInstallationService implements InstallationResolver {
   // Credential mechanism comes from security (ADR-019); this class only adapts
   // its table and projects the domain state.
   private readonly credentials: InstallationCredentialStore<HeartbeatInstallationDraft, HeartbeatInstallation>;
-  private readonly tokenVerifier: InstallationTokenVerifier<HeartbeatInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<HeartbeatInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<HeartbeatInstallationDraft, HeartbeatInstallation>(
       this.prisma.heartbeatInstallation,
     );
@@ -193,27 +198,6 @@ export class HeartbeatInstallationService implements InstallationResolver {
   // -------------------------------------------------------------------------
   // Ping ingest
   // -------------------------------------------------------------------------
-
-  /**
-   * Look up a non-revoked installation by its plaintext token. Unknown and
-   * revoked tokens both return null so the two cases stay indistinguishable.
-   */
-  async resolveByToken(token: string): Promise<HeartbeatInstallation | null> {
-    return this.tokenVerifier.verify(token);
-  }
-
-  /**
-   * InstallationResolver port (ADR-016): authenticate a report token for the
-   * InstallationAuthGuard. Throws UnauthorizedException for unknown or
-   * revoked tokens.
-   */
-  async resolve(token: string): Promise<HeartbeatInstallation> {
-    const installation = await this.resolveByToken(token);
-    if (!installation) {
-      throw new UnauthorizedException("Invalid or revoked installation token.");
-    }
-    return installation;
-  }
 
   /**
    * Advance liveness for an already-authenticated installation in a single

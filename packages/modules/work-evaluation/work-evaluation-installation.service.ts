@@ -11,6 +11,7 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
 import {
   DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
   withDerivedOnlineState,
@@ -45,17 +46,18 @@ interface WorkEvaluationInstallationDraft {
  * cannot write evidence for another member.
  */
 @Injectable()
-export class WorkEvaluationInstallationService {
+export class WorkEvaluationInstallationService extends BaseInstallationService<WorkEvaluationInstallation> {
   private readonly credentials: InstallationCredentialStore<
     WorkEvaluationInstallationDraft,
     WorkEvaluationInstallation
   >;
-  private readonly tokenVerifier: InstallationTokenVerifier<WorkEvaluationInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<WorkEvaluationInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<WorkEvaluationInstallationDraft, WorkEvaluationInstallation>(
       this.prisma.workEvaluationInstallation,
     );
@@ -119,11 +121,6 @@ export class WorkEvaluationInstallationService {
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
     return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
-  }
-
-  /** Token-only authentication for the ingest endpoints. */
-  async resolveByToken(token: string) {
-    return this.tokenVerifier.verify(token);
   }
 
   /**

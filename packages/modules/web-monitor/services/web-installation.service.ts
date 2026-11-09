@@ -12,6 +12,7 @@ import {
 } from "@modules/security/installation/installation-credential";
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
+import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
 import {
   DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
   withDerivedOnlineState,
@@ -42,14 +43,15 @@ interface WebInstallationDraft {
  * identity.
  */
 @Injectable()
-export class WebInstallationService {
+export class WebInstallationService extends BaseInstallationService<WebMonitorInstallation> {
   private readonly credentials: InstallationCredentialStore<WebInstallationDraft, WebMonitorInstallation>;
-  private readonly tokenVerifier: InstallationTokenVerifier<WebMonitorInstallation>;
+  protected readonly tokenVerifier: InstallationTokenVerifier<WebMonitorInstallation>;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogService: AuditLogService,
   ) {
+    super();
     this.credentials = prismaInstallationCredentialStore<WebInstallationDraft, WebMonitorInstallation>(
       this.prisma.webMonitorInstallation,
     );
@@ -124,11 +126,6 @@ export class WebInstallationService {
   async unrevoke(id: string, actor?: string) {
     await this.getOrThrow(id);
     return restoreInstallationCredential(this.credentials, id, this.credentialAudit(actor));
-  }
-
-  /** Token-only authentication for the report endpoint. */
-  async resolveByToken(token: string) {
-    return this.tokenVerifier.verify(token);
   }
 
   /**
