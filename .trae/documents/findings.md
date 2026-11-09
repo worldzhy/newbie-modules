@@ -220,3 +220,14 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 - R26-03 fixed：`ca83ab1` / `ed0b920`（`isBlockedAddress` 对 `::ffff:<hex>` 重建内嵌 IPv4 后再判私网），新增 `public-url.test.ts` 两组正反例。
 - R26-05 fixed：`ca83ab1`（`.prettierignore` 增加 `**/.sst`），registry `npm run format:check` 转绿。
 - 验证边界：backend `npm test` 762/762、`tsc --noEmit`、改动文件 eslint、`format:check` 全绿；模块 registry↔宿主 `diff -rq` 为空；后端 build + 重启后 `/` 200、Swagger `checkedAt` 描述已更新；宿主 `newbie-modules.json` 已 re-pin 到 `ca83ab1`（`0a78ae1`）。
+
+## round29（2026-11-09，scope=`workspace`，报告在 devbie `.trae/documents/expert-review-2026-11-09-round29.md`）
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R29-02 | newbie-modules | `RateLimiter.spend` 把配额拒绝（rate-limiter-flexible 以 `RateLimiterRes` reject，非 Error）误判为 Redis 故障进 `degradedTo`，误报 "backend unavailable" 且 30s 降级窗口内本地空桶重置配额（verification-code 以 spend 作配额判定，无需并发即触发） | P1 | live | 任意登录用户 | fixed（2026-11-09，registry `93035fb` / 宿主装配 `67eee17`）：catch 内判别配额形状（`'remainingPoints' in error`）按配额语义返回剩余点数、不进降级，fallback 桶同样处理；补 2 例回归测试（修复前红 2/绿 5、修复后绿 7），运行时探针 10×400 后 429 且日志零 "backend unavailable" |
+| R29-04 | newbie-modules | web-monitor `ip-task.service.ts:133` `getErrorMessage` 收敛漏网：`err instanceof Error ? err.message : err`（fallback 非 `String()`） | P3 | live | — | open |
+| R29-05 | newbie-modules | 权限分层新规的严格读法：service 层基于已解析范围抛 403（web-monitor-access.service.ts:28、notification-center assertProjectVisible）属 fail-closed 合规，但与 site.controller getSites "静默忽略 projectId" 语义不统一，建议拒绝路径统一上移 controller | P3 | live | — | open |
+| R29-06 | newbie-modules | notification-center README 只写 `NOTIFICATION_PUSH_PORT`，9634316 后 `NOTIFICATION_VISIBILITY_PORT` 变为必需（不绑定启动失败），文档缺口 | P3 | docs | — | open |
+| R29-07 | newbie-modules | approved-subnet.service.ts:57/59、api-key.service.ts:100/101 存在性探测残留：不存在 404、他人资源 403，可区分行存在性（数字 ID 可枚举），与 20bf920 统一 403 目标矛盾 | P3 | live | — | open |
+| R29-08 | newbie-modules | llm `base-url-guard.ts:37` SSRF 谓词小缺口：裸 IPv4-compatible `::7f00:1` 不在 BLOCKED；NAT64 `64:ff9b::/96` 未列（现代栈不路由，可利用性低） | P3 | live | — | open |
