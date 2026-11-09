@@ -12,6 +12,7 @@ import {
 import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
 import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
 import { InstallationPresence, isInstallationOnline } from "@modules/security/installation/installation-presence";
+import { LivenessState, worseLivenessState } from "@modules/security/installation/liveness-state";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** Requested interval between client snapshots; echoed back in the response. */
@@ -31,9 +32,6 @@ interface HealthInstallationDraft {
   externalRef: string | null;
 }
 
-/** Derived health state of an installation. */
-export type HealthState = "unknown" | "healthy" | "degraded" | "offline";
-
 /** One failing dependency indicator from the latest snapshot. */
 export interface HealthDownIndicator {
   name: string;
@@ -46,7 +44,7 @@ export interface HealthDownIndicator {
  * in the latest snapshot (empty for every state except "degraded").
  */
 export interface HealthLivenessSnapshot {
-  state: HealthState;
+  state: LivenessState;
   lastSnapshotAt: Date | null;
   downIndicators: HealthDownIndicator[];
 }
@@ -159,7 +157,7 @@ export class HealthInstallationService implements InstallationResolver {
         lastSnapshotAt: row.lastSnapshotAt,
         // Indicator detail is only meaningful while the process is reporting;
         // an offline process's stale info must not masquerade as live faults.
-        downIndicators: state === "degraded" ? this.extractDownIndicators(row.lastSnapshotInfo) : [],
+        downIndicators: state === LivenessState.DEGRADED ? this.extractDownIndicators(row.lastSnapshotInfo) : [],
       };
       const prev = snapshots.get(row.externalRef);
       if (!prev) {
@@ -168,7 +166,7 @@ export class HealthInstallationService implements InstallationResolver {
       }
       // Worst state wins across installations; on a tie the newer snapshot
       // carries the more current indicators.
-      const worse = this.worseState(prev.state, state);
+      const worse = worseLivenessState(prev.state, state);
       if (worse === state && worse !== prev.state) {
         snapshots.set(row.externalRef, candidate);
       } else if (
@@ -239,7 +237,7 @@ export class HealthInstallationService implements InstallationResolver {
       env: string | null;
       instanceId: string | null;
       appVersion: string | null;
-      state: HealthState;
+      state: LivenessState;
       lastSnapshotAt: Date | null;
       lastSnapshotStatus: string | null;
       lastSnapshotInfo: unknown;
@@ -329,15 +327,10 @@ export class HealthInstallationService implements InstallationResolver {
   // Helpers
   // -------------------------------------------------------------------------
 
-  private deriveState(lastSnapshotAt: Date | null, lastSnapshotStatus: string | null): HealthState {
-    if (!lastSnapshotAt) return "unknown";
-    if (!isInstallationOnline(lastSnapshotAt, ONLINE_THRESHOLD_SECONDS)) return "offline";
-    return lastSnapshotStatus === "ok" ? "healthy" : "degraded";
-  }
-
-  private worseState(a: HealthState, b: HealthState): HealthState {
-    const order: Record<HealthState, number> = { unknown: 0, healthy: 1, degraded: 2, offline: 3 };
-    return order[a] >= order[b] ? a : b;
+  private deriveState(lastSnapshotAt: Date | null, lastSnapshotStatus: string | null): LivenessState {
+    if (!lastSnapshotAt) return LivenessState.UNKNOWN;
+    if (!isInstallationOnline(lastSnapshotAt, ONLINE_THRESHOLD_SECONDS)) return LivenessState.OFFLINE;
+    return lastSnapshotStatus === "ok" ? LivenessState.HEALTHY : LivenessState.DEGRADED;
   }
 
   /**
