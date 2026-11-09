@@ -47,8 +47,7 @@ function buildService(opts: { aggregateResult?: unknown[] } = {}) {
       return { aggregate: page.aggregate };
     },
   };
-  const config = { get: () => ({}) };
-  const service = new WebMonitorAnalysisService(models as never, config as never);
+  const service = new WebMonitorAnalysisService(models as never);
   return { service, env, page, appKeys };
 }
 

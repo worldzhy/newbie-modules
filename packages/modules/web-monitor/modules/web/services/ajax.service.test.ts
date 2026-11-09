@@ -18,8 +18,7 @@ function newService(opts: { countRows?: unknown[]; listRows?: Record<string, unk
       };
     },
   };
-  const config = { get: () => ({}) };
-  return { service: new AjaxService(ch as never, config as never), appKeys, finds };
+  return { service: new AjaxService(ch as never), appKeys, finds };
 }
 
 function listQuery(finds: { args: FindArgs }[]) {

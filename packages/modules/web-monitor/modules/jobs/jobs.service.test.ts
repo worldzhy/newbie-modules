@@ -198,11 +198,8 @@ function harness(options: HarnessOptions = {}) {
     },
   };
 
-  const configService = { get: () => ({}) };
-
   const service = new JobsService(
     redis as never,
-    configService as never,
     site as never,
     nodeCache as never,
     dayReportNum as never,

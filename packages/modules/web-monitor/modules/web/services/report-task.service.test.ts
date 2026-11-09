@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { ConfigService } from "@nestjs/config";
 import { ReportType } from "../../../models/enum";
 import { WebReportTaskService } from "./report-task.service";
 
@@ -33,14 +32,13 @@ function emptyBuckets() {
 }
 
 function buildService() {
-  const config = { get: () => ({}) } as unknown as ConfigService;
   const redis = {} as never;
   const site = {
     getSiteForAppId: async () => ({ appKey: VALID_APP_KEY, slowPageTime: 5 }),
   } as never;
   const models = {} as never;
   const ch = {} as never;
-  return new WebReportTaskService(config, redis, site, models, ch);
+  return new WebReportTaskService(redis, site, models, ch);
 }
 
 type DrainResult = string | null;

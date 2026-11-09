@@ -1,19 +1,12 @@
 import { Injectable } from "@nestjs/common";
 import { PipelineStage } from "mongoose";
 import { WebMonitorModelsService } from "../../../models/mongo/web-monitor-models.service";
-import { ConfigService } from "@nestjs/config";
 import { func } from "../../../shared/utils";
 import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 
 @Injectable()
 export class PageService {
-  private cfg: Record<string, unknown>;
-  constructor(
-    private readonly models: WebMonitorModelsService,
-    private readonly config: ConfigService,
-  ) {
-    this.cfg = this.config.get("modules.web-monitor") || {};
-  }
+  constructor(private readonly models: WebMonitorModelsService) {}
 
   async getAveragePageList(query: Record<string, unknown>) {
     const { appKey, type = "", pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;

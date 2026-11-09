@@ -80,8 +80,7 @@ function harness(options: { apps?: Row[]; initial?: Record<string, string>; dayR
     DayReportNum: () => DayModelWithQuery,
   };
 
-  const configService = { get: () => ({}) };
-  const service = new DayReportNumService(models as never, redis as never, configService as never);
+  const service = new DayReportNumService(models as never, redis as never);
   return { service, store, redisCalls, saved, readModes, findOneCalls };
 }
 

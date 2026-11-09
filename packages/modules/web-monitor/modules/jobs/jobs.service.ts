@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
-import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
@@ -29,13 +28,11 @@ import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 @Injectable()
 export class JobsService implements OnModuleInit {
-  private cfg: Record<string, unknown>;
   private readonly logger = new Logger(JobsService.name);
   private readonly alertState: AlertStateMachine;
 
   constructor(
     private readonly redis: RedisService,
-    private readonly configService: ConfigService,
     private readonly site: SiteService,
     private readonly nodeCache: NodeCacheService,
     private readonly dayReportNum: DayReportNumService,
@@ -47,7 +44,6 @@ export class JobsService implements OnModuleInit {
     private readonly clickhouse: WebMonitorClickHouseService,
     private readonly eventEmitter: EventEmitter2,
   ) {
-    this.cfg = this.configService.get("modules.web-monitor") || {};
     this.alertState = new AlertStateMachine(this.redis, this.logger);
   }
 

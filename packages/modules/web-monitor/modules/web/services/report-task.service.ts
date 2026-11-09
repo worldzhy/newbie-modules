@@ -1,5 +1,4 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { WebMonitorClickHouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
@@ -73,17 +72,13 @@ interface WebReportItem {
 
 @Injectable()
 export class WebReportTaskService {
-  private cfg: Record<string, unknown>;
   private readonly logger = new Logger(WebReportTaskService.name);
   constructor(
-    private readonly config: ConfigService,
     private readonly redis: RedisService,
     private readonly site: SiteService,
     private readonly models: WebMonitorModelsService,
     private readonly ch: WebMonitorClickHouseService,
-  ) {
-    this.cfg = this.config.get("modules.web-monitor") || {};
-  }
+  ) {}
 
   private pushRow(bucket: Record<string, Record<string, unknown>[]>, appKey: string, row: Record<string, unknown>) {
     const rows = bucket[appKey];

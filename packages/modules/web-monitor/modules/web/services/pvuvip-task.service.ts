@@ -1,5 +1,4 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { SiteService } from "@modules/web-monitor/modules/site/site.service";
 import { PvuvipService } from "./pvuvip.service";
 import { func, mapWithConcurrency } from "../../../shared/utils";
@@ -16,15 +15,11 @@ function cronMinuteInterval(cronExp: string) {
 
 @Injectable()
 export class WebPvuvipTaskService {
-  private cfg: Record<string, unknown>;
   private readonly logger = new Logger(WebPvuvipTaskService.name);
   constructor(
-    private readonly config: ConfigService,
     private readonly site: SiteService,
     private readonly pvuvip: PvuvipService,
-  ) {
-    this.cfg = this.config.get("modules.web-monitor") || {};
-  }
+  ) {}
 
   async getWebPvUvIpByMinute() {
     const between = cronMinuteInterval(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));

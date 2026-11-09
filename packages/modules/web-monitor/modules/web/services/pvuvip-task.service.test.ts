@@ -32,8 +32,7 @@ function buildService(
       return {};
     },
   };
-  const config = { get: () => ({}) };
-  const service = new WebPvuvipTaskService(config as never, site as never, pvuvip as never);
+  const service = new WebPvuvipTaskService(site as never, pvuvip as never);
   (service as unknown as { logger: unknown }).logger = { error: () => {} };
   return { service, surveys, saves };
 }

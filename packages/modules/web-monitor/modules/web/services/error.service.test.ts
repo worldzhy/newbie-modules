@@ -28,8 +28,7 @@ function newService(
       };
     },
   };
-  const config = { get: () => ({}) };
-  return { service: new ErrorService(ch as never, config as never), appKeys, finds };
+  return { service: new ErrorService(ch as never), appKeys, finds };
 }
 
 function listQuery(finds: { args: FindArgs }[]) {

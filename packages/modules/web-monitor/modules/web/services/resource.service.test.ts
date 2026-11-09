@@ -41,9 +41,8 @@ function newService(opts: { count?: number; aggRows?: unknown[]; distinctValues?
       };
     },
   };
-  const config = { get: () => ({}) };
   return {
-    service: new ResourceService(models as never, config as never),
+    service: new ResourceService(models as never),
     appKeys,
     counts,
     pipelines,

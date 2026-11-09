@@ -1,17 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { WEB_MONITOR_CONFIG } from "../../../shared/web-monitor-config";
 import { WebMonitorClickHouseService } from "../../../models/clickhouse/web-monitor-clickhouse.service";
 
 @Injectable()
 export class AjaxService {
-  private cfg: Record<string, unknown>;
-  constructor(
-    private readonly ch: WebMonitorClickHouseService,
-    private readonly config: ConfigService,
-  ) {
-    this.cfg = this.config.get("modules.web-monitor") || {};
-  }
+  constructor(private readonly ch: WebMonitorClickHouseService) {}
 
   async getPageAjaxsAvg(appKey: string, url?: string, beginTime?: string, endTime?: string) {
     const wheres: string[] = [];

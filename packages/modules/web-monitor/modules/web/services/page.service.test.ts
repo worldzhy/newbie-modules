@@ -48,9 +48,8 @@ function newService(
       };
     },
   };
-  const config = { get: () => ({}) };
   return {
-    service: new PageService(models as never, config as never),
+    service: new PageService(models as never),
     appKeys,
     counts,
     pipelines,
