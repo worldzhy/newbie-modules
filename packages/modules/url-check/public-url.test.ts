@@ -45,6 +45,21 @@ test("isBlockedAddress judges the hex form of IPv4-mapped addresses", () => {
   assert.equal(isBlockedAddress("0:0:0:0:0:ffff:7f00:1"), true);
 });
 
+test("isBlockedAddress blocks IPv4-compatible ::/96 and NAT64 64:ff9b::/96", () => {
+  // Bare IPv4-compatible forms the ::ffff: branch does not reach.
+  assert.equal(isBlockedAddress("::7f00:1"), true);
+  assert.equal(isBlockedAddress("0:0:0:0:0:0:7f00:1"), true);
+  assert.equal(isBlockedAddress("::127.0.0.1"), true);
+  assert.equal(isBlockedAddress("::8.8.8.8"), true);
+  // NAT64 well-known prefix, dotted and hex embedded forms.
+  assert.equal(isBlockedAddress("64:ff9b::127.0.0.1"), true);
+  assert.equal(isBlockedAddress("64:ff9b::7f00:1"), true);
+  assert.equal(isBlockedAddress("64:ff9b::808:808"), true);
+  // Lookalikes outside the two ranges stay allowed.
+  assert.equal(isBlockedAddress("64:ff9b:1::7f00:1"), false);
+  assert.equal(isBlockedAddress("2001::7f00:1"), false);
+});
+
 test("assertPublicHttpUrl allows URL-normalized public IPv4-mapped addresses", () => {
   assert.equal(assertPublicHttpUrl("http://[::ffff:8.8.8.8]/"), undefined);
   assert.equal(assertPublicHttpUrl("http://[::ffff:1.1.1.1]/"), undefined);

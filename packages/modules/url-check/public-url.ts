@@ -51,6 +51,31 @@ function parseIpv4(address: string): number | null {
   return value;
 }
 
+/** Replaces a trailing dotted IPv4 tail (e.g. "::127.0.0.1") with two hex hextets. */
+function normalizeEmbeddedIpv4(normalized: string): string {
+  const lastColon = normalized.lastIndexOf(":");
+  if (lastColon === -1) return normalized;
+  const value = parseIpv4(normalized.slice(lastColon + 1));
+  if (value === null) return normalized;
+  return `${normalized.slice(0, lastColon + 1)}${(value >>> 16).toString(16)}:${(value & 0xffff).toString(16)}`;
+}
+
+/** Expands a pure-hex IPv6 address into its 8 hextets; null when malformed. */
+function parseIpv6Hextets(address: string): number[] | null {
+  if (address.includes(".")) return null;
+  const halves = address.split("::");
+  if (halves.length > 2) return null;
+  const left = halves[0] === "" ? [] : halves[0].split(":");
+  const right = halves.length === 2 ? (halves[1] === "" ? [] : halves[1].split(":")) : [];
+  if (halves.length === 1 && left.length !== 8) return null;
+  const missing = 8 - left.length - right.length;
+  if (missing < 0 || (halves.length === 2 && missing === 0)) return null;
+  const parts = [...left, ...new Array<string>(missing).fill("0"), ...right];
+  const hextets = parts.map((part) => parseInt(part || "0", 16));
+  if (hextets.some((hextet) => Number.isNaN(hextet) || hextet > 0xffff)) return null;
+  return hextets;
+}
+
 /** True when the IPv4/IPv6 address (already parsed, brackets stripped) is not public. */
 export function isBlockedAddress(rawAddress: string): boolean {
   const version = isIP(rawAddress);
@@ -84,6 +109,15 @@ export function isBlockedAddress(rawAddress: string): boolean {
         return true;
       }
     }
+    // IPv4-compatible (::/96) and NAT64 (64:ff9b::/96) forms embed an IPv4
+    // address the ::ffff: prefix branch above does not reach, e.g. ::7f00:1.
+    const hextets = parseIpv6Hextets(normalizeEmbeddedIpv4(normalized));
+    if (hextets === null) return true;
+    const zeroHextets1to5 =
+      hextets[1] === 0 && hextets[2] === 0 && hextets[3] === 0 && hextets[4] === 0 && hextets[5] === 0;
+    if (hextets[0] === 0 && zeroHextets1to5) return true; // ::/96 IPv4-compatible
+    const zeroHextets2to5 = hextets[2] === 0 && hextets[3] === 0 && hextets[4] === 0 && hextets[5] === 0;
+    if (hextets[0] === 0x64 && hextets[1] === 0xff9b && zeroHextets2to5) return true; // 64:ff9b::/96 NAT64
     const firstHextet = parseInt(normalized.split(":")[0] || "0", 16);
     if ((firstHextet & 0xffc0) === 0xfe80) return true; // fe80::/10 link-local
     if ((firstHextet & 0xfe00) === 0xfc00) return true; // fc00::/7 unique local
