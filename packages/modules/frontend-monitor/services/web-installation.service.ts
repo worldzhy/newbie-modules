@@ -53,7 +53,7 @@ export class WebInstallationService extends BaseInstallationService<FrontendMoni
   ) {
     super();
     this.credentials = prismaInstallationCredentialStore<WebInstallationDraft, FrontendMonitorInstallation>(
-      this.prisma.webMonitorInstallation,
+      this.prisma.frontendMonitorInstallation,
     );
     this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
   }
@@ -88,7 +88,7 @@ export class WebInstallationService extends BaseInstallationService<FrontendMoni
   }
 
   async list(query: { externalRef?: string }) {
-    const rows = await this.prisma.webMonitorInstallation.findMany({
+    const rows = await this.prisma.frontendMonitorInstallation.findMany({
       where: query.externalRef ? { externalRef: query.externalRef } : undefined,
       orderBy: { createdAt: "desc" },
     });
@@ -96,7 +96,7 @@ export class WebInstallationService extends BaseInstallationService<FrontendMoni
   }
 
   async getOrThrow(id: string) {
-    const row = await this.prisma.webMonitorInstallation.findUnique({ where: { id } });
+    const row = await this.prisma.frontendMonitorInstallation.findUnique({ where: { id } });
     if (!row) throw new NotFoundException(`Web installation ${id} not found.`);
     return row;
   }
@@ -107,7 +107,7 @@ export class WebInstallationService extends BaseInstallationService<FrontendMoni
 
   /** Exact-match lookup by the host-mapping tag ("projectId/applicationId"). */
   async findByExternalRef(externalRef: string) {
-    return this.prisma.webMonitorInstallation.findFirst({ where: { externalRef } });
+    return this.prisma.frontendMonitorInstallation.findFirst({ where: { externalRef } });
   }
 
   /** Rotate the token; the old hash stops working immediately. */
