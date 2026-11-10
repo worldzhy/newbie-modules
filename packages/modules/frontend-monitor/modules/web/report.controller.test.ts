@@ -179,7 +179,7 @@ test("a full redis queue throttles with 429 before any push", async () => {
     (error) =>
       error instanceof HttpException &&
       error.getStatus() === HttpStatus.TOO_MANY_REQUESTS &&
-      error.message === `redis: ${RedisKeys.WEB_REPORT_DATAS}: rate limit reached (${limit})`,
+      error.message === `redis: ${RedisKeys.FRONTEND_REPORT_DATAS}: rate limit reached (${limit})`,
   );
   assert.equal(h.lpushCalls.length, 0);
   assert.equal(h.counted.length, 0);
@@ -198,8 +198,8 @@ test("the happy path touches liveness, pushes the report and counts the day in o
   await h.controller.webReport(req(headers) as never, headers, { type: "PagePerf" } as never);
   assert.deepEqual(h.touched, ["inst-1"]);
   assert.deepEqual(h.ops, [
-    `llen:${RedisKeys.WEB_REPORT_DATAS}`,
-    `lpush:${RedisKeys.WEB_REPORT_DATAS}`,
+    `llen:${RedisKeys.FRONTEND_REPORT_DATAS}`,
+    `lpush:${RedisKeys.FRONTEND_REPORT_DATAS}`,
     "redisCount:APP1",
   ]);
 });
