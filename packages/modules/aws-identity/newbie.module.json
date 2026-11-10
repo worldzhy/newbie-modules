@@ -10,11 +10,11 @@
     "modules": ["security"],
     "config": {
       "aws-identity": {
-        "platformAccountId": "process.env.PLATFORM_AWS_ACCOUNT_ID"
+        "platformAccountId": "process.env.AWS_IDENTITY_PLATFORM_ACCOUNT_ID"
       }
     },
     "env": {
-      "PLATFORM_AWS_ACCOUNT_ID": ""
+      "AWS_IDENTITY_PLATFORM_ACCOUNT_ID": ""
     },
     "dependencies": {
       "@aws-sdk/client-sts": "latest",
