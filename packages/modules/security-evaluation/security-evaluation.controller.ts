@@ -1,7 +1,9 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
 import { EvaluationFindingService } from "@modules/evaluation/evaluation-finding.service";
+import { EvaluationResultService } from "@modules/evaluation/evaluation-result.service";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 
@@ -11,6 +13,7 @@ import { SecurityEvaluationRunService } from "./security-evaluation-run.service"
 import { SECURITY_EVALUATION_SUBJECT_KINDS } from "./security-evaluation.constants";
 import {
   GetSecurityEvaluationAssetRequestDto,
+  GetSecurityEvaluationFindingRequestDto,
   GetSecurityEvaluationReportRequestDto,
   IngestSecurityEvaluationSubjectRequestDto,
   IngestSecurityEvaluationSubjectResponseDto,
@@ -24,6 +27,8 @@ import {
   ListSecurityEvaluationResultsResponseDto,
   ListSecurityEvaluationRunsRequestDto,
   ListSecurityEvaluationRunsResponseDto,
+  SecurityEvaluationFindingDetailResponseDto,
+  SecurityEvaluationFindingResponseDto,
   SecurityEvaluationReportResponseDto,
   SecurityEvaluationRunAcceptedResponseDto,
   StartSecurityEvaluationRunRequestDto,
@@ -52,6 +57,8 @@ export class SecurityEvaluationController {
     private readonly assets: SecurityEvaluationAssetService,
     private readonly runs: SecurityEvaluationRunService,
     private readonly findings: EvaluationFindingService,
+    private readonly results: EvaluationResultService,
+    private readonly criteria: EvaluationCriteriaService,
     private readonly reports: SecurityEvaluationReportService,
   ) {}
 
@@ -174,6 +181,92 @@ export class SecurityEvaluationController {
       page: query.page,
       pageSize: query.pageSize,
     });
+  }
+
+  @Get("findings/:findingId")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationFinding)
+  @ApiOperation({
+    summary: "One finding with its matched evidence items from the last-seen run's archived result",
+  })
+  @ApiResponse({ status: 200, type: SecurityEvaluationFindingDetailResponseDto })
+  async getFindingDetail(
+    @Param() params: GetSecurityEvaluationFindingRequestDto,
+  ): Promise<SecurityEvaluationFindingDetailResponseDto> {
+    const finding = await this.findings.getFinding(params.findingId);
+
+    // No last-seen run (should not happen for an OPEN finding, but guard anyway).
+    if (!finding.lastSeenRunId) {
+      return {
+        finding: finding as unknown as SecurityEvaluationFindingResponseDto,
+        evidenceItems: [],
+      };
+    }
+
+    // Result may be missing (run status FAILED before judgment) — tolerate gracefully.
+    let manifest: unknown[] = [];
+    let ruleSetVersion: string | null = null;
+    let evaluationKey: string | null = null;
+    try {
+      const runResult = await this.results.getResultForRun(finding.lastSeenRunId);
+      const manifestResult = await this.results.getResultManifest(runResult.id);
+      manifest = manifestResult.manifest as unknown[];
+      const version = await this.criteria.getVersion(runResult.ruleSetVersionId);
+      ruleSetVersion = version.version ?? null;
+      evaluationKey = version.evaluationKey ?? null;
+    } catch {
+      // No result / run — return finding alone.
+    }
+
+    const evidenceItems = this.matchEvidence(manifest, finding.metadata as Record<string, unknown> | null);
+
+    return {
+      finding: finding as unknown as SecurityEvaluationFindingResponseDto,
+      ruleSetVersion,
+      evaluationKey,
+      evidenceItems,
+    };
+  }
+
+  /**
+   * Match a finding's metadata against the manifest. Two strategies, both
+   * scoped to this feature's evidence shapes:
+   *   - metadata.path → manifest item.summary (CODE_SCAN: summary is the file path)
+   *   - metadata.evidenceRefs (legacy, skeleton does not persist this) → item.id
+   */
+  private matchEvidence(
+    manifest: unknown[],
+    metadata: Record<string, unknown> | null,
+  ): SecurityEvaluationFindingDetailResponseDto["evidenceItems"] {
+    if (!metadata || manifest.length === 0) return [];
+
+    const byId = new Map<string, SecurityEvaluationFindingDetailResponseDto["evidenceItems"][number]>();
+    const pathMatch = metadata.path;
+    const pathStr = typeof pathMatch === "string" ? pathMatch : null;
+
+    const refs = metadata.evidenceRefs;
+    const refList = Array.isArray(refs) ? refs.filter((r): r is string => typeof r === "string") : [];
+
+    for (const raw of manifest) {
+      const item = raw as Record<string, unknown>;
+      const id = typeof item.id === "string" ? item.id : null;
+      const summary = typeof item.summary === "string" ? item.summary : null;
+      if (!id) continue;
+
+      const matchedByPath = pathStr && summary === pathStr;
+      const matchedByRef = refList.includes(id);
+      if (!matchedByPath && !matchedByRef) continue;
+
+      byId.set(id, {
+        id,
+        layer: typeof item.layer === "string" ? item.layer : "source",
+        source: typeof item.source === "string" ? item.source : "",
+        summary: summary ?? id,
+        observedAt: item.observedAt instanceof Date ? item.observedAt : new Date(),
+        refs: Array.isArray(item.refs) ? (item.refs as string[]) : null,
+        payload: item.payload as object | undefined,
+      });
+    }
+    return [...byId.values()];
   }
 
   // --- Report ------------------------------------------------------------

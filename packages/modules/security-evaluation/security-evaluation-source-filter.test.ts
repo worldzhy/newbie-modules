@@ -68,6 +68,14 @@ function createController(subjectIds: string[] | null) {
       seen.findings.push(input);
       return { items: [], countOfTotal: 0, page: 1, pageSize: 20 };
     },
+    getFinding: async () => ({ lastSeenRunId: null }),
+  };
+  const results = {
+    getResultForRun: async () => ({ ruleSetVersionId: "v" }),
+    getResultManifest: async () => ({ manifest: [] }),
+  };
+  const criteria = {
+    getVersion: async () => ({ version: "v1", evaluationKey: "test" }),
   };
   const reports = {
     getReport: async (ids: string[] | null) => {
@@ -77,7 +85,14 @@ function createController(subjectIds: string[] | null) {
   };
 
   return {
-    controller: new SecurityEvaluationController(assets as never, runs as never, findings as never, reports as never),
+    controller: new SecurityEvaluationController(
+      assets as never,
+      runs as never,
+      findings as never,
+      results as never,
+      criteria as never,
+      reports as never,
+    ),
     seen,
   };
 }

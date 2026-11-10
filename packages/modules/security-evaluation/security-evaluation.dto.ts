@@ -12,6 +12,13 @@ export class GetSecurityEvaluationAssetRequestDto {
   assetId!: string;
 }
 
+/** Path-parameter envelope for finding-scoped routes. */
+export class GetSecurityEvaluationFindingRequestDto {
+  @ApiProperty({ type: String, format: "uuid" })
+  @IsUUID()
+  findingId!: string;
+}
+
 // --- Subject ingest ------------------------------------------------------
 
 /**
@@ -313,6 +320,54 @@ export class SecurityEvaluationFindingResponseDto {
 }
 
 export class ListSecurityEvaluationFindingsResponseDto extends CommonListResponseDto<SecurityEvaluationFindingResponseDto> {}
+
+// --- Finding detail + evidence -------------------------------------------
+
+/**
+ * One matched manifest item: the exact shape EvaluationEvidenceItem archives
+ * in EvaluationResult.manifest, returned verbatim so the client renders it.
+ */
+export class SecurityEvaluationEvidenceItemResponseDto {
+  @ApiProperty({ description: "Stable id of this evidence item inside the manifest" })
+  id!: string;
+  @ApiProperty({ description: 'Collection layer: "declared" / "knowledge" / "source"' })
+  layer!: string;
+  @ApiProperty({ description: "Origin source the evidence came from (repository, threat-intel, config-api, …)" })
+  source!: string;
+  @ApiProperty({ description: "Human-readable summary — for source items this is the file path" })
+  summary!: string;
+  @ApiProperty({ type: Date })
+  observedAt!: Date;
+  @ApiPropertyOptional({ type: [String], description: "Cross-references the item carries (e.g. git revision)" })
+  refs?: string[] | null;
+  @ApiPropertyOptional({
+    type: Object,
+    description:
+      "Feature-defined payload. CODE_SCAN items carry { path, language, bytes, revision, contentHash, excerpt, truncated }",
+  })
+  payload?: object | null;
+}
+
+/**
+ * Single-finding read path: the finding row plus whichever manifest item of
+ * its last-seen run matched (by file path for CODE_SCAN, by evidenceRefs for
+ * other families). Returns evidenceItems = [] when the run had no matching
+ * item (e.g. a finding carried no metadata.path or the run had no result).
+ */
+export class SecurityEvaluationFindingDetailResponseDto {
+  @ApiProperty({ type: SecurityEvaluationFindingResponseDto })
+  finding!: SecurityEvaluationFindingResponseDto;
+  @ApiPropertyOptional({ description: "Rule set version label the last-seen run evaluated under" })
+  ruleSetVersion?: string | null;
+  @ApiPropertyOptional({ description: "Evaluated key of the last-seen run — echoes finding.evaluationKey" })
+  evaluationKey?: string | null;
+  @ApiProperty({
+    type: [SecurityEvaluationEvidenceItemResponseDto],
+    isArray: true,
+    description: "Manifest items from the last-seen run's result that match the finding",
+  })
+  evidenceItems!: SecurityEvaluationEvidenceItemResponseDto[];
+}
 
 // --- Report --------------------------------------------------------------
 
