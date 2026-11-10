@@ -237,3 +237,21 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 本轮无涉及 registry 源码的 finding。台账订正项 R30-01（P2，docs）登记于 devbie findings.md round30 节，涉及本仓两点：①本文件 `:30`（R5-P2-04 removed）与 `:119`（carry-over 注记仍称 open）自相矛盾，需订正；②R3-25 open 引用失真（正文条目已不在本台账，前端测试缺口已被后续轮次覆盖）。装配一致性 34/34 diff 空、模块分层新规则零违规（9 处 ForbiddenException 逐点判定合规）。
 
 R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30` 口径统一（R5-P2-04 removed，不再 open）；② R3-25 open 引用按 round30 裁决关闭（前端 12 文件/109 用例全绿）。devbie 侧同步关闭 R28-06/R28-08 并删除 backlog R3-25 引用。
+
+## round31（2026-11-10，scope=`modules: [security-evaluation]`，报告 `expert-review-2026-11-10-round31.md`）
+
+评审对象：ADR-054 code-scan 全链路（registry `21e4ef8`）+ 宿主装配整合（nightwatch-backend `743c24b`）。装配 `diff -rq` 零差异。全部状态 `open`（评审会话只读）。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R31-01 | newbie-modules + nightwatch-backend | LLM scope 不可解析时全量文件记 unavailable skip，run 仍 SUCCEEDED（evaluated=0），骨架 resolveAbsentFindings 随即关闭该 subject 全部 OPEN code-scan findings（executed：解绑后 2 条 finding 18s 内 RESOLVED，重绑后缓存重放恢复） | P1 | live | 管理员解绑/连接不可用，含 daily 无人值守 | open |
+| R31-02 | nightwatch-backend | code-scan 未登记项目安全分类表 R1（`security-evaluation-read-model.service.ts:51-56`）→ `unknown` → 空 buckets，findings 在项目安全总览/风险快照被静默丢弃（executed 纯函数探针：threat-intel 落 unclassified，code-scan 无桶） | P1 | live | 任意登录项目查看者 | open |
+| R31-03 | nightwatch-frontend | security-evaluation 页的标签表/筛选/手动触发三处均无 code-scan，新能力只能靠 API 或 daily 任务触发 | P2 | live | 任意登录用户 | open |
+| R31-04 | nightwatch-backend | 快照适配器扩展名判定用整条 path 的 lastIndexOf(".")（`docs/v1.2/README` 误判 non-source；无点号文件被当源码）；EXCLUDED_PREFIXES 只匹配根级 | P2 | live | — | open |
+| R31-05 | nightwatch-backend | GitHub tree 截断仅 warn，不折进 skipped/manifest，违反全量记账契约（静默欠覆盖） | P2 | live | 超大仓库 | open |
+| R31-06 | newbie-modules | 缓存身份以模型名 modelId 为准，跨连接同名模型共享判决；temperature 只进 signature 不进身份 | P2 | live | — | open |
+| R31-07 | newbie-modules | 仅"丢弃条目"而无文件跳过时 skipped 为 undefined，丢弃说明不进 coverage，只留 metadata 计数 | P2 | live | — | open |
+| R31-08 | newbie-modules | 超 maxFiles 的每个源码文件逐条写 skipped items，随仓库规模线性膨胀 result 体积 | P2 | live | 大仓库 | open |
+| R31-09 | newbie-modules | `MAX_FILES=200` 与 `LLM_CALL_BUDGET=200` 相等且缓存不耗预算 → budgetCut 分支不可达；ADR-054 条款 6 的"缓存救预算跳过文件"表述不成立 | P2 | source | — | open |
+| R31-10 | newbie-modules + nightwatch-backend | 源码摘录（≤12000 字符/文件×200）随 manifest 持久化，secret-exposure finding 可能把密钥原文写入 findings 与缓存表；ADR 只声明"出境"，未覆盖二次落库与保留期 | P2 | live | — | open |
+
