@@ -325,7 +325,7 @@ export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestD
   })
   @IsOptional()
   @IsIn(["P1", "P2", "P3", "P4"])
-  urgency?: string;
+  urgency?: "P1" | "P2" | "P3" | "P4";
 
   @ApiPropertyOptional({
     type: Boolean,
