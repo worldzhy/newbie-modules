@@ -9,9 +9,9 @@ import { defineEvent } from "@modules/event-emitter/event-definition";
  * the event becomes a user-facing notification (mirrors the job-scheduler
  * run-failed event pattern).
  */
-export const FRONTEND_THRESHOLD_ALERT_EVENT = "frontend-monitor.threshold-alert";
+export const FRONTEND_MONITOR_THRESHOLD_ALERT_EVENT = "frontend-monitor.threshold-alert";
 
-export type FrontendThresholdAlertSignal =
+export type FrontendMonitorThresholdAlertSignal =
   "slow-page" | "slow-first-paint" | "slow-resource" | "slow-ajax" | "js-error-spike" | "js-error-first-seen";
 
 /**
@@ -19,19 +19,19 @@ export type FrontendThresholdAlertSignal =
  * observed); `recovered` is emitted when the same signal fingerprint has been
  * clean for N consecutive evaluation windows (ADR-051).
  */
-export type FrontendThresholdAlertPhase = "firing" | "recovered";
+export type FrontendMonitorThresholdAlertPhase = "firing" | "recovered";
 
-export type FrontendThresholdAlertCategory = "js" | "css" | "img";
+export type FrontendMonitorThresholdAlertCategory = "js" | "css" | "img";
 
-export interface FrontendThresholdAlertEvent {
+export interface FrontendMonitorThresholdAlertEvent {
   /** System partition key (browser SDK appKey). */
   appKey: string;
   systemName: string;
-  signal: FrontendThresholdAlertSignal;
+  signal: FrontendMonitorThresholdAlertSignal;
   /** Lifecycle phase; defaults to firing when omitted. */
-  phase?: FrontendThresholdAlertPhase;
+  phase?: FrontendMonitorThresholdAlertPhase;
   /** Set for slow-resource alerts to distinguish JS/CSS/image resources. */
-  category?: FrontendThresholdAlertCategory;
+  category?: FrontendMonitorThresholdAlertCategory;
   severity: "medium" | "high";
   /** Breaching occurrences observed in the window. */
   count: number;
@@ -53,8 +53,8 @@ export interface FrontendThresholdAlertEvent {
   fingerprint?: string;
 }
 
-const FRONTEND_THRESHOLD_ALERT = defineEvent<FrontendThresholdAlertEvent>({
-  key: FRONTEND_THRESHOLD_ALERT_EVENT,
+const FRONTEND_THRESHOLD_ALERT = defineEvent<FrontendMonitorThresholdAlertEvent>({
+  key: FRONTEND_MONITOR_THRESHOLD_ALERT_EVENT,
   name: "Frontend monitor threshold alert",
   description: "Emitted when a monitored system breaches a performance or error threshold in the evaluation window.",
   payloadExample: {

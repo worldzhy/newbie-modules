@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { JobsService } from "./jobs.service";
-import { FRONTEND_THRESHOLD_ALERT_EVENT } from "./threshold-alert.event";
+import { FRONTEND_MONITOR_THRESHOLD_ALERT_EVENT } from "./threshold-alert.event";
 import { RedisKeys } from "../../models/enum";
 import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 
@@ -338,8 +338,8 @@ test("a breached slow-page threshold emits the firing event with top offenders",
   await h.service.evaluateThresholdAlerts();
   const event = h.events.find((candidate) => candidate.payload.signal === "slow-page");
   assert.ok(event);
-  assert.equal(event.name, FRONTEND_THRESHOLD_ALERT_EVENT);
-  assert.equal(FRONTEND_THRESHOLD_ALERT_EVENT, "frontend-monitor.threshold-alert");
+  assert.equal(event.name, FRONTEND_MONITOR_THRESHOLD_ALERT_EVENT);
+  assert.equal(FRONTEND_MONITOR_THRESHOLD_ALERT_EVENT, "frontend-monitor.threshold-alert");
   const payload = event.payload;
   assert.equal(payload.appKey, "APP1");
   assert.equal(payload.systemName, "APP1", "a missing systemName falls back to the appKey");

@@ -2,12 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BadRequestException, HttpException, HttpStatus } from "@nestjs/common";
 
-import { FrontendReportController } from "./report.controller";
+import { FrontendMonitorReportController } from "./report.controller";
 import { RedisKeys } from "../../models/enum";
 import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 
 /**
- * Public ingest contract of FrontendReportController (ADR-016): the appKey always
+ * Public ingest contract of FrontendMonitorReportController (ADR-016): the appKey always
  * comes from the resolved installation token and overwrites any
  * client-supplied value, malformed payloads are 400, an unknown appKey is
  * 400, a full redis queue is 429, and the happy path lpush'es the report and
@@ -59,7 +59,7 @@ function harness(options: { site?: Row | null; listLength?: number } = {}) {
       touched.push(installationId);
     },
   };
-  const controller = new FrontendReportController(
+  const controller = new FrontendMonitorReportController(
     site as never,
     dayReportNum as never,
     redis as never,

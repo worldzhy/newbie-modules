@@ -9,17 +9,17 @@ import { func } from "../../shared/utils";
 import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 import { DayReportNumService } from "@modules/frontend-monitor/modules/day-report/day-report-num.service";
 import { RedisKeys } from "../../models/enum";
-import { FrontendReportTaskService } from "@modules/frontend-monitor/modules/web/services/report-task.service";
-import { FrontendPvuvipTaskService } from "@modules/frontend-monitor/modules/web/services/pvuvip-task.service";
-import { FrontendIpTaskService } from "@modules/frontend-monitor/modules/web/services/ip-task.service";
+import { FrontendMonitorReportTaskService } from "@modules/frontend-monitor/modules/web/services/report-task.service";
+import { FrontendMonitorPvuvipTaskService } from "@modules/frontend-monitor/modules/web/services/pvuvip-task.service";
+import { FrontendMonitorIpTaskService } from "@modules/frontend-monitor/modules/web/services/ip-task.service";
 import { FrontendMonitorModelsService } from "../../models/mongo/frontend-monitor-models.service";
 import { FrontendMonitorClickHouseService } from "../../models/clickhouse/frontend-monitor-clickhouse.service";
 import { SystemDocument } from "../../models/mongo/system.schema";
 import {
-  FRONTEND_THRESHOLD_ALERT_EVENT,
-  FrontendThresholdAlertCategory,
-  FrontendThresholdAlertEvent,
-  FrontendThresholdAlertSignal,
+  FRONTEND_MONITOR_THRESHOLD_ALERT_EVENT,
+  FrontendMonitorThresholdAlertCategory,
+  FrontendMonitorThresholdAlertEvent,
+  FrontendMonitorThresholdAlertSignal,
 } from "./threshold-alert.event";
 import { FIRST_SEEN_SOURCE_FILTER, SPIKE_SOURCE_FILTER } from "./error-source";
 import { AlertStateMachine } from "./alert-state";
@@ -37,9 +37,9 @@ export class JobsService implements OnModuleInit {
     private readonly nodeCache: NodeCacheService,
     private readonly dayReportNum: DayReportNumService,
     private readonly scheduler: SchedulerRegistry,
-    private readonly frontendReportTask: FrontendReportTaskService,
-    private readonly frontendPvuvipTask: FrontendPvuvipTaskService,
-    private readonly frontendIpTask: FrontendIpTaskService,
+    private readonly frontendReportTask: FrontendMonitorReportTaskService,
+    private readonly frontendPvuvipTask: FrontendMonitorPvuvipTaskService,
+    private readonly frontendIpTask: FrontendMonitorIpTaskService,
     private readonly models: FrontendMonitorModelsService,
     private readonly clickhouse: FrontendMonitorClickHouseService,
     private readonly eventEmitter: EventEmitter2,
@@ -230,7 +230,7 @@ export class JobsService implements OnModuleInit {
     // Only slow resources are persisted (see saveResours), so every row in
     // the window already breached its category threshold at ingest time.
     const categories: {
-      category: FrontendThresholdAlertCategory;
+      category: FrontendMonitorThresholdAlertCategory;
       types: string[];
       thresholdSeconds: number;
     }[] = [
@@ -449,12 +449,12 @@ export class JobsService implements OnModuleInit {
     }
   }
 
-  private emitAlert(event: FrontendThresholdAlertEvent) {
+  private emitAlert(event: FrontendMonitorThresholdAlertEvent) {
     try {
-      this.eventEmitter.emit(FRONTEND_THRESHOLD_ALERT_EVENT, event);
+      this.eventEmitter.emit(FRONTEND_MONITOR_THRESHOLD_ALERT_EVENT, event);
     } catch (error) {
       this.logger.error(
-        `Failed to emit ${FRONTEND_THRESHOLD_ALERT_EVENT} for system ${event.appKey} (${event.signal}): ${getErrorMessage(error)}`,
+        `Failed to emit ${FRONTEND_MONITOR_THRESHOLD_ALERT_EVENT} for system ${event.appKey} (${event.signal}): ${getErrorMessage(error)}`,
       );
     }
   }
@@ -467,8 +467,8 @@ export class JobsService implements OnModuleInit {
    */
   private alertStateKey(
     appKey: string,
-    signal: FrontendThresholdAlertSignal,
-    category?: FrontendThresholdAlertCategory,
+    signal: FrontendMonitorThresholdAlertSignal,
+    category?: FrontendMonitorThresholdAlertCategory,
     fingerprint?: string,
   ): string {
     let key = `frontend-monitor:alert-state:${appKey}:${signal}`;

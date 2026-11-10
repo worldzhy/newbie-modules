@@ -5,10 +5,10 @@ import { SharedModule } from "../../shared/shared.module";
 import { DayReportModule } from "@modules/frontend-monitor/modules/day-report/day-report.module";
 import { SiteModule } from "@modules/frontend-monitor/modules/site/site.module";
 import { installationResolverToken } from "@modules/security/ports/installation.resolver";
-import { FrontendInstallationService } from "../../services/frontend-installation.service";
-import { FrontendTokenResolver } from "../../services/frontend-token.resolver";
+import { FrontendMonitorInstallationService } from "../../services/frontend-monitor-installation.service";
+import { FrontendMonitorTokenResolver } from "../../services/frontend-monitor-token.resolver";
 
-import { FrontendReportController } from "./report.controller";
+import { FrontendMonitorReportController } from "./report.controller";
 
 import { AjaxController } from "./ajax.controller";
 import { ErrorController } from "./error.controller";
@@ -26,15 +26,15 @@ import { EnvironmentService } from "./services/environment.service";
 import { FrontendMonitorAnalysisService } from "./services/analysis.service";
 import { PvuvipService } from "./services/pvuvip.service";
 import { WebCustomService } from "./services/custom.service";
-import { FrontendReportTaskService } from "./services/report-task.service";
-import { FrontendPvuvipTaskService } from "./services/pvuvip-task.service";
-import { FrontendIpTaskService } from "./services/ip-task.service";
+import { FrontendMonitorReportTaskService } from "./services/report-task.service";
+import { FrontendMonitorPvuvipTaskService } from "./services/pvuvip-task.service";
+import { FrontendMonitorIpTaskService } from "./services/ip-task.service";
 import { FrontendMonitorAccessService } from "./frontend-monitor-access.service";
 
 @Module({
   imports: [FrontendMonitorClickHouseModule, FrontendMonitorModelsModule, SharedModule, DayReportModule, SiteModule],
   controllers: [
-    FrontendReportController,
+    FrontendMonitorReportController,
     AjaxController,
     ErrorController,
     PageController,
@@ -53,28 +53,28 @@ import { FrontendMonitorAccessService } from "./frontend-monitor-access.service"
     FrontendMonitorAnalysisService,
     PvuvipService,
     WebCustomService,
-    FrontendReportTaskService,
-    FrontendPvuvipTaskService,
-    FrontendIpTaskService,
+    FrontendMonitorReportTaskService,
+    FrontendMonitorPvuvipTaskService,
+    FrontendMonitorIpTaskService,
     FrontendMonitorAccessService,
     // Installation identity lives here (not on the root FrontendMonitorModule) so
-    // FrontendReportController can resolve FrontendTokenResolver without a module cycle.
-    FrontendInstallationService,
-    FrontendTokenResolver,
+    // FrontendMonitorReportController can resolve FrontendMonitorTokenResolver without a module cycle.
+    FrontendMonitorInstallationService,
+    FrontendMonitorTokenResolver,
     // Bind the report-token resolver to security's SPI port (ADR-016);
     // useExisting keeps the singleton so the token cache is never duplicated.
-    { provide: installationResolverToken("frontend-monitor"), useExisting: FrontendTokenResolver },
+    { provide: installationResolverToken("frontend-monitor"), useExisting: FrontendMonitorTokenResolver },
   ],
-  // FrontendInstallationService is re-exported by the root FrontendMonitorModule for
+  // FrontendMonitorInstallationService is re-exported by the root FrontendMonitorModule for
   // consuming projects whose application layer provisions installations.
   // PvuvipService/PageService/FrontendMonitorAnalysisService are read services exported for
   // consuming-project application layers that read aggregated web metrics
   // (e.g. the nightwatch copilot frontend-monitoring data source).
   exports: [
-    FrontendReportTaskService,
-    FrontendPvuvipTaskService,
-    FrontendIpTaskService,
-    FrontendInstallationService,
+    FrontendMonitorReportTaskService,
+    FrontendMonitorPvuvipTaskService,
+    FrontendMonitorIpTaskService,
+    FrontendMonitorInstallationService,
     PvuvipService,
     PageService,
     FrontendMonitorAnalysisService,

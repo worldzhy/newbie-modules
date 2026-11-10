@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { ReportType } from "../../../models/enum";
-import { FrontendReportTaskService } from "./report-task.service";
+import { FrontendMonitorReportTaskService } from "./report-task.service";
 
 /**
  * R9-01: `time` arrives from the public SDK payload and was never validated.
@@ -38,13 +38,13 @@ function buildService() {
   } as never;
   const models = {} as never;
   const ch = {} as never;
-  return new FrontendReportTaskService(redis, site, models, ch);
+  return new FrontendMonitorReportTaskService(redis, site, models, ch);
 }
 
 type DrainResult = string | null;
 
 function drain(
-  service: FrontendReportTaskService,
+  service: FrontendMonitorReportTaskService,
   raw: Record<string, unknown>,
   buckets: ReturnType<typeof emptyBuckets>,
 ) {

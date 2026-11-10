@@ -3,10 +3,10 @@ import { test } from "node:test";
 
 import { UnauthorizedException } from "@nestjs/common";
 
-import { FrontendTokenResolver } from "./frontend-token.resolver";
+import { FrontendMonitorTokenResolver } from "./frontend-monitor-token.resolver";
 
 /**
- * The resolver adapts FrontendInstallationService to security's InstallationResolver
+ * The resolver adapts FrontendMonitorInstallationService to security's InstallationResolver
  * port (ADR-016/ADR-019). Token verification itself lives in the shared
  * security verifier and is covered by the web-installation tests, so this
  * suite only pins the port contract, the null-to-401 mapping and the
@@ -30,7 +30,7 @@ function newResolver(options: FakeInstallationsOptions = {}) {
       if (options.touchError) throw options.touchError;
     },
   };
-  const resolver = new FrontendTokenResolver(installations as never);
+  const resolver = new FrontendMonitorTokenResolver(installations as never);
   return { resolver, calls };
 }
 

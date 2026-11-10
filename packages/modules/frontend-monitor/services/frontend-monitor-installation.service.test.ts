@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { ONLINE_THRESHOLD_SECONDS } from "./frontend-installation.service";
+import { ONLINE_THRESHOLD_SECONDS } from "./frontend-monitor-installation.service";
 
 /**
  * frontend-monitor reports flush near-continuously, so it keeps the shared 180s
@@ -11,7 +11,7 @@ import { ONLINE_THRESHOLD_SECONDS } from "./frontend-installation.service";
  * not be consulted for it (round 27, P2-3 moved this out of the security
  * package).
  */
-const SERVICE_SOURCE = readFileSync(join(__dirname, "frontend-installation.service.ts"), "utf8");
+const SERVICE_SOURCE = readFileSync(join(__dirname, "frontend-monitor-installation.service.ts"), "utf8");
 
 test("frontend-monitor keeps the 180s default window", () => {
   assert.equal(ONLINE_THRESHOLD_SECONDS, 180);

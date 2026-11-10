@@ -71,8 +71,8 @@ interface WebReportItem {
 }
 
 @Injectable()
-export class FrontendReportTaskService {
-  private readonly logger = new Logger(FrontendReportTaskService.name);
+export class FrontendMonitorReportTaskService {
+  private readonly logger = new Logger(FrontendMonitorReportTaskService.name);
   constructor(
     private readonly redis: RedisService,
     private readonly site: SiteService,

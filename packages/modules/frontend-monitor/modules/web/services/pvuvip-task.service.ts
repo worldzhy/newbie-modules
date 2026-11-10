@@ -14,8 +14,8 @@ function cronMinuteInterval(cronExp: string) {
 }
 
 @Injectable()
-export class FrontendPvuvipTaskService {
-  private readonly logger = new Logger(FrontendPvuvipTaskService.name);
+export class FrontendMonitorPvuvipTaskService {
+  private readonly logger = new Logger(FrontendMonitorPvuvipTaskService.name);
   constructor(
     private readonly site: SiteService,
     private readonly pvuvip: PvuvipService,

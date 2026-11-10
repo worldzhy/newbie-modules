@@ -3,10 +3,10 @@ import { test } from "node:test";
 
 import { RedisKeyPrefix } from "../../../models/enum";
 import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
-import { FrontendIpTaskService } from "./ip-task.service";
+import { FrontendMonitorIpTaskService } from "./ip-task.service";
 
 /**
- * Orchestration contracts for FrontendIpTaskService: each web site is scanned for
+ * Orchestration contracts for FrontendMonitorIpTaskService: each web site is scanned for
  * environment rows without a city, the scan resumes from a Redis checkpoint
  * (or ip_task_space_time in the past), geo lookups are cached per /24 under
  * the IP_GEO_CACHE prefix, and a processed batch advances the checkpoint to
@@ -99,7 +99,7 @@ function buildService(
   const store = fakeModels(opts.docs ?? [], { findError: opts.findError });
   const site = { getWebSiteList: async () => opts.systems ?? [] };
   const config = { get: () => opts.config ?? {} };
-  const service = new FrontendIpTaskService(
+  const service = new FrontendMonitorIpTaskService(
     config as never,
     store.models as never,
     redis.redis as never,
