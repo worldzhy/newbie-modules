@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import { FrontendMonitorClickHouseService } from "../../../models/clickhouse/frontend-monitor-clickhouse.service";
-import { WEB_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
 
 @Injectable()
 export class ErrorService {
@@ -14,7 +14,7 @@ export class ErrorService {
       type = "",
       realTime,
       resourceUrl,
-      pageSize = WEB_MONITOR_CONFIG.pageSize,
+      pageSize = FRONTEND_MONITOR_CONFIG.pageSize,
       uid,
       phone,
     } = query;
@@ -96,7 +96,7 @@ export class ErrorService {
   async getOneErrorList(query: Record<string, unknown>) {
     const { appKey, url, name = "", status = "", type = "", beginTime, endTime, phone = "", uid = "" } = query;
     const pageNo = Number(query.pageNo || 1);
-    const pageSize = Number(query.pageSize || WEB_MONITOR_CONFIG.pageSize);
+    const pageSize = Number(query.pageSize || FRONTEND_MONITOR_CONFIG.pageSize);
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};
     if (url) {

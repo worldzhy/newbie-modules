@@ -6,7 +6,7 @@ import { RedisService } from "@modules/redis/redis.service";
 import { SiteService } from "@modules/frontend-monitor/modules/site/site.service";
 import { NodeCacheService } from "../../shared/node-cache.service";
 import { func } from "../../shared/utils";
-import { WEB_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 import { DayReportNumService } from "@modules/frontend-monitor/modules/day-report/day-report-num.service";
 import { RedisKeys } from "../../models/enum";
 import { WebReportTaskService } from "@modules/frontend-monitor/modules/web/services/report-task.service";
@@ -56,7 +56,7 @@ export class JobsService implements OnModuleInit {
   }
 
   private registerReportStoreTask() {
-    const consumption = WEB_MONITOR_CONFIG.redis_consumption;
+    const consumption = FRONTEND_MONITOR_CONFIG.redis_consumption;
     const expr = consumption.task_time;
     const job = new CronJob(
       expr,
@@ -94,7 +94,10 @@ export class JobsService implements OnModuleInit {
     if (this.redis.isConfigured()) {
       let acquired = false;
       try {
-        acquired = await this.redisLock(RedisKeys.ALERT_EVALUATION_TASK_LOCK, WEB_MONITOR_CONFIG.alertTaskLockTime);
+        acquired = await this.redisLock(
+          RedisKeys.ALERT_EVALUATION_TASK_LOCK,
+          FRONTEND_MONITOR_CONFIG.alertTaskLockTime,
+        );
       } catch (error) {
         this.logger.error(
           `Alert evaluation lock failed (Redis error), proceeding without it: ${getErrorMessage(error)}`,
@@ -112,7 +115,7 @@ export class JobsService implements OnModuleInit {
       return;
     }
 
-    const windowMs = WEB_MONITOR_CONFIG.alertWindowMs;
+    const windowMs = FRONTEND_MONITOR_CONFIG.alertWindowMs;
     const windowEnd = new Date();
     const windowStart = new Date(windowEnd.getTime() - windowMs);
     // Bounded worker pool: evaluate systems in parallel but cap concurrency so a
@@ -557,14 +560,14 @@ export class JobsService implements OnModuleInit {
   async pvuvipMinuteCount() {
     const getLock = await this.redisLock(
       RedisKeys.PVUVIP_PRE_MINUTE_LOCK,
-      WEB_MONITOR_CONFIG.pvuvip_task_minute_lock_time,
+      FRONTEND_MONITOR_CONFIG.pvuvip_task_minute_lock_time,
     );
     if (!getLock) return;
     await this.webPvuvipTask.getWebPvUvIpByMinute();
   }
 
   async ipTask() {
-    const getLock = await this.redisLock(RedisKeys.IP_TASK_LOCK, WEB_MONITOR_CONFIG.ip_task_lock_time);
+    const getLock = await this.redisLock(RedisKeys.IP_TASK_LOCK, FRONTEND_MONITOR_CONFIG.ip_task_lock_time);
     if (!getLock) return;
     await this.webIpTask.saveWebGetIpDatas();
   }
@@ -572,7 +575,7 @@ export class JobsService implements OnModuleInit {
   async dayReportNumTask() {
     const getLock = await this.redisLock(
       RedisKeys.DAY_REPORT_NUM_TASK_LOCK,
-      WEB_MONITOR_CONFIG.day_report_num_task_lock_time,
+      FRONTEND_MONITOR_CONFIG.day_report_num_task_lock_time,
     );
     if (!getLock) return;
     await this.dayReportNum.numCountTask();
@@ -581,7 +584,7 @@ export class JobsService implements OnModuleInit {
   async consumeReportQueues() {
     // Use the cron expression from configuration
     try {
-      if (WEB_MONITOR_CONFIG.is_web_consume_task_run) await this.consumeWebQueue();
+      if (FRONTEND_MONITOR_CONFIG.is_web_consume_task_run) await this.consumeWebQueue();
     } catch (e) {
       this.logger.error("Consumer queue exception", getErrorMessage(e));
     }

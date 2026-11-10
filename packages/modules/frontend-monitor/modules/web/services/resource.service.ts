@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { FrontendMonitorModelsService } from "../../../models/mongo/frontend-monitor-models.service";
 import { func } from "../../../shared/utils";
-import { WEB_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
 
 @Injectable()
 export class ResourceService {
@@ -33,7 +33,15 @@ export class ResourceService {
   }
 
   async getAverageResourceList(query: Record<string, unknown>) {
-    const { appKey, type = 1, pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, beginTime, endTime, url } = query;
+    const {
+      appKey,
+      type = 1,
+      pageNo = 1,
+      pageSize = FRONTEND_MONITOR_CONFIG.pageSize,
+      beginTime,
+      endTime,
+      url,
+    } = query;
     const match: Record<string, unknown> = { speedType: Number(type) };
     if (url) match.name = { $regex: new RegExp(func.escapeRegExp(url), "i") };
     if (beginTime || endTime) {
@@ -87,7 +95,7 @@ export class ResourceService {
     appKey: string,
     url: string,
     pageNo: number = 1,
-    pageSize: number = WEB_MONITOR_CONFIG.pageSize,
+    pageSize: number = FRONTEND_MONITOR_CONFIG.pageSize,
     beginTime?: string,
     endTime?: string,
   ) {

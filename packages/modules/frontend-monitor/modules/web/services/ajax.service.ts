@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import { WEB_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
 import { FrontendMonitorClickHouseService } from "../../../models/clickhouse/frontend-monitor-clickhouse.service";
 
 @Injectable()
@@ -43,7 +43,7 @@ export class AjaxService {
   }
 
   async getAverageAjaxList(query: Record<string, unknown>) {
-    const { appKey, beginTime, endTime, type = 1, url, pageSize = WEB_MONITOR_CONFIG.pageSize } = query;
+    const { appKey, beginTime, endTime, type = 1, url, pageSize = FRONTEND_MONITOR_CONFIG.pageSize } = query;
     const pageNo = Number(query.pageNo || 1);
     const wheres: string[] = [];
     const queryParams: Record<string, unknown> = {};

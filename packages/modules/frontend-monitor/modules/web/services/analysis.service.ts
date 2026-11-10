@@ -1,14 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { FrontendMonitorModelsService } from "../../../models/mongo/frontend-monitor-models.service";
 import { func } from "../../../shared/utils";
-import { WEB_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
 
 @Injectable()
 export class FrontendMonitorAnalysisService {
   constructor(private readonly models: FrontendMonitorModelsService) {}
 
   private get topAnalysisLimit() {
-    const size = WEB_MONITOR_CONFIG.top_alalysis_size;
+    const size = FRONTEND_MONITOR_CONFIG.top_alalysis_size;
     return func.isObject(size) ? Number(size.web) || 10 : 10;
   }
 

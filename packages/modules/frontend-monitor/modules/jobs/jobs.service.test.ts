@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { JobsService } from "./jobs.service";
 import { WEB_THRESHOLD_ALERT_EVENT } from "./threshold-alert.event";
 import { RedisKeys } from "../../models/enum";
-import { WEB_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 
 /**
  * Behavior-level orchestration contract of JobsService: scheduled entry-point
@@ -246,7 +246,7 @@ test("evaluateThresholdAlerts takes the alert lock with the configured ttl", asy
   await h.service.evaluateThresholdAlerts();
   const lockWrite = h.redisCalls.set.find((call) => call.mode === "NX");
   assert.equal(lockWrite?.key, RedisKeys.ALERT_EVALUATION_TASK_LOCK);
-  assert.equal(lockWrite?.ttl, WEB_MONITOR_CONFIG.alertTaskLockTime);
+  assert.equal(lockWrite?.ttl, FRONTEND_MONITOR_CONFIG.alertTaskLockTime);
 });
 
 test("evaluateThresholdAlerts runs lock-free when Redis is not configured", async () => {
@@ -347,7 +347,7 @@ test("a breached slow-page threshold emits the firing event with top offenders",
   assert.equal(payload.severity, "medium");
   assert.equal(payload.count, 5);
   assert.equal(payload.thresholdMs, 3000);
-  assert.equal(payload.windowMs, WEB_MONITOR_CONFIG.alertWindowMs);
+  assert.equal(payload.windowMs, FRONTEND_MONITOR_CONFIG.alertWindowMs);
   assert.equal(typeof payload.windowStartedAt, "string");
   assert.deepEqual(payload.topItems, ["/home — 3 load(s), max 4200ms"]);
 });
@@ -366,7 +366,7 @@ test("slow-page queries Mongo inside the evaluation window with the slow speedTy
   const match = slowPage.match as { createTime: { $gte: Date; $lt: Date }; speedType: number };
   assert.equal(match.speedType, 2);
   assert.ok(match.createTime.$gte instanceof Date && match.createTime.$lt instanceof Date);
-  assert.equal(match.createTime.$lt.getTime() - match.createTime.$gte.getTime(), WEB_MONITOR_CONFIG.alertWindowMs);
+  assert.equal(match.createTime.$lt.getTime() - match.createTime.$gte.getTime(), FRONTEND_MONITOR_CONFIG.alertWindowMs);
   const aggregate = h.mongoAggregateCalls.find((call) => call.kind === "page");
   assert.deepEqual(aggregate?.pipeline.at(-1), { $limit: 3 }, "top offenders are capped");
 });
@@ -527,7 +527,7 @@ test("pvuvipMinuteCount runs the task only while holding its lock", async () => 
   assert.equal(free.pvuvipCalls.count, 1);
   const lockWrite = free.redisCalls.set.find((call) => call.mode === "NX");
   assert.equal(lockWrite?.key, RedisKeys.PVUVIP_PRE_MINUTE_LOCK);
-  assert.equal(lockWrite?.ttl, WEB_MONITOR_CONFIG.pvuvip_task_minute_lock_time);
+  assert.equal(lockWrite?.ttl, FRONTEND_MONITOR_CONFIG.pvuvip_task_minute_lock_time);
 });
 
 test("ipTask runs the task only while holding its lock", async () => {
@@ -539,7 +539,7 @@ test("ipTask runs the task only while holding its lock", async () => {
   assert.equal(free.ipCalls.count, 1);
   const lockWrite = free.redisCalls.set.find((call) => call.mode === "NX");
   assert.equal(lockWrite?.key, RedisKeys.IP_TASK_LOCK);
-  assert.equal(lockWrite?.ttl, WEB_MONITOR_CONFIG.ip_task_lock_time);
+  assert.equal(lockWrite?.ttl, FRONTEND_MONITOR_CONFIG.ip_task_lock_time);
 });
 
 test("dayReportNumTask runs the task only while holding its lock", async () => {
@@ -551,7 +551,7 @@ test("dayReportNumTask runs the task only while holding its lock", async () => {
   assert.equal(free.dayReportNumCalls.numCountTask, 1);
   const lockWrite = free.redisCalls.set.find((call) => call.mode === "NX");
   assert.equal(lockWrite?.key, RedisKeys.DAY_REPORT_NUM_TASK_LOCK);
-  assert.equal(lockWrite?.ttl, WEB_MONITOR_CONFIG.day_report_num_task_lock_time);
+  assert.equal(lockWrite?.ttl, FRONTEND_MONITOR_CONFIG.day_report_num_task_lock_time);
 });
 
 test("updateAppInfoCache rebuilds the site cache and swallows load failures", async () => {

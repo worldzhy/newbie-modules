@@ -4,7 +4,7 @@ import { BadRequestException, HttpException, HttpStatus } from "@nestjs/common";
 
 import { WebReportController } from "./report.controller";
 import { RedisKeys } from "../../models/enum";
-import { WEB_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 
 /**
  * Public ingest contract of WebReportController (ADR-016): the appKey always
@@ -172,7 +172,7 @@ test("an appKey with no registered site is rejected", async () => {
 });
 
 test("a full redis queue throttles with 429 before any push", async () => {
-  const limit = WEB_MONITOR_CONFIG.redis_consumption.total_limit_web;
+  const limit = FRONTEND_MONITOR_CONFIG.redis_consumption.total_limit_web;
   const h = harness({ listLength: limit });
   await assert.rejects(
     () => h.controller.webReport(req() as never, {}, {} as never),
@@ -186,7 +186,7 @@ test("a full redis queue throttles with 429 before any push", async () => {
 });
 
 test("one slot below the limit still accepts the report", async () => {
-  const h = harness({ listLength: WEB_MONITOR_CONFIG.redis_consumption.total_limit_web - 1 });
+  const h = harness({ listLength: FRONTEND_MONITOR_CONFIG.redis_consumption.total_limit_web - 1 });
   const result = await h.controller.webReport(req() as never, {}, {} as never);
   assert.equal(result, "ok");
   assert.equal(h.lpushCalls.length, 1);

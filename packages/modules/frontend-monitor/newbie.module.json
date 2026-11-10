@@ -13,11 +13,11 @@
     "modules": ["audit", "clickhouse", "event-emitter", "mongo", "redis", "security"],
     "config": {
       "frontend-monitor": {
-        "TENCENTMAPKEY": "process.env.WEB_MONITOR_TENCENT_MAP_KEY"
+        "TENCENTMAPKEY": "process.env.FRONTEND_MONITOR_TENCENT_MAP_KEY"
       }
     },
     "env": {
-      "WEB_MONITOR_TENCENT_MAP_KEY": ""
+      "FRONTEND_MONITOR_TENCENT_MAP_KEY": ""
     },
     "dependencies": {
       "@nestjs/event-emitter": "latest",

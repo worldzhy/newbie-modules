@@ -5,7 +5,7 @@ import { FrontendMonitorClickHouseService } from "../../../models/clickhouse/fro
 import { FrontendMonitorModelsService } from "../../../models/mongo/frontend-monitor-models.service";
 import { SystemDocument } from "../../../models/mongo/system.schema";
 import { func } from "../../../shared/utils";
-import { WEB_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
 import { UAParser } from "ua-parser-js";
 import { RedisKeys, RedisKeyPrefix, ReportType } from "../../../models/enum";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
@@ -321,7 +321,7 @@ export class WebReportTaskService {
   }
 
   async saveWebReportDatasForRedis() {
-    const consumption = WEB_MONITOR_CONFIG.redis_consumption;
+    const consumption = FRONTEND_MONITOR_CONFIG.redis_consumption;
     const count = Number(consumption.thread_web) || 1000;
     const buckets: DrainBuckets = {
       appAjaxs: {},

@@ -2,7 +2,7 @@ import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestj
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { DayReportNumService } from "@modules/frontend-monitor/modules/day-report/day-report-num.service";
 import { func, pickRequestId } from "../../shared/utils";
-import { WEB_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 import { PvuvipService } from "./services/pvuvip.service";
 import { FrontendMonitorPvUvIpResponseDto } from "./pvuvip.dto";
 import parser from "cron-parser";
@@ -30,7 +30,7 @@ export class PvuvipController {
   async getPvUvIpSurveyToday(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
+    const interval = parser.parseExpression(String(FRONTEND_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
     const betweenTime = Math.abs(new Date(timer).getTime() - timestrat);
@@ -83,7 +83,7 @@ export class PvuvipController {
     const { beginTime, endTime } = q;
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
+    const interval = parser.parseExpression(String(FRONTEND_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const timer = interval.prev().toString();
     const timestrat = new Date(interval.prev().toString()).getTime();
     const betweenTime = Math.abs(new Date(timer).getTime() - timestrat);
@@ -101,7 +101,7 @@ export class PvuvipController {
     const { beginTime, endTime } = q;
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const interval = parser.parseExpression(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
+    const interval = parser.parseExpression(String(FRONTEND_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     interval.prev();
     let et: Date;
     let bt: Date;

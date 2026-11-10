@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { RedisKeyPrefix } from "../../../models/enum";
-import { WEB_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
 import { WebIpTaskService } from "./ip-task.service";
 
 /**
@@ -122,16 +122,16 @@ test("the scan only asks for rows without a city, oldest first, bounded by ip_th
   const { service, store } = buildService({ systems: [{ appKey: APP_KEY }] });
   await service.saveWebGetIpDatas();
   assert.deepEqual(store.findQueries[0].city, { $exists: false });
-  assert.equal(store.chain.limit, WEB_MONITOR_CONFIG.ip_thread * 60);
+  assert.equal(store.chain.limit, FRONTEND_MONITOR_CONFIG.ip_thread * 60);
   assert.deepEqual(store.chain.sort, { createTime: 1 });
   assert.equal(store.chain.readMode, "secondaryPreferred");
 });
 
 test("without a stored checkpoint the scan starts ip_task_space_time in the past", async () => {
   const { service, store } = buildService({ systems: [{ appKey: APP_KEY }] });
-  const before = Date.now() - WEB_MONITOR_CONFIG.ip_task_space_time;
+  const before = Date.now() - FRONTEND_MONITOR_CONFIG.ip_task_space_time;
   await service.saveWebGetIpDatas();
-  const after = Date.now() - WEB_MONITOR_CONFIG.ip_task_space_time;
+  const after = Date.now() - FRONTEND_MONITOR_CONFIG.ip_task_space_time;
   const gt = (store.findQueries[0].createTime as { $gt: Date }).$gt;
   assert.ok(
     gt.getTime() >= before && gt.getTime() <= after,

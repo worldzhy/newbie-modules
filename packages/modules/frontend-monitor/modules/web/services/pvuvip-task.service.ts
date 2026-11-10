@@ -2,7 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { SiteService } from "@modules/frontend-monitor/modules/site/site.service";
 import { PvuvipService } from "./pvuvip.service";
 import { func, mapWithConcurrency } from "../../../shared/utils";
-import { WEB_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
 import { SystemDocument } from "../../../models/mongo/system.schema";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
@@ -22,7 +22,7 @@ export class WebPvuvipTaskService {
   ) {}
 
   async getWebPvUvIpByMinute() {
-    const between = cronMinuteInterval(String(WEB_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
+    const between = cronMinuteInterval(String(FRONTEND_MONITOR_CONFIG.pvuvip_task_minute_cron_time));
     const endTime = new Date();
     const beginTime = new Date(endTime.getTime() - between);
 

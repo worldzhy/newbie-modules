@@ -4,7 +4,7 @@
  * constants, not assembly configuration). Key names match the former
  * manifest fields verbatim.
  */
-export const WEB_MONITOR_CONFIG = {
+export const FRONTEND_MONITOR_CONFIG = {
   redis_consumption: {
     task_time: "*/10 * * * * *",
     thread_web: 1000,

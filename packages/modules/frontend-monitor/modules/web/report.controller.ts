@@ -5,7 +5,7 @@ import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
 import { SiteService } from "@modules/frontend-monitor/modules/site/site.service";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 import { func } from "../../shared/utils";
-import { WEB_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 import { DayReportNumService } from "@modules/frontend-monitor/modules/day-report/day-report-num.service";
 import { RedisService } from "@modules/redis/redis.service";
 import { RedisKeys } from "../../models/enum";
@@ -68,7 +68,7 @@ export class WebReportController {
   }
 
   private async saveWebReportDataForRedis(query: Record<string, unknown>) {
-    const consumption = WEB_MONITOR_CONFIG.redis_consumption;
+    const consumption = FRONTEND_MONITOR_CONFIG.redis_consumption;
     const limit = Number(consumption.total_limit_web) || 0;
     if (limit) {
       const length = await this.redis.getClient().llen(RedisKeys.WEB_REPORT_DATAS);

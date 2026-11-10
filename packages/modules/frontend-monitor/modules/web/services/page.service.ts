@@ -2,14 +2,14 @@ import { Injectable } from "@nestjs/common";
 import { PipelineStage } from "mongoose";
 import { FrontendMonitorModelsService } from "../../../models/mongo/frontend-monitor-models.service";
 import { func } from "../../../shared/utils";
-import { WEB_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
+import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
 
 @Injectable()
 export class PageService {
   constructor(private readonly models: FrontendMonitorModelsService) {}
 
   async getAveragePageList(query: Record<string, unknown>) {
-    const { appKey, type = "", pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
+    const { appKey, type = "", pageNo = 1, pageSize = FRONTEND_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
     const appIdStr = String(appKey);
     const match: Record<string, unknown> = {};
     if (isFirstIn !== undefined && isFirstIn !== "") {
@@ -168,7 +168,7 @@ export class PageService {
   }
 
   async getOnePageList(query: Record<string, unknown>) {
-    const { appKey: rawAppId, type, pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
+    const { appKey: rawAppId, type, pageNo = 1, pageSize = FRONTEND_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
     const appKey = String(rawAppId);
     const match: Record<string, unknown> = { url };
     if (isFirstIn !== undefined && isFirstIn !== "") {
