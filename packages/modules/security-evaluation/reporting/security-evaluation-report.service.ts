@@ -347,7 +347,7 @@ export class SecurityEvaluationReportService {
     const rows = await this.prisma.$queryRaw<
       Array<{ day: Date; critical: number; high: number; medium: number; low: number; info: number }>
     >`
-      WITH window AS (
+      WITH day_series AS (
         SELECT generate_series(
           date_trunc('day', ${now}::timestamptz) - (${days}::int - 1) * interval '1 day',
           date_trunc('day', ${now}::timestamptz),
@@ -361,7 +361,7 @@ export class SecurityEvaluationReportService {
         (count(f."id") FILTER (WHERE f."severity" = 'MEDIUM'))::int AS "medium",
         (count(f."id") FILTER (WHERE f."severity" = 'LOW'))::int AS "low",
         (count(f."id") FILTER (WHERE f."severity" = 'INFO'))::int AS "info"
-      FROM window w
+      FROM day_series w
       LEFT JOIN "module/evaluation"."EvaluationFinding" f
         ON f."subjectId" IN (${Prisma.join([...subjectIds])})
        AND f."status" <> 'SUPPRESSED'
