@@ -20,8 +20,9 @@ export interface SecurityEvaluationCodeScanExcerptInput {
  * excerpt.
  *
  * Retention is physical: `pruneExpired` deletes rows whose last observation is
- * older than the declared window, and the finding detail read then falls back
- * to hash + truncated instead of resurrecting the code.
+ * older than the declared window, and `load` applies the same window so a row
+ * that outlives a prune cycle is never returned. The finding detail read then
+ * falls back to hash + truncated instead of resurrecting the code.
  */
 @Injectable()
 export class SecurityEvaluationCodeScanExcerptService {
@@ -42,11 +43,18 @@ export class SecurityEvaluationCodeScanExcerptService {
   }
 
   /** Excerpts still inside the retention window, keyed by content hash. */
-  async load(subjectId: string, contentHashes: readonly string[]): Promise<Map<string, string>> {
+  async load(
+    subjectId: string,
+    contentHashes: readonly string[],
+    retentionDays = SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS,
+  ): Promise<Map<string, string>> {
     const unique = [...new Set(contentHashes)];
     if (unique.length === 0) return new Map();
+    // Retention is enforced on read as well as by the daily prune: a row that
+    // outlives the window must not resurface source code between prune runs.
+    const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     const rows = await this.prisma.securityEvaluationCodeScanFileExcerpt.findMany({
-      where: { subjectId, contentHash: { in: unique } },
+      where: { subjectId, contentHash: { in: unique }, updatedAt: { gte: cutoff } },
       select: { contentHash: true, excerpt: true },
     });
     return new Map(rows.map((row) => [row.contentHash, row.excerpt]));

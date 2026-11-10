@@ -216,9 +216,10 @@ criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
   immutable result manifest: it lives in
   `SecurityEvaluationCodeScanFileExcerpt`, content-addressed by
   `(subjectId, contentHash)`, and `pruneExpired()` physically deletes rows
-  after `SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS` (90). The
-  finding detail read re-attaches it while the row exists and otherwise falls
-  back to `contentHash` + `truncated` (ADR-054 D7).
+  after `SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS` (90). Reads
+  apply the same window, so a row that outlives a prune cycle is never
+  re-attached; the finding detail then falls back to `contentHash` +
+  `truncated` (ADR-054 D7).
 - CODE_SCAN sends (truncated) source code to the configured LLM provider —
   including any secrets committed to the repository. That exposure is an
   accepted trade-off of v1; the `code-scan.secret-exposure` findings it

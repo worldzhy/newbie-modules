@@ -609,6 +609,32 @@ test("retention physically deletes expired verdict-cache rows and excerpts", asy
   assert.ok(excerptAgeDays > 89 && excerptAgeDays < 91, `excerpt cutoff was ${excerptAgeDays} days`);
 });
 
+test("retained-excerpt reads apply the retention window between prune runs", async () => {
+  const now = Date.now();
+  const stored = [
+    { contentHash: "fresh", excerpt: "fresh code", updatedAt: new Date(now - 86_400_000) },
+    { contentHash: "expired", excerpt: "expired code", updatedAt: new Date(now - 120 * 86_400_000) },
+  ];
+  let queriedCutoff: Date | undefined;
+  const prisma = {
+    securityEvaluationCodeScanFileExcerpt: {
+      findMany: async (args: { where: { updatedAt: { gte: Date } } }) => {
+        queriedCutoff = args.where.updatedAt.gte;
+        return stored
+          .filter((row) => row.updatedAt >= queriedCutoff!)
+          .map(({ contentHash, excerpt }) => ({ contentHash, excerpt }));
+      },
+    },
+  } as unknown as PrismaService;
+  const excerpts = new SecurityEvaluationCodeScanExcerptService(prisma);
+
+  const loaded = await excerpts.load(SUBJECT.id, ["fresh", "expired"]);
+
+  assert.deepEqual([...loaded.keys()], ["fresh"]);
+  const readAgeDays = (now - (queriedCutoff as Date).getTime()) / 86_400_000;
+  assert.ok(readAgeDays > 89 && readAgeDays < 91, `read cutoff was ${readAgeDays} days`);
+});
+
 // --- Verdict cache TTL contract (ADR-033 discipline, ADR-054 clause 6) -------------
 
 test("code-scan verdict cache TTL is declared per environment and never falls back", () => {
