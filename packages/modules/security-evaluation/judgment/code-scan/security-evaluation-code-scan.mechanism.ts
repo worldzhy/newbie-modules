@@ -157,7 +157,12 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
     private readonly resolver: ChatModelResolver,
     @Inject(securityEvaluationCodeScanVerdictCacheToken)
     private readonly verdictCache: SecurityEvaluationCodeScanVerdictCachePort,
-  ) {}
+    budgetOverride?: number,
+  ) {
+    this.llmCallBudget = budgetOverride ?? SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET;
+  }
+
+  private readonly llmCallBudget: number;
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
     if (input.ruleSetVersion.evaluationKey !== SECURITY_EVALUATION_KEY_CODE_SCAN) {
@@ -218,9 +223,12 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
     }
     const revision = payloads.get(sourceItems[0].id)?.revision ?? "unknown";
 
+    const connectionId = chatModel.connectionId ?? null;
+
     const cached = await this.verdictCache.lookup({
       subjectId: input.subject.id,
       modelId,
+      connectionId,
       promptVersion,
       ruleSetVersion,
       files: sourceItems.map((item) => {
@@ -281,7 +289,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
         continue;
       }
 
-      if (llmCalls >= SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET) {
+      if (llmCalls >= this.llmCallBudget) {
         budgetCutCount++;
         skippedIds.push(item.id);
         continue;
@@ -345,6 +353,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
             path: payload.path,
             contentHash: payload.contentHash,
             modelId,
+            connectionId,
             promptVersion,
             ruleSetVersion,
             findings: byCriterion.get(criterion.criterionKey)!,
@@ -378,14 +387,24 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
         `${discardedEntries} finding entrie(s) discarded: unknown criterion or out-of-range evidenceRef`,
       );
 
+    // skipped is always defined when there is anything to note — a run that
+    // discards entries (unknown criterion, out-of-range evidenceRef) but
+    // judges every file must still report the discard count in coverage
+    // (R31-07). When there are no skipped IDs the items list is empty but
+    // the note still carries the discarded-entry summary.
+    const hasAnyNote = skippedIds.length > 0 || skippedReasons.length > 0;
+
     return {
       verdicts: [],
       findings,
       evaluatedRefs,
-      skipped:
-        skippedIds.length > 0
-          ? { total: skippedIds.length, items: skippedIds, note: skippedReasons.join("; ") }
-          : undefined,
+      skipped: hasAnyNote
+        ? {
+            total: skippedIds.length,
+            items: skippedIds,
+            note: skippedReasons.join("; "),
+          }
+        : undefined,
       summary: `Code scan judged ${evaluatedRefs.length} file(s) at revision ${revision}: ${findings.length} finding(s), ${cacheHits} cache hit(s), ${llmCalls} LLM call(s).`,
       metadata: {
         modelId,

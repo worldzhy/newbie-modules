@@ -32,6 +32,12 @@ export interface RepositorySnapshotEntry {
 export interface RepositorySnapshotSkippedEntry {
   path: string;
   reason: string;
+  /**
+   * When set, this entry aggregates `count` files (e.g. over the file budget
+   * or hidden by a truncated tree). Only one such entry is emitted per reason,
+   * and `path` becomes an empty string placeholder.
+   */
+  count?: number;
 }
 
 export interface RepositorySnapshotListing {

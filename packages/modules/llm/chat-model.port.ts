@@ -81,6 +81,12 @@ export type ModelStreamChunk =
 export interface ChatModelPort {
   /** Human-readable provider/model identifier for audit logs. */
   readonly modelId: string;
+  /**
+   * ConnectionScope.id of the LLM Connection that backs this model, set by
+   * the resolver on wrapped ports. Adapters that build ports directly leave
+   * this undefined; consumers that need it should go through the resolver.
+   */
+  readonly connectionId?: string;
   complete(request: ChatRequest): Promise<ChatResult>;
   stream(request: ChatRequest): AsyncIterable<ModelStreamChunk>;
 }

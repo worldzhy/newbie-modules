@@ -40,6 +40,8 @@ export interface SecurityEvaluationCodeScanVerdictCacheEntry {
   path: string;
   contentHash: string;
   modelId: string;
+  /** ConnectionScope.id of the LLM that produced this verdict. Nullable for rows written before the column existed. */
+  connectionId?: string | null;
   promptVersion: string;
   ruleSetVersion: string;
   /** The call's findings for THIS criterion (empty when the call found none). */
@@ -51,6 +53,8 @@ export interface SecurityEvaluationCodeScanVerdictCacheEntry {
 export interface SecurityEvaluationCodeScanVerdictLookup {
   subjectId: string;
   modelId: string;
+  /** ConnectionScope.id to disambiguate connections that happen to share a modelId. */
+  connectionId?: string | null;
   promptVersion: string;
   ruleSetVersion: string;
   files: readonly { path: string; contentHash: string }[];

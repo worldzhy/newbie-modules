@@ -227,6 +227,10 @@ model SecurityEvaluationCodeScanVerdictCache {
   // SHA-256 of the full file content the verdict describes.
   contentHash    String   @db.VarChar(64)
   modelId        String   @db.VarChar(255)
+  // LLM ConnectionScope.id that produced this verdict; nullable for legacy
+  // rows written before the connectionId column existed. Two connections that
+  // happen to share the same modelId still cache separately.
+  connectionId   String?  @db.Uuid
   // SHA-256 of the system prompt bytes; editing the prompt invalidates rows.
   promptVersion  String   @db.VarChar(64)
   ruleSetVersion String   @db.VarChar(32)
@@ -237,7 +241,7 @@ model SecurityEvaluationCodeScanVerdictCache {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  @@unique([subjectId, criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion], name: "codeScanVerdictIdentity")
+  @@unique([subjectId, criterionKey, path, contentHash, modelId, connectionId, promptVersion, ruleSetVersion], name: "codeScanVerdictIdentity")
   @@index([subjectId, updatedAt])
   @@schema("module/security-evaluation")
 }

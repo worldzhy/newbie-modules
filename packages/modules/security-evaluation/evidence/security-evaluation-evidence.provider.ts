@@ -337,22 +337,28 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
    * covering both reasons (intel budget discipline).
    */
   private buildCodeScanSkippedBucket(
-    listingSkipped: readonly { path: string; reason: string }[],
+    listingSkipped: readonly { path: string; reason: string; count?: number }[],
     readFailureIds: string[],
   ): EvaluationCoverageBucket {
-    const items = [...listingSkipped.map((entry) => codeScanEvidenceId(entry.path)), ...readFailureIds];
-    if (items.length === 0) return { total: 0 };
+    const items = [
+      ...listingSkipped.filter((entry) => entry.path.length > 0).map((entry) => codeScanEvidenceId(entry.path)),
+      ...readFailureIds,
+    ];
+    const aggregatedFromHost = listingSkipped.reduce((sum, entry) => sum + (entry.count ?? 0), 0);
+    const total = items.length + aggregatedFromHost;
+    if (total === 0) return { total: 0 };
     const notes: string[] = [];
     if (listingSkipped.length > 0) {
       const reasons = new Set(listingSkipped.map((entry) => entry.reason));
+      const aggregatedNote = aggregatedFromHost > 0 ? ` (${aggregatedFromHost} aggregated)` : "";
       notes.push(
-        `${listingSkipped.length} file(s) not registered by the host snapshot (reasons: ${[...reasons].join(", ")}).`,
+        `${listingSkipped.length} skipped-host listing entries${aggregatedNote} (reasons: ${[...reasons].join(", ")}).`,
       );
     }
     if (readFailureIds.length > 0) {
       notes.push(`${readFailureIds.length} listed file(s) could not be read at the pinned revision.`);
     }
-    return { total: items.length, items, note: notes.join(" ") };
+    return { total, items, note: notes.join(" ") };
   }
 
   /**

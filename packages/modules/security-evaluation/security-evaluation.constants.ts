@@ -97,7 +97,7 @@ export const SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS = 12_000;
  * Files that would need more are not judged and land in the judgment's
  * skipped bucket (same discipline as the INTEL re-rank budget).
  */
-export const SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET = 200;
+export const SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET = 180;
 
 /** Asset knowledge vocabulary. */
 export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE = "npm.package";

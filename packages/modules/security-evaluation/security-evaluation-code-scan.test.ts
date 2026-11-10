@@ -375,6 +375,54 @@ test("code-scan mechanism ignores other evaluationKeys", async () => {
   assert.equal(calls.length, 0);
 });
 
+test("code-scan mechanism budget-cuts files when LLM_CALL_BUDGET is exhausted (round31 R31-09)", async () => {
+  const items = Array.from({ length: 5 }, (_, i) => codeScanItem(`src/file${i}.ts`, `const x${i} = ${i};`));
+  const cache = stubCache();
+  const { resolver } = stubResolver(() => JSON.stringify({ findings: [] }));
+  // budget 3 so files 4 and 5 are skipped
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, 3);
+  const judgment = await mechanism.judge(judgmentInput(items));
+
+  assert.equal(judgment.evaluatedRefs.length, 3);
+  assert.equal(judgment.skipped?.total, 2);
+  assert.equal(judgment.skipped?.items.length, 2);
+  assert.ok(judgment.skipped?.note?.includes("over the per-run LLM call budget"));
+  assert.equal(judgment.metadata?.llmCalls, 3);
+  assert.equal(cache.recorded.length, 3);
+});
+
+test("code-scan mechanism reports discarded-entry note even when no file was skipped (round31 R31-07)", async () => {
+  const item = codeScanItem("src/a.ts", "const a = 1;");
+  const cache = stubCache();
+  // model returns one entry with a criterionKey that is not in our criteria
+  const { resolver } = stubResolver(() =>
+    JSON.stringify({
+      findings: [
+        {
+          criterionKey: "unknown",
+          severity: "MEDIUM",
+          title: "t",
+          detail: "d",
+          rationale: "r",
+          symbol: null,
+          evidenceRefs: ["whatever"],
+        },
+      ],
+    }),
+  );
+
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const judgment = await mechanism.judge(judgmentInput([item]));
+
+  // The file was evaluated, just the model's single entry was discarded
+  assert.equal(judgment.evaluatedRefs.length, 1);
+  assert.equal(judgment.findings.length, 0);
+  // R31-07 fix: skipped is still defined because there's a note about discarded entries
+  assert.ok(judgment.skipped !== undefined, "skipped should not be undefined when there are discard reasons");
+  assert.equal(judgment.skipped?.total, 0, "no file id was skipped");
+  assert.ok(judgment.skipped?.note?.includes("discarded"));
+});
+
 // --- Evidence collection (ADR-054 clause 7) --------------------------------------
 
 function stubSnapshotAccess(listing: {

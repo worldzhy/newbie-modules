@@ -38,10 +38,12 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
   ): Promise<Map<string, SecurityEvaluationCodeScanVerdictCacheEntry[]>> {
     if (input.files.length === 0) return new Map();
     const cutoff = new Date(Date.now() - this.ttlMs);
+    const connectionId = input.connectionId ?? null;
     const rows = await this.prisma.securityEvaluationCodeScanVerdictCache.findMany({
       where: {
         subjectId: input.subjectId,
         modelId: input.modelId,
+        connectionId,
         promptVersion: input.promptVersion,
         ruleSetVersion: input.ruleSetVersion,
         path: { in: input.files.map((file) => file.path) },
@@ -60,6 +62,7 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
         path: row.path,
         contentHash: row.contentHash,
         modelId: row.modelId,
+        connectionId: row.connectionId,
         promptVersion: row.promptVersion,
         ruleSetVersion: row.ruleSetVersion,
         // Rows are written from validated finding entries only; the cast is safe.
@@ -76,8 +79,9 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
   async record(entries: readonly SecurityEvaluationCodeScanVerdictCacheEntry[]): Promise<void> {
     if (entries.length === 0) return;
     await this.prisma.$transaction(
-      entries.map((entry) =>
-        this.prisma.securityEvaluationCodeScanVerdictCache.upsert({
+      entries.map((entry) => {
+        const connectionId = entry.connectionId ?? null;
+        return this.prisma.securityEvaluationCodeScanVerdictCache.upsert({
           where: {
             codeScanVerdictIdentity: {
               subjectId: entry.subjectId,
@@ -85,6 +89,7 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
               path: entry.path,
               contentHash: entry.contentHash,
               modelId: entry.modelId,
+              connectionId,
               promptVersion: entry.promptVersion,
               ruleSetVersion: entry.ruleSetVersion,
             },
@@ -95,6 +100,7 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
             path: entry.path,
             contentHash: entry.contentHash,
             modelId: entry.modelId,
+            connectionId,
             promptVersion: entry.promptVersion,
             ruleSetVersion: entry.ruleSetVersion,
             findings: entry.findings as unknown as never,
@@ -104,8 +110,8 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
             findings: entry.findings as unknown as never,
             inputSignature: entry.signature,
           },
-        }),
-      ),
+        });
+      }),
     );
   }
 }
