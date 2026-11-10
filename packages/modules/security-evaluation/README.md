@@ -168,7 +168,7 @@ symbol)` — no content hash, no line numbers (those live in finding
 criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
   an unchanged file replays its cached verdict and never re-calls the model.
   `unavailable` verdicts are never cached. Rows expire after the declared
-  `codeScanVerdictCacheTtlDays` (`CODE_SCAN_VERDICT_CACHE_TTL_DAYS`, no
+  `codeScanVerdictCacheTtlDays` (`SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS`, no
   fallback) so long-unchanged files are re-judged against model drift.
 - The LLM connection binds to the `security-evaluation-code-scan` scope.
   Without a bound model every file lands in the run's skipped bucket and no
