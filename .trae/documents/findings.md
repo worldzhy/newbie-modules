@@ -253,5 +253,20 @@ R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30
 | R31-07 | newbie-modules | 仅"丢弃条目"而无文件跳过时 skipped 为 undefined，丢弃说明不进 coverage，只留 metadata 计数 | P2 | live | — | fixed（registry `19aa090`；skipped 只要有 note 就有定义，含专门回归用例） |
 | R31-08 | newbie-modules | 超 maxFiles 的每个源码文件逐条写 skipped items，随仓库规模线性膨胀 result 体积 | P2 | live | 大仓库 | fixed（host `7f10ee5`；端口加 count 字段，适配器聚合 budget/tree 截断条目为单 entry） |
 | R31-09 | newbie-modules | `MAX_FILES=200` 与 `LLM_CALL_BUDGET=200` 相等且缓存不耗预算 → budgetCut 分支不可达；ADR-054 条款 6 的"缓存救预算跳过文件"表述不成立 | P2 | source | — | fixed（registry `19aa090`；BUDGET 从 200 降到 180，测试用 182 文件触发验证） |
-| R31-10 | newbie-modules + nightwatch-backend | 源码摘录（≤12000 字符/文件×200）随 manifest 持久化，secret-exposure finding 可能把密钥原文写入 findings 与缓存表；ADR 只声明"出境"，未覆盖二次落库与保留期 | P2 | live | — | open（需 ADR 级别决策：掩码/缩短/保留期，留待后续专题） |
+| R31-10 | newbie-modules + nightwatch-backend | 源码摘录（≤12000 字符/文件×200）随 manifest 持久化，secret-exposure finding 可能把密钥原文写入 findings 与缓存表；ADR 只声明"出境"，未覆盖二次落库与保留期 | P2 | live | — | superseded → R33-01（2026-11-10 round33 反驳轮 CONFIRMED 并升 P1：摘录原文切片零掩码、manifest 整体落 JsonB 与 schema:220 注释不符、单 finding API 原样返回、VerdictCache 行永不删除） |
+
+## round33（2026-11-10，scope=`workspace` 中的 registry 相关条目）
+
+报告（主仓 devbie）：`devbie/.trae/documents/reviews/expert-review-2026-11-10-round33.md`。装配一致性：34/34 模块 `diff -rq` 零内容差异（含 security-evaluation、account 全量）。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R33-01 | newbie-modules + nightwatch-backend | code-scan 源码摘录无掩码永久落库：`evidence/security-evaluation-evidence.provider.ts:316` 原文切片（全模块 mask/redact 零命中）→ `evaluation/evaluation-result.service.ts:98` 整体落 JsonB → `security-evaluation.controller.ts:277` 原样返回（仅 List 权限）；VerdictCache 无删除路径（`persistence/security-evaluation-code-scan-verdict-cache.repository.ts:40` 仅 lookup+upsert，TTL 只是读取 cutoff） | P1 | live | 持 security-evaluation 读权限者（需被扫仓库含硬编码密钥） | fixed（`734541b` + `19531cd`；宿主 `4106b87`）：manifest 只留 path/language/bytes/revision/contentHash/truncated；摘录入 `SecurityEvaluationCodeScanFileExcerpt`，键 `(subjectId, contentHash)`（collect 无 runId，内容寻址使同内容跨 run 复用、旧 run 详情仍读到其所判内容）；判定从该表读，缺失 fail-closed；详情读行存在时回填 excerpt，过期回落 hash + truncated；`SecurityEvaluationRetentionService.pruneExpired()` 物理删除 90 天前摘录与到期 VerdictCache 行，宿主每日扫描任务先调用。ADR-054 条款 6/7 已修订；PG migration `20261110010000_security_evaluation_code_scan_file_excerpt` |
+| R33-04 | newbie-modules | TOTP `twoFactorSecret` 明文存储（`account/prisma/schema.prisma:39`，`two-factor.service.ts:255` 直读），未获 R20-11 同等 seal 待遇；DB 读即全员 2FA 失效 | P2 | live | DB 读取者 | open |
+| R33-05 | newbie-modules | 登录审计契约测试弱化：`account/auth/login-audit-coverage.test.ts:61` `SUCCESS_SESSION_PATTERN=/sessionService\.generate\(/` 匹配不到现行 `auth.service.ts:164` 的 `generateWithTransaction`（检查空转）；`login-by-totp.controller.ts` 不在 `LOGIN_ENTRY_FILES`（其拒绝分支已人工核实逐条审计，但未被契约钉住） | P2 | source | 关键路径门禁 | fixed（`734541b`）：正则改 `generate(?:WithTransaction)?\(`，TOTP 入口纳入 `LOGIN_ENTRY_FILES`；29 pass |
+| R33-09 | newbie-modules | `membership/membership.service.ts:13-15` 卡号 Math.random（约 10k 空间仅查重）；registry 独有，未装配 | P3 | source | 采用该模块者 | open |
+
+**2026-11-10 订正（R33-01 读面口径）**：`security-evaluation.controller.ts:198-282` 复核——详情接口只返回与 finding 匹配的 manifest 条目（`matchEvidence`：`item.summary === metadata.path` 或 id ∈ `evidenceRefs`），`:278` 原样下发 `payload.excerpt`，权限 `List EvaluationFinding`（`:199`）；不是「全部 200 个文件原样返回」。留存面与判定输入面不变：`evidence/security-evaluation-evidence.provider.ts:316` 为每个扫描文件写摘录 → `evaluation/evaluation-result.service.ts:98` 整体落库；`judgment/code-scan/security-evaluation-code-scan.mechanism.ts:204-215,298` 以该摘录构造 LLM 请求；`security-evaluation.dto.ts:390` 公开 payload 形状。故「只为命中文件留存摘录」需在判定完成后裁剪（判定前 findings 尚不存在），会损失判定输入的完整归档；替代形态是摘录独立表 + 保留期。
+
+反驳轮误报剔除（registry 相关）：「frontend-monitor appKey 用 Math.random 生成致 ingest 凭证可预测」REFUTED——appKey 是公开分区键（`shared/utils.ts:3-7` 注释明示），ingest 由 `@InstallationAuth` 校验 token（`installation.guard.ts:72-83`），真凭证为 `installation-credential.ts:17-19` `crypto.randomUUID()` 存 SHA-256 哈希。分层规则复核：round30 对 9 处 ForbiddenException 的合规裁决维持（防枚举/执行层设计）；`organization/membership.service.ts` role 检查属字面违反但该模块未装配，记观察。
 
