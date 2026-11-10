@@ -24,12 +24,14 @@ import { join } from "node:path";
  *    (e.g. an OAuth handshake returning no profile) is exempt, but only
  *    when the surrounding code says so explicitly via a comment containing
  *    "handshake" or "audit: not required" — silence is not an exemption.
- * 2. Success coverage — any file that mints a session directly via
- *    `sessionService.generate(` must also record `AuditEvent.LOGIN`.
- * 3. TOTP gate coverage — any file that mints a session directly must pass
- *    the account-level TOTP gate (`evaluateLoginMfaGate`, ADR-007) before
- *    generating it, so enabling TOTP protects every login channel, not just
- *    the ones routed through the shared AuthService.login().
+ * 2. Success coverage — the declared direct-mint file(s) in DIRECT_MINT_FILES
+ *    must actually mint a session and record `AuditEvent.LOGIN` right after it;
+ *    every other entry file must not mint directly. An undeclared mint fails
+ *    the contract instead of silently skipping checks 2-3 (R34-05).
+ * 3. TOTP gate coverage — each direct mint must be preceded by the
+ *    account-level TOTP gate (`evaluateLoginMfaGate`, ADR-007), so enabling
+ *    TOTP protects every login channel, not just the ones routed through the
+ *    shared AuthService.login().
  *
  * A fourth check pins the shared-issuance structure: out-of-band identity
  * channels (Lark OAuth, WeChat mini-program) must not mint sessions directly
@@ -64,6 +66,17 @@ const SUCCESS_AUDIT_PATTERN = /AuditEvent\.LOGIN\b/;
 const TOTP_GATE_PATTERN = /evaluateLoginMfaGate\(/;
 
 /**
+ * Entry files that mint a session directly and therefore carry the success
+ * audit and TOTP gate themselves. Declared explicitly: a renamed or relocated
+ * mint call then fails the contract instead of silently skipping checks 2-3,
+ * and a delegating entry that starts minting on its own is rejected (R34-05).
+ */
+const DIRECT_MINT_FILES = ["auth.service.ts"];
+
+/** A direct mint must sit this close to its TOTP gate and LOGIN audit record. */
+const MINT_PROXIMITY_LINES = 60;
+
+/**
  * Out-of-band identity channels that resolve the user without the credential
  * eligibility gates (OAuth profile / mini-program phone ownership). They must
  * issue sessions exclusively through AuthService.issueLoginSession().
@@ -87,6 +100,11 @@ function findUncoveredRejections(lines: string[]): number[] {
   return uncovered;
 }
 
+/** Index of the first line matching the pattern, or -1 when absent. */
+function firstMatchIndex(lines: string[], pattern: RegExp): number {
+  return lines.findIndex((line) => pattern.test(line));
+}
+
 describe("login audit coverage contract", () => {
   for (const relativePath of LOGIN_ENTRY_FILES) {
     it(`${relativePath}: every identity-resolved rejection is audited or explicitly exempt`, () => {
@@ -99,22 +117,41 @@ describe("login audit coverage contract", () => {
       );
     });
 
-    it(`${relativePath}: a directly-minted session is matched by a success audit record`, () => {
-      const content = readLines(relativePath).join("\n");
-      if (!SUCCESS_SESSION_PATTERN.test(content)) return;
-      assert.ok(
-        SUCCESS_AUDIT_PATTERN.test(content),
-        `${relativePath} calls sessionService.generate() but never records AuditEvent.LOGIN.`,
+    it(`${relativePath}: direct-mint status matches the declared roll-call`, () => {
+      const mintIndex = firstMatchIndex(readLines(relativePath), SUCCESS_SESSION_PATTERN);
+      const declared = DIRECT_MINT_FILES.includes(relativePath);
+      assert.equal(
+        mintIndex >= 0,
+        declared,
+        declared
+          ? `${relativePath} is listed in DIRECT_MINT_FILES but no sessionService.generate() call was found — ` +
+              `if the mint moved, move the declaration with it.`
+          : `${relativePath} mints a session directly — declare it in DIRECT_MINT_FILES and add the success ` +
+              `audit plus TOTP gate, or route it through AuthService.issueLoginSession().`,
       );
     });
 
-    it(`${relativePath}: a directly-minted session passes the account-level TOTP gate`, () => {
-      const content = readLines(relativePath).join("\n");
-      if (!SUCCESS_SESSION_PATTERN.test(content)) return;
+    it(`${relativePath}: a directly-minted session records AuditEvent.LOGIN right after it`, () => {
+      const lines = readLines(relativePath);
+      const mintIndex = firstMatchIndex(lines, SUCCESS_SESSION_PATTERN);
+      if (mintIndex < 0) return;
+      const auditIndex = lines.findIndex((line, index) => index > mintIndex && SUCCESS_AUDIT_PATTERN.test(line));
       assert.ok(
-        TOTP_GATE_PATTERN.test(content),
-        `${relativePath} mints a session via sessionService.generate() but never calls ` +
-          `evaluateLoginMfaGate() — every session-minting login path must enforce the ` +
+        auditIndex >= 0 && auditIndex - mintIndex <= MINT_PROXIMITY_LINES,
+        `${relativePath} mints a session at line ${mintIndex + 1} but does not record AuditEvent.LOGIN ` +
+          `within ${MINT_PROXIMITY_LINES} lines after it — the LOGIN audit must follow the mint, never precede it.`,
+      );
+    });
+
+    it(`${relativePath}: a directly-minted session passes the account-level TOTP gate first`, () => {
+      const lines = readLines(relativePath);
+      const mintIndex = firstMatchIndex(lines, SUCCESS_SESSION_PATTERN);
+      if (mintIndex < 0) return;
+      const gateIndex = firstMatchIndex(lines, TOTP_GATE_PATTERN);
+      assert.ok(
+        gateIndex >= 0 && gateIndex < mintIndex && mintIndex - gateIndex <= MINT_PROXIMITY_LINES,
+        `${relativePath} mints a session via sessionService.generate() at line ${mintIndex + 1} without a ` +
+          `preceding evaluateLoginMfaGate() — every session-minting login path must enforce the ` +
           `account-level TOTP gate before generating the session (see ADR-007).`,
       );
     });

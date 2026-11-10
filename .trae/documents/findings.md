@@ -238,7 +238,7 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 
 R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30` 口径统一（R5-P2-04 removed，不再 open）；② R3-25 open 引用按 round30 裁决关闭（前端 12 文件/109 用例全绿）。devbie 侧同步关闭 R28-06/R28-08 并删除 backlog R3-25 引用。
 
-## round31（2026-11-10，scope=`modules: [security-evaluation]`，报告 `expert-review-2026-11-10-round31.md`）
+## round31（2026-11-10，scope=`modules: [security-evaluation]`，报告 `reviews/expert-review-2026-11-10-round31.md`）
 
 评审对象：ADR-054 code-scan 全链路（registry `21e4ef8`）+ 宿主装配整合（nightwatch-backend `743c24b`）。装配 `diff -rq` 零差异。全部状态 `open`（评审会话只读）。2026-11-10 修复会话关闭 R31-01/R31-02（commit 见行内）。
 
@@ -278,10 +278,10 @@ R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30
 | --- | --- | --- | --- | --- | --- | --- |
 | R34-02 | newbie-modules | R33-01 部分闭合：LLM 产出 `title`/`detail` 原样入库（`packages/modules/evaluation/evaluation-finding.service.ts:257-258`，同写面 `:300-301`；来源 `judgment/code-scan/security-evaluation-code-scan.mechanism.ts:112-129`，提示词 `:301-311` 携带源码摘录）；`grep evaluationFinding.delete` 零处；`security-evaluation-retention.service.ts:30-35` 只清 verdict cache 与 excerpts | P2 | live | 持 `List EvaluationFinding` 者 | open |
 | R34-03 | newbie-modules | TOTP 封缄密钥无 keyId/轮换：`security/token/token.service.ts:255-260`（派生行 `:257`）取 `userRefresh.secret \|\| defaultSecret`，信封固定 `v1` 四段（`:213-224`、`:239-242`）；`account/modules/two-factor/two-factor.service.ts:119`（`setup` `:55` 同型）解封为实参求值、早于 `:145-161` 密码比对，解封失败即 401，用户无法凭密码关闭 TOTP；env 默认全空（`security/newbie.module.json:27-29`） | P2 | live | 运维轮换 secret → 全体 TOTP 用户 | open |
-| R34-05 | newbie-modules | 登录审计契约测试仍可静默空转：`account/auth/login-audit-coverage.test.ts:104/:113` 均 `if (!SUCCESS_SESSION_PATTERN.test(content)) return;`；逐文件实测 9 个 `LOGIN_ENTRY_FILES` 仅 `auth.service.ts` 命中 1 次；`:106` 全文匹配不保证审计早于 mint | P2 | source | 关键路径门禁 | open |
+| R34-05 | newbie-modules | 登录审计契约测试仍可静默空转：`account/auth/login-audit-coverage.test.ts:104/:113` 均 `if (!SUCCESS_SESSION_PATTERN.test(content)) return;`；逐文件实测 9 个 `LOGIN_ENTRY_FILES` 仅 `auth.service.ts` 命中 1 次；`:106` 全文匹配不保证审计早于 mint | P2 | source | 关键路径门禁 | fixed（`login-audit-coverage.test.ts` 新增 `DIRECT_MINT_FILES` 显式点名 + mint 状态双向断言：声明必命 mint、未声明不得 mint；审计断言改为「mint 后 60 行内」、TOTP gate 断言「mint 前 60 行内」——审计本就在签发之后，故以邻近性+方向表达原意） |
 | R34-11 | newbie-modules | `evidence/security-evaluation-code-scan-excerpt.service.ts:45-53` `load` 无读侧 cutoff，保留语义仅靠每日 cron；宿主 `src/modules/job-scheduler/scheduler/scheduled-job.ts:28-38` 在 `onModuleInit` 把 `isEnabled` 交给 DB 声明，可停用 | P3 | live | — | open |
-| R34-18 | newbie-modules | `.trae/documents/expert-review-2026-11-10-round31.md` 为根部残留旧副本（与 `reviews/` 同名文件 `diff` 不一致） | P3 | docs | 任何人引档 | open |
-| R34-19 | newbie-modules | `.github/workflows/ci.yml:36` 钉 `@devbie/newbie-cli@1.18.0`，源码已 1.20.0，门禁实际跑旧规则 | P3 | source | 门禁 | open |
+| R34-18 | newbie-modules | `.trae/documents/expert-review-2026-11-10-round31.md` 为根部残留旧副本（与 `reviews/` 同名文件 `diff` 不一致） | P3 | docs | 任何人引档 | fixed（复核发现根部文件并非旧副本，而是同日 15:16–16:30 另一份评审的唯一副本；已移入 `reviews/expert-review-2026-11-10-security-evaluation-filters.md` 保留内容，round31 台账指针改为 `reviews/` 路径） |
+| R34-19 | newbie-modules | `.github/workflows/ci.yml:36` 钉 `@devbie/newbie-cli@1.18.0`，源码已 1.20.0，门禁实际跑旧规则 | P3 | source | 门禁 | fixed（ci.yml 钉版本改 1.20.0，与 devbie `packages/newbie-cli` 源码一致） |
 | R33-09 | newbie-modules | `membership/membership.service.ts:13-16` 卡号 `"9"+a+a+b` Math.random（10⁴ 空间仅查重）；registry 独有，未装配 | P3 | source | 采用该模块者 | open（重验仍存在） |
 
 反驳轮（本轮）：C2（封缄密钥无轮换 + disable 解封早于密码校验）CONFIRMED；C4（finding 文本无掩码无保留期）CONFIRMED；C3（历史 manifest 明文可读，属宿主+registry 同源，登记在 devbie R34-01）CONFIRMED。R33-04 封缄实现本身重验通过：四个读写点全部经解封、序列化层删除秘密字段、域分离密文互不可开、fail-closed 无明文回落。

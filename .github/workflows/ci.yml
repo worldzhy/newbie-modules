@@ -33,7 +33,7 @@ jobs:
       # instead of vendored into the registry. Pin the exact release: lint
       # semantics must not change under a floating major tag (R5-P2-16);
       # bump it deliberately alongside registry tooling changes.
-      - run: npx --yes @devbie/newbie-cli@1.18.0 modules lint
+      - run: npx --yes @devbie/newbie-cli@1.20.0 modules lint
       # Module business-logic tests (e.g. account/auth/login-audit-coverage.test.ts)
       # cannot run standalone here: this registry has no NestJS/zod/etc.
       # dependencies installed, by design (modules are copied into a consumer
