@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 
 import { InstallationTouchThrottle } from "@modules/security/installation/installation-touch-throttle";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
-import { FrontendInstallationService } from "./web-installation.service";
+import { FrontendInstallationService } from "./frontend-installation.service";
 
 export interface ResolvedWebToken {
   installationId: string;

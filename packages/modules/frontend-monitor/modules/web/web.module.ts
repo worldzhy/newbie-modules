@@ -5,8 +5,8 @@ import { SharedModule } from "../../shared/shared.module";
 import { DayReportModule } from "@modules/frontend-monitor/modules/day-report/day-report.module";
 import { SiteModule } from "@modules/frontend-monitor/modules/site/site.module";
 import { installationResolverToken } from "@modules/security/ports/installation.resolver";
-import { FrontendInstallationService } from "../../services/web-installation.service";
-import { FrontendTokenResolver } from "../../services/web-token.resolver";
+import { FrontendInstallationService } from "../../services/frontend-installation.service";
+import { FrontendTokenResolver } from "../../services/frontend-token.resolver";
 
 import { FrontendReportController } from "./report.controller";
 

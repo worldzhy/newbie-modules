@@ -9,7 +9,7 @@ import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 import { DayReportNumService } from "@modules/frontend-monitor/modules/day-report/day-report-num.service";
 import { RedisService } from "@modules/redis/redis.service";
 import { RedisKeys } from "../../models/enum";
-import { ResolvedWebToken, FrontendTokenResolver } from "../../services/web-token.resolver";
+import { ResolvedWebToken, FrontendTokenResolver } from "../../services/frontend-token.resolver";
 
 /**
  * Token-only public endpoint for frontend-monitor ingestion (ADR-016), peer to

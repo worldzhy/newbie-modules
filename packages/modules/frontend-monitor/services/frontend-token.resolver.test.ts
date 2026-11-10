@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { UnauthorizedException } from "@nestjs/common";
 
-import { FrontendTokenResolver } from "./web-token.resolver";
+import { FrontendTokenResolver } from "./frontend-token.resolver";
 
 /**
  * The resolver adapts FrontendInstallationService to security's InstallationResolver
