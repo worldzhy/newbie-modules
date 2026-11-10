@@ -240,12 +240,12 @@ R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30
 
 ## round31（2026-11-10，scope=`modules: [security-evaluation]`，报告 `expert-review-2026-11-10-round31.md`）
 
-评审对象：ADR-054 code-scan 全链路（registry `21e4ef8`）+ 宿主装配整合（nightwatch-backend `743c24b`）。装配 `diff -rq` 零差异。全部状态 `open`（评审会话只读）。
+评审对象：ADR-054 code-scan 全链路（registry `21e4ef8`）+ 宿主装配整合（nightwatch-backend `743c24b`）。装配 `diff -rq` 零差异。全部状态 `open`（评审会话只读）。2026-11-10 修复会话关闭 R31-01/R31-02（commit 见行内）。
 
 | ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| R31-01 | newbie-modules + nightwatch-backend | LLM scope 不可解析时全量文件记 unavailable skip，run 仍 SUCCEEDED（evaluated=0），骨架 resolveAbsentFindings 随即关闭该 subject 全部 OPEN code-scan findings（executed：解绑后 2 条 finding 18s 内 RESOLVED，重绑后缓存重放恢复） | P1 | live | 管理员解绑/连接不可用，含 daily 无人值守 | open |
-| R31-02 | nightwatch-backend | code-scan 未登记项目安全分类表 R1（`security-evaluation-read-model.service.ts:51-56`）→ `unknown` → 空 buckets，findings 在项目安全总览/风险快照被静默丢弃（executed 纯函数探针：threat-intel 落 unclassified，code-scan 无桶） | P1 | live | 任意登录项目查看者 | open |
+| R31-01 | newbie-modules + nightwatch-backend | LLM scope 不可解析时全量文件记 unavailable skip，run 仍 SUCCEEDED（evaluated=0），骨架 resolveAbsentFindings 随即关闭该 subject 全部 OPEN code-scan findings（executed：解绑后 2 条 finding 18s 内 RESOLVED，重绑后缓存重放恢复） | P1 | live | 管理员解绑/连接不可用，含 daily 无人值守 | fixed（registry `cbd3f4f` + host `3f585b1`；判定层 fail-closed，回归 `security-evaluation-code-scan.test.ts` 的 "fails the run when…" 两例 + E2E 解绑 run FAILED/findings 保持 OPEN） |
+| R31-02 | nightwatch-backend | code-scan 未登记项目安全分类表 R1（`security-evaluation-read-model.service.ts:51-56`）→ `unknown` → 空 buckets，findings 在项目安全总览/风险快照被静默丢弃（executed 纯函数探针：threat-intel 落 unclassified，code-scan 无桶） | P1 | live | 任意登录项目查看者 | fixed（host `3f585b1`；R1 登记为空桶 → unclassified，回归 `security-evaluation-read-model.test.ts` 的 code-scan 归属例） |
 | R31-03 | nightwatch-frontend | security-evaluation 页的标签表/筛选/手动触发三处均无 code-scan，新能力只能靠 API 或 daily 任务触发 | P2 | live | 任意登录用户 | open |
 | R31-04 | nightwatch-backend | 快照适配器扩展名判定用整条 path 的 lastIndexOf(".")（`docs/v1.2/README` 误判 non-source；无点号文件被当源码）；EXCLUDED_PREFIXES 只匹配根级 | P2 | live | — | open |
 | R31-05 | nightwatch-backend | GitHub tree 截断仅 warn，不折进 skipped/manifest，违反全量记账契约（静默欠覆盖） | P2 | live | 超大仓库 | open |
