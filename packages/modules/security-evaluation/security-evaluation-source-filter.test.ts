@@ -89,6 +89,9 @@ function createController(subjectIds: string[] | null) {
       return {};
     },
   };
+  const excerpts = {
+    load: async () => new Map<string, string>(),
+  };
 
   return {
     controller: new SecurityEvaluationController(
@@ -98,6 +101,7 @@ function createController(subjectIds: string[] | null) {
       results as never,
       criteria as never,
       reports as never,
+      excerpts as never,
     ),
     seen,
   };
