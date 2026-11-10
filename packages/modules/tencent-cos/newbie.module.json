@@ -21,7 +21,7 @@
       "TENCENT_COS_SECRET_KEY": "",
       "TENCENT_COS_REGION": "",
       "TENCENT_COS_BUCKET": "",
-      "STORE_PATH": ""
+      "TENCENT_COS_STORE_PATH": ""
     },
     "dependencies": {
       "cos-nodejs-sdk-v5": "latest"
