@@ -2,7 +2,7 @@
 
 Unfinished engineering tasks. Completed items are deleted (git history is the archive).
 
-来源标记：`[安全评审 round2 2026-10-30]` 指 devbie 仓 `.trae/documents/expert-review-2026-10-30-round2.md`（已入库）。
+来源标记：`[安全评审 round2 2026-10-30]` 指 devbie 仓 `.trae/documents/reviews/expert-review-2026-10-30-round2.md`（已入库）。
 
 ## P0（未修复）
 
@@ -30,13 +30,13 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 ## security-evaluation 评审 round4 未修项（2026-10-31）
 
-报告：`.trae/documents/expert-review-2026-10-31-round4.md`；台账：同目录 `findings.md`。
+报告：`.trae/documents/reviews/expert-review-2026-10-31-round4.md`；台账：同目录 `findings.md`。
 
 （R4-04 + R4-09 已修复：NegativeCache → VerdictCache（加 verdict 枚举），record 加 verdict/matchedEntity 字段；filterUncached 加 verdict="not-relevant" + TTL 过滤（默认 7 天，NEGATIVE_CACHE_TTL_DAYS env 可覆盖）；evidence provider fetchedAt asc → desc；硬命中也写缓存（audit-only，不进 filterUncached）。commit 16930cf。）
 
 ## 安全评审 round3 P2（二次取证后 open，2026-11-02 入账）
 
-> 来源：devbie `.trae/documents/expert-review-2026-10-31-round3.md` §P2 + §R3-G1。9 条误报与 1 条出界已剔除（见同文件 §误报剔除与本次复核记录）。
+> 来源：devbie `.trae/documents/reviews/expert-review-2026-10-31-round3.md` §P2 + §R3-G1。9 条误报与 1 条出界已剔除（见同文件 §误报剔除与本次复核记录）。
 
 （Wave 5 最后一条 P2-08 已修复：event-emitter `record()` 前加 lazy `deleteMany({ emittedAt: < now - N days })`，默认 30 天，`EVENT_EMISSION_RETENTION_DAYS` env 可覆盖；无 @nestjs/schedule 依赖、无 migration。）
 
@@ -45,7 +45,7 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 ## 安全评审 round27 P3（2026-11-08，registry）
 
-> 来源：devbie `.trae/documents/expert-review-2026-11-08-round27.md`（R25 修复批次复核）。
+> 来源：devbie `.trae/documents/reviews/expert-review-2026-11-08-round27.md`（R25 修复批次复核）。
 > R27-02 已于 `4817d10` 修复：`permission-group.dto.test.ts` 用前端同一张向量表断言 Create/Update DTO，装配进 backend 后 5/5 通过。
 
 ## security-evaluation credentialRef 评审（2026-11-08 入账）
@@ -70,13 +70,13 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 
 ## round30 评审入账（2026-11-09，workspace scope）
 
-> 来源：devbie `.trae/documents/expert-review-2026-11-09-round30.md`；台账见 devbie `findings.md` round30 节与同目录 `findings.md` 引用行。
+> 来源：devbie `.trae/documents/reviews/expert-review-2026-11-09-round30.md`；台账见 devbie `findings.md` round30 节与同目录 `findings.md` 引用行。
 
 - [x] `[R30-02 已关闭 2026-11-09]` ClickHouseModel 原始插值面收敛 — **取证后判定无需动作**：find() 与 delete() 均提供 `queryParams` 占位符绑定（`{name:Type}` 语法），types.ts 已文档约束，当前所有 caller 均走安全路径；delete() 是框架公共 API（JSDoc + service.ts 文档已承诺），nightwatch-backend 零调用只是宿主暂态，其他宿主或未来 retention/cleanup 功能可能用到。标识符白名单 API 为过度设计（`select: "count() as total"`、`toStartOfHour()` 表达式非简单列名，无法白名单）。
 
 ## round31 backlog 核对入账（2026-11-09，plan scope）
 
-> 来源：devbie `.trae/documents/expert-review-2026-11-09-round31.md`（scope = 6 份 backlog 的声明清单）。
+> 来源：devbie `.trae/documents/reviews/expert-review-2026-11-09-round31.md`（scope = 6 份 backlog 的声明清单）。
 
 - [x] `[R31-13]` **本文件 `:17`「registry 唯一 package-lock」计数不实（P3）**：实测 2 个（仓根 + `packages/modules/message-tracker/sst/`，`find -name package-lock.json -not -path '*/node_modules/*'`）。**fixed（2026-11-09）**：`message-tracker` 条目改为「根与 sst 各一」（round32 复核订正错名）。
 - [x] `[R31-17]` **本文件 `:25`「`modules.config.ts` 49 处 process.env」计数不实（P3）**：**fixed（2026-11-09）**：实测 46（`grep -c 'process.env' nightwatch-backend/src/modules/modules.config.ts`），行内已改为 46；「无 fallback」部分成立。

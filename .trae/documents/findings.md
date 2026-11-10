@@ -1,6 +1,6 @@
 # Findings 台账（newbie-modules）
 
-评审报告：`.trae/documents/expert-review-2026-10-31-round4.md`（scope=`modules: [security-evaluation]`）。
+评审报告：`.trae/documents/reviews/expert-review-2026-10-31-round4.md`（scope=`modules: [security-evaluation]`）。
 
 字段：ID / 仓 / 标题 / severity / 暴露面 / 可达性 / 状态 / 回归指针。
 
@@ -18,7 +18,7 @@
 
 已撤销/误报：见报告 §7。
 
-## round5（2026-11-03，scope=`workspace`，报告在 `devbie/.trae/documents/expert-review-2026-11-03-round5.md`）
+## round5（2026-11-03，scope=`workspace`，报告在 `devbie/.trae/documents/reviews/expert-review-2026-11-03-round5.md`）
 
 只登记 registry 模块级条目；跨仓与宿主条目见 `devbie/.trae/documents/findings.md`。
 
@@ -33,11 +33,11 @@
 | R5-P2-07 | newbie-modules                      | notification push-failures 无分页，随累积行数无界返回                                                                                               | P2     | artifact           | OPERATOR/ADMIN                 | fixed（`51821c4`，`take: 200` 上限）                                                                                                              |
 | R5-13    | newbie-modules ↔ nightwatch-backend | ClickHouse 标识符注入：registry 已加 `quoteIdentifier/quoteTable`，宿主副本仍裸插值；web-monitor `appId` 无校验（详见 devbie 台账同名条目）         | P1     | live（宿主旧副本） | MEMBER/OPERATOR 且项目 EDITOR+ | **fixed（2026-11-04）**：`5adec55` 的 `assertAppId` 已在 Mongo/ClickHouse 工厂、`saveSiteData` 与 ingest 生效；宿主 `diff -rq` 与 registry 零差异 |
 
-复核轮（2026-11-03）：R5-P2-02 的 `link` 条款降为契约不对称；R5-P2-03 的「owner 状态」修正为「verifier 端口未做该校验，且通道无调用方」（与 devbie 台账 N-1 同源）；新增 R5-13。详见 `devbie/.trae/documents/expert-review-2026-11-03-round5.md` §12。
+复核轮（2026-11-03）：R5-P2-02 的 `link` 条款降为契约不对称；R5-P2-03 的「owner 状态」修正为「verifier 端口未做该校验，且通道无调用方」（与 devbie 台账 N-1 同源）；新增 R5-13。详见 `devbie/.trae/documents/reviews/expert-review-2026-11-03-round5.md` §12。
 
 W1 落地（2026-11-03）：`d78bf84` security 拒绝公开/过短签名密钥（启动、签名、验签三处 fail-closed）；`0891fcb` clickhouse 配置改为纯 `process.env`。根因是 manifest 中 `process.env.X || 'fallback'` 含内层引号，CLI 正则不解包、原样写成字符串字面量；devbie CLI 已补装配期告警（`5ccd7c9`），其余同类 manifest 仍待逐模块收敛。
 
-## round6 复核（2026-11-04，scope=`workspace`，报告在 `devbie/.trae/documents/expert-review-2026-11-04-round6.md`）
+## round6 复核（2026-11-04，scope=`workspace`，报告在 `devbie/.trae/documents/reviews/expert-review-2026-11-04-round6.md`）
 
 状态更正（历史行保留，以本节为准）：
 
@@ -60,7 +60,7 @@ W1 落地（2026-11-03）：`d78bf84` security 拒绝公开/过短签名密钥�
 
 复核取证：registry 与宿主 34 个模块 `diff -rq` 零差异；registry 模块单测无法在 registry 仓独立运行（`tsx` 未声明为 devDependency，`ERR_MODULE_NOT_FOUND`），相关用例改由宿主副本执行并通过。
 
-## round7 裁决（2026-11-04，scope=`workspace`，报告在本仓 `.trae/documents/expert-review-2026-11-04-round7.md`）
+## round7 裁决（2026-11-04，scope=`workspace`，报告在本仓 `.trae/documents/reviews/expert-review-2026-11-04-round7.md`）
 
 状态更正（历史行保留，以本节为准）：
 
@@ -70,7 +70,7 @@ W1 落地（2026-11-03）：`d78bf84` security 拒绝公开/过短签名密钥�
 
 回归证据（宿主副本）：`security-evaluation-intel.test.ts` + `security-evaluation-evidence.provider.test.ts` 共 15 例全过，含「签名按模型看到的确切字节内容寻址」「缓存只复用当前签名下的行（changed/legacy/missing 均 miss）」「hard-hit 仅审计」。
 
-## round9 元评审（2026-11-04，scope=`modules: [web-monitor]`，报告在本仓 `.trae/documents/expert-review-2026-11-04-round9.md`）
+## round9 元评审（2026-11-04，scope=`modules: [web-monitor]`，报告在本仓 `.trae/documents/reviews/expert-review-2026-11-04-round9.md`）
 
 round9 是对 round8 结论的元评审；R9-02..R9-08 为方案/报告缺陷，正文保留在 round9 报告（快照规则），此处只登记代码级 finding：
 
@@ -83,7 +83,7 @@ round9 是对 round8 结论的元评审；R9-02..R9-08 为方案/报告缺陷，
 - **R6-13 修订注记**（2026-11-04）：round8 裁决方向成立；round9 修订——毒丸等级上调 P1（R9-01，仅对 appId 向量的 P2 结论撤回）；切片顺序改为 C 层先行、A 批次与 B 同批或用模块级异常过滤器；计数与清单按 R9-03 修正（site 8 端点、custom 4、controllers 11、`assertAppId` 7 调用点、补 analysis 与 49 处 `throw new Error`）。
 - R9-02（切片顺序矛盾）/R9-03（计数不实）/R9-05（R8-02 确认）/R9-06（R8-07 未定级）/R9-08（R8-03 措辞收窄）：方案与报告层结论，见 round9 报告 §5/§10，不占用代码 finding 状态位。
 
-## round10 复核（2026-11-05，scope=`modules: [web-monitor]` 的 R9-01 变更集，报告在本仓 `.trae/documents/expert-review-2026-11-05-round10.md`）
+## round10 复核（2026-11-05，scope=`modules: [web-monitor]` 的 R9-01 变更集，报告在本仓 `.trae/documents/reviews/expert-review-2026-11-05-round10.md`）
 
 | ID     | 仓             | 标题                                                                                                                         | 严重度 | 暴露面 | 可达性                  | 状态                                                                                                                           |
 | ------ | -------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------ | ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -93,7 +93,7 @@ round9 是对 round8 结论的元评审；R9-02..R9-08 为方案/报告缺陷，
 - 误报剔除：「合法但越界 Date 构成同类毒丸」被 CH 探针否决——`DateTime` 列对 1966/3000 年插入静默截断为 `[1970-01-01, 2106-02-07]`，写不失败，不构成重入队（round10 §7）。
 - R9-01 状态更新见上表；backend 装配与提交待用户确认后按 registry-first 流程执行。
 
-## round12（2026-11-05，scope=`plan`：round9 §10 C 层切片草案，报告在本仓 `.trae/documents/expert-review-2026-11-05-round12.md`）
+## round12（2026-11-05，scope=`plan`：round9 §10 C 层切片草案，报告在本仓 `.trae/documents/reviews/expert-review-2026-11-05-round12.md`）
 
 C 层草案判定：现状主张 C1–C4 与支撑论证 P4 成立；方案主张 P1/P2/P3 与隐含充分性 P5 均「证据不足/待细化」（dropped 粒度与行级识别、分类表须覆盖 drain+flush 两段、重试计数载体、与限流绕过关系四问未定）。新发现：
 
@@ -105,7 +105,7 @@ C 层草案判定：现状主张 C1–C4 与支撑论证 P4 成立；方案主�
 - 误报剔除：「CH bodySize NaN 构成写失败毒丸」被探针否决（null → Int32 落 0）；「round11 编号可用」否决（他会话已占用）。
 - R9-04/R9-07 现为 fixed（2026-11-06，`51821c4`）：实际落地的是「逐项记账 + 重入队上限 + 死信」，round12 §9 四问中「重试计数载体」按 Redis payload 字段 `__reportAttempts` 作答；分类法仍按 R9-07 原结论不引入（归一化 + 上限已覆盖已知向量）。
 
-## round15（2026-11-06，scope=`workspace`，报告在 `devbie/.trae/documents/expert-review-2026-11-06-round15.md`）
+## round15（2026-11-06，scope=`workspace`，报告在 `devbie/.trae/documents/reviews/expert-review-2026-11-06-round15.md`）
 
 锚点：newbie-modules `a3ab33c`。registry 4 个新提交全为 ADR-034 manifest 迁移，模块源码未动，故 round12 及之前条目结论维持。
 
@@ -120,7 +120,7 @@ carry-over 更新（2026-11-09）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转
 
 误报剔除：R12-01 CH 侧毒丸向量（探针反驳）；registry CI pin 滞后（已升 1.18.0）。详见 devbie round15 报告 §7。
 
-## round18（2026-11-06，scope=`plan`：ADR-050 错误来源分级，报告在本仓 `.trae/documents/expert-review-2026-11-06-round18.md`）
+## round18（2026-11-06，scope=`plan`：ADR-050 错误来源分级，报告在本仓 `.trae/documents/reviews/expert-review-2026-11-06-round18.md`）
 
 锚点：newbie-modules `971721e`（0 dirty）/ devbie `4df0a04c`（3 untracked，均不在 SDK 区）。结论摘要：ADR 的"复用 `api` 作来源真源、不改 schema"方向成立；两条 high 信号的来源边界未闭合。
 
@@ -145,7 +145,7 @@ carry-over 更新（2026-11-09）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转
   - R18-04 fixed：ADR-050「验证（registry-first）」已写明"清表"前置。
   - R18-05/R18-06 fixed：ADR-050 已按评审订正措辞（`error.name`、分组在告警任务、`models/clickhouse/web/error.ts` 全路径），并在影响节记录 `type=script → log` 改变前端错误列表聚合口径（`error.service.ts` L72-L77）。
 
-## round19（2026-11-06，scope=`plan`：ADR-051 告警冷却与恢复落地，报告在本仓 `.trae/documents/expert-review-2026-11-06-round19.md`）
+## round19（2026-11-06，scope=`plan`：ADR-051 告警冷却与恢复落地，报告在本仓 `.trae/documents/reviews/expert-review-2026-11-06-round19.md`）
 
 锚点：newbie-modules `066cac8`（0 dirty）/ nightwatch-backend `6a48981`（1 untracked，不在被审域）/ nightwatch-frontend `025caed`（0 dirty）。结论摘要：状态机接线、schema、宿主/前端链路与装配一致性成立；P1 fail-open 注释失实、E2E 勾选无持久证据。
 
@@ -175,7 +175,7 @@ carry-over 更新（2026-11-09）：R12-01 / R12-02 / R9-04 / R9-07 / R10-02 转
 
 ## round20（workspace scope）模块级条目指针
 
-round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/documents/expert-review-2026-11-06-round20.md`、`devbie/.trae/documents/findings.md` R20-01..R20-41）。本仓相关条目（按不复制正文规则仅留指针）：
+round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/documents/reviews/expert-review-2026-11-06-round20.md`、`devbie/.trae/documents/findings.md` R20-01..R20-41）。本仓相关条目（按不复制正文规则仅留指针）：
 
 - `R20-01` / `R20-02`（P1，fixed 2026-11-07）：web-monitor `/system/update` 与 `/remove/customDeleteData` 鉴权按 body `projectId` 解析、写入/删除按 body `appKey` 执行，二者无绑定 → 跨租户改写/删除。修复：controller 取参与 guard 同源，appKey 由安装注册表派生（`5c47402` + 宿主 `b54062d`）；宿主另加 appKey scope resolver 纵深。E2E 探针：body 他人 appKey → 403，受害文档/时间窗数据未变。
 - `R20-04`（P1，live）：ajax `duration` 无上限，`1e21` → ClickHouse `Code: 27`，整批失败后按 app 全量重排 → 死信（executed 探针，Memory 表已 DROP）。
@@ -183,7 +183,7 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 - `R20-03`（P1）：本仓 `lark.service.ts` 12 处 raw error 入日志，与宿主金蝶同根因；executed 序列化探针证明 token 会被打印。
 
 
-## round21（2026-11-07，scope=`plan`：alert-lifecycle resolved→recovered 改动集，报告在本仓 `.trae/documents/expert-review-2026-11-07-round21.md`）
+## round21（2026-11-07，scope=`plan`：alert-lifecycle resolved→recovered 改动集，报告在本仓 `.trae/documents/reviews/expert-review-2026-11-07-round21.md`）
 
 锚点：newbie-modules `2513d4c`（0 dirty）/ nightwatch-backend `0a6d7a6`（0 dirty）/ nightwatch-frontend `fd25aca`（1 dirty=next-env.d.ts 生成噪音，不在被审域）。结论摘要：9 条主张全部成立（四层契约一致、E2E 证据独立复核为真）；方案外新发现 4 条均 P2。
 
@@ -201,7 +201,7 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 - R21-03 fixed：registry `d469238`（drop 分支补 debug 日志）+ 宿主装配 `f930bce`。报告中行号引用 `:181-184` 系凭记忆重构所致偏差，实际 drop 分支在 `:184-186`，此处已更正。
 - R21-04 fixed：宿主 `9961dc8`（url-check/heartbeat 恢复通知补 `status:"recovered"` + `recoveredAt`）。验证边界：tsc+eslint 绿、build 绿、重启健康检查正常；两调用点复用既有 center 落库路径（其 recovered 相位已由 round21 E2E 证据覆盖），R21-03 的 debug 日志行无独立运行时探针。
 
-## round26（2026-11-08，scope=`modules: [url-check]`：功能测试与验证，报告在本仓 `.trae/documents/expert-review-2026-11-08-round26.md`）
+## round26（2026-11-08，scope=`modules: [url-check]`：功能测试与验证，报告在本仓 `.trae/documents/reviews/expert-review-2026-11-08-round26.md`）
 
 锚点：newbie-modules `93a4797`（3 新增测试文件）/ nightwatch-backend `bbb0b34`（4 新增测试文件）/ nightwatch-frontend `ae6b3e1`（5 dirty，均在 url-check 域外）。结论摘要：新增 38 用例全绿（url-check 相关 52/52，全仓 759/759），tsc/eslint/prettier 绿；SSRF 双层防线与状态机事务性均有 executed 证据；发现 1 个 P1（时间显示偏移）与 2 个 P2。
 
@@ -221,7 +221,7 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 - R26-05 fixed：`ca83ab1`（`.prettierignore` 增加 `**/.sst`），registry `npm run format:check` 转绿。
 - 验证边界：backend `npm test` 762/762、`tsc --noEmit`、改动文件 eslint、`format:check` 全绿；模块 registry↔宿主 `diff -rq` 为空；后端 build + 重启后 `/` 200、Swagger `checkedAt` 描述已更新；宿主 `newbie-modules.json` 已 re-pin 到 `ca83ab1`（`0a78ae1`）。
 
-## round29（2026-11-09，scope=`workspace`，报告在 devbie `.trae/documents/expert-review-2026-11-09-round29.md`）
+## round29（2026-11-09，scope=`workspace`，报告在 devbie `.trae/documents/reviews/expert-review-2026-11-09-round29.md`）
 
 | ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -232,7 +232,7 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 | R29-07 | newbie-modules | approved-subnet.service.ts:57/59、api-key.service.ts:100/101 存在性探测残留：不存在 404、他人资源 403，可区分行存在性（数字 ID 可枚举），与 20bf920 统一 403 目标矛盾 | P3 | live | — | fixed（2026-11-09，registry `ef00afb` / 宿主装配 `47a9e82`）：改 `findFirst({ id, userId })`，缺失与他人资源同为 403 同文案；运行时冒烟 api-keys/approved-subnets 不存在 id 均 403 |
 | R29-08 | newbie-modules | llm `base-url-guard.ts:37` SSRF 谓词小缺口：裸 IPv4-compatible `::7f00:1` 不在 BLOCKED；NAT64 `64:ff9b::/96` 未列（现代栈不路由，可利用性低） | P3 | live | — | fixed（2026-11-09，registry `ef00afb` / 宿主装配 `47a9e82`）：BLOCKED 增 `::/96` 与 `64:ff9b::/96`；dist 实测 `::7f00:1`、`64:ff9b::7f00:1`、`::ffff:127.0.0.1` 全拒、公网域名放行 |
 
-## round30（2026-11-09，scope=`workspace`，报告在 devbie `.trae/documents/expert-review-2026-11-09-round30.md`）
+## round30（2026-11-09，scope=`workspace`，报告在 devbie `.trae/documents/reviews/expert-review-2026-11-09-round30.md`）
 
 本轮无涉及 registry 源码的 finding。台账订正项 R30-01（P2，docs）登记于 devbie findings.md round30 节，涉及本仓两点：①本文件 `:30`（R5-P2-04 removed）与 `:119`（carry-over 注记仍称 open）自相矛盾，需订正；②R3-25 open 引用失真（正文条目已不在本台账，前端测试缺口已被后续轮次覆盖）。装配一致性 34/34 diff 空、模块分层新规则零违规（9 处 ForbiddenException 逐点判定合规）。
 
