@@ -14,7 +14,7 @@ import { InstallationTokenVerifier } from "./installation-token.verifier";
  * token format + SHA-256 + revocation semantics (ADR-019).
  *
  * Only A-layer concrete installation services use this. B-layer resolver
- * classes (FrontendTokenResolver, MonitorTokenResolver, ...) still own their own
+ * classes (FrontendMonitorTokenResolver, MonitorTokenResolver, ...) still own their own
  * resolve() because they return trimmed DTOs with module-specific fields.
  */
 export abstract class BaseInstallationService<Installation extends InstallationCredentialRecord> {
