@@ -1,10 +1,10 @@
 // ! ------------------------------------------------------------ //
-// !              [Module] Web Monitor models                     //
+// !              [Module] Frontend Monitor models                     //
 // ! ------------------------------------------------------------ //
 // * FrontendMonitorInstallation                                                //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// Web-monitor ingest identity. PostgreSQL schema: "module/frontend-monitor".
+// Frontend-monitor ingest identity. PostgreSQL schema: "module/frontend-monitor".
 // One FrontendMonitorInstallation = one FRONTEND application whose browser SDK reports
 // to /frontend-monitor/report. The module owns the token end to end instead of
 // reading application.Agent (FRONTEND_MONITOR): the token is a random UUID, only
@@ -12,7 +12,7 @@
 // enrollment/rotation, and revocation is a soft delete.
 //
 // `appKey` is the immutable public partition key embedded in Mongo collection
-// names (WebPages_<appKey>) and ClickHouse table names (frontend_monitor_requests_<appKey>);
+// names (FrontendPages_<appKey>) and ClickHouse table names (frontend_monitor_requests_<appKey>);
 // it is generated at enrollment and never rotated.
 //
 // Host-side grouping lives in opaque `externalRef` (convention:
