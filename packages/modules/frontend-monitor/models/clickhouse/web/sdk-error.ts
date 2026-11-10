@@ -5,7 +5,7 @@ import { ClickHouseTablePrefix } from "../../enum";
 
 export default function WebSdkError(clickhouse: ClickHouseService, dbName: string) {
   const schema = {
-    tableName: ClickHouseTablePrefix.WEB_SDK_ERROR,
+    tableName: ClickHouseTablePrefix.FRONTEND_SDK_ERROR,
     schema: {
       createTime: { type: ClickHouseDataType.DateTime, default: Date.now }, // Created time
       appKey: { type: ClickHouseDataType.String }, // App Key

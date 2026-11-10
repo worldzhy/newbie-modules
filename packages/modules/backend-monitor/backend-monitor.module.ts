@@ -16,7 +16,7 @@ import { MonitorInstallationService } from "./services/monitor-installation.serv
  * them in ClickHouse. Query endpoints back the monitoring UI's request/error
  * log lists. The former ai-analysis sub-feature moved to the consuming
  * project's application layer as project-level "analysis" (ADR-011 in
- * nightwatch-backend) — it spans the project roster, web-monitor tables and
+ * nightwatch-backend) — it spans the project roster, frontend-monitor tables and
  * the llm module, none of which belong to this module's domain.
  *
  * ClickHouse DDL lives in the consuming project's clickhouse/migrations

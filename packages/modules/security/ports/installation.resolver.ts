@@ -1,7 +1,7 @@
 /**
  * SPI port for installation credential resolution (ADR-016). The security
  * module only owns the HTTP transport (Bearer header, legacy private header
- * during the migration window, or a body field for the web-monitor sendBeacon
+ * during the migration window, or a body field for the frontend-monitor sendBeacon
  * exception); token hashing, storage and revocation checks belong to the
  * collector that owns the installation table.
  *
@@ -22,7 +22,7 @@ export interface InstallationResolver {
   readonly legacyHeader?: string;
   /**
    * Body field carrying the token for endpoints whose browser SDK posts via
-   * navigator.sendBeacon, which cannot set custom headers (web-monitor only).
+   * navigator.sendBeacon, which cannot set custom headers (frontend-monitor only).
    */
   readonly bodyTokenField?: string;
   /**

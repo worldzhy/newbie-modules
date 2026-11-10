@@ -71,14 +71,14 @@ export class WebReportController {
     const consumption = FRONTEND_MONITOR_CONFIG.redis_consumption;
     const limit = Number(consumption.total_limit_web) || 0;
     if (limit) {
-      const length = await this.redis.getClient().llen(RedisKeys.WEB_REPORT_DATAS);
+      const length = await this.redis.getClient().llen(RedisKeys.FRONTEND_REPORT_DATAS);
       if (length >= limit)
         throw new HttpException(
-          `redis: ${RedisKeys.WEB_REPORT_DATAS}: rate limit reached (${limit})`,
+          `redis: ${RedisKeys.FRONTEND_REPORT_DATAS}: rate limit reached (${limit})`,
           HttpStatus.TOO_MANY_REQUESTS,
         );
     }
-    await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DATAS, JSON.stringify(query));
+    await this.redis.getClient().lpush(RedisKeys.FRONTEND_REPORT_DATAS, JSON.stringify(query));
     await this.dayReportNum.redisCount(String(query.appKey));
   }
 }

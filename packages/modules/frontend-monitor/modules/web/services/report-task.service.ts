@@ -334,7 +334,7 @@ export class WebReportTaskService {
     };
     // One round trip for the whole batch instead of one RPOP per report
     // (RPOP key count, Redis >= 6.2).
-    const raws = (await this.redis.getClient().rpop(RedisKeys.WEB_REPORT_DATAS, count)) || [];
+    const raws = (await this.redis.getClient().rpop(RedisKeys.FRONTEND_REPORT_DATAS, count)) || [];
     const rawsByApp: Record<string, string[]> = {};
     let failedItems = 0;
     for (const raw of raws) {
@@ -359,11 +359,11 @@ export class WebReportTaskService {
         for (const raw of rawsByApp[appKey] ?? []) {
           const payload = this.nextAttemptPayload(raw);
           if (payload) {
-            await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DATAS, payload);
+            await this.redis.getClient().lpush(RedisKeys.FRONTEND_REPORT_DATAS, payload);
             requeued += 1;
           } else {
-            await this.redis.getClient().lpush(RedisKeys.WEB_REPORT_DEAD_LETTERS, raw);
-            await this.redis.getClient().ltrim(RedisKeys.WEB_REPORT_DEAD_LETTERS, 0, MAX_DEAD_LETTER_ENTRIES - 1);
+            await this.redis.getClient().lpush(RedisKeys.FRONTEND_REPORT_DEAD_LETTERS, raw);
+            await this.redis.getClient().ltrim(RedisKeys.FRONTEND_REPORT_DEAD_LETTERS, 0, MAX_DEAD_LETTER_ENTRIES - 1);
             deadLettered += 1;
           }
         }

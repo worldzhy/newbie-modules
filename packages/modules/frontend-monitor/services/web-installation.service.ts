@@ -39,7 +39,7 @@ interface WebInstallationDraft {
  *
  * Token generation, hashing, lifecycle and verification come from security
  * (ADR-019); this class only adapts the table, mints the immutable appKey and
- * projects domain state. Replaces the retired application.Agent (WEB_MONITOR)
+ * projects domain state. Replaces the retired application.Agent (FRONTEND_MONITOR)
  * identity.
  */
 @Injectable()

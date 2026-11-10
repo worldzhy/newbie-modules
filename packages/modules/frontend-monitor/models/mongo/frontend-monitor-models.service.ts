@@ -42,7 +42,7 @@ export class FrontendMonitorModelsService {
   WebEnvironment(appKey: string) {
     assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebEnvironmentDocument>(
-      `${MongoCollectionPrefix.WEB_ENVIRONMENT}${appKey}`,
+      `${MongoCollectionPrefix.FRONTEND_ENVIRONMENT}${appKey}`,
       WebEnvironmentSchema,
     );
   }
@@ -50,7 +50,7 @@ export class FrontendMonitorModelsService {
   WebPage(appKey: string) {
     assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebPageDocument>(
-      `${MongoCollectionPrefix.WEB_PAGE}${appKey}`,
+      `${MongoCollectionPrefix.FRONTEND_PAGE}${appKey}`,
       WebPageSchema,
     );
   }
@@ -58,7 +58,7 @@ export class FrontendMonitorModelsService {
   WebResource(appKey: string) {
     assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebResourceDocument>(
-      `${MongoCollectionPrefix.WEB_RESOURCE}${appKey}`,
+      `${MongoCollectionPrefix.FRONTEND_RESOURCE}${appKey}`,
       WebResourceSchema,
     );
   }
@@ -66,7 +66,7 @@ export class FrontendMonitorModelsService {
   WebCustom(appKey: string) {
     assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebCustomDocument>(
-      `${MongoCollectionPrefix.WEB_CUSTOM}${appKey}`,
+      `${MongoCollectionPrefix.FRONTEND_CUSTOM}${appKey}`,
       WebCustomSchema,
     );
   }
@@ -74,13 +74,16 @@ export class FrontendMonitorModelsService {
   WebCustomFilter(appKey: string) {
     assertAppKey(appKey);
     return this.modelRegistry.getOrCreateModel<WebCustomFilterDocument>(
-      `${MongoCollectionPrefix.WEB_CUSTOM_FILTER}${appKey}`,
+      `${MongoCollectionPrefix.FRONTEND_CUSTOM_FILTER}${appKey}`,
       WebCustomFilterSchema,
     );
   }
 
   // WEB pvuvip is static in v4
   WebPvuvip() {
-    return this.modelRegistry.getOrCreateModel<WebPvuvipDocument>(MongoStaticCollection.WebPvUvIp, WebPvuvipSchema);
+    return this.modelRegistry.getOrCreateModel<WebPvuvipDocument>(
+      MongoStaticCollection.FrontendPvUvIp,
+      WebPvuvipSchema,
+    );
   }
 }

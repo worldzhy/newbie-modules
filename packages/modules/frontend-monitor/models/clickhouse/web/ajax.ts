@@ -6,7 +6,7 @@ import { assertAppKey } from "../../../shared/utils";
 
 export default function WebAjax(clickhouse: ClickHouseService, dbName: string) {
   const schema = {
-    tableName: ClickHouseTablePrefix.WEB_AJAX,
+    tableName: ClickHouseTablePrefix.FRONTEND_AJAX,
     schema: {
       // DateTime is an unsigned 32-bit epoch-seconds column: instants before
       // 1970 or after 2106-02-07 are silently clamped by the writer, not

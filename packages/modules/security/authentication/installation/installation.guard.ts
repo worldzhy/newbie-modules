@@ -25,7 +25,7 @@ const BEARER_PATTERN = /^bearer\s+(.+)$/i;
  *  1. `Authorization: Bearer <token>` — the single standard.
  *  2. The resolver's legacyHeader — private per-module headers kept for the
  *     SDK migration window; controllers never see them.
- *  3. The resolver's bodyTokenField — the web-monitor sendBeacon exception.
+ *  3. The resolver's bodyTokenField — the frontend-monitor sendBeacon exception.
  *
  * On success the resolver's installation context is attached as
  * `req.installation`.

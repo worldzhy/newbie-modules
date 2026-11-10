@@ -7,7 +7,7 @@
 // Web-monitor ingest identity. PostgreSQL schema: "module/frontend-monitor".
 // One FrontendMonitorInstallation = one FRONTEND application whose browser SDK reports
 // to /frontend-monitor/report. The module owns the token end to end instead of
-// reading application.Agent (WEB_MONITOR): the token is a random UUID, only
+// reading application.Agent (FRONTEND_MONITOR): the token is a random UUID, only
 // its SHA-256 hash is stored, the plaintext is returned once at
 // enrollment/rotation, and revocation is a soft delete.
 //

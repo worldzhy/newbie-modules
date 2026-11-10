@@ -6,7 +6,7 @@ import { assertAppKey } from "../../../shared/utils";
 
 export default function WebError(clickhouse: ClickHouseService, dbName: string) {
   const schema = {
-    tableName: ClickHouseTablePrefix.WEB_ERROR,
+    tableName: ClickHouseTablePrefix.FRONTEND_ERROR,
     schema: {
       createTime: { type: ClickHouseDataType.DateTime, default: Date.now }, // Created time
       msg: { type: ClickHouseDataType.String }, // Error message
