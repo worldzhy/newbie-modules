@@ -25,6 +25,12 @@ const SEALED_TOKEN_IV_BYTES = 12;
 const SEALED_TOKEN_TAG_BYTES = 16;
 
 /**
+ * Key domain strings for sealed values: one per kind of secret, so the derived
+ * keys never overlap even though they share the same source secret.
+ */
+type SealedDomain = "refresh-token" | "totp-secret";
+
+/**
  * A signing secret is only usable when it is long enough to be unguessable.
  * Failing here stops the process at startup instead of letting every token be
  * forgeable with a value that ships in the source tree.
@@ -187,9 +193,40 @@ export class TokenService {
    * database read yields ciphertext rather than a live token (R20-11).
    */
   sealToken(token: string): string {
+    return this.seal(token, "refresh-token");
+  }
+
+  /**
+   * Open a value produced by sealToken(). A malformed or tampered value is
+   * rejected as an invalid token — never partially decoded.
+   */
+  openSealedToken(sealed: string): string {
+    return this.openSealed(sealed, "refresh-token");
+  }
+
+  /**
+   * Seal a TOTP shared secret before it is persisted (R33-04). The domain
+   * string is distinct from the refresh-token one, so the two ciphertext
+   * families are not interchangeable: a sealed refresh token can never be
+   * opened as an authenticator secret, or the reverse.
+   */
+  sealTotpSecret(secret: string): string {
+    return this.seal(secret, "totp-secret");
+  }
+
+  /**
+   * Open a value produced by sealTotpSecret(). A damaged stored secret is a
+   * credential failure, not a plaintext fallback: the caller must not proceed
+   * with an unreadable authenticator secret.
+   */
+  openTotpSecret(sealed: string): string {
+    return this.openSealed(sealed, "totp-secret");
+  }
+
+  private seal(value: string, domain: SealedDomain): string {
     const iv = randomBytes(SEALED_TOKEN_IV_BYTES);
-    const cipher = createCipheriv("aes-256-gcm", this.sealedTokenKey(), iv);
-    const payload = Buffer.concat([cipher.update(token, "utf8"), cipher.final()]);
+    const cipher = createCipheriv("aes-256-gcm", this.sealedKey(domain), iv);
+    const payload = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
     return [
       SEALED_TOKEN_PREFIX,
       iv.toString("base64url"),
@@ -198,17 +235,13 @@ export class TokenService {
     ].join(".");
   }
 
-  /**
-   * Open a value produced by sealToken(). A malformed or tampered value is
-   * rejected as an invalid token — never partially decoded.
-   */
-  openSealedToken(sealed: string): string {
+  private openSealed(sealed: string, domain: SealedDomain): string {
     const [version, iv, tag, payload] = sealed.split(".");
     if (version !== SEALED_TOKEN_PREFIX || !iv || !tag || !payload) {
       throw new UnauthorizedException(INVALID_TOKEN);
     }
     try {
-      const decipher = createDecipheriv("aes-256-gcm", this.sealedTokenKey(), Buffer.from(iv, "base64url"));
+      const decipher = createDecipheriv("aes-256-gcm", this.sealedKey(domain), Buffer.from(iv, "base64url"));
       const tagBytes = Buffer.from(tag, "base64url");
       if (tagBytes.length !== SEALED_TOKEN_TAG_BYTES) {
         throw new Error("invalid tag length");
@@ -220,10 +253,10 @@ export class TokenService {
     }
   }
 
-  private sealedTokenKey(): Buffer {
+  private sealedKey(domain: SealedDomain): Buffer {
     const secret = this.tokenConfig.userRefresh.secret || this.tokenConfig.defaultSecret;
-    assertUsableSecret(secret, "refresh-token sealing secret");
-    return createHash("sha256").update(`${secret}:refresh-token-next`).digest();
+    assertUsableSecret(secret, "sealing secret");
+    return createHash("sha256").update(`${secret}:${domain}-next`).digest();
   }
 
   /**

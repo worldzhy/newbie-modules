@@ -54,3 +54,21 @@ test("malformed sealed values are rejected", () => {
     assert.throws(() => tokenService.openSealedToken(value), UnauthorizedException);
   }
 });
+
+// R33-04: TOTP secrets use their own key domain, so a database read yields
+// ciphertext and the two sealed families cannot be swapped for one another.
+test("a sealed TOTP secret round-trips", () => {
+  const tokenService = buildTokenService();
+  const sealed = tokenService.sealTotpSecret("JBSWY3DPEHPK3PXP");
+  assert.notEqual(sealed, "JBSWY3DPEHPK3PXP");
+  assert.equal(tokenService.openTotpSecret(sealed), "JBSWY3DPEHPK3PXP");
+});
+
+test("TOTP and refresh-token seals are not interchangeable", () => {
+  const tokenService = buildTokenService();
+  const sealedSecret = tokenService.sealTotpSecret("JBSWY3DPEHPK3PXP");
+  const sealedToken = tokenService.sealToken("raw-refresh-token");
+
+  assert.throws(() => tokenService.openSealedToken(sealedSecret), UnauthorizedException);
+  assert.throws(() => tokenService.openTotpSecret(sealedToken), UnauthorizedException);
+});
