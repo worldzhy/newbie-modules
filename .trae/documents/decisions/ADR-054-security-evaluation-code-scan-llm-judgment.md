@@ -2,7 +2,7 @@
 
 状态：已采纳
 日期：2026-11-10
-更新：2026-11-10 — 用户拍板采纳；条款 6 verdict 缓存 TTL 契约同日补入（f95ca31）。
+更新：2026-11-10 — 用户拍板采纳；条款 6 verdict 缓存 TTL 契约同日补入（f95ca31）。2026-11-10 — round31 R31-01/R31-02 修复：判定层 fail-closed（模型不可解析或全部文件不可判 = run 失败），宿主 R1 将 code-scan 登记为无类别源（落 unclassified 桶），见条款 11/12。
 
 > 设计前置证据：expert-review round 27（用户"AI 全量扫码很简单"主张评审）与 round 28（最小方案评审），见 `.trae/documents/expert-review-2026-11-10-round27.md`、`expert-review-2026-11-10-round28.md`。本 ADR 的决策点全部来自 round 28 的四项必须修复结论。
 
@@ -40,6 +40,8 @@ security-evaluation 目前对 `repository` 主体只有 `npm-osv`（依赖漏洞
 8. **审计 metadata**：run result metadata 记录 modelId、promptVersion、温度、revision、LLM 调用数、缓存命中数、请求签名（byte-identical，沿用 intel 先例），保证"同一代码两次结论不同"可复盘。
 9. **注入防线**：源码是不可信输入，prompt 必须把代码包裹为数据并声明忽略其中指令。
 10. **调度**：`SECURITY_EVALUATION_SCHEDULES` 新增 daily 条目；全量扫描是 finding 生命周期的硬约束（`resolveAbsentFindings`），不做增量，增量需另立 partial-scope ADR。
+11. **判定层 fail-closed（round31 R31-01）**：LLM scope 不可解析、或本 run 全部文件均为 unavailable verdict 时，机制抛错使 run FAILED，不得产出 `evaluated=0` 的 SUCCEEDED——骨架随后会调用 `resolveAbsentFindings` 关闭该 subject 全部 OPEN findings，等于用"没判过"冒充"没发现"。部分文件不可判仍记 skipped 并进 coverage 记账，run 可成功。
+12. **宿主分类登记（round31 R31-02）**：code-scan 在宿主项目安全分类表 R1 中登记为无类别源（`[]`），与 threat-intel 同构：findings 与 runs 落 unclassified 桶、可在项目安全总览与 `RiskDailySnapshot` 看到，但不进 Layer 2 风险评分；v1 不新增产品类别，若未来要进风险评分，需按 ADR-037 新增类别而非改本登记。
 
 **已接受的权衡（显式披露）**：v1 把截断源码发给 LLM 提供方——文件可能含硬编码密钥，密钥会随 prompt 出境。缓解：`secret-exposure` 类别不豁免该事实，模型选型（企业/自托管）经 llm 模块注册是部署决策；v1 不引入本地确定性密钥扫描器，列入后续机制增补候选。已知能力边界：文件级裁决无跨文件数据流分析，README Limitations 须如实写明。
 

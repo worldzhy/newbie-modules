@@ -140,8 +140,13 @@ function toValidFinding(
  * version, within TTL) — a hit replays positive AND negative verdicts, so an
  * unchanged file's findings reappear byte-identically and never flap. Only a
  * complete row set (one row per criterion) counts as a hit. Unavailable
- * verdicts (unbound model, call failure, malformed response) are never
- * cached; the file lands in the skipped bucket instead.
+ * verdicts (call failure, malformed response) are never cached; the file lands
+ * in the skipped bucket instead.
+ *
+ * The judgment is fail-closed: an unresolvable model, or a run that leaves
+ * every file unjudged, throws so the run fails. Recording such a run as
+ * SUCCEEDED would make the skeleton close every existing finding of the
+ * subject (resolveAbsentFindings) on evidence the run never produced.
  */
 @Injectable()
 export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJudgmentMechanism {
@@ -181,9 +186,16 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
     try {
       chatModel = await this.resolver.resolve(SECURITY_EVALUATION_CODE_SCAN_LLM_SCOPE);
     } catch (error) {
-      this.logger.warn(`CODE_SCAN LLM scope unresolvable; every file is an unavailable verdict: ${String(error)}`);
+      // Fail-closed: without a model no file can be judged, and a "successful"
+      // zero-evaluation run would resolve every absent finding.
+      throw new Error(
+        `CODE_SCAN judgment cannot run: LLM scope "${SECURITY_EVALUATION_CODE_SCAN_LLM_SCOPE}" is unresolvable (${String(error)})`,
+      );
     }
     const modelId = chatModel?.modelId ?? null;
+    if (!chatModel || !modelId) {
+      throw new Error("CODE_SCAN judgment cannot run: the resolved chat model has no modelId");
+    }
 
     const payloads = new Map<string, CodeScanEvidencePayload>();
     for (const item of sourceItems) {
@@ -206,18 +218,16 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
     }
     const revision = payloads.get(sourceItems[0].id)?.revision ?? "unknown";
 
-    const cached = modelId
-      ? await this.verdictCache.lookup({
-          subjectId: input.subject.id,
-          modelId,
-          promptVersion,
-          ruleSetVersion,
-          files: sourceItems.map((item) => {
-            const payload = payloads.get(item.id)!;
-            return { path: payload.path, contentHash: payload.contentHash };
-          }),
-        })
-      : new Map<string, never[]>();
+    const cached = await this.verdictCache.lookup({
+      subjectId: input.subject.id,
+      modelId,
+      promptVersion,
+      ruleSetVersion,
+      files: sourceItems.map((item) => {
+        const payload = payloads.get(item.id)!;
+        return { path: payload.path, contentHash: payload.contentHash };
+      }),
+    });
 
     const findings: EvaluationFindingCandidate[] = [];
     const evaluatedRefs: string[] = [];
@@ -271,11 +281,6 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
         continue;
       }
 
-      if (!chatModel || !modelId) {
-        unavailableCount++;
-        skippedIds.push(item.id);
-        continue;
-      }
       if (llmCalls >= SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET) {
         budgetCutCount++;
         skippedIds.push(item.id);
@@ -356,6 +361,13 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
       for (const finding of valid) pushFinding(finding, item, payload);
     }
 
+    if (unavailableCount === sourceItems.length) {
+      // Fail-closed: a run that judged none of its files proves nothing, and
+      // returning it as a success would resolve every absent finding.
+      throw new Error(
+        `CODE_SCAN judgment unavailable for all ${sourceItems.length} file(s); refusing to record a vacuous clean run`,
+      );
+    }
     if (unavailableCount > 0)
       skippedReasons.push(
         `${unavailableCount} file(s) not judged: the LLM call was unavailable or the response malformed`,
@@ -376,7 +388,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
           : undefined,
       summary: `Code scan judged ${evaluatedRefs.length} file(s) at revision ${revision}: ${findings.length} finding(s), ${cacheHits} cache hit(s), ${llmCalls} LLM call(s).`,
       metadata: {
-        modelId: modelId ?? "unbound",
+        modelId,
         promptVersion,
         temperature: 0,
         revision,

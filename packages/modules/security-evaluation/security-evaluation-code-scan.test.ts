@@ -47,7 +47,8 @@ import {
  * Behavior-level tests for CODE_SCAN (ADR-054): finding fingerprints stay
  * stable across content edits, cached verdicts replay byte-identically,
  * skipped files are accounted with ids and reasons, out-of-range model output
- * is discarded, and unavailable verdicts are never cached.
+ * is discarded, unavailable verdicts are never cached, and a run that judges
+ * no file at all fails instead of recording a vacuous clean result.
  */
 
 const SUBJECT: EvaluationSubjectRef = {
@@ -317,34 +318,47 @@ test("code-scan mechanism discards out-of-range entries and caches per-criterion
   }
 });
 
-test("code-scan mechanism never caches an unavailable verdict (malformed response)", async () => {
-  const item = codeScanItem("src/a.ts", "const a = 1;");
+test("code-scan mechanism never caches an unavailable verdict (partial: one malformed file, one judged)", async () => {
+  const judged = codeScanItem("src/a.ts", "const a = 1;");
+  const malformed = codeScanItem("src/b.ts", "const b = 2;");
+  const cache = stubCache();
+  const { resolver } = stubResolver((call) =>
+    call.messages.some((message) => message.content?.includes("src/b.ts"))
+      ? "this is not json"
+      : JSON.stringify({ findings: [] }),
+  );
+
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const judgment = await mechanism.judge(judgmentInput([judged, malformed]));
+
+  assert.deepEqual(judgment.evaluatedRefs, [judged.id]);
+  assert.deepEqual(
+    cache.recorded[0].map((row) => row.path),
+    CRITERIA.map(() => "src/a.ts"),
+  );
+  assert.equal(judgment.skipped?.total, 1);
+  assert.deepEqual(judgment.skipped?.items, [malformed.id]);
+  assert.ok(judgment.skipped?.note?.includes("unavailable"));
+});
+
+test("code-scan mechanism fails the run when every file verdict is unavailable", async () => {
+  const items = [codeScanItem("src/a.ts", "const a = 1;"), codeScanItem("src/b.ts", "const b = 2;")];
   const cache = stubCache();
   const { resolver } = stubResolver(() => "this is not json");
 
   const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
-  const judgment = await mechanism.judge(judgmentInput([item]));
-
-  assert.deepEqual(judgment.evaluatedRefs, []);
-  assert.equal(judgment.findings.length, 0);
+  await assert.rejects(() => mechanism.judge(judgmentInput(items)), /unavailable for all 2 file/);
   assert.equal(cache.recorded.length, 0);
-  assert.equal(judgment.skipped?.total, 1);
-  assert.deepEqual(judgment.skipped?.items, [item.id]);
-  assert.ok(judgment.skipped?.note?.includes("unavailable"));
 });
 
-test("code-scan mechanism never caches an unavailable verdict (LLM scope unbound)", async () => {
+test("code-scan mechanism fails the run when the LLM scope is unbound (no vacuous clean run)", async () => {
   const item = codeScanItem("src/a.ts", "const a = 1;");
   const cache = stubCache();
   const resolver = { resolve: async () => Promise.reject(new Error("no model bound")) } as unknown as ChatModelResolver;
 
   const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
-  const judgment = await mechanism.judge(judgmentInput([item]));
-
-  assert.deepEqual(judgment.evaluatedRefs, []);
+  await assert.rejects(() => mechanism.judge(judgmentInput([item])), /unresolvable/);
   assert.equal(cache.recorded.length, 0);
-  assert.equal(judgment.skipped?.total, 1);
-  assert.deepEqual(judgment.skipped?.items, [item.id]);
 });
 
 test("code-scan mechanism ignores other evaluationKeys", async () => {
