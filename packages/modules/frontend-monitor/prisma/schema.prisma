@@ -12,7 +12,7 @@
 // enrollment/rotation, and revocation is a soft delete.
 //
 // `appKey` is the immutable public partition key embedded in Mongo collection
-// names (FrontendPages_<appKey>) and ClickHouse table names (frontend_monitor_requests_<appKey>);
+// names (WebPages_<appKey>) and ClickHouse table names (frontend_monitor_requests_<appKey>);
 // it is generated at enrollment and never rotated.
 //
 // Host-side grouping lives in opaque `externalRef` (convention:
