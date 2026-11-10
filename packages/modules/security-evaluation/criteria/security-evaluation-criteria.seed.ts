@@ -5,10 +5,17 @@ import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criter
 import {
   SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,
   SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION,
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_AUTH_BOUNDARY,
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_CRYPTO_MISUSE,
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_DANGEROUS_CONFIG,
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_INJECTION,
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_SECRET_EXPOSURE,
+  SECURITY_EVALUATION_CODE_SCAN_RULE_SET_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_RULE_SET_VERSION,
   SECURITY_EVALUATION_DEPENDENCY_CRITERION_KEY,
   SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
   SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+  SECURITY_EVALUATION_KEY_CODE_SCAN,
   SECURITY_EVALUATION_KEY_NPM_OSV,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
@@ -153,11 +160,74 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     });
   }
 
+  /**
+   * CODE_SCAN criteria (ADR-054): one ASSERTION per risk category. The
+   * metadata carries the severity guidance and the CWE mapping the LLM
+   * judgment aligns to; the product is assertion findings, never a score
+   * (ADR-020 D5.3).
+   */
+  async seedCodeScanBaseline(): Promise<void> {
+    await this.seedBaselineIfMissing({
+      kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+      evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+      version: SECURITY_EVALUATION_CODE_SCAN_RULE_SET_VERSION,
+      description:
+        "Code scan: every source file of the repository snapshot is judged by an LLM against five risk categories (full scan; a finding's identity is its criterion + path + symbol, not the content).",
+      metadata: { mechanism: "code-llm", scanScope: "full" },
+      criteria: [
+        {
+          criterionKey: SECURITY_EVALUATION_CODE_SCAN_CRITERION_INJECTION,
+          name: "Injection sink",
+          description:
+            "Untrusted input reaches a command, query, template or expression execution sink without parameterization or validation.",
+          metadata: {
+            severityGuidance: "MEDIUM to CRITICAL depending on reachability of the sink",
+            cwe: ["CWE-78", "CWE-89", "CWE-94"],
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_CODE_SCAN_CRITERION_AUTH_BOUNDARY,
+          name: "Missing authorization boundary",
+          description:
+            "A privileged operation is reachable without an authentication or authorization check at the boundary.",
+          metadata: {
+            severityGuidance: "HIGH to CRITICAL when the privileged operation is externally reachable",
+            cwe: ["CWE-306", "CWE-862"],
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_CODE_SCAN_CRITERION_SECRET_EXPOSURE,
+          name: "Hardcoded secret",
+          description: "Credential, token, key or other secret material embedded in source code.",
+          metadata: { severityGuidance: "HIGH; CRITICAL when the secret grants production access", cwe: ["CWE-798"] },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_CODE_SCAN_CRITERION_CRYPTO_MISUSE,
+          name: "Cryptographic misuse",
+          description:
+            "Weak algorithm, static IV, predictable randomness for security purposes, or other misuse of a cryptographic primitive.",
+          metadata: {
+            severityGuidance: "LOW to HIGH depending on the protected asset",
+            cwe: ["CWE-327", "CWE-329", "CWE-338"],
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_CODE_SCAN_CRITERION_DANGEROUS_CONFIG,
+          name: "Dangerous configuration",
+          description:
+            "Insecure default or dangerous flag in code-level configuration (TLS verification off, debug enabled, permissive CORS, …).",
+          metadata: { severityGuidance: "MEDIUM; HIGH when exposed in a production path", cwe: ["CWE-16", "CWE-942"] },
+        },
+      ],
+    });
+  }
+
   private async seedMissingBaselines(): Promise<void> {
     await this.seedDependencyBaseline();
     await this.seedAwsConfigBaseline();
     await this.seedAwsCustomBaseline();
     await this.seedIntelligenceBaseline();
+    await this.seedCodeScanBaseline();
   }
 
   private async seedBaselineIfMissing(baseline: BaselineSeed): Promise<void> {

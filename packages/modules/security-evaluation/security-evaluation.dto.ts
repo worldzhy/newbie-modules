@@ -1,7 +1,26 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
+import { Transform, Type } from "class-transformer";
+import {
+  IsBoolean,
+  IsEnum,
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from "class-validator";
 import { EvaluationFindingSeverity, EvaluationFindingStatus, EvaluationRunStatus } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
+
+import {
+  SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS,
+  SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS_MAX,
+} from "./security-evaluation.constants";
 
 // --- Path params ---------------------------------------------------------
 
@@ -10,6 +29,13 @@ export class GetSecurityEvaluationAssetRequestDto {
   @ApiProperty({ type: String, format: "uuid" })
   @IsUUID()
   assetId!: string;
+}
+
+/** Path-parameter envelope for finding-scoped routes. */
+export class GetSecurityEvaluationFindingRequestDto {
+  @ApiProperty({ type: String, format: "uuid" })
+  @IsUUID()
+  findingId!: string;
 }
 
 // --- Subject ingest ------------------------------------------------------
@@ -191,6 +217,11 @@ export class ListSecurityEvaluationRunsRequestDto extends CommonListRequestDto {
   @IsOptional()
   @IsUUID()
   ruleSetVersionId?: string;
+
+  @ApiPropertyOptional({ enum: EvaluationRunStatus, description: "Restrict to one run status, e.g. FAILED" })
+  @IsOptional()
+  @IsEnum(EvaluationRunStatus)
+  status?: EvaluationRunStatus;
 }
 
 /** Mirrors the skeleton's EvaluationRun row, decorated with the evaluationKey labels. */
@@ -287,6 +318,26 @@ export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestD
   @IsOptional()
   @IsEnum(EvaluationFindingSeverity)
   severity?: EvaluationFindingSeverity;
+
+  @ApiPropertyOptional({
+    enum: ["P1", "P2", "P3", "P4"],
+    description: "Urgency band stored in the finding's metadata (ADR-022 D5); equality filter",
+  })
+  @IsOptional()
+  @IsIn(["P1", "P2", "P3", "P4"])
+  urgency?: "P1" | "P2" | "P3" | "P4";
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'When "true", only OPEN findings not re-observed within the staleness window ' +
+      "(the run that used to reproduce them stopped covering them without resolving them). " +
+      "Implies status=OPEN unless status is given explicitly.",
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
+  staleOnly?: boolean;
 }
 
 /** Mirrors the skeleton's EvaluationFinding row. */
@@ -314,6 +365,54 @@ export class SecurityEvaluationFindingResponseDto {
 
 export class ListSecurityEvaluationFindingsResponseDto extends CommonListResponseDto<SecurityEvaluationFindingResponseDto> {}
 
+// --- Finding detail + evidence -------------------------------------------
+
+/**
+ * One matched manifest item: the exact shape EvaluationEvidenceItem archives
+ * in EvaluationResult.manifest, returned verbatim so the client renders it.
+ */
+export class SecurityEvaluationEvidenceItemResponseDto {
+  @ApiProperty({ description: "Stable id of this evidence item inside the manifest" })
+  id!: string;
+  @ApiProperty({ description: 'Collection layer: "declared" / "knowledge" / "source"' })
+  layer!: string;
+  @ApiProperty({ description: "Origin source the evidence came from (repository, threat-intel, config-api, …)" })
+  source!: string;
+  @ApiProperty({ description: "Human-readable summary — for source items this is the file path" })
+  summary!: string;
+  @ApiProperty({ type: Date })
+  observedAt!: Date;
+  @ApiPropertyOptional({ type: [String], description: "Cross-references the item carries (e.g. git revision)" })
+  refs?: string[] | null;
+  @ApiPropertyOptional({
+    type: Object,
+    description:
+      "Feature-defined payload. CODE_SCAN items carry { path, language, bytes, revision, contentHash, excerpt, truncated }",
+  })
+  payload?: object | null;
+}
+
+/**
+ * Single-finding read path: the finding row plus whichever manifest item of
+ * its last-seen run matched (by file path for CODE_SCAN, by evidenceRefs for
+ * other families). Returns evidenceItems = [] when the run had no matching
+ * item (e.g. a finding carried no metadata.path or the run had no result).
+ */
+export class SecurityEvaluationFindingDetailResponseDto {
+  @ApiProperty({ type: SecurityEvaluationFindingResponseDto })
+  finding!: SecurityEvaluationFindingResponseDto;
+  @ApiPropertyOptional({ description: "Rule set version label the last-seen run evaluated under" })
+  ruleSetVersion?: string | null;
+  @ApiPropertyOptional({ description: "Evaluated key of the last-seen run — echoes finding.evaluationKey" })
+  evaluationKey?: string | null;
+  @ApiProperty({
+    type: [SecurityEvaluationEvidenceItemResponseDto],
+    isArray: true,
+    description: "Manifest items from the last-seen run's result that match the finding",
+  })
+  evidenceItems!: SecurityEvaluationEvidenceItemResponseDto[];
+}
+
 // --- Report --------------------------------------------------------------
 
 export class GetSecurityEvaluationReportRequestDto {
@@ -329,6 +428,19 @@ export class GetSecurityEvaluationReportRequestDto {
   @IsOptional()
   @IsString()
   scopeId?: string;
+
+  @ApiPropertyOptional({
+    description: "Window of the daily severity trend, in days (1…365). Defaults to 30.",
+    default: SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS,
+    minimum: 1,
+    maximum: SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS_MAX,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS_MAX)
+  days?: number;
 }
 
 export class SecurityEvaluationReportAssetsDto {
@@ -358,14 +470,42 @@ export class SecurityEvaluationReportTopFindingDto {
   @ApiProperty() firstSeenAt!: Date;
 }
 
+/** Open findings of one evaluationKey, split by severity. */
+export class SecurityEvaluationReportFindingsByKeyDto {
+  @ApiProperty({ description: 'Evaluation key, e.g. "npm-osv"' }) evaluationKey!: string;
+  @ApiProperty() open!: number;
+  @ApiProperty({ type: Object, description: "Open findings counted per severity" })
+  bySeverity!: Record<string, number>;
+}
+
 export class SecurityEvaluationReportFindingsDto {
   @ApiProperty() open!: number;
   @ApiProperty({ type: Object, description: "Open findings counted per severity" })
   bySeverity!: Record<string, number>;
   @ApiProperty({ type: Object, description: "Open findings counted per urgency band" })
   byUrgency!: Record<string, number>;
+  @ApiProperty({
+    type: [SecurityEvaluationReportFindingsByKeyDto],
+    isArray: true,
+    description: "Open findings counted per evaluationKey and severity",
+  })
+  byEvaluationKey!: SecurityEvaluationReportFindingsByKeyDto[];
   @ApiProperty({ type: [SecurityEvaluationReportTopFindingDto], isArray: true })
   topOpen!: SecurityEvaluationReportTopFindingDto[];
+}
+
+/** One day of the severity trend: findings still open at the end of that day. */
+export class SecurityEvaluationReportSeverityTrendPointDto {
+  @ApiProperty() day!: Date;
+  @ApiProperty({ type: Object, description: "Open findings counted per severity on that day" })
+  bySeverity!: Record<string, number>;
+  @ApiProperty() total!: number;
+}
+
+export class SecurityEvaluationReportSeverityTrendDto {
+  @ApiProperty() windowDays!: number;
+  @ApiProperty({ type: [SecurityEvaluationReportSeverityTrendPointDto], isArray: true })
+  points!: SecurityEvaluationReportSeverityTrendPointDto[];
 }
 
 export class SecurityEvaluationReportTrendPointDto {
@@ -374,11 +514,24 @@ export class SecurityEvaluationReportTrendPointDto {
   @ApiProperty() resolved!: number;
 }
 
+export class SecurityEvaluationReportMttrByKeyDto {
+  @ApiProperty({ description: 'Evaluation key, e.g. "npm-osv"' }) evaluationKey!: string;
+  @ApiPropertyOptional({ description: "Mean days to resolve inside the window" }) averageDays?: number | null;
+  @ApiPropertyOptional({ description: "Median days to resolve inside the window" }) medianDays?: number | null;
+  @ApiProperty() resolvedCount!: number;
+}
+
 export class SecurityEvaluationReportMttrDto {
   @ApiPropertyOptional({ description: "Mean days to resolve, null while nothing has been resolved" })
   averageDays?: number | null;
   @ApiProperty() resolvedCount!: number;
   @ApiProperty() windowDays!: number;
+  @ApiProperty({
+    type: [SecurityEvaluationReportMttrByKeyDto],
+    isArray: true,
+    description: "The same window split per evaluationKey",
+  })
+  byEvaluationKey!: SecurityEvaluationReportMttrByKeyDto[];
 }
 
 /** Single-axis report (ADR-022 D6): no composite score, no cross-evaluationKey weighting. */
@@ -389,5 +542,7 @@ export class SecurityEvaluationReportResponseDto {
   @ApiProperty({ type: SecurityEvaluationReportFindingsDto }) findings!: SecurityEvaluationReportFindingsDto;
   @ApiProperty({ type: [SecurityEvaluationReportTrendPointDto], isArray: true })
   trend!: SecurityEvaluationReportTrendPointDto[];
+  @ApiProperty({ type: SecurityEvaluationReportSeverityTrendDto })
+  severityTrend!: SecurityEvaluationReportSeverityTrendDto;
   @ApiProperty({ type: SecurityEvaluationReportMttrDto }) mttr!: SecurityEvaluationReportMttrDto;
 }

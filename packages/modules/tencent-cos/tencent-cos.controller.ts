@@ -81,7 +81,7 @@ export class TencentCosController {
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.CosFile)
   @ApiCreatedResponse({ type: Object })
   async initMultipartUpload(@Body() body: { fileName: string }) {
-    const path = process.env.STORE_PATH as string;
+    const path = process.env.TENCENT_COS_STORE_PATH as string;
     const key = `${path}/large/${Date.now()}-${body.fileName}`;
     const { UploadId } = await this.cos.initMultipartUpload(key);
 

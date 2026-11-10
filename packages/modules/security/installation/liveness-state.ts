@@ -4,7 +4,7 @@
  * model. The const object doubles as the Swagger enum on the host DTO, so
  * the wire contract and the module-internal derivation can never drift.
  *
- * FRONTEND reporters (heartbeat, web-monitor) never report "degraded" (no
+ * FRONTEND reporters (heartbeat, frontend-monitor) never report "degraded" (no
  * dependency visibility); health adds it for a process that is alive but
  * reports a failing dependency.
  */

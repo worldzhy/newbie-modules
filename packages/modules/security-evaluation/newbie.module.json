@@ -10,14 +10,20 @@
     "modules": ["evaluation", "security", "llm"],
     "config": {
       "security-evaluation": {
-        "ttlDays": "process.env.NEGATIVE_CACHE_TTL_DAYS"
+        "ttlDays": "process.env.SECURITY_EVALUATION_NEGATIVE_CACHE_TTL_DAYS",
+        "codeScanVerdictCacheTtlDays": "process.env.SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS"
       }
     },
     "env": {
-      "NEGATIVE_CACHE_TTL_DAYS": {
+      "SECURITY_EVALUATION_NEGATIVE_CACHE_TTL_DAYS": {
         "type": "int",
         "example": 7,
         "description": "Days to keep 'not-relevant' verdict cache rows before they expire. Hard-hit rows are audit-only and never expire."
+      },
+      "SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS": {
+        "type": "int",
+        "example": 30,
+        "description": "Days to keep code-scan LLM verdict cache rows before they are re-judged. Content or version changes already invalidate the cache key; the TTL only forces long-unchanged files to be re-judged against model drift (ADR-054)."
       }
     }
   }

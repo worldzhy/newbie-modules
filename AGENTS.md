@@ -11,6 +11,17 @@ A directory belongs in `packages/modules/` only when all of these hold:
 
 Code hosts are vendor adapters, not host features: `github` and `bitbucket` both live here because each wraps an external API behind a declared config block — how widely one of them is deployed is not an admission test.
 
+## Workflow conventions (see `user_profile.md` for full text)
+
+- Git branch: dev, never main
+- Pre-commit gate: `npm run format:check` must pass; never bare `git add -A`
+- This repo is a registry, not an npm publisher — publish from devbie
+- Back-port direction: consumer (e.g. nightwatch-backend) validates, then copies verbatim into this repo; `diff -rq` empty = done; no re-run of tests or format on registry side
+
+## Env facts
+
+Executable operation manuals live in devbie `.trae/documents/env-setup.md`. Read that file before any Shell call.
+
 ## Backlog convention
 
 Unfinished engineering tasks live in the backlog file under .trae/documents (backlog.md). At session end, append leftover tasks there; at session start, check it for pending work. Delete items when done.

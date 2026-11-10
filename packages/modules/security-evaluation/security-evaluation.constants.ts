@@ -23,6 +23,7 @@ export const SECURITY_EVALUATION_KEY_NPM_OSV = "npm-osv";
 export const SECURITY_EVALUATION_KEY_AWS_CIS_1_5 = "aws-cis-1.5";
 export const SECURITY_EVALUATION_KEY_AWS_CUSTOM = "aws-custom";
 export const SECURITY_EVALUATION_KEY_THREAT_INTEL = "threat-intel";
+export const SECURITY_EVALUATION_KEY_CODE_SCAN = "code-scan";
 
 /**
  * The criteria versions this build ships. Criteria are code-defined and
@@ -59,6 +60,45 @@ export const SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION = "v1";
 /** The first aws-custom criteria version this build ships (ADR-033/ADR-037). */
 export const SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION = "v1";
 
+/** The first code-scan criteria version this build ships (ADR-054). */
+export const SECURITY_EVALUATION_CODE_SCAN_RULE_SET_VERSION = "v1";
+
+/**
+ * CODE_SCAN criteria (ADR-054): one ASSERTION criterion per risk category —
+ * never one per rule — so a ruleset change is a version bump, not a criteria
+ * churn, and finding fingerprints stay anchored to a stable category key.
+ */
+export const SECURITY_EVALUATION_CODE_SCAN_CRITERION_INJECTION = "code-scan.injection";
+export const SECURITY_EVALUATION_CODE_SCAN_CRITERION_AUTH_BOUNDARY = "code-scan.auth-boundary";
+export const SECURITY_EVALUATION_CODE_SCAN_CRITERION_SECRET_EXPOSURE = "code-scan.secret-exposure";
+export const SECURITY_EVALUATION_CODE_SCAN_CRITERION_CRYPTO_MISUSE = "code-scan.crypto-misuse";
+export const SECURITY_EVALUATION_CODE_SCAN_CRITERION_DANGEROUS_CONFIG = "code-scan.dangerous-config";
+
+export const SECURITY_EVALUATION_CODE_SCAN_CRITERION_KEYS = [
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_INJECTION,
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_AUTH_BOUNDARY,
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_SECRET_EXPOSURE,
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_CRYPTO_MISUSE,
+  SECURITY_EVALUATION_CODE_SCAN_CRITERION_DANGEROUS_CONFIG,
+] as const;
+
+/**
+ * CODE_SCAN selection budgets (ADR-054): the host lists at most maxFiles
+ * files of at most maxFileBytes each; everything beyond lands in the skipped
+ * bucket. The excerpt cap bounds what a single LLM call sees — files larger
+ * than it are judged on their prefix and flagged `truncated`.
+ */
+export const SECURITY_EVALUATION_CODE_SCAN_MAX_FILES = 200;
+export const SECURITY_EVALUATION_CODE_SCAN_MAX_FILE_BYTES = 65_536;
+export const SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS = 12_000;
+
+/**
+ * Maximum number of LLM judgment calls a single CODE_SCAN run may spend.
+ * Files that would need more are not judged and land in the judgment's
+ * skipped bucket (same discipline as the INTEL re-rank budget).
+ */
+export const SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET = 180;
+
 /** Asset knowledge vocabulary. */
 export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE = "npm.package";
 
@@ -87,8 +127,19 @@ export const SECURITY_EVALUATION_OSV_REQUEST_TIMEOUT_MS = 30_000;
 /** Reported as stale when an asset has not been observed within this window. */
 export const SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS = 7;
 
+/**
+ * An OPEN finding not re-observed within this window is stale: the run that
+ * used to reproduce it stopped covering it (asset no longer evaluated, rule
+ * removed) without ever resolving it — worth surfacing for triage.
+ */
+export const SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS = 7;
+
 /** Trend and mean-time-to-resolve windows of the report read model. */
 export const SECURITY_EVALUATION_REPORT_TREND_WEEKS = 12;
+
+/** Default and maximum window of the report's daily severity trend. */
+export const SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS = 30;
+export const SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS_MAX = 365;
 
 /**
  * Scheduling declarations only. The host decides the cron and the trigger
@@ -114,5 +165,10 @@ export const SECURITY_EVALUATION_SCHEDULES = [
     evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
     recommendedInterval: "hourly",
+  },
+  {
+    evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+    subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+    recommendedInterval: "daily",
   },
 ] as const;

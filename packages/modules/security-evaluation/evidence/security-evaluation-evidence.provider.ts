@@ -11,10 +11,14 @@ import type {
 
 import { SecurityEvaluationAssetService } from "../assets/security-evaluation-asset.service";
 import {
+  SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS,
+  SECURITY_EVALUATION_CODE_SCAN_MAX_FILE_BYTES,
+  SECURITY_EVALUATION_CODE_SCAN_MAX_FILES,
   SECURITY_EVALUATION_ECOSYSTEM_NPM,
   SECURITY_EVALUATION_INTEL_EVIDENCE_BUDGET,
   SECURITY_EVALUATION_INTEL_EVIDENCE_WINDOW_DAYS,
   SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE,
+  SECURITY_EVALUATION_KEY_CODE_SCAN,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_LOCKFILE_CANDIDATES,
 } from "../security-evaluation.constants";
@@ -22,6 +26,11 @@ import {
   dependencyEvidenceId,
   dependencyKnowledgeKey,
 } from "../judgment/dependency/security-evaluation-dependency.identity";
+import {
+  codeScanContentHash,
+  codeScanEvidenceId,
+  codeScanLanguage,
+} from "../judgment/code-scan/security-evaluation-code-scan.identity";
 import {
   parseDeclaredDependencies,
   parsePackageLock,
@@ -38,6 +47,10 @@ import {
 import { buildSecurityEvaluationIntelReRankRequest } from "../judgment/intel/security-evaluation-intel-request";
 import { SECURITY_EVALUATION_INTEL_LLM_SCOPE } from "../judgment/intel/security-evaluation-intel-re-ranker";
 import { RepositoryAccess, securityEvaluationRepositoryAccessToken } from "../ports/repository-access.port";
+import {
+  RepositorySnapshotAccess,
+  securityEvaluationRepositorySnapshotAccessToken,
+} from "../ports/repository-snapshot-access.port";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 interface ResolvedLockfile {
@@ -77,6 +90,9 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     private readonly scopeEntitiesProvider?: SecurityEvaluationScopeEntitiesProvider,
     @Optional()
     private readonly chatModelResolver?: ChatModelResolver,
+    @Optional()
+    @Inject(securityEvaluationRepositorySnapshotAccessToken)
+    private readonly repositorySnapshotAccess?: RepositorySnapshotAccess,
   ) {}
 
   async collect(
@@ -85,6 +101,9 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
   ): Promise<EvidenceCollection> {
     if (ruleSetVersion.evaluationKey === SECURITY_EVALUATION_KEY_THREAT_INTEL) {
       return this.collectIntel(subject);
+    }
+    if (ruleSetVersion.evaluationKey === SECURITY_EVALUATION_KEY_CODE_SCAN) {
+      return this.collectCodeScan(subject);
     }
 
     const asset = await this.assets.getOrCreateAsset(subject);
@@ -237,6 +256,109 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       );
     }
     return { total: items.length, items, note: notes.join(" ") };
+  }
+
+  /**
+   * CODE_SCAN evidence (ADR-054 clause 7): every file of the pinned snapshot
+   * is one manifest item, including files that will yield zero findings — the
+   * manifest is the audit of what the run looked at. Files the host cut
+   * (binary, over budget) or failed to read are accounted in the skipped
+   * bucket with their ids and the reason. An unbound snapshot port, a listing
+   * failure, or an empty scan set fails the run rather than reporting a
+   * vacuous clean result.
+   */
+  private async collectCodeScan(subject: EvaluationSubjectRef): Promise<EvidenceCollection> {
+    const access = this.repositorySnapshotAccess;
+    if (!access) {
+      throw new Error(
+        "No RepositorySnapshotAccess is bound to SECURITY_EVALUATION_REPOSITORY_SNAPSHOT_ACCESS; the host must bind the port before running code-scan evaluations.",
+      );
+    }
+
+    const listing = await access.list(subject, {
+      maxFiles: SECURITY_EVALUATION_CODE_SCAN_MAX_FILES,
+      maxFileBytes: SECURITY_EVALUATION_CODE_SCAN_MAX_FILE_BYTES,
+    });
+    if (listing.entries.length === 0) {
+      throw new BadRequestException(
+        `code-scan found no scannable files in ${subject.displayName} (revision ${listing.revision}); a run over nothing would report a vacuous clean result.`,
+      );
+    }
+
+    const contents = await access.read(
+      subject,
+      listing.revision,
+      listing.entries.map((entry) => entry.path),
+    );
+
+    const observedAt = new Date();
+    const items: EvaluationEvidenceItem[] = [];
+    const readFailureIds: string[] = [];
+    for (const entry of listing.entries) {
+      const content = contents.get(entry.path);
+      if (content === undefined) {
+        readFailureIds.push(codeScanEvidenceId(entry.path));
+        continue;
+      }
+      items.push({
+        id: codeScanEvidenceId(entry.path),
+        layer: "source",
+        source: "repository",
+        summary: entry.path,
+        observedAt,
+        refs: [listing.revision],
+        payload: {
+          path: entry.path,
+          language: codeScanLanguage(entry.path),
+          bytes: entry.sizeBytes,
+          revision: listing.revision,
+          contentHash: codeScanContentHash(content),
+          excerpt: content.slice(0, SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS),
+          truncated: content.length > SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS,
+        },
+      });
+    }
+    if (items.length === 0) {
+      throw new BadRequestException(
+        `code-scan could not read any of the ${listing.entries.length} listed file(s) of ${subject.displayName} at revision ${listing.revision}; a run over nothing would report a vacuous clean result.`,
+      );
+    }
+
+    return {
+      items,
+      declaredUnlinked: { total: 0 },
+      skipped: this.buildCodeScanSkippedBucket(listing.skipped, readFailureIds),
+    };
+  }
+
+  /**
+   * The host's listing cut-offs and the collector's read failures share the
+   * contract's single skipped bucket: totals summed, ids listed and one note
+   * covering both reasons (intel budget discipline).
+   */
+  private buildCodeScanSkippedBucket(
+    listingSkipped: readonly { path: string; reason: string; count?: number }[],
+    readFailureIds: string[],
+  ): EvaluationCoverageBucket {
+    const items = [
+      ...listingSkipped.filter((entry) => entry.path.length > 0).map((entry) => codeScanEvidenceId(entry.path)),
+      ...readFailureIds,
+    ];
+    const aggregatedFromHost = listingSkipped.reduce((sum, entry) => sum + (entry.count ?? 0), 0);
+    const total = items.length + aggregatedFromHost;
+    if (total === 0) return { total: 0 };
+    const notes: string[] = [];
+    if (listingSkipped.length > 0) {
+      const reasons = new Set(listingSkipped.map((entry) => entry.reason));
+      const aggregatedNote = aggregatedFromHost > 0 ? ` (${aggregatedFromHost} aggregated)` : "";
+      notes.push(
+        `${listingSkipped.length} skipped-host listing entries${aggregatedNote} (reasons: ${[...reasons].join(", ")}).`,
+      );
+    }
+    if (readFailureIds.length > 0) {
+      notes.push(`${readFailureIds.length} listed file(s) could not be read at the pinned revision.`);
+    }
+    return { total, items, note: notes.join(" ") };
   }
 
   /**

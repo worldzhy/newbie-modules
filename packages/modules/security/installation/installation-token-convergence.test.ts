@@ -24,7 +24,14 @@ import { describe, it } from "node:test";
 
 const MODULES_DIR = join(__dirname, "..", "..");
 
-const COLLECTOR_MODULES = ["heartbeat", "health", "module-hub", "backend-monitor", "web-monitor", "work-evaluation"];
+const COLLECTOR_MODULES = [
+  "heartbeat",
+  "health",
+  "module-hub",
+  "backend-monitor",
+  "frontend-monitor",
+  "work-evaluation",
+];
 
 const PRIMITIVES_IMPORT_PATTERN = /@modules\/security\/installation\//;
 const TOKEN_COLUMN_ASSIGNMENT_PATTERN = /\btokenHash\s*:/;

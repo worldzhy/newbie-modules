@@ -58,12 +58,13 @@ anything — access is the system-level permission grant (ADR-039 D3).
 
 ## Evaluation keys
 
-| Evaluation key | Kind          | Version | Content                                                                                  |
-| -------------- | ------------- | ------- | ---------------------------------------------------------------------------------------- |
-| `npm-osv`      | `repository`  | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                     |
-| `aws-cis-1.5`  | `aws-account` | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027).  |
-| `aws-custom`   | `aws-account` | `v1`    | Custom hardening criteria inherited from the predecessor aws-audit module (ADR-033/037). |
-| `threat-intel` | `repository`  | `v1`    | Threat-intelligence relevance criteria (ADR-039).                                        |
+| Evaluation key | Kind          | Version | Content                                                                                        |
+| -------------- | ------------- | ------- | ---------------------------------------------------------------------------------------------- |
+| `npm-osv`      | `repository`  | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                           |
+| `aws-cis-1.5`  | `aws-account` | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027).        |
+| `aws-custom`   | `aws-account` | `v1`    | Custom hardening criteria inherited from the predecessor aws-audit module (ADR-033/037).       |
+| `threat-intel` | `repository`  | `v1`    | Threat-intelligence relevance criteria (ADR-039).                                              |
+| `code-scan`    | `repository`  | `v1`    | Five ASSERTION risk-category criteria; every source file judged by an LLM full scan (ADR-054). |
 
 Each CIS criterion carries `controlId`, `severity`, `remediation` and
 `knowledgeRequirements` in its metadata; the judgment reads severity from there, and
@@ -80,14 +81,23 @@ The module implements the skeleton's kind-scoped ports for both kinds:
 - `EVALUATION_JUDGMENT:{repository|aws-account}` → `SecurityEvaluationJudgmentService`
   (looks up the mechanisms declared for `ruleSetVersion.evaluationKey` in the
   registry: `npm-osv` → `dependency`, `aws-cis-1.5` / `aws-custom` → `aws-config`,
-  `threat-intel` → `intel`, then merges their judgments, ADR-046)
+  `threat-intel` → `intel`, `code-scan` → `code-llm`, then merges their
+  judgments, ADR-046)
 
-The host must bind two more ports, owned by this module:
+The host must bind three more ports, owned by this module:
 
 ```ts
 { provide: securityEvaluationRepositoryAccessToken, useClass: YourRepositoryAccess }
+{ provide: securityEvaluationRepositorySnapshotAccessToken, useClass: YourRepositorySnapshotAccess }
 { provide: securityEvaluationAwsConfigAccessToken, useClass: YourAwsConfigAccess }
 ```
+
+`RepositorySnapshotAccess` (ADR-054) pins a whole run to one revision:
+`list(subject, selection)` returns the scannable file entries plus the files
+it cut (binary, over budget) with reasons, and `read(subject, revision, paths)`
+resolves contents at exactly that revision. An unbound port, a listing
+failure, or an empty scan set fails the run instead of reporting a vacuous
+clean result.
 
 `RepositoryAccess.getFile(subject, path)` returns a file at the repository root
 or `null`. `AwsConfigAccess.collect(subject)` returns raw
@@ -134,8 +144,38 @@ SECURITY_EVALUATION_SCHEDULES = [
   { evaluationKey: "aws-cis-1.5", subjectKind: "aws-account", recommendedInterval: "daily" },
   { evaluationKey: "aws-custom", subjectKind: "aws-account", recommendedInterval: "daily" },
   { evaluationKey: "threat-intel", subjectKind: "repository", recommendedInterval: "hourly" },
+  { evaluationKey: "code-scan", subjectKind: "repository", recommendedInterval: "daily" },
 ];
 ```
+
+## CODE_SCAN (ADR-054)
+
+`code-scan` judges every source file of the repository snapshot with one LLM
+call per file against five risk-category ASSERTION criteria
+(`code-scan.injection`, `code-scan.auth-boundary`, `code-scan.secret-exposure`,
+`code-scan.crypto-misuse`, `code-scan.dangerous-config`). It never auto-fires:
+a repository subject stays on `npm-osv` unless the run carries
+`config.evaluationKey: "code-scan"` (or the host schedules it explicitly).
+
+Judgment identity and caching:
+
+- A finding's fingerprint is `sha256("code-scan" + criterionKey + path +
+symbol)` — no content hash, no line numbers (those live in finding
+  metadata), so editing the vulnerable code keeps the finding's identity and
+  any human suppression intact.
+- Verdicts are cached bipolar (positive AND negative) in
+  `SecurityEvaluationCodeScanVerdictCache`, keyed by `(subjectId,
+criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
+  an unchanged file replays its cached verdict and never re-calls the model.
+  `unavailable` verdicts are never cached. Rows expire after the declared
+  `codeScanVerdictCacheTtlDays` (`SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS`, no
+  fallback) so long-unchanged files are re-judged against model drift.
+- The LLM connection binds to the `security-evaluation-code-scan` scope.
+  Without a bound model every file lands in the run's skipped bucket and no
+  verdict is cached; the run still succeeds.
+- The system prompt wraps source as untrusted data and forbids following
+  directives inside the file; entries with an unknown criterion or an
+  evidenceRef outside the judged file are discarded and accounted.
 
 ## Endpoints
 
@@ -164,3 +204,13 @@ SECURITY_EVALUATION_SCHEDULES = [
   signal exists, so urgency derives no relief.
 - The report has no composite score and no cross-evaluationKey weighting (ADR-020 D5.3,
   ADR-022 D6). A second axis is a later milestone, not a field to sneak in.
+- CODE_SCAN judgment is per file: there is no cross-file dataflow analysis, so
+  a vulnerability whose source and sink live in different files is out of
+  reach (a v2 mechanism candidate, ADR-054).
+- Files larger than the excerpt budget are judged on their truncated prefix
+  and flagged `truncated` in the evidence payload; the verdict cache key still
+  hashes the full content.
+- CODE_SCAN sends (truncated) source code to the configured LLM provider —
+  including any secrets committed to the repository. That exposure is an
+  accepted trade-off of v1; the `code-scan.secret-exposure` findings it
+  produces are the detection side of it.

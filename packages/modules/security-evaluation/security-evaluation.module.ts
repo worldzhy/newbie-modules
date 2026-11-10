@@ -19,6 +19,9 @@ import { TheHackerNewsAdapter } from "./knowledge/adapters/the-hacker-news.adapt
 import { SECURITY_EVALUATION_KNOWLEDGE_SOURCE_ADAPTERS } from "./knowledge/adapters/source-adapter.port";
 import { SecurityEvaluationKnowledgeService } from "./knowledge/security-evaluation-knowledge.service";
 import { SecurityEvaluationAwsConfigJudgment } from "./judgment/aws-config/security-evaluation-aws-config.judgment";
+import { SecurityEvaluationCodeScanMechanism } from "./judgment/code-scan/security-evaluation-code-scan.mechanism";
+import { SecurityEvaluationCodeScanModelScopeRegistration } from "./judgment/code-scan/security-evaluation-code-scan-model-scope";
+import { securityEvaluationCodeScanVerdictCacheToken } from "./judgment/code-scan/security-evaluation-code-scan-verdict-cache.port";
 import { SecurityEvaluationDependencyJudgment } from "./judgment/dependency/security-evaluation-dependency.judgment";
 import { SecurityEvaluationOsvClient } from "./judgment/dependency/security-evaluation-osv.client";
 import { SecurityEvaluationIntelJudgment } from "./judgment/intel/security-evaluation-intel.judgment";
@@ -28,6 +31,7 @@ import { SecurityEvaluationIntelModelScopeRegistration } from "./judgment/intel/
 import { SecurityEvaluationIntelReRanker } from "./judgment/intel/security-evaluation-intel-re-ranker";
 import { SecurityEvaluationJudgmentService } from "./judgment/security-evaluation-judgment.service";
 import { SECURITY_EVALUATION_JUDGMENT_MECHANISMS } from "./judgment/security-evaluation-mechanism";
+import { SecurityEvaluationCodeScanVerdictCacheRepository } from "./persistence/security-evaluation-code-scan-verdict-cache.repository";
 import { SecurityEvaluationIntelNegativeCacheRepository } from "./persistence/security-evaluation-intel-negative-cache.repository";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationController } from "./security-evaluation.controller";
@@ -55,7 +59,8 @@ import {
  * duplicated (the registry resolves the ports by token from the global
  * container).
  *
- * `SECURITY_EVALUATION_REPOSITORY_ACCESS` and
+ * `SECURITY_EVALUATION_REPOSITORY_ACCESS`,
+ * `SECURITY_EVALUATION_REPOSITORY_SNAPSHOT_ACCESS` (ADR-054) and
  * `SECURITY_EVALUATION_AWS_CONFIG_ACCESS` are intentionally not bound
  * here: the host binds them (nightwatch uses its github and aws-identity
  * modules). An unbound port fails the run with a wiring error rather than
@@ -79,6 +84,9 @@ import {
     SecurityEvaluationIntelMatchService,
     SecurityEvaluationIntelNegativeCacheRepository,
     SecurityEvaluationIntelJudgment,
+    SecurityEvaluationCodeScanMechanism,
+    SecurityEvaluationCodeScanModelScopeRegistration,
+    SecurityEvaluationCodeScanVerdictCacheRepository,
     SecurityEvaluationJudgmentService,
     // The dispatcher's mechanism set (ADR-046): each key's declared mechanisms
     // are looked up here, so a new key or dimension is a registry data change.
@@ -88,16 +96,22 @@ import {
         dependency: SecurityEvaluationDependencyJudgment,
         awsConfig: SecurityEvaluationAwsConfigJudgment,
         intel: SecurityEvaluationIntelJudgment,
-      ) => [dependency, awsConfig, intel],
+        codeScan: SecurityEvaluationCodeScanMechanism,
+      ) => [dependency, awsConfig, intel, codeScan],
       inject: [
         SecurityEvaluationDependencyJudgment,
         SecurityEvaluationAwsConfigJudgment,
         SecurityEvaluationIntelJudgment,
+        SecurityEvaluationCodeScanMechanism,
       ],
     },
     {
       provide: securityEvaluationIntelNegativeCacheToken,
       useExisting: SecurityEvaluationIntelNegativeCacheRepository,
+    },
+    {
+      provide: securityEvaluationCodeScanVerdictCacheToken,
+      useExisting: SecurityEvaluationCodeScanVerdictCacheRepository,
     },
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,

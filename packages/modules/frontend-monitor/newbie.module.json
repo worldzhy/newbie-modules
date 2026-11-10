@@ -1,0 +1,30 @@
+{
+  "key": "frontend-monitor",
+  "layer": "feature",
+  "wiring": {
+    "file": "frontend-monitor.module",
+    "className": "FrontendMonitorModule",
+    "prismaSchema": "prisma/schema.prisma"
+  },
+  "collector": {
+    "peerSdk": "@devbie/frontend-monitor-sdk"
+  },
+  "requires": {
+    "modules": ["audit", "clickhouse", "event-emitter", "mongo", "redis", "security"],
+    "config": {
+      "frontend-monitor": {
+        "TENCENTMAPKEY": "process.env.FRONTEND_MONITOR_TENCENT_MAP_KEY"
+      }
+    },
+    "env": {
+      "FRONTEND_MONITOR_TENCENT_MAP_KEY": ""
+    },
+    "dependencies": {
+      "@nestjs/event-emitter": "latest",
+      "@nestjs/schedule": "latest",
+      "cron-parser": "4.x",
+      "dotenv": "latest",
+      "ua-parser-js": "latest"
+    }
+  }
+}

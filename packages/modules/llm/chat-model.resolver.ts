@@ -110,6 +110,7 @@ function withHealthTracking(
 
   return {
     modelId: port.modelId,
+    connectionId,
 
     async complete(request: ChatRequest): Promise<ChatResult> {
       try {

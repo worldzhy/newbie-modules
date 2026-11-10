@@ -1,0 +1,48 @@
+import { Injectable, OnModuleInit } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { ClickHouseModel } from "@modules/clickhouse/clickhouse.model";
+import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
+
+import WebAjaxFactory from "./web/ajax";
+import WebErrorFactory from "./web/error";
+import WebSdkErrorFactory from "./web/sdk-error";
+
+@Injectable()
+export class FrontendMonitorClickHouseService implements OnModuleInit {
+  private webAjaxFactory!: (appKey: string) => Promise<ClickHouseModel>;
+  private webErrorFactory!: (appKey: string) => Promise<ClickHouseModel>;
+  private webSdkErrorFactory!: () => Promise<ClickHouseModel>;
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly clickhouse: ClickHouseService,
+  ) {}
+
+  async onModuleInit() {
+    // The shared ClickHouseService owns the @clickhouse/client connection and
+    // exposes the ORM-like helpers (createDatabase / model). The database is
+    // always the host-level shared one (ADR-015); collector modules do not
+    // carry their own deployment topology.
+    const dbName = this.configService.getOrThrow<string>("modules.clickhouse.database");
+
+    // Ensure the database exists before creating tables.
+    await this.clickhouse.createDatabase(dbName);
+
+    // Initialize table factories with the shared service and database name.
+    this.webAjaxFactory = WebAjaxFactory(this.clickhouse, dbName);
+    this.webErrorFactory = WebErrorFactory(this.clickhouse, dbName);
+    this.webSdkErrorFactory = WebSdkErrorFactory(this.clickhouse, dbName);
+  }
+
+  async WebAjax(appKey: string) {
+    return this.webAjaxFactory(appKey);
+  }
+
+  async WebError(appKey: string) {
+    return this.webErrorFactory(appKey);
+  }
+
+  async WebSdkError() {
+    return this.webSdkErrorFactory();
+  }
+}

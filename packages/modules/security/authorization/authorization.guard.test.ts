@@ -194,9 +194,9 @@ describe("AuthorizationGuard scope resolution", () => {
 
   it("honours an explicit self scope opt-out without resolving a project", async () => {
     const { guard, context, authorizeCalls, resolverCalls } = makeGuard(
-      { resource: "WebMonitorSite", action: "List", scope: "self" },
-      { "web-monitor-site": { param: "appId", resolve: async () => ({ type: "project", id: "p-9" }) } },
-      ["WebMonitorSite"],
+      { resource: "FrontendMonitorSite", action: "List", scope: "self" },
+      { "frontend-monitor-site": { param: "appId", resolve: async () => ({ type: "project", id: "p-9" }) } },
+      ["FrontendMonitorSite"],
       { params: { appId: "app-1" } },
     );
 
