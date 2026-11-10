@@ -9,7 +9,7 @@ import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 import { DayReportNumService } from "@modules/frontend-monitor/modules/day-report/day-report-num.service";
 import { RedisService } from "@modules/redis/redis.service";
 import { RedisKeys } from "../../models/enum";
-import { ResolvedWebToken, WebTokenResolver } from "../../services/web-token.resolver";
+import { ResolvedWebToken, FrontendTokenResolver } from "../../services/web-token.resolver";
 
 /**
  * Token-only public endpoint for frontend-monitor ingestion (ADR-016), peer to
@@ -23,12 +23,12 @@ import { ResolvedWebToken, WebTokenResolver } from "../../services/web-token.res
  */
 @ApiTags("Frontend Monitor / Web / Report")
 @Controller("/frontend-monitor")
-export class WebReportController {
+export class FrontendReportController {
   constructor(
     private readonly site: SiteService,
     private readonly dayReportNum: DayReportNumService,
     private readonly redis: RedisService,
-    private readonly tokenResolver: WebTokenResolver,
+    private readonly tokenResolver: FrontendTokenResolver,
   ) {}
 
   @Post("/report")

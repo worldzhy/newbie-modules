@@ -22,7 +22,7 @@ import { RemoveModule } from "./modules/remove/remove.module";
     WebModule,
     RemoveModule,
   ],
-  // WebInstallationService is provided by WebModule (report-side wiring) and
+  // FrontendInstallationService is provided by WebModule (report-side wiring) and
   // re-exported here for consuming projects whose application layer
   // provisions installations (e.g. nightwatch). SiteModule is re-exported so
   // application-layer scheduled jobs can consume SiteService.

@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { func } from "../../../shared/utils";
-import { WebPvuvipTaskService } from "./pvuvip-task.service";
+import { FrontendPvuvipTaskService } from "./pvuvip-task.service";
 
 /**
- * Orchestration contracts for WebPvuvipTaskService: the minute task surveys
+ * Orchestration contracts for FrontendPvuvipTaskService: the minute task surveys
  * the trailing cron-derived window and stores type-1 rows stamped at the
  * window end; the day task surveys yesterday (history shape) and stores
  * type-2 rows stamped at the day start; one failing site must not stop the
@@ -32,7 +32,7 @@ function buildService(
       return {};
     },
   };
-  const service = new WebPvuvipTaskService(site as never, pvuvip as never);
+  const service = new FrontendPvuvipTaskService(site as never, pvuvip as never);
   (service as unknown as { logger: unknown }).logger = { error: () => {} };
   return { service, surveys, saves };
 }

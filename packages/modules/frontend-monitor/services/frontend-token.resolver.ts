@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from "@nestjs/common";
 
 import { InstallationTouchThrottle } from "@modules/security/installation/installation-touch-throttle";
 import { InstallationResolver } from "@modules/security/ports/installation.resolver";
-import { WebInstallationService } from "./web-installation.service";
+import { FrontendInstallationService } from "./web-installation.service";
 
 export interface ResolvedWebToken {
   installationId: string;
@@ -26,14 +26,14 @@ export interface ResolvedWebToken {
  * browser SDK posts via navigator.sendBeacon, which cannot set headers.
  */
 @Injectable()
-export class WebTokenResolver implements InstallationResolver {
+export class FrontendTokenResolver implements InstallationResolver {
   readonly kind = "frontend-monitor";
   /** sendBeacon cannot set headers, so the body token IS the standard (ADR-016 documented exception). */
   readonly bodyTokenField = "token";
 
   private readonly touchThrottle = new InstallationTouchThrottle();
 
-  constructor(private readonly installations: WebInstallationService) {}
+  constructor(private readonly installations: FrontendInstallationService) {}
 
   /**
    * Validates the token and returns installationId plus appKey.

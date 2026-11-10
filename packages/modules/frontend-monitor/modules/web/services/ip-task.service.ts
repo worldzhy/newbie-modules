@@ -16,9 +16,9 @@ interface TencentIpResponse {
 }
 
 @Injectable()
-export class WebIpTaskService {
+export class FrontendIpTaskService {
   private cfg: Record<string, unknown>;
-  private readonly logger = new Logger(WebIpTaskService.name);
+  private readonly logger = new Logger(FrontendIpTaskService.name);
   constructor(
     private readonly config: ConfigService,
     private readonly models: FrontendMonitorModelsService,

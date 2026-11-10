@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { ReportType } from "../../../models/enum";
-import { WebReportTaskService } from "./report-task.service";
+import { FrontendReportTaskService } from "./report-task.service";
 
 /**
  * R9-01: `time` arrives from the public SDK payload and was never validated.
@@ -38,12 +38,16 @@ function buildService() {
   } as never;
   const models = {} as never;
   const ch = {} as never;
-  return new WebReportTaskService(redis, site, models, ch);
+  return new FrontendReportTaskService(redis, site, models, ch);
 }
 
 type DrainResult = string | null;
 
-function drain(service: WebReportTaskService, raw: Record<string, unknown>, buckets: ReturnType<typeof emptyBuckets>) {
+function drain(
+  service: FrontendReportTaskService,
+  raw: Record<string, unknown>,
+  buckets: ReturnType<typeof emptyBuckets>,
+) {
   const target = service as unknown as {
     collectQueueItem: (payload: string, buckets: unknown) => Promise<DrainResult>;
   };

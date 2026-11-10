@@ -9,17 +9,17 @@ import { func } from "../../shared/utils";
 import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 import { DayReportNumService } from "@modules/frontend-monitor/modules/day-report/day-report-num.service";
 import { RedisKeys } from "../../models/enum";
-import { WebReportTaskService } from "@modules/frontend-monitor/modules/web/services/report-task.service";
-import { WebPvuvipTaskService } from "@modules/frontend-monitor/modules/web/services/pvuvip-task.service";
-import { WebIpTaskService } from "@modules/frontend-monitor/modules/web/services/ip-task.service";
+import { FrontendReportTaskService } from "@modules/frontend-monitor/modules/web/services/report-task.service";
+import { FrontendPvuvipTaskService } from "@modules/frontend-monitor/modules/web/services/pvuvip-task.service";
+import { FrontendIpTaskService } from "@modules/frontend-monitor/modules/web/services/ip-task.service";
 import { FrontendMonitorModelsService } from "../../models/mongo/frontend-monitor-models.service";
 import { FrontendMonitorClickHouseService } from "../../models/clickhouse/frontend-monitor-clickhouse.service";
 import { SystemDocument } from "../../models/mongo/system.schema";
 import {
-  WEB_THRESHOLD_ALERT_EVENT,
-  WebThresholdAlertCategory,
-  WebThresholdAlertEvent,
-  WebThresholdAlertSignal,
+  FRONTEND_THRESHOLD_ALERT_EVENT,
+  FrontendThresholdAlertCategory,
+  FrontendThresholdAlertEvent,
+  FrontendThresholdAlertSignal,
 } from "./threshold-alert.event";
 import { FIRST_SEEN_SOURCE_FILTER, SPIKE_SOURCE_FILTER } from "./error-source";
 import { AlertStateMachine } from "./alert-state";
@@ -37,9 +37,9 @@ export class JobsService implements OnModuleInit {
     private readonly nodeCache: NodeCacheService,
     private readonly dayReportNum: DayReportNumService,
     private readonly scheduler: SchedulerRegistry,
-    private readonly webReportTask: WebReportTaskService,
-    private readonly webPvuvipTask: WebPvuvipTaskService,
-    private readonly webIpTask: WebIpTaskService,
+    private readonly frontendReportTask: FrontendReportTaskService,
+    private readonly frontendPvuvipTask: FrontendPvuvipTaskService,
+    private readonly frontendIpTask: FrontendIpTaskService,
     private readonly models: FrontendMonitorModelsService,
     private readonly clickhouse: FrontendMonitorClickHouseService,
     private readonly eventEmitter: EventEmitter2,
@@ -230,7 +230,7 @@ export class JobsService implements OnModuleInit {
     // Only slow resources are persisted (see saveResours), so every row in
     // the window already breached its category threshold at ingest time.
     const categories: {
-      category: WebThresholdAlertCategory;
+      category: FrontendThresholdAlertCategory;
       types: string[];
       thresholdSeconds: number;
     }[] = [
@@ -449,12 +449,12 @@ export class JobsService implements OnModuleInit {
     }
   }
 
-  private emitAlert(event: WebThresholdAlertEvent) {
+  private emitAlert(event: FrontendThresholdAlertEvent) {
     try {
-      this.eventEmitter.emit(WEB_THRESHOLD_ALERT_EVENT, event);
+      this.eventEmitter.emit(FRONTEND_THRESHOLD_ALERT_EVENT, event);
     } catch (error) {
       this.logger.error(
-        `Failed to emit ${WEB_THRESHOLD_ALERT_EVENT} for system ${event.appKey} (${event.signal}): ${getErrorMessage(error)}`,
+        `Failed to emit ${FRONTEND_THRESHOLD_ALERT_EVENT} for system ${event.appKey} (${event.signal}): ${getErrorMessage(error)}`,
       );
     }
   }
@@ -467,8 +467,8 @@ export class JobsService implements OnModuleInit {
    */
   private alertStateKey(
     appKey: string,
-    signal: WebThresholdAlertSignal,
-    category?: WebThresholdAlertCategory,
+    signal: FrontendThresholdAlertSignal,
+    category?: FrontendThresholdAlertCategory,
     fingerprint?: string,
   ): string {
     let key = `frontend-monitor:alert-state:${appKey}:${signal}`;
@@ -563,13 +563,13 @@ export class JobsService implements OnModuleInit {
       FRONTEND_MONITOR_CONFIG.pvuvip_task_minute_lock_time,
     );
     if (!getLock) return;
-    await this.webPvuvipTask.getWebPvUvIpByMinute();
+    await this.frontendPvuvipTask.getWebPvUvIpByMinute();
   }
 
   async ipTask() {
     const getLock = await this.redisLock(RedisKeys.IP_TASK_LOCK, FRONTEND_MONITOR_CONFIG.ip_task_lock_time);
     if (!getLock) return;
-    await this.webIpTask.saveWebGetIpDatas();
+    await this.frontendIpTask.saveWebGetIpDatas();
   }
 
   async dayReportNumTask() {
@@ -592,6 +592,6 @@ export class JobsService implements OnModuleInit {
   }
 
   private async consumeWebQueue() {
-    await this.webReportTask.saveWebReportDatasForRedis();
+    await this.frontendReportTask.saveWebReportDatasForRedis();
   }
 }

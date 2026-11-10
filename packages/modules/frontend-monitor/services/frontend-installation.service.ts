@@ -27,7 +27,7 @@ export const ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SE
 const AUDIT_RESOURCE_TYPE = "frontend-monitor-installation";
 
 /** Domain columns stored next to the credential (ADR-019). */
-interface WebInstallationDraft {
+interface FrontendInstallationDraft {
   label: string;
   externalRef: string | null;
   appKey: string;
@@ -43,8 +43,8 @@ interface WebInstallationDraft {
  * identity.
  */
 @Injectable()
-export class WebInstallationService extends BaseInstallationService<FrontendMonitorInstallation> {
-  private readonly credentials: InstallationCredentialStore<WebInstallationDraft, FrontendMonitorInstallation>;
+export class FrontendInstallationService extends BaseInstallationService<FrontendMonitorInstallation> {
+  private readonly credentials: InstallationCredentialStore<FrontendInstallationDraft, FrontendMonitorInstallation>;
   protected readonly tokenVerifier: InstallationTokenVerifier<FrontendMonitorInstallation>;
 
   constructor(
@@ -52,7 +52,7 @@ export class WebInstallationService extends BaseInstallationService<FrontendMoni
     private readonly auditLogService: AuditLogService,
   ) {
     super();
-    this.credentials = prismaInstallationCredentialStore<WebInstallationDraft, FrontendMonitorInstallation>(
+    this.credentials = prismaInstallationCredentialStore<FrontendInstallationDraft, FrontendMonitorInstallation>(
       this.prisma.frontendMonitorInstallation,
     );
     this.tokenVerifier = new InstallationTokenVerifier(this.credentials);

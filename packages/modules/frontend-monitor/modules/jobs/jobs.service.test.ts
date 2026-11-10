@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { JobsService } from "./jobs.service";
-import { WEB_THRESHOLD_ALERT_EVENT } from "./threshold-alert.event";
+import { FRONTEND_THRESHOLD_ALERT_EVENT } from "./threshold-alert.event";
 import { RedisKeys } from "../../models/enum";
 import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 
@@ -172,19 +172,19 @@ function harness(options: HarnessOptions = {}) {
     },
   };
   const pvuvipCalls = { count: 0 };
-  const webPvuvipTask = {
+  const frontendPvuvipTask = {
     getWebPvUvIpByMinute: async () => {
       pvuvipCalls.count += 1;
     },
   };
   const ipCalls = { count: 0 };
-  const webIpTask = {
+  const frontendIpTask = {
     saveWebGetIpDatas: async () => {
       ipCalls.count += 1;
     },
   };
   const reportDrain = { calls: 0, error: undefined as Error | undefined };
-  const webReportTask = {
+  const frontendReportTask = {
     saveWebReportDatasForRedis: async () => {
       reportDrain.calls += 1;
       if (reportDrain.error) throw reportDrain.error;
@@ -204,9 +204,9 @@ function harness(options: HarnessOptions = {}) {
     nodeCache as never,
     dayReportNum as never,
     scheduler as never,
-    webReportTask as never,
-    webPvuvipTask as never,
-    webIpTask as never,
+    frontendReportTask as never,
+    frontendPvuvipTask as never,
+    frontendIpTask as never,
     models as never,
     clickhouse as never,
     eventEmitter as never,
@@ -338,8 +338,8 @@ test("a breached slow-page threshold emits the firing event with top offenders",
   await h.service.evaluateThresholdAlerts();
   const event = h.events.find((candidate) => candidate.payload.signal === "slow-page");
   assert.ok(event);
-  assert.equal(event.name, WEB_THRESHOLD_ALERT_EVENT);
-  assert.equal(WEB_THRESHOLD_ALERT_EVENT, "frontend-monitor.threshold-alert");
+  assert.equal(event.name, FRONTEND_THRESHOLD_ALERT_EVENT);
+  assert.equal(FRONTEND_THRESHOLD_ALERT_EVENT, "frontend-monitor.threshold-alert");
   const payload = event.payload;
   assert.equal(payload.appKey, "APP1");
   assert.equal(payload.systemName, "APP1", "a missing systemName falls back to the appKey");
