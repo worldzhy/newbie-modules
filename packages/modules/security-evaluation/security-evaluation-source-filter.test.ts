@@ -40,7 +40,7 @@ interface SeenCalls {
   assets: Array<Record<string, unknown>>;
   runs: RunsInput[];
   findings: FindingsInput[];
-  reports: Array<string[] | null>;
+  reports: Array<{ subjectIds: string[] | null; days?: number }>;
 }
 
 function createController(subjectIds: string[] | null) {
@@ -78,8 +78,8 @@ function createController(subjectIds: string[] | null) {
     getVersion: async () => ({ version: "v1", evaluationKey: "test" }),
   };
   const reports = {
-    getReport: async (ids: string[] | null) => {
-      seen.reports.push(ids);
+    getReport: async (ids: string[] | null, days?: number) => {
+      seen.reports.push({ subjectIds: ids, days });
       return {};
     },
   };
@@ -130,7 +130,7 @@ test("findings, runs and the report narrow to the subjects the source contribute
       page: 1,
       pageSize: 20,
     });
-    assert.deepEqual(seen.reports[0], subjectIds);
+    assert.deepEqual(seen.reports[0].subjectIds, subjectIds);
   }
 });
 
@@ -145,7 +145,18 @@ test("an absent filter is the platform view, not an empty set", async () => {
   // `undefined` means "no subject narrowing"; an empty array would hide all rows.
   assert.equal(seen.findings[0].subjectIds, undefined);
   assert.equal(seen.runs[0].subjectIds, undefined);
-  assert.equal(seen.reports[0], null);
+  assert.equal(seen.reports[0].subjectIds, null);
+});
+
+test("the report forwards the requested severity-trend window", async () => {
+  const { controller, seen } = createController(null);
+
+  await controller.getReport({ days: 90 });
+  await controller.getReport({});
+
+  assert.equal(seen.reports[0].days, 90);
+  // Absent means the service default (30 days), never an unbounded window.
+  assert.equal(seen.reports[1].days, undefined);
 });
 
 test("an explicit subject id bypasses provenance resolution", async () => {

@@ -1,7 +1,24 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsEnum, IsNotEmpty, IsObject, IsOptional, IsString, IsUUID, MaxLength } from "class-validator";
+import { Type } from "class-transformer";
+import {
+  IsEnum,
+  IsInt,
+  IsNotEmpty,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Max,
+  MaxLength,
+  Min,
+} from "class-validator";
 import { EvaluationFindingSeverity, EvaluationFindingStatus, EvaluationRunStatus } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
+
+import {
+  SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS,
+  SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS_MAX,
+} from "./security-evaluation.constants";
 
 // --- Path params ---------------------------------------------------------
 
@@ -384,6 +401,19 @@ export class GetSecurityEvaluationReportRequestDto {
   @IsOptional()
   @IsString()
   scopeId?: string;
+
+  @ApiPropertyOptional({
+    description: "Window of the daily severity trend, in days (1…365). Defaults to 30.",
+    default: SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS,
+    minimum: 1,
+    maximum: SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS_MAX,
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS_MAX)
+  days?: number;
 }
 
 export class SecurityEvaluationReportAssetsDto {
@@ -413,14 +443,42 @@ export class SecurityEvaluationReportTopFindingDto {
   @ApiProperty() firstSeenAt!: Date;
 }
 
+/** Open findings of one evaluationKey, split by severity. */
+export class SecurityEvaluationReportFindingsByKeyDto {
+  @ApiProperty({ description: 'Evaluation key, e.g. "npm-osv"' }) evaluationKey!: string;
+  @ApiProperty() open!: number;
+  @ApiProperty({ type: Object, description: "Open findings counted per severity" })
+  bySeverity!: Record<string, number>;
+}
+
 export class SecurityEvaluationReportFindingsDto {
   @ApiProperty() open!: number;
   @ApiProperty({ type: Object, description: "Open findings counted per severity" })
   bySeverity!: Record<string, number>;
   @ApiProperty({ type: Object, description: "Open findings counted per urgency band" })
   byUrgency!: Record<string, number>;
+  @ApiProperty({
+    type: [SecurityEvaluationReportFindingsByKeyDto],
+    isArray: true,
+    description: "Open findings counted per evaluationKey and severity",
+  })
+  byEvaluationKey!: SecurityEvaluationReportFindingsByKeyDto[];
   @ApiProperty({ type: [SecurityEvaluationReportTopFindingDto], isArray: true })
   topOpen!: SecurityEvaluationReportTopFindingDto[];
+}
+
+/** One day of the severity trend: findings still open at the end of that day. */
+export class SecurityEvaluationReportSeverityTrendPointDto {
+  @ApiProperty() day!: Date;
+  @ApiProperty({ type: Object, description: "Open findings counted per severity on that day" })
+  bySeverity!: Record<string, number>;
+  @ApiProperty() total!: number;
+}
+
+export class SecurityEvaluationReportSeverityTrendDto {
+  @ApiProperty() windowDays!: number;
+  @ApiProperty({ type: [SecurityEvaluationReportSeverityTrendPointDto], isArray: true })
+  points!: SecurityEvaluationReportSeverityTrendPointDto[];
 }
 
 export class SecurityEvaluationReportTrendPointDto {
@@ -429,11 +487,24 @@ export class SecurityEvaluationReportTrendPointDto {
   @ApiProperty() resolved!: number;
 }
 
+export class SecurityEvaluationReportMttrByKeyDto {
+  @ApiProperty({ description: 'Evaluation key, e.g. "npm-osv"' }) evaluationKey!: string;
+  @ApiPropertyOptional({ description: "Mean days to resolve inside the window" }) averageDays?: number | null;
+  @ApiPropertyOptional({ description: "Median days to resolve inside the window" }) medianDays?: number | null;
+  @ApiProperty() resolvedCount!: number;
+}
+
 export class SecurityEvaluationReportMttrDto {
   @ApiPropertyOptional({ description: "Mean days to resolve, null while nothing has been resolved" })
   averageDays?: number | null;
   @ApiProperty() resolvedCount!: number;
   @ApiProperty() windowDays!: number;
+  @ApiProperty({
+    type: [SecurityEvaluationReportMttrByKeyDto],
+    isArray: true,
+    description: "The same window split per evaluationKey",
+  })
+  byEvaluationKey!: SecurityEvaluationReportMttrByKeyDto[];
 }
 
 /** Single-axis report (ADR-022 D6): no composite score, no cross-evaluationKey weighting. */
@@ -444,5 +515,7 @@ export class SecurityEvaluationReportResponseDto {
   @ApiProperty({ type: SecurityEvaluationReportFindingsDto }) findings!: SecurityEvaluationReportFindingsDto;
   @ApiProperty({ type: [SecurityEvaluationReportTrendPointDto], isArray: true })
   trend!: SecurityEvaluationReportTrendPointDto[];
+  @ApiProperty({ type: SecurityEvaluationReportSeverityTrendDto })
+  severityTrend!: SecurityEvaluationReportSeverityTrendDto;
   @ApiProperty({ type: SecurityEvaluationReportMttrDto }) mttr!: SecurityEvaluationReportMttrDto;
 }

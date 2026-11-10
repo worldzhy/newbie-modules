@@ -277,6 +277,6 @@ export class SecurityEvaluationController {
   @ApiResponse({ status: 200, type: SecurityEvaluationReportResponseDto })
   async getReport(@Query() query: GetSecurityEvaluationReportRequestDto) {
     const subjectIds = await this.assets.listSubjectIdsBySource(query);
-    return this.reports.getReport(subjectIds);
+    return this.reports.getReport(subjectIds, query.days);
   }
 }

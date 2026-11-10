@@ -4,6 +4,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import {
   SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS,
+  SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS,
   SECURITY_EVALUATION_REPORT_TREND_WEEKS,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KINDS,
@@ -15,7 +16,13 @@ const TOP_OPEN_LIMIT = 20;
 /** Bounded page size for reading OPEN findings whose urgency is JSON metadata. */
 const FINDING_SUMMARY_PAGE_SIZE = 500;
 const SEVERITIES = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"] as const;
+type Severity = (typeof SEVERITIES)[number];
 const URGENCIES: readonly SecurityEvaluationUrgency[] = ["P1", "P2", "P3", "P4"];
+
+/** A zeroed severity bucket, so a missing severity still renders as 0. */
+function emptySeverityCounts(): Record<Severity, number> {
+  return Object.fromEntries(SEVERITIES.map((severity) => [severity, 0])) as Record<Severity, number>;
+}
 
 /** Ranked top-open ordering: highest urgency first, then oldest finding, then id for stability. */
 function compareTopOpen(
@@ -59,8 +66,13 @@ export interface SecurityEvaluationReport {
   };
   findings: {
     open: number;
-    bySeverity: Record<(typeof SEVERITIES)[number], number>;
+    bySeverity: Record<Severity, number>;
     byUrgency: Record<SecurityEvaluationUrgency, number>;
+    byEvaluationKey: {
+      evaluationKey: string;
+      open: number;
+      bySeverity: Record<Severity, number>;
+    }[];
     topOpen: {
       id: string;
       subjectId: string;
@@ -71,7 +83,26 @@ export interface SecurityEvaluationReport {
     }[];
   };
   trend: { weekStart: Date; opened: number; resolved: number }[];
-  mttr: { averageDays: number | null; resolvedCount: number; windowDays: number };
+  /**
+   * Findings still open at the end of each day of the window, split by
+   * severity. Reconstructed from firstSeenAt/resolvedAt so a day keeps the
+   * count it had at the time.
+   */
+  severityTrend: {
+    windowDays: number;
+    points: { day: Date; bySeverity: Record<Severity, number>; total: number }[];
+  };
+  mttr: {
+    averageDays: number | null;
+    resolvedCount: number;
+    windowDays: number;
+    byEvaluationKey: {
+      evaluationKey: string;
+      averageDays: number | null;
+      medianDays: number | null;
+      resolvedCount: number;
+    }[];
+  };
 }
 
 /**
@@ -88,8 +119,14 @@ export class SecurityEvaluationReportService {
    * Build the platform report, or a provenance-filtered slice when `subjectIds`
    * is given (ADR-039): `null` means the whole platform, an empty array means
    * the filter matched nothing.
+   *
+   * `severityTrendDays` sizes the daily severity series; the weekly
+   * opened/resolved trend and the MTTR window stay fixed.
    */
-  async getReport(subjectIdsFilter: readonly string[] | null): Promise<SecurityEvaluationReport> {
+  async getReport(
+    subjectIdsFilter: readonly string[] | null,
+    severityTrendDays = SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS,
+  ): Promise<SecurityEvaluationReport> {
     const subjects = await this.prisma.evaluationSubject.findMany({
       where: subjectIdsFilter
         ? { id: { in: [...subjectIdsFilter] } }
@@ -159,6 +196,7 @@ export class SecurityEvaluationReportService {
       coverage,
       findings,
       trend: await this.trend(subjectIds, since),
+      severityTrend: await this.severityTrend(subjectIds, severityTrendDays, now),
       mttr: await this.mttr(subjectIds, since, windowDays),
     };
   }
@@ -191,28 +229,41 @@ export class SecurityEvaluationReportService {
   }
 
   private async findingSummary(subjectIds: readonly string[]) {
-    const bySeverity = Object.fromEntries(SEVERITIES.map((severity) => [severity, 0])) as Record<
-      (typeof SEVERITIES)[number],
-      number
-    >;
+    const bySeverity = emptySeverityCounts();
     const byUrgency = Object.fromEntries(URGENCIES.map((urgency) => [urgency, 0])) as Record<
       SecurityEvaluationUrgency,
       number
     >;
+    const byKey = new Map<string, { evaluationKey: string; open: number; bySeverity: Record<Severity, number> }>();
     if (subjectIds.length === 0) {
-      return { open: 0, bySeverity, byUrgency, topOpen: [] };
+      return { open: 0, bySeverity, byUrgency, byEvaluationKey: [], topOpen: [] };
     }
 
+    // One pass over the OPEN set yields the platform severity split and the
+    // per-evaluationKey split: the grouped rows are already keyed by both.
     const grouped = await this.prisma.evaluationFinding.groupBy({
-      by: ["severity", "status"],
+      by: ["evaluationKey", "severity"],
       where: { subjectId: { in: [...subjectIds] }, status: EvaluationFindingStatus.OPEN },
       _count: { _all: true },
     });
     let open = 0;
     for (const row of grouped) {
-      open += row._count._all;
-      if (row.severity in bySeverity) bySeverity[row.severity as (typeof SEVERITIES)[number]] += row._count._all;
+      const count = row._count._all;
+      open += count;
+      const severity = row.severity as Severity;
+      if (severity in bySeverity) bySeverity[severity] += count;
+      const keyEntry = byKey.get(row.evaluationKey) ?? {
+        evaluationKey: row.evaluationKey,
+        open: 0,
+        bySeverity: emptySeverityCounts(),
+      };
+      keyEntry.open += count;
+      if (severity in keyEntry.bySeverity) keyEntry.bySeverity[severity] += count;
+      byKey.set(row.evaluationKey, keyEntry);
     }
+    const byEvaluationKey = [...byKey.values()].sort((left, right) =>
+      left.evaluationKey.localeCompare(right.evaluationKey),
+    );
 
     // Urgency lives in the JSON metadata column, so it cannot be aggregated by
     // Prisma. Iterate the OPEN findings in bounded pages and keep only the
@@ -252,7 +303,7 @@ export class SecurityEvaluationReportService {
       cursor = { id: batch[batch.length - 1].id };
     }
 
-    return { open, bySeverity, byUrgency, topOpen };
+    return { open, bySeverity, byUrgency, byEvaluationKey, topOpen };
   }
 
   private async trend(subjectIds: readonly string[], since: Date) {
@@ -285,20 +336,100 @@ export class SecurityEvaluationReportService {
     return [...weeks.values()].sort((left, right) => left.weekStart.getTime() - right.weekStart.getTime());
   }
 
-  private async mttr(subjectIds: readonly string[], since: Date, windowDays: number) {
-    if (subjectIds.length === 0) return { averageDays: null, resolvedCount: 0, windowDays };
-    const rows = await this.prisma.$queryRaw<{ averageDays: number | null; resolvedCount: number }[]>`
+  /**
+   * Findings still open at the end of each day in the window, split by
+   * severity. A finding counts on a day when it had already been first seen and
+   * was not yet resolved at that day's end; suppressed findings are excluded
+   * because a suppression carries no timestamp to place on the timeline.
+   */
+  private async severityTrend(subjectIds: readonly string[], days: number, now: Date) {
+    if (subjectIds.length === 0) return { windowDays: days, points: [] };
+    const rows = await this.prisma.$queryRaw<
+      Array<{ day: Date; critical: number; high: number; medium: number; low: number; info: number }>
+    >`
+      WITH window AS (
+        SELECT generate_series(
+          date_trunc('day', ${now}::timestamptz) - (${days}::int - 1) * interval '1 day',
+          date_trunc('day', ${now}::timestamptz),
+          interval '1 day'
+        ) AS day
+      )
       SELECT
-        avg(extract(epoch from ("resolvedAt" - "firstSeenAt")) / 86400.0)::float8 AS "averageDays",
-        count(*)::int AS "resolvedCount"
-      FROM "module/evaluation"."EvaluationFinding"
-      WHERE "subjectId" IN (${Prisma.join([...subjectIds])}) AND "resolvedAt" IS NOT NULL AND "resolvedAt" >= ${since}
+        w.day AS "day",
+        (count(f."id") FILTER (WHERE f."severity" = 'CRITICAL'))::int AS "critical",
+        (count(f."id") FILTER (WHERE f."severity" = 'HIGH'))::int AS "high",
+        (count(f."id") FILTER (WHERE f."severity" = 'MEDIUM'))::int AS "medium",
+        (count(f."id") FILTER (WHERE f."severity" = 'LOW'))::int AS "low",
+        (count(f."id") FILTER (WHERE f."severity" = 'INFO'))::int AS "info"
+      FROM window w
+      LEFT JOIN "module/evaluation"."EvaluationFinding" f
+        ON f."subjectId" IN (${Prisma.join([...subjectIds])})
+       AND f."status" <> 'SUPPRESSED'
+       AND f."firstSeenAt" < w.day + interval '1 day'
+       AND (f."resolvedAt" IS NULL OR f."resolvedAt" >= w.day + interval '1 day')
+      GROUP BY w.day
+      ORDER BY w.day
     `;
-    const row = rows[0];
+    return {
+      windowDays: days,
+      points: rows.map((row) => {
+        const bySeverity: Record<Severity, number> = {
+          CRITICAL: row.critical,
+          HIGH: row.high,
+          MEDIUM: row.medium,
+          LOW: row.low,
+          INFO: row.info,
+        };
+        return {
+          day: row.day,
+          bySeverity,
+          total: row.critical + row.high + row.medium + row.low + row.info,
+        };
+      }),
+    };
+  }
+
+  private async mttr(subjectIds: readonly string[], since: Date, windowDays: number) {
+    if (subjectIds.length === 0) {
+      return { averageDays: null, resolvedCount: 0, windowDays, byEvaluationKey: [] };
+    }
+    const [overall, perKey] = await Promise.all([
+      this.prisma.$queryRaw<{ averageDays: number | null; resolvedCount: number }[]>`
+        SELECT
+          avg(extract(epoch from ("resolvedAt" - "firstSeenAt")) / 86400.0)::float8 AS "averageDays",
+          count(*)::int AS "resolvedCount"
+        FROM "module/evaluation"."EvaluationFinding"
+        WHERE "subjectId" IN (${Prisma.join([...subjectIds])}) AND "resolvedAt" IS NOT NULL AND "resolvedAt" >= ${since}
+      `,
+      // Median needs the window function; average alone would hide a long tail
+      // that a few stale findings produce per evaluationKey.
+      this.prisma.$queryRaw<
+        Array<{ evaluationKey: string; averageDays: number | null; medianDays: number | null; resolvedCount: number }>
+      >`
+        SELECT
+          "evaluationKey" AS "evaluationKey",
+          avg(extract(epoch from ("resolvedAt" - "firstSeenAt")) / 86400.0)::float8 AS "averageDays",
+          percentile_cont(0.5) WITHIN GROUP (
+            ORDER BY extract(epoch from ("resolvedAt" - "firstSeenAt"))::float8 / 86400.0
+          )::float8 AS "medianDays",
+          count(*)::int AS "resolvedCount"
+        FROM "module/evaluation"."EvaluationFinding"
+        WHERE "subjectId" IN (${Prisma.join([...subjectIds])}) AND "resolvedAt" IS NOT NULL AND "resolvedAt" >= ${since}
+        GROUP BY 1
+        ORDER BY 1
+      `,
+    ]);
+    const row = overall[0];
     return {
       averageDays: row?.averageDays ?? null,
       resolvedCount: row?.resolvedCount ?? 0,
       windowDays,
+      byEvaluationKey: perKey.map((entry) => ({
+        evaluationKey: entry.evaluationKey,
+        averageDays: entry.averageDays ?? null,
+        medianDays: entry.medianDays ?? null,
+        resolvedCount: entry.resolvedCount,
+      })),
     };
   }
 }

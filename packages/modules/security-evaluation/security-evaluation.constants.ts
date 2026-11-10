@@ -130,6 +130,10 @@ export const SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS = 7;
 /** Trend and mean-time-to-resolve windows of the report read model. */
 export const SECURITY_EVALUATION_REPORT_TREND_WEEKS = 12;
 
+/** Default and maximum window of the report's daily severity trend. */
+export const SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS = 30;
+export const SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS_MAX = 365;
+
 /**
  * Scheduling declarations only. The host decides the cron and the trigger
  * conditions; the module never registers a scheduler of its own.
