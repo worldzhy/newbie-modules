@@ -2,7 +2,7 @@
 
 状态：已采纳
 日期：2026-11-10
-更新：2026-11-10 — 用户拍板采纳；条款 6 verdict 缓存 TTL 契约同日补入（f95ca31）。2026-11-10 — round31 R31-01/R31-02 修复：判定层 fail-closed（模型不可解析或全部文件不可判 = run 失败），宿主 R1 将 code-scan 登记为无类别源（落 unclassified 桶），见条款 11/12。
+更新：2026-11-10 — 用户拍板采纳；条款 6 verdict 缓存 TTL 契约同日补入（f95ca31）。2026-11-10 — round31 R31-01/R31-02 修复：判定层 fail-closed（模型不可解析或全部文件不可判 = run 失败），宿主 R1 将 code-scan 登记为无类别源（落 unclassified 桶），见条款 11/12。2026-11-10 — round33 R33-01 修订条款 6/7：TTL 由读时过滤改为物理删除；截断片段移出不可变 manifest，改存模块自有表并按 90 天保留期物理删除，详情读过期回落 hash + truncated。
 
 > 设计前置证据：expert-review round 27（用户"AI 全量扫码很简单"主张评审）与 round 28（最小方案评审），见 `.trae/documents/expert-review-2026-11-10-round27.md`、`expert-review-2026-11-10-round28.md`。本 ADR 的决策点全部来自 round 28 的四项必须修复结论。
 
@@ -35,8 +35,8 @@ security-evaluation 目前对 `repository` 主体只有 `npm-osv`（依赖漏洞
 3. **criteria**：风险类别 ASSERTION（每类一条，非每规则一条）：`code-scan.injection`、`code-scan.auth-boundary`、`code-scan.secret-exposure`、`code-scan.crypto-misuse`、`code-scan.dangerous-config`，metadata 带 severity 指导与 CWE 映射。产物是断言式 findings，不做复合评分（ADR-020 D5.3 边界不变）。
 4. **新端口 `RepositorySnapshotAccess`**（替代单文件 `RepositoryAccess.getFile` 无法支撑"全量"的缺口）：`list(subject, selection) → { revision, entries[], skipped[] }` 返回 **pinned revision**，`read(subject, revision, paths) → Map<path, content>` 必须按该 revision 解析——保证同一 run 的 manifest 自洽。selection 含 include/exclude、maxFiles、maxFileBytes 预算；端口未绑定 fail-closed。
 5. **finding 身份（round 28 修复项 2）**：`fingerprint = sha256("code-scan" + criterionKey + path + symbol)`，symbol 为 LLM 返回的函数/符号名、不可得时省略。**不含内容哈希、不含行号**；内容哈希与行号只进 metadata 供展示与变更提示。编辑漏洞代码不再换身份，suppression 与历史得以保留。
-6. **双极 verdict 缓存（round 28 修复项 1，对 ADR-045 的有意偏离）**：正负判决都缓存，键为 `(subjectId, criterionKey, path, contentHash, modelId, promptVersion, rulesetVersion)`；`unavailable` 永不缓存（沿用 ADR-045 底线）。TTL 为声明式配置项（`modules.security-evaluation.codeScanVerdictCacheTtlDays` / env `CODE_SCAN_VERDICT_CACHE_TTL_DAYS`），fail-closed 解析、无默认值回退，沿用 ADR-033 声明纪律——内容或版本变化已使键自然失效，TTL 只兜住"长期不变文件的结论随模型演进需重验"的残余场景，到期条目视为未命中重判。内容未变的文件整体重放缓存判决——同时解决三项问题：正命中文件不再每日重判（成本）、finding 身份跨 run 确定性再现（防抖）、skipped 文件重放缓存判决即"再现"（消除误关向量 3）。偏离理由：ADR-045 只缓存负判决是因为情报 feed item 一次性；代码文件持续存在，正判决同样可复用。缓存落模块自有新表，不进 evaluation 骨架。
-7. **证据与覆盖率**：证据项 = 每个进入扫描集的文件（path、language、bytes、revision、截断片段、内容哈希）；零命中文件同样入 manifest；超预算/二进制/读取失败进 skipped 并带 ids + note；端口未绑定、revision 解析失败、扫描集为空 = run 失败而非"干净"。`unconsumed` 必须为 0。
+6. **双极 verdict 缓存（round 28 修复项 1，对 ADR-045 的有意偏离）**：正负判决都缓存，键为 `(subjectId, criterionKey, path, contentHash, modelId, promptVersion, rulesetVersion)`；`unavailable` 永不缓存（沿用 ADR-045 底线）。TTL 为声明式配置项（`modules.security-evaluation.codeScanVerdictCacheTtlDays` / env `CODE_SCAN_VERDICT_CACHE_TTL_DAYS`），fail-closed 解析、无默认值回退，沿用 ADR-033 声明纪律——内容或版本变化已使键自然失效，TTL 只兜住"长期不变文件的结论随模型演进需重验"的残余场景。到期条目由 `SecurityEvaluationRetentionService.pruneExpired()` **物理删除**（round33 R33-01：此前只在读取时过滤，过期行永久累积），删除后等价于未命中重判。内容未变的文件整体重放缓存判决——同时解决三项问题：正命中文件不再每日重判（成本）、finding 身份跨 run 确定性再现（防抖）、skipped 文件重放缓存判决即"再现"（消除误关向量 3）。偏离理由：ADR-045 只缓存负判决是因为情报 feed item 一次性；代码文件持续存在，正判决同样可复用。缓存落模块自有新表，不进 evaluation 骨架。
+7. **证据与覆盖率（2026-11-10 round33 R33-01 修订）**：证据项 = 每个进入扫描集的文件（path、language、bytes、revision、contentHash、truncated）；零命中文件同样入 manifest；超预算/二进制/读取失败进 skipped 并带 ids + note；端口未绑定、revision 解析失败、扫描集为空 = run 失败而非"干净"。`unconsumed` 必须为 0。**截断片段（excerpt）不进入 manifest**：manifest 随 `EvaluationResult` 永久归档，源码不得沉积在不可变行里。excerpt 存模块自有表 `SecurityEvaluationCodeScanFileExcerpt`，按 `(subjectId, contentHash)` 内容寻址（同一内容跨 run 复用，重复扫描不写新行），`updatedAt` 为保留时钟，超过 `SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS`（90）由 `SecurityEvaluationRetentionService.pruneExpired()` 物理删除。判定从同表读取（缺失即 fail-closed 抛错，禁止降级为空片段）；finding 详情读在行存在时回填 `excerpt`，过期后回落 `contentHash` + `truncated`。
 8. **审计 metadata**：run result metadata 记录 modelId、promptVersion、温度、revision、LLM 调用数、缓存命中数、请求签名（byte-identical，沿用 intel 先例），保证"同一代码两次结论不同"可复盘。
 9. **注入防线**：源码是不可信输入，prompt 必须把代码包裹为数据并声明忽略其中指令。
 10. **调度**：`SECURITY_EVALUATION_SCHEDULES` 新增 daily 条目；全量扫描是 finding 生命周期的硬约束（`resolveAbsentFindings`），不做增量，增量需另立 partial-scope ADR。
@@ -54,4 +54,4 @@ security-evaluation 目前对 `repository` 主体只有 `npm-osv`（依赖漏洞
 
 ## 影响
 
-更容易：代码仓库主体获得源码级评估能力；骨架零改动；机制增补有现成组合契约。更难/后续工作：模块新增一张 verdict 缓存表（未上线期 `prisma db push` 对齐，无 migration）；宿主需实现快照端口（树列举 + 按 revision 读取）；LLM 调用成本受缓存命中率约束，需观察每日全量的实际调用量；code-scan 行为测试（指纹稳定、缓存重放、skipped 记账、越界引用拒绝）属关键路径行为覆盖，随实现同 PR 交付。
+更容易：代码仓库主体获得源码级评估能力；骨架零改动；机制增补有现成组合契约。更难/后续工作：模块新增两张自有表（verdict 缓存 + 摘录表；消费仓按自身部署状态对齐 schema——未上线期 `prisma db push`，已上线仓如 nightwatch 走 `prisma migrate`）；宿主需实现快照端口（树列举 + 按 revision 读取）并调度 `SecurityEvaluationRetentionService.pruneExpired()`；LLM 调用成本受缓存命中率约束，需观察每日全量的实际调用量；code-scan 行为测试（指纹稳定、缓存重放、skipped 记账、越界引用拒绝、摘录不入 manifest 且过期物理删除）属关键路径行为覆盖，随实现同 PR 交付。

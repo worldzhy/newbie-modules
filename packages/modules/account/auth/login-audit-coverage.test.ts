@@ -49,6 +49,7 @@ const LOGIN_ENTRY_FILES = [
   "lark/lark-auth.service.ts",
   "wechat/auth.service.ts",
   "login-by-approved-subnet.controller.ts",
+  "login-by-totp.controller.ts",
   "strategies/refresh-token.strategy.ts",
 ];
 
@@ -58,7 +59,7 @@ const AUDIT_CALL_PATTERN = /recordLoginFailure\(|auditLogService\.record\(/;
 const EXEMPTION_COMMENT_PATTERN = /handshake|audit: not required/i;
 const LOOKBACK_LINES = 8;
 
-const SUCCESS_SESSION_PATTERN = /sessionService\.generate\(/;
+const SUCCESS_SESSION_PATTERN = /sessionService\.generate(?:WithTransaction)?\(/;
 const SUCCESS_AUDIT_PATTERN = /AuditEvent\.LOGIN\b/;
 const TOTP_GATE_PATTERN = /evaluateLoginMfaGate\(/;
 

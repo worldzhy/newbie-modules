@@ -93,6 +93,15 @@ export const SECURITY_EVALUATION_CODE_SCAN_MAX_FILE_BYTES = 65_536;
 export const SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS = 12_000;
 
 /**
+ * How long the truncated excerpt of a judged file is kept after the run that
+ * observed it. The excerpt is source code, so it never enters the immutable
+ * result manifest: it lives in its own table and is physically deleted once it
+ * is older than this window, after which the finding detail read falls back to
+ * the content hash and the truncated flag (ADR-054 D7).
+ */
+export const SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS = 90;
+
+/**
  * Maximum number of LLM judgment calls a single CODE_SCAN run may spend.
  * Files that would need more are not judged and land in the judgment's
  * skipped bucket (same discipline as the INTEL re-rank budget).

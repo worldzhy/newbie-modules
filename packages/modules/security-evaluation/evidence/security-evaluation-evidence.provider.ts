@@ -52,6 +52,7 @@ import {
   securityEvaluationRepositorySnapshotAccessToken,
 } from "../ports/repository-snapshot-access.port";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
+import { SecurityEvaluationCodeScanExcerptService } from "./security-evaluation-code-scan-excerpt.service";
 
 interface ResolvedLockfile {
   path: string;
@@ -82,6 +83,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     private readonly assets: SecurityEvaluationAssetService,
     @Inject(securityEvaluationIntelNegativeCacheToken)
     private readonly negativeCache: SecurityEvaluationIntelNegativeCachePort,
+    private readonly excerpts: SecurityEvaluationCodeScanExcerptService,
     @Optional()
     @Inject(securityEvaluationRepositoryAccessToken)
     private readonly repositoryAccess?: RepositoryAccess,
@@ -293,6 +295,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
 
     const observedAt = new Date();
     const items: EvaluationEvidenceItem[] = [];
+    const excerpts: { contentHash: string; excerpt: string }[] = [];
     const readFailureIds: string[] = [];
     for (const entry of listing.entries) {
       const content = contents.get(entry.path);
@@ -300,6 +303,12 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
         readFailureIds.push(codeScanEvidenceId(entry.path));
         continue;
       }
+      const excerpt = content.slice(0, SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS);
+      const contentHash = codeScanContentHash(content);
+      // The manifest item is the audit record and ends up in the immutable
+      // result row, so it carries the hash and the truncation flag only: the
+      // source excerpt lives in its own retention-bounded table (ADR-054 D7).
+      excerpts.push({ contentHash, excerpt });
       items.push({
         id: codeScanEvidenceId(entry.path),
         layer: "source",
@@ -312,8 +321,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
           language: codeScanLanguage(entry.path),
           bytes: entry.sizeBytes,
           revision: listing.revision,
-          contentHash: codeScanContentHash(content),
-          excerpt: content.slice(0, SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS),
+          contentHash,
           truncated: content.length > SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS,
         },
       });
@@ -323,6 +331,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
         `code-scan could not read any of the ${listing.entries.length} listed file(s) of ${subject.displayName} at revision ${listing.revision}; a run over nothing would report a vacuous clean result.`,
       );
     }
+    await this.excerpts.save(subject.id, excerpts);
 
     return {
       items,
