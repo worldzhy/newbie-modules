@@ -86,6 +86,8 @@ export interface ListEvaluationRunsInput {
   /** Host scope coordinate on the subject; narrows the list to one scope. */
   scopeType?: string;
   scopeId?: string;
+  /** Restrict to one run status, e.g. FAILED for a latest-failure banner. */
+  status?: EvaluationRunStatus;
   page?: number;
   pageSize?: number;
 }
@@ -242,6 +244,7 @@ export class EvaluationRunService {
           subjectId: query.subjectId,
           ...(query.subjectIds ? { subjectId: { in: [...query.subjectIds] } } : {}),
           ...(query.ruleSetVersionId ? { ruleSetVersionId: query.ruleSetVersionId } : {}),
+          ...(query.status ? { status: query.status } : {}),
           ...(query.kind || query.scopeType || query.scopeId
             ? {
                 subject: {

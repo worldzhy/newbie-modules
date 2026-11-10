@@ -1,6 +1,6 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
-import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { EvaluationFindingStatus, PermissionAction, Prisma } from "@generated/prisma/client";
 import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
 import { EvaluationFindingService } from "@modules/evaluation/evaluation-finding.service";
 import { EvaluationResultService } from "@modules/evaluation/evaluation-result.service";
@@ -10,7 +10,10 @@ import { UserRequest } from "@modules/security/security.interface";
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
-import { SECURITY_EVALUATION_SUBJECT_KINDS } from "./security-evaluation.constants";
+import {
+  SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS,
+  SECURITY_EVALUATION_SUBJECT_KINDS,
+} from "./security-evaluation.constants";
 import {
   GetSecurityEvaluationAssetRequestDto,
   GetSecurityEvaluationFindingRequestDto,
@@ -140,6 +143,7 @@ export class SecurityEvaluationController {
       subjectIds: subjectIds ?? undefined,
       subjectId: query.subjectId,
       ruleSetVersionId: query.ruleSetVersionId,
+      status: query.status,
       page: query.page,
       pageSize: query.pageSize,
     });
@@ -166,18 +170,26 @@ export class SecurityEvaluationController {
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationFinding)
   @ApiOperation({
     summary:
-      "List findings (platform view), optionally filtered by provenance source, subject, run, evaluationKey, status, severity",
+      "List findings (platform view), optionally filtered by provenance source, subject, run, evaluationKey, status, severity, urgency, staleness",
   })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationFindingsResponseDto })
   async listFindings(@Query() query: ListSecurityEvaluationFindingsRequestDto) {
     const subjectIds = query.subjectId ? null : await this.assets.listSubjectIdsBySource(query);
+    // Stale = OPEN but not re-observed within the window: the run that used to
+    // reproduce the finding stopped covering it without resolving it. An
+    // explicit status filter always wins over the implied OPEN.
+    const staleBefore = query.staleOnly
+      ? new Date(Date.now() - SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS * 24 * 60 * 60 * 1000)
+      : undefined;
     return this.findings.listFindings({
       subjectIds: subjectIds ?? undefined,
       subjectId: query.subjectId,
       runId: query.runId,
       evaluationKey: query.evaluationKey,
-      status: query.status,
+      status: query.status ?? (staleBefore ? EvaluationFindingStatus.OPEN : undefined),
       severity: query.severity,
+      urgency: query.urgency,
+      lastSeenBefore: staleBefore,
       page: query.page,
       pageSize: query.pageSize,
     });

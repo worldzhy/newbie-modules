@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { SecurityEvaluationController } from "./security-evaluation.controller";
-import { SECURITY_EVALUATION_SUBJECT_KINDS } from "./security-evaluation.constants";
+import {
+  SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS,
+  SECURITY_EVALUATION_SUBJECT_KINDS,
+} from "./security-evaluation.constants";
 
 /**
  * Read-path contract test for the ADR-039 provenance filter.
@@ -23,6 +26,8 @@ interface FindingsInput {
   evaluationKey?: string;
   status?: string;
   severity?: string;
+  urgency?: string;
+  lastSeenBefore?: Date;
   page?: number;
   pageSize?: number;
 }
@@ -31,6 +36,7 @@ interface RunsInput {
   subjectIds?: string[];
   subjectId?: string;
   ruleSetVersionId?: string;
+  status?: string;
   page?: number;
   pageSize?: number;
 }
@@ -120,6 +126,8 @@ test("findings, runs and the report narrow to the subjects the source contribute
       evaluationKey: undefined,
       status: undefined,
       severity: undefined,
+      urgency: undefined,
+      lastSeenBefore: undefined,
       page: 1,
       pageSize: 20,
     });
@@ -127,6 +135,7 @@ test("findings, runs and the report narrow to the subjects the source contribute
       subjectIds,
       subjectId: undefined,
       ruleSetVersionId: undefined,
+      status: undefined,
       page: 1,
       pageSize: 20,
     });
@@ -146,6 +155,30 @@ test("an absent filter is the platform view, not an empty set", async () => {
   assert.equal(seen.findings[0].subjectIds, undefined);
   assert.equal(seen.runs[0].subjectIds, undefined);
   assert.equal(seen.reports[0].subjectIds, null);
+});
+
+test("urgency and staleness filters translate to service inputs", async () => {
+  const { controller, seen } = createController(null);
+
+  const before = Date.now();
+  await controller.listFindings({ urgency: "P1", staleOnly: true, page: 1, pageSize: 20 });
+  const after = Date.now();
+
+  assert.equal(seen.findings[0].urgency, "P1");
+  // staleOnly implies OPEN unless the caller overrides the status explicitly.
+  assert.equal(seen.findings[0].status, "OPEN");
+  const cutoff = seen.findings[0].lastSeenBefore;
+  assert.ok(cutoff instanceof Date);
+  const windowMs = SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS * 24 * 60 * 60 * 1000;
+  assert.ok(cutoff.getTime() <= before - windowMs + 1000 && cutoff.getTime() >= after - windowMs - 1000);
+
+  await controller.listFindings({ staleOnly: true, status: "RESOLVED", page: 1, pageSize: 20 });
+  // An explicit status always wins over the implied OPEN.
+  assert.equal(seen.findings[1].status, "RESOLVED");
+  assert.ok(seen.findings[1].lastSeenBefore instanceof Date);
+
+  await controller.listRuns({ status: "FAILED", page: 1, pageSize: 20 });
+  assert.equal(seen.runs[0].status, "FAILED");
 });
 
 test("the report forwards the requested severity-trend window", async () => {

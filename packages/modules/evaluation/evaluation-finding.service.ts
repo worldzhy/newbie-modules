@@ -26,6 +26,14 @@ export interface ListEvaluationFindingsInput {
   evaluationKey?: string;
   status?: EvaluationFindingStatus;
   severity?: FindingSeverity;
+  /**
+   * Feature-level urgency convention stored at the `urgency` key of the
+   * finding's JSON metadata (e.g. security-evaluation's P1..P4 bands).
+   * Equality filter on the JSON path; unknown values simply match nothing.
+   */
+  urgency?: string;
+  /** Only findings last observed before this instant (staleness views). */
+  lastSeenBefore?: Date;
   page?: number;
   pageSize?: number;
 }
@@ -202,6 +210,10 @@ export class EvaluationFindingService {
           // two literals are equal today, but a renamed enum member must not
           // turn a filter into a silent no-match.
           ...(query.severity ? { severity: toPersistedSeverity(query.severity) } : {}),
+          // Urgency is not a column; it lives in the JSON metadata blob, so the
+          // filter goes through a JSON path equality check (JsonB on Postgres).
+          ...(query.urgency ? { metadata: { path: ["urgency"], equals: query.urgency } } : {}),
+          ...(query.lastSeenBefore ? { lastSeenAt: { lt: query.lastSeenBefore } } : {}),
           ...(query.scopeType || query.scopeId
             ? {
                 subject: {

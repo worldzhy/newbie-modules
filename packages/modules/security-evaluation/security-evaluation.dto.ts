@@ -1,7 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
+  IsBoolean,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsObject,
@@ -215,6 +217,11 @@ export class ListSecurityEvaluationRunsRequestDto extends CommonListRequestDto {
   @IsOptional()
   @IsUUID()
   ruleSetVersionId?: string;
+
+  @ApiPropertyOptional({ enum: EvaluationRunStatus, description: "Restrict to one run status, e.g. FAILED" })
+  @IsOptional()
+  @IsEnum(EvaluationRunStatus)
+  status?: EvaluationRunStatus;
 }
 
 /** Mirrors the skeleton's EvaluationRun row, decorated with the evaluationKey labels. */
@@ -311,6 +318,26 @@ export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestD
   @IsOptional()
   @IsEnum(EvaluationFindingSeverity)
   severity?: EvaluationFindingSeverity;
+
+  @ApiPropertyOptional({
+    enum: ["P1", "P2", "P3", "P4"],
+    description: "Urgency band stored in the finding's metadata (ADR-022 D5); equality filter",
+  })
+  @IsOptional()
+  @IsIn(["P1", "P2", "P3", "P4"])
+  urgency?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'When "true", only OPEN findings not re-observed within the staleness window ' +
+      "(the run that used to reproduce them stopped covering them without resolving them). " +
+      "Implies status=OPEN unless status is given explicitly.",
+  })
+  @IsOptional()
+  @Transform(({ value }) => value === "true" || value === true)
+  @IsBoolean()
+  staleOnly?: boolean;
 }
 
 /** Mirrors the skeleton's EvaluationFinding row. */

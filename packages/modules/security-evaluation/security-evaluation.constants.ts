@@ -127,6 +127,13 @@ export const SECURITY_EVALUATION_OSV_REQUEST_TIMEOUT_MS = 30_000;
 /** Reported as stale when an asset has not been observed within this window. */
 export const SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS = 7;
 
+/**
+ * An OPEN finding not re-observed within this window is stale: the run that
+ * used to reproduce it stopped covering it (asset no longer evaluated, rule
+ * removed) without ever resolving it — worth surfacing for triage.
+ */
+export const SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS = 7;
+
 /** Trend and mean-time-to-resolve windows of the report read model. */
 export const SECURITY_EVALUATION_REPORT_TREND_WEEKS = 12;
 
