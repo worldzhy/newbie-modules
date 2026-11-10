@@ -1,0 +1,211 @@
+import { Injectable } from "@nestjs/common";
+import { PipelineStage } from "mongoose";
+import { FrontendMonitorModelsService } from "../../../models/mongo/frontend-monitor-models.service";
+import { func } from "../../../shared/utils";
+import { WEB_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config";
+
+@Injectable()
+export class PageService {
+  constructor(private readonly models: FrontendMonitorModelsService) {}
+
+  async getAveragePageList(query: Record<string, unknown>) {
+    const { appKey, type = "", pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
+    const appIdStr = String(appKey);
+    const match: Record<string, unknown> = {};
+    if (isFirstIn !== undefined && isFirstIn !== "") {
+      match.isFirstIn = isFirstIn === "true" ? true : false;
+    }
+    func.setMatchTime(query, match);
+    if (type) match.speedType = Number(type);
+    if (url) match.url = { $regex: new RegExp(func.escapeRegExp(url), "i") };
+    const group_id = { url: "$url" };
+    return url
+      ? await this.oneThread(appIdStr, match, Number(pageNo), Number(pageSize), group_id)
+      : await this.getPages(appIdStr, match, Number(pageNo), Number(pageSize));
+  }
+
+  private async getPages(appKey: string, match: Record<string, unknown>, pageNo: number, pageSize: number) {
+    const model = this.models.WebPage(appKey);
+    const distinct = (await model.distinct("url", match).read("secondaryPreferred").exec()) || [];
+    const copdistinct = distinct.slice();
+    const slice = distinct.slice((pageNo - 1) * pageSize, (pageNo - 1) * pageSize + pageSize);
+    let $group: PipelineStage.Group["$group"] = {
+      _id: { url: "$url" },
+      count: { $sum: 1 },
+    };
+    // if has isFirstIn is first mode,or is visit mode
+    if (match.hasOwnProperty("isFirstIn")) {
+      $group = {
+        ...$group,
+        loadTime: { $avg: "$loadTime" },
+        dnsTime: { $avg: "$dnsTime" },
+        tcpTime: { $avg: "$tcpTime" },
+        whiteTime: { $avg: "$whiteTime" },
+        requestTime: { $avg: "$requestTime" },
+        analysisDomTime: { $avg: "$analysisDomTime" },
+      };
+    }
+    const jobs = slice.map((url: string) =>
+      this.models
+        .WebPage(appKey)
+        .aggregate([
+          { $match: { ...match, url } },
+          {
+            $group,
+          },
+        ])
+        .read("secondaryPreferred")
+        .exec(),
+    );
+    const all = await Promise.all(jobs);
+    const result = all.map((item) => item?.[0]).filter(Boolean);
+    return { dataList: result, totalNum: copdistinct.length, pageNo };
+  }
+
+  private async oneThread(
+    appKey: string,
+    match: Record<string, unknown>,
+    pageNo: number,
+    pageSize: number,
+    group_id: Record<string, unknown>,
+  ) {
+    const count = await this.models.WebPage(appKey).distinct("url", match).read("secondaryPreferred").exec();
+    const dataList = await this.models
+      .WebPage(appKey)
+      .aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: group_id,
+            count: { $sum: 1 },
+            loadTime: { $avg: "$loadTime" },
+            dnsTime: { $avg: "$dnsTime" },
+            tcpTime: { $avg: "$tcpTime" },
+            domTime: { $avg: "$domTime" },
+            whiteTime: { $avg: "$whiteTime" },
+            requestTime: { $avg: "$requestTime" },
+            analysisDomTime: { $avg: "$analysisDomTime" },
+            readyTime: { $avg: "$readyTime" },
+          },
+        },
+        { $skip: (pageNo - 1) * pageSize },
+        { $sort: { count: -1 } },
+        { $limit: pageSize },
+      ])
+      .read("secondaryPreferred")
+      .exec();
+    return { dataList, totalNum: count.length, pageNo };
+  }
+
+  async getRealTimeAveragePageList(query: Record<string, unknown>) {
+    const { appKey: rawAppId, type = "", beginTime, endTime } = query;
+    const appKey = String(rawAppId);
+    const match: Record<string, unknown> = { isFirstIn: true };
+    if (type) match.speedType = Number(type);
+    func.setMatchTime(query, match);
+    const _querys = this.getSpaceTime(beginTime, endTime, 60000);
+    const result = await this.models
+      .WebPage(appKey)
+      .aggregate([
+        { $match: match },
+        {
+          $group: {
+            _id: {
+              year: { $year: "$createTime" },
+              dayOfMonth: { $dayOfMonth: "$createTime" },
+              month: { $month: "$createTime" },
+              hour: { $hour: "$createTime" },
+              interval: {
+                $subtract: [{ $minute: "$createTime" }, { $mod: [{ $minute: "$createTime" }, 1] }],
+              },
+            },
+            count: { $sum: 1 },
+            createTime: { $addToSet: "$createTime" },
+            loadTime: { $avg: "$loadTime" },
+            dnsTime: { $avg: "$dnsTime" },
+            tcpTime: { $avg: "$tcpTime" },
+            whiteTime: { $avg: "$whiteTime" },
+            requestTime: { $avg: "$requestTime" },
+            analysisDomTime: { $avg: "$analysisDomTime" },
+          },
+        },
+        {
+          $project: {
+            count: "$count",
+            createTime: { $slice: ["$createTime", 0, 1] },
+            loadTime: "$loadTime",
+            dnsTime: "$dnsTime",
+            tcpTime: "$tcpTime",
+            whiteTime: "$whiteTime",
+            requestTime: "$requestTime",
+            analysisDomTime: "$analysisDomTime",
+          },
+        },
+      ])
+      .read("secondaryPreferred")
+      .exec();
+    for (let i = 0; i < _querys.length; i++) {
+      for (let r_i = 0; r_i < result.length; r_i++) {
+        const rDate = func.toDate(result[r_i].createTime).getTime();
+        if (rDate > _querys[i].beginTime && rDate < _querys[i].endTime) {
+          _querys[i].result = result[r_i];
+          result.splice(r_i, 1);
+          break;
+        }
+      }
+      if (!result.length) break;
+    }
+    return _querys.map((item) => ({
+      beginTime: func.format(new Date(item.beginTime), "yyyy/MM/dd hh:mm"),
+      endTime: func.format(new Date(item.endTime), "yyyy/MM/dd hh:mm"),
+      count: item.result ? item.result.count : 0,
+      dnsTime: item.result ? item.result.dnsTime : 0,
+      loadTime: item.result ? item.result.loadTime : 0,
+      requestTime: item.result ? item.result.requestTime : 0,
+      tcpTime: item.result ? item.result.tcpTime : 0,
+      whiteTime: item.result ? item.result.whiteTime : 0,
+    }));
+  }
+
+  async getOnePageList(query: Record<string, unknown>) {
+    const { appKey: rawAppId, type, pageNo = 1, pageSize = WEB_MONITOR_CONFIG.pageSize, url, isFirstIn } = query;
+    const appKey = String(rawAppId);
+    const match: Record<string, unknown> = { url };
+    if (isFirstIn !== undefined && isFirstIn !== "") {
+      const isFirstInNum = Number(isFirstIn);
+      if (!isNaN(isFirstInNum)) {
+        match.isFirstIn = isFirstInNum === 2;
+      } else {
+        match.isFirstIn = isFirstIn === "true" || isFirstIn === true;
+      }
+    }
+    if (type) match.speedType = Number(type);
+    func.setMatchTime(query, match);
+    const count = await this.models.WebPage(appKey).count(match).read("secondaryPreferred").exec();
+    const dataList = await this.models
+      .WebPage(appKey)
+      .aggregate([
+        { $match: match },
+        { $sort: { createTime: -1 } },
+        { $skip: (Number(pageNo) - 1) * Number(pageSize) },
+        { $limit: Number(pageSize) },
+      ])
+      .read("secondaryPreferred")
+      .exec();
+    return { dataList, totalNum: count, pageNo: Number(pageNo) };
+  }
+
+  async getPageDetails(appKey: string, id: string) {
+    return await this.models.WebPage(appKey).findOne({ _id: id }).read("secondaryPreferred").exec();
+  }
+
+  private getSpaceTime(beginTime?: unknown, endTime?: unknown, spaceTime = 60000) {
+    const begin = (beginTime ? func.toDate(beginTime) : new Date()).getTime();
+    const end = (endTime ? func.toDate(endTime) : new Date()).getTime();
+    const list: { beginTime: number; endTime: number; result: Record<string, unknown> | null }[] = [];
+    for (let t = begin; t <= end; t += spaceTime) {
+      list.push({ beginTime: t, endTime: t + spaceTime, result: null });
+    }
+    return list;
+  }
+}
