@@ -270,3 +270,19 @@ R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30
 
 反驳轮误报剔除（registry 相关）：「frontend-monitor appKey 用 Math.random 生成致 ingest 凭证可预测」REFUTED——appKey 是公开分区键（`shared/utils.ts:3-7` 注释明示），ingest 由 `@InstallationAuth` 校验 token（`installation.guard.ts:72-83`），真凭证为 `installation-credential.ts:17-19` `crypto.randomUUID()` 存 SHA-256 哈希。分层规则复核：round30 对 9 处 ForbiddenException 的合规裁决维持（防枚举/执行层设计）；`organization/membership.service.ts` role 检查属字面违反但该模块未装配，记观察。
 
+## round34（2026-11-10，scope=`workspace` 中的 registry 相关条目）
+
+报告（主仓 devbie）：`devbie/.trae/documents/reviews/expert-review-2026-11-10-round34.md`。收工锚点：本仓 `bd9e22a`，工作树干净；装配面 nightwatch-backend `0cfa154`，34/34 模块 `diff -rq` 零内容差异（唯一差异为 `aws-secrets-manager` 的 registry 独有 `prisma/`、`sst/`）。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R34-02 | newbie-modules | R33-01 部分闭合：LLM 产出 `title`/`detail` 原样入库（`packages/modules/evaluation/evaluation-finding.service.ts:257-258`，同写面 `:300-301`；来源 `judgment/code-scan/security-evaluation-code-scan.mechanism.ts:112-129`，提示词 `:301-311` 携带源码摘录）；`grep evaluationFinding.delete` 零处；`security-evaluation-retention.service.ts:30-35` 只清 verdict cache 与 excerpts | P2 | live | 持 `List EvaluationFinding` 者 | open |
+| R34-03 | newbie-modules | TOTP 封缄密钥无 keyId/轮换：`security/token/token.service.ts:255-260`（派生行 `:257`）取 `userRefresh.secret \|\| defaultSecret`，信封固定 `v1` 四段（`:213-224`、`:239-242`）；`account/modules/two-factor/two-factor.service.ts:119`（`setup` `:55` 同型）解封为实参求值、早于 `:145-161` 密码比对，解封失败即 401，用户无法凭密码关闭 TOTP；env 默认全空（`security/newbie.module.json:27-29`） | P2 | live | 运维轮换 secret → 全体 TOTP 用户 | open |
+| R34-05 | newbie-modules | 登录审计契约测试仍可静默空转：`account/auth/login-audit-coverage.test.ts:104/:113` 均 `if (!SUCCESS_SESSION_PATTERN.test(content)) return;`；逐文件实测 9 个 `LOGIN_ENTRY_FILES` 仅 `auth.service.ts` 命中 1 次；`:106` 全文匹配不保证审计早于 mint | P2 | source | 关键路径门禁 | open |
+| R34-11 | newbie-modules | `evidence/security-evaluation-code-scan-excerpt.service.ts:45-53` `load` 无读侧 cutoff，保留语义仅靠每日 cron；宿主 `src/modules/job-scheduler/scheduler/scheduled-job.ts:28-38` 在 `onModuleInit` 把 `isEnabled` 交给 DB 声明，可停用 | P3 | live | — | open |
+| R34-18 | newbie-modules | `.trae/documents/expert-review-2026-11-10-round31.md` 为根部残留旧副本（与 `reviews/` 同名文件 `diff` 不一致） | P3 | docs | 任何人引档 | open |
+| R34-19 | newbie-modules | `.github/workflows/ci.yml:36` 钉 `@devbie/newbie-cli@1.18.0`，源码已 1.20.0，门禁实际跑旧规则 | P3 | source | 门禁 | open |
+| R33-09 | newbie-modules | `membership/membership.service.ts:13-16` 卡号 `"9"+a+a+b` Math.random（10⁴ 空间仅查重）；registry 独有，未装配 | P3 | source | 采用该模块者 | open（重验仍存在） |
+
+反驳轮（本轮）：C2（封缄密钥无轮换 + disable 解封早于密码校验）CONFIRMED；C4（finding 文本无掩码无保留期）CONFIRMED；C3（历史 manifest 明文可读，属宿主+registry 同源，登记在 devbie R34-01）CONFIRMED。R33-04 封缄实现本身重验通过：四个读写点全部经解封、序列化层删除秘密字段、域分离密文互不可开、fail-closed 无明文回落。
+
