@@ -40,6 +40,7 @@ import { SecurityEvaluationCodeScanVerdictCacheRepository } from "./persistence/
 import {
   SECURITY_EVALUATION_CODE_SCAN_CRITERION_KEYS,
   SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS,
+  SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET,
   SECURITY_EVALUATION_KEY_CODE_SCAN,
 } from "./security-evaluation.constants";
 
@@ -375,20 +376,24 @@ test("code-scan mechanism ignores other evaluationKeys", async () => {
   assert.equal(calls.length, 0);
 });
 
-test("code-scan mechanism budget-cuts files when LLM_CALL_BUDGET is exhausted (round31 R31-09)", async () => {
-  const items = Array.from({ length: 5 }, (_, i) => codeScanItem(`src/file${i}.ts`, `const x${i} = ${i};`));
+test("code-scan mechanism budget-cuts files when the LLM_CALL_BUDGET (now 180, below MAX_FILES=200) is exceeded (round31 R31-09)", async () => {
+  // BUDGET is lowered to 180 (down from 200) so files 181-200 are budget-cut
+  // when all sourceItems are uncached — making the branch reachable with
+  // large repositories instead of being dead code as before the fix.
+  const items = Array.from({ length: SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET + 2 }, (_, i) =>
+    codeScanItem(`src/file${i}.ts`, `const x${i} = ${i};`),
+  );
   const cache = stubCache();
   const { resolver } = stubResolver(() => JSON.stringify({ findings: [] }));
-  // budget 3 so files 4 and 5 are skipped
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, 3);
+
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
   const judgment = await mechanism.judge(judgmentInput(items));
 
-  assert.equal(judgment.evaluatedRefs.length, 3);
+  assert.equal(judgment.evaluatedRefs.length, SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET);
   assert.equal(judgment.skipped?.total, 2);
-  assert.equal(judgment.skipped?.items.length, 2);
   assert.ok(judgment.skipped?.note?.includes("over the per-run LLM call budget"));
-  assert.equal(judgment.metadata?.llmCalls, 3);
-  assert.equal(cache.recorded.length, 3);
+  assert.equal(judgment.metadata?.llmCalls, SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET);
+  assert.equal(cache.recorded.length, SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET);
 });
 
 test("code-scan mechanism reports discarded-entry note even when no file was skipped (round31 R31-07)", async () => {

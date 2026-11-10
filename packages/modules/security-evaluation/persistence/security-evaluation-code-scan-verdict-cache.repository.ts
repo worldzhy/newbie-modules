@@ -89,7 +89,7 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
               path: entry.path,
               contentHash: entry.contentHash,
               modelId: entry.modelId,
-              connectionId,
+              connectionId: connectionId as string,
               promptVersion: entry.promptVersion,
               ruleSetVersion: entry.ruleSetVersion,
             },

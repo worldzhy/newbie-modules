@@ -157,12 +157,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
     private readonly resolver: ChatModelResolver,
     @Inject(securityEvaluationCodeScanVerdictCacheToken)
     private readonly verdictCache: SecurityEvaluationCodeScanVerdictCachePort,
-    budgetOverride?: number,
-  ) {
-    this.llmCallBudget = budgetOverride ?? SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET;
-  }
-
-  private readonly llmCallBudget: number;
+  ) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
     if (input.ruleSetVersion.evaluationKey !== SECURITY_EVALUATION_KEY_CODE_SCAN) {
@@ -289,7 +284,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
         continue;
       }
 
-      if (llmCalls >= this.llmCallBudget) {
+      if (llmCalls >= SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET) {
         budgetCutCount++;
         skippedIds.push(item.id);
         continue;
