@@ -247,11 +247,11 @@ R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30
 | R31-01 | newbie-modules + nightwatch-backend | LLM scope 不可解析时全量文件记 unavailable skip，run 仍 SUCCEEDED（evaluated=0），骨架 resolveAbsentFindings 随即关闭该 subject 全部 OPEN code-scan findings（executed：解绑后 2 条 finding 18s 内 RESOLVED，重绑后缓存重放恢复） | P1 | live | 管理员解绑/连接不可用，含 daily 无人值守 | fixed（registry `cbd3f4f` + host `3f585b1`；判定层 fail-closed，回归 `security-evaluation-code-scan.test.ts` 的 "fails the run when…" 两例 + E2E 解绑 run FAILED/findings 保持 OPEN） |
 | R31-02 | nightwatch-backend | code-scan 未登记项目安全分类表 R1（`security-evaluation-read-model.service.ts:51-56`）→ `unknown` → 空 buckets，findings 在项目安全总览/风险快照被静默丢弃（executed 纯函数探针：threat-intel 落 unclassified，code-scan 无桶） | P1 | live | 任意登录项目查看者 | fixed（host `3f585b1`；R1 登记为空桶 → unclassified，回归 `security-evaluation-read-model.test.ts` 的 code-scan 归属例） |
 | R31-03 | nightwatch-frontend | security-evaluation 页的标签表/筛选/手动触发三处均无 code-scan，新能力只能靠 API 或 daily 任务触发 | P2 | live | 任意登录用户 | open |
-| R31-04 | nightwatch-backend | 快照适配器扩展名判定用整条 path 的 lastIndexOf(".")（`docs/v1.2/README` 误判 non-source；无点号文件被当源码）；EXCLUDED_PREFIXES 只匹配根级 | P2 | live | — | open |
-| R31-05 | nightwatch-backend | GitHub tree 截断仅 warn，不折进 skipped/manifest，违反全量记账契约（静默欠覆盖） | P2 | live | 超大仓库 | open |
-| R31-06 | newbie-modules | 缓存身份以模型名 modelId 为准，跨连接同名模型共享判决；temperature 只进 signature 不进身份 | P2 | live | — | open |
-| R31-07 | newbie-modules | 仅"丢弃条目"而无文件跳过时 skipped 为 undefined，丢弃说明不进 coverage，只留 metadata 计数 | P2 | live | — | open |
-| R31-08 | newbie-modules | 超 maxFiles 的每个源码文件逐条写 skipped items，随仓库规模线性膨胀 result 体积 | P2 | live | 大仓库 | open |
-| R31-09 | newbie-modules | `MAX_FILES=200` 与 `LLM_CALL_BUDGET=200` 相等且缓存不耗预算 → budgetCut 分支不可达；ADR-054 条款 6 的"缓存救预算跳过文件"表述不成立 | P2 | source | — | open |
-| R31-10 | newbie-modules + nightwatch-backend | 源码摘录（≤12000 字符/文件×200）随 manifest 持久化，secret-exposure finding 可能把密钥原文写入 findings 与缓存表；ADR 只声明"出境"，未覆盖二次落库与保留期 | P2 | live | — | open |
+| R31-04 | nightwatch-backend | 快照适配器扩展名判定用整条 path 的 lastIndexOf(".")（`docs/v1.2/README` 误判 non-source；无点号文件被当源码）；EXCLUDED_PREFIXES 只匹配根级 | P2 | live | — | fixed（host `7f10ee5`；basename 扩展名判定 + prefix 匹配路径任意段） |
+| R31-05 | nightwatch-backend | GitHub tree 截断仅 warn，不折进 skipped/manifest，违反全量记账契约（静默欠覆盖） | P2 | live | 超大仓库 | fixed（host `7f10ee5`；tree 截断以聚合 skipped entry 记账，含 count 字段） |
+| R31-06 | newbie-modules | 缓存身份以模型名 modelId 为准，跨连接同名模型共享判决；temperature 只进 signature 不进身份 | P2 | live | — | fixed（registry `df43cbf`；ChatModelPort.connectionId + prisma 唯一键 + 端口/仓储全链路，db push 已执行） |
+| R31-07 | newbie-modules | 仅"丢弃条目"而无文件跳过时 skipped 为 undefined，丢弃说明不进 coverage，只留 metadata 计数 | P2 | live | — | fixed（registry `19aa090`；skipped 只要有 note 就有定义，含专门回归用例） |
+| R31-08 | newbie-modules | 超 maxFiles 的每个源码文件逐条写 skipped items，随仓库规模线性膨胀 result 体积 | P2 | live | 大仓库 | fixed（host `7f10ee5`；端口加 count 字段，适配器聚合 budget/tree 截断条目为单 entry） |
+| R31-09 | newbie-modules | `MAX_FILES=200` 与 `LLM_CALL_BUDGET=200` 相等且缓存不耗预算 → budgetCut 分支不可达；ADR-054 条款 6 的"缓存救预算跳过文件"表述不成立 | P2 | source | — | fixed（registry `19aa090`；BUDGET 从 200 降到 180，测试用 182 文件触发验证） |
+| R31-10 | newbie-modules + nightwatch-backend | 源码摘录（≤12000 字符/文件×200）随 manifest 持久化，secret-exposure finding 可能把密钥原文写入 findings 与缓存表；ADR 只声明"出境"，未覆盖二次落库与保留期 | P2 | live | — | open（需 ADR 级别决策：掩码/缩短/保留期，留待后续专题） |
 
