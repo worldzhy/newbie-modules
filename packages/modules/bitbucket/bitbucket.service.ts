@@ -217,7 +217,7 @@ export class BitbucketService {
     // listing the root directory.
     const entries: RepositoryTreeEntry[] = [];
     let truncated = false;
-    let nextUrl = this.buildTreePageUrl(workspace, repo, ref, recursive);
+    let nextUrl: string | undefined = this.buildTreePageUrl(workspace, repo, ref, recursive);
 
     while (nextUrl) {
       let response: Response;
