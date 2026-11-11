@@ -1,4 +1,4 @@
-import { BadRequestException, ExecutionContext, Injectable } from "@nestjs/common";
+import { BadRequestException, ExecutionContext, Injectable, Logger } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { randomUUID } from "crypto";
 import { Request, Response } from "express";
@@ -66,8 +66,15 @@ export class GoogleAuthGuard extends AuthGuard(GuardType.GOOGLE) {
     return { state, session: false };
   }
 
-  handleRequest<TUser>(err: BadRequestException | null, user: TUser): TUser {
-    if (err) throw new BadRequestException("Google authorization verification failed");
+  private readonly logger = new Logger(GoogleAuthGuard.name);
+
+  handleRequest<TUser>(err: unknown | null, user: TUser): TUser {
+    if (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const stack = err instanceof Error ? err.stack : undefined;
+      this.logger.error(`Google OAuth verification failed: ${message}`, stack);
+      throw new BadRequestException(`Google authorization verification failed: ${message}`);
+    }
     return user;
   }
 }
