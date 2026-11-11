@@ -6,7 +6,7 @@ import { IsArray, IsInt, IsNotEmpty, IsOptional, IsString, Length } from "class-
 
 /**
  * Request DTO for creating a role. Roles created through the API are never
- * builtin; builtin roles (ADMIN, OPERATOR, MEMBER) are seeded by migrations only.
+ * builtin; builtin roles (ADMIN, MEMBER) are seeded by migrations only.
  */
 export class CreateRoleDto {
   @ApiProperty({ type: String, description: "Unique role name.", minLength: 1, maxLength: 64 })

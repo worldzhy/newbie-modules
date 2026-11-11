@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
-import type { CopilotAuditEntry, CopilotAuditSink } from "../kernel/audit-sink";
-import type { KernelLogger } from "../kernel/skill-registry";
+import type { CopilotAuditEntry, CopilotAuditSink } from "@modules/copilot/kernel/audit-sink";
+import type { KernelLogger } from "@modules/copilot/kernel/skill-registry";
 
 /**
  * Registry-side audit sink. Bridges the framework-free kernel audit seam
