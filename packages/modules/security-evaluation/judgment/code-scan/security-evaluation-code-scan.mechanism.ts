@@ -12,6 +12,7 @@ import {
   SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET,
   SECURITY_EVALUATION_KEY_CODE_SCAN,
 } from "../../security-evaluation.constants";
+import { SecurityEvaluationCodeScanExcerptService } from "../../evidence/security-evaluation-code-scan-excerpt.service";
 import {
   SECURITY_EVALUATION_MECHANISM_NAME_CODE_LLM,
   type SecurityEvaluationJudgmentMechanism,
@@ -40,7 +41,6 @@ interface CodeScanEvidencePayload {
   bytes: number;
   revision: string;
   contentHash: string;
-  excerpt: string;
   truncated: boolean;
 }
 
@@ -157,6 +157,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
     private readonly resolver: ChatModelResolver,
     @Inject(securityEvaluationCodeScanVerdictCacheToken)
     private readonly verdictCache: SecurityEvaluationCodeScanVerdictCachePort,
+    private readonly excerpts: SecurityEvaluationCodeScanExcerptService,
   ) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
@@ -201,22 +202,28 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
     for (const item of sourceItems) {
       const payload = asRecord(item.payload);
       const path = asNonEmptyString(payload?.path);
-      const excerpt = typeof payload?.excerpt === "string" ? payload.excerpt : null;
       const contentHash = asNonEmptyString(payload?.contentHash);
-      if (!path || excerpt === null || !contentHash) {
-        throw new Error(`CODE_SCAN evidence item ${item.id} is missing path/excerpt/contentHash payload fields`);
+      if (!path || !contentHash) {
+        throw new Error(`CODE_SCAN evidence item ${item.id} is missing path/contentHash payload fields`);
       }
       payloads.set(item.id, {
         path,
         language: asNonEmptyString(payload?.language) ?? undefined,
-        bytes: typeof payload?.bytes === "number" ? payload.bytes : excerpt.length,
+        bytes: typeof payload?.bytes === "number" ? payload.bytes : 0,
         revision: asNonEmptyString(payload?.revision) ?? "unknown",
         contentHash,
-        excerpt,
         truncated: payload?.truncated === true,
       });
     }
     const revision = payloads.get(sourceItems[0].id)?.revision ?? "unknown";
+
+    // The excerpt is not part of the archived manifest; it is read from the
+    // retention-bounded store by content hash (ADR-054 D7). Files that still
+    // have a cached verdict never need it.
+    const excerptByHash = await this.excerpts.load(
+      input.subject.id,
+      [...payloads.values()].map((payload) => payload.contentHash),
+    );
 
     const connectionId = chatModel.connectionId ?? null;
 
@@ -291,11 +298,17 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
       }
       llmCalls++;
 
+      const excerpt = excerptByHash.get(payload.contentHash);
+      if (excerpt === undefined) {
+        throw new Error(
+          `CODE_SCAN evidence item ${item.id} has no retained excerpt for content hash ${payload.contentHash}; judging it would omit the file body`,
+        );
+      }
       const filePayload: SecurityEvaluationCodeScanFilePayload = {
         evidenceId: item.id,
         path: payload.path,
         language: payload.language,
-        excerpt: payload.excerpt,
+        excerpt,
         truncated: payload.truncated,
       };
       const request = buildSecurityEvaluationCodeScanRequest(filePayload, criteriaBriefs, modelId);

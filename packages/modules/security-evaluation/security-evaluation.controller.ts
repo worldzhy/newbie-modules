@@ -8,6 +8,7 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { UserRequest } from "@modules/security/security.interface";
 
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
+import { SecurityEvaluationCodeScanExcerptService } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
 import {
@@ -63,6 +64,7 @@ export class SecurityEvaluationController {
     private readonly results: EvaluationResultService,
     private readonly criteria: EvaluationCriteriaService,
     private readonly reports: SecurityEvaluationReportService,
+    private readonly excerpts: SecurityEvaluationCodeScanExcerptService,
   ) {}
 
   // --- Subject ingest ----------------------------------------------------
@@ -218,8 +220,10 @@ export class SecurityEvaluationController {
     let manifest: unknown[] = [];
     let ruleSetVersion: string | null = null;
     let evaluationKey: string | null = null;
+    let subjectId: string | null = null;
     try {
       const runResult = await this.results.getResultForRun(finding.lastSeenRunId);
+      subjectId = runResult.subjectId;
       const manifestResult = await this.results.getResultManifest(runResult.id);
       manifest = manifestResult.manifest as unknown[];
       const version = await this.criteria.getVersion(runResult.ruleSetVersionId);
@@ -229,7 +233,10 @@ export class SecurityEvaluationController {
       // No result / run — return finding alone.
     }
 
-    const evidenceItems = this.matchEvidence(manifest, finding.metadata as Record<string, unknown> | null);
+    const evidenceItems = await this.attachRetainedExcerpts(
+      subjectId,
+      this.matchEvidence(manifest, finding.metadata as Record<string, unknown> | null),
+    );
 
     return {
       finding: finding as unknown as SecurityEvaluationFindingResponseDto,
@@ -279,6 +286,37 @@ export class SecurityEvaluationController {
       });
     }
     return [...byId.values()];
+  }
+
+  /**
+   * Re-attach the retained excerpt to a matched evidence item.
+   *
+   * The archived manifest never stores source code (ADR-054 D7): it carries the
+   * content hash and the truncated flag, and the excerpt is read from the
+   * retention-bounded store. Once that row is physically deleted the item is
+   * returned as-is, so an expired finding degrades to hash + truncated instead
+   * of pretending the code is still available.
+   */
+  private async attachRetainedExcerpts(
+    subjectId: string | null,
+    items: SecurityEvaluationFindingDetailResponseDto["evidenceItems"],
+  ): Promise<SecurityEvaluationFindingDetailResponseDto["evidenceItems"]> {
+    if (!subjectId || items.length === 0) return items;
+    const contentHashes = items
+      .map((item) => (item.payload as { contentHash?: unknown } | undefined)?.contentHash)
+      .filter((hash): hash is string => typeof hash === "string");
+    if (contentHashes.length === 0) return items;
+
+    const excerpts = await this.excerpts.load(subjectId, contentHashes);
+    if (excerpts.size === 0) return items;
+
+    return items.map((item) => {
+      const payload = item.payload as { contentHash?: unknown } | undefined;
+      const contentHash = payload?.contentHash;
+      const excerpt = typeof contentHash === "string" ? excerpts.get(contentHash) : undefined;
+      if (excerpt === undefined) return item;
+      return { ...item, payload: { ...payload, excerpt } };
+    });
   }
 
   // --- Report ------------------------------------------------------------

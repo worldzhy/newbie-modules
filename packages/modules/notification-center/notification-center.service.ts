@@ -37,8 +37,17 @@ const MAX_UNRESOLVED_PUSH_FAILURES = 200;
 
 // Links stored on a notification are rendered as anchors. Site-relative paths
 // and http(s) URLs are the only forms the UI can open safely (R5-P2-02).
+// The path checks mirror isSafeInternalPath / isSafeRedirectPath (R34-15):
+// browsers normalize "/\evil.com" into "//evil.com", and WHATWG URL parsing
+// strips tab/newline/CR, so backslashes and C0 control characters are rejected
+// rather than repaired.
 function isSafeNotificationLink(link: string): boolean {
-  if (link.startsWith("/")) return !link.startsWith("//");
+  if (link.startsWith("/")) {
+    if (link.startsWith("//")) return false;
+    if (link.includes("\\")) return false;
+    if (/[\u0000-\u001f\u007f]/.test(link)) return false;
+    return true;
+  }
   try {
     const url = new URL(link);
     return url.protocol === "http:" || url.protocol === "https:";

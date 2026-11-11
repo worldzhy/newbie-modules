@@ -169,7 +169,10 @@ criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
   an unchanged file replays its cached verdict and never re-calls the model.
   `unavailable` verdicts are never cached. Rows expire after the declared
   `codeScanVerdictCacheTtlDays` (`SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS`, no
-  fallback) so long-unchanged files are re-judged against model drift.
+  fallback) so long-unchanged files are re-judged against model drift, and the
+  TTL is enforced physically: `SecurityEvaluationRetentionService.pruneExpired()`
+  deletes expired rows instead of leaving them as permanent read-side misses
+  (the host schedules that call, next to the daily scan).
 - The LLM connection binds to the `security-evaluation-code-scan` scope.
   Without a bound model every file lands in the run's skipped bucket and no
   verdict is cached; the run still succeeds.
@@ -209,7 +212,14 @@ criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
   reach (a v2 mechanism candidate, ADR-054).
 - Files larger than the excerpt budget are judged on their truncated prefix
   and flagged `truncated` in the evidence payload; the verdict cache key still
-  hashes the full content.
+  hashes the full content. The excerpt itself is never written into the
+  immutable result manifest: it lives in
+  `SecurityEvaluationCodeScanFileExcerpt`, content-addressed by
+  `(subjectId, contentHash)`, and `pruneExpired()` physically deletes rows
+  after `SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS` (90). Reads
+  apply the same window, so a row that outlives a prune cycle is never
+  re-attached; the finding detail then falls back to `contentHash` +
+  `truncated` (ADR-054 D7).
 - CODE_SCAN sends (truncated) source code to the configured LLM provider —
   including any secrets committed to the repository. That exposure is an
   accepted trade-off of v1; the `code-scan.secret-exposure` findings it

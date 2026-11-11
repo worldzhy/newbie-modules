@@ -10,6 +10,7 @@ import { TokenService } from "@modules/security/token/token.service";
 import { CookieName } from "@modules/security/cookie/cookie.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "@modules/account/auth/login-audit";
+import { INACTIVE_ACCOUNT_MESSAGE } from "@modules/account/auth/inactive-account";
 
 @Injectable()
 export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.refresh-token") {
@@ -67,7 +68,7 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.ref
         userAgent: req.headers["user-agent"],
         detail: { reason: "inactive_user", provider: "refresh_token" },
       });
-      throw new ForbiddenException("The account is not active.");
+      throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
     }
 
     return true;

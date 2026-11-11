@@ -8,6 +8,7 @@ import type { EvaluationRuleSetVersionRef, EvaluationSubjectRef } from "@modules
 import type { JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
 import type { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
+import type { SecurityEvaluationCodeScanExcerptService } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
 import { SecurityEvaluationIntelJudgment } from "./judgment/intel/security-evaluation-intel.judgment";
 import { SecurityEvaluationIntelMatchService } from "./judgment/intel/security-evaluation-intel-match.service";
@@ -137,10 +138,22 @@ function stubReRanker(
 }
 
 function buildEvidence(prisma: PrismaService, negativeCache: SecurityEvaluationIntelNegativeCachePort) {
-  return new SecurityEvaluationEvidenceProvider(prisma, stubAssets(), negativeCache, undefined, SCOPE_PROVIDER).collect(
-    SUBJECT,
-    INTEL_VERSION,
-  );
+  return new SecurityEvaluationEvidenceProvider(
+    prisma,
+    stubAssets(),
+    negativeCache,
+    stubExcerpts(),
+    undefined,
+    SCOPE_PROVIDER,
+  ).collect(SUBJECT, INTEL_VERSION);
+}
+
+function stubExcerpts(): SecurityEvaluationCodeScanExcerptService {
+  return {
+    save: async () => {},
+    load: async () => new Map(),
+    pruneExpired: async () => ({ deleted: 0 }),
+  } as unknown as SecurityEvaluationCodeScanExcerptService;
 }
 
 function judgmentInput(evidence: Awaited<ReturnType<typeof buildEvidence>>["items"]): JudgmentInput {
@@ -251,10 +264,14 @@ test("the re-rank budget leaves overflow candidates in the judgment skipped buck
 test("INTEL collection fails loudly when the scope port is unbound or the subject scope is unknown", async () => {
   const { port } = stubNegativeCache();
   const build = (scope: SecurityEvaluationScopeEntitiesProvider | undefined) =>
-    new SecurityEvaluationEvidenceProvider(stubPrisma([]), stubAssets(), port, undefined, scope).collect(
-      SUBJECT,
-      INTEL_VERSION,
-    );
+    new SecurityEvaluationEvidenceProvider(
+      stubPrisma([]),
+      stubAssets(),
+      port,
+      stubExcerpts(),
+      undefined,
+      scope,
+    ).collect(SUBJECT, INTEL_VERSION);
 
   await assert.rejects(() => build(undefined), /No SecurityEvaluationScopeEntitiesProvider/);
   await assert.rejects(

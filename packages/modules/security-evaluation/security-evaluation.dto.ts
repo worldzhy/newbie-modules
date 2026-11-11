@@ -387,7 +387,7 @@ export class SecurityEvaluationEvidenceItemResponseDto {
   @ApiPropertyOptional({
     type: Object,
     description:
-      "Feature-defined payload. CODE_SCAN items carry { path, language, bytes, revision, contentHash, excerpt, truncated }",
+      "Feature-defined payload. CODE_SCAN items carry { path, language, bytes, revision, contentHash, truncated }; the source excerpt is stored outside the archived manifest and is attached as `excerpt` only while it is inside the retention window",
   })
   payload?: object | null;
 }

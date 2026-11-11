@@ -8,6 +8,7 @@ import { SecurityEvaluationAssetService } from "./assets/security-evaluation-ass
 import { SecurityEvaluationCriteriaProvider } from "./criteria/security-evaluation-criteria.provider";
 import { SecurityEvaluationCriteriaSeed } from "./criteria/security-evaluation-criteria.seed";
 import { SecurityEvaluationAwsConfigEvidenceProvider } from "./evidence/security-evaluation-aws-config-evidence.provider";
+import { SecurityEvaluationCodeScanExcerptService } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
 import { AwsSecurityBulletinsAdapter } from "./knowledge/adapters/aws-security-bulletins.adapter";
 import { BleepingComputerAdapter } from "./knowledge/adapters/bleeping-computer.adapter";
@@ -34,6 +35,7 @@ import { SECURITY_EVALUATION_JUDGMENT_MECHANISMS } from "./judgment/security-eva
 import { SecurityEvaluationCodeScanVerdictCacheRepository } from "./persistence/security-evaluation-code-scan-verdict-cache.repository";
 import { SecurityEvaluationIntelNegativeCacheRepository } from "./persistence/security-evaluation-intel-negative-cache.repository";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
+import { SecurityEvaluationRetentionService } from "./security-evaluation-retention.service";
 import { SecurityEvaluationController } from "./security-evaluation.controller";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
 import {
@@ -86,7 +88,9 @@ import {
     SecurityEvaluationIntelJudgment,
     SecurityEvaluationCodeScanMechanism,
     SecurityEvaluationCodeScanModelScopeRegistration,
+    SecurityEvaluationCodeScanExcerptService,
     SecurityEvaluationCodeScanVerdictCacheRepository,
+    SecurityEvaluationRetentionService,
     SecurityEvaluationJudgmentService,
     // The dispatcher's mechanism set (ADR-046): each key's declared mechanisms
     // are looked up here, so a new key or dimension is a registry data change.
@@ -177,6 +181,7 @@ import {
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,
     SecurityEvaluationKnowledgeService,
+    SecurityEvaluationRetentionService,
     criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
     criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
     evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),

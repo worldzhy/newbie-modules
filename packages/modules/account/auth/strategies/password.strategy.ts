@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-local";
 import type { Request } from "express";
@@ -8,6 +8,7 @@ import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/
 import { UserStatus } from "@generated/prisma/client";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "../login-audit";
+import { INACTIVE_ACCOUNT_MESSAGE } from "../inactive-account";
 
 @Injectable()
 export class PasswordStrategy extends PassportStrategy(Strategy, "local.password") {
@@ -51,7 +52,7 @@ export class PasswordStrategy extends PassportStrategy(Strategy, "local.password
         actorId: user.id,
         detail: { account, reason: "inactive_user" },
       });
-      throw new NewbieException(NewbieExceptionType.Login_InactiveUser);
+      throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
     }
 
     // [step 3] Handle no password situation.

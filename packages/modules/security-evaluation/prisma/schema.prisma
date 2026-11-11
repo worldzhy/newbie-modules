@@ -245,3 +245,30 @@ model SecurityEvaluationCodeScanVerdictCache {
   @@index([subjectId, updatedAt])
   @@schema("module/security-evaluation")
 }
+
+/// Truncated source excerpt of one scanned file — the material the CODE_SCAN
+/// LLM actually judged (ADR-054 D7). It deliberately lives outside the
+/// archived result manifest: the manifest keeps the content hash and the
+/// truncated flag only, so the immutable result never accumulates source code.
+///
+/// Content-addressed by (subjectId, contentHash): rescanning unchanged files
+/// writes nothing, and every run whose manifest carries that hash reads the
+/// same excerpt. `updatedAt` is the retention clock — rows older than
+/// `SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS` are physically
+/// deleted by the retention service, after which the finding detail read falls
+/// back to hash + truncated.
+model SecurityEvaluationCodeScanFileExcerpt {
+  id          String   @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId   String   @db.Uuid
+  // SHA-256 of the full file content the excerpt was cut from.
+  contentHash String   @db.VarChar(64)
+  // The truncated prefix the LLM call saw.
+  excerpt     String   @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([subjectId, contentHash])
+  @@index([updatedAt])
+  @@schema("module/security-evaluation")
+}

@@ -26,6 +26,7 @@ import { TwoFactorService } from "@modules/account/modules/two-factor/two-factor
 import { IssuedLoginSession, LoginResult } from "@modules/account/account.interface";
 import { AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "./login-audit";
+import { INACTIVE_ACCOUNT_MESSAGE } from "./inactive-account";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { CookieService } from "@modules/security/cookie/cookie.service";
 import { TokenService } from "@modules/security/token/token.service";
@@ -143,7 +144,7 @@ export class AuthService {
         userAgent: params.userAgent,
         detail: { reason: "inactive_user" },
       });
-      throw new ForbiddenException("The account is not active.");
+      throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
     }
 
     // [step 1] Account-level TOTP gate. Sitting in the single issuance exit, it
@@ -408,7 +409,7 @@ export class AuthService {
           userAgent: params.userAgent,
           detail: { reason: "inactive_user", provider: "google" },
         });
-        throw new ForbiddenException("The account is not active.");
+        throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
       }
       // Sync the verification state: Google proved control of the email.
       await this.prisma.email.updateMany({

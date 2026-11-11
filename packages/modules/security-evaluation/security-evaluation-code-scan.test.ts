@@ -15,6 +15,11 @@ import type {
 import type { JudgmentInput } from "@modules/evaluation/ports/judgment.port";
 
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
+import {
+  SecurityEvaluationCodeScanExcerptService,
+  type SecurityEvaluationCodeScanExcerptInput,
+} from "./evidence/security-evaluation-code-scan-excerpt.service";
+import { SecurityEvaluationRetentionService } from "./security-evaluation-retention.service";
 import type { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
 import {
   codeScanContentHash,
@@ -76,6 +81,10 @@ const CRITERIA: EvaluationCriterionRef[] = SECURITY_EVALUATION_CODE_SCAN_CRITERI
 }));
 
 function codeScanItem(path: string, content: string): EvaluationEvidenceItem {
+  // The excerpt is not part of the manifest any more (ADR-054 clause 7): the
+  // judgment reads it from the retention-bounded store, so the fixture has to
+  // seed that store with the same content hash.
+  FIXTURE_EXCERPTS.set(codeScanContentHash(content), content);
   return {
     id: codeScanEvidenceId(path),
     layer: "source",
@@ -89,10 +98,32 @@ function codeScanItem(path: string, content: string): EvaluationEvidenceItem {
       bytes: content.length,
       revision: "abc123",
       contentHash: codeScanContentHash(content),
-      excerpt: content,
       truncated: false,
     },
   };
+}
+
+const FIXTURE_EXCERPTS = new Map<string, string>();
+
+function stubExcerptStore(seed: ReadonlyMap<string, string> = new Map()) {
+  const rows = new Map(seed);
+  const saved: SecurityEvaluationCodeScanExcerptInput[] = [];
+  const store = {
+    save: async (_subjectId: string, excerpts: readonly SecurityEvaluationCodeScanExcerptInput[]) => {
+      for (const excerpt of excerpts) {
+        saved.push({ ...excerpt });
+        rows.set(excerpt.contentHash, excerpt.excerpt);
+      }
+    },
+    load: async (_subjectId: string, contentHashes: readonly string[]) =>
+      new Map(contentHashes.filter((hash) => rows.has(hash)).map((hash) => [hash, rows.get(hash) as string] as const)),
+    pruneExpired: async () => ({ deleted: 0 }),
+  } as unknown as SecurityEvaluationCodeScanExcerptService;
+  return { store, saved, rows };
+}
+
+function codeScanExcerpts(): SecurityEvaluationCodeScanExcerptService {
+  return stubExcerptStore(FIXTURE_EXCERPTS).store;
 }
 
 function judgmentInput(evidence: EvaluationEvidenceItem[]): JudgmentInput {
@@ -219,7 +250,7 @@ test("code-scan mechanism replays a complete cached verdict set without calling 
     throw new Error("LLM must not be called on a cache hit");
   });
 
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, codeScanExcerpts());
   const judgment = await mechanism.judge(judgmentInput([item]));
 
   assert.equal(calls.length, 0);
@@ -243,7 +274,7 @@ test("code-scan mechanism treats a partial cached row set as a miss and re-judge
   const cache = stubCache(rows);
   const { resolver, calls } = stubResolver(() => JSON.stringify({ findings: [] }));
 
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, codeScanExcerpts());
   const judgment = await mechanism.judge(judgmentInput([item]));
 
   assert.equal(calls.length, 1);
@@ -290,7 +321,7 @@ test("code-scan mechanism discards out-of-range entries and caches per-criterion
   const cache = stubCache();
   const { resolver } = stubResolver(() => JSON.stringify(response));
 
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, codeScanExcerpts());
   const judgment = await mechanism.judge(judgmentInput([item]));
 
   assert.equal(judgment.findings.length, 1);
@@ -329,7 +360,7 @@ test("code-scan mechanism never caches an unavailable verdict (partial: one malf
       : JSON.stringify({ findings: [] }),
   );
 
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, codeScanExcerpts());
   const judgment = await mechanism.judge(judgmentInput([judged, malformed]));
 
   assert.deepEqual(judgment.evaluatedRefs, [judged.id]);
@@ -347,7 +378,7 @@ test("code-scan mechanism fails the run when every file verdict is unavailable",
   const cache = stubCache();
   const { resolver } = stubResolver(() => "this is not json");
 
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, codeScanExcerpts());
   await assert.rejects(() => mechanism.judge(judgmentInput(items)), /unavailable for all 2 file/);
   assert.equal(cache.recorded.length, 0);
 });
@@ -357,7 +388,7 @@ test("code-scan mechanism fails the run when the LLM scope is unbound (no vacuou
   const cache = stubCache();
   const resolver = { resolve: async () => Promise.reject(new Error("no model bound")) } as unknown as ChatModelResolver;
 
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, codeScanExcerpts());
   await assert.rejects(() => mechanism.judge(judgmentInput([item])), /unresolvable/);
   assert.equal(cache.recorded.length, 0);
 });
@@ -366,7 +397,7 @@ test("code-scan mechanism ignores other evaluationKeys", async () => {
   const item = codeScanItem("src/a.ts", "const a = 1;");
   const cache = stubCache();
   const { resolver, calls } = stubResolver(() => "{}");
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, codeScanExcerpts());
   const input = judgmentInput([item]);
   const judgment = await mechanism.judge({
     ...input,
@@ -386,7 +417,7 @@ test("code-scan mechanism budget-cuts files when the LLM_CALL_BUDGET (now 180, b
   const cache = stubCache();
   const { resolver } = stubResolver(() => JSON.stringify({ findings: [] }));
 
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, codeScanExcerpts());
   const judgment = await mechanism.judge(judgmentInput(items));
 
   assert.equal(judgment.evaluatedRefs.length, SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET);
@@ -416,7 +447,7 @@ test("code-scan mechanism reports discarded-entry note even when no file was ski
     }),
   );
 
-  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port);
+  const mechanism = new SecurityEvaluationCodeScanMechanism(resolver, cache.port, codeScanExcerpts());
   const judgment = await mechanism.judge(judgmentInput([item]));
 
   // The file was evaluated, just the model's single entry was discarded
@@ -448,11 +479,15 @@ function stubSnapshotAccess(listing: {
   };
 }
 
-function codeScanEvidenceProvider(snapshotAccess?: RepositorySnapshotAccess): SecurityEvaluationEvidenceProvider {
+function codeScanEvidenceProvider(
+  excerpts: SecurityEvaluationCodeScanExcerptService,
+  snapshotAccess?: RepositorySnapshotAccess,
+): SecurityEvaluationEvidenceProvider {
   return new SecurityEvaluationEvidenceProvider(
     {} as PrismaService,
     { getOrCreateAsset: async () => ({ id: "asset-1" }) } as unknown as SecurityEvaluationAssetService,
     {} as SecurityEvaluationIntelNegativeCachePort,
+    excerpts,
     undefined,
     undefined,
     undefined,
@@ -462,6 +497,7 @@ function codeScanEvidenceProvider(snapshotAccess?: RepositorySnapshotAccess): Se
 
 test("code-scan evidence registers every readable file and accounts host-skipped and read-failed files", async () => {
   const provider = codeScanEvidenceProvider(
+    codeScanExcerpts(),
     stubSnapshotAccess({
       entries: [
         { path: "src/a.ts", sizeBytes: 10 },
@@ -488,32 +524,115 @@ test("code-scan evidence registers every readable file and accounts host-skipped
 
 test("code-scan evidence fails the run when the snapshot port is unbound or the scan set is empty", async () => {
   await assert.rejects(
-    () => codeScanEvidenceProvider(undefined).collect(SUBJECT, CODE_SCAN_VERSION),
+    () => codeScanEvidenceProvider(codeScanExcerpts(), undefined).collect(SUBJECT, CODE_SCAN_VERSION),
     /SECURITY_EVALUATION_REPOSITORY_SNAPSHOT_ACCESS/,
   );
 
-  const emptyListing = codeScanEvidenceProvider(stubSnapshotAccess({ entries: [] }));
+  const emptyListing = codeScanEvidenceProvider(codeScanExcerpts(), stubSnapshotAccess({ entries: [] }));
   await assert.rejects(() => emptyListing.collect(SUBJECT, CODE_SCAN_VERSION), BadRequestException);
 
   const allReadFailed = codeScanEvidenceProvider(
+    codeScanExcerpts(),
     stubSnapshotAccess({ entries: [{ path: "src/a.ts", sizeBytes: 1 }], readFail: ["src/a.ts"] }),
   );
   await assert.rejects(() => allReadFailed.collect(SUBJECT, CODE_SCAN_VERSION), BadRequestException);
 });
 
-test("code-scan evidence truncates the excerpt but hashes the full content", async () => {
+test("code-scan manifest keeps hash and truncated flag but never the source excerpt", async () => {
   const big = "x".repeat(SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS + 500);
-  const provider = codeScanEvidenceProvider({
+  const { store, saved } = stubExcerptStore();
+  const provider = codeScanEvidenceProvider(store, {
     list: async () => ({ revision: "abc123", entries: [{ path: "src/big.ts", sizeBytes: big.length }], skipped: [] }),
     read: async () => new Map([["src/big.ts", big]]),
   });
 
   const collection = await provider.collect(SUBJECT, CODE_SCAN_VERSION);
-  const payload = collection.items[0].payload as { excerpt: string; truncated: boolean; contentHash: string };
+  const payload = collection.items[0].payload as { excerpt?: string; truncated: boolean; contentHash: string };
   assert.equal(payload.truncated, true);
-  assert.equal(payload.excerpt.length, SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS);
+  // The archived manifest is immutable, so source code must not land in it.
+  assert.equal(payload.excerpt, undefined);
   assert.equal(payload.contentHash, codeScanContentHash(big));
-  assert.notEqual(payload.contentHash, codeScanContentHash(payload.excerpt));
+
+  // The excerpt that the judgment reads lives in the retention-bounded store.
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].contentHash, codeScanContentHash(big));
+  assert.equal(saved[0].excerpt.length, SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS);
+  assert.notEqual(saved[0].contentHash, codeScanContentHash(saved[0].excerpt));
+});
+
+// --- Excerpt retention & physical deletion (ADR-054 clauses 6/7, R33-01) -----------
+
+test("code-scan mechanism refuses to judge a file whose retained excerpt is gone", async () => {
+  const item = codeScanItem("src/a.ts", "const a = 1;");
+  const cache = stubCache();
+  const { resolver, calls } = stubResolver(() => JSON.stringify({ findings: [] }));
+
+  const mechanism = new SecurityEvaluationCodeScanMechanism(
+    resolver,
+    cache.port,
+    stubExcerptStore().store, // empty store: the excerpt has been pruned
+  );
+
+  await assert.rejects(() => mechanism.judge(judgmentInput([item])), /no retained excerpt/);
+  assert.equal(calls.length, 0);
+  assert.equal(cache.recorded.length, 0);
+});
+
+test("retention physically deletes expired verdict-cache rows and excerpts", async () => {
+  const cutoffs: Date[] = [];
+  const prisma = {
+    securityEvaluationCodeScanVerdictCache: {
+      deleteMany: async (args: { where: { updatedAt: { lt: Date } } }) => {
+        cutoffs.push(args.where.updatedAt.lt);
+        return { count: 2 };
+      },
+    },
+    securityEvaluationCodeScanFileExcerpt: {
+      deleteMany: async (args: { where: { updatedAt: { lt: Date } } }) => {
+        cutoffs.push(args.where.updatedAt.lt);
+        return { count: 3 };
+      },
+    },
+  } as unknown as PrismaService;
+  const retention = new SecurityEvaluationRetentionService(
+    new SecurityEvaluationCodeScanVerdictCacheRepository(prisma, {
+      getOrThrow: () => "30",
+    } as unknown as ConfigService),
+    new SecurityEvaluationCodeScanExcerptService(prisma),
+  );
+
+  assert.deepEqual(await retention.pruneExpired(), { verdictCacheDeleted: 2, excerptsDeleted: 3 });
+
+  const now = Date.now();
+  const [verdictAgeDays, excerptAgeDays] = cutoffs.map((cutoff) => (now - cutoff.getTime()) / 86_400_000);
+  assert.ok(verdictAgeDays > 29 && verdictAgeDays < 31, `verdict cutoff was ${verdictAgeDays} days`);
+  assert.ok(excerptAgeDays > 89 && excerptAgeDays < 91, `excerpt cutoff was ${excerptAgeDays} days`);
+});
+
+test("retained-excerpt reads apply the retention window between prune runs", async () => {
+  const now = Date.now();
+  const stored = [
+    { contentHash: "fresh", excerpt: "fresh code", updatedAt: new Date(now - 86_400_000) },
+    { contentHash: "expired", excerpt: "expired code", updatedAt: new Date(now - 120 * 86_400_000) },
+  ];
+  let queriedCutoff: Date | undefined;
+  const prisma = {
+    securityEvaluationCodeScanFileExcerpt: {
+      findMany: async (args: { where: { updatedAt: { gte: Date } } }) => {
+        queriedCutoff = args.where.updatedAt.gte;
+        return stored
+          .filter((row) => row.updatedAt >= queriedCutoff!)
+          .map(({ contentHash, excerpt }) => ({ contentHash, excerpt }));
+      },
+    },
+  } as unknown as PrismaService;
+  const excerpts = new SecurityEvaluationCodeScanExcerptService(prisma);
+
+  const loaded = await excerpts.load(SUBJECT.id, ["fresh", "expired"]);
+
+  assert.deepEqual([...loaded.keys()], ["fresh"]);
+  const readAgeDays = (now - (queriedCutoff as Date).getTime()) / 86_400_000;
+  assert.ok(readAgeDays > 89 && readAgeDays < 91, `read cutoff was ${readAgeDays} days`);
 });
 
 // --- Verdict cache TTL contract (ADR-033 discipline, ADR-054 clause 6) -------------

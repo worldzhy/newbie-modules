@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { randomInt } from "node:crypto";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 @Injectable()
@@ -10,8 +11,8 @@ export class MembershipService {
     let existing = false;
     let cardNumber = "";
     do {
-      const a = Math.floor(Math.random() * 10); // 0~9
-      const b = Math.floor(Math.random() * 1000); // 0~999
+      const a = randomInt(0, 10); // 0~9
+      const b = randomInt(0, 1000); // 0~999
       cardNumber = "9" + `${a}${a}${b}`;
       const count = await this.prisma.membership.count({ where: { cardNumber } });
 

@@ -11,11 +11,17 @@ export class GoogleStrategy extends PassportStrategy(Strategy, "google") {
     const clientSecret = config.getOrThrow<string>("modules.account.googleAuth.clientSecret");
     const callbackURL = config.getOrThrow<string>("modules.account.googleAuth.callbackURL");
 
+    // Override passport-google-oauth20's default endpoints: it hardcodes
+    // `www.googleapis.com` which is unreachable from some regions (GFW
+    // interference on TLS handshake). Use Google's regional-reachable OAuth2
+    // and OpenID Connect endpoints instead.
     super({
       clientID: clientID,
       clientSecret: clientSecret,
       callbackURL: callbackURL,
       scope: ["email", "profile"],
+      tokenURL: "https://oauth2.googleapis.com/token",
+      userProfileURL: "https://openidconnect.googleapis.com/v1/userinfo",
     });
   }
 

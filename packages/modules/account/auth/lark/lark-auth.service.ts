@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { ForbiddenException, Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as Lark from "@larksuiteoapi/node-sdk";
 import { Response } from "express";
@@ -7,6 +7,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { ApprovedSubnetService } from "@modules/account/modules/approved-subnet/approved-subnet.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "@modules/account/auth/login-audit";
+import { INACTIVE_ACCOUNT_MESSAGE } from "@modules/account/auth/inactive-account";
 import { buildUiAvatarsUrl } from "@modules/account/helpers/ui-avatar";
 import { AuthService } from "@modules/account/auth/auth.service";
 import { LoginResult } from "@modules/account/account.interface";
@@ -226,7 +227,7 @@ export class LarkAuthService {
         userAgent,
         detail: { reason: "inactive_user", provider: "lark" },
       });
-      throw new UnauthorizedException("The account is not active.");
+      throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
     } else {
       // Refresh the profile snapshot on returning logins. Email/phone are
       // backfilled only when missing so a user-set value is never overwritten by

@@ -8,6 +8,7 @@ import { GoogleUserResDto } from "@modules/security/authentication/google-oauth/
 import { CookieName, CookieService } from "@modules/security/cookie/cookie.service";
 import { isSafeRedirectPath } from "@modules/security/cookie/redirect-path";
 import { AuthService, PendingApprovalException } from "@modules/account/auth/auth.service";
+import { isInactiveAccountError } from "@modules/account/auth/inactive-account";
 import { LoginResult } from "@modules/account/account.interface";
 
 /**
@@ -66,6 +67,12 @@ export class LoginByGoogleController {
       // login page with a notice instead of an error page.
       if (error instanceof PendingApprovalException) {
         response.redirect(`${frontendUrl}/account/login?pendingApproval=1`);
+        return;
+      }
+      // A deactivated account is also a browser navigation: hand the user back
+      // to the login page with a notice instead of rendering the 403 JSON.
+      if (isInactiveAccountError(error)) {
+        response.redirect(`${frontendUrl}/account/login?inactive=1`);
         return;
       }
       throw error;

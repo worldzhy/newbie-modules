@@ -36,6 +36,8 @@ model User {
   timezone             String?
   twoFactorMethod      MfaMethod        @default(NONE)
   twoFactorPhone       String?
+  // AES-256-GCM ciphertext produced by TokenService.sealTotpSecret(), never
+  // the raw base32 secret (R33-04). A database read alone cannot mint codes.
   twoFactorSecret      String?
   // Pending TOTP secret awaiting confirmation via enable(). The active
   // twoFactorSecret is only overwritten inside enable() after a valid code

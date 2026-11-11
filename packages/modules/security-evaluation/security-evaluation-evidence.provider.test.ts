@@ -4,6 +4,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import type { EvaluationRuleSetVersionRef, EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
 import type { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
+import type { SecurityEvaluationCodeScanExcerptService } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
 import type { SecurityEvaluationIntelNegativeCachePort } from "./judgment/intel/security-evaluation-intel-negative-cache.port";
 import type { RepositoryAccess } from "./ports/repository-access.port";
@@ -76,12 +77,21 @@ function stubNegativeCache(): SecurityEvaluationIntelNegativeCachePort {
   };
 }
 
+function stubExcerpts(): SecurityEvaluationCodeScanExcerptService {
+  return {
+    save: async () => {},
+    load: async () => new Map(),
+    pruneExpired: async () => ({ deleted: 0 }),
+  } as unknown as SecurityEvaluationCodeScanExcerptService;
+}
+
 test("a repository with no supported lockfile fails the run instead of reporting a clean one", async () => {
   const { assets, writes } = fakeAssets();
   const provider = new SecurityEvaluationEvidenceProvider(
     stubPrisma(),
     assets,
     stubNegativeCache(),
+    stubExcerpts(),
     fakeRepositoryAccess({}),
   );
 
@@ -97,6 +107,7 @@ test("a legacy lockfile without a packages map fails the run with its own reason
     stubPrisma(),
     assets,
     stubNegativeCache(),
+    stubExcerpts(),
     fakeRepositoryAccess({ "package-lock.json": JSON.stringify({ lockfileVersion: 1, dependencies: {} }) }),
   );
 
@@ -109,6 +120,7 @@ test("a lockfile that resolves no packages fails the run instead of reporting a 
     stubPrisma(),
     assets,
     stubNegativeCache(),
+    stubExcerpts(),
     fakeRepositoryAccess({ "package-lock.json": JSON.stringify({ lockfileVersion: 3, packages: { "": {} } }) }),
   );
 
@@ -121,6 +133,7 @@ test("declared dependencies absent from the lockfile are reported as declaredUnl
     stubPrisma(),
     assets,
     stubNegativeCache(),
+    stubExcerpts(),
     fakeRepositoryAccess({
       "package-lock.json": LOCKFILE,
       "package.json": JSON.stringify({ dependencies: { lodash: "^4.17.0", "left-pad": "^1.3.0" } }),
@@ -142,7 +155,16 @@ test("declared dependencies absent from the lockfile are reported as declaredUnl
 
 test("a host that forgot to bind RepositoryAccess fails loudly instead of collecting nothing", async () => {
   const { assets } = fakeAssets();
-  const provider = new SecurityEvaluationEvidenceProvider(stubPrisma(), assets, stubNegativeCache(), undefined);
+  const provider = new SecurityEvaluationEvidenceProvider(
+    stubPrisma(),
+    assets,
+    stubNegativeCache(),
+    stubExcerpts(),
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+  );
 
   await assert.rejects(() => provider.collect(subject, ruleSetVersion), /No RepositoryAccess is bound/);
 });

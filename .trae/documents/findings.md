@@ -238,7 +238,7 @@ round20 为 `workspace` scope，报告与全量台账落 `devbie`（`.trae/docum
 
 R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30` 口径统一（R5-P2-04 removed，不再 open）；② R3-25 open 引用按 round30 裁决关闭（前端 12 文件/109 用例全绿）。devbie 侧同步关闭 R28-06/R28-08 并删除 backlog R3-25 引用。
 
-## round31（2026-11-10，scope=`modules: [security-evaluation]`，报告 `expert-review-2026-11-10-round31.md`）
+## round31（2026-11-10，scope=`modules: [security-evaluation]`，报告 `reviews/expert-review-2026-11-10-round31.md`）
 
 评审对象：ADR-054 code-scan 全链路（registry `21e4ef8`）+ 宿主装配整合（nightwatch-backend `743c24b`）。装配 `diff -rq` 零差异。全部状态 `open`（评审会话只读）。2026-11-10 修复会话关闭 R31-01/R31-02（commit 见行内）。
 
@@ -253,5 +253,54 @@ R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30
 | R31-07 | newbie-modules | 仅"丢弃条目"而无文件跳过时 skipped 为 undefined，丢弃说明不进 coverage，只留 metadata 计数 | P2 | live | — | fixed（registry `19aa090`；skipped 只要有 note 就有定义，含专门回归用例） |
 | R31-08 | newbie-modules | 超 maxFiles 的每个源码文件逐条写 skipped items，随仓库规模线性膨胀 result 体积 | P2 | live | 大仓库 | fixed（host `7f10ee5`；端口加 count 字段，适配器聚合 budget/tree 截断条目为单 entry） |
 | R31-09 | newbie-modules | `MAX_FILES=200` 与 `LLM_CALL_BUDGET=200` 相等且缓存不耗预算 → budgetCut 分支不可达；ADR-054 条款 6 的"缓存救预算跳过文件"表述不成立 | P2 | source | — | fixed（registry `19aa090`；BUDGET 从 200 降到 180，测试用 182 文件触发验证） |
-| R31-10 | newbie-modules + nightwatch-backend | 源码摘录（≤12000 字符/文件×200）随 manifest 持久化，secret-exposure finding 可能把密钥原文写入 findings 与缓存表；ADR 只声明"出境"，未覆盖二次落库与保留期 | P2 | live | — | open（需 ADR 级别决策：掩码/缩短/保留期，留待后续专题） |
+| R31-10 | newbie-modules + nightwatch-backend | 源码摘录（≤12000 字符/文件×200）随 manifest 持久化，secret-exposure finding 可能把密钥原文写入 findings 与缓存表；ADR 只声明"出境"，未覆盖二次落库与保留期 | P2 | live | — | superseded → R33-01（2026-11-10 round33 反驳轮 CONFIRMED 并升 P1：摘录原文切片零掩码、manifest 整体落 JsonB 与 schema:220 注释不符、单 finding API 原样返回、VerdictCache 行永不删除） |
 
+## round33（2026-11-10，scope=`workspace` 中的 registry 相关条目）
+
+报告（主仓 devbie）：`devbie/.trae/documents/reviews/expert-review-2026-11-10-round33.md`。装配一致性：34/34 模块 `diff -rq` 零内容差异（含 security-evaluation、account 全量）。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R33-01 | newbie-modules + nightwatch-backend | code-scan 源码摘录无掩码永久落库：`evidence/security-evaluation-evidence.provider.ts:316` 原文切片（全模块 mask/redact 零命中）→ `evaluation/evaluation-result.service.ts:98` 整体落 JsonB → `security-evaluation.controller.ts:277` 原样返回（仅 List 权限）；VerdictCache 无删除路径（`persistence/security-evaluation-code-scan-verdict-cache.repository.ts:40` 仅 lookup+upsert，TTL 只是读取 cutoff） | P1 | live | 持 security-evaluation 读权限者（需被扫仓库含硬编码密钥） | fixed（`734541b` + `19531cd`；宿主 `4106b87`）：manifest 只留 path/language/bytes/revision/contentHash/truncated；摘录入 `SecurityEvaluationCodeScanFileExcerpt`，键 `(subjectId, contentHash)`（collect 无 runId，内容寻址使同内容跨 run 复用、旧 run 详情仍读到其所判内容）；判定从该表读，缺失 fail-closed；详情读行存在时回填 excerpt，过期回落 hash + truncated；`SecurityEvaluationRetentionService.pruneExpired()` 物理删除 90 天前摘录与到期 VerdictCache 行，宿主每日扫描任务先调用。ADR-054 条款 6/7 已修订；PG migration `20261110010000_security_evaluation_code_scan_file_excerpt` |
+| R33-04 | newbie-modules | TOTP `twoFactorSecret` 明文存储（`account/prisma/schema.prisma:39`，`two-factor.service.ts:255` 直读），未获 R20-11 同等 seal 待遇；DB 读即全员 2FA 失效 | P2 | live | DB 读取者 | fixed（`c1bb87b`；宿主 `0cfa154`）：`security/token/token.service.ts` 增 `SealedDomain`（`refresh-token`/`totp-secret`），`sealTotpSecret/openTotpSecret` 与 `sealToken/openSealedToken` 共用 GCM 封装但密钥域分离、密文互不可开；`two-factor.service.ts` 四个读写点（setup 重绑校验、enable 提升、disable、consumeMfaChallenge）改为先开再验，`enable` 直接把已封缄 pending 值原样提升；未封缄/损坏值 fail-closed（抛错，不回落明文）。宿主新增一次回填 `npm run seal:totp-secrets`（幂等，v1 四段判定跳过）。token 测试 +5（往返、不可互换、篡改/错钥/畸形拒绝），two-factor 测试 5 pass |
+| R33-05 | newbie-modules | 登录审计契约测试弱化：`account/auth/login-audit-coverage.test.ts:61` `SUCCESS_SESSION_PATTERN=/sessionService\.generate\(/` 匹配不到现行 `auth.service.ts:164` 的 `generateWithTransaction`（检查空转）；`login-by-totp.controller.ts` 不在 `LOGIN_ENTRY_FILES`（其拒绝分支已人工核实逐条审计，但未被契约钉住） | P2 | source | 关键路径门禁 | fixed（`734541b`）：正则改 `generate(?:WithTransaction)?\(`，TOTP 入口纳入 `LOGIN_ENTRY_FILES`；29 pass |
+| R33-09 | newbie-modules | `membership/membership.service.ts:13-15` 卡号 Math.random（约 10k 空间仅查重）；registry 独有，未装配 | P3 | source | 采用该模块者 | open |
+
+**2026-11-10 订正（R33-01 读面口径）**：`security-evaluation.controller.ts:198-282` 复核——详情接口只返回与 finding 匹配的 manifest 条目（`matchEvidence`：`item.summary === metadata.path` 或 id ∈ `evidenceRefs`），`:278` 原样下发 `payload.excerpt`，权限 `List EvaluationFinding`（`:199`）；不是「全部 200 个文件原样返回」。留存面与判定输入面不变：`evidence/security-evaluation-evidence.provider.ts:316` 为每个扫描文件写摘录 → `evaluation/evaluation-result.service.ts:98` 整体落库；`judgment/code-scan/security-evaluation-code-scan.mechanism.ts:204-215,298` 以该摘录构造 LLM 请求；`security-evaluation.dto.ts:390` 公开 payload 形状。故「只为命中文件留存摘录」需在判定完成后裁剪（判定前 findings 尚不存在），会损失判定输入的完整归档；替代形态是摘录独立表 + 保留期。
+
+反驳轮误报剔除（registry 相关）：「frontend-monitor appKey 用 Math.random 生成致 ingest 凭证可预测」REFUTED——appKey 是公开分区键（`shared/utils.ts:3-7` 注释明示），ingest 由 `@InstallationAuth` 校验 token（`installation.guard.ts:72-83`），真凭证为 `installation-credential.ts:17-19` `crypto.randomUUID()` 存 SHA-256 哈希。分层规则复核：round30 对 9 处 ForbiddenException 的合规裁决维持（防枚举/执行层设计）；`organization/membership.service.ts` role 检查属字面违反但该模块未装配，记观察。
+
+## round34（2026-11-10，scope=`workspace` 中的 registry 相关条目）
+
+报告（主仓 devbie）：`devbie/.trae/documents/reviews/expert-review-2026-11-10-round34.md`。收工锚点：本仓 `bd9e22a`，工作树干净；装配面 nightwatch-backend `0cfa154`，34/34 模块 `diff -rq` 零内容差异（唯一差异为 `aws-secrets-manager` 的 registry 独有 `prisma/`、`sst/`）。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R34-02 | newbie-modules | R33-01 部分闭合：LLM 产出 `title`/`detail` 原样入库（`packages/modules/evaluation/evaluation-finding.service.ts:257-258`，同写面 `:300-301`；来源 `judgment/code-scan/security-evaluation-code-scan.mechanism.ts:112-129`，提示词 `:301-311` 携带源码摘录）；`grep evaluationFinding.delete` 零处；`security-evaluation-retention.service.ts:30-35` 只清 verdict cache 与 excerpts | P2 | live | 持 `List EvaluationFinding` 者 | open |
+| R34-03 | newbie-modules | TOTP 封缄密钥无 keyId/轮换：`security/token/token.service.ts:255-260`（派生行 `:257`）取 `userRefresh.secret \|\| defaultSecret`，信封固定 `v1` 四段（`:213-224`、`:239-242`）；`account/modules/two-factor/two-factor.service.ts:119`（`setup` `:55` 同型）解封为实参求值、早于 `:145-161` 密码比对，解封失败即 401，用户无法凭密码关闭 TOTP；env 默认全空（`security/newbie.module.json:27-29`） | P2 | live | 运维轮换 secret → 全体 TOTP 用户 | open |
+| R34-05 | newbie-modules | 登录审计契约测试仍可静默空转：`account/auth/login-audit-coverage.test.ts:104/:113` 均 `if (!SUCCESS_SESSION_PATTERN.test(content)) return;`；逐文件实测 9 个 `LOGIN_ENTRY_FILES` 仅 `auth.service.ts` 命中 1 次；`:106` 全文匹配不保证审计早于 mint | P2 | source | 关键路径门禁 | fixed（`login-audit-coverage.test.ts` 新增 `DIRECT_MINT_FILES` 显式点名 + mint 状态双向断言：声明必命 mint、未声明不得 mint；审计断言改为「mint 后 60 行内」、TOTP gate 断言「mint 前 60 行内」——审计本就在签发之后，故以邻近性+方向表达原意） |
+| R34-11 | newbie-modules | `evidence/security-evaluation-code-scan-excerpt.service.ts:45-53` `load` 无读侧 cutoff，保留语义仅靠每日 cron；宿主 `src/modules/job-scheduler/scheduler/scheduled-job.ts:28-38` 在 `onModuleInit` 把 `isEnabled` 交给 DB 声明，可停用 | P3 | live | — | open |
+| R34-18 | newbie-modules | `.trae/documents/expert-review-2026-11-10-round31.md` 为根部残留旧副本（与 `reviews/` 同名文件 `diff` 不一致） | P3 | docs | 任何人引档 | fixed（复核发现根部文件并非旧副本，而是同日 15:16–16:30 另一份评审的唯一副本；已移入 `reviews/expert-review-2026-11-10-security-evaluation-filters.md` 保留内容，round31 台账指针改为 `reviews/` 路径） |
+| R34-19 | newbie-modules | `.github/workflows/ci.yml:36` 钉 `@devbie/newbie-cli@1.18.0`，源码已 1.20.0，门禁实际跑旧规则 | P3 | source | 门禁 | fixed（ci.yml 钉版本改 1.20.0，与 devbie `packages/newbie-cli` 源码一致） |
+| R33-09 | newbie-modules | `membership/membership.service.ts:13-16` 卡号 `"9"+a+a+b` Math.random（10⁴ 空间仅查重）；registry 独有，未装配 | P3 | source | 采用该模块者 | open（重验仍存在） |
+
+反驳轮（本轮）：C2（封缄密钥无轮换 + disable 解封早于密码校验）CONFIRMED；C4（finding 文本无掩码无保留期）CONFIRMED；C3（历史 manifest 明文可读，属宿主+registry 同源，登记在 devbie R34-01）CONFIRMED。R33-04 封缄实现本身重验通过：四个读写点全部经解封、序列化层删除秘密字段、域分离密文互不可开、fail-closed 无明文回落。
+
+
+round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents/reviews/expert-review-2026-11-10-round34-verify.md`）：registry 侧 open 条目（R34-02/03/05/11/18/19、R33-09）逐条按最新树重新取证，全部成立、维持 open，无升降级；R33-07 仍 open（curl 再查 `0.0.0-stage` deprecated=None，另 `style-guide@0.0.0-stage` 同型未 deprecated）；本仓装配面复核 34/34、`diff -rq` 仍仅 `aws-secrets-manager` 的 registry 独有 `prisma/`+`sst/`（预期排除项）。
+
+## round36（2026-11-11，scope=`modules: [copilot]`）
+
+报告：`newbie-modules/.trae/documents/reviews/expert-review-2026-11-11-round36.md`。锚点：newbie-modules `8cbc60f`（干净）、nightwatch-backend `2c4212a`（干净）、nightwatch-frontend `4c25111`（dirty 4 文件均在 iam 域，非被审域）；copilot 装配 `diff -rq` 零差异。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R36-01 | newbie-modules + nightwatch-backend | copilot 工具级动作不入平台审计库：`grep AuditService src/application/copilot` 与 `grep -ri audit src/modules/task-management` 均 0 命中；audit 模块仅 HTTP 信封级拦截器（`audit/http-access.interceptor.ts`）；kernel 审计缝只写 stdout JSON（`copilot/observability/copilot-audit.logger.ts:14-16`），audit-logs 页查不到 create/update/delete_task 及确认决策 | P1 | live | 任意登录用户 | open |
+| R36-02 | nightwatch-backend | `/security-evaluation` 推荐提示词引用不存在的 project 上下文（`transports/web/chat-recommended-prompts.ts:91-98` 两条「for this project」；`route-context.ts:19-21` 明示该页无 project 段） | P2 | live | 该页访客 | fixed（nightwatch-backend `69c2011`：提示词改「across all projects」+ `chat-recommended-prompts.test.ts` 回归 pin） |
+| R36-03 | nightwatch-backend | 读覆盖缺口：14 个 dashboard 页面中 11 个无路由上下文（fallback General）；17 个 skill 仅覆盖 7 域，security-evaluation 本体/work-evaluation/audit 查询/backups/job-scheduler/event-emitter/iam/jdy/llm-models/lark-bindings 等域无查询 skill | P2 | live | 全体用户 | open |
+| R36-04 | nightwatch-backend | 写覆盖缺口：`access: "write"` 仅 3 个且全在 task 域；项目 CRUD、应用绑定、通知规则、调度启停、LLM scope 绑定、评估触发、lark 绑定管理等平台写面 copilot 均不可执行 | P2 | live | 全体用户 | open |
+| R36-05 | newbie-modules + nightwatch-frontend | 会话不持久：内存 30min TTL（`kernel/conversation-store.ts:15-27`）+ 前端 `useState` 仅存 conversationId（`use-copilot-chat.ts:99`），刷新/重启即丢；无会话列表/历史 UI、无反馈按钮 | P2 | live | 全体用户 | open |
+| R36-06 | nightwatch-backend | 双 AI 管线并存不互通：`application/analysis/analysis.controller.ts` `/analysis/chat` 独立 SSE 协议/model scope/提示词体系 vs copilot kernel；合并与否需 ADR | P2 | live | 架构层 | open |
+| R36-07 | nightwatch-backend | prompt-sections 仅 backend/frontend monitoring 两域（`ls prompt-sections/` 2 文件），其余功能域无领域知识注入 | P2 | live | 全体用户 | open |
+
+反驳轮（本轮）：「@RequireOwner 等于无鉴权」REFUTED（self-by-token 构造成立，逐技能授权在 skill 内）；「task 写技能无权限检查」REFUTED（项目可见性过滤 + 服务层 forbidden + 全量确认门）；「/security-evaluation 页完全无 skill」REFUTED（aws/dependency 4 个 skill 声明该页路由）。本轮为静态评审，未跑 tsc/测试。

@@ -114,4 +114,17 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
       }),
     );
   }
+
+  /**
+   * Single deletion point for expired rows. A row past the TTL is a miss on
+   * read, so keeping it only grows the table: the TTL is enforced physically
+   * here rather than being a read-side filter over an unbounded store.
+   */
+  async pruneExpired(): Promise<{ deleted: number }> {
+    const cutoff = new Date(Date.now() - this.ttlMs);
+    const { count } = await this.prisma.securityEvaluationCodeScanVerdictCache.deleteMany({
+      where: { updatedAt: { lt: cutoff } },
+    });
+    return { deleted: count };
+  }
 }

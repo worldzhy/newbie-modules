@@ -52,7 +52,7 @@ export class TwoFactorService {
     }
 
     if (user.twoFactorMethod === MfaMethod.TOTP) {
-      const ok = await this.verifyCurrentCredential(user.twoFactorSecret, user.password, params);
+      const ok = await this.verifyCurrentCredential(this.openStoredSecret(user.twoFactorSecret), user.password, params);
       if (!ok) {
         throw new BadRequestException("Provide your current password or a valid authenticator code.");
       }
@@ -63,10 +63,11 @@ export class TwoFactorService {
     const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
 
     // The active secret is never overwritten here; enable() promotes the pending
-    // value only after a valid code is presented against it.
+    // value only after a valid code is presented against it. Secrets are sealed
+    // before they touch the database (R33-04).
     await this.prisma.user.update({
       where: { id: userId },
-      data: { pendingTwoFactorSecret: secret },
+      data: { pendingTwoFactorSecret: this.tokenService.sealTotpSecret(secret) },
     });
     return { secret, otpauthUrl, qrCodeDataUrl };
   }
@@ -86,9 +87,10 @@ export class TwoFactorService {
       throw new BadRequestException("Start enrollment before confirming a code.");
     }
 
+    const pendingSecret = this.tokenService.openTotpSecret(user.pendingTwoFactorSecret);
     const result = await verify({
       token: code,
-      secret: user.pendingTwoFactorSecret,
+      secret: pendingSecret,
       epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
     });
     if (!result.valid) {
@@ -98,6 +100,7 @@ export class TwoFactorService {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
+        // The stored value is already sealed; promote it verbatim.
         twoFactorSecret: user.pendingTwoFactorSecret,
         twoFactorMethod: MfaMethod.TOTP,
         pendingTwoFactorSecret: null,
@@ -113,7 +116,7 @@ export class TwoFactorService {
       select: { password: true, twoFactorSecret: true },
     });
 
-    const ok = await this.verifyCurrentCredential(user.twoFactorSecret, user.password, params);
+    const ok = await this.verifyCurrentCredential(this.openStoredSecret(user.twoFactorSecret), user.password, params);
     if (!ok) {
       throw new BadRequestException("Provide your current password or a valid authenticator code.");
     }
@@ -122,6 +125,15 @@ export class TwoFactorService {
       where: { id: userId },
       data: { twoFactorMethod: MfaMethod.NONE, twoFactorSecret: null, pendingTwoFactorSecret: null },
     });
+  }
+
+  /**
+   * Open a stored TOTP secret. A null column stays null so callers keep their
+   * "no secret configured" branch; a sealed value that cannot be opened throws
+   * instead of being used as a secret (R33-04).
+   */
+  private openStoredSecret(sealed: string | null): string | null {
+    return sealed ? this.tokenService.openTotpSecret(sealed) : null;
   }
 
   /**
@@ -252,7 +264,7 @@ export class TwoFactorService {
 
     const result = await verify({
       token: params.code,
-      secret: user.twoFactorSecret,
+      secret: this.tokenService.openTotpSecret(user.twoFactorSecret),
       epochTolerance: TOTP_EPOCH_TOLERANCE_SECONDS,
     });
     if (!result.valid) {

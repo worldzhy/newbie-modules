@@ -32,7 +32,6 @@ import {
   UserChangePasswordResponseDto,
   UserResponseDto,
 } from "./user.dto";
-import { Request } from "express";
 
 @ApiTags("Account / User")
 @ApiBearerAuth()
@@ -193,21 +192,33 @@ export class UserController {
         throw new BadRequestException("You cannot change your own roles.");
       }
 
-      // Refuse to touch a user who holds a role the caller does not have; the
-      // caller could otherwise strip a higher-privileged user's roles and
-      // replace them with its own.
+      // Refuse to touch a user whose roles carry permissions the caller does
+      // not hold; the caller could otherwise strip a higher-privileged user's
+      // roles and replace them with its own. The comparison is over effective
+      // permission atoms, not role names: after ADR-043 an ADMIN does not
+      // literally hold MEMBER, yet ADMIN's atom set fully covers it, so a name
+      // comparison would make every MEMBER uneditable by every ADMIN.
       const target = await this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
         select: { roles: { select: { role: { select: { name: true } } } } },
       });
-      const outOfReach = target.roles.map((entry) => entry.role.name).filter((name) => !callerRoles.includes(name));
+      const targetRoles = target.roles.map((entry) => entry.role.name);
+      const atomsByRole = await this.loadRoleAtoms([...roles, ...targetRoles, ...callerRoles]);
+      const callerAtoms = this.collectAtoms(atomsByRole, callerRoles);
+
+      const outOfReach = this.rolesOutsidePermissions(targetRoles, atomsByRole, callerAtoms);
       if (outOfReach.length > 0) {
         throw new ForbiddenException(
           `You cannot change the roles of a user holding roles you do not have: ${outOfReach.join(", ")}.`,
         );
       }
 
-      await this.assertGrantableRoles(roles, callerRoles);
+      const ungrantable = this.rolesOutsidePermissions(roles, atomsByRole, callerAtoms);
+      if (ungrantable.length > 0) {
+        throw new ForbiddenException(
+          `You cannot grant roles whose permissions you do not hold: ${ungrantable.join(", ")}.`,
+        );
+      }
 
       const roleRows = await this.prisma.role.findMany({
         where: { name: { in: roles } },
@@ -246,7 +257,7 @@ export class UserController {
   @ApiResponse({ type: UserResponseDto })
   async deleteUser(
     @Param("userId") userId: string,
-    @Req() req: Request,
+    @Req() req: UserRequest,
   ): Promise<Omit<User, "password" | "twoFactorSecret" | "pendingTwoFactorSecret" | "wechatSessionKey">> {
     // Prevent users from deleting their own account.
     const token = this.tokenService.getTokenFromHttpRequest(req);
@@ -259,6 +270,19 @@ export class UserController {
 
     const user = await this.prisma.user.delete({
       where: { id: userId },
+    });
+
+    // Deleting a PENDING_APPROVAL account is how the IAM console rejects an
+    // application: the row is gone, so the same person can submit a fresh
+    // application instead of being stuck behind a permanent INACTIVE state.
+    // Record the removed identity because the user row no longer carries it.
+    await this.auditLogService.record(AuditEvent.USER_DELETED, {
+      actorId: req.user.userId,
+      resourceType: "user",
+      resourceId: userId,
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"],
+      detail: { status: user.status, account: user.email ?? user.phone },
     });
 
     // Strip the password hash from the response.
@@ -336,9 +360,25 @@ export class UserController {
   private async assertGrantableRoles(requested: string[], callerRoles: string[]): Promise<void> {
     if (requested.length === 0) return;
 
-    const roleNames = [...new Set([...requested, ...callerRoles])];
+    const atomsByRole = await this.loadRoleAtoms([...requested, ...callerRoles]);
+    const callerAtoms = this.collectAtoms(atomsByRole, callerRoles);
+    const ungrantable = this.rolesOutsidePermissions(requested, atomsByRole, callerAtoms);
+
+    if (ungrantable.length > 0) {
+      throw new ForbiddenException(
+        `You cannot grant roles whose permissions you do not hold: ${ungrantable.join(", ")}.`,
+      );
+    }
+  }
+
+  /** Load each role's effective permission atoms as "action:resource" strings. */
+  private async loadRoleAtoms(roleNames: string[]): Promise<Map<string, Set<string>>> {
+    const uniqueNames = [...new Set(roleNames)];
+    const atomsByRole = new Map<string, Set<string>>();
+    if (uniqueNames.length === 0) return atomsByRole;
+
     const roles = await this.prisma.role.findMany({
-      where: { name: { in: roleNames } },
+      where: { name: { in: uniqueNames } },
       select: {
         name: true,
         permissions: { select: { action: true, resource: true } },
@@ -352,7 +392,6 @@ export class UserController {
       },
     });
 
-    const atomsByRole = new Map<string, Set<string>>();
     for (const role of roles) {
       const atoms = new Set<string>();
       for (const permission of role.permissions) {
@@ -366,27 +405,36 @@ export class UserController {
       atomsByRole.set(role.name, atoms);
     }
 
-    const callerAtoms = new Set<string>();
-    for (const name of callerRoles) {
-      for (const atom of atomsByRole.get(name) ?? []) callerAtoms.add(atom);
-    }
+    return atomsByRole;
+  }
 
-    const ungrantable = requested.filter((name) => {
+  /** Union of the atoms held by the given roles. */
+  private collectAtoms(atomsByRole: Map<string, Set<string>>, roleNames: string[]): Set<string> {
+    const atoms = new Set<string>();
+    for (const name of roleNames) {
+      for (const atom of atomsByRole.get(name) ?? []) atoms.add(atom);
+    }
+    return atoms;
+  }
+
+  /**
+   * Roles whose atoms are not all held by the caller. A role missing from the
+   * loaded set does not exist, so it is reported as outside the caller's reach
+   * rather than silently ignored.
+   */
+  private rolesOutsidePermissions(
+    roleNames: string[],
+    atomsByRole: Map<string, Set<string>>,
+    callerAtoms: Set<string>,
+  ): string[] {
+    return roleNames.filter((name) => {
       const atoms = atomsByRole.get(name);
-      // An unknown role is not a role the caller holds either; reject it here
-      // rather than silently creating the user without it.
       if (!atoms) return true;
       for (const atom of atoms) {
         if (!callerAtoms.has(atom)) return true;
       }
       return false;
     });
-
-    if (ungrantable.length > 0) {
-      throw new ForbiddenException(
-        `You cannot grant roles whose permissions you do not hold: ${ungrantable.join(", ")}.`,
-      );
-    }
   }
 
   /* External platform identities (evidence attribution, ADR-029) */
