@@ -32,7 +32,6 @@ import {
   UserChangePasswordResponseDto,
   UserResponseDto,
 } from "./user.dto";
-import { Request } from "express";
 
 @ApiTags("Account / User")
 @ApiBearerAuth()
@@ -246,7 +245,7 @@ export class UserController {
   @ApiResponse({ type: UserResponseDto })
   async deleteUser(
     @Param("userId") userId: string,
-    @Req() req: Request,
+    @Req() req: UserRequest,
   ): Promise<Omit<User, "password" | "twoFactorSecret" | "pendingTwoFactorSecret" | "wechatSessionKey">> {
     // Prevent users from deleting their own account.
     const token = this.tokenService.getTokenFromHttpRequest(req);
@@ -259,6 +258,19 @@ export class UserController {
 
     const user = await this.prisma.user.delete({
       where: { id: userId },
+    });
+
+    // Deleting a PENDING_APPROVAL account is how the IAM console rejects an
+    // application: the row is gone, so the same person can submit a fresh
+    // application instead of being stuck behind a permanent INACTIVE state.
+    // Record the removed identity because the user row no longer carries it.
+    await this.auditLogService.record(AuditEvent.USER_DELETED, {
+      actorId: req.user.userId,
+      resourceType: "user",
+      resourceId: userId,
+      ipAddress: req.ip,
+      userAgent: req.headers["user-agent"],
+      detail: { status: user.status, account: user.email ?? user.phone },
     });
 
     // Strip the password hash from the response.

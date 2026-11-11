@@ -5,6 +5,7 @@ import {
   AccessTokenSessionResolver,
   ResolvedAccessTokenSession,
 } from "@modules/security/ports/access-token-session.resolver";
+import { INACTIVE_ACCOUNT_MESSAGE } from "@modules/account/auth/inactive-account";
 
 /**
  * Account-side binding of security's AccessTokenSessionResolver port:
@@ -38,7 +39,7 @@ export class AccountAccessTokenSessionResolver implements AccessTokenSessionReso
     // Disabled/deleted users keep no valid access until re-enabled,
     // regardless of unexpired tokens issued earlier.
     if (session.user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException("The account is not active.");
+      throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
     }
 
     const roles = session.user.roles.map((ur) => ur.role.name);
