@@ -20,9 +20,10 @@ const TEST_TIMEOUT_MS = 15_000;
 /**
  * Admin endpoints for the LLM connection registry (ADR-006).
  *
- * Read access to GET /llm/connections is granted to any authenticated session
- * (API keys are masked; dock header and model-health dot depend on this).
- * Write endpoints require the ADMIN role via the global AuthorizationGuard.
+ * Every endpoint requires the matching LlmConnection permission via
+ * @RequirePermission (the List grant ships with the LLM Models permission
+ * group, so the dock header and model-health dot only load for accounts
+ * holding that group). API keys are masked in read responses.
  */
 @ApiTags("LLM Connection Admin")
 @ApiBearerAuth()
