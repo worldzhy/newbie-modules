@@ -288,3 +288,19 @@ R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30
 
 
 round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents/reviews/expert-review-2026-11-10-round34-verify.md`）：registry 侧 open 条目（R34-02/03/05/11/18/19、R33-09）逐条按最新树重新取证，全部成立、维持 open，无升降级；R33-07 仍 open（curl 再查 `0.0.0-stage` deprecated=None，另 `style-guide@0.0.0-stage` 同型未 deprecated）；本仓装配面复核 34/34、`diff -rq` 仍仅 `aws-secrets-manager` 的 registry 独有 `prisma/`+`sst/`（预期排除项）。
+
+## round36（2026-11-11，scope=`modules: [copilot]`）
+
+报告：`newbie-modules/.trae/documents/reviews/expert-review-2026-11-11-round36.md`。锚点：newbie-modules `8cbc60f`（干净）、nightwatch-backend `2c4212a`（干净）、nightwatch-frontend `4c25111`（dirty 4 文件均在 iam 域，非被审域）；copilot 装配 `diff -rq` 零差异。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R36-01 | newbie-modules + nightwatch-backend | copilot 工具级动作不入平台审计库：`grep AuditService src/application/copilot` 与 `grep -ri audit src/modules/task-management` 均 0 命中；audit 模块仅 HTTP 信封级拦截器（`audit/http-access.interceptor.ts`）；kernel 审计缝只写 stdout JSON（`copilot/observability/copilot-audit.logger.ts:14-16`），audit-logs 页查不到 create/update/delete_task 及确认决策 | P1 | live | 任意登录用户 | open |
+| R36-02 | nightwatch-backend | `/security-evaluation` 推荐提示词引用不存在的 project 上下文（`transports/web/chat-recommended-prompts.ts:91-98` 两条「for this project」；`route-context.ts:19-21` 明示该页无 project 段） | P2 | live | 该页访客 | open |
+| R36-03 | nightwatch-backend | 读覆盖缺口：14 个 dashboard 页面中 11 个无路由上下文（fallback General）；17 个 skill 仅覆盖 7 域，security-evaluation 本体/work-evaluation/audit 查询/backups/job-scheduler/event-emitter/iam/jdy/llm-models/lark-bindings 等域无查询 skill | P2 | live | 全体用户 | open |
+| R36-04 | nightwatch-backend | 写覆盖缺口：`access: "write"` 仅 3 个且全在 task 域；项目 CRUD、应用绑定、通知规则、调度启停、LLM scope 绑定、评估触发、lark 绑定管理等平台写面 copilot 均不可执行 | P2 | live | 全体用户 | open |
+| R36-05 | newbie-modules + nightwatch-frontend | 会话不持久：内存 30min TTL（`kernel/conversation-store.ts:15-27`）+ 前端 `useState` 仅存 conversationId（`use-copilot-chat.ts:99`），刷新/重启即丢；无会话列表/历史 UI、无反馈按钮 | P2 | live | 全体用户 | open |
+| R36-06 | nightwatch-backend | 双 AI 管线并存不互通：`application/analysis/analysis.controller.ts` `/analysis/chat` 独立 SSE 协议/model scope/提示词体系 vs copilot kernel；合并与否需 ADR | P2 | live | 架构层 | open |
+| R36-07 | nightwatch-backend | prompt-sections 仅 backend/frontend monitoring 两域（`ls prompt-sections/` 2 文件），其余功能域无领域知识注入 | P2 | live | 全体用户 | open |
+
+反驳轮（本轮）：「@RequireOwner 等于无鉴权」REFUTED（self-by-token 构造成立，逐技能授权在 skill 内）；「task 写技能无权限检查」REFUTED（项目可见性过滤 + 服务层 forbidden + 全量确认门）；「/security-evaluation 页完全无 skill」REFUTED（aws/dependency 4 个 skill 声明该页路由）。本轮为静态评审，未跑 tsc/测试。
