@@ -6,15 +6,17 @@ import { NestLoggerCopilotAuditSink } from "./observability/copilot-audit-sink";
 /**
  * Copilot capability module. Owns the protocol-neutral agent kernel
  * infrastructure (conversation store + confirmation manager) and the audit
- * logger. The LLM model provider lives in the `llm` module (ADR-005); the
+ * sink. The LLM model provider lives in the `llm` module (ADR-005); the
  * kernel depends on its ChatModelPort and the host transports resolve the
  * "copilot" scope via ChatModelResolver exported there.
  *
  * AgentRunner and SkillRegistry are NOT provided here. The host application
  * assembles the concrete skill list (COPILOT_SKILL_DEFINITIONS) and constructs
  * both in its own providers, injecting NestLoggerCopilotAuditSink exported by
- * module. Transports (web SSE, lark webhook) likewise stay with the host and
- * inject ChatModelResolver / AgentRunner / etc. from the two modules' exports.
+ * this module — or a host-specific replacement that also writes the platform
+ * AuditLog table (see src/application/copilot/observability/platform-audit-sink.ts).
+ * Transports (web SSE, lark webhook) likewise stay with the host and inject
+ * ChatModelResolver / AgentRunner / etc. from the two modules' exports.
  */
 @Global()
 @Module({

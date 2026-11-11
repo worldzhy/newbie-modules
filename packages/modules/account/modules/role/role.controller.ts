@@ -160,8 +160,8 @@ export class RoleController {
   async deleteRole(@Param("roleId") roleId: number): Promise<RoleResponseDto> {
     const role = await this.prisma.role.findUniqueOrThrow({ where: { id: roleId } });
     if (role.isBuiltin) {
-      // ADMIN carries the *:Manage grant and USER is the signup default
-      // (auth services connectOrCreate it); both must survive.
+      // Builtin roles (ADMIN, MEMBER) are owned by the seed and both are
+      // referenced by deployment policy (signup default / bootstrap admin).
       throw new BadRequestException(`Builtin role "${role.name}" cannot be deleted.`);
     }
 
