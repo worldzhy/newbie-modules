@@ -296,7 +296,7 @@ round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents
 | ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
 | R36-01 | newbie-modules + nightwatch-backend | copilot 工具级动作不入平台审计库：`grep AuditService src/application/copilot` 与 `grep -ri audit src/modules/task-management` 均 0 命中；audit 模块仅 HTTP 信封级拦截器（`audit/http-access.interceptor.ts`）；kernel 审计缝只写 stdout JSON（`copilot/observability/copilot-audit.logger.ts:14-16`），audit-logs 页查不到 create/update/delete_task 及确认决策 | P1 | live | 任意登录用户 | open |
-| R36-02 | nightwatch-backend | `/security-evaluation` 推荐提示词引用不存在的 project 上下文（`transports/web/chat-recommended-prompts.ts:91-98` 两条「for this project」；`route-context.ts:19-21` 明示该页无 project 段） | P2 | live | 该页访客 | open |
+| R36-02 | nightwatch-backend | `/security-evaluation` 推荐提示词引用不存在的 project 上下文（`transports/web/chat-recommended-prompts.ts:91-98` 两条「for this project」；`route-context.ts:19-21` 明示该页无 project 段） | P2 | live | 该页访客 | fixed（nightwatch-backend `69c2011`：提示词改「across all projects」+ `chat-recommended-prompts.test.ts` 回归 pin） |
 | R36-03 | nightwatch-backend | 读覆盖缺口：14 个 dashboard 页面中 11 个无路由上下文（fallback General）；17 个 skill 仅覆盖 7 域，security-evaluation 本体/work-evaluation/audit 查询/backups/job-scheduler/event-emitter/iam/jdy/llm-models/lark-bindings 等域无查询 skill | P2 | live | 全体用户 | open |
 | R36-04 | nightwatch-backend | 写覆盖缺口：`access: "write"` 仅 3 个且全在 task 域；项目 CRUD、应用绑定、通知规则、调度启停、LLM scope 绑定、评估触发、lark 绑定管理等平台写面 copilot 均不可执行 | P2 | live | 全体用户 | open |
 | R36-05 | newbie-modules + nightwatch-frontend | 会话不持久：内存 30min TTL（`kernel/conversation-store.ts:15-27`）+ 前端 `useState` 仅存 conversationId（`use-copilot-chat.ts:99`），刷新/重启即丢；无会话列表/历史 UI、无反馈按钮 | P2 | live | 全体用户 | open |
