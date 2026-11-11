@@ -20,7 +20,7 @@ Code hosts are vendor adapters, not host features: `github` and `bitbucket` both
 
 ## Env facts
 
-Executable operation manuals live in devbie `.trae/documents/env-setup.md`. Read that file before any Shell call.
+Executable operation manuals live in devbie `.trae/documents/environment-runbook.md`. Read that file before any Shell call.
 
 ## Backlog convention
 

@@ -9,6 +9,7 @@ export interface ModelCallAuditEntry {
   requestId: string;
   conversationId: string;
   userId: string;
+  transport: "web" | "lark";
   model: string;
   /** 1-based tool-loop turn. */
   step: number;
@@ -28,6 +29,7 @@ export interface SkillCallAuditEntry {
   requestId: string;
   conversationId: string;
   userId: string;
+  transport: "web" | "lark";
   skillName: string;
   /** Redacted, length-bounded JSON preview; never contains secrets. */
   argumentSummary: string;
@@ -45,6 +47,7 @@ export interface ConfirmationAuditEntry {
   requestId: string;
   conversationId: string;
   userId: string;
+  transport: "web" | "lark";
   skillName: string;
   toolCallId: string;
   confirmationId: string;

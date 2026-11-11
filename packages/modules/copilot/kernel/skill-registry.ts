@@ -407,6 +407,7 @@ export class SkillRegistry {
       requestId: context.requestId,
       conversationId: context.conversationId,
       userId: context.userId,
+      transport: context.transport,
       skillName: name,
       argumentSummary: summarizeForLog(rawArguments),
       status: this.statusFromEnvelope(envelope),

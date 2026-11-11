@@ -204,8 +204,14 @@ function validateBucket(name: string, bucket: EvaluationCoverageBucket): string[
       problems.push("coverageStats.skipped must list the dropped item ids");
     }
   }
-  if (name === "skipped" && bucket.items && bucket.items.length !== bucket.total) {
-    problems.push(`coverageStats.skipped.items lists ${bucket.items.length} ids but total is ${bucket.total}`);
+  // Aggregated skipped entries (empty path + count, e.g. budget or tree
+  // truncation) have no per-file ids, so total can exceed items.length.
+  // items must never outnumber total — that would mean an id was registered
+  // without being counted (invariant broken).
+  if (name === "skipped" && bucket.items && bucket.items.length > bucket.total) {
+    problems.push(
+      `coverageStats.skipped.items lists ${bucket.items.length} ids but total is ${bucket.total} (items must not outnumber total)`,
+    );
   }
   if (name === "declaredUnlinked" && bucket.total > 0 && !bucket.note) {
     problems.push("coverageStats.declaredUnlinked requires a note explaining the gap");
