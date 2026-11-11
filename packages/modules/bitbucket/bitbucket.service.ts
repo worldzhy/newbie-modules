@@ -149,7 +149,10 @@ export class BitbucketService {
   }
 
   /** Shared fetch wrapper: injects auth header + timeout + consistent error mapping. */
-  private async apiFetch(url: string, accept404 = false): Promise<Response> {
+  private async apiFetch(
+    url: string,
+    opts: { accept404?: boolean; tolerateStatus?: number[] } = {},
+  ): Promise<Response> {
     if (this.auth.kind === "none") throw new BitbucketNotConfiguredError();
     const response = await fetch(url, {
       headers: {
@@ -158,7 +161,8 @@ export class BitbucketService {
       },
       signal: AbortSignal.timeout(BITBUCKET_FETCH_TIMEOUT_MS),
     });
-    if (accept404 && response.status === 404) return response;
+    if (opts.accept404 && response.status === 404) return response;
+    if (opts.tolerateStatus?.includes(response.status)) return response;
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       throw new Error(`Bitbucket API ${response.status} for ${url}: ${text.slice(0, 300)}`);
@@ -179,7 +183,7 @@ export class BitbucketService {
       .join("/");
     const encodedRef = encodeURIComponent(ref);
     const url = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repo)}/src/${encodedRef}/${encodedPath}`;
-    const response = await this.apiFetch(url, true);
+    const response = await this.apiFetch(url, { accept404: true });
     if (response.status === 404) return null;
     return response.text();
   }
@@ -192,7 +196,7 @@ export class BitbucketService {
    */
   async getCommit(workspace: string, repo: string, ref: string): Promise<RepositoryCommit | null> {
     const url = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repo)}/commit/${encodeURIComponent(ref)}`;
-    const response = await this.apiFetch(url, true);
+    const response = await this.apiFetch(url, { accept404: true });
     if (response.status === 404) return null;
 
     const json = (await response.json()) as {
@@ -252,7 +256,7 @@ export class BitbucketService {
     while (nextUrl) {
       let response: Response;
       try {
-        response = await this.apiFetch(nextUrl, true);
+        response = await this.apiFetch(nextUrl, { accept404: true, tolerateStatus: [555] });
       } catch (error) {
         if (error instanceof DOMException && error.name === "TimeoutError") {
           this.logger.warn(`Bitbucket tree walk timed out for ${workspace}/${repo}@${ref}; marking as truncated`);
