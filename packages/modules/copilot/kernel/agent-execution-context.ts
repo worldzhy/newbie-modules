@@ -24,6 +24,10 @@ export interface AgentExecutionContext {
   /** Aborts both the model call and in-flight skill work on client disconnect. */
   readonly signal: AbortSignal;
   readonly pageContext?: AgentPageContext;
+  /** Client ip for audit; optional because Lark transport reports the webhook server ip. */
+  readonly ipAddress?: string;
+  /** User-agent for audit; optional. */
+  readonly userAgent?: string;
 }
 
 export interface AgentRunInput {
