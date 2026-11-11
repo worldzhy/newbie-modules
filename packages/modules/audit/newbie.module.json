@@ -9,7 +9,6 @@
   "requires": {
     "modules": ["security"],
     "dependencies": {
-      "geolite2-redist": "latest",
       "lru-cache": "latest",
       "maxmind": "latest",
       "ua-parser-js": "latest"

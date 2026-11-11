@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
 import { existsSync } from "node:fs";
 import path from "node:path";
-import geolite2, { GeoIpDbName } from "geolite2-redist";
 import maxmind, { CityResponse, Reader } from "maxmind";
 import { LRUCache } from "lru-cache";
 
@@ -9,11 +8,17 @@ import { LRUCache } from "lru-cache";
 /// nobody tuned stays code, not environment surface).
 const GEOLOCATION_LRU_SIZE = 100;
 
+/// City database baked into the production image by the `geoip` build stage
+/// (deploy/geoip), filtered to CN/US. It is read as a plain file: no
+/// download, no auto-updater and nothing written under node_modules at
+/// runtime. Local runs simply have no database and geolocation stays empty.
+const GEOLOCATION_DATABASE_PATH = path.join(process.cwd(), "geoip", "dbip-city-lite-cn-us.mmdb");
+
 @Injectable()
 export class GeolocationService implements OnModuleDestroy {
   private readonly logger = new Logger(GeolocationService.name);
-  private reader!: Reader<CityResponse> | null;
-  private openFailed = false;
+  private reader: Reader<CityResponse> | null = null;
+  private openAttempted = false;
   private lru: LRUCache<string, Partial<CityResponse>>;
 
   constructor() {
@@ -21,7 +26,7 @@ export class GeolocationService implements OnModuleDestroy {
   }
 
   onModuleDestroy() {
-    if (this.reader) this.reader = null;
+    this.reader = null;
   }
 
   /** Get the geolocation from an IP address */
@@ -34,10 +39,8 @@ export class GeolocationService implements OnModuleDestroy {
 
   private async getSafeLocation(ipAddress: string): Promise<Partial<CityResponse>> {
     try {
-      if (!this.reader) {
-        this.reader = await this.openReader();
-      }
-      return this.reader?.get(ipAddress) ?? {};
+      const reader = await this.getReader();
+      return reader?.get(ipAddress) ?? {};
     } catch (error) {
       this.logger.error(`Failed to resolve geolocation: ${String(error)}`);
       return {};
@@ -45,51 +48,25 @@ export class GeolocationService implements OnModuleDestroy {
   }
 
   /**
-   * Open the GeoLite city database. Prefer the locally cached copy opened
-   * directly with maxmind: geolite2.open() spawns a background auto-updater
-   * whose network failures surface as unhandled rejections and can kill the
-   * whole process (the update endpoint is unreachable in this deployment).
-   * Fall back to the managed open only when no cached copy exists yet.
+   * Open the bundled database once. A missing or unreadable file is logged a
+   * single time and remembered: geolocation is an audit nicety, it must never
+   * add latency or log noise to the request that triggered it.
    */
-  private async openReader(): Promise<Reader<CityResponse> | null> {
-    if (this.openFailed) return null;
+  private async getReader(): Promise<Reader<CityResponse> | null> {
+    if (this.reader) return this.reader;
+    if (this.openAttempted) return null;
+    this.openAttempted = true;
 
-    const cachedDatabasePath = this.getCachedDatabasePath();
-    if (cachedDatabasePath && existsSync(cachedDatabasePath)) {
-      return await maxmind.open<CityResponse>(cachedDatabasePath);
-    }
-
-    // geolite2.open() downloads the database and spawns a background
-    // auto-updater before resolving. On hosts where the package directory is
-    // not writable or the download endpoint is slow, that stalls every
-    // request that resolves geolocation (login included) for minutes. Bound
-    // the attempt; the losing promise carries a catch so the eventual
-    // rejection stays handled, and stop retrying after the first failure.
-    const openPromise = geolite2
-      .open(GeoIpDbName.City, (databasePath) => maxmind.open<CityResponse>(databasePath))
-      .catch((error) => {
-        this.logger.error(`GeoLite database is unavailable: ${String(error)}`);
-        return null;
-      });
-    const raced = await Promise.race([
-      openPromise,
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000)),
-    ]);
-    if (!raced) {
-      this.openFailed = true;
+    if (!existsSync(GEOLOCATION_DATABASE_PATH)) {
+      this.logger.warn(`GeoIP database not found at ${GEOLOCATION_DATABASE_PATH}; geolocation is disabled`);
       return null;
     }
-    return raced;
-  }
 
-  private getCachedDatabasePath(): string | null {
     try {
-      // The package's exports map blocks direct access to package.json, so
-      // resolve the entry point (<root>/dist/index.js) and walk to the dbs
-      // directory from there.
-      const entryPath = require.resolve("geolite2-redist");
-      return path.join(path.dirname(entryPath), "..", "dbs", "GeoLite2-City.mmdb");
-    } catch {
+      this.reader = await maxmind.open<CityResponse>(GEOLOCATION_DATABASE_PATH);
+      return this.reader;
+    } catch (error) {
+      this.logger.error(`Failed to open GeoIP database at ${GEOLOCATION_DATABASE_PATH}: ${String(error)}`);
       return null;
     }
   }
