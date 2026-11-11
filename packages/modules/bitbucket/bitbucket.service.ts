@@ -9,20 +9,20 @@ import { parseRepositorySlug } from "@devbie/newbie/utilities/repository-url.uti
  */
 export class BitbucketNotConfiguredError extends Error {
   constructor() {
-    super("Bitbucket access token is not configured");
+    super("Bitbucket credentials are not configured (no workspace access token nor personal API token pair)");
     this.name = "BitbucketNotConfiguredError";
   }
 }
 
 const BITBUCKET_API_BASE = "https://api.bitbucket.org/2.0";
 
-/** Outbound fetch budget; matches the 30s convention for external vendor APIs (jdy). */
+/** Outbound fetch budget; matches the 30s convention for external vendor APIs. */
 const BITBUCKET_FETCH_TIMEOUT_MS = 30_000;
 
 /** Default max_depth for recursive tree walks; 999 covers any reasonable repo. */
 const BITBUCKET_TREE_MAX_DEPTH = 999;
 
-/** Page size for paginated Bitbucket endpoints; matches the default (10). */
+/** Page size for paginated Bitbucket endpoints; matches the default (100). */
 const BITBUCKET_PAGELEN = 100;
 
 /** One commit as surfaced by the read-only repository accessors (mirrors GitHubService). */
@@ -68,10 +68,7 @@ function bitbucketEntryTypeToGit(type: string): string {
   }
 }
 
-/**
- * A single page of paginated Bitbucket results. The `next` URL is absolute
- * and can be followed directly.
- */
+/** A single page of paginated Bitbucket results. The `next` URL is absolute. */
 interface BitbucketPaginatedResponse<T> {
   values: T[];
   next?: string;
@@ -80,26 +77,46 @@ interface BitbucketPaginatedResponse<T> {
   size?: number;
 }
 
+/**
+ * Bitbucket Cloud accepts two mutually-exclusive credential forms:
+ *   - Workspace/Project/Repository access tokens → Bearer (single token value)
+ *   - Personal API tokens → Basic HTTP Auth (email + api_token, base64)
+ *
+ * Precedence: if both are configured the Bearer form wins because access
+ * tokens are the service-identity form (no personal tie, longer expiry).
+ */
+type AuthConfig =
+  { kind: "bearer"; token: string } | { kind: "basic"; email: string; apiToken: string } | { kind: "none" };
+
 @Injectable()
 export class BitbucketService {
   private readonly logger = new Logger(BitbucketService.name);
 
-  private readonly accessToken?: string;
+  private readonly auth: AuthConfig;
 
   constructor(private readonly config: ConfigService) {
     const bitbucket = this.config.getOrThrow("modules.bitbucket");
-    this.accessToken = bitbucket.accessToken;
+    const workspaceToken: string | undefined = bitbucket.accessToken;
+    const apiEmail: string | undefined = bitbucket.apiEmail;
+    const apiToken: string | undefined = bitbucket.apiToken;
 
-    if (this.accessToken) {
-      this.logger.log("Bitbucket service configured (workspace access token)");
+    if (workspaceToken) {
+      this.auth = { kind: "bearer", token: workspaceToken };
+      this.logger.log("Bitbucket service configured (workspace access token, Bearer auth)");
+    } else if (apiEmail && apiToken) {
+      this.auth = { kind: "basic", email: apiEmail, apiToken };
+      this.logger.log(`Bitbucket service configured (personal API token for ${apiEmail}, Basic auth)`);
     } else {
-      this.logger.warn("Bitbucket access token not configured");
+      this.auth = { kind: "none" };
+      this.logger.warn(
+        "Bitbucket credentials not configured: set BITBUCKET_ACCESS_TOKEN (workspace token) or BITBUCKET_API_EMAIL + BITBUCKET_API_TOKEN (personal API token)",
+      );
     }
   }
 
-  /** Whether a workspace access token is present to call the Bitbucket API. */
+  /** Whether any usable credentials are present to call the Bitbucket API. */
   isConfigured(): boolean {
-    return Boolean(this.accessToken);
+    return this.auth.kind !== "none";
   }
 
   /**
@@ -116,6 +133,39 @@ export class BitbucketService {
     return { workspace: slug.owner, repo: slug.repo };
   }
 
+  /** Build the Authorization header value from the configured credential form. */
+  private authorizationHeader(): string {
+    switch (this.auth.kind) {
+      case "bearer":
+        return `Bearer ${this.auth.token}`;
+      case "basic": {
+        const raw = `${this.auth.email}:${this.auth.apiToken}`;
+        // Node Buffer is available globally in NestJS; avoid pulling an extra import.
+        return `Basic ${Buffer.from(raw).toString("base64")}`;
+      }
+      default:
+        throw new BitbucketNotConfiguredError();
+    }
+  }
+
+  /** Shared fetch wrapper: injects auth header + timeout + consistent error mapping. */
+  private async apiFetch(url: string, accept404 = false): Promise<Response> {
+    if (this.auth.kind === "none") throw new BitbucketNotConfiguredError();
+    const response = await fetch(url, {
+      headers: {
+        Authorization: this.authorizationHeader(),
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(BITBUCKET_FETCH_TIMEOUT_MS),
+    });
+    if (accept404 && response.status === 404) return response;
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`Bitbucket API ${response.status} for ${url}: ${text.slice(0, 300)}`);
+    }
+    return response;
+  }
+
   /**
    * Read a UTF-8 text file at a given ref. Defaults to HEAD. Returns null
    * when the path does not exist (404) or is not a regular file; other API
@@ -123,22 +173,14 @@ export class BitbucketService {
    * as "no material".
    */
   async getFileContent(workspace: string, repo: string, path: string, ref = "HEAD"): Promise<string | null> {
-    if (!this.accessToken) throw new BitbucketNotConfiguredError();
     const encodedPath = path
       .split("/")
       .map((segment) => encodeURIComponent(segment))
       .join("/");
     const encodedRef = encodeURIComponent(ref);
     const url = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repo)}/src/${encodedRef}/${encodedPath}`;
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      signal: AbortSignal.timeout(BITBUCKET_FETCH_TIMEOUT_MS),
-    });
+    const response = await this.apiFetch(url, true);
     if (response.status === 404) return null;
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`Bitbucket API ${response.status} for ${url}: ${text.slice(0, 300)}`);
-    }
     return response.text();
   }
 
@@ -149,17 +191,10 @@ export class BitbucketService {
    * interchangeable for the CODE_SCAN snapshot pin.
    */
   async getCommit(workspace: string, repo: string, ref: string): Promise<RepositoryCommit | null> {
-    if (!this.accessToken) throw new BitbucketNotConfiguredError();
     const url = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repo)}/commit/${encodeURIComponent(ref)}`;
-    const response = await fetch(url, {
-      headers: { Authorization: `Bearer ${this.accessToken}` },
-      signal: AbortSignal.timeout(BITBUCKET_FETCH_TIMEOUT_MS),
-    });
+    const response = await this.apiFetch(url, true);
     if (response.status === 404) return null;
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`Bitbucket API ${response.status} for ${url}: ${text.slice(0, 300)}`);
-    }
+
     const json = (await response.json()) as {
       hash: string;
       message?: string;
@@ -167,8 +202,6 @@ export class BitbucketService {
       author?: { raw?: string; user?: { display_name?: string; nickname?: string } } | string;
     };
 
-    // Bitbucket author is either a raw string like "Name <email>" or a struct
-    // with raw + user. Prefer the parsed pieces when available.
     let authorName: string | null = null;
     let authorEmail: string | null = null;
     if (typeof json.author === "string") {
@@ -195,7 +228,6 @@ export class BitbucketService {
   private parseAuthorRaw(raw: string): { name: string | null; email: string | null } {
     const m = raw.match(/^(.+?)\s*<([^>]+)>\s*$/);
     if (m) return { name: m[1].trim() || null, email: m[2] || null };
-    // No angle brackets — treat the whole thing as name if non-empty.
     return { name: raw.trim() || null, email: null };
   }
 
@@ -211,24 +243,17 @@ export class BitbucketService {
    * treats both services as interchangeable.
    */
   async getTree(workspace: string, repo: string, ref: string, recursive = false): Promise<RepositoryTree | null> {
-    if (!this.accessToken) throw new BitbucketNotConfiguredError();
-
     // Start at the repo root. Bitbucket requires a trailing slash when
     // listing the root directory.
     const entries: RepositoryTreeEntry[] = [];
     let truncated = false;
-    let nextUrl: string | undefined = this.buildTreePageUrl(workspace, repo, ref, recursive);
+    let nextUrl = this.buildTreePageUrl(workspace, repo, ref, recursive);
 
     while (nextUrl) {
       let response: Response;
       try {
-        response = await fetch(nextUrl, {
-          headers: { Authorization: `Bearer ${this.accessToken}` },
-          signal: AbortSignal.timeout(BITBUCKET_FETCH_TIMEOUT_MS),
-        });
+        response = await this.apiFetch(nextUrl, true);
       } catch (error) {
-        // Timeout from too-large max_depth or network failure — surface as
-        // truncation so the caller knows it didn't get the full tree.
         if (error instanceof DOMException && error.name === "TimeoutError") {
           this.logger.warn(`Bitbucket tree walk timed out for ${workspace}/${repo}@${ref}; marking as truncated`);
           truncated = true;
@@ -238,15 +263,14 @@ export class BitbucketService {
       }
 
       if (response.status === 404) return null;
+
+      // apiFetch already throws on !ok, so we know it's 2xx here — except
+      // 555, Bitbucket's "max_depth too large" timeout which we want to
+      // tolerate as truncation rather than fail the whole run.
       if (response.status === 555) {
-        // Bitbucket's "max_depth too large" timeout.
         this.logger.warn(`Bitbucket returned 555 for tree walk of ${workspace}/${repo}@${ref}; marking as truncated`);
         truncated = true;
         break;
-      }
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        throw new Error(`Bitbucket API ${response.status} for ${nextUrl}: ${text.slice(0, 300)}`);
       }
 
       const page = (await response.json()) as BitbucketPaginatedResponse<{

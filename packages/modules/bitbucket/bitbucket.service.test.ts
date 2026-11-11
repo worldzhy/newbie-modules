@@ -16,8 +16,23 @@ function makeService(env: Record<string, string | undefined>): BitbucketService 
   return new BitbucketService({
     getOrThrow: () => ({
       accessToken: env.BITBUCKET_ACCESS_TOKEN,
+      apiEmail: env.BITBUCKET_API_EMAIL,
+      apiToken: env.BITBUCKET_API_TOKEN,
     }),
   } as any);
+}
+
+/** Helper: expect a Bearer auth header on the first fetch call. */
+function assertBearerHeader(calls: { init?: RequestInit }[], expectedToken: string) {
+  const headers = calls[0].init?.headers as Record<string, string>;
+  assert.equal(headers.Authorization, `Bearer ${expectedToken}`);
+}
+
+/** Helper: expect a Basic auth header on the first fetch call. */
+function assertBasicHeader(calls: { init?: RequestInit }[], expectedEmail: string, expectedToken: string) {
+  const headers = calls[0].init?.headers as Record<string, string>;
+  const expected = `Basic ${Buffer.from(`${expectedEmail}:${expectedToken}`).toString("base64")}`;
+  assert.equal(headers.Authorization, expected);
 }
 
 const originalFetch = globalThis.fetch;
@@ -87,7 +102,36 @@ describe("BitbucketService.getFileContent", () => {
       calls[0].url,
       "https://api.bitbucket.org/2.0/repositories/acme/atlas-api/src/HEAD/packages/web%20app/package-lock.json",
     );
-    assert.equal((calls[0].init?.headers as Record<string, string>).Authorization, "Bearer token");
+    assertBearerHeader(calls, "token");
+  });
+
+  it("uses Basic auth when configured with personal API token + email", async () => {
+    const service = makeService({
+      BITBUCKET_API_EMAIL: "dev@acme.com",
+      BITBUCKET_API_TOKEN: "personal-token-xyz",
+    });
+    const calls = stubFetch(200, "ok");
+    await service.getFileContent("acme", "atlas-api", "README.md");
+    assertBasicHeader(calls, "dev@acme.com", "personal-token-xyz");
+  });
+
+  it("prefers Bearer over Basic when both credential forms are present", async () => {
+    const service = makeService({
+      BITBUCKET_ACCESS_TOKEN: "workspace-token",
+      BITBUCKET_API_EMAIL: "dev@acme.com",
+      BITBUCKET_API_TOKEN: "personal-token",
+    });
+    const calls = stubFetch(200, "ok");
+    await service.getFileContent("acme", "atlas-api", "README.md");
+    assertBearerHeader(calls, "workspace-token");
+  });
+
+  it("rejects reads when neither credential form is configured", async () => {
+    const service = makeService({});
+    await assert.rejects(
+      service.getFileContent("acme", "atlas-api", "package-lock.json"),
+      (error: any) => error instanceof BitbucketNotConfiguredError,
+    );
   });
 
   it("reads content at a specified ref (branch or sha)", async () => {
@@ -112,14 +156,6 @@ describe("BitbucketService.getFileContent", () => {
     const service = makeService({ BITBUCKET_ACCESS_TOKEN: "token" });
     stubFetch(403, "Forbidden");
     await assert.rejects(service.getFileContent("acme", "atlas-api", "package-lock.json"), /Bitbucket API 403/);
-  });
-
-  it("rejects reads when credentials are missing", async () => {
-    const service = makeService({});
-    await assert.rejects(
-      service.getFileContent("acme", "atlas-api", "package-lock.json"),
-      (error: any) => error instanceof BitbucketNotConfiguredError,
-    );
   });
 });
 
