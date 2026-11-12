@@ -33,6 +33,73 @@ export function pickRequestId(
   return typeof value === "string" && value ? value : undefined;
 }
 
+/**
+ * Query keys whose values are credentials or session material. The key is kept
+ * so dashboards still show the parameter was present; the value is replaced.
+ */
+const SENSITIVE_QUERY_KEYS = new Set([
+  "token",
+  "access_token",
+  "refresh_token",
+  "id_token",
+  "password",
+  "passwd",
+  "pwd",
+  "secret",
+  "client_secret",
+  "api_key",
+  "apikey",
+  "authorization",
+  "auth",
+  "session",
+  "sessionid",
+  "session_id",
+  "cookie",
+  "sig",
+  "signature",
+  "code",
+  "otp",
+]);
+
+const REDACTED_QUERY_VALUE = "[redacted]";
+
+function maskQueryForStorage(rawQuery: string): string {
+  if (!rawQuery) return "";
+  return rawQuery
+    .split("&")
+    .map((pair) => {
+      const eq = pair.indexOf("=");
+      if (eq === -1) return pair;
+      const rawKey = pair.slice(0, eq);
+      let key = rawKey;
+      try {
+        key = decodeURIComponent(rawKey);
+      } catch {
+        // Keep the raw key when it is not valid percent-encoding.
+      }
+      return SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? `${rawKey}=${REDACTED_QUERY_VALUE}` : pair;
+    })
+    .join("&");
+}
+
+/**
+ * Second-pass cleanup for a URL that is about to reach a store. The SDK drops
+ * the query and fragment on the client, but a report without `url` falls back
+ * to the raw Referer header, so the server cannot trust the client trimming
+ * (R1-05). Fragments and userinfo are always dropped (SPA hash routes and
+ * `user:pass@` carry credentials); credential-like query values are masked
+ * while the rest of the URL stays usable for debugging.
+ */
+function stripUrlForStorage(raw: unknown): string {
+  let out = typeof raw === "string" ? raw : String(raw ?? "");
+  if (!out) return "";
+  const hashAt = out.indexOf("#");
+  if (hashAt > -1) out = out.slice(0, hashAt);
+  out = out.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/?#@]*@/i, "$1");
+  const queryAt = out.indexOf("?");
+  return queryAt === -1 ? out : `${out.slice(0, queryAt + 1)}${maskQueryForStorage(out.slice(queryAt + 1))}`;
+}
+
 export const func = {
   isSkipIp(ip?: string) {
     if (!ip || ip === "127.0.0.1" || ip === "::1" || ip.includes("127.0.0.1") || ip.includes("::ffff")) return true;
@@ -97,6 +164,22 @@ export const func = {
     } catch {
       return input;
     }
+  },
+  // Full URL column (fullUrl/callUrl/url/preUrl): fragment and userinfo are
+  // dropped, credential-like query values masked, everything else preserved.
+  sanitizeUrlForStorage(raw: unknown) {
+    return stripUrlForStorage(raw);
+  },
+  // Page/resource identity column: same cleanup, plus the whole query string is
+  // dropped because identity rows never need it.
+  sanitizePathForStorage(raw: unknown) {
+    const url = stripUrlForStorage(raw);
+    const queryAt = url.indexOf("?");
+    return queryAt === -1 ? url : url.slice(0, queryAt);
+  },
+  // Bare query-string column: mask only, no fragment/userinfo handling.
+  sanitizeSearchForStorage(raw: unknown) {
+    return maskQueryForStorage(typeof raw === "string" ? raw : "");
   },
   // Added: object check (arrays included)
   isObject(input: unknown): input is Record<string, unknown> {

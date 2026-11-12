@@ -62,7 +62,13 @@ export class FrontendMonitorReportController {
 
     query.ip = func.getRealIp(req.headers, req.ip);
 
-    query.url = query.url || headers["referer"];
+    // The client normally trims the query/fragment itself, but the Referer
+    // fallback is a raw browser header. Sanitize before the payload enters the
+    // Redis queue so credentials never land there as plaintext (R1-05).
+    const reportedUrl = typeof query.url === "string" ? query.url : "";
+    query.url = reportedUrl
+      ? func.sanitizeUrlForStorage(reportedUrl)
+      : func.sanitizeUrlForStorage(headers["referer"] || "");
     query.userAgent = headers["user-agent"];
 
     const system = await this.site.getSiteForAppId(String(query.appKey));

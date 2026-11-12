@@ -128,6 +128,53 @@ test("urlHelper never throws on malformed input", () => {
   assert.equal(func.urlHelper("not a url at all /5"), "not a url at all /*");
 });
 
+test("sanitizeUrlForStorage drops the fragment", () => {
+  assert.equal(
+    func.sanitizeUrlForStorage("https://example.com/reset#access_token=abc"),
+    "https://example.com/reset",
+    "SPA hash routes carry tokens and must never be stored",
+  );
+});
+
+test("sanitizeUrlForStorage strips userinfo credentials", () => {
+  assert.equal(func.sanitizeUrlForStorage("https://user:pass@example.com/a"), "https://example.com/a");
+});
+
+test("sanitizeUrlForStorage masks credential-like query values and keeps the rest", () => {
+  const out = func.sanitizeUrlForStorage("https://example.com/a?page=2&token=abc&q=x");
+  assert.equal(out, "https://example.com/a?page=2&token=[redacted]&q=x");
+});
+
+test("sanitizeUrlForStorage matches query keys case-insensitively and after decoding", () => {
+  assert.equal(func.sanitizeUrlForStorage("https://e.com/?PASSWORD=x"), "https://e.com/?PASSWORD=[redacted]");
+  assert.equal(
+    func.sanitizeUrlForStorage("https://e.com/?%61ccess_token=x"),
+    "https://e.com/?%61ccess_token=[redacted]",
+  );
+});
+
+test("sanitizeUrlForStorage leaves a query-less url untouched", () => {
+  assert.equal(func.sanitizeUrlForStorage("https://example.com/a/b"), "https://example.com/a/b");
+});
+
+test("sanitizeUrlForStorage returns an empty string for non-values", () => {
+  assert.equal(func.sanitizeUrlForStorage(undefined), "");
+  assert.equal(func.sanitizeUrlForStorage(null), "");
+  assert.equal(func.sanitizeUrlForStorage(""), "");
+});
+
+test("sanitizePathForStorage drops the whole query string", () => {
+  assert.equal(func.sanitizePathForStorage("https://example.com/a?token=x&page=2"), "https://example.com/a");
+  assert.equal(func.sanitizePathForStorage("/a?b=1"), "/a");
+  assert.equal(func.sanitizePathForStorage("/a"), "/a");
+});
+
+test("sanitizeSearchForStorage masks bare query strings", () => {
+  assert.equal(func.sanitizeSearchForStorage("page=2&token=abc"), "page=2&token=[redacted]");
+  assert.equal(func.sanitizeSearchForStorage(undefined), "");
+  assert.equal(func.sanitizeSearchForStorage({}), "");
+});
+
 test("toDate passes a Date through by reference and treats numbers as epoch ms", () => {
   const date = new Date(1700000000000);
   assert.equal(func.toDate(date), date);
