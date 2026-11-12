@@ -56,13 +56,13 @@ export interface SecurityEvaluationScopeEntitiesProvider {
 
 - `subject.kind !== "repository"` → 返回 `null`（当前宿主只解析仓库资产，`aws-account` 的 INTEL 尚未接入）。
 - 仓库解析以 `repository.id = subject.subjectKey` 为主，兼容 `repository.url` / `repository.fullName = subject.subjectKey`。subjectKey 存在 `repository|<cuid>` 与 `repository|<url>` 两种历史形态（评审 R3-04），只认单一形态会再次 fail-closed。
-- 实体集：`fullName` 的 `owner/repo` slug、`fullName` 原值、`applications[].name`、`applications[].project.name`；大小写归一、去重，单资产上限 80（沿用 `MAX_ENTITIES_PER_PROFILE`）。
+- 实体集：`fullName` 原值、`fullName` 派生的 `owner/repo` slug、`url` 派生的 `owner/repo` slug、`applications[].name`、`applications[].project.name`；大小写归一、去重，单资产上限 80（超限截断并记 warn）。
 - 找不到仓库 → 返回 `null`，不抛异常（判定权在模块）。
 - 新增 `project-security-profile.service.test.ts`：id 命中 / URL 命中 / 未知 subject → null / 去重与上限 / 非 repository kind → null。
 
 ### D4. 数据影响
 
-`SecurityEvaluationThreatNegativeCache` 唯一键含 `scopeKey`。旧键 `platform:deployment` 的行在新语义下不再被读取；这些行是本缺陷下的误判产物（该坐标下 run 全部失败，预期写入量为 0），落地时核对并清理。无 schema 变更，无需迁移。
+`SecurityEvaluationThreatVerdictCache` 唯一键含 `scopeKey`。旧键 `platform:deployment` 的行在新语义下不再被读取；这些行是本缺陷下的误判产物（该坐标下 run 全部失败，预期写入量为 0），落地时核对并清理。无 schema 变更，无需迁移。
 
 ## 跨宿主 / 演进检验
 

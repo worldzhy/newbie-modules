@@ -84,13 +84,21 @@ The module implements the skeleton's kind-scoped ports for both kinds:
   `threat-intel` → `intel`, `code-scan` → `code-llm`, then merges their
   judgments, ADR-046)
 
-The host must bind three more ports, owned by this module:
+The host must bind four more ports, owned by this module:
 
 ```ts
 { provide: securityEvaluationRepositoryAccessToken, useClass: YourRepositoryAccess }
 { provide: securityEvaluationRepositorySnapshotAccessToken, useClass: YourRepositorySnapshotAccess }
 { provide: securityEvaluationAwsConfigAccessToken, useClass: YourAwsConfigAccess }
+{ provide: SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER, useClass: YourScopeEntitiesProvider }
 ```
+
+`SecurityEvaluationScopeEntitiesProvider` (ADR-058) answers one question: which
+business entities belong to _this_ subject? `null` means the host does not know
+the subject and the run fails closed; `[]` means the host knows it but has
+nothing to match, which short-circuits to an empty collection. The port is
+optional at wiring time, but a `threat-intel` run without it fails with a
+stable error instead of judging an empty profile.
 
 `RepositorySnapshotAccess` (ADR-054) pins a whole run to one revision:
 `list(subject, selection)` returns the scannable file entries plus the files

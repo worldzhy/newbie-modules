@@ -181,7 +181,7 @@ enum SecurityEvaluationVerdictKind {
 model SecurityEvaluationThreatVerdictCache {
   id              String                              @id @default(uuid()) @db.Uuid
   knowledgeItemId  String                             @db.Uuid
-  // Host-defined scope identifier, stored verbatim: "scopeType:scopeId".
+  // Cache scope, stored verbatim: "<subject.kind>:<subject.subjectKey>" (ADR-058).
   scopeKey        String                             @db.VarChar(512)
   verdict         SecurityEvaluationVerdictKind      @default(notRelevant)
   reason          String?                            @db.Text           // LLM reason for not-relevant; null on hard-hit
