@@ -19,7 +19,13 @@ export const SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER = Symbol("SECURITY_EVAL
 export interface SecurityEvaluationScopeEntity {
   /** Entity label, e.g. package name, vendor, repository slug, or domain. */
   value: string;
-  /** Optional human-readable context shown in the LLM prompt. */
+  /**
+   * Optional human-readable detail about this entity (which application or
+   * project contributed it, say). No host populates it today. It is serialized
+   * into the re-rank payload and therefore into `inputSignature`, so starting
+   * to fill it in invalidates every cached verdict — wire it behind an ADR
+   * rather than as a drive-by change.
+   */
   context?: string;
 }
 
