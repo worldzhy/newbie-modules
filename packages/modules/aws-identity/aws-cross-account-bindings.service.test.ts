@@ -71,7 +71,12 @@ function createFakePrisma(bindings: BindingRow[] = [], usages: UsageRow[] = []) 
     state: { bindings, usages },
     awsCrossAccountBinding: {
       async findMany() {
-        return [...bindings];
+        // The service asks for the usages alongside each binding (include),
+        // so the fake decorates every row with its consumer IDs.
+        return bindings.map((binding) => ({
+          ...binding,
+          usages: usages.filter((row) => row.bindingId === binding.id).map((row) => ({ consumerId: row.consumerId })),
+        }));
       },
       async findUnique({ where }: { where: { id?: string; accountId?: string } }) {
         return (
@@ -211,4 +216,17 @@ test("deleting an account that a consumer still references is rejected", async (
 
   await assert.rejects(() => service.deleteAccountCredential(ACCOUNT_ID), ConflictException);
   assert.equal(prisma.state.bindings.length, 1, "the binding is preserved while it is in use");
+});
+
+test("the account list reports which consumers reference each account", async () => {
+  const binding = seedBinding();
+  const prisma = createFakePrisma([binding]);
+  const service = createService(prisma);
+
+  await service.attachConsumerCredential(CONSUMER_A, ACCOUNT_ID);
+  await service.attachConsumerCredential(CONSUMER_B, ACCOUNT_ID);
+
+  const listed = await service.listAccountCredentials();
+  assert.deepEqual(listed.accounts[0].consumerIds, [CONSUMER_A, CONSUMER_B]);
+  assert.equal(listed.accounts[0].accountId, ACCOUNT_ID);
 });

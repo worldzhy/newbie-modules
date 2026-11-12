@@ -55,6 +55,13 @@ export class AwsCrossAccountBindingDto {
 
   @ApiProperty({ description: "Last update timestamp (ISO)" })
   updatedAt!: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    isArray: true,
+    description: "Consumer IDs referencing this account; present in the account list response",
+  })
+  consumerIds?: string[];
 }
 
 /**

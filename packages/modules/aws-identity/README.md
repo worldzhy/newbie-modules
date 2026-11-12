@@ -69,3 +69,6 @@ GET    /aws-cross-account-bindings/consumers/:consumerId
 PUT    /aws-cross-account-bindings/consumers/:consumerId
 DELETE /aws-cross-account-bindings/consumers/:consumerId
 ```
+
+The account list carries `consumerIds` per account so a host can render the
+account card (referencing projects, delete guard) without a second lookup.

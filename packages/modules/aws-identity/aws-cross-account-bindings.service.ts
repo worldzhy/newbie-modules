@@ -97,10 +97,19 @@ export class AwsCrossAccountBindingsService {
 
   async listAccountCredentials() {
     const [bindings, defaultAccountId] = await Promise.all([
-      this.prisma.awsCrossAccountBinding.findMany({ orderBy: { accountId: "asc" } }),
+      this.prisma.awsCrossAccountBinding.findMany({
+        orderBy: { accountId: "asc" },
+        include: { usages: { select: { consumerId: true } } },
+      }),
       this.resolveDefaultAccountId(),
     ]);
-    return { accounts: bindings.map((binding) => this.serializeBinding(binding)), defaultAccountId };
+    return {
+      accounts: bindings.map(({ usages, ...binding }) => ({
+        ...this.serializeBinding(binding),
+        consumerIds: usages.map((usage) => usage.consumerId),
+      })),
+      defaultAccountId,
+    };
   }
 
   async getAccountCredential(accountId: string) {
