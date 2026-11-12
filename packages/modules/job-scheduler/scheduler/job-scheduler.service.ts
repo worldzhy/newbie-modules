@@ -196,11 +196,12 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     });
 
     await this.reconcile();
-    return updated;
+    return { ...updated, nextRunAt: this.computeNextRunAt(updated) };
   }
 
-  listSchedules() {
-    return this.prisma.jobSchedule.findMany({ orderBy: { key: "asc" } });
+  async listSchedules() {
+    const schedules = await this.prisma.jobSchedule.findMany({ orderBy: { key: "asc" } });
+    return schedules.map((schedule) => ({ ...schedule, nextRunAt: this.computeNextRunAt(schedule) }));
   }
 
   async listScheduleRuns(key: string, page?: number, pageSize?: number) {
@@ -225,6 +226,21 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       throw new BadRequestException(
         `Invalid cron expression or timezone: "${cronExpr}" (${timezone}) — ${getErrorMessage(error)}`,
       );
+    }
+  }
+
+  /// Next execution time for an enabled schedule, computed with the same cron
+  /// library and timezone the in-memory job runs with. Paused schedules have no
+  /// next run; an invalid expression yields null instead of failing the list.
+  private computeNextRunAt(schedule: { isEnabled: boolean; cronExpr: string; timezone: string }): Date | null {
+    if (!schedule.isEnabled) {
+      return null;
+    }
+    try {
+      const cronJob = new CronJob(schedule.cronExpr, () => {}, null, false, schedule.timezone || DEFAULT_TIMEZONE);
+      return cronJob.nextDate().toJSDate();
+    } catch {
+      return null;
     }
   }
 

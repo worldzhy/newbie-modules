@@ -24,6 +24,14 @@ export class JobScheduleDto {
   @ApiProperty()
   isEnabled!: boolean;
 
+  @ApiProperty({
+    nullable: true,
+    type: String,
+    format: "date-time",
+    description: "Next scheduled run time; null when the schedule is paused or its cron expression is invalid",
+  })
+  nextRunAt!: Date | null;
+
   @ApiPropertyOptional({ type: Object, nullable: true })
   payload?: unknown;
 
