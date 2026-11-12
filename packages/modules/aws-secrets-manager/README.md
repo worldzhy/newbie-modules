@@ -4,11 +4,11 @@ A stateless read-through proxy over AWS Secrets Manager. AWS is the single sourc
 
 ## Design
 
-- **Read-through proxy**: every endpoint resolves the project's cross-account binding (via the `aws-identity` module) and calls AWS Secrets Manager directly. Project isolation comes from the credential itself — each project points at its own AWS account.
+- **Read-through proxy**: every endpoint resolves the project's account binding (via the `aws-identity` module) and calls AWS Secrets Manager directly. Isolation comes from the assumed role; projects that reference the same account share the account boundary and are separated by platform authorization.
 - **Tag-based contract**: managed secrets carry two tags, written atomically at creation time:
   - `devbie:managed=true` — marks the secret as visible to this management plane
   - `devbie:secret-type=<TYPE>` — one of `RDS_CREDENTIALS`, `DOCUMENTDB_CREDENTIALS`, `AWS_API_KEY`, `GENERIC_SECRET`; consumed by the rotation Lambda to pick a strategy
-- **No infrastructure deployment in the API process**: the rotation Lambda is deployed by the `newbie secrets deploy-rotation` CLI command, which prints the Lambda ARN to paste into Project Settings (`awsSecretsManagerRotationLambdaArn`).
+- **No infrastructure deployment in the API process**: the rotation Lambda is deployed in the customer account either from the AWS account card (CloudFormation one-click) or with the `newbie secrets deploy-rotation` CLI command. Its ARN is stored on the account binding (`rotationLambdaArn` in the `aws-identity` module), not on the project: the Lambda is an account-level resource shared by every project that references the account.
 
 ## API Endpoints
 

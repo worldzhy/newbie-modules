@@ -2,6 +2,7 @@
 // !!              [Module] AWS Identity models                   //
 // !! ------------------------------------------------------------ //
 // * AwsCrossAccountBinding                                        //
+// * AwsCrossAccountBindingUsage                                   //
 // * v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v //
 
 // Cross-account access is delegated through a customer-managed IAM role.
@@ -11,29 +12,49 @@
 // bootstrap (the external ID has been generated but the role ARN has not
 // been saved yet).
 //
+// accountId is the customer AWS account ID and the binding's scope key: an
+// IAM role, its trust policy, the region list and the rotation Lambda are
+// all account-level resources, so one row describes the platform's access
+// relationship with one customer account. Consumers reference the row
+// through AwsCrossAccountBindingUsage.
+//
 // Replacing the identity is a two-phase operation: while a rebind is in
 // progress, pendingExternalId holds the external ID of the candidate
 // identity and the active identity keeps serving. The pending value is
 // promoted (and the old external ID retired) only after the candidate role
 // has been assumed successfully.
-//
-// projectId is the host scope ID (a project id / tenant id / ...). It is
-// intentionally a plain column without a foreign key or a Prisma relation:
-// this module never reads host tables and can be assembled into any host
-// application. A missing host scope row simply means "not configured".
 model AwsCrossAccountBinding {
-  id                String    @id @default(uuid()) @db.Uuid
-  projectId         String    @unique @db.Uuid
-  roleArn           String?   @unique
-  externalId        String    @unique
+  id                String                       @id @default(uuid()) @db.Uuid
+  accountId         String                       @unique
+  roleArn           String?                      @unique
+  externalId        String                       @unique
   pendingExternalId String?
-  awsAccountId      String?
   roleName          String?
+  rotationLambdaArn String?
   defaultRegion     String?
   regions           String[]
   lastVerifiedAt    DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  usages            AwsCrossAccountBindingUsage[]
+
+  @@schema("module/aws-identity")
+}
+
+// A consumer (project / tenant / organization) references one account
+// binding. consumerId is intentionally a plain column without a foreign key
+// or a Prisma relation: this module never reads host tables and can be
+// assembled into any host application. A missing usage row simply means
+// "this consumer has not attached an AWS account". The relation to the
+// binding restricts deletion so an in-use account cannot be detached
+// silently.
+model AwsCrossAccountBindingUsage {
+  id         String                 @id @default(uuid()) @db.Uuid
+  consumerId String                 @unique
+  bindingId  String                 @db.Uuid
+  binding    AwsCrossAccountBinding @relation(fields: [bindingId], references: [id])
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
 
   @@schema("module/aws-identity")
 }
