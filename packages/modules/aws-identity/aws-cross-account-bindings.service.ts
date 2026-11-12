@@ -10,7 +10,7 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
-import type { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import type { AwsCrossAccountBinding } from "@generated/prisma/client";
 import { UpsertAwsCrossAccountBindingDto } from "./aws-cross-account-bindings.dto";
 import {
