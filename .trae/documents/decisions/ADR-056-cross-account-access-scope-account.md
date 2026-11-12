@@ -58,6 +58,20 @@ Supersedes: ADR-052 的「以 `projectId` 作为绑定唯一作用域键」这�
 | 演进路径 | 若出现"一个消费方需访问多个账户"，只需放宽唯一约束为 `@@unique([consumerId, bindingId])` 并让解析接受账户参数；本决策不堵这条路 |
 | 安全边界 | 同账户多项目共享一个角色后，AWS 侧隔离降为账户边界，项目间隔离由平台授权层承担。这是账户级建模的固有取舍，必须在模块 README 与接入页文案中明示 |
 
+## UI 归属修订（2026-11-13 用户拍板）
+
+账户成为绑定作用域后，界面也按宿主划分职责，`/aws-accounts` 顶部入口（header 上 Projects 右侧）承担账户生命周期：
+
+| 界面 | 职责 |
+|------|------|
+| `/aws-accounts`（平台级卡片页） | 接入账户（bootstrap）、角色 ARN / 默认区域 / 区域列表、external ID 轮换、两阶段替换（rebind）、verify、rotation Lambda ARN 与一键部署、删除账户 |
+| `projects/:projectId/settings` 的 Cross-Account Role 页签 | 只做挂载与解绑：选择已有账户挂载，或新账户 bootstrap + 挂载；展示当前账户状态并链接回 `/aws-accounts` |
+
+两条实现约束：
+
+- 账户删除在引用存在时禁用（`consumerIds.length > 0`，tooltip 说明原因），后端 `ConflictException` 为第二道防线；因此账户列表响应必须携带引用方：`AwsCrossAccountBindingDto.consumerIds?: string[]`（由 `AwsCrossAccountBindingUsage` 反查）。
+- 导航入口数据驱动：新增 `PermissionGroup`（`routePath=/aws-accounts`、`navPlacement=HEADER_NAVIGATION`、`navOrder` 紧随 Projects、`navIcon=Cloud`）并授予角色；前端 `NAV_ICONS` 需登记 `Cloud`。这是数据而非代码，生产环境需单独种入。
+
 ## 影响
 
 **更容易**：一账户一次接入，多个项目复用；role 名与 external ID 不再冲突；rotation Lambda ARN 与所属账户绑定，换 Lambda 只改一处；region 列表单一副本。
