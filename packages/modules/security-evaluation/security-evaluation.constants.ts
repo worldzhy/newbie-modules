@@ -124,7 +124,13 @@ export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_INSTANCE_NETWORK = "aws.
 
 /** npm is the only ecosystem parsed in this build, matching the predecessor. */
 export const SECURITY_EVALUATION_ECOSYSTEM_NPM = "npm";
-export const SECURITY_EVALUATION_LOCKFILE_CANDIDATES = ["package-lock.json"];
+/** Lockfiles the dependency evidence can resolve installed packages from. */
+export const SECURITY_EVALUATION_LOCKFILE_NPM = "package-lock.json";
+export const SECURITY_EVALUATION_LOCKFILE_YARN_V1 = "yarn.lock";
+export const SECURITY_EVALUATION_LOCKFILE_CANDIDATES = [
+  SECURITY_EVALUATION_LOCKFILE_NPM,
+  SECURITY_EVALUATION_LOCKFILE_YARN_V1,
+];
 
 export const SECURITY_EVALUATION_OSV_API_BASE_URL = "https://api.osv.dev";
 // 500 queries per request keeps the response (which paginates around 3000

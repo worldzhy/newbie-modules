@@ -42,6 +42,18 @@ const LOCKFILE = JSON.stringify({
   },
 });
 
+const YARN_LOCKFILE = `# yarn lockfile v1
+
+
+lodash@^4.17.0:
+  version "4.17.20"
+  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.20.tgz"
+
+typescript@^5.0.0:
+  version "5.9.3"
+  resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.9.3.tgz"
+`;
+
 function fakeAssets() {
   const writes = { items: 0, touched: 0 };
   const assets = {
@@ -151,6 +163,32 @@ test("declared dependencies absent from the lockfile are reported as declaredUnl
   assert.deepEqual(collection.declaredUnlinked.items, ["left-pad"]);
   assert.match(collection.declaredUnlinked.note ?? "", /left-pad/);
   assert.equal(collection.skipped.total, 0);
+});
+
+test("a yarn classic lockfile resolves packages and takes the dev split from the manifest", async () => {
+  const { assets } = fakeAssets();
+  const provider = new SecurityEvaluationEvidenceProvider(
+    stubPrisma(),
+    assets,
+    stubNegativeCache(),
+    stubExcerpts(),
+    fakeRepositoryAccess({
+      "yarn.lock": YARN_LOCKFILE,
+      "package.json": JSON.stringify({
+        dependencies: { lodash: "^4.17.0" },
+        devDependencies: { typescript: "^5.0.0" },
+      }),
+    }),
+  );
+
+  const collection = await provider.collect(subject, ruleSetVersion);
+
+  assert.deepEqual(
+    collection.items.map((item) => item.id),
+    ["pkg:npm:lodash@4.17.20", "pkg:npm:typescript@5.9.3"],
+  );
+  assert.equal(collection.items[1].payload?.isDev, true);
+  assert.equal(collection.declaredUnlinked.total, 0);
 });
 
 test("a host that forgot to bind RepositoryAccess fails loudly instead of collecting nothing", async () => {

@@ -21,6 +21,7 @@ import {
   SECURITY_EVALUATION_KEY_CODE_SCAN,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
   SECURITY_EVALUATION_LOCKFILE_CANDIDATES,
+  SECURITY_EVALUATION_LOCKFILE_YARN_V1,
 } from "../security-evaluation.constants";
 import {
   dependencyEvidenceId,
@@ -32,9 +33,11 @@ import {
   codeScanLanguage,
 } from "../judgment/code-scan/security-evaluation-code-scan.identity";
 import {
-  parseDeclaredDependencies,
+  parseManifestDependencies,
   parsePackageLock,
+  parseYarnLock,
   type LockedPackage,
+  type ManifestDependencies,
 } from "../judgment/dependency/security-evaluation-lockfile";
 import {
   SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER,
@@ -112,7 +115,8 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     const asset = await this.assets.getOrCreateAsset(subject);
     const observedAt = new Date();
     const lockfile = await this.resolveLockfile(subject);
-    const packages = this.readPackages(lockfile);
+    const manifest = await this.readManifestDependencies(subject);
+    const packages = this.readPackages(lockfile, manifest);
     const items = this.buildItems(packages, observedAt);
 
     await this.assets.upsertNpmPackageKnowledgeItems(
@@ -128,7 +132,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
 
     return {
       items,
-      declaredUnlinked: await this.computeDeclaredUnlinked(subject, lockfile, packages),
+      declaredUnlinked: this.computeDeclaredUnlinked(lockfile, packages, manifest),
       skipped: { total: 0 },
     };
   }
@@ -398,10 +402,30 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     );
   }
 
-  private readPackages(lockfile: ResolvedLockfile): LockedPackage[] {
+  /**
+   * The manifest's direct dependency names, or null when package.json is
+   * missing or unparsable. yarn.lock records no dev flag, so its production /
+   * development split can only come from here.
+   */
+  private async readManifestDependencies(subject: EvaluationSubjectRef): Promise<ManifestDependencies | null> {
+    const access = this.repositoryAccess;
+    if (!access) return null;
+    const content = await access.getFile(subject, "package.json");
+    if (!content) return null;
+    try {
+      return parseManifestDependencies(content);
+    } catch {
+      return null;
+    }
+  }
+
+  private readPackages(lockfile: ResolvedLockfile, manifest: ManifestDependencies | null): LockedPackage[] {
     let packages: LockedPackage[];
     try {
-      packages = parsePackageLock(lockfile.content);
+      packages =
+        lockfile.path === SECURITY_EVALUATION_LOCKFILE_YARN_V1
+          ? parseYarnLock(lockfile.content, new Set(manifest?.devOnly ?? []))
+          : parsePackageLock(lockfile.content);
     } catch (error) {
       throw new BadRequestException(`${lockfile.path} could not be parsed: ${getErrorMessage(error)}`);
     }
@@ -435,24 +459,14 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
    * dependency without an installed knowledge item was not judged, and saying
    * so beats counting it as clean.
    */
-  private async computeDeclaredUnlinked(
-    subject: EvaluationSubjectRef,
+  private computeDeclaredUnlinked(
     lockfile: ResolvedLockfile,
     packages: readonly LockedPackage[],
-  ): Promise<EvidenceCollection["declaredUnlinked"]> {
-    const access = this.repositoryAccess;
-    if (!access) return { total: 0 };
-    const manifestContent = await access.getFile(subject, "package.json");
-    if (!manifestContent) return { total: 0 };
-
-    let declared: string[];
-    try {
-      declared = parseDeclaredDependencies(manifestContent);
-    } catch {
-      return { total: 0 };
-    }
+    manifest: ManifestDependencies | null,
+  ): EvidenceCollection["declaredUnlinked"] {
+    if (!manifest) return { total: 0 };
     const resolved = new Set(packages.map((pkg) => pkg.name));
-    const unlinked = declared.filter((name) => !resolved.has(name));
+    const unlinked = manifest.declared.filter((name) => !resolved.has(name));
     if (unlinked.length === 0) return { total: 0 };
     return {
       total: unlinked.length,

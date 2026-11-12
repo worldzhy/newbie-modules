@@ -45,19 +45,85 @@ export function parsePackageLock(content: string): LockedPackage[] {
   return [...byKey.values()];
 }
 
+const YARN_ENTRY_HEADER = /^[^\s#].*:$/;
+const YARN_ENTRY_VERSION = /^\s+version\s+"([^"]+)"/;
+
 /**
- * Dependencies declared in package.json (direct only). Used to report what the
- * lockfile could not link back to an installed knowledge item — declared names without a
- * resolved version are a coverage gap, not a silent omission.
+ * Parse a yarn classic (v1) lockfile. Each entry is a header listing one or
+ * more selectors, followed by its resolved fields:
+ *
+ *   lodash@^4.17.0, lodash@~4.17.20:
+ *     version "4.17.20"
+ *
+ * The same name@version reachable through several selectors is one installed
+ * dependency. yarn v1 records no dev flag, so `devOnlyNames` (the manifest's
+ * devDependencies minus its dependencies) approximates it: a package declared
+ * only as a development dependency is development-only, while a transitive
+ * dev dependency stays "production" — that overstates exposure instead of
+ * hiding it. Entries without a resolved version (git, file, patch, alias
+ * selectors) carry no exact version to match against OSV and are skipped.
  */
-export function parseDeclaredDependencies(content: string): string[] {
+export function parseYarnLock(content: string, devOnlyNames: ReadonlySet<string> = new Set()): LockedPackage[] {
+  if (/^__metadata:/m.test(content)) {
+    throw new Error(
+      `Unsupported ${SECURITY_EVALUATION_ECOSYSTEM_NPM} lockfile format: yarn berry (v2+) is not supported, yarn classic v1 required.`,
+    );
+  }
+
+  const byKey = new Map<string, LockedPackage>();
+  let names: string[] = [];
+  for (const line of content.split(/\r?\n/)) {
+    if (YARN_ENTRY_HEADER.test(line)) {
+      names = parseYarnSelectors(line.slice(0, -1));
+      continue;
+    }
+    const version = YARN_ENTRY_VERSION.exec(line)?.[1];
+    if (!version) continue;
+    for (const name of names) {
+      const key = `${name}@${version}`;
+      if (byKey.has(key)) continue;
+      byKey.set(key, { name, version, dev: devOnlyNames.has(name) });
+    }
+    names = [];
+  }
+  return [...byKey.values()];
+}
+
+function parseYarnSelectors(header: string): string[] {
+  return header
+    .split(",")
+    .map((selector) => selector.trim().replace(/^"|"$/g, ""))
+    .map(yarnSelectorName)
+    .filter((name): name is string => name !== null);
+}
+
+/** The package a v1 selector resolves, or null for alias/protocol selectors. */
+function yarnSelectorName(selector: string): string | null {
+  if (!selector || selector.includes("npm:") || selector.includes(":/")) return null;
+  const at = selector.indexOf("@", selector.startsWith("@") ? 1 : 0);
+  return at > 0 ? selector.slice(0, at) : null;
+}
+
+/** Direct dependency names declared by a manifest. */
+export interface ManifestDependencies {
+  /** Every direct dependency name, production and development, sorted. */
+  declared: string[];
+  /** Development-only names: declared in devDependencies and not in dependencies. */
+  devOnly: string[];
+}
+
+/**
+ * Dependencies declared in package.json (direct only). `declared` reports what
+ * the lockfile could not link back to an installed knowledge item — a declared
+ * name without a resolved version is a coverage gap, not a silent omission.
+ */
+export function parseManifestDependencies(content: string): ManifestDependencies {
   const manifest = JSON.parse(content) as {
     dependencies?: Record<string, string>;
     devDependencies?: Record<string, string>;
   } | null;
-  const names = new Set([
-    ...Object.keys(manifest?.dependencies ?? {}),
-    ...Object.keys(manifest?.devDependencies ?? {}),
-  ]);
-  return [...names].sort((left, right) => left.localeCompare(right));
+  const production = new Set(Object.keys(manifest?.dependencies ?? {}));
+  const development = Object.keys(manifest?.devDependencies ?? {});
+  const declared = [...new Set([...production, ...development])].sort((left, right) => left.localeCompare(right));
+  return { declared, devOnly: development.filter((name) => !production.has(name)).sort((a, b) => a.localeCompare(b)) };
 }

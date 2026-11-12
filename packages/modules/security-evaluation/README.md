@@ -130,6 +130,12 @@ Every run records the skeleton's three buckets:
   (`cis-1-13`) or the specific resource (`cis-2-1-1:<bucket>`). Skipped always
   carries a note and the item ids, never just a number.
 
+Dependency evidence reads `package-lock.json` (lockfileVersion 2+) or a yarn
+classic (`yarn.lock`, v1) lockfile, in that order. yarn records no dev flag, so
+its development-only marking comes from `package.json`: a name declared in
+`devDependencies` alone is development-only, while a transitive dev dependency
+stays production — that overstates exposure instead of hiding it.
+
 An unreadable lockfile, an unsupported lockfile format, a lockfile resolving
 zero packages, or a cloud account whose knowledge all failed to collect fails the
 run. An empty evaluated set must never surface as a clean result.
