@@ -1,6 +1,6 @@
 # ADR-039: threat-intelligence 能力迁入 security-evaluation，独立模块下线
 
-状态：已采纳（2026-10-27 用户批准）
+状态：已采纳（2026-10-27 用户批准；D4 的实体供给契约形状由 ADR-058 取代）
 日期：2026-10-27
 
 > 归属：registry 模块边界与契约决策 → 本仓。宿主侧实施（ScopeEntitiesProvider 重绑、通知重绑、调度重绑）归 nightwatch-backend，随本决策同步改造。

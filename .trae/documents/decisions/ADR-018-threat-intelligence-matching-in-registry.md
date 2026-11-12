@@ -1,6 +1,6 @@
 # ADR-018: threat-intelligence 整理层下沉 registry（模块交付完整收集+整理能力）
 
-状态：已采纳（2026-10-25 实施并交付）
+状态：已采纳（2026-10-25 实施并交付；「跨宿主 / 演进检验」中实体来源行的 SPI 形状由 ADR-058 取代）
 日期：2026-10-25
 
 > Errata（2026-10-25，代码评审后）：SPI 实体类型 `ProfileEntity` 更名为 `ScopeEntity`（`matching/scope-entities.port.ts`），契约语义不变；另修正 match 扫描为 oldest-first 分页（消除积压饿死）、`match-created` 事件仅在新建时发出、`matchedEntity` 契约改为非空。下文及「跨宿主检验」表中出现的旧名仅作历史记录。

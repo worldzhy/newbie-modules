@@ -1,6 +1,6 @@
 # ADR-045: intel 负缓存的持久化边界与数据模型
 
-状态：已采纳（2026-10-31）
+状态：已采纳（2026-10-31；「跨宿主 / 演进检验」中的 scopeKey 组成由 ADR-058 取代）
 日期：2026-10-31
 归属：框架层（newbie-modules registry，`packages/modules/security-evaluation`）
 关联：registry ADR-037 D9.4（judge 只吃 evidence）、ADR-039（threat-intel 并入）、ADR-018（负缓存语义）

@@ -45,6 +45,7 @@ import {
   SecurityEvaluationIntelNegativeCachePort,
 } from "../judgment/intel/security-evaluation-intel-negative-cache.port";
 import { buildSecurityEvaluationIntelReRankRequest } from "../judgment/intel/security-evaluation-intel-request";
+import { securityEvaluationIntelScopeKey } from "../judgment/intel/security-evaluation-intel-scope-key";
 import { SECURITY_EVALUATION_INTEL_LLM_SCOPE } from "../judgment/intel/security-evaluation-intel-re-ranker";
 import { RepositoryAccess, securityEvaluationRepositoryAccessToken } from "../ports/repository-access.port";
 import {
@@ -149,26 +150,23 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       );
     }
 
-    const scopes = await scopeEntitiesProvider.listScopeEntities();
-    const scope = scopes.find(
-      (candidate) => candidate.scopeType === subject.scopeType && candidate.scopeId === subject.scopeId,
-    );
-    if (!scope) {
+    const entities = await scopeEntitiesProvider.listScopeEntities(subject);
+    if (entities === null) {
       throw new BadRequestException(
-        `No scope "${subject.scopeType}:${subject.scopeId}" is registered with the host; a run over an unknown scope would report a vacuous clean result.`,
+        `The host does not know subject "${subject.kind}:${subject.subjectKey}"; a run over an unknown subject would report a vacuous clean result.`,
       );
     }
-    if (scope.entities.length === 0) return this.emptyCollection();
+    if (entities.length === 0) return this.emptyCollection();
 
     const observedAt = new Date();
-    const scopeKey = `${subject.scopeType}:${subject.scopeId}`;
-    const declaredItems = scope.entities.map((entity, index): EvaluationEvidenceItem => ({
+    const scopeKey = securityEvaluationIntelScopeKey(subject.kind, subject.subjectKey);
+    const declaredItems = entities.map((entity, index): EvaluationEvidenceItem => ({
       id: `scope-entity:${index}`,
       layer: "declared",
       source: "project-profile",
       summary: entity.value,
       observedAt,
-      payload: { scopeType: subject.scopeType, scopeId: subject.scopeId, entity: entity.value },
+      payload: { subjectKind: subject.kind, subjectKey: subject.subjectKey, entity: entity.value },
     }));
 
     const since = new Date(observedAt.getTime() - SECURITY_EVALUATION_INTEL_EVIDENCE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -194,7 +192,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     // The judgment rebuilds entities from the evidence manifest, which carries
     // only the value today; project the same shape so both sides hash the
     // identical payload the model sees.
-    const projectedEntities = scope.entities.map((entity) => ({ value: entity.value }));
+    const projectedEntities = entities.map((entity) => ({ value: entity.value }));
     const uncached = new Set(
       await this.negativeCache.filterUncached(
         scopeKey,

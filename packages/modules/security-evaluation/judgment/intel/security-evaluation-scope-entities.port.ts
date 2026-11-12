@@ -1,12 +1,14 @@
+import type { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
+
 /**
- * SPI port for scope entity resolution (ADR-018, re-homed under
- * security-evaluation by ADR-039).
+ * SPI port for subject-scoped entity resolution (ADR-018, re-homed under
+ * security-evaluation by ADR-039, re-shaped by ADR-058).
  *
- * The INTEL judgment needs the set of entities each matchable scope cares
- * about (package names, repository slugs, vendors, domains). Deriving those
- * from business data is the one host-specific step of matching, so hosts
- * bind an implementation of this port and the module stays agnostic of host
- * concepts like Project or Application.
+ * The INTEL judgment needs the set of entities the run's subject cares about
+ * (package names, repository slugs, vendors, domains). Deriving those from
+ * business data is the one host-specific step of matching, so hosts bind an
+ * implementation of this port and the module stays agnostic of host concepts
+ * like Project or Application.
  */
 export const SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER = Symbol("SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER");
 
@@ -21,19 +23,14 @@ export interface SecurityEvaluationScopeEntity {
   context?: string;
 }
 
-/** The entity set of one matchable scope (e.g. a project in the host). */
-export interface SecurityEvaluationScopeEntities {
-  /** Host-defined scope discriminator, e.g. "project". Stored verbatim. */
-  scopeType: string;
-  /** Host-defined scope identifier. Stored without a foreign key. */
-  scopeId: string;
-  entities: SecurityEvaluationScopeEntity[];
-}
-
 export interface SecurityEvaluationScopeEntitiesProvider {
   /**
-   * List every matchable scope with its entity set. An empty list disables
-   * matching for the run.
+   * The entity set of one evaluation subject.
+   *
+   * Return `null` when the host does not know the subject: a run over an
+   * unknown subject would report a vacuous clean result, so the module fails
+   * closed. Return an empty list when the subject is known but has no
+   * matchable entity.
    */
-  listScopeEntities(): Promise<SecurityEvaluationScopeEntities[]>;
+  listScopeEntities(subject: EvaluationSubjectRef): Promise<SecurityEvaluationScopeEntity[] | null>;
 }
