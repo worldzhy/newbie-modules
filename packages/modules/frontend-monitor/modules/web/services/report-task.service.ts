@@ -50,7 +50,6 @@ interface WebReportItem {
   markUv: string;
   markDevice: string;
   url: string;
-  p?: string;
   uid?: unknown;
   isFirstIn: boolean;
   errorList?: Record<string, unknown>[];
@@ -317,7 +316,6 @@ export class FrontendMonitorReportTaskService {
 
   private setUser(obj: Record<string, unknown>, data: WebReportItem) {
     if (data.uid) obj.uid = String(data.uid);
-    if (data.p) obj.phone = func.decryptPhone(data.p);
   }
 
   async saveWebReportDatasForRedis() {
@@ -453,9 +451,6 @@ export class FrontendMonitorReportTaskService {
       markUv: str(query.markUv),
       markDevice: str(query.markDevice),
       url: str(query.url),
-      // The encrypted phone is declared a string; a non-string payload value
-      // must not reach a String column (Mongoose cast error → requeue loop).
-      p: str(query.p) || undefined,
       uid: query.uid,
       isFirstIn: Boolean(query.isFirstIn),
       errorList: Array.isArray(query.errorList) ? query.errorList : undefined,
@@ -523,7 +518,6 @@ export class FrontendMonitorReportTaskService {
     }
     if (item.traceId) _ajax.traceId = func.toStringOrUndefined(item.traceId) ?? "";
     if (data.uid) _ajax.uid = String(data.uid);
-    if (data.p) _ajax.phone = func.decryptPhone(data.p);
     _ajax.markPage = data.markPage || "";
     _ajax.markUser = data.markUser || "";
 
@@ -578,7 +572,6 @@ export class FrontendMonitorReportTaskService {
       errors.markPage = data.markPage || "";
       errors.markUser = data.markUser || "";
       if (data.uid) errors.uid = String(data.uid);
-      if (data.p) errors.phone = func.decryptPhone(data.p);
 
       this.pushRow(appErrors, data.appKey, errors);
     }

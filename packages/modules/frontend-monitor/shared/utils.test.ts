@@ -212,20 +212,6 @@ test("escapeRegExp turns user text into a literal pattern", () => {
   assert.ok(!new RegExp(`^${escaped}$`).test("axbxc"), "escaped dots must not act as wildcards");
 });
 
-test("decryptPhone decodes two-character pairs via the decryptP table", () => {
-  assert.equal(func.decryptPhone("QRxacLpFOebnsMytUvik"), "0123456789");
-});
-
-test("decryptPhone passes non-strings through untouched", () => {
-  assert.equal(func.decryptPhone(123), 123);
-  assert.equal(func.decryptPhone(undefined), undefined);
-});
-
-test("decryptPhone rejects unknown pairs and trailing odd characters", () => {
-  assert.equal(func.decryptPhone("QRzz"), undefined);
-  assert.equal(func.decryptPhone("QRi"), undefined);
-});
-
 test("setMatchTime maps beginTime and endTime onto $match.createTime", () => {
   const match: Record<string, unknown> = {};
   func.setMatchTime({ beginTime: "2026-01-01T00:00:00.000Z", endTime: "2026-01-02T00:00:00.000Z" }, match);

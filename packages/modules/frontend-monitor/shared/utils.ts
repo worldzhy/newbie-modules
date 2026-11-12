@@ -33,19 +33,6 @@ export function pickRequestId(
   return typeof value === "string" && value ? value : undefined;
 }
 
-const decryptP: Record<string, number> = {
-  QR: 0,
-  xa: 1,
-  cL: 2,
-  pF: 3,
-  Oe: 4,
-  bn: 5,
-  sM: 6,
-  yt: 7,
-  Uv: 8,
-  ik: 9,
-};
-
 export const func = {
   isSkipIp(ip?: string) {
     if (!ip || ip === "127.0.0.1" || ip === "::1" || ip.includes("127.0.0.1") || ip.includes("::ffff")) return true;
@@ -179,25 +166,6 @@ export const func = {
   // for `$regex`, Node-side ReDoS for `new RegExp`). See R15-02/R5-P2-05.
   escapeRegExp(input: unknown) {
     return String(input).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  },
-  decryptPhone(str: unknown) {
-    if (typeof str !== "string") return str;
-    const out: string[] = [];
-    let pair = "";
-    for (const item of str.split("")) {
-      pair += item;
-      if (pair.length === 2) {
-        const digit = decryptP[pair];
-        pair = "";
-        // An unknown pair means the payload is not a valid encoded phone: fail
-        // the whole value instead of returning a silently truncated number.
-        if (digit === undefined) return undefined;
-        out.push(String(digit));
-      }
-    }
-    // A dangling odd character can never form a pair, so the value is invalid.
-    if (pair.length) return undefined;
-    return out.join("");
   },
   setMatchTime(query: Record<string, unknown>, $match: Record<string, unknown>) {
     const createTime: Record<string, unknown> = {};
