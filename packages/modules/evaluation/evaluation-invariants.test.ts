@@ -158,11 +158,23 @@ describe("coverage composition (ADR-020 D5.2)", () => {
     assert.ok(problems.some((problem) => problem.includes("dropped item ids")));
   });
 
-  it("rejects a skipped bucket whose item list disagrees with its total", () => {
-    const mismatched = { ...BASE_COVERAGE, skipped: { total: 3, note: "budget", items: ["e2"] } };
+  it("rejects a skipped bucket that lists more ids than its total counts", () => {
+    const mismatched = { ...BASE_COVERAGE, skipped: { total: 3, note: "budget", items: ["e1", "e2", "e3", "e4"] } };
     const problems = validateCoverageStats(mismatched);
 
-    assert.ok(problems.some((problem) => problem.includes("lists 1 ids but total is 3")));
+    assert.ok(problems.some((problem) => problem.includes("lists 4 ids but total is 3")));
+  });
+
+  it("accepts a skipped total larger than its id list because a host cut-off aggregates unlisted files", () => {
+    // ADR-054: files over the budget or hidden by a truncated tree are one
+    // count per reason, so the host cannot produce a per-file id for them.
+    const aggregated = {
+      ...BASE_COVERAGE,
+      skipped: { total: 339, note: "over file budget (304 file(s))", items: ["e2"] },
+    };
+    const problems = validateCoverageStats(aggregated);
+
+    assert.deepEqual(problems, []);
   });
 
   it("rejects evaluated items that are not part of the archived manifest", () => {

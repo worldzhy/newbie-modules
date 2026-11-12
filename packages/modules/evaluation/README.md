@@ -77,8 +77,9 @@ sense, and tracking a problem inside a JSON blob makes it untrackable.
    collected item is reported as a problem and the run is rejected — never
    silently bucketed under an "unknown" source. `validateCoverageStats` rejects
    a skipped bucket with `total > 0` unless it names the dropped items and
-   explains why, rejects a skipped item list that disagrees with the total,
-   rejects an unexplained `declaredUnlinked` gap, and — when given the manifest
+   explains why, rejects a skipped item list that outnumbers the total (a host
+   cut-off may aggregate files it never listed into one count), rejects an
+   unexplained `declaredUnlinked` gap, and — when given the manifest
    ids — rejects evaluated items outside the manifest. Verdict and finding
    `evidenceRefs` must likewise resolve to manifest items.
 3. **No composite score.** The result table has no total field and the module

@@ -153,8 +153,9 @@ function mergeBuckets(buckets: readonly (EvaluationCoverageBucket | undefined)[]
     if (bucket.note) notes.push(bucket.note);
   }
   if (Object.keys(bySource).length > 0) merged.bySource = bySource;
-  // Not deduplicated: one entry per skipped count, so items.length === total
-  // stays checkable by validateCoverageStats.
+  // Not deduplicated: one entry per skipped count. items.length never exceeds
+  // the summed total, but it can be smaller: a host cut-off aggregates many
+  // files into one count (ADR-054), so those files never produced ids.
   if (items.length > 0) merged.items = items;
   if (notes.length > 0) merged.note = notes.join("; ");
   return merged;
@@ -204,7 +205,11 @@ function validateBucket(name: string, bucket: EvaluationCoverageBucket): string[
       problems.push("coverageStats.skipped must list the dropped item ids");
     }
   }
-  if (name === "skipped" && bucket.items && bucket.items.length !== bucket.total) {
+  // The host never listed the paths of files it cut by budget or a truncated
+  // tree, so it aggregates them into one count per reason (ADR-054). A total
+  // larger than the id list is therefore legitimate; an id that outnumbers the
+  // total is the defect — it was registered without being counted.
+  if (name === "skipped" && bucket.items && bucket.items.length > bucket.total) {
     problems.push(`coverageStats.skipped.items lists ${bucket.items.length} ids but total is ${bucket.total}`);
   }
   if (name === "declaredUnlinked" && bucket.total > 0 && !bucket.note) {
