@@ -2,7 +2,7 @@
 // !             [Module] Module Hub models                       //
 // ! ------------------------------------------------------------ //
 // * ModuleHubInstallation                                                //
-// * HubModuleRelease                                               //
+// * ModuleHubRelease                                               //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 // Module-hub observer-plane models. PostgreSQL schema: "module/module-hub".
@@ -67,7 +67,7 @@ model ModuleHubInstallation {
 
 // Immutable registry catalog rows, inserted by the GitHub push webhook
 // (and a periodic fallback sync). One row per (module, registry commit).
-model HubModuleRelease {
+model ModuleHubRelease {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
   moduleKey String @db.VarChar(64)

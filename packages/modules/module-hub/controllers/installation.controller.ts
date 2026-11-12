@@ -87,14 +87,14 @@ export class InstallationController {
   // -- Catalog ---------------------------------------------------------------
 
   @Get("catalog")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.HubModuleRelease)
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.ModuleHubRelease)
   @ApiOkResponse()
   async catalog() {
     return this.releases.getCatalog();
   }
 
   @Get("catalog/:moduleKey/releases")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.HubModuleRelease)
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.ModuleHubRelease)
   @ApiOkResponse()
   async moduleReleases(@Param("moduleKey") moduleKey: string) {
     return this.releases.getReleasesForModule(moduleKey);
@@ -106,7 +106,7 @@ export class InstallationController {
    * shared idempotent upsert makes re-runs no-ops.
    */
   @Post("catalog/sync")
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.HubModuleRelease)
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.ModuleHubRelease)
   @ApiOkResponse()
   async syncCatalog(@Req() request: UserRequest) {
     return this.releases.syncCatalogFromRegistry({
