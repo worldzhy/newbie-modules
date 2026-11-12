@@ -71,6 +71,7 @@ Supersedes: ADR-052 的「以 `projectId` 作为绑定唯一作用域键」这�
 
 - 账户删除在引用存在时禁用（`consumerIds.length > 0`，tooltip 说明原因），后端 `ConflictException` 为第二道防线；因此账户列表响应必须携带引用方：`AwsCrossAccountBindingDto.consumerIds?: string[]`（由 `AwsCrossAccountBindingUsage` 反查）。
 - 导航入口数据驱动：新增 `PermissionGroup`（`routePath=/aws-accounts`、`navPlacement=HEADER_NAVIGATION`、`navOrder` 紧随 Projects、`navIcon=Cloud`）并授予角色；前端 `NAV_ICONS` 需登记 `Cloud`。这是数据而非代码，生产环境需单独种入。
+- 授权分层：账户级路由以 `AwsCrossAccountBinding` 作系统级资源（请求中没有项目上下文，按角色权限判定）；`consumers/:consumerId` 路由以 `AwsCrossAccountBindingUsage` 作项目级资源，宿主必须注册 `consumerId` 的 scope resolver。把这两个资源的方向搞反会让账户页 403（fail closed），不能靠放宽 guard 解决。
 
 ## 影响
 

@@ -72,3 +72,16 @@ DELETE /aws-cross-account-bindings/consumers/:consumerId
 
 The account list carries `consumerIds` per account so a host can render the
 account card (referencing projects, delete guard) without a second lookup.
+
+## Authorization
+
+The two route groups are authorized at different levels, and hosts must wire the
+second one:
+
+- Account routes use `AwsCrossAccountBinding` as a system-level (role-based)
+  resource: they carry no host consumer in the request, so no project scope can
+  be resolved for them.
+- Consumer routes use `AwsCrossAccountBindingUsage` as a project-scoped
+  resource. Hosts must register a scope resolver for the `consumerId` request
+  key that maps the consumer to its owning project; without it the guard fails
+  closed and every attach/detach call is denied.
