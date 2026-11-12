@@ -54,6 +54,11 @@ export class FrontendMonitorReportController {
     const { installationId, appKey } = req.installation;
     await this.tokenResolver.touchOnReport(installationId);
     query.appKey = appKey;
+    // The SDK submits its installation token in the body (sendBeacon cannot set
+    // headers). It has done its job in the guard and must not reach the Redis
+    // queue — nor the dead-letter list — as plaintext where it would outlive
+    // the request.
+    delete query.token;
 
     query.ip = func.getRealIp(req.headers, req.ip);
 
