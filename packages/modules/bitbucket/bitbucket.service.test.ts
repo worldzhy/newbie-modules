@@ -215,6 +215,49 @@ describe("BitbucketService.getCommit", () => {
   });
 });
 
+describe("BitbucketService.getRepository", () => {
+  it("maps the repository payload to the platform shape", async () => {
+    const service = makeService({ BITBUCKET_ACCESS_TOKEN: "token" });
+    const calls = stubFetch(200, {
+      full_name: "acme/atlas-api",
+      is_private: true,
+      mainbranch: { name: "develop" },
+      links: { clone: [{ name: "https", href: "https://bitbucket.org/acme/atlas-api.git" }] },
+    });
+
+    const repository = await service.getRepository("acme", "atlas-api");
+    assert.deepEqual(repository, {
+      fullName: "acme/atlas-api",
+      cloneUrl: "https://bitbucket.org/acme/atlas-api.git",
+      defaultBranch: "develop",
+      private: true,
+    });
+    assert.equal(calls[0].url, "https://api.bitbucket.org/2.0/repositories/acme/atlas-api");
+  });
+
+  it("falls back when optional fields are missing (empty repository)", async () => {
+    const service = makeService({ BITBUCKET_ACCESS_TOKEN: "token" });
+    stubFetch(200, { mainbranch: null });
+
+    const repository = await service.getRepository("acme", "empty");
+    assert.deepEqual(repository, {
+      fullName: "acme/empty",
+      cloneUrl: "https://bitbucket.org/acme/empty.git",
+      defaultBranch: null,
+      private: false,
+    });
+  });
+
+  it("returns null on 404 and throws on other API errors", async () => {
+    const service = makeService({ BITBUCKET_ACCESS_TOKEN: "token" });
+    stubFetch(404, "Not found");
+    assert.equal(await service.getRepository("acme", "missing"), null);
+
+    stubFetch(401, "Unauthorized");
+    await assert.rejects(service.getRepository("acme", "atlas-api"), /Bitbucket API 401/);
+  });
+});
+
 describe("BitbucketService.getTree", () => {
   const TREE_PAGE = {
     pagelen: 100,

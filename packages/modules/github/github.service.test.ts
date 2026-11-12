@@ -187,6 +187,63 @@ describe("GitHubService.parseGitHubUrl", () => {
   });
 });
 
+describe("GitHubService.getRepository", () => {
+  it("maps the repository payload to the platform shape", async () => {
+    const m = makeOctokitMock({
+      "repos.get": async () => ({
+        data: {
+          full_name: "acme/atlas-api",
+          clone_url: "https://github.com/acme/atlas-api.git",
+          default_branch: "main",
+          private: true,
+        },
+      }),
+    });
+
+    const repository = await makeService(m).getRepository("acme", "atlas-api");
+    assert.deepEqual(repository, {
+      fullName: "acme/atlas-api",
+      cloneUrl: "https://github.com/acme/atlas-api.git",
+      defaultBranch: "main",
+      private: true,
+    });
+    assert.deepEqual(m.calls["repos.get"][0][0], { owner: "acme", repo: "atlas-api" });
+  });
+
+  it("returns null on 404 (missing repo or invisible to the credential)", async () => {
+    const m = makeOctokitMock({
+      "repos.get": async () => {
+        throw httpError(404);
+      },
+    });
+    assert.equal(await makeService(m).getRepository("acme", "atlas-api"), null);
+  });
+
+  it("rethrows non-404 errors", async () => {
+    const m = makeOctokitMock({
+      "repos.get": async () => {
+        throw httpError(403);
+      },
+    });
+    await assert.rejects(makeService(m).getRepository("acme", "atlas-api"), (e: any) => e.status === 403);
+  });
+
+  it("treats an empty repository (null default_branch) as readable", async () => {
+    const m = makeOctokitMock({
+      "repos.get": async () => ({
+        data: {
+          full_name: "acme/empty",
+          clone_url: "https://github.com/acme/empty.git",
+          default_branch: null,
+          private: true,
+        },
+      }),
+    });
+    const repository = await makeService(m).getRepository("acme", "empty");
+    assert.equal(repository?.defaultBranch, null);
+  });
+});
+
 describe("GitHubService.getFileContent", () => {
   const encodeFile = (text: string) => ({
     data: { type: "file", content: Buffer.from(text).toString("base64"), sha: "blob-1" },

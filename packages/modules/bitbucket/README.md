@@ -18,11 +18,14 @@ When the token is absent, `BitbucketNotConfiguredError` is thrown by any API cal
 
 ## Methods
 
-| Method                                  | Semantics                                                                                                                                                                    |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `isConfigured()`                        | Whether an access token exists                                                                                                                                               |
-| `parseBitbucketUrl(url)`                | Parse `https://bitbucket.org/<workspace>/<repo>` and `git@bitbucket.org:<workspace>/<repo>` (with or without `.git`/trailing slash) into `{workspace, repo}`; null otherwise |
-| `getFileContent(workspace, repo, path)` | Read a UTF-8 text file at HEAD; null on 404, other API failures throw. Path segments are URL-encoded individually                                                            |
+| Method                                      | Semantics                                                                                                                                                                    |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `isConfigured()`                            | Whether an access token exists                                                                                                                                               |
+| `parseBitbucketUrl(url)`                    | Parse `https://bitbucket.org/<workspace>/<repo>` and `git@bitbucket.org:<workspace>/<repo>` (with or without `.git`/trailing slash) into `{workspace, repo}`; null otherwise |
+| `getFileContent(workspace, repo, path)`     | Read a UTF-8 text file at HEAD; null on 404, other API failures throw. Path segments are URL-encoded individually                                                            |
+| `getRepository(workspace, repo)`            | Repository metadata as visible to the configured credential: `{fullName, cloneUrl, defaultBranch, private}`. Null on 404 (missing repo or no access); other failures throw   |
+| `getCommit(workspace, repo, ref)`           | One commit's metadata (`{sha, message, authorName, authorEmail, committedAt}`); null on 404. Mirrors the GitHub accessor                                                     |
+| `getTree(workspace, repo, ref, recursive?)` | Git tree at a branch/tag/sha: `{entries: {path, type, sha, size}[], truncated}`; `recursive` walks subdirectories. Null on 404                                               |
 
 `BitbucketNotConfiguredError` is thrown by any API method when the service was constructed without a token, so an unconfigured deployment fails fast with a meaningful error.
 

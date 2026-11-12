@@ -90,6 +90,16 @@ export interface RepositoryTree {
   truncated: boolean;
 }
 
+/** Repository metadata read through the platform credentials. */
+export interface RepositoryInfo {
+  /** `owner/repo` as GitHub reports it (authoritative casing). */
+  fullName: string;
+  cloneUrl: string;
+  /** null when the repository is empty (no commits, hence no default branch). */
+  defaultBranch: string | null;
+  private: boolean;
+}
+
 /** The subset of a GitHub commit payload these accessors read. */
 interface GitHubCommitPayload {
   sha: string;
@@ -194,6 +204,27 @@ export class GitHubService {
     if (!slug) return null;
     if (!/github\.com/.test(url)) return null;
     return slug;
+  }
+
+  /**
+   * Repository metadata as visible to the configured credential, or null when
+   * the repository is absent. GitHub answers 404 both for a missing repo and
+   * for one the credential cannot see, so null covers "not found" and "no
+   * access" alike; other failures throw.
+   */
+  async getRepository(owner: string, repo: string): Promise<RepositoryInfo | null> {
+    try {
+      const { data } = await this.client().repos.get({ owner, repo });
+      return {
+        fullName: data.full_name,
+        cloneUrl: data.clone_url,
+        defaultBranch: data.default_branch ?? null,
+        private: data.private,
+      };
+    } catch (e: unknown) {
+      if (getErrorStatus(e) === 404) return null;
+      throw e;
+    }
   }
 
   /**
