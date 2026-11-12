@@ -65,9 +65,13 @@ const REDACTED_QUERY_VALUE = "[redacted]";
 
 function maskQueryForStorage(rawQuery: string): string {
   if (!rawQuery) return "";
+  // `&` is the WHATWG separator, but some backends still accept `;`. Split on
+  // both while keeping the original separators so the stored string is not
+  // rewritten (R2-02).
   return rawQuery
-    .split("&")
-    .map((pair) => {
+    .split(/([&;])/)
+    .map((pair, index) => {
+      if (index % 2 === 1) return pair;
       const eq = pair.indexOf("=");
       if (eq === -1) return pair;
       const rawKey = pair.slice(0, eq);
@@ -79,7 +83,7 @@ function maskQueryForStorage(rawQuery: string): string {
       }
       return SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? `${rawKey}=${REDACTED_QUERY_VALUE}` : pair;
     })
-    .join("&");
+    .join("");
 }
 
 /**
@@ -96,6 +100,9 @@ function stripUrlForStorage(raw: unknown): string {
   const hashAt = out.indexOf("#");
   if (hashAt > -1) out = out.slice(0, hashAt);
   out = out.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/?#@]*@/i, "$1");
+  // Protocol-relative URLs (`//user:pass@host/...`) never match the scheme
+  // branch above but carry the same credentials (R2-01).
+  out = out.replace(/^\/\/[^/?#@]*@/, "//");
   const queryAt = out.indexOf("?");
   return queryAt === -1 ? out : `${out.slice(0, queryAt + 1)}${maskQueryForStorage(out.slice(queryAt + 1))}`;
 }

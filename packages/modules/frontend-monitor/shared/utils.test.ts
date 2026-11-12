@@ -140,6 +140,17 @@ test("sanitizeUrlForStorage strips userinfo credentials", () => {
   assert.equal(func.sanitizeUrlForStorage("https://user:pass@example.com/a"), "https://example.com/a");
 });
 
+test("sanitizeUrlForStorage strips userinfo from protocol-relative urls", () => {
+  assert.equal(func.sanitizeUrlForStorage("//user:pass@cdn.example.com/a.js"), "//cdn.example.com/a.js");
+});
+
+test("sanitizeUrlForStorage masks credential-like query values separated by semicolons", () => {
+  assert.equal(
+    func.sanitizeUrlForStorage("https://e.com/a?page=2;token=abc"),
+    "https://e.com/a?page=2;token=[redacted]",
+  );
+});
+
 test("sanitizeUrlForStorage masks credential-like query values and keeps the rest", () => {
   const out = func.sanitizeUrlForStorage("https://example.com/a?page=2&token=abc&q=x");
   assert.equal(out, "https://example.com/a?page=2&token=[redacted]&q=x");
