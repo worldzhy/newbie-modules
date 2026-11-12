@@ -509,7 +509,7 @@ export class FrontendMonitorReportTaskService {
     const bs = func.toNumberOrUndefined(item.bodySize);
     if (bs !== undefined) _ajax.bodySize = bs;
     _ajax.callUrl = data.url || "";
-    if (item.options) _ajax.options = func.filterKeyWord(item.options);
+    if (item.options) _ajax.options = func.toStorageText(item.options);
     try {
       const newurl = new URL(String(item.name));
       if (newurl.searchParams.toString()) _ajax.query = newurl.searchParams.toString();
@@ -566,7 +566,7 @@ export class FrontendMonitorReportTaskService {
       } catch {
         // Expected failure: the URL may be malformed — skip query extraction.
       }
-      if (item.options) errors.options = func.filterKeyWord(item.options);
+      if (item.options) errors.options = func.toStorageText(item.options);
       if (item.traceId) errors.traceId = item.traceId;
 
       errors.markPage = data.markPage || "";

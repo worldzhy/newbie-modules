@@ -154,7 +154,10 @@ export const func = {
     }
     return undefined;
   },
-  filterKeyWord(input: unknown) {
+  // Coerce a client value into the TEXT column it is stored in. This is
+  // storage serialization, not redaction: nothing is filtered here, so a name
+  // implying sanitization (`filterKeyWord`) misled readers — see R1-02.
+  toStorageText(input: unknown) {
     try {
       return typeof input === "string" ? input : JSON.stringify(input);
     } catch {

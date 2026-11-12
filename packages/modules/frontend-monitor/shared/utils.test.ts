@@ -186,16 +186,16 @@ test("toStringOrUndefined returns undefined for numbers and other non-strings", 
   assert.equal(func.toStringOrUndefined(circular), undefined, "an unstringifiable object must not throw");
 });
 
-test("filterKeyWord passes strings through and JSON-stringifies other values", () => {
-  assert.equal(func.filterKeyWord("keyword"), "keyword");
-  assert.equal(func.filterKeyWord(5), "5");
-  assert.equal(func.filterKeyWord({ a: 1 }), JSON.stringify({ a: 1 }));
+test("toStorageText passes strings through and JSON-stringifies other values", () => {
+  assert.equal(func.toStorageText("keyword"), "keyword");
+  assert.equal(func.toStorageText(5), "5");
+  assert.equal(func.toStorageText({ a: 1 }), JSON.stringify({ a: 1 }));
 });
 
-test("filterKeyWord returns an empty string when stringification fails", () => {
+test("toStorageText returns an empty string when stringification fails", () => {
   const circular: Record<string, unknown> = {};
   circular.self = circular;
-  assert.equal(func.filterKeyWord(circular), "");
+  assert.equal(func.toStorageText(circular), "");
 });
 
 test("escapeRegExp escapes every regex metacharacter so the result matches literally", () => {
