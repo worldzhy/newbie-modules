@@ -68,6 +68,9 @@ export class ErrorService {
     else if (type === "ajax|fetch") groupBy = "resourceUrl,status,type";
     else if (type === "bussiness-ajax|bussiness-fetch") groupBy = "resourceUrl,status,type";
     else if (type === "log") groupBy = "resourceUrl,type";
+    // A rejected promise was split out of `log`; the frontend folds it into the
+    // script tab because it is a runtime error, so it needs script's grouping.
+    else if (type === "script|promise-rejection") groupBy = "resourceUrl,name,type";
 
     // An absent or unrecognized type leaves groupBy empty; an empty grouping
     // prefix would emit a leading comma in the select list (invalid SQL) and an

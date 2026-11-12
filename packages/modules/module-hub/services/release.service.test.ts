@@ -81,7 +81,7 @@ test("one failing module does not abort the catalog sync", async () => {
     getFileContent: async () => null,
   };
   const service = new ModuleHubReleaseService(
-    { hubModuleRelease: { findUnique: async () => null } } as any,
+    { moduleHubRelease: { findUnique: async () => null } } as any,
     { get: () => undefined } as any,
     {} as any,
     github as any,

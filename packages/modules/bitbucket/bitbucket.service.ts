@@ -49,6 +49,16 @@ export interface RepositoryTree {
   truncated: boolean;
 }
 
+/** Repository metadata read through the platform credentials. */
+export interface RepositoryInfo {
+  /** `workspace/repo` as Bitbucket reports it. */
+  fullName: string;
+  cloneUrl: string;
+  /** null when the repository is empty (no commits, hence no main branch). */
+  defaultBranch: string | null;
+  private: boolean;
+}
+
 /**
  * Map Bitbucket source entry types to the generic Git vocabulary used by
  * the rest of the platform. Host-side consumers switch on `"blob"` /
@@ -186,6 +196,29 @@ export class BitbucketService {
     const response = await this.apiFetch(url, { accept404: true });
     if (response.status === 404) return null;
     return response.text();
+  }
+
+  /**
+   * Repository metadata as visible to the configured credential, or null on
+   * 404 (absent, or invisible to the token); other failures throw.
+   */
+  async getRepository(workspace: string, repo: string): Promise<RepositoryInfo | null> {
+    const url = `${BITBUCKET_API_BASE}/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(repo)}`;
+    const response = await this.apiFetch(url, { accept404: true });
+    if (response.status === 404) return null;
+
+    const json = (await response.json()) as {
+      full_name?: string;
+      is_private?: boolean;
+      mainbranch?: { name?: string } | null;
+      links?: { clone?: { href?: string }[] } | null;
+    };
+    return {
+      fullName: json.full_name ?? `${workspace}/${repo}`,
+      cloneUrl: json.links?.clone?.[0]?.href ?? `https://bitbucket.org/${workspace}/${repo}.git`,
+      defaultBranch: json.mainbranch?.name ?? null,
+      private: json.is_private ?? false,
+    };
   }
 
   /**

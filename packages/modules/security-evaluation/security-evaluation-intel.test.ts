@@ -36,8 +36,8 @@ import {
 const SUBJECT: EvaluationSubjectRef = {
   id: "11111111-1111-4111-8111-111111111111",
   kind: "repository",
-  scopeType: "project",
-  scopeId: "22222222-2222-4222-8222-222222222222",
+  scopeType: "platform",
+  scopeId: "deployment",
   subjectKey: "application-1",
   displayName: "nightwatch-backend",
 };
@@ -49,7 +49,7 @@ const INTEL_VERSION: EvaluationRuleSetVersionRef = {
   version: "v1",
 };
 
-const SCOPE_KEY = `${SUBJECT.scopeType}:${SUBJECT.scopeId}`;
+const SCOPE_KEY = `${SUBJECT.kind}:${SUBJECT.subjectKey}`;
 
 interface IntelRow {
   id: string;
@@ -86,12 +86,15 @@ function stubPrisma(rows: IntelRow[]): PrismaService {
 
 function stubNegativeCache(rows: IntelRow[] = []) {
   const recorded: { knowledgeItemId: string; scopeKey: string; verdict: string; signature: string }[] = [];
+  const seenScopeKeys: string[] = [];
   const cachedIds = new Set(rows.filter((row) => row.negativeCache?.[SCOPE_KEY] !== undefined).map((row) => row.id));
   const port: SecurityEvaluationIntelNegativeCachePort = {
-    filterUncached: async (_scopeKey, candidates) =>
-      candidates
+    filterUncached: async (scopeKey, candidates) => {
+      seenScopeKeys.push(scopeKey);
+      return candidates
         .filter((candidate) => !cachedIds.has(candidate.knowledgeItemId))
-        .map((candidate) => candidate.knowledgeItemId),
+        .map((candidate) => candidate.knowledgeItemId);
+    },
     record: async (entry) => {
       recorded.push({
         knowledgeItemId: entry.knowledgeItemId,
@@ -101,17 +104,11 @@ function stubNegativeCache(rows: IntelRow[] = []) {
       });
     },
   };
-  return { port, recorded };
+  return { port, recorded, seenScopeKeys };
 }
 
 const SCOPE_PROVIDER: SecurityEvaluationScopeEntitiesProvider = {
-  listScopeEntities: async () => [
-    {
-      scopeType: SUBJECT.scopeType,
-      scopeId: SUBJECT.scopeId,
-      entities: [{ value: "next" }, { value: "nightwatch-backend" }],
-    },
-  ],
+  listScopeEntities: async () => [{ value: "next" }, { value: "nightwatch-backend" }],
 };
 
 function stubAssets(): SecurityEvaluationAssetService {
@@ -177,9 +174,10 @@ test("INTEL candidates are registered as knowledge evidence items and negative-c
     row("kn-1", { title: "Next.js advisory", severity: "high", summary: "Affects next@<14.2." }),
     row("kn-2", { negativeCache: { [SCOPE_KEY]: "not relevant" } }),
   ];
-  const { port } = stubNegativeCache(rows);
+  const { port, seenScopeKeys } = stubNegativeCache(rows);
 
   const evidence = await buildEvidence(stubPrisma(rows), port);
+  assert.deepEqual(seenScopeKeys, [SCOPE_KEY]);
   const knowledge = evidence.items.filter((item) => item.layer === "knowledge");
   assert.deepEqual(
     knowledge.map((item) => [item.id, item.source, item.summary, item.refs]),
@@ -238,6 +236,7 @@ test("the judgment maps examined candidates to manifest ids and budget cut-offs 
     // re-ranked candidate is recorded as "not-relevant".
     ["hard", "not-relevant"],
   );
+  assert.ok(recorded.every((entry) => entry.scopeKey === SCOPE_KEY));
 });
 
 test("the re-rank budget leaves overflow candidates in the judgment skipped bucket", async () => {
@@ -261,7 +260,7 @@ test("the re-rank budget leaves overflow candidates in the judgment skipped buck
   assert.equal(recorded.length, SECURITY_EVALUATION_INTEL_RE_RANK_BUDGET);
 });
 
-test("INTEL collection fails loudly when the scope port is unbound or the subject scope is unknown", async () => {
+test("INTEL collection fails closed on an unknown subject and short-circuits a subject with no entities", async () => {
   const { port } = stubNegativeCache();
   const build = (scope: SecurityEvaluationScopeEntitiesProvider | undefined) =>
     new SecurityEvaluationEvidenceProvider(
@@ -275,9 +274,11 @@ test("INTEL collection fails loudly when the scope port is unbound or the subjec
 
   await assert.rejects(() => build(undefined), /No SecurityEvaluationScopeEntitiesProvider/);
   await assert.rejects(
-    () => build({ listScopeEntities: async () => [] }),
+    () => build({ listScopeEntities: async () => null }),
     (error: unknown) => error instanceof BadRequestException,
   );
+  const empty = await build({ listScopeEntities: async () => [] });
+  assert.deepEqual(empty.items, []);
 });
 
 function reRankerReturning(payload: unknown): SecurityEvaluationIntelReRanker {

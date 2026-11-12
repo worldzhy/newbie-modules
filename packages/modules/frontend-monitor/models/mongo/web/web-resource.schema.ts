@@ -29,3 +29,5 @@ WebResourceSchema.index({ speedType: 1, url: 1 });
 // (jobs.service slow-resource signals), which previously scanned the whole
 // per-app collection.
 WebResourceSchema.index({ type: 1, createTime: -1 });
+// 90-day retention, matching the ClickHouse and backend tables (ADR-044).
+WebResourceSchema.index({ createTime: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });

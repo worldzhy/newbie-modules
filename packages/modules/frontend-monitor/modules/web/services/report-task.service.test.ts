@@ -387,7 +387,6 @@ test("object client values on String columns are coerced, not cast-error poison 
       type: ReportType.AjaxPerf,
       url: "https://example.com/a",
       markPage: "p1",
-      p: {},
       resourceList: [
         { type: "fetch", name: {}, method: {}, nextHopProtocol: {}, duration: 300 },
         { type: "img", name: {}, method: {}, duration: 5000 },

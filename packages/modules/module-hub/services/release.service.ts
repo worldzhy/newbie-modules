@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import { HubModuleRelease, Prisma } from "@generated/prisma/client";
+import { ModuleHubRelease, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditActorType, AuditLogService } from "@modules/audit/audit-log.service";
 import { GitHubService } from "@modules/github/github.service";
@@ -107,8 +107,8 @@ export class ModuleHubReleaseService {
     manifest: ManifestShape,
     trigger: IngestTrigger = WEBHOOK_TRIGGER,
     committedAt?: Date | null,
-  ): Promise<HubModuleRelease> {
-    const row = await this.prisma.hubModuleRelease.upsert({
+  ): Promise<ModuleHubRelease> {
+    const row = await this.prisma.moduleHubRelease.upsert({
       where: { moduleKey_sourceCommit: { moduleKey, sourceCommit } },
       // Backfill the commit date on rows ingested before it was recorded.
       update: committedAt ? { committedAt } : {},
@@ -138,14 +138,14 @@ export class ModuleHubReleaseService {
    * (R23-04). `publishedAt` stays the fallback for rows ingested before
    * `committedAt` existed.
    */
-  async getCatalog(): Promise<HubModuleRelease[]> {
-    const rows = await this.prisma.hubModuleRelease.findMany({ orderBy: { moduleKey: "asc" } });
+  async getCatalog(): Promise<ModuleHubRelease[]> {
+    const rows = await this.prisma.moduleHubRelease.findMany({ orderBy: { moduleKey: "asc" } });
     return pickLatestReleases(rows);
   }
 
   /** Full release history of one module. */
-  async getReleasesForModule(moduleKey: string): Promise<HubModuleRelease[]> {
-    return this.prisma.hubModuleRelease.findMany({
+  async getReleasesForModule(moduleKey: string): Promise<ModuleHubRelease[]> {
+    return this.prisma.moduleHubRelease.findMany({
       where: { moduleKey },
       orderBy: { publishedAt: "desc" },
     });
@@ -153,7 +153,7 @@ export class ModuleHubReleaseService {
 
   /** Most recently ingested registry commit, surfaced in agent poll responses. */
   async getLatestRegistrySourceCommit(): Promise<string | null> {
-    const row = await this.prisma.hubModuleRelease.findFirst({
+    const row = await this.prisma.moduleHubRelease.findFirst({
       orderBy: { publishedAt: "desc" },
       select: { sourceCommit: true },
     });
@@ -227,7 +227,7 @@ export class ModuleHubReleaseService {
       try {
         const last = await this.getLastCommitForModule(key);
         if (!last) continue;
-        const existing = await this.prisma.hubModuleRelease.findUnique({
+        const existing = await this.prisma.moduleHubRelease.findUnique({
           where: { moduleKey_sourceCommit: { moduleKey: key, sourceCommit: last.sha } },
           select: { id: true, committedAt: true },
         });

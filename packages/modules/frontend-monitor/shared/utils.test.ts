@@ -128,6 +128,64 @@ test("urlHelper never throws on malformed input", () => {
   assert.equal(func.urlHelper("not a url at all /5"), "not a url at all /*");
 });
 
+test("sanitizeUrlForStorage drops the fragment", () => {
+  assert.equal(
+    func.sanitizeUrlForStorage("https://example.com/reset#access_token=abc"),
+    "https://example.com/reset",
+    "SPA hash routes carry tokens and must never be stored",
+  );
+});
+
+test("sanitizeUrlForStorage strips userinfo credentials", () => {
+  assert.equal(func.sanitizeUrlForStorage("https://user:pass@example.com/a"), "https://example.com/a");
+});
+
+test("sanitizeUrlForStorage strips userinfo from protocol-relative urls", () => {
+  assert.equal(func.sanitizeUrlForStorage("//user:pass@cdn.example.com/a.js"), "//cdn.example.com/a.js");
+});
+
+test("sanitizeUrlForStorage masks credential-like query values separated by semicolons", () => {
+  assert.equal(
+    func.sanitizeUrlForStorage("https://e.com/a?page=2;token=abc"),
+    "https://e.com/a?page=2;token=[redacted]",
+  );
+});
+
+test("sanitizeUrlForStorage masks credential-like query values and keeps the rest", () => {
+  const out = func.sanitizeUrlForStorage("https://example.com/a?page=2&token=abc&q=x");
+  assert.equal(out, "https://example.com/a?page=2&token=[redacted]&q=x");
+});
+
+test("sanitizeUrlForStorage matches query keys case-insensitively and after decoding", () => {
+  assert.equal(func.sanitizeUrlForStorage("https://e.com/?PASSWORD=x"), "https://e.com/?PASSWORD=[redacted]");
+  assert.equal(
+    func.sanitizeUrlForStorage("https://e.com/?%61ccess_token=x"),
+    "https://e.com/?%61ccess_token=[redacted]",
+  );
+});
+
+test("sanitizeUrlForStorage leaves a query-less url untouched", () => {
+  assert.equal(func.sanitizeUrlForStorage("https://example.com/a/b"), "https://example.com/a/b");
+});
+
+test("sanitizeUrlForStorage returns an empty string for non-values", () => {
+  assert.equal(func.sanitizeUrlForStorage(undefined), "");
+  assert.equal(func.sanitizeUrlForStorage(null), "");
+  assert.equal(func.sanitizeUrlForStorage(""), "");
+});
+
+test("sanitizePathForStorage drops the whole query string", () => {
+  assert.equal(func.sanitizePathForStorage("https://example.com/a?token=x&page=2"), "https://example.com/a");
+  assert.equal(func.sanitizePathForStorage("/a?b=1"), "/a");
+  assert.equal(func.sanitizePathForStorage("/a"), "/a");
+});
+
+test("sanitizeSearchForStorage masks bare query strings", () => {
+  assert.equal(func.sanitizeSearchForStorage("page=2&token=abc"), "page=2&token=[redacted]");
+  assert.equal(func.sanitizeSearchForStorage(undefined), "");
+  assert.equal(func.sanitizeSearchForStorage({}), "");
+});
+
 test("toDate passes a Date through by reference and treats numbers as epoch ms", () => {
   const date = new Date(1700000000000);
   assert.equal(func.toDate(date), date);
@@ -186,16 +244,16 @@ test("toStringOrUndefined returns undefined for numbers and other non-strings", 
   assert.equal(func.toStringOrUndefined(circular), undefined, "an unstringifiable object must not throw");
 });
 
-test("filterKeyWord passes strings through and JSON-stringifies other values", () => {
-  assert.equal(func.filterKeyWord("keyword"), "keyword");
-  assert.equal(func.filterKeyWord(5), "5");
-  assert.equal(func.filterKeyWord({ a: 1 }), JSON.stringify({ a: 1 }));
+test("toStorageText passes strings through and JSON-stringifies other values", () => {
+  assert.equal(func.toStorageText("keyword"), "keyword");
+  assert.equal(func.toStorageText(5), "5");
+  assert.equal(func.toStorageText({ a: 1 }), JSON.stringify({ a: 1 }));
 });
 
-test("filterKeyWord returns an empty string when stringification fails", () => {
+test("toStorageText returns an empty string when stringification fails", () => {
   const circular: Record<string, unknown> = {};
   circular.self = circular;
-  assert.equal(func.filterKeyWord(circular), "");
+  assert.equal(func.toStorageText(circular), "");
 });
 
 test("escapeRegExp escapes every regex metacharacter so the result matches literally", () => {
@@ -210,20 +268,6 @@ test("escapeRegExp turns user text into a literal pattern", () => {
   assert.equal(escaped, "a\\.b\\*c");
   assert.ok(new RegExp(`^${escaped}$`).test("a.b*c"));
   assert.ok(!new RegExp(`^${escaped}$`).test("axbxc"), "escaped dots must not act as wildcards");
-});
-
-test("decryptPhone decodes two-character pairs via the decryptP table", () => {
-  assert.equal(func.decryptPhone("QRxacLpFOebnsMytUvik"), "0123456789");
-});
-
-test("decryptPhone passes non-strings through untouched", () => {
-  assert.equal(func.decryptPhone(123), 123);
-  assert.equal(func.decryptPhone(undefined), undefined);
-});
-
-test("decryptPhone rejects unknown pairs and trailing odd characters", () => {
-  assert.equal(func.decryptPhone("QRzz"), undefined);
-  assert.equal(func.decryptPhone("QRi"), undefined);
 });
 
 test("setMatchTime maps beginTime and endTime onto $match.createTime", () => {

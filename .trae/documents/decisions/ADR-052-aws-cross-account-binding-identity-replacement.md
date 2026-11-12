@@ -1,8 +1,9 @@
 # ADR-052: 跨账户绑定的身份以两阶段原子替换
 
-状态：已采纳
+状态：已采纳（作用域键部分由 ADR-056 取代）
+Superseded by: ADR-056（2026-11-13，仅「以 `projectId` 作为绑定唯一作用域键」这一结论；两阶段身份替换状态机、草案/活动身份、external ID 随身份轮换继续有效）
 日期：2026-11-08
-关联：ADR-002（区域作为绑定作用域）；nightwatch-backend ADR-012（生产 AWS 拓扑）
+关联：ADR-002（区域作为绑定作用域）；nightwatch-backend ADR-012（生产 AWS 拓扑）；ADR-056（作用域键由 projectId 收敛为 accountId）
 
 ## 背景
 

@@ -8,7 +8,6 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from "@nestjs/common";
-import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AwsCrossAccountBindingsService } from "@modules/aws-identity/aws-cross-account-bindings.service";
 import {
   CancelRotateSecretCommand,
@@ -78,10 +77,7 @@ export class AwsSecretsManagerService {
   private readonly logger = new Logger(AwsSecretsManagerService.name);
   private readonly clientCache = new Map<string, CachedClient>();
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly credentialService: AwsCrossAccountBindingsService,
-  ) {}
+  constructor(private readonly credentialService: AwsCrossAccountBindingsService) {}
 
   /**
    * Returns a single AWS page (cursor pagination). The opaque nextToken must be
@@ -428,7 +424,7 @@ export class AwsSecretsManagerService {
       const lambdaArn = await this.getRotationLambdaArn(projectId);
       if (!lambdaArn) {
         throw new BadRequestException(
-          "Rotation Lambda ARN is not configured in Project Settings, cannot enable rotation",
+          "Rotation Lambda ARN is not configured for the project's AWS account, cannot enable rotation",
         );
       }
       // RotateSecret both configures the rotation schedule and starts the first rotation.
@@ -505,15 +501,9 @@ export class AwsSecretsManagerService {
     }
   }
 
+  /** The rotation Lambda is account-scoped configuration, resolved through aws-identity. */
   private async getRotationLambdaArn(projectId: string): Promise<string | null> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { awsSecretsManagerRotationLambdaArn: true },
-    });
-    if (!project) {
-      throw new NotFoundException(`Project not found: ${projectId}`);
-    }
-    return project.awsSecretsManagerRotationLambdaArn;
+    return await this.credentialService.resolveRotationLambdaArn(projectId);
   }
 
   /**

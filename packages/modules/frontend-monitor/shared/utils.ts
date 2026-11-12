@@ -33,18 +33,79 @@ export function pickRequestId(
   return typeof value === "string" && value ? value : undefined;
 }
 
-const decryptP: Record<string, number> = {
-  QR: 0,
-  xa: 1,
-  cL: 2,
-  pF: 3,
-  Oe: 4,
-  bn: 5,
-  sM: 6,
-  yt: 7,
-  Uv: 8,
-  ik: 9,
-};
+/**
+ * Query keys whose values are credentials or session material. The key is kept
+ * so dashboards still show the parameter was present; the value is replaced.
+ */
+const SENSITIVE_QUERY_KEYS = new Set([
+  "token",
+  "access_token",
+  "refresh_token",
+  "id_token",
+  "password",
+  "passwd",
+  "pwd",
+  "secret",
+  "client_secret",
+  "api_key",
+  "apikey",
+  "authorization",
+  "auth",
+  "session",
+  "sessionid",
+  "session_id",
+  "cookie",
+  "sig",
+  "signature",
+  "code",
+  "otp",
+]);
+
+const REDACTED_QUERY_VALUE = "[redacted]";
+
+function maskQueryForStorage(rawQuery: string): string {
+  if (!rawQuery) return "";
+  // `&` is the WHATWG separator, but some backends still accept `;`. Split on
+  // both while keeping the original separators so the stored string is not
+  // rewritten (R2-02).
+  return rawQuery
+    .split(/([&;])/)
+    .map((pair, index) => {
+      if (index % 2 === 1) return pair;
+      const eq = pair.indexOf("=");
+      if (eq === -1) return pair;
+      const rawKey = pair.slice(0, eq);
+      let key = rawKey;
+      try {
+        key = decodeURIComponent(rawKey);
+      } catch {
+        // Keep the raw key when it is not valid percent-encoding.
+      }
+      return SENSITIVE_QUERY_KEYS.has(key.toLowerCase()) ? `${rawKey}=${REDACTED_QUERY_VALUE}` : pair;
+    })
+    .join("");
+}
+
+/**
+ * Second-pass cleanup for a URL that is about to reach a store. The SDK drops
+ * the query and fragment on the client, but a report without `url` falls back
+ * to the raw Referer header, so the server cannot trust the client trimming
+ * (R1-05). Fragments and userinfo are always dropped (SPA hash routes and
+ * `user:pass@` carry credentials); credential-like query values are masked
+ * while the rest of the URL stays usable for debugging.
+ */
+function stripUrlForStorage(raw: unknown): string {
+  let out = typeof raw === "string" ? raw : String(raw ?? "");
+  if (!out) return "";
+  const hashAt = out.indexOf("#");
+  if (hashAt > -1) out = out.slice(0, hashAt);
+  out = out.replace(/^([a-z][a-z0-9+.-]*:\/\/)[^/?#@]*@/i, "$1");
+  // Protocol-relative URLs (`//user:pass@host/...`) never match the scheme
+  // branch above but carry the same credentials (R2-01).
+  out = out.replace(/^\/\/[^/?#@]*@/, "//");
+  const queryAt = out.indexOf("?");
+  return queryAt === -1 ? out : `${out.slice(0, queryAt + 1)}${maskQueryForStorage(out.slice(queryAt + 1))}`;
+}
 
 export const func = {
   isSkipIp(ip?: string) {
@@ -111,6 +172,22 @@ export const func = {
       return input;
     }
   },
+  // Full URL column (fullUrl/callUrl/url/preUrl): fragment and userinfo are
+  // dropped, credential-like query values masked, everything else preserved.
+  sanitizeUrlForStorage(raw: unknown) {
+    return stripUrlForStorage(raw);
+  },
+  // Page/resource identity column: same cleanup, plus the whole query string is
+  // dropped because identity rows never need it.
+  sanitizePathForStorage(raw: unknown) {
+    const url = stripUrlForStorage(raw);
+    const queryAt = url.indexOf("?");
+    return queryAt === -1 ? url : url.slice(0, queryAt);
+  },
+  // Bare query-string column: mask only, no fragment/userinfo handling.
+  sanitizeSearchForStorage(raw: unknown) {
+    return maskQueryForStorage(typeof raw === "string" ? raw : "");
+  },
   // Added: object check (arrays included)
   isObject(input: unknown): input is Record<string, unknown> {
     return input !== null && typeof input === "object";
@@ -167,7 +244,10 @@ export const func = {
     }
     return undefined;
   },
-  filterKeyWord(input: unknown) {
+  // Coerce a client value into the TEXT column it is stored in. This is
+  // storage serialization, not redaction: nothing is filtered here, so a name
+  // implying sanitization (`filterKeyWord`) misled readers — see R1-02.
+  toStorageText(input: unknown) {
     try {
       return typeof input === "string" ? input : JSON.stringify(input);
     } catch {
@@ -179,25 +259,6 @@ export const func = {
   // for `$regex`, Node-side ReDoS for `new RegExp`). See R15-02/R5-P2-05.
   escapeRegExp(input: unknown) {
     return String(input).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  },
-  decryptPhone(str: unknown) {
-    if (typeof str !== "string") return str;
-    const out: string[] = [];
-    let pair = "";
-    for (const item of str.split("")) {
-      pair += item;
-      if (pair.length === 2) {
-        const digit = decryptP[pair];
-        pair = "";
-        // An unknown pair means the payload is not a valid encoded phone: fail
-        // the whole value instead of returning a silently truncated number.
-        if (digit === undefined) return undefined;
-        out.push(String(digit));
-      }
-    }
-    // A dangling odd character can never form a pair, so the value is invalid.
-    if (pair.length) return undefined;
-    return out.join("");
   },
   setMatchTime(query: Record<string, unknown>, $match: Record<string, unknown>) {
     const createTime: Record<string, unknown> = {};

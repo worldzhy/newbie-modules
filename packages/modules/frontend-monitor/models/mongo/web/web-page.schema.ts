@@ -31,3 +31,5 @@ export type WebPageDocument = WebPage & Document;
 export const WebPageSchema = SchemaFactory.createForClass(WebPage);
 WebPageSchema.index({ speedType: 1, isFirstIn: 1, url: 1, createTime: -1 });
 WebPageSchema.index({ createTime: -1 });
+// 90-day retention, matching the ClickHouse and backend tables (ADR-044).
+WebPageSchema.index({ createTime: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });

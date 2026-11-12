@@ -6,11 +6,12 @@ import {
   HttpException,
   Injectable,
   Logger,
+  NotFoundException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { AwsCrossAccountBinding } from "@generated/prisma/client";
+import type { AwsCrossAccountBinding } from "@generated/prisma/client";
 import { UpsertAwsCrossAccountBindingDto } from "./aws-cross-account-bindings.dto";
 import {
   assumeRole,
@@ -43,11 +44,13 @@ export function awsBindingRef(bindingId: string): string {
 
 export interface ResolvedAwsCredentials {
   bindingId: string;
+  accountId: string;
   roleArn: string;
-  awsAccountId: string | null;
   roleName: string | null;
   defaultRegion: string;
   regions: string[];
+  /** Rotation Lambda ARN configured for this account, or null when absent. */
+  rotationLambdaArn: string | null;
   /**
    * Lazy temporary-credential source for AWS SDK clients. The implementation
    * re-reads the binding on every session exchange, caches the assumed
@@ -88,9 +91,30 @@ export class AwsCrossAccountBindingsService {
     return this.defaultCredentialsProvider;
   }
 
-  async getProjectCredential(projectId: string) {
-    const binding = await this.getBindingByProjectId(projectId);
-    return this.serialize(projectId, binding, await this.resolveDefaultAccountId());
+  // ---------------------------------------------------------------------------
+  // Account-scoped operations (identity + usage scope)
+  // ---------------------------------------------------------------------------
+
+  async listAccountCredentials() {
+    const [bindings, defaultAccountId] = await Promise.all([
+      this.prisma.awsCrossAccountBinding.findMany({
+        orderBy: { accountId: "asc" },
+        include: { usages: { select: { consumerId: true } } },
+      }),
+      this.resolveDefaultAccountId(),
+    ]);
+    return {
+      accounts: bindings.map(({ usages, ...binding }) => ({
+        ...this.serializeBinding(binding),
+        consumerIds: usages.map((usage) => usage.consumerId),
+      })),
+      defaultAccountId,
+    };
+  }
+
+  async getAccountCredential(accountId: string) {
+    const binding = await this.getBindingByAccountId(accountId);
+    return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
   }
 
   /**
@@ -98,37 +122,37 @@ export class AwsCrossAccountBindingsService {
    * can paste it into the role trust policy before saving the role ARN.
    * Idempotent: an existing row (bootstrapped or fully configured) wins.
    */
-  async bootstrapProjectCredential(projectId: string) {
-    const binding = await this.bootstrapBinding(projectId);
-    return this.serialize(projectId, binding, await this.resolveDefaultAccountId());
+  async bootstrapAccountCredential(accountId: string) {
+    const binding = await this.bootstrapBinding(accountId);
+    return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
   }
 
-  async upsertProjectCredential(projectId: string, dto: UpsertAwsCrossAccountBindingDto) {
-    const binding = await this.updateBinding(projectId, dto);
-    return this.serialize(projectId, binding, await this.resolveDefaultAccountId());
+  async upsertAccountCredential(accountId: string, dto: UpsertAwsCrossAccountBindingDto) {
+    const binding = await this.updateBinding(accountId, dto);
+    return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
   }
 
   /**
    * Start a two-phase identity replacement. The active identity keeps
    * serving while a pending external ID awaits the candidate role, so a
-   * configuration change never leaves the host scope without credentials.
+   * configuration change never leaves the consumers without credentials.
    * Idempotent: an open draft is returned as-is.
    */
-  async rebindProjectCredential(projectId: string) {
-    const binding = await this.startRebind(projectId);
-    return this.serialize(projectId, binding, await this.resolveDefaultAccountId());
+  async rebindAccountCredential(accountId: string) {
+    const binding = await this.startRebind(accountId);
+    return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
   }
 
   /** Abandon a pending identity replacement; the active identity is unaffected. */
-  async cancelRebind(projectId: string) {
-    const binding = await this.cancelPendingRebind(projectId);
-    return this.serialize(projectId, binding, await this.resolveDefaultAccountId());
+  async cancelRebind(accountId: string) {
+    const binding = await this.cancelPendingRebind(accountId);
+    return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
   }
 
-  async verifyProjectCredential(projectId: string) {
-    const { binding, identity } = await this.verifyBinding(projectId);
+  async verifyAccountCredential(accountId: string) {
+    const { binding, identity } = await this.verifyBinding(accountId);
     return {
-      ...this.serialize(projectId, binding, await this.resolveDefaultAccountId()),
+      ...this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId()),
       verification: identity,
     };
   }
@@ -137,36 +161,89 @@ export class AwsCrossAccountBindingsService {
    * Generate a new external ID. The customer must update the role trust
    * policy before verification can succeed again.
    */
-  async rotateExternalId(projectId: string) {
-    const binding = await this.rotateBindingExternalId(projectId);
-    return this.serialize(projectId, binding, await this.resolveDefaultAccountId());
+  async rotateExternalId(accountId: string) {
+    const binding = await this.rotateBindingExternalId(accountId);
+    return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
   }
 
-  async deleteProjectCredential(projectId: string) {
-    const existing = await this.getBindingByProjectId(projectId);
+  /**
+   * Delete the account binding. Refused while any consumer still references
+   * it: silently detaching consumers would leave projects pointing at
+   * credentials that no longer exist.
+   */
+  async deleteAccountCredential(accountId: string) {
+    const existing = await this.getBindingByAccountId(accountId);
     if (existing) {
+      const usageCount = await this.prisma.awsCrossAccountBindingUsage.count({
+        where: { bindingId: existing.id },
+      });
+      if (usageCount > 0) {
+        throw new ConflictException(
+          `This AWS account is referenced by ${usageCount} consumer(s); detach them before deleting the binding`,
+        );
+      }
       await this.prisma.awsCrossAccountBinding.delete({ where: { id: existing.id } });
       this.invalidateSession(existing.id);
     }
-    return { projectId, configured: false, credential: null, defaultAccountId: await this.resolveDefaultAccountId() };
+    return { accountId, configured: false, credential: null, defaultAccountId: await this.resolveDefaultAccountId() };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Consumer-scoped operations (references)
+  // ---------------------------------------------------------------------------
+
+  /** The account binding referenced by a consumer, rendered for the consumer page. */
+  async getConsumerCredential(consumerId: string) {
+    const binding = await this.getBindingByConsumerId(consumerId);
+    return this.serializeConsumer(consumerId, binding, await this.resolveDefaultAccountId());
+  }
+
+  /**
+   * Attach a consumer to a bootstrapped account (or move it to another one).
+   * The account must exist so a typo cannot create a dangling reference.
+   */
+  async attachConsumerCredential(consumerId: string, accountId: string) {
+    const binding = await this.getBindingByAccountId(accountId);
+    if (!binding) {
+      throw new NotFoundException(`AWS account ${accountId} is not bootstrapped`);
+    }
+    await this.prisma.awsCrossAccountBindingUsage.upsert({
+      where: { consumerId },
+      create: { consumerId, bindingId: binding.id },
+      update: { bindingId: binding.id },
+    });
+    return this.serializeConsumer(consumerId, binding, await this.resolveDefaultAccountId());
+  }
+
+  async detachConsumerCredential(consumerId: string) {
+    await this.prisma.awsCrossAccountBindingUsage.deleteMany({ where: { consumerId } });
+    return this.serializeConsumer(consumerId, null, await this.resolveDefaultAccountId());
   }
 
   // ---------------------------------------------------------------------------
   // Binding-level operations
   // ---------------------------------------------------------------------------
 
-  private async getBindingByProjectId(projectId: string): Promise<AwsCrossAccountBinding | null> {
-    return this.prisma.awsCrossAccountBinding.findUnique({ where: { projectId } });
+  private async getBindingByAccountId(accountId: string): Promise<AwsCrossAccountBinding | null> {
+    return this.prisma.awsCrossAccountBinding.findUnique({ where: { accountId } });
   }
 
-  private async bootstrapBinding(projectId: string): Promise<AwsCrossAccountBinding> {
-    const existing = await this.getBindingByProjectId(projectId);
+  private async getBindingByConsumerId(consumerId: string): Promise<AwsCrossAccountBinding | null> {
+    const usage = await this.prisma.awsCrossAccountBindingUsage.findUnique({
+      where: { consumerId },
+      include: { binding: true },
+    });
+    return usage?.binding ?? null;
+  }
+
+  private async bootstrapBinding(accountId: string): Promise<AwsCrossAccountBinding> {
+    const existing = await this.getBindingByAccountId(accountId);
     if (existing) {
       return existing;
     }
     return this.prisma.awsCrossAccountBinding.create({
       data: {
-        projectId,
+        accountId,
         externalId: randomUUID(),
         regions: [],
       },
@@ -181,7 +258,7 @@ export class AwsCrossAccountBindingsService {
    *   bootstrap external ID is the draft the role trust policy already uses.
    * - roleArn unchanged => only the usage scope changes: no probe, no
    *   rotation, and any open rebind draft is abandoned.
-   * - roleArn differs => a rebind draft must exist (POST :scopeId/rebind);
+   * - roleArn differs => a rebind draft must exist (POST :accountId/rebind);
    *   the candidate is probed with the pending external ID and only a
    *   successful probe replaces the whole identity value object.
    *
@@ -190,10 +267,10 @@ export class AwsCrossAccountBindingsService {
    * request the platform makes.
    */
   private async updateBinding(
-    projectId: string,
+    accountId: string,
     dto: UpsertAwsCrossAccountBindingDto,
   ): Promise<AwsCrossAccountBinding> {
-    const existing = await this.getBindingByProjectId(projectId);
+    const existing = await this.getBindingByAccountId(accountId);
 
     const roleArn = dto.roleArn.trim();
     // Regions are usage scope, not identity: an explicit list wins, an omitted
@@ -215,6 +292,15 @@ export class AwsCrossAccountBindingsService {
     const defaultRegion =
       requestedDefault || (storedDefault && regions.includes(storedDefault) ? storedDefault : regions[0]);
 
+    // The rotation Lambda is account-scoped configuration, not identity:
+    // omitted keeps the stored ARN, null clears it.
+    const rotationLambdaArn =
+      dto.rotationLambdaArn === undefined
+        ? (existing?.rotationLambdaArn ?? null)
+        : dto.rotationLambdaArn === null
+          ? null
+          : dto.rotationLambdaArn.trim();
+
     // Identity unchanged: this is a scope edit. Re-probing STS would couple a
     // region edit to STS availability (and to unrelated credential outages),
     // and leaving a draft open would keep the UI in "rebinding" for an
@@ -222,7 +308,7 @@ export class AwsCrossAccountBindingsService {
     if (existing?.roleArn && existing.roleArn === roleArn) {
       return this.prisma.awsCrossAccountBinding.update({
         where: { id: existing.id },
-        data: { defaultRegion, regions, pendingExternalId: null },
+        data: { defaultRegion, regions, rotationLambdaArn, pendingExternalId: null },
       });
     }
 
@@ -235,14 +321,15 @@ export class AwsCrossAccountBindingsService {
       );
     }
 
-    await this.assertRoleArnAvailable(projectId, roleArn);
+    await this.assertRoleArnAvailable(accountId, roleArn);
 
     const identity = await this.verifyRoleAssumption({
       roleArn,
       externalId: probeExternalId,
       defaultRegion,
-      sessionName: this.buildProbeSessionName(projectId),
+      sessionName: this.buildProbeSessionName(accountId),
     });
+    this.assertIdentityMatchesAccount(accountId, identity);
 
     // One write replaces the identity value object, promotes the pending
     // external ID and clears the draft, so no mixed-generation row is ever
@@ -254,8 +341,8 @@ export class AwsCrossAccountBindingsService {
             roleArn,
             externalId: probeExternalId,
             pendingExternalId: null,
-            awsAccountId: identity.accountId ?? null,
             roleName: identity.iamUserName ?? null,
+            rotationLambdaArn,
             defaultRegion,
             regions,
             lastVerifiedAt: new Date(),
@@ -263,11 +350,11 @@ export class AwsCrossAccountBindingsService {
         })
       : await this.prisma.awsCrossAccountBinding.create({
           data: {
-            projectId,
+            accountId,
             roleArn,
             externalId: probeExternalId,
-            awsAccountId: identity.accountId ?? null,
             roleName: identity.iamUserName ?? null,
+            rotationLambdaArn,
             defaultRegion,
             regions,
             lastVerifiedAt: new Date(),
@@ -280,22 +367,22 @@ export class AwsCrossAccountBindingsService {
 
   /**
    * A role ARN identifies one role in one customer account; binding it to a
-   * second host scope would make the unique constraint surface as a 500.
+   * second account row would make the unique constraint surface as a 500.
    */
-  private async assertRoleArnAvailable(projectId: string, roleArn: string): Promise<void> {
+  private async assertRoleArnAvailable(accountId: string, roleArn: string): Promise<void> {
     const conflict = await this.prisma.awsCrossAccountBinding.findFirst({
-      where: { roleArn, projectId: { not: projectId } },
-      select: { projectId: true },
+      where: { roleArn, accountId: { not: accountId } },
+      select: { accountId: true },
     });
     if (conflict) {
-      throw new ConflictException("This role ARN is already bound to another host scope");
+      throw new ConflictException("This role ARN is already bound to another AWS account");
     }
   }
 
-  private async startRebind(projectId: string): Promise<AwsCrossAccountBinding> {
-    const existing = await this.getBindingByProjectId(projectId);
+  private async startRebind(accountId: string): Promise<AwsCrossAccountBinding> {
+    const existing = await this.getBindingByAccountId(accountId);
     if (!existing?.roleArn) {
-      throw new BadRequestException("AWS cross-account role is not configured for this host scope");
+      throw new BadRequestException("AWS cross-account role is not configured for this account");
     }
     if (existing.pendingExternalId) {
       return existing;
@@ -306,8 +393,8 @@ export class AwsCrossAccountBindingsService {
     });
   }
 
-  private async cancelPendingRebind(projectId: string): Promise<AwsCrossAccountBinding> {
-    const existing = await this.getBindingByProjectId(projectId);
+  private async cancelPendingRebind(accountId: string): Promise<AwsCrossAccountBinding> {
+    const existing = await this.getBindingByAccountId(accountId);
     if (!existing) {
       throw new BadRequestException("AWS cross-account binding is not bootstrapped");
     }
@@ -320,13 +407,13 @@ export class AwsCrossAccountBindingsService {
     });
   }
 
-  private async verifyBinding(projectId: string): Promise<{
+  private async verifyBinding(accountId: string): Promise<{
     binding: AwsCrossAccountBinding;
     identity: AwsCallerIdentity;
   }> {
-    const existing = await this.getBindingByProjectId(projectId);
+    const existing = await this.getBindingByAccountId(accountId);
     if (!existing?.roleArn) {
-      throw new BadRequestException("AWS cross-account role is not configured for this host scope");
+      throw new BadRequestException("AWS cross-account role is not configured for this account");
     }
 
     const credentials = this.resolveBindingCredentials(existing);
@@ -334,11 +421,11 @@ export class AwsCrossAccountBindingsService {
     const identity = await getCallerIdentity(credentials, region).catch((error) => {
       throw this.toAssumptionException(error);
     });
+    this.assertIdentityMatchesAccount(accountId, identity);
 
     const binding = await this.prisma.awsCrossAccountBinding.update({
       where: { id: existing.id },
       data: {
-        awsAccountId: identity.accountId || undefined,
         roleName: identity.iamUserName || undefined,
         lastVerifiedAt: new Date(),
       },
@@ -347,8 +434,8 @@ export class AwsCrossAccountBindingsService {
     return { binding, identity };
   }
 
-  private async rotateBindingExternalId(projectId: string): Promise<AwsCrossAccountBinding> {
-    const existing = await this.getBindingByProjectId(projectId);
+  private async rotateBindingExternalId(accountId: string): Promise<AwsCrossAccountBinding> {
+    const existing = await this.getBindingByAccountId(accountId);
     if (!existing) {
       throw new BadRequestException("AWS cross-account binding is not bootstrapped");
     }
@@ -362,16 +449,30 @@ export class AwsCrossAccountBindingsService {
   }
 
   /**
-   * Resolve the cross-account role for consumption by other modules.
+   * Resolve the cross-account role for consumption by other modules. The
+   * caller's subject is the consumer id it already uses elsewhere; the
+   * consumer -> account indirection stays inside this method so no consumer
+   * module needs to know the account-scoped model.
    * Throws when no role is configured; the returned provider exchanges and
    * caches temporary credentials through STS AssumeRole.
    */
   async resolveProjectCredential(projectId: string): Promise<ResolvedAwsCredentials> {
-    const binding = await this.getBindingByProjectId(projectId);
+    const binding = await this.getBindingByConsumerId(projectId);
     if (!binding?.roleArn) {
       throw new BadRequestException("AWS cross-account role is not configured for this host scope");
     }
     return this.toResolvedCredentials(binding);
+  }
+
+  /**
+   * The rotation Lambda ARN configured for the account a consumer references.
+   * Returns null (instead of throwing) when nothing is attached yet, so
+   * callers can render a "not provisioned" state without treating it as an
+   * error.
+   */
+  async resolveRotationLambdaArn(consumerId: string): Promise<string | null> {
+    const binding = await this.getBindingByConsumerId(consumerId);
+    return binding?.rotationLambdaArn ?? null;
   }
 
   /**
@@ -398,11 +499,12 @@ export class AwsCrossAccountBindingsService {
     const regions = binding.regions?.length ? binding.regions : [DEFAULT_REGION];
     return {
       bindingId: binding.id,
+      accountId: binding.accountId,
       roleArn: binding.roleArn!,
-      awsAccountId: binding.awsAccountId,
       roleName: binding.roleName,
       defaultRegion: binding.defaultRegion || regions[0],
       regions,
+      rotationLambdaArn: binding.rotationLambdaArn,
       credentials: this.resolveBindingCredentials(binding),
     };
   }
@@ -471,9 +573,9 @@ export class AwsCrossAccountBindingsService {
     return `${SESSION_NAME_PREFIX}${bindingId}`.slice(0, 64);
   }
 
-  /** One-off pre-persist probe session, keyed by the host scope id. */
-  private buildProbeSessionName(projectId: string): string {
-    return `nightwatch-probe-${projectId}`.slice(0, 64);
+  /** One-off pre-persist probe session, keyed by the customer account id. */
+  private buildProbeSessionName(accountId: string): string {
+    return `nightwatch-probe-${accountId}`.slice(0, 64);
   }
 
   private async verifyRoleAssumption(params: {
@@ -496,6 +598,19 @@ export class AwsCrossAccountBindingsService {
       return await getCallerIdentity(credentials, defaultRegion);
     } catch (error) {
       throw this.toAssumptionException(error);
+    }
+  }
+
+  /**
+   * The account id is the binding's scope key, so it must describe the role's
+   * real account. STS resolves the truth; a mismatch means the customer pasted
+   * a role from a different account and must be rejected before persisting.
+   */
+  private assertIdentityMatchesAccount(accountId: string, identity: AwsCallerIdentity): void {
+    if (identity.accountId && identity.accountId !== accountId) {
+      throw new BadRequestException(
+        `The role belongs to AWS account ${identity.accountId}, which does not match ${accountId}`,
+      );
     }
   }
 
@@ -556,25 +671,44 @@ export class AwsCrossAccountBindingsService {
     return region.trim().toLowerCase();
   }
 
-  private serialize(projectId: string, binding: AwsCrossAccountBinding | null, defaultAccountId: string | null) {
+  private serializeBinding(binding: AwsCrossAccountBinding) {
+    return {
+      id: binding.id,
+      accountId: binding.accountId,
+      roleArn: binding.roleArn,
+      externalId: binding.externalId,
+      pendingExternalId: binding.pendingExternalId,
+      roleName: binding.roleName,
+      rotationLambdaArn: binding.rotationLambdaArn,
+      defaultRegion: binding.defaultRegion,
+      regions: binding.regions,
+      lastVerifiedAt: binding.lastVerifiedAt,
+      updatedAt: binding.updatedAt,
+    };
+  }
+
+  private serializeAccount(accountId: string, binding: AwsCrossAccountBinding | null, defaultAccountId: string | null) {
     if (!binding) {
-      return { projectId, configured: false, credential: null, defaultAccountId };
+      return { accountId, configured: false, credential: null, defaultAccountId };
     }
     return {
-      projectId,
+      accountId,
       configured: Boolean(binding.roleArn),
-      credential: {
-        id: binding.id,
-        roleArn: binding.roleArn,
-        externalId: binding.externalId,
-        pendingExternalId: binding.pendingExternalId,
-        awsAccountId: binding.awsAccountId,
-        roleName: binding.roleName,
-        defaultRegion: binding.defaultRegion,
-        regions: binding.regions,
-        lastVerifiedAt: binding.lastVerifiedAt,
-        updatedAt: binding.updatedAt,
-      },
+      credential: this.serializeBinding(binding),
+      defaultAccountId,
+    };
+  }
+
+  private serializeConsumer(
+    consumerId: string,
+    binding: AwsCrossAccountBinding | null,
+    defaultAccountId: string | null,
+  ) {
+    return {
+      consumerId,
+      accountId: binding?.accountId ?? null,
+      configured: Boolean(binding?.roleArn),
+      credential: binding ? this.serializeBinding(binding) : null,
       defaultAccountId,
     };
   }

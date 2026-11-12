@@ -77,6 +77,7 @@ test("getAverageErrorList picks the grouping key from the error type", async () 
     "ajax|fetch": "resourceUrl,status,type",
     "bussiness-ajax|bussiness-fetch": "resourceUrl,status,type",
     log: "resourceUrl,type",
+    "script|promise-rejection": "resourceUrl,name,type",
   };
   for (const [type, groupBy] of Object.entries(expected)) {
     const { service, finds } = newService();

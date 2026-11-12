@@ -82,8 +82,8 @@ function entityAppearsIn(haystack: string, entity: string): boolean {
  *
  * The LLM re-rank budget bounds how many candidates a single run may spend a
  * call on; hard-recall hits do not consume it (ADR-037 D9.4). A "not-relevant"
- * verdict is written through the negative-cache port keyed by
- * "scopeType:scopeId" (ADR-045); "unavailable" verdicts are never cached.
+ * verdict is written through the negative-cache port keyed by the subject
+ * (ADR-058: `${kind}:${subjectKey}`); "unavailable" verdicts are never cached.
  */
 @Injectable()
 export class SecurityEvaluationIntelMatchService {

@@ -50,7 +50,6 @@ interface WebReportItem {
   markUv: string;
   markDevice: string;
   url: string;
-  p?: string;
   uid?: unknown;
   isFirstIn: boolean;
   errorList?: Record<string, unknown>[];
@@ -123,9 +122,11 @@ export class FrontendMonitorReportTaskService {
     let newName = "";
     try {
       const u = new URL(func.urlHelper(item.url));
-      newName = `${u.protocol}//${u.host}${u.pathname}${u.hash ? u.hash : ""}`;
+      // No fragment: SPA hash routes can carry tokens and never belong to the
+      // page identity (R1-05).
+      newName = `${u.protocol}//${u.host}${u.pathname}`;
     } catch {
-      newName = item.url || "";
+      newName = func.sanitizePathForStorage(item.url);
     }
     slowPageTime = slowPageTime * 1000;
     const speedType = Number(performance.lodt) >= slowPageTime ? 2 : 1;
@@ -133,8 +134,8 @@ export class FrontendMonitorReportTaskService {
       appKey: item.appKey,
       createTime: item.createTime,
       url: newName,
-      fullUrl: item.url,
-      preUrl: item.preUrl,
+      fullUrl: func.sanitizeUrlForStorage(item.url),
+      preUrl: item.preUrl === undefined ? undefined : func.sanitizeUrlForStorage(item.preUrl),
       speedType,
       isFirstIn: item.isFirstIn,
       markPage: item.markPage,
@@ -218,19 +219,19 @@ export class FrontendMonitorReportTaskService {
       const u = new URL(func.urlHelper(item.name));
       newName = `${u.protocol}//${u.host}${u.pathname}`;
     } catch {
-      newName = typeof item.name === "string" ? item.name : "";
+      newName = typeof item.name === "string" ? func.sanitizePathForStorage(item.name) : "";
     }
     const resource: Record<string, unknown> = {
       appKey: data.appKey,
       createTime: item.requestTime ? func.toDateOrNow(item.requestTime) : data.createTime,
-      url: data.url,
+      url: func.sanitizeUrlForStorage(data.url),
       speedType,
       name: newName,
     };
     // String-declared columns: coerce client values so an object can never
     // produce a Mongoose CastError that fails the whole app batch (R15-01).
     const fullUrl = func.toStringOrUndefined(item.name);
-    if (fullUrl !== undefined) resource.fullUrl = fullUrl;
+    if (fullUrl !== undefined) resource.fullUrl = func.sanitizeUrlForStorage(fullUrl);
     const method = func.toStringOrUndefined(item.method);
     if (method !== undefined) resource.method = method;
     const type = func.toStringOrUndefined(item.type);
@@ -266,7 +267,7 @@ export class FrontendMonitorReportTaskService {
     const environment: Record<string, unknown> = {
       appKey: data.appKey,
       createTime: data.createTime,
-      url: data.url,
+      url: func.sanitizeUrlForStorage(data.url),
       markPage: data.markPage,
       markUser: data.markUser,
       markUv: data.markUv,
@@ -317,7 +318,6 @@ export class FrontendMonitorReportTaskService {
 
   private setUser(obj: Record<string, unknown>, data: WebReportItem) {
     if (data.uid) obj.uid = String(data.uid);
-    if (data.p) obj.phone = func.decryptPhone(data.p);
   }
 
   async saveWebReportDatasForRedis() {
@@ -453,9 +453,6 @@ export class FrontendMonitorReportTaskService {
       markUv: str(query.markUv),
       markDevice: str(query.markDevice),
       url: str(query.url),
-      // The encrypted phone is declared a string; a non-string payload value
-      // must not reach a String column (Mongoose cast error → requeue loop).
-      p: str(query.p) || undefined,
       uid: query.uid,
       isFirstIn: Boolean(query.isFirstIn),
       errorList: Array.isArray(query.errorList) ? query.errorList : undefined,
@@ -492,7 +489,7 @@ export class FrontendMonitorReportTaskService {
       const newurl = new URL(func.urlHelper(item.name));
       newName = `${newurl.protocol}//${newurl.host}${newurl.pathname}`;
     } catch {
-      newName = typeof item.name === "string" ? item.name : "";
+      newName = typeof item.name === "string" ? func.sanitizePathForStorage(item.name) : "";
     }
     const rawDuration = func.toNumberOrUndefined(item.duration);
     // Invalid duration falls back to 0 for the row write — CH silently
@@ -506,24 +503,24 @@ export class FrontendMonitorReportTaskService {
       createTime: item.requestTime ? func.toDateOrNow(item.requestTime) : data.createTime,
     };
     _ajax.url = newName || "";
-    _ajax.fullUrl = func.toStringOrUndefined(item.name) ?? "";
+    _ajax.fullUrl = func.sanitizeUrlForStorage(func.toStringOrUndefined(item.name) ?? "");
     _ajax.method = func.toStringOrUndefined(item.method) ?? "";
     _ajax.duration = duration;
     // bodySize: skip write for invalid values — CH Nullable column (or just
     // let CH coerce to 0; we normalize to make the intent explicit).
     const bs = func.toNumberOrUndefined(item.bodySize);
     if (bs !== undefined) _ajax.bodySize = bs;
-    _ajax.callUrl = data.url || "";
-    if (item.options) _ajax.options = func.filterKeyWord(item.options);
+    _ajax.callUrl = func.sanitizeUrlForStorage(data.url);
+    if (item.options) _ajax.options = func.toStorageText(item.options);
     try {
       const newurl = new URL(String(item.name));
-      if (newurl.searchParams.toString()) _ajax.query = newurl.searchParams.toString();
+      const search = newurl.searchParams.toString();
+      if (search) _ajax.query = func.sanitizeSearchForStorage(search);
     } catch {
       // Expected failure: the URL may be malformed — skip query extraction.
     }
     if (item.traceId) _ajax.traceId = func.toStringOrUndefined(item.traceId) ?? "";
     if (data.uid) _ajax.uid = String(data.uid);
-    if (data.p) _ajax.phone = func.decryptPhone(data.p);
     _ajax.markPage = data.markPage || "";
     _ajax.markUser = data.markUser || "";
 
@@ -543,13 +540,13 @@ export class FrontendMonitorReportTaskService {
         const newurl = new URL(func.urlHelper(resourceUrl));
         newName = `${newurl.protocol}//${newurl.host}${newurl.pathname}`;
       } catch {
-        newName = resourceUrl;
+        newName = func.sanitizePathForStorage(resourceUrl);
       }
 
       const errors: Record<string, unknown> = {};
       errors.resourceUrl = newName || "";
-      errors.fullUrl = resourceUrl;
-      errors.url = data.url || "";
+      errors.fullUrl = func.sanitizeUrlForStorage(resourceUrl);
+      errors.url = func.sanitizeUrlForStorage(data.url);
       errors.createTime = item.createTime ? func.toDateOrNow(item.createTime) : data.createTime;
 
       if (typeof item.msg === "object") errors.msg = JSON.stringify(item.msg);
@@ -568,17 +565,17 @@ export class FrontendMonitorReportTaskService {
 
       try {
         const u = new URL(resourceUrl);
-        if (u.searchParams.toString()) errors.query = u.searchParams.toString();
+        const search = u.searchParams.toString();
+        if (search) errors.query = func.sanitizeSearchForStorage(search);
       } catch {
         // Expected failure: the URL may be malformed — skip query extraction.
       }
-      if (item.options) errors.options = func.filterKeyWord(item.options);
+      if (item.options) errors.options = func.toStorageText(item.options);
       if (item.traceId) errors.traceId = item.traceId;
 
       errors.markPage = data.markPage || "";
       errors.markUser = data.markUser || "";
       if (data.uid) errors.uid = String(data.uid);
-      if (data.p) errors.phone = func.decryptPhone(data.p);
 
       this.pushRow(appErrors, data.appKey, errors);
     }

@@ -30,9 +30,11 @@ export default function WebError(clickhouse: ClickHouseService, dbName: string) 
       uid: { type: ClickHouseDataType.String }, // User ID
       traceId: { type: ClickHouseDataType.String }, // Trace ID
     },
+    // 90-day retention, matching the backend monitor tables (ADR-044).
     options: `ENGINE = MergeTree
     PARTITION BY toYYYYMM(createTime)
-    ORDER BY createTime`,
+    ORDER BY createTime
+    TTL createTime + INTERVAL 90 DAY`,
     autoCreate: true,
     autoSync: true,
   };

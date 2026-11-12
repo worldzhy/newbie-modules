@@ -24,5 +24,7 @@ export class WebEnvironment {
 export type WebEnvironmentDocument = WebEnvironment & Document;
 export const WebEnvironmentSchema = SchemaFactory.createForClass(WebEnvironment);
 WebEnvironmentSchema.index({ createTime: -1 });
+// 90-day retention, matching the ClickHouse and backend tables (ADR-044).
+WebEnvironmentSchema.index({ createTime: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 WebEnvironmentSchema.index({ markPage: -1 });
 WebEnvironmentSchema.index({ markUser: -1 });

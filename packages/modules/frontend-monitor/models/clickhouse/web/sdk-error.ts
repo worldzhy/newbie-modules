@@ -21,9 +21,11 @@ export default function WebSdkError(clickhouse: ClickHouseService, dbName: strin
       system: { type: ClickHouseDataType.LowCardinality(ClickHouseDataType.String) }, // System
       systemVersion: { type: ClickHouseDataType.String }, // System version
     },
+    // 90-day retention, matching the backend monitor tables (ADR-044).
     options: `ENGINE = MergeTree
     PARTITION BY toYYYYMM(createTime)
-    ORDER BY createTime`,
+    ORDER BY createTime
+    TTL createTime + INTERVAL 90 DAY`,
     autoCreate: true,
     autoSync: true,
   };

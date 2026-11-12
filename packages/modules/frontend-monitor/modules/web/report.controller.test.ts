@@ -162,6 +162,13 @@ test("a missing url falls back to the referer and the user agent is tagged", asy
   assert.equal(lastPayload(h).userAgent, "Mozilla/5.0");
 });
 
+test("the referer fallback is sanitized before it enters the queue", async () => {
+  const h = harness();
+  const headers = { referer: "https://x/landing?token=abc#frag", "user-agent": "UA" };
+  await h.controller.webReport(req(headers) as never, headers, {} as never);
+  assert.equal(lastPayload(h).url, "https://x/landing?token=[redacted]", "credentials must never reach redis");
+});
+
 test("an appKey with no registered site is rejected", async () => {
   const h = harness({ site: null });
   await assert.rejects(

@@ -17,6 +17,8 @@ export class WebCustom {
 export type WebCustomDocument = WebCustom & Document;
 export const WebCustomSchema = SchemaFactory.createForClass(WebCustom);
 WebCustomSchema.index({ createTime: -1 });
+// 90-day retention, matching the ClickHouse and backend tables (ADR-044).
+WebCustomSchema.index({ createTime: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
 
 @Schema({ shardKey: { _id: "hashed" } })
 export class WebCustomFilter {
