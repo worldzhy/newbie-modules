@@ -22,7 +22,8 @@ function newService(state: { settingQueried: boolean }) {
     }),
   };
   const deliveryRules = { evaluate: async () => ({ action: "deliver", ruleId: "r1", reason: "rule" }) };
-  return new NotificationCenterService(prisma as never, registry as never, deliveryRules as never);
+  const silences = { findActiveId: async () => null };
+  return new NotificationCenterService(prisma as never, registry as never, deliveryRules as never, silences as never);
 }
 
 test("notify rejects a project outside the resolved scope before reading settings", async () => {
@@ -66,10 +67,11 @@ test("an empty resolved scope rejects every project instead of widening to all",
 
 type RuleSeed = { priority: number; condition: unknown; action: string; isEnabled?: boolean };
 
-function newServiceWithCenter(severity: string, rules: RuleSeed[] = []) {
+function newServiceWithCenter(severity: string, rules: RuleSeed[] = [], activeSilenceId: string | null = null) {
   const created: Record<string, unknown>[] = [];
   const attempts: Record<string, unknown>[] = [];
   const alerts = new Map<string, Record<string, any>>();
+  const silences = { findActiveId: async () => activeSilenceId };
   const ruleRows = rules.map((rule, index) => ({
     id: `rule-${index + 1}`,
     updatedAt: new Date(0),
@@ -144,17 +146,31 @@ function newServiceWithCenter(severity: string, rules: RuleSeed[] = []) {
       return [];
     },
   };
-  const ruleService = new NotificationDeliveryRuleService(prisma as never);
+  const ruleService = new NotificationDeliveryRuleService(prisma as never, silences as never);
   const service = new NotificationCenterService(
     prisma as never,
     registry as never,
     ruleService as never,
+    silences as never,
     pushPort as never,
   );
   return { service, ruleService, created, attempts, pushed: () => pushed };
 }
 
 const HIGH_RULE: RuleSeed[] = [{ priority: 10, condition: { severityAtLeast: "high" }, action: "deliver" }];
+
+test("an active silence keeps a deliverable notification in-app", async () => {
+  const { service, created, attempts, pushed } = newServiceWithCenter("critical", HIGH_RULE, "silence-1");
+  const result = await service.notify({ notificationKey: "k" });
+  assert.equal(result.decision, "deliver");
+  assert.equal(result.runtimeReason, "silenced");
+  // The record still lands in the bell; only the push is intercepted.
+  assert.equal(created.length, 1);
+  assert.equal(attempts.length, 1);
+  assert.equal(attempts[0].runtimeReason, "silenced");
+  assert.equal(attempts[0].silenceId, "silence-1");
+  assert.equal(pushed(), false);
+});
 
 test("an event matching a rule is recorded and pushed", async () => {
   const { service, created, attempts, pushed } = newServiceWithCenter("critical", HIGH_RULE);
@@ -283,7 +299,10 @@ function newRuleStore(initial: Array<{ condition: unknown; action: string; isEna
     },
     $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations),
   };
-  return { service: new NotificationDeliveryRuleService(prisma as never), rows };
+  return {
+    service: new NotificationDeliveryRuleService(prisma as never, { findActiveId: async () => null } as never),
+    rows,
+  };
 }
 
 test("create appends the new rule after the last priority", async () => {
