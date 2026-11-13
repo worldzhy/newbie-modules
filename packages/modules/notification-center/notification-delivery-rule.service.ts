@@ -4,6 +4,8 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   DEFAULT_DELIVERY_RULE_CONDITION,
   DEFAULT_DELIVERY_RULE_PRIORITY,
+  DEFAULT_RECOVERY_RULE_CONDITION,
+  DEFAULT_RECOVERY_RULE_PRIORITY,
   DELIVERY_RULE_ACTIONS,
   DELIVERY_RULE_PRIORITY_STEP,
   matchesDeliveryCondition,
@@ -49,10 +51,10 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Seed one rule when the table is empty, so a fresh install keeps pushing
-   * high and critical signals instead of starting from "everything
-   * suppressed". `remove()` refuses to delete the last rule, so an empty table
-   * only ever exists before this seed runs.
+   * Seed the default rules when the table is empty, so a fresh install keeps
+   * pushing high and critical signals (instead of starting from "everything
+   * suppressed") and still announces recoveries. `remove()` refuses to delete
+   * the last rule, so an empty table only ever exists before this seed runs.
    */
   async onApplicationBootstrap(): Promise<void> {
     const count = await this.prisma.notificationDeliveryRule.count();
@@ -60,14 +62,23 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
       return;
     }
     try {
-      await this.prisma.notificationDeliveryRule.create({
-        data: {
-          priority: DEFAULT_DELIVERY_RULE_PRIORITY,
-          condition: DEFAULT_DELIVERY_RULE_CONDITION as unknown as Prisma.InputJsonValue,
-          action: "deliver",
-        },
-      });
-      this.logger.log("Seeded the default delivery rule (severityAtLeast high → deliver)");
+      await this.prisma.$transaction([
+        this.prisma.notificationDeliveryRule.create({
+          data: {
+            priority: DEFAULT_DELIVERY_RULE_PRIORITY,
+            condition: DEFAULT_DELIVERY_RULE_CONDITION as unknown as Prisma.InputJsonValue,
+            action: "deliver",
+          },
+        }),
+        this.prisma.notificationDeliveryRule.create({
+          data: {
+            priority: DEFAULT_RECOVERY_RULE_PRIORITY,
+            condition: DEFAULT_RECOVERY_RULE_CONDITION as unknown as Prisma.InputJsonValue,
+            action: "deliver",
+          },
+        }),
+      ]);
+      this.logger.log("Seeded the default delivery rules (high+ deliver, recovered deliver)");
     } catch (error: unknown) {
       // A concurrent instance seeded first; the unique priority settles it.
       if ((error as { code?: string })?.code !== PG_UNIQUE_VIOLATION) {

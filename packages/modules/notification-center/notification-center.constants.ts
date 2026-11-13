@@ -34,11 +34,14 @@ export const DEFAULT_DELIVERY_RULE_PRIORITY = 10;
 export const DELIVERY_RULE_PRIORITY_STEP = 10;
 
 /**
- * Default rule seeded when the table is empty, so a fresh install keeps pushing
- * high and critical signals instead of starting from "everything suppressed".
- * It is an ordinary rule: operators can edit or delete it.
+ * Default rules seeded when the table is empty, so a fresh install keeps
+ * pushing high and critical signals instead of starting from "everything
+ * suppressed", and a recovery still announces itself even when its alert was
+ * kept in-app. They are ordinary rules: operators can edit or delete them.
  */
 export const DEFAULT_DELIVERY_RULE_CONDITION: DeliveryCondition = { severityAtLeast: "high" };
+export const DEFAULT_RECOVERY_RULE_PRIORITY = 20;
+export const DEFAULT_RECOVERY_RULE_CONDITION: DeliveryCondition = { phase: "recovered" };
 
 /** Outcome of the rule judgement for one alert; frozen on the alert instance. */
 export interface DeliveryVerdict {

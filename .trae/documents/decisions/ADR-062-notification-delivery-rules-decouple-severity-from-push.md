@@ -126,7 +126,7 @@ if (result.decision !== "delivered") return;
 - 条件渐进披露：默认只显示级别，其他条件收进"添加条件"。
 - `suppress` 规则归入"例外"分区，主流程只写 deliver 规则。
 - **模拟器为必需项**：选中一条最近通知，跑同一求值函数，显示命中第几条规则。这是有序规则模型唯一可靠的纠错手段。
-- seed 一条 `{ priority: 10, condition: { severityAtLeast: "high" }, action: "deliver" }`，使默认用户零操作。
+- seed 两条默认规则，使默认用户零操作：`{ priority: 10, condition: { severityAtLeast: "high" }, action: "deliver" }` 与 `{ priority: 20, condition: { phase: "recovered" }, action: "deliver" }`。第二条保留"恢复必达"这一既有可用行为（旧实现靠 `recoveryOf` 继承 firing 级别实现），否则升级后所有恢复推送会被静默。最后一条规则不允许删除，因此"空表"只存在于首次 seed 之前。
 
 ## 跨宿主 / 演进检验（registry 模块设计必填）
 
@@ -139,7 +139,7 @@ if (result.decision !== "delivered") return;
 - registry `notification-center`：
   - schema 新增 `NotificationDeliveryRule`、`NotificationAlert`、`NotificationDeliveryAttempt`；`NotificationRecord` 增加 `alertId`。
   - `notify()` 拆为规则裁决与实时判定两段；`NotifyResult` 由 `pushSuppressed: boolean` 改为 `decision` + `reason`。
-  - 删除 `recoveryOf`、`NotificationCenterSetting.minimumSeverity`、`pushPolicy`、`pushSuppressed`；`NotificationDeclaration` 新增 `notifyOnRecovery`。
+  - 删除 `recoveryOf`、`NotificationCenterSetting.minimumSeverity`、`pushPolicy`、`pushSuppressed`。
   - README、测试同步改写。
 - 宿主（nightwatch-backend）：
   - `project-notification-push.service.ts` 改读 `decision`。
