@@ -15,7 +15,6 @@ export const SEVERITY_LEVEL: Record<string, number> = Object.fromEntries(
 
 export const CENTER_SETTING_SINGLETON_ID = 1;
 export const DEFAULT_PUSH_ENABLED = false;
-export const DEFAULT_MINIMUM_SEVERITY = "high";
 export const DEFAULT_NOTIFICATION_PUSH_ENABLED = true;
 
 // --- Delivery rules (ADR-062) ----------------------------------------------
@@ -25,8 +24,28 @@ export type DeliveryRuleAction = (typeof DELIVERY_RULE_ACTIONS)[number];
 
 // Why a delivery decision came out the way it did, stored on the audit row so
 // every push or suppression is explainable without replaying the rule table.
-export const DELIVERY_DECISION_REASONS = ["rule", "no-rule-matched", "below-minimum"] as const;
+export const DELIVERY_DECISION_REASONS = ["rule", "no-rule-matched"] as const;
 export type DeliveryDecisionReason = (typeof DELIVERY_DECISION_REASONS)[number];
+
+// Priority of the rule seeded on first boot, and the gap between adjacent
+// rules. The UI never shows the number: it drags rows and the API rewrites the
+// sequence from the submitted order.
+export const DEFAULT_DELIVERY_RULE_PRIORITY = 10;
+export const DELIVERY_RULE_PRIORITY_STEP = 10;
+
+/**
+ * Default rule seeded when the table is empty, so a fresh install keeps pushing
+ * high and critical signals instead of starting from "everything suppressed".
+ * It is an ordinary rule: operators can edit or delete it.
+ */
+export const DEFAULT_DELIVERY_RULE_CONDITION: DeliveryCondition = { severityAtLeast: "high" };
+
+/** Outcome of the rule judgement for one alert; frozen on the alert instance. */
+export interface DeliveryVerdict {
+  action: DeliveryRuleAction;
+  ruleId: string | null;
+  reason: DeliveryDecisionReason | null;
+}
 
 /**
  * Condition of one delivery rule. Absent fields do not filter; an empty
@@ -91,6 +110,49 @@ export function matchesDeliveryCondition(condition: unknown, labels: DeliveryLab
     }
   }
   return true;
+}
+
+const CONDITION_FIELDS = ["phase", "severityAtLeast", "notificationKeys", "projectIds", "tags"] as const;
+const CONDITION_PHASES = ["firing", "recovered"] as const;
+
+/**
+ * Validate a condition submitted through the API. `condition` is a JSON column,
+ * so this is the only thing standing between a malformed payload and a rule
+ * that silently never matches. Returns the problems found; empty means valid.
+ */
+export function validateDeliveryCondition(condition: unknown): string[] {
+  if (condition === null || typeof condition !== "object" || Array.isArray(condition)) {
+    return ["condition must be an object"];
+  }
+  const rule = condition as Record<string, unknown>;
+  const problems: string[] = [];
+  for (const key of Object.keys(rule)) {
+    if (!(CONDITION_FIELDS as readonly string[]).includes(key)) {
+      problems.push(`unknown condition field: ${key}`);
+    }
+  }
+  if (rule.phase !== undefined && !(CONDITION_PHASES as readonly unknown[]).includes(rule.phase)) {
+    problems.push(`phase must be one of ${CONDITION_PHASES.join(", ")}`);
+  }
+  if (rule.severityAtLeast !== undefined && !(SEVERITIES as readonly unknown[]).includes(rule.severityAtLeast)) {
+    problems.push(`severityAtLeast must be one of ${SEVERITIES.join(", ")}`);
+  }
+  for (const key of ["notificationKeys", "projectIds"] as const) {
+    const value = rule[key];
+    if (value === undefined) continue;
+    if (!Array.isArray(value) || value.some((item) => typeof item !== "string" || item.length === 0)) {
+      problems.push(`${key} must be an array of non-empty strings`);
+    }
+  }
+  if (rule.tags !== undefined) {
+    const tags = rule.tags;
+    if (tags === null || typeof tags !== "object" || Array.isArray(tags)) {
+      problems.push("tags must be an object of string values");
+    } else if (Object.values(tags).some((value) => typeof value !== "string")) {
+      problems.push("tags must be an object of string values");
+    }
+  }
+  return problems;
 }
 
 // Delivery scope of a notification. "system" notifications are platform-wide

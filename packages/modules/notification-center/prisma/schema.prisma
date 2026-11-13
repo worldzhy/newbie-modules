@@ -129,8 +129,6 @@ model NotificationCenterSetting {
   // notification push only fires when both this switch and the notification's
   // own isPushEnabled are on.
   isPushEnabled Boolean @default(false)
-  // Notifications below this severity are recorded in-app but skip push.
-  minimumSeverity String @default("high") @db.VarChar(10)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -140,8 +138,8 @@ model NotificationCenterSetting {
 
 // Ordered delivery rules (ADR-062). The first enabled rule whose condition
 // matches decides the delivery; when nothing matches, delivery is suppressed.
-// An empty table means "no rule configured yet": the legacy center minimum
-// severity keeps deciding until the first rule is written (ADR-062 phase P0).
+// One default rule is seeded on a fresh install so high and critical signals
+// keep pushing without any operator action.
 model NotificationDeliveryRule {
   id        String   @id @default(uuid()) @db.Uuid
   // Ascending evaluation order; lower runs first.

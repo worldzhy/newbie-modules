@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, Allow } from "class-validator";
+import { IsArray, IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, Allow } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import {
   DELIVERY_DECISION_REASONS,
@@ -107,11 +107,6 @@ export class NotifyResultDto {
     description: "Why the verdict came out that way; null for verdicts frozen before the reason was recorded",
   })
   reason!: string | null;
-
-  @ApiProperty({
-    description: "True when the delivery was recorded in-app but skipped push (superseded by decision in phase P2)",
-  })
-  pushSuppressed!: boolean;
 }
 
 export class ListNotificationsRequestDto extends CommonListRequestDto {
@@ -212,9 +207,6 @@ export class UpdateNotificationSettingDto {
 export class NotificationCenterSettingDto {
   @ApiProperty({ description: "Master switch for chat push through the host-provided push adapter" })
   isPushEnabled!: boolean;
-
-  @ApiProperty({ enum: SEVERITIES })
-  minimumSeverity!: string;
 }
 
 export class UpdateNotificationCenterSettingDto {
@@ -222,12 +214,175 @@ export class UpdateNotificationCenterSettingDto {
   @IsOptional()
   @IsBoolean()
   isPushEnabled?: boolean;
+}
 
-  @ApiPropertyOptional({ enum: SEVERITIES })
+// ---------------------------------------------------------------------------
+// Delivery rule DTOs (ADR-062)
+// ---------------------------------------------------------------------------
+
+export class DeliveryConditionDto {
+  @ApiPropertyOptional({ enum: ["firing", "recovered"], description: "Lifecycle phase the rule applies to" })
+  @IsOptional()
+  @IsIn(["firing", "recovered"])
+  phase?: string;
+
+  @ApiPropertyOptional({ enum: SEVERITIES, description: "Minimum severity label the event must carry" })
   @IsOptional()
   @IsString()
   @IsIn(SEVERITIES as unknown as string[])
-  minimumSeverity?: string;
+  severityAtLeast?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    isArray: true,
+    description: "Notification keys the rule applies to; an empty array never matches",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  notificationKeys?: string[];
+
+  @ApiPropertyOptional({
+    type: [String],
+    isArray: true,
+    description: "Project ids the rule applies to; an empty array never matches",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  projectIds?: string[];
+
+  @ApiPropertyOptional({ type: Object, description: "Tag key/value pairs the event must carry" })
+  @IsOptional()
+  @IsObject()
+  tags?: Record<string, string>;
+}
+
+export class DeliveryRuleDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ description: "Ascending evaluation order; lower runs first. The UI shows the row order instead." })
+  priority!: number;
+
+  @ApiProperty({ type: () => DeliveryConditionDto })
+  condition!: DeliveryConditionDto;
+
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS })
+  action!: string;
+
+  @ApiProperty()
+  isEnabled!: boolean;
+
+  @ApiProperty()
+  updatedAt!: Date;
+}
+
+export class CreateDeliveryRuleDto {
+  @ApiProperty({ type: () => DeliveryConditionDto })
+  @IsObject()
+  condition!: DeliveryConditionDto;
+
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS })
+  @IsString()
+  @IsIn(DELIVERY_RULE_ACTIONS as unknown as string[])
+  action!: string;
+
+  @ApiPropertyOptional({ description: "Defaults to true" })
+  @IsOptional()
+  @IsBoolean()
+  isEnabled?: boolean;
+}
+
+export class UpdateDeliveryRuleDto {
+  @ApiPropertyOptional({ type: () => DeliveryConditionDto })
+  @IsOptional()
+  @IsObject()
+  condition?: DeliveryConditionDto;
+
+  @ApiPropertyOptional({ enum: DELIVERY_RULE_ACTIONS })
+  @IsOptional()
+  @IsString()
+  @IsIn(DELIVERY_RULE_ACTIONS as unknown as string[])
+  action?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isEnabled?: boolean;
+}
+
+export class ReorderDeliveryRulesDto {
+  @ApiProperty({
+    type: [String],
+    isArray: true,
+    description: "Every rule id exactly once, in the new evaluation order",
+  })
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  ids!: string[];
+}
+
+export class SimulateDeliveryRequestDto {
+  @ApiPropertyOptional({ description: "Replay a persisted notification record" })
+  @IsOptional()
+  @IsUUID()
+  recordId?: string;
+
+  @ApiPropertyOptional({ description: "Manual mode: notification key to evaluate" })
+  @IsOptional()
+  @IsString()
+  notificationKey?: string;
+
+  @ApiPropertyOptional({ enum: SEVERITIES, description: "Manual mode: severity label to evaluate" })
+  @IsOptional()
+  @IsString()
+  @IsIn(SEVERITIES as unknown as string[])
+  severity?: string;
+
+  @ApiPropertyOptional({ enum: ["firing", "recovered"], description: "Manual mode: defaults to firing" })
+  @IsOptional()
+  @IsIn(["firing", "recovered"])
+  phase?: string;
+
+  @ApiPropertyOptional({ description: "Manual mode: project id to evaluate" })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+}
+
+export class SimulateDeliveryResultDto {
+  @ApiProperty({ type: Object, description: "Labels the rules were evaluated against" })
+  labels!: Record<string, unknown>;
+
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS })
+  decision!: string;
+
+  @ApiProperty({ enum: DELIVERY_DECISION_REASONS, nullable: true })
+  reason!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: "Rule that decided; null when nothing matched" })
+  matchedRuleId!: string | null;
+
+  @ApiProperty({ type: Number, nullable: true, description: "1-based position of the deciding rule" })
+  matchedRuleIndex!: number | null;
+
+  @ApiProperty({ description: "Number of enabled rules evaluated" })
+  ruleCount!: number;
+}
+
+export class NotificationDeliveryAttemptDto {
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS })
+  decision!: string;
+
+  @ApiProperty({ enum: DELIVERY_DECISION_REASONS, nullable: true })
+  reason!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: "Rule that decided; null when nothing matched" })
+  ruleId!: string | null;
+
+  @ApiProperty()
+  createdAt!: Date;
 }
 
 export class PushDeliveryResultDto {
