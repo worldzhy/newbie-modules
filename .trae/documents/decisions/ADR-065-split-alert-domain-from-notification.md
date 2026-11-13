@@ -175,8 +175,8 @@ sourceType String? @db.VarChar(20)  // alert | event
 sourceRef  String? @db.VarChar(100) // Alert.id 或其他来源 id，无外键
 ```
 
-- `NotificationDeclaration` 增加 `kind: "alert" | "event"`（代码注册）。`kind` 决定可用模板形态（`alert` 允许 recovered 模板）与规则条件里的可用维度。
-- `notify()` 入参：移除 `alertKey`、`status`、`recoveredAt`；保留 `notificationKey`、`context`、`severity`、`scopeId`、`link`、`deduplicationKey`；新增 `phase`（仅 `kind=alert` 使用，驱动标题/正文模板选择与规则 `phase` 条件）与 `sourceType` / `sourceRef`（溯源）。
+- `NotificationDeclaration` 增加 `kind: "alert" | "event"`（代码注册）。`kind` 只决定可用模板形态（`alert` 允许 recovered 模板），不再影响规则维度；声明不再持有默认 severity，severity 一律由调用方传入（见 ADR-062「severity 契约」）。
+- `notify()` 入参：移除 `alertKey`、`status`、`recoveredAt`；保留 `notificationKey`、`context`、`severity`（必传，词表固定五档）、`scopeId`、`link`、`deduplicationKey`；新增 `phase`（仅 `kind=alert` 使用，驱动标题/正文模板选择与规则 `phase` 条件）与 `sourceType` / `sourceRef`（溯源）。
 - **投递规则按次求值，不再冻结**。同一告警的 firing 与 recovered 因为 severity 稳定，命中同一侧的规则；只有显式按 `phase` 区分的规则才会分开——这是操作者的明确意图，不需要模型层强制。
 - 按 key 开关、中心开关、通道判定保持原样，判定痕迹继续落在 `NotificationDeliveryAttempt`。通知域不再有任何「这条消息要不要因为时间窗口而不发」的判断：要不要发由调用方（告警域）决定，通知域只管发得成发不成。
 
