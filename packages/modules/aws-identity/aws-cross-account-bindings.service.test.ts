@@ -19,6 +19,7 @@ const CONSUMER_B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 interface BindingRow {
   id: string;
   accountId: string;
+  name: string | null;
   roleArn: string | null;
   externalId: string;
   pendingExternalId: string | null;
@@ -47,6 +48,7 @@ function seedBinding(overrides: Partial<BindingRow> = {}): BindingRow {
   return {
     id: `binding-${sequence}`,
     accountId: ACCOUNT_ID,
+    name: null,
     roleArn: ROLE_ARN,
     externalId: "external-id",
     pendingExternalId: null,
@@ -92,6 +94,7 @@ function createFakePrisma(bindings: BindingRow[] = [], usages: UsageRow[] = []) 
         const row: BindingRow = {
           id: `binding-${(sequence += 1)}`,
           accountId: data.accountId!,
+          name: data.name ?? null,
           roleArn: data.roleArn ?? null,
           externalId: data.externalId!,
           pendingExternalId: data.pendingExternalId ?? null,
@@ -229,4 +232,50 @@ test("the account list reports which consumers reference each account", async ()
   const listed = await service.listAccountCredentials();
   assert.deepEqual(listed.accounts[0].consumerIds, [CONSUMER_A, CONSUMER_B]);
   assert.equal(listed.accounts[0].accountId, ACCOUNT_ID);
+});
+
+test("resolveAccountCredential resolves the binding without a consumer usage", async () => {
+  const binding = seedBinding();
+  const prisma = createFakePrisma([binding]);
+  const service = createService(prisma);
+
+  // No consumer is attached: the account is addressed directly (ADR-059).
+  const credential = await service.resolveAccountCredential(ACCOUNT_ID);
+  assert.equal(credential.bindingId, binding.id);
+  assert.equal(credential.accountId, ACCOUNT_ID);
+  assert.deepEqual(credential.regions, ["us-east-1"]);
+});
+
+test("resolveAccountCredential rejects an account with no configured role", async () => {
+  const prisma = createFakePrisma([seedBinding({ roleArn: null })]);
+  const service = createService(prisma);
+
+  await assert.rejects(() => service.resolveAccountCredential(ACCOUNT_ID));
+});
+
+test("resolveAccountCredential rejects an unknown account", async () => {
+  const prisma = createFakePrisma([]);
+  const service = createService(prisma);
+
+  await assert.rejects(() => service.resolveAccountCredential("444455556666"));
+});
+
+test("the account list exposes the platform-side display name", async () => {
+  const binding = seedBinding({ name: "Production" });
+  const prisma = createFakePrisma([binding]);
+  const service = createService(prisma);
+
+  const listed = await service.listAccountCredentials();
+  assert.equal(listed.accounts[0].name, "Production");
+  assert.equal(listed.accounts[0].accountId, ACCOUNT_ID, "the numeric account id stays alongside the name");
+});
+
+test("a rename saves through the scope-edit path without re-probing STS", async () => {
+  const binding = seedBinding({ name: "Old name" });
+  const prisma = createFakePrisma([binding]);
+  const service = createService(prisma);
+
+  const saved = await service.upsertAccountCredential(ACCOUNT_ID, { roleArn: ROLE_ARN, name: "  Renamed  " });
+  assert.equal(saved.credential?.name, "Renamed", "the name is trimmed before it is stored");
+  assert.equal(saved.credential?.externalId, "external-id", "the identity is untouched by a rename");
 });
