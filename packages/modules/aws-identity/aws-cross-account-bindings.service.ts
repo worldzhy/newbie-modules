@@ -12,7 +12,7 @@ import { ConfigService } from "@nestjs/config";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import type { AwsCrossAccountBinding } from "@generated/prisma/client";
-import { UpsertAwsCrossAccountBindingDto } from "./aws-cross-account-bindings.dto";
+import { UpsertAwsCrossAccountBindingDto, UpdateAwsCrossAccountBindingNameDto } from "./aws-cross-account-bindings.dto";
 import {
   assumeRole,
   AwsCallerIdentity,
@@ -129,6 +129,23 @@ export class AwsCrossAccountBindingsService {
 
   async upsertAccountCredential(accountId: string, dto: UpsertAwsCrossAccountBindingDto) {
     const binding = await this.updateBinding(accountId, dto);
+    return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
+  }
+
+  /**
+   * Rename an account. The display name is platform-side metadata, not part of
+   * the identity exchange or the usage scope, so this path never probes STS and
+   * works for accounts whose role has not been configured yet.
+   */
+  async renameAccount(accountId: string, dto: UpdateAwsCrossAccountBindingNameDto) {
+    const existing = await this.getBindingByAccountId(accountId);
+    if (!existing) {
+      throw new NotFoundException("AWS cross-account binding is not bootstrapped");
+    }
+    const binding = await this.prisma.awsCrossAccountBinding.update({
+      where: { id: existing.id },
+      data: { name: dto.name?.trim() || null },
+    });
     return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
   }
 

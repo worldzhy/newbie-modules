@@ -279,3 +279,22 @@ test("a rename saves through the scope-edit path without re-probing STS", async 
   assert.equal(saved.credential?.name, "Renamed", "the name is trimmed before it is stored");
   assert.equal(saved.credential?.externalId, "external-id", "the identity is untouched by a rename");
 });
+
+test("renameAccount names an account that has no role yet and clears a blank name", async () => {
+  const binding = seedBinding({ name: null, roleArn: null });
+  const prisma = createFakePrisma([binding]);
+  const service = createService(prisma);
+
+  const saved = await service.renameAccount(ACCOUNT_ID, { name: "  Sandbox  " });
+  assert.equal(saved.credential?.name, "Sandbox", "the name is trimmed before it is stored");
+  assert.equal(saved.credential?.roleArn, null, "renaming never configures a role");
+
+  const cleared = await service.renameAccount(ACCOUNT_ID, { name: "   " });
+  assert.equal(cleared.credential?.name, null, "a blank name clears the stored name");
+});
+
+test("renameAccount rejects an account that was never bootstrapped", async () => {
+  const service = createService(createFakePrisma([]));
+
+  await assert.rejects(() => service.renameAccount("444455556666", { name: "Nope" }));
+});

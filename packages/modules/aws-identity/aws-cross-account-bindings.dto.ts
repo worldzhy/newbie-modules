@@ -211,6 +211,22 @@ export class UpsertAwsCrossAccountBindingDto {
 }
 
 /**
+ * Rename an account. The name is display-only metadata: it is never part of
+ * the identity exchange or the region scope, so an account whose role is not
+ * configured yet can still be named. Null or blank clears the name.
+ */
+export class UpdateAwsCrossAccountBindingNameDto {
+  @ApiPropertyOptional({
+    description: "Platform-side display name for the account; null or blank clears it",
+    type: String,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  name?: string | null;
+}
+
+/**
  * Attach (or move) a consumer to an account binding. The account must already
  * be bootstrapped; attaching an unknown account is rejected so a typo cannot
  * create a dangling reference.

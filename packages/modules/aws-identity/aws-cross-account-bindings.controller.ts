@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
@@ -9,6 +9,7 @@ import {
   AwsCrossAccountBindingListResponseDto,
   AwsCrossAccountBindingResponseDto,
   UpsertAwsCrossAccountBindingDto,
+  UpdateAwsCrossAccountBindingNameDto,
   VerifyAwsCrossAccountBindingResponseDto,
 } from "./aws-cross-account-bindings.dto";
 
@@ -50,6 +51,14 @@ export class AwsCrossAccountBindingsController {
   @ApiResponse({ status: 200, type: AwsCrossAccountBindingResponseDto })
   async upsertAccountCredential(@Param("accountId") accountId: string, @Body() body: UpsertAwsCrossAccountBindingDto) {
     return await this.service.upsertAccountCredential(accountId, body);
+  }
+
+  @Patch("accounts/:accountId/name")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.AwsCrossAccountBinding)
+  @ApiOperation({ summary: "Rename an account without changing its role, external ID or region scope" })
+  @ApiResponse({ status: 200, type: AwsCrossAccountBindingResponseDto })
+  async renameAccount(@Param("accountId") accountId: string, @Body() body: UpdateAwsCrossAccountBindingNameDto) {
+    return await this.service.renameAccount(accountId, body);
   }
 
   @Post("accounts/:accountId/rebind")
