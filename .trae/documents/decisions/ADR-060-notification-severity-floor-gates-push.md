@@ -1,6 +1,6 @@
 # ADR-060: notification-center 的 severity floor 只约束推送，不约束落库
 
-状态：已采纳
+状态：已被 ADR-062 取代
 日期：2026-11-13
 
 ## 背景
