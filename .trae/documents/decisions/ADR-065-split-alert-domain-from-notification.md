@@ -3,14 +3,14 @@
 状态：已采纳
 日期：2026-11-14
 取代：ADR-062 §4/§5（每次投递开告警实例、裁决冻结在告警上）、ADR-064（通知侧的 fingerprint 配对键）、ADR-063 的静默机制（`NotificationSilence` 与 `silenced` 原因）
-保留：ADR-051 的 firing / recovered 术语；ADR-062 §1-§3、§6 的规则表与可解释性设计；ADR-063 的投递原因落库（`NotificationDeliveryAttempt`）
+保留：ADR-051 的生命周期术语，但统一为 `firing | resolved`（`recovered` 降为文案与 template key 后缀，不作枚举值）；ADR-062 §1-§3、§6 的规则表与可解释性设计；ADR-063 的投递原因落库（`NotificationDeliveryAttempt`）
 
 ## 背景
 
 告警现在住在通知的 schema 里（`packages/modules/notification-center/prisma/schema.prisma` 的 `NotificationAlert`），并且由 `notify()` 创建。这带来三个结构性后果：
 
 1. **因果颠倒**：告警的存在由通知调用次数决定，而不是由状态变化决定。`notify()` 第 268 行无条件 `upsertAlert`。
-2. **数据污染**：宿主 13 处 `notify()` 调用点里只有 4 处（url-check、heartbeat 的 firing/recovered）真在做生命周期，其余 9 处是纯事件（digest、weekly report、task-status、job-failure、error spike 等），每次投递留下一行永远停在 `firing` 的告警，占用唯一索引与 `@@index([state, lastSeenAt])`。
+2. **数据污染**：宿主 13 处 `notify()` 调用点里只有 4 处（url-check、heartbeat 的 firing/resolved）真在做生命周期，其余 9 处是纯事件（digest、weekly report、task-status、job-failure、error spike 等），每次投递留下一行永远停在 `firing` 的告警，占用唯一索引与 `@@index([state, lastSeenAt])`。
 3. **演进被锁死**：TTL、自动 resolved、抑制、分组都必须先排除这 9 类僵尸行，所以这些能力一件也落不了地。
 
 取证：`NotificationAlert` 只被模块自身的 service 读写；宿主 9 处事件生产者、其他 registry 模块、前端都没有引用它。搬表没有外部读面。
@@ -82,9 +82,9 @@ model AlertSource {
 要点：
 
 - **没有 verdict 列**。投递策略属于通知域，不写进告警表。
-- **severity 在告警上稳定**。firing 与 recovered 用同一个 severity，通知规则按 severity 匹配时两侧自然一致，不需要冻结裁决。
+- **severity 在告警上稳定**。firing 与 resolved 用同一个 severity，通知规则按 severity 匹配时两侧自然一致，不需要冻结裁决。
 - `labels` 与 `data` 分工：`labels` 供匹配与筛选（可索引、可枚举），`data` 是给消息渲染用的不透明上下文（URL、错误文本、恢复时间等）。
-- `source` 是一等身份，不是自由文本备注：它决定提醒间隔的默认值、暂停开关的作用范围，也是通知侧 `(source, phase) → notificationKey` 映射的左键。
+- `source` 是一等身份，不是自由文本备注：它决定提醒间隔的默认值、暂停开关的作用范围，也是通知侧 `(source, state) → notificationKey` 映射的左键。
 - `AlertSource` 由 `raise` 惰性 upsert（只写 `key` 与默认值），不需要宿主预注册；`displayName`、`defaultRepeatMinutes`、`notifyPausedUntil` 由用户或宿主后续编辑。未声明的来源自动出现在设置面上，代价是首次噪声，收益是零配置即可接入。
 - `AlertSource` **不设 `enabled`**。暂停只停外发不停记录；若拒收 `raise`，后续 `resolve` 将找不到行，状态机会出现无法闭合的窗口。
 - 无跨域外键；通知侧要溯源时只存 `(sourceType="alert", sourceRef=<Alert.id>)` 字符串。
@@ -93,8 +93,8 @@ model AlertSource {
 
 ```text
 raise({ source, alertKey, scopeId?, severity, labels?, data?, repeatIntervalMinutes? })
-                                                                 -> { id, state, isNew, phase }
-resolve({ source, alertKey, scopeId?, resolvedAt? })             -> { id, phase } | null
+                                                                 -> { id, state, isNew }
+resolve({ source, alertKey, scopeId?, resolvedAt? })             -> { id } | null
 list({ state?, source?, scopeId?, cursor?, limit })              -> 分页
 get(id)                                                          -> 详情
 dispatchDueReminders({ now?, limit? })                           -> { dispatched: number }
@@ -108,19 +108,19 @@ dispatchDueReminders({ now?, limit? })                           -> { dispatched
 | firing | raise | `lastSeenAt` 前推、`occurrences+1`；`nextNotificationAt` 不动 | 否（去噪，节奏不被重复上报重置） |
 | firing | 提醒到点 | `lastNotificationAt=now`，`nextNotificationAt=now+repeatIntervalMinutes` | 是（firing，同一模板） |
 | resolved | raise | 重开：`state=firing`、`resolvedAt=null`、`occurrences=1`、`firstSeenAt=now`，重算 `nextNotificationAt` | 是（firing） |
-| firing | resolve | `state=resolved`、`resolvedAt=now`、`nextNotificationAt=null` | 是（recovered） |
+| firing | resolve | `state=resolved`、`resolvedAt=now`、`nextNotificationAt=null` | 是（resolved） |
 | resolved | resolve | 幂等返回，不改数据 | 否 |
 | 无 | resolve | 返回 null 并记日志（迟到的恢复不凭空造告警） | 否 |
 
-术语映射（唯一翻译点）：告警域用状态词，通知域用事件词，映射只允许发生在宿主适配器里。
+术语：全链路只用一组值 `firing | resolved`，与 Alertmanager / PagerDuty / Grafana 对齐。告警表、通知端口、规则条件都用同一个字段名 `state`，不设 `phase`，也不引入 `recovered` / `raised` / `pending`——`recovered` 仅作中文文案与宿主 `notificationKey` 后缀（`url-check.recovered` 是模板名，不是枚举值）。
 
-| 告警域 | 通知端口 `phase` | 用户看到 |
+| 场景 | `state` | 用户看到 |
 | --- | --- | --- |
-| `raise` 新建或重开（`state=firing`） | `firing` | 「发生」 |
-| 提醒到点（`state=firing`） | `firing` + `reminderCount` | 「仍未恢复（第 N 次提醒）」 |
-| `resolve`（`state=resolved`） | `recovered` | 「已恢复」 |
+| `raise` 新建或重开 | `firing` | 「发生」 |
+| 提醒到点 | `firing` + `reminderCount` | 「仍未恢复（第 N 次提醒）」 |
+| `resolve` | `resolved` | 「已恢复」 |
 
-`phase` 只取 `firing | recovered` 两值，是通知域的模板轴与规则维度；不扩成三态，否则 `notificationKey` 会随提醒分裂，按 key 静音与规则分流也跟着拆开。`resolved` 与 `recovered` 指同一时刻，只在适配器边界换一次词。
+提醒复用 `firing` 的 `notificationKey` 与模板，key 不随提醒次数分裂，按 key 静音与规则分流因此稳定。
 
 并发：`fingerprint` 唯一约束是唯一仲裁点；`raise` 捕获唯一冲突后重读 winner 行继续推进，不向调用方抛错。
 
@@ -148,7 +148,7 @@ nextNotificationAt = max(source.notifyPausedUntil ?? now, now) + repeatIntervalM
 
 1. **停外发不停记录**。暂停期间 `raise` 照常建行、推进 `lastSeenAt` 与 `occurrences`，`resolve` 照常落 `resolvedAt`；只是不调用通知端口。
 2. **到期最多一条迟到提醒**。恢复外发后只命中当前一次的提醒，不补发暂停期内错过的每一条。
-3. **期间发生的恢复不外发**。暂停期内 `resolve` 不发 recovered 消息，但状态照常变为 `resolved`，宿主查询可见。
+3. **期间发生的恢复不外发**。暂停期内 `resolve` 不发 resolved 消息，但状态照常变为 `resolved`，宿主查询可见。
 
 `notifyPausedUntil` 只放在 `AlertSource` 上。单条告警的「延后提醒」直接写 `nextNotificationAt`，不重复设同义字段。
 
@@ -166,7 +166,7 @@ interface AlertNotificationPort {
     alertId: string;
     source: string;
     scopeId?: string;
-    phase: "firing" | "recovered";
+    state: "firing" | "resolved";
     severity: string;
     labels: Record<string, string>;
     data: Record<string, unknown> | null;
@@ -175,7 +175,7 @@ interface AlertNotificationPort {
 }
 ```
 
-宿主适配器负责把 `(source, phase)` 映射成通知 key（如 `url-check` + `firing` → `url-check.down`），再调用 `NotificationCenterService.notify()`。映射属于宿主业务，registry 侧零模板知识。
+宿主适配器负责把 `(source, state)` 映射成通知 key（如 `url-check` + `firing` → `url-check.down`，`url-check` + `resolved` → `url-check.recovered`），再调用 `NotificationCenterService.notify()`。映射属于宿主业务，registry 侧零模板知识。
 
 ### 6. 通知域收缩
 
@@ -188,9 +188,9 @@ sourceType String? @db.VarChar(20)  // alert | event
 sourceRef  String? @db.VarChar(100) // Alert.id 或其他来源 id，无外键
 ```
 
-- `NotificationDeclaration` 增加 `kind: "alert" | "event"`（代码注册）。`kind` 只决定可用模板形态（`alert` 允许 recovered 模板），不再影响规则维度；声明不再持有默认 severity，severity 一律由调用方传入（见 ADR-062「severity 契约」）。
-- `notify()` 入参：移除 `alertKey`、`status`、`recoveredAt`；保留 `notificationKey`、`context`、`severity`（必传，词表固定五档）、`scopeId`、`link`、`deduplicationKey`；新增 `phase`（仅 `kind=alert` 使用，驱动标题/正文模板选择与规则 `phase` 条件）与 `sourceType` / `sourceRef`（溯源）。
-- **投递规则按次求值，不再冻结**。同一告警的 firing 与 recovered 因为 severity 稳定，命中同一侧的规则；只有显式按 `phase` 区分的规则才会分开——这是操作者的明确意图，不需要模型层强制。
+- `NotificationDeclaration` 增加 `kind: "alert" | "event"`（代码注册）。`kind` 只决定可用模板形态（`alert` 允许恢复模板），不再影响规则维度；声明不再持有默认 severity，severity 一律由调用方传入（见 ADR-062「severity 契约」）。
+- `notify()` 入参：移除 `alertKey`、`status`、`recoveredAt`；保留 `notificationKey`、`context`、`severity`（必传，词表固定五档）、`scopeId`、`link`、`deduplicationKey`；新增 `state`（仅 `kind=alert` 使用，取 `firing | resolved`，驱动标题/正文模板选择与规则 `state` 条件）与 `sourceType` / `sourceRef`（溯源）。
+- **投递规则按次求值，不再冻结**。同一告警的 firing 与 resolved 因为 severity 稳定，命中同一侧的规则；只有显式按 `state` 区分的规则才会分开——这是操作者的明确意图，不需要模型层强制。
 - 按 key 开关、中心开关、通道判定保持原样，判定痕迹继续落在 `NotificationDeliveryAttempt`。通知域不再有任何「这条消息要不要因为时间窗口而不发」的判断：要不要发由调用方（告警域）决定，通知域只管发得成发不成。
 
 ### 7. 表结构与迁移
@@ -198,7 +198,7 @@ sourceRef  String? @db.VarChar(100) // Alert.id 或其他来源 id，无外键
 - 新文件 `packages/modules/alert-center/prisma/schema.prisma` 含 `Alert` 与 `AlertSource`。
 - 通知侧 schema 删除 `NotificationAlert`、`NotificationSilence`、两处 `alertId`，新增 `sourceType` / `sourceRef`。
 - 宿主（nightwatch-backend）按版本化迁移落地，分两次：先加新表与新区列、代码双写可读；再删旧列与旧表。
-- **不回溯数据**。存量 `NotificationAlert` 行里 9/13 是僵尸行，且告警状态可由生产者自愈：url-check 与 heartbeat 下一次轮询就会重新 `raise`。历史消息本身保留在 `NotificationRecord`（标题、正文、firing/recovered 状态），审计价值不依赖告警表。
+- **不回溯数据**。存量 `NotificationAlert` 行里 9/13 是僵尸行，且告警状态可由生产者自愈：url-check 与 heartbeat 下一次轮询就会重新 `raise`。历史消息本身保留在 `NotificationRecord`（标题、正文、firing/resolved 状态），审计价值不依赖告警表。
 - 旧表删除前确认零读：`NotificationAlert` 与 `NotificationSilence` 当前只有模块 service 读取，随 P0 代码删除即可满足。
 
 ## 跨宿主 / 演进检验（registry 模块设计必填）

@@ -5,6 +5,7 @@
 更新：2026-11-13 — P3 拆为静默与抑制两段；静默的实时求值与投递原因落库见 ADR-063，抑制等待告警状态机收敛
 更新：2026-11-14 — 补记告警与通知的域边界判断（见文末补充）；结论已由 ADR-065 取代
 更新：2026-11-14 — 补记 severity 契约：取值归生产者，后果归通知域
+更新：2026-11-14 — 条件维度 `phase` 统一为 `state`，全链路只用 `firing | resolved` 一组值
 
 取代：ADR-060（severity floor 门控推送）、ADR-061（恢复投递与 severity 解耦）
 
@@ -59,13 +60,15 @@ model NotificationDeliveryRule {
 
 ```ts
 type DeliveryCondition = {
-  phase?: "firing" | "recovered";   // 枚举，单值
+  state?: "firing" | "resolved";    // 枚举，单值
   severityAtLeast?: Severity;       // 阈值，单值
   notificationKeys?: string[];      // 集合
   projectIds?: string[];            // 集合
   tags?: Record<string, string>;    // 映射
 };
 ```
+
+维度名用 `state` 而不是 `phase`：告警表、端口、规则条件只用一个词、一组值，与 Alertmanager / PagerDuty / Grafana 的 `firing | resolved` 对齐。`recovered` 只保留在文案（「已恢复」）与宿主 `notificationKey` 后缀（`url-check.recovered`）里，不作为枚举值；`raised`、`pending` 等都不引入。
 
 单值只用于枚举与阈值，集合只用于多选匹配。集合字段的空值语义固定：
 
@@ -108,7 +111,7 @@ runtimeReason =
 | 转换 | 动作 |
 | --- | --- |
 | firing → firing | 只更新 `lastSeenAt`；同 `deduplicationKey` 的记录合并 |
-| firing → resolved | `state=resolved`、`resolvedAt=now`；记录一条 recovered；跑实时段后投递 |
+| firing → resolved | `state=resolved`、`resolvedAt=now`；记录一条恢复投递；跑实时段后投递 |
 | resolved → firing | `state=firing`、`resolvedAt=null`、**清空裁决并重算**（新周期） |
 
 ### 6. 可解释性
@@ -129,7 +132,7 @@ if (result.decision !== "delivered") return;
 - 条件渐进披露：默认只显示级别，其他条件收进"添加条件"。
 - `suppress` 规则归入"例外"分区，主流程只写 deliver 规则。
 - **模拟器为必需项**：选中一条最近通知，跑同一求值函数，显示命中第几条规则。这是有序规则模型唯一可靠的纠错手段。
-- seed 两条默认规则，使默认用户零操作：`{ priority: 10, condition: { severityAtLeast: "high" }, action: "deliver" }` 与 `{ priority: 20, condition: { phase: "recovered" }, action: "deliver" }`。第二条保留"恢复必达"这一既有可用行为（旧实现靠 `recoveryOf` 继承 firing 级别实现），否则升级后所有恢复推送会被静默。最后一条规则不允许删除，因此"空表"只存在于首次 seed 之前。
+- seed 两条默认规则，使默认用户零操作：`{ priority: 10, condition: { severityAtLeast: "high" }, action: "deliver" }` 与 `{ priority: 20, condition: { state: "resolved" }, action: "deliver" }`。第二条保留"恢复必达"这一既有可用行为（旧实现靠 `recoveryOf` 继承 firing 级别实现），否则升级后所有恢复推送会被静默。最后一条规则不允许删除，因此"空表"只存在于首次 seed 之前。
 
 ## 补充：告警与通知的域边界（2026-11-14）
 
@@ -137,9 +140,9 @@ if (result.decision !== "delivered") return;
 
 **两域本质不同。** Alert 是状态机：有身份（`fingerprint`）、有生命周期（`firstSeenAt` → `lastSeenAt` → `resolvedAt`）、severity 在周期内稳定；它回答"这件事现在是不是还坏着"。Notification 是一次投递事件：渲染、去重、路由、推送、已读；它回答"这一刻要不要打扰谁"。两者的变更驱动也不同——改规则、改 TTL、改对账策略属于告警域；改模板、加渠道、改静默属于通知域。
 
-**依赖方向是告警 → 通知。** 告警是状态机，独立产生、独立推进，状态变化后作为调用方把消息交给通知域投递；通知是通用通道，支持告警类与系统事件类等多种消息，用 `sourceRef` 溯源但不创建告警。三个具体衔接点：同一告警的 firing 与 recovered 落在同一行（告警域身份键）、severity 在告警行稳定因此两侧规则判定一致、静默归属到具体告警窗口（ADR-063）。通知不需要知道告警何时创建，告警也不需要知道消息如何渲染。
+**依赖方向是告警 → 通知。** 告警是状态机，独立产生、独立推进，状态变化后作为调用方把消息交给通知域投递；通知是通用通道，支持告警类与系统事件类等多种消息，用 `sourceRef` 溯源但不创建告警。三个具体衔接点：同一告警的 firing 与 resolved 落在同一行（告警域身份键）、severity 在告警行稳定因此两侧规则判定一致、静默归属到具体告警窗口（ADR-063）。通知不需要知道告警何时创建，告警也不需要知道消息如何渲染。
 
-**当前实现是反向耦合，且假设已被宿主数据推翻。** `notify()` 无条件创建告警行，等于让告警的存在由通知调用次数决定。宿主共有 13 处 `notify()` 调用点（不含 `project-notification-push` 自身的透传），其中只有 4 处传 `status` / `alertKey`（url-check 的 down、recovered 与 heartbeat 的 offline、recovered），其余 9 处覆盖 8 个生产者（digest、weekly report、task-status-changed、job.run-failed、error spike 等）都是纯事件：它们的告警行 `state` 永远停在 `firing`、没有 recovered 阶段，却照样占用 `fingerprint`、进入 `@@index([state, lastSeenAt])`，并会落入未来任何 TTL / 自动 resolved 的扫描面。也就是说，告警运维语义正在承载不属于它的数据。
+**当前实现是反向耦合，且假设已被宿主数据推翻。** `notify()` 无条件创建告警行，等于让告警的存在由通知调用次数决定。宿主共有 13 处 `notify()` 调用点（不含 `project-notification-push` 自身的透传），其中只有 4 处传 `status` / `alertKey`（url-check 的 down、recovered 与 heartbeat 的 offline、recovered），其余 9 处覆盖 8 个生产者（digest、weekly report、task-status-changed、job.run-failed、error spike 等）都是纯事件：它们的告警行 `state` 永远停在 `firing`、没有 resolved 阶段，却照样占用 `fingerprint`、进入 `@@index([state, lastSeenAt])`，并会落入未来任何 TTL / 自动 resolved 的扫描面。也就是说，告警运维语义正在承载不属于它的数据。
 
 **解耦的形状（见 ADR-065）。** 告警独立成模块并拥有自己的表：告警域提供 raise / resolve 与状态机；通知域只保留渲染、去重、实时段（静默、开关、通道）、推送与未读，声明按 `kind` 区分告警类与事件类消息。`alertKey` 退出 `notify()` 入参，成为告警域内部身份键；投递规则按次求值，不再在告警上冻结裁决。
 
