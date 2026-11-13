@@ -176,6 +176,9 @@ model NotificationAlert {
 
   verdictAction   String?   @db.VarChar(10)
   verdictRuleId   String?   @db.Uuid
+  // Why that verdict came out the way it did, so the recovery of this cycle and
+  // the audit rows explain themselves without replaying the rule table.
+  verdictReason   String?   @db.VarChar(40)
   verdictAt       DateTime?
 
   firstSeenAt     DateTime  @default(now())

@@ -72,6 +72,7 @@ function newServiceWithCenter(
   } = {},
 ) {
   const created: Record<string, unknown>[] = [];
+  const attempts: Record<string, unknown>[] = [];
   const alerts = new Map<string, Record<string, any>>();
   let pushed = false;
   const prisma = {
@@ -100,6 +101,7 @@ function newServiceWithCenter(
           id: `alert-${alerts.size + 1}`,
           verdictAction: null,
           verdictRuleId: null,
+          verdictReason: null,
           ...data,
         };
         alerts.set(`${data.notificationKey}::${data.fingerprint}`, row);
@@ -109,6 +111,12 @@ function newServiceWithCenter(
         const row = [...alerts.values()].find((candidate) => candidate.id === where.id)!;
         Object.assign(row, data);
         return row;
+      },
+    },
+    notificationDeliveryAttempt: {
+      create: async ({ data }: { data: Record<string, unknown> }) => {
+        attempts.push(data);
+        return data;
       },
     },
     notificationRecord: {
@@ -138,16 +146,30 @@ function newServiceWithCenter(
     },
   };
   const service = new NotificationCenterService(prisma as never, registry as never, pushPort as never);
-  return { service, created, pushed: () => pushed };
+  return { service, created, attempts, pushed: () => pushed };
 }
 
 test("a delivery below the center floor is recorded in-app but not pushed", async () => {
   const { service, created, pushed } = newServiceWithCenter("medium", "high");
   const result = await service.notify({ notificationKey: "k" });
   assert.equal(result.pushSuppressed, true);
+  assert.equal(result.decision, "suppress");
+  assert.equal(result.reason, "below-minimum");
   assert.equal(result.deduplicated, false);
   assert.equal(created.length, 1);
   assert.equal(pushed(), false);
+});
+
+test("each recorded delivery writes one audit attempt with its decision", async () => {
+  const { service, created, attempts } = newServiceWithCenter("medium", "high");
+  await service.notify({ notificationKey: "k" });
+  await service.notify({ notificationKey: "k", status: "recovered" });
+  assert.equal(created.length, 2);
+  assert.equal(attempts.length, 2);
+  assert.equal(attempts[0].decision, "suppress");
+  assert.equal(attempts[0].reason, "below-minimum");
+  assert.equal(attempts[1].alertId, attempts[0].alertId);
+  assert.equal(attempts[1].reason, "below-minimum");
 });
 
 test("a delivery at or above the center floor is recorded and pushed", async () => {

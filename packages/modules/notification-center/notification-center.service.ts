@@ -19,7 +19,7 @@ import {
   SEVERITIES,
   SEVERITY_LEVEL,
 } from "./notification-center.constants";
-import type { DeliveryLabels, DeliveryRuleAction } from "./notification-center.constants";
+import type { DeliveryDecisionReason, DeliveryLabels, DeliveryRuleAction } from "./notification-center.constants";
 import {
   ListNotificationsRequestDto,
   ListNotificationsResponseDto,
@@ -118,10 +118,14 @@ export interface NotifyResult {
   id: string;
   /** True when the deduplication key already existed and no row was created. */
   deduplicated: boolean;
+  /** Delivery verdict of the alert this event belongs to (ADR-062). */
+  decision: DeliveryRuleAction;
+  /** Why the verdict came out that way; null only for pre-P1 frozen verdicts. */
+  reason: DeliveryDecisionReason | null;
   /**
-   * True when the delivery was recorded in-app but skipped push because the
-   * firing severity is below the center floor (ADR-060). Always false for
-   * recovered-phase deliveries, which the floor never gates (ADR-061).
+   * True when the delivery was recorded in-app but skipped push. Kept for the
+   * callers that still read the boolean; ADR-062 phase P2 replaces it with
+   * `decision`.
    */
   pushSuppressed: boolean;
 }
@@ -144,6 +148,27 @@ function renderTemplate(template: string, context?: Record<string, unknown>): st
   });
 }
 
+/** Outcome of the rule judgement for one alert; frozen on the alert instance. */
+interface DeliveryVerdict {
+  action: DeliveryRuleAction;
+  ruleId: string | null;
+  reason: DeliveryDecisionReason | null;
+}
+
+/** Human-readable form of a suppress verdict, for the debug log. */
+function describeSuppression(verdict: DeliveryVerdict, severity: string, minimumSeverity: string): string {
+  switch (verdict.reason) {
+    case "no-rule-matched":
+      return "no enabled rule matched the event";
+    case "below-minimum":
+      return `severity ${severity} is below the configured minimum ${minimumSeverity}`;
+    case "rule":
+      return `rule ${verdict.ruleId} decided suppress`;
+    default:
+      return "the alert carried a frozen suppress verdict";
+  }
+}
+
 @Injectable()
 export class NotificationCenterService {
   private readonly logger = new Logger(NotificationCenterService.name);
@@ -162,14 +187,16 @@ export class NotificationCenterService {
    * Produce one notification record from a registered notification. The
    * notification's templates are rendered with `context` and severity is
    * resolved from the override or the notification default. The record is
-   * always persisted: the center minimum-severity floor only gates push
-   * delivery of firing records (the in-app bell is the base layer), so a
-   * closure or low-severity signal never disappears while its firing
-   * counterpart stays visible. Recovered-phase deliveries are never gated by
-   * the floor (ADR-061): recovery is a lifecycle state, not an alert level.
-   * System-scope notifications are pushed through the host-provided push port;
-   * project-scope push routing is owned by the host (per-project chat bindings)
-   * and reads `pushSuppressed` from the result.
+   * always persisted: the delivery verdict only gates push, so a suppressed
+   * low-severity signal never disappears from the in-app bell.
+   *
+   * ADR-062: every delivery opens an alert instance and freezes the rule
+   * verdict on it, so one alert and its recovery land on the same side of the
+   * rules. Each recorded delivery also writes one audit attempt. While no rule
+   * is configured the center minimum severity still decides, so the phase P0/P1
+   * wiring changes no push behaviour. System-scope notifications are pushed
+   * through the host-provided push port; project-scope push routing is owned by
+   * the host (per-project chat bindings) and reads `decision` from the result.
    */
   async notify(input: NotifyInput): Promise<NotifyResult> {
     const declared = this.registry.get(input.notificationKey);
@@ -223,11 +250,11 @@ export class NotificationCenterService {
       severity,
       phase: input.status ?? "firing",
     });
-    const verdict = alert.verdictAction
+    const verdict: DeliveryVerdict = alert.verdictAction
       ? {
           action: alert.verdictAction as DeliveryRuleAction,
           ruleId: alert.verdictRuleId,
-          reason: `alert ${alert.id} carried a frozen ${alert.verdictAction} verdict`,
+          reason: (alert.verdictReason as DeliveryDecisionReason | null) ?? null,
         }
       : await this.freezeVerdict(
           alert.id,
@@ -243,7 +270,13 @@ export class NotificationCenterService {
         );
     const pushSuppressed = verdict.action === "suppress";
     if (pushSuppressed) {
-      this.logger.debug(`Notification ${input.notificationKey} recorded without push: ${verdict.reason}`);
+      this.logger.debug(
+        `Notification ${input.notificationKey} recorded without push: ${describeSuppression(
+          verdict,
+          alertSeverity,
+          center.minimumSeverity,
+        )}`,
+      );
     }
 
     // ADR-051: recovered-phase notifications prefer the declaration's recovered
@@ -293,10 +326,27 @@ export class NotificationCenterService {
     }
 
     if (!deduplicated) {
+      // One audit row per delivery decision (ADR-062) so every push or
+      // suppression is explainable after the fact.
+      await this.prisma.notificationDeliveryAttempt.create({
+        data: {
+          alertId: alert.id,
+          recordId,
+          decision: verdict.action,
+          reason: verdict.reason,
+          ruleId: verdict.ruleId,
+        },
+      });
       await this.dispatchPush(setting.scope, setting.isPushEnabled, center, pushSuppressed, title, detail, recordId);
     }
 
-    return { id: recordId, deduplicated, pushSuppressed };
+    return {
+      id: recordId,
+      deduplicated,
+      decision: verdict.action,
+      reason: verdict.reason,
+      pushSuppressed,
+    };
   }
 
   /**
@@ -310,8 +360,18 @@ export class NotificationCenterService {
     projectId?: string;
     severity: string;
     phase: "firing" | "recovered";
-  }): Promise<{ id: string; verdictAction: string | null; verdictRuleId: string | null }> {
-    const select = { id: true, verdictAction: true, verdictRuleId: true } as const;
+  }): Promise<{
+    id: string;
+    verdictAction: string | null;
+    verdictRuleId: string | null;
+    verdictReason: string | null;
+  }> {
+    const select = {
+      id: true,
+      verdictAction: true,
+      verdictRuleId: true,
+      verdictReason: true,
+    } as const;
     const existing = await this.prisma.notificationAlert.findUnique({
       where: {
         notificationKey_fingerprint: {
@@ -342,7 +402,7 @@ export class NotificationCenterService {
         severity: input.severity,
         state: input.phase,
         resolvedAt: input.phase === "recovered" ? new Date() : null,
-        ...(reopens ? { verdictAction: null, verdictRuleId: null, verdictAt: null } : {}),
+        ...(reopens ? { verdictAction: null, verdictRuleId: null, verdictReason: null, verdictAt: null } : {}),
       },
       select,
     });
@@ -354,10 +414,7 @@ export class NotificationCenterService {
    * the center minimum severity keeps deciding, so phase P0 of ADR-062 changes
    * no behaviour; once a rule table exists, an unmatched event is suppressed.
    */
-  private async resolveVerdict(
-    labels: DeliveryLabels,
-    minimumSeverity: string,
-  ): Promise<{ action: DeliveryRuleAction; ruleId: string | null; reason: string }> {
+  private async resolveVerdict(labels: DeliveryLabels, minimumSeverity: string): Promise<DeliveryVerdict> {
     const rules = await this.prisma.notificationDeliveryRule.findMany({
       where: { isEnabled: true },
       orderBy: { priority: "asc" },
@@ -365,32 +422,26 @@ export class NotificationCenterService {
     });
     for (const rule of rules) {
       if (matchesDeliveryCondition(rule.condition, labels)) {
-        return {
-          action: rule.action as DeliveryRuleAction,
-          ruleId: rule.id,
-          reason: `rule ${rule.id} decided ${rule.action}`,
-        };
+        return { action: rule.action as DeliveryRuleAction, ruleId: rule.id, reason: "rule" };
       }
     }
     if (rules.length > 0) {
-      return { action: "suppress", ruleId: null, reason: "no enabled rule matched the event" };
+      return { action: "suppress", ruleId: null, reason: "no-rule-matched" };
     }
     const belowMinimum = SEVERITY_LEVEL[labels.severity] < (SEVERITY_LEVEL[minimumSeverity] ?? SEVERITY_LEVEL.high);
-    return {
-      action: belowMinimum ? "suppress" : "deliver",
-      ruleId: null,
-      reason: `severity ${labels.severity} is below the configured minimum ${minimumSeverity}`,
-    };
+    return { action: belowMinimum ? "suppress" : "deliver", ruleId: null, reason: "below-minimum" };
   }
 
   /** Persist the verdict on the alert so its recovery reuses it. */
-  private async freezeVerdict(
-    alertId: string,
-    verdict: { action: DeliveryRuleAction; ruleId: string | null; reason: string },
-  ): Promise<{ action: DeliveryRuleAction; ruleId: string | null; reason: string }> {
+  private async freezeVerdict(alertId: string, verdict: DeliveryVerdict): Promise<DeliveryVerdict> {
     await this.prisma.notificationAlert.update({
       where: { id: alertId },
-      data: { verdictAction: verdict.action, verdictRuleId: verdict.ruleId, verdictAt: new Date() },
+      data: {
+        verdictAction: verdict.action,
+        verdictRuleId: verdict.ruleId,
+        verdictReason: verdict.reason,
+        verdictAt: new Date(),
+      },
     });
     return verdict;
   }

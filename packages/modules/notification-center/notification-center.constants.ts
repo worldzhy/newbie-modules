@@ -23,6 +23,11 @@ export const DEFAULT_NOTIFICATION_PUSH_ENABLED = true;
 export const DELIVERY_RULE_ACTIONS = ["deliver", "suppress"] as const;
 export type DeliveryRuleAction = (typeof DELIVERY_RULE_ACTIONS)[number];
 
+// Why a delivery decision came out the way it did, stored on the audit row so
+// every push or suppression is explainable without replaying the rule table.
+export const DELIVERY_DECISION_REASONS = ["rule", "no-rule-matched", "below-minimum"] as const;
+export type DeliveryDecisionReason = (typeof DELIVERY_DECISION_REASONS)[number];
+
 /**
  * Condition of one delivery rule. Absent fields do not filter; an empty
  * collection never matches, so clearing a selector can only narrow the rule

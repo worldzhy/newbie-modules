@@ -2,7 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import { IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, Allow } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
-import { NOTIFICATION_SCOPES, SEVERITIES } from "./notification-center.constants";
+import {
+  DELIVERY_DECISION_REASONS,
+  DELIVERY_RULE_ACTIONS,
+  NOTIFICATION_SCOPES,
+  SEVERITIES,
+} from "./notification-center.constants";
 
 // ---------------------------------------------------------------------------
 // Notification record DTOs
@@ -93,7 +98,19 @@ export class NotifyResultDto {
   @ApiProperty({ description: "True when the deduplication key already existed" })
   deduplicated!: boolean;
 
-  @ApiProperty({ description: "True when the delivery was recorded in-app but skipped push (below minimum severity)" })
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS, description: "Delivery verdict of the alert this event belongs to" })
+  decision!: string;
+
+  @ApiProperty({
+    enum: DELIVERY_DECISION_REASONS,
+    nullable: true,
+    description: "Why the verdict came out that way; null for verdicts frozen before the reason was recorded",
+  })
+  reason!: string | null;
+
+  @ApiProperty({
+    description: "True when the delivery was recorded in-app but skipped push (superseded by decision in phase P2)",
+  })
   pushSuppressed!: boolean;
 }
 
