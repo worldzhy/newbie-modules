@@ -343,14 +343,14 @@ round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents
 
 | ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| R41-01 | newbie-modules | `upsertAlert` 先查后建无 P2002 兜底（`notification-center.service.ts:424-437`）：同 fingerprint 首次并发投递一路 500；与 R39-10 同类 | P2 | live | 首次并发 | open |
-| R41-02 | newbie-modules + nightwatch-frontend | `cancel()` 对 `startsAt` 在未来的窗口写 `endsAt=now`（`notification-silence.service.ts:91-102`，不重跑 `assertWindow`），产生 `endsAt<startsAt`；startsAt 前列表显示 scheduled、重复 cancel 空转却提示成功；无错误静默、可经 PUT 自愈 | P2 | live | MEMBER/ADMIN | open（初判 P1，反驳轮降级） |
-| R41-03 | newbie-modules | `update()` 可改写已被 `NotificationDeliveryAttempt.silenceId` 引用的窗口（`notification-silence.service.ts:67-85`，attempt 无窗口快照），绕过 ADR-063:90「已产生投递记录的窗口只能提前结束」；Restrict 只封删除不封改写 | P2 | live | MEMBER/ADMIN | open |
-| R41-04 | newbie-modules | HTTP `NotifyDto` 未暴露 `alertKey`（及 `status`/`recoveredAt`）（`notification-center.dto.ts:75-105`），HTTP 投递无法配对或产生 recovery；当前无 HTTP 消费者，属契约悬空 | P2 | artifact | 持 Create 权限者（无现存调用方） | open |
-| R41-05 | newbie-modules | README:10 的 fingerprint 构造仍写「project id + deduplication key，回退 notification key」，漏 `alertKey`，与 ADR-064/schema/实现漂移 | P2 | docs | 文档 | open |
-| R41-06 | newbie-modules | ADR-064 背景把复合唯一键归因给 ADR-062，但 ADR-062 全文无 fingerprint（`grep` 取证），复合键实际来自 schema | P2 | docs | 文档 | open |
-| R41-07 | newbie-modules | `NotifyDto` 的 `link`/`deduplicationKey`/`notificationKey` 无长度上界，DB VarChar 溢出触发 P2000 → 500（宿主无 Prisma 异常过滤器） | P2 | live | 持 Create 权限者 | open |
-| R41-08 | newbie-modules | fingerprint 唯一索引迁移无去重前置步骤（`20261114003000.../migration.sql`），其它消费仓若已有重复 fingerprint 会迁移失败；本宿主已成功应用 | P2 | ops | 其它消费仓 | open |
+| R41-01 | newbie-modules | `upsertAlert` 先查后建无 P2002 兜底（`notification-center.service.ts:424-437`）：同 fingerprint 首次并发投递一路 500；与 R39-10 同类 | P2 | live | 首次并发 | fixed（`create` 捕获 P2002 后重读 winner 行并沿该行 update；单测「a delivery that loses the first-alert insert race...」） |
+| R41-02 | newbie-modules + nightwatch-frontend | `cancel()` 对 `startsAt` 在未来的窗口写 `endsAt=now`（`notification-silence.service.ts:91-102`，不重跑 `assertWindow`），产生 `endsAt<startsAt`；startsAt 前列表显示 scheduled、重复 cancel 空转却提示成功；无错误静默、可经 PUT 自愈 | P2 | live | MEMBER/ADMIN | fixed（未开始窗口的 `startsAt` 一并压到 `now`，不再写出反向窗口；scheduled/active 两条单测） |
+| R41-03 | newbie-modules | `update()` 可改写已被 `NotificationDeliveryAttempt.silenceId` 引用的窗口（`notification-silence.service.ts:67-85`，attempt 无窗口快照），绕过 ADR-063:90「已产生投递记录的窗口只能提前结束」；Restrict 只封删除不封改写 | P2 | live | MEMBER/ADMIN | fixed（存在 attempt 时冻结 condition/startsAt，`endsAt` 仅可前移；四条单测） |
+| R41-04 | newbie-modules | HTTP `NotifyDto` 未暴露 `alertKey`（及 `status`/`recoveredAt`）（`notification-center.dto.ts:75-105`），HTTP 投递无法配对或产生 recovery；当前无 HTTP 消费者，属契约悬空 | P2 | artifact | 持 Create 权限者（无现存调用方） | fixed（DTO 增 `alertKey`/`status`/`recoveredAt`，controller 将 ISO 串转 Date；apits 重新生成 api.ts +12 行；README 同步） |
+| R41-05 | newbie-modules | README:10 的 fingerprint 构造仍写「project id + deduplication key，回退 notification key」，漏 `alertKey`，与 ADR-064/schema/实现漂移 | P2 | docs | 文档 | fixed（README 改为 project id + alertKey → dedupKey → notificationKey 全回退链） |
+| R41-06 | newbie-modules | ADR-064 背景把复合唯一键归因给 ADR-062，但 ADR-062 全文无 fingerprint（`grep` 取证），复合键实际来自 schema | P2 | docs | 文档 | fixed（背景改为「上一轮落地时 schema 用复合键」，并注明 ADR-062 §4 只声明配对保证） |
+| R41-07 | newbie-modules | `NotifyDto` 的 `link`/`deduplicationKey`/`notificationKey` 无长度上界，DB VarChar 溢出触发 P2000 → 500（宿主无 Prisma 异常过滤器） | P2 | live | 持 Create 权限者 | fixed（`notificationKey` 100 / `link` 512 / `deduplicationKey` 255，与 VarChar 对齐） |
+| R41-08 | newbie-modules | fingerprint 唯一索引迁移无去重前置步骤（`20261114003000.../migration.sql`），其它消费仓若已有重复 fingerprint 会迁移失败；本宿主已成功应用 | P2 | ops | 其它消费仓 | fixed（迁移已应用，改文件会触发 Prisma checksum 不符，故走文档：README「Upgrading」要求升级前清空 `NotificationAlert`，说明 `alertId` 为 `SetNull`） |
 
 反驳轮（本轮）：R41-02 初判「永久卡死、完全不可编辑、会产生错误静默」被推翻，保留不变量破坏与 scheduled 显示，降为 P2；R41-03/R41-04 结论成立，R41-04 定性收窄为「契约悬空、无现存消费者」。已核验通过：装配零差异、fingerprint 含 projectId 前缀、宿主 url-check/heartbeat 两侧 alertKey 一致、删除链彻底移除、Restrict 生效、读面可见性、写面归属、并发兜底（R39-09/10）、链接安全第二向量、端点计数一致。R39-11/R39-12 仍 open；R40-03/04 withdrawn。
 

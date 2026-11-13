@@ -6,7 +6,7 @@
 
 ## 背景
 
-ADR-062 用 `@@unique([notificationKey, fingerprint])` 建立 firing 与 recovered 的配对，并声明"同进同退由数据模型保证"。R39-03 把 `fingerprint` 改成携带项目维度的构造（`${projectId ?? "-"}:${deduplicationKey ?? notificationKey}`，超长取前缀 + sha256），但唯一键与注释没有同步：
+上一轮落地时 schema 用 `@@unique([notificationKey, fingerprint])` 建立 firing 与 recovered 的配对，并声明"同进同退由数据模型保证"（ADR-062 §4 只声明了这条保证，并未规定唯一键的维度）。R39-03 把 `fingerprint` 改成携带项目维度的构造（`${projectId ?? "-"}:${deduplicationKey ?? notificationKey}`，超长取前缀 + sha256），但唯一键与注释没有同步：
 
 - 注释仍写"无 deduplication key 时默认等于 notification key"，与实际构造不符。
 - 唯一键仍把 `notificationKey` 当作配对维度。同一个 deduplication key 在不同项目下本应各自成对，复合键却允许同一个 `fingerprint` 出现多行（因为 `notificationKey` 不同），按复合键 `findUnique` 会漏配，产生"没有 firing 的已恢复"记录。

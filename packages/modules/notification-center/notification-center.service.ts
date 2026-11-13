@@ -421,22 +421,37 @@ export class NotificationCenterService {
       verdictRuleId: true,
       verdictReason: true,
     } as const;
-    const existing = await this.prisma.notificationAlert.findUnique({
-      where: { fingerprint: input.fingerprint },
-      select: { ...select, state: true },
-    });
-    if (!existing) {
-      return this.prisma.notificationAlert.create({
-        data: {
-          notificationKey: input.notificationKey,
-          fingerprint: input.fingerprint,
-          projectId: input.projectId ?? null,
-          severity: input.severity,
-          state: input.phase,
-          resolvedAt: input.phase === "recovered" ? new Date() : null,
-        },
-        select,
+    const findAlert = () =>
+      this.prisma.notificationAlert.findUnique({
+        where: { fingerprint: input.fingerprint },
+        select: { ...select, state: true },
       });
+    let existing = await findAlert();
+    if (!existing) {
+      try {
+        return await this.prisma.notificationAlert.create({
+          data: {
+            notificationKey: input.notificationKey,
+            fingerprint: input.fingerprint,
+            projectId: input.projectId ?? null,
+            severity: input.severity,
+            state: input.phase,
+            resolvedAt: input.phase === "recovered" ? new Date() : null,
+          },
+          select,
+        });
+      } catch (error) {
+        // Two first deliveries of one fingerprint can race between the read and
+        // the insert; the winner's row is the alert to advance, so re-read it
+        // instead of failing the loser (R41-01).
+        if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === PG_UNIQUE_VIOLATION)) {
+          throw error;
+        }
+        existing = await findAlert();
+        if (!existing) {
+          throw error;
+        }
+      }
     }
     const reopens = input.phase === "firing" && existing.state === "resolved";
     return this.prisma.notificationAlert.update({

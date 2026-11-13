@@ -4,11 +4,15 @@ import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
-import { NotificationCenterService, NotifyInput, NotifyResult } from "./notification-center.service";
+import { NotificationCenterService, NotifyResult } from "./notification-center.service";
 import { NotificationDeliveryRuleService } from "./notification-delivery-rule.service";
 import { NotificationSettingService } from "./notification-setting.service";
 import { NotificationSilenceService } from "./notification-silence.service";
-import { NOTIFICATION_VISIBILITY_PORT, NotificationVisibilityPort } from "./notification-center.constants";
+import {
+  NOTIFICATION_VISIBILITY_PORT,
+  NotificationVisibilityPort,
+  type NotificationSeverity,
+} from "./notification-center.constants";
 import {
   CreateDeliveryRuleDto,
   CreateSilenceDto,
@@ -64,7 +68,13 @@ export class NotificationCenterController {
     const visibleProjectIds = body.projectId
       ? await this.projectVisibility.visibleProjectIds(req.user.userId)
       : undefined;
-    return this.notificationCenter.notify({ ...body, visibleProjectIds } as NotifyInput);
+    // The HTTP contract carries ISO strings; the service works with Date.
+    return this.notificationCenter.notify({
+      ...body,
+      severity: body.severity as NotificationSeverity | undefined,
+      recoveredAt: body.recoveredAt ? new Date(body.recoveredAt) : undefined,
+      visibleProjectIds,
+    });
   }
 
   // --- Notification reads -------------------------------------------------

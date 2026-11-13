@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@generated/prisma/client";
 import { NotificationCenterService } from "./notification-center.service";
 import { NotificationDeliveryRuleService } from "./notification-delivery-rule.service";
 import { matchesDeliveryCondition, validateDeliveryCondition } from "./notification-center.constants";
@@ -67,10 +68,28 @@ test("an empty resolved scope rejects every project instead of widening to all",
 
 type RuleSeed = { priority: number; condition: unknown; action: string; isEnabled?: boolean };
 
-function newServiceWithCenter(severity: string, rules: RuleSeed[] = [], activeSilenceId: string | null = null) {
+function newServiceWithCenter(
+  severity: string,
+  rules: RuleSeed[] = [],
+  activeSilenceId: string | null = null,
+  raceFirstAlertInsert = false,
+) {
   const created: Record<string, unknown>[] = [];
   const attempts: Record<string, unknown>[] = [];
   const alerts = new Map<string, Record<string, any>>();
+  let alertReads = 0;
+  if (raceFirstAlertInsert) {
+    // Another delivery already committed the first alert of this fingerprint.
+    alerts.set("-:k", {
+      id: "alert-winner",
+      notificationKey: "k",
+      fingerprint: "-:k",
+      state: "firing",
+      verdictAction: null,
+      verdictRuleId: null,
+      verdictReason: null,
+    });
+  }
   const silences = { findActiveId: async () => activeSilenceId };
   const ruleRows = rules.map((rule, index) => ({
     id: `rule-${index + 1}`,
@@ -100,8 +119,23 @@ function newServiceWithCenter(severity: string, rules: RuleSeed[] = [], activeSi
     },
     notificationAlert: {
       // The alert table is keyed by fingerprint alone (ADR-064).
-      findUnique: async ({ where }: any) => alerts.get(where.fingerprint) ?? null,
+      findUnique: async ({ where }: any) => {
+        alertReads += 1;
+        // The racing delivery sees "no alert" on its first read.
+        if (raceFirstAlertInsert && alertReads === 1) {
+          return null;
+        }
+        return alerts.get(where.fingerprint) ?? null;
+      },
       create: async ({ data }: any) => {
+        if (raceFirstAlertInsert) {
+          // The concurrent delivery committed first, so this insert loses.
+          throw new Prisma.PrismaClientKnownRequestError("Unique constraint failed on the fields: (`fingerprint`)", {
+            code: "P2002",
+            clientVersion: "test",
+            meta: { target: ["fingerprint"] },
+          });
+        }
         const row = {
           id: `alert-${alerts.size + 1}`,
           verdictAction: null,
@@ -276,6 +310,16 @@ test("an explicit alertKey pairs events whose notification and deduplication key
     alertKey: "url-check:t1:100",
   });
   assert.equal(alerts.size, 1);
+});
+
+test("a delivery that loses the first-alert insert race advances the winner's row (R41-01)", async () => {
+  const { service, attempts } = newServiceWithCenter("critical", HIGH_RULE, null, true);
+  const result = await service.notify({ notificationKey: "k" });
+  assert.equal(result.decision, "deliver");
+  assert.equal(attempts.length, 1);
+  // The row created by the concurrent winner is the lifecycle this delivery
+  // belongs to; a P2002 must not fail the notification outright.
+  assert.equal(attempts[0].alertId, "alert-winner");
 });
 
 test("matchesDeliveryCondition treats absent fields as unfiltered and empty collections as never matching", () => {

@@ -72,6 +72,7 @@ export class NotificationSilenceService {
     const startsAt = input.startsAt ? new Date(input.startsAt) : existing.startsAt;
     const endsAt = input.endsAt ? new Date(input.endsAt) : existing.endsAt;
     this.assertWindow(startsAt, endsAt);
+    await this.assertRewritable(id, existing, input, startsAt, endsAt);
     const updated = await this.prisma.notificationSilence.update({
       where: { id },
       data: {
@@ -94,9 +95,14 @@ export class NotificationSilenceService {
     if (existing.endsAt <= now) {
       return toSilenceDto(existing, now);
     }
+    // A scheduled window has intercepted nothing yet, so ending it early closes
+    // it outright: the start collapses to now as well instead of leaving an
+    // inverted window (endsAt < startsAt) that every other path rejects
+    // (R41-02). An active window keeps its original start.
+    const startsAt = existing.startsAt > now ? now : existing.startsAt;
     const updated = await this.prisma.notificationSilence.update({
       where: { id },
-      data: { endsAt: now },
+      data: { startsAt, endsAt: now },
     });
     return toSilenceDto(updated, now);
   }
@@ -131,6 +137,34 @@ export class NotificationSilenceService {
     const problems = validateDeliveryCondition(condition);
     if (problems.length > 0) {
       throw new BadRequestException(`Invalid silence condition: ${problems.join("; ")}`);
+    }
+  }
+
+  /**
+   * A window that already intercepted deliveries belongs to the audit trail
+   * (ADR-063): delivery attempts point at it, so its matcher and start are
+   * frozen and its end may only move earlier. Without this guard an operator
+   * could rewrite the meaning of every attempt that references the window by
+   * editing `condition`, and could extend a window that already ended (R41-03).
+   */
+  private async assertRewritable(
+    id: string,
+    existing: { condition: Prisma.JsonValue; startsAt: Date; endsAt: Date },
+    input: UpdateSilenceDto,
+    startsAt: Date,
+    endsAt: Date,
+  ): Promise<void> {
+    const attempts = await this.prisma.notificationDeliveryAttempt.count({ where: { silenceId: id } });
+    if (attempts === 0) {
+      return;
+    }
+    const conditionChanged =
+      input.condition !== undefined && JSON.stringify(input.condition) !== JSON.stringify(existing.condition);
+    const startChanged = input.startsAt !== undefined && startsAt.getTime() !== existing.startsAt.getTime();
+    if (conditionChanged || startChanged || endsAt.getTime() > existing.endsAt.getTime()) {
+      throw new BadRequestException(
+        "A silence that already intercepted deliveries can only be ended earlier; its condition and start are fixed.",
+      );
     }
   }
 

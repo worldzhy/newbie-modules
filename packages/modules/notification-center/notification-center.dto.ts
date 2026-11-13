@@ -73,8 +73,9 @@ export class NotificationRecordDto {
 }
 
 export class NotifyDto {
-  @ApiProperty({ description: "Key of a registered notification" })
+  @ApiProperty({ description: "Key of a registered notification", maxLength: 100 })
   @IsString()
+  @MaxLength(100)
   notificationKey!: string;
 
   @ApiPropertyOptional({ type: Object, description: "Values interpolated into the notification templates" })
@@ -84,7 +85,6 @@ export class NotifyDto {
 
   @ApiPropertyOptional({ enum: SEVERITIES, description: "Override the notification default severity" })
   @IsOptional()
-  @IsString()
   @IsIn(SEVERITIES as unknown as string[])
   severity?: string;
 
@@ -93,15 +93,42 @@ export class NotifyDto {
   @IsString()
   projectId?: string;
 
-  @ApiPropertyOptional({ type: String })
+  @ApiPropertyOptional({ type: String, maxLength: 512 })
   @IsOptional()
   @IsString()
+  @MaxLength(512)
   link?: string;
 
-  @ApiPropertyOptional({ type: String, description: "Optional idempotency key" })
+  @ApiPropertyOptional({ type: String, description: "Optional idempotency key", maxLength: 255 })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   deduplicationKey?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    description: "Pairing key for one alert lifecycle (ADR-064); a firing and its recovery must pass the same value",
+  })
+  @IsOptional()
+  @IsString()
+  alertKey?: string;
+
+  @ApiPropertyOptional({
+    enum: ["firing", "recovered"],
+    description: "Alert lifecycle phase (ADR-051); defaults to firing",
+  })
+  @IsOptional()
+  @IsIn(["firing", "recovered"])
+  status?: "firing" | "recovered";
+
+  @ApiPropertyOptional({
+    type: String,
+    format: "date-time",
+    description: "Recovery timestamp for recovered events; defaults to now",
+  })
+  @IsOptional()
+  @IsDateString()
+  recoveredAt?: string;
 }
 
 export class NotifyResultDto {
