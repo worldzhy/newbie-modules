@@ -4,6 +4,7 @@ import { NotificationCenterService } from "./notification-center.service";
 import { NotificationDeliveryRuleService } from "./notification-delivery-rule.service";
 import { NotificationRegistryService } from "./notification-registry.service";
 import { NotificationSettingService } from "./notification-setting.service";
+import { NotificationSilenceService } from "./notification-silence.service";
 
 @Global()
 @Module({
@@ -13,12 +14,14 @@ import { NotificationSettingService } from "./notification-setting.service";
     NotificationDeliveryRuleService,
     NotificationRegistryService,
     NotificationSettingService,
+    NotificationSilenceService,
   ],
   exports: [
     NotificationCenterService,
     NotificationDeliveryRuleService,
     NotificationRegistryService,
     NotificationSettingService,
+    NotificationSilenceService,
   ],
 })
 export class NotificationCenterModule {}

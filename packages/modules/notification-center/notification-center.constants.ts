@@ -27,6 +27,19 @@ export type DeliveryRuleAction = (typeof DELIVERY_RULE_ACTIONS)[number];
 export const DELIVERY_DECISION_REASONS = ["rule", "no-rule-matched"] as const;
 export type DeliveryDecisionReason = (typeof DELIVERY_DECISION_REASONS)[number];
 
+// Why a notification that the rules allowed to deliver was nonetheless kept
+// in-app (ADR-063). These are environment facts read at delivery time, kept
+// apart from the frozen rule verdict. Listed in evaluation order: the first
+// match wins.
+export const DELIVERY_RUNTIME_REASONS = [
+  "subscription-off",
+  "recovery-opt-out",
+  "channel-off",
+  "silenced",
+  "no-port",
+] as const;
+export type DeliveryRuntimeReason = (typeof DELIVERY_RUNTIME_REASONS)[number];
+
 // Priority of the rule seeded on first boot, and the gap between adjacent
 // rules. The UI never shows the number: it drags rows and the API rewrites the
 // sequence from the submitted order.

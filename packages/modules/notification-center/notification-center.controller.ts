@@ -7,9 +7,11 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { NotificationCenterService, NotifyInput, NotifyResult } from "./notification-center.service";
 import { NotificationDeliveryRuleService } from "./notification-delivery-rule.service";
 import { NotificationSettingService } from "./notification-setting.service";
+import { NotificationSilenceService } from "./notification-silence.service";
 import { NOTIFICATION_VISIBILITY_PORT, NotificationVisibilityPort } from "./notification-center.constants";
 import {
   CreateDeliveryRuleDto,
+  CreateSilenceDto,
   DeliveryRuleDto,
   ListNotificationsRequestDto,
   ListNotificationsResponseDto,
@@ -22,6 +24,7 @@ import {
   NotifyDto,
   NotifyResultDto,
   ReorderDeliveryRulesDto,
+  SilenceDto,
   SimulateDeliveryRequestDto,
   SimulateDeliveryResultDto,
   TestPushResultDto,
@@ -29,6 +32,7 @@ import {
   UpdateDeliveryRuleDto,
   UpdateNotificationCenterSettingDto,
   UpdateNotificationSettingDto,
+  UpdateSilenceDto,
 } from "./notification-center.dto";
 
 interface AuthenticatedRequest {
@@ -43,6 +47,7 @@ export class NotificationCenterController {
     private readonly notificationCenter: NotificationCenterService,
     private readonly notificationSettings: NotificationSettingService,
     private readonly deliveryRules: NotificationDeliveryRuleService,
+    private readonly silences: NotificationSilenceService,
     @Inject(NOTIFICATION_VISIBILITY_PORT)
     private readonly projectVisibility: NotificationVisibilityPort,
   ) {}
@@ -214,6 +219,48 @@ export class NotificationCenterController {
   @ApiResponse({ status: 200, description: "The deleted rule id" })
   deleteDeliveryRule(@Param("id") id: string): Promise<{ id: string }> {
     return this.deliveryRules.remove(id);
+  }
+
+  // --- Silences (ADR-063) ---------------------------------------------------
+
+  @Get("notification-silences")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.NotificationSilence)
+  @ApiOperation({ summary: "List maintenance windows, newest end first" })
+  @ApiResponse({ status: 200, type: [SilenceDto] })
+  listSilences(): Promise<SilenceDto[]> {
+    return this.silences.list();
+  }
+
+  @Post("notification-silences")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.NotificationSilence)
+  @ApiOperation({ summary: "Open a maintenance window; matching notifications stay in-app" })
+  @ApiResponse({ status: 201, type: SilenceDto })
+  createSilence(@Req() req: AuthenticatedRequest, @Body() body: CreateSilenceDto): Promise<SilenceDto> {
+    return this.silences.create(body, req.user.userId);
+  }
+
+  @Put("notification-silences/:id")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.NotificationSilence)
+  @ApiOperation({ summary: "Update one maintenance window" })
+  @ApiResponse({ status: 200, type: SilenceDto })
+  updateSilence(@Param("id") id: string, @Body() body: UpdateSilenceDto): Promise<SilenceDto> {
+    return this.silences.update(id, body ?? {});
+  }
+
+  @Post("notification-silences/:id/cancel")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.NotificationSilence)
+  @ApiOperation({ summary: "End a maintenance window now, keeping its row for audit" })
+  @ApiResponse({ status: 200, type: SilenceDto })
+  cancelSilence(@Param("id") id: string): Promise<SilenceDto> {
+    return this.silences.cancel(id);
+  }
+
+  @Delete("notification-silences/:id")
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.NotificationSilence)
+  @ApiOperation({ summary: "Delete a maintenance window outright" })
+  @ApiResponse({ status: 200, description: "The deleted silence id" })
+  deleteSilence(@Param("id") id: string): Promise<{ id: string }> {
+    return this.silences.remove(id);
   }
 
   // --- Push failures --------------------------------------------------------

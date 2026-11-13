@@ -16,7 +16,13 @@ import {
   PG_UNIQUE_VIOLATION,
   SEVERITIES,
 } from "./notification-center.constants";
-import type { DeliveryDecisionReason, DeliveryRuleAction, DeliveryVerdict } from "./notification-center.constants";
+import type {
+  DeliveryDecisionReason,
+  DeliveryLabels,
+  DeliveryRuleAction,
+  DeliveryRuntimeReason,
+  DeliveryVerdict,
+} from "./notification-center.constants";
 import {
   ListNotificationsRequestDto,
   ListNotificationsResponseDto,
@@ -30,7 +36,9 @@ import {
   UpdateNotificationCenterSettingDto,
 } from "./notification-center.dto";
 import { NotificationRegistryService } from "./notification-registry.service";
+import type { RegisteredNotification } from "./notification-registry.service";
 import { NotificationDeliveryRuleService } from "./notification-delivery-rule.service";
+import { NotificationSilenceService } from "./notification-silence.service";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 // Upper bound for the unresolved push-failure admin listing (R5-P2-07).
@@ -121,6 +129,11 @@ export interface NotifyResult {
   decision: DeliveryRuleAction;
   /** Why the verdict came out that way; null only for pre-P1 frozen verdicts. */
   reason: DeliveryDecisionReason | null;
+  /**
+   * Why a notification the rules allowed to deliver was nonetheless kept
+   * in-app (ADR-063); null when the delivery went through (or was deduplicated).
+   */
+  runtimeReason: DeliveryRuntimeReason | null;
 }
 
 /**
@@ -161,6 +174,7 @@ export class NotificationCenterService {
     private readonly prisma: PrismaService,
     private readonly registry: NotificationRegistryService,
     private readonly deliveryRules: NotificationDeliveryRuleService,
+    private readonly silences: NotificationSilenceService,
     @Optional()
     @Inject(NOTIFICATION_PUSH_PORT)
     private readonly pushPort?: NotificationPushPort,
@@ -287,9 +301,36 @@ export class NotificationCenterService {
       recordId = created.id;
     }
 
+    let runtimeReason: DeliveryRuntimeReason | null = null;
+
     if (!deduplicated) {
-      // One audit row per delivery decision (ADR-062) so every push or
-      // suppression is explainable after the fact.
+      // ADR-063: the real-time segment runs only when the rules allow delivery.
+      // The first matching environment fact wins, and it is recorded next to the
+      // frozen verdict so "delivered by the rules but kept in-app" is explainable.
+      let silenceId: string | null = null;
+      if (verdict.action === "deliver") {
+        const runtime = await this.resolveRuntime({
+          scope: setting.scope,
+          notificationPushEnabled: setting.isPushEnabled,
+          centerPushEnabled: center.isPushEnabled,
+          recovered,
+          declaration: declared,
+          labels: {
+            phase: input.status ?? "firing",
+            severity,
+            notificationKey: input.notificationKey,
+            projectId: input.projectId,
+          },
+        });
+        runtimeReason = runtime.reason;
+        silenceId = runtime.silenceId;
+      }
+      if (runtimeReason) {
+        this.logger.debug(`Notification ${input.notificationKey} kept in-app: ${runtimeReason}`);
+      }
+
+      // One audit row per delivery decision (ADR-062/063) so every push,
+      // suppression or real-time interception is explainable after the fact.
       await this.prisma.notificationDeliveryAttempt.create({
         data: {
           alertId: alert.id,
@@ -297,9 +338,11 @@ export class NotificationCenterService {
           decision: verdict.action,
           reason: verdict.reason,
           ruleId: verdict.ruleId,
+          runtimeReason,
+          silenceId,
         },
       });
-      await this.dispatchPush(setting.scope, setting.isPushEnabled, center, verdict.action, title, detail, recordId);
+      await this.dispatchPush(setting.scope, verdict.action, runtimeReason, title, detail, recordId);
     }
 
     return {
@@ -307,6 +350,7 @@ export class NotificationCenterService {
       deduplicated,
       decision: verdict.action,
       reason: verdict.reason,
+      runtimeReason,
     };
   }
 
@@ -383,21 +427,54 @@ export class NotificationCenterService {
     return verdict;
   }
 
+  /**
+   * Real-time segment of the delivery decision (ADR-063). Environment facts
+   * read at delivery time, in fixed order: the first match wins. Only runs
+   * when the rule verdict is "deliver".
+   */
+  private async resolveRuntime(input: {
+    scope: string;
+    notificationPushEnabled: boolean;
+    centerPushEnabled: boolean;
+    recovered: boolean;
+    declaration: RegisteredNotification;
+    labels: DeliveryLabels;
+  }): Promise<{ reason: DeliveryRuntimeReason | null; silenceId: string | null }> {
+    if (!input.notificationPushEnabled) {
+      return { reason: "subscription-off", silenceId: null };
+    }
+    if (input.recovered && input.declaration.notifyOnRecovery === false) {
+      return { reason: "recovery-opt-out", silenceId: null };
+    }
+    if (!input.centerPushEnabled) {
+      return { reason: "channel-off", silenceId: null };
+    }
+    const silenceId = await this.silences.findActiveId(input.labels);
+    if (silenceId) {
+      return { reason: "silenced", silenceId };
+    }
+    // Only system-scope deliveries go through the center's port; project-scope
+    // ones are routed by the host, so an absent port is not an interception.
+    if (input.scope === "system" && !this.pushPort) {
+      return { reason: "no-port", silenceId: null };
+    }
+    return { reason: null, silenceId: null };
+  }
+
   private async dispatchPush(
     scope: string,
-    notificationPushEnabled: boolean,
-    center: { isPushEnabled: boolean },
     decision: DeliveryRuleAction,
+    runtimeReason: DeliveryRuntimeReason | null,
     title: string,
     detail: string | null,
     recordId: string,
   ): Promise<void> {
-    if (decision === "suppress" || !notificationPushEnabled || !center.isPushEnabled || !this.pushPort) {
+    if (decision !== "deliver" || runtimeReason !== null) {
       return;
     }
     // Only system-scope notifications push through the center; project-scope
     // deliveries are routed to the owning project's bound chats by the host.
-    if (scope !== "system") {
+    if (scope !== "system" || !this.pushPort) {
       return;
     }
     const text = detail ? `${title}\n${detail}` : title;
@@ -609,7 +686,7 @@ export class NotificationCenterService {
     const attempt = await this.prisma.notificationDeliveryAttempt.findFirst({
       where: { recordId: id },
       orderBy: { createdAt: "desc" },
-      select: { decision: true, reason: true, ruleId: true, createdAt: true },
+      select: { decision: true, reason: true, ruleId: true, runtimeReason: true, silenceId: true, createdAt: true },
     });
     return attempt ?? null;
   }

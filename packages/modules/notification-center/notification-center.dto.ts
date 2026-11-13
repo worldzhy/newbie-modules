@@ -1,10 +1,22 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsArray, IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, Allow } from "class-validator";
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsIn,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Allow,
+} from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import {
   DELIVERY_DECISION_REASONS,
   DELIVERY_RULE_ACTIONS,
+  DELIVERY_RUNTIME_REASONS,
   NOTIFICATION_SCOPES,
   SEVERITIES,
 } from "./notification-center.constants";
@@ -107,6 +119,13 @@ export class NotifyResultDto {
     description: "Why the verdict came out that way; null for verdicts frozen before the reason was recorded",
   })
   reason!: string | null;
+
+  @ApiProperty({
+    enum: DELIVERY_RUNTIME_REASONS,
+    nullable: true,
+    description: "Real-time interception that kept a deliverable notification in-app (ADR-063)",
+  })
+  runtimeReason!: string | null;
 }
 
 export class ListNotificationsRequestDto extends CommonListRequestDto {
@@ -383,6 +402,19 @@ export class SimulateDeliveryResultDto {
 
   @ApiProperty({ description: "Number of enabled rules evaluated" })
   ruleCount!: number;
+
+  @ApiProperty({
+    enum: DELIVERY_RUNTIME_REASONS,
+    nullable: true,
+    description: "Real-time interception found while replaying; today the simulator evaluates active silences",
+  })
+  runtimeReason!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: "Silence that would intercept; null when none is active" })
+  silenceId!: string | null;
+
+  @ApiProperty({ description: "Final outcome: the rules deliver and no real-time interception applies" })
+  delivered!: boolean;
 }
 
 export class NotificationDeliveryAttemptDto {
@@ -395,8 +427,93 @@ export class NotificationDeliveryAttemptDto {
   @ApiProperty({ type: String, nullable: true, description: "Rule that decided; null when nothing matched" })
   ruleId!: string | null;
 
+  @ApiProperty({ enum: DELIVERY_RUNTIME_REASONS, nullable: true })
+  runtimeReason!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: "Silence that intercepted; null unless silenced" })
+  silenceId!: string | null;
+
   @ApiProperty()
   createdAt!: Date;
+}
+
+// ---------------------------------------------------------------------------
+// Silence DTOs (ADR-063)
+// ---------------------------------------------------------------------------
+
+export class SilenceDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ type: () => DeliveryConditionDto, description: "Matchers; an empty object silences everything" })
+  condition!: DeliveryConditionDto;
+
+  @ApiProperty({ type: Date })
+  startsAt!: Date;
+
+  @ApiProperty({ type: Date })
+  endsAt!: Date;
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  comment!: string | null;
+
+  @ApiProperty({ type: String, required: false, nullable: true })
+  createdBy!: string | null;
+
+  @ApiProperty({ description: "True while startsAt <= now < endsAt" })
+  isActive!: boolean;
+
+  @ApiProperty()
+  createdAt!: Date;
+
+  @ApiProperty()
+  updatedAt!: Date;
+}
+
+export class CreateSilenceDto {
+  @ApiPropertyOptional({
+    type: () => DeliveryConditionDto,
+    description: "Matchers reused from delivery rules; omitted means silence everything",
+  })
+  @IsOptional()
+  @IsObject()
+  condition?: DeliveryConditionDto;
+
+  @ApiPropertyOptional({ type: String, format: "date-time", description: "Defaults to now" })
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string;
+
+  @ApiProperty({ type: String, format: "date-time" })
+  @IsDateString()
+  endsAt!: string;
+
+  @ApiPropertyOptional({ type: String, maxLength: 512 })
+  @IsOptional()
+  @IsString()
+  comment?: string;
+}
+
+export class UpdateSilenceDto {
+  @ApiPropertyOptional({ type: () => DeliveryConditionDto })
+  @IsOptional()
+  @IsObject()
+  condition?: DeliveryConditionDto;
+
+  @ApiPropertyOptional({ type: String, format: "date-time" })
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string;
+
+  @ApiPropertyOptional({ type: String, format: "date-time" })
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string;
+
+  @ApiPropertyOptional({ type: String, maxLength: 512 })
+  @IsOptional()
+  @IsString()
+  comment?: string;
 }
 
 export class PushDeliveryResultDto {

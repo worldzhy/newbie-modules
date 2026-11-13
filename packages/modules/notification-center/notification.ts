@@ -23,6 +23,8 @@ export abstract class Notification implements OnModuleInit {
   protected readonly recoveredTitleTemplate?: string;
   protected readonly recoveredDetailTemplate?: string;
   protected readonly defaultPushEnabled?: boolean;
+  /** Whether recovered events are pushed; defaults to true (ADR-063). */
+  protected readonly notifyOnRecovery?: boolean;
   protected abstract readonly logger: Logger;
 
   @Inject(NotificationRegistryService)
@@ -39,6 +41,7 @@ export abstract class Notification implements OnModuleInit {
       recoveredDetailTemplate: this.recoveredDetailTemplate,
       defaultSeverity: this.defaultSeverity,
       defaultPushEnabled: this.defaultPushEnabled,
+      notifyOnRecovery: this.notifyOnRecovery,
     });
   }
 }

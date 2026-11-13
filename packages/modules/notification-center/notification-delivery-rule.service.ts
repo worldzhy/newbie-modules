@@ -20,6 +20,7 @@ import {
   SimulateDeliveryResultDto,
   UpdateDeliveryRuleDto,
 } from "./notification-center.dto";
+import { NotificationSilenceService } from "./notification-silence.service";
 
 function toRuleDto(rule: {
   id: string;
@@ -48,7 +49,10 @@ function toRuleDto(rule: {
 export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
   private readonly logger = new Logger(NotificationDeliveryRuleService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly silences: NotificationSilenceService,
+  ) {}
 
   /**
    * Seed the default rules when the table is empty, so a fresh install keeps
@@ -210,6 +214,10 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
       verdict = { action: rule.action as DeliveryRuleAction, ruleId: rule.id, reason: "rule" };
       break;
     }
+    // ADR-063: replay the real-time segment too, so the simulator answers the
+    // operator's real question ("will this be pushed?") and not just which rule
+    // matches. Today the only environment fact it can evaluate is silences.
+    const silenceId = verdict.action === "deliver" ? await this.silences.findActiveId(labels) : null;
     return {
       labels,
       decision: verdict.action,
@@ -217,6 +225,9 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
       matchedRuleId: verdict.ruleId,
       matchedRuleIndex: matchedIndex,
       ruleCount: rules.length,
+      runtimeReason: silenceId ? "silenced" : null,
+      silenceId,
+      delivered: verdict.action === "deliver" && silenceId === null,
     };
   }
 

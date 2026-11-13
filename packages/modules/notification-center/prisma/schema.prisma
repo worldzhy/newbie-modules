@@ -8,6 +8,7 @@
 // * NotificationDeliveryRule                                     //
 // * NotificationAlert                                            //
 // * NotificationDeliveryAttempt                                  //
+// * NotificationSilence                                          //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 // Per-notification delivery settings. Business code declares a notification
@@ -199,11 +200,39 @@ model NotificationDeliveryAttempt {
   decision String   @db.VarChar(10)
   reason   String?  @db.VarChar(40)
   ruleId   String?  @db.Uuid
+  // Real-time interception reason (ADR-063): silenced | subscription-off |
+  // recovery-opt-out | channel-off | no-port. Kept apart from `reason` so a
+  // rule can deliver while the runtime segment keeps the push in-app.
+  runtimeReason String? @db.VarChar(40)
+  // Silence that intercepted this delivery; set only for runtimeReason
+  // "silenced", so the notification can be traced back to one maintenance
+  // window.
+  silenceId     String? @db.Uuid
 
   createdAt DateTime @default(now())
 
   @@index([recordId])
   @@index([alertId])
+  @@index([silenceId])
   @@index([createdAt])
+  @@schema("module/notification-center")
+}
+
+// A maintenance window that keeps matching notifications in-app (ADR-063).
+// Active while startsAt <= now < endsAt, so a window can be announced ahead of
+// time and expires without a scheduled job. Matchers reuse DeliveryCondition
+// and matchesDeliveryCondition(); an empty collection never matches.
+model NotificationSilence {
+  id        String   @id @default(uuid()) @db.Uuid
+  condition Json
+  startsAt  DateTime @default(now())
+  endsAt    DateTime
+  comment   String?  @db.VarChar(512)
+  createdBy String?  @db.Uuid
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([endsAt])
   @@schema("module/notification-center")
 }

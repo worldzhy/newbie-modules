@@ -38,6 +38,11 @@ export interface NotificationDeclaration {
    */
   defaultPushEnabled?: boolean;
   /**
+   * Whether a recovered event is pushed. Declared once and read by both
+   * phases; defaults to true (ADR-062 §4, ADR-063).
+   */
+  notifyOnRecovery?: boolean;
+  /**
    * Delivery scope: "system" notifications are platform-wide (no owning
    * project) and configured at the top level; "project" notifications are
    * produced by a project and routed to that project's bound chats by the
