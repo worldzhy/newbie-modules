@@ -24,9 +24,18 @@ export interface NotificationDeclaration {
    */
   recoveredTitleTemplate?: string;
   recoveredDetailTemplate?: string;
-  /** Severity applied when notify() does not pass an explicit override. */
+  /**
+   * Severity applied when notify() does not pass an explicit override. A
+   * declaration whose records are always recovered-phase declares "low":
+   * recovery has no alert level and is never gated by the center floor
+   * (ADR-061).
+   */
   defaultSeverity: (typeof SEVERITIES)[number];
-  /** Whether push is on for this notification by default. */
+  /**
+   * Whether push is on for this notification by default. A dedicated recovered
+   * declaration must mirror its firing counterpart's switch so an alert and
+   * its recovery are either both pushed or both kept in-app (ADR-061).
+   */
   defaultPushEnabled?: boolean;
   /**
    * Delivery scope: "system" notifications are platform-wide (no owning

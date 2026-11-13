@@ -113,3 +113,14 @@ test("a delivery at or above the center floor is recorded and pushed", async () 
   assert.equal(created.length, 1);
   assert.equal(pushed(), true);
 });
+
+test("a recovered delivery is never suppressed by the center floor", async () => {
+  // Recovery is a lifecycle state, not an alert level (ADR-061): its severity
+  // sits below the floor, yet the push still follows the key's own switch.
+  const { service, created, pushed } = newServiceWithCenter("low", "high");
+  const result = await service.notify({ notificationKey: "k", status: "recovered" });
+  assert.equal(result.pushSuppressed, false);
+  assert.equal(created.length, 1);
+  assert.equal(created[0].status, "recovered");
+  assert.equal(pushed(), true);
+});

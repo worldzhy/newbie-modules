@@ -116,7 +116,11 @@ export interface NotifyResult {
   id: string;
   /** True when the deduplication key already existed and no row was created. */
   deduplicated: boolean;
-  /** True when the delivery was recorded in-app but skipped push (below the center floor). */
+  /**
+   * True when the delivery was recorded in-app but skipped push because the
+   * firing severity is below the center floor (ADR-060). Always false for
+   * recovered-phase deliveries, which the floor never gates (ADR-061).
+   */
   pushSuppressed: boolean;
 }
 
@@ -157,8 +161,10 @@ export class NotificationCenterService {
    * notification's templates are rendered with `context` and severity is
    * resolved from the override or the notification default. The record is
    * always persisted: the center minimum-severity floor only gates push
-   * delivery (the in-app bell is the base layer), so a closure or low-severity
-   * signal never disappears while its firing counterpart stays visible.
+   * delivery of firing records (the in-app bell is the base layer), so a
+   * closure or low-severity signal never disappears while its firing
+   * counterpart stays visible. Recovered-phase deliveries are never gated by
+   * the floor (ADR-061): recovery is a lifecycle state, not an alert level.
    * System-scope notifications are pushed through the host-provided push port;
    * project-scope push routing is owned by the host (per-project chat bindings)
    * and reads `pushSuppressed` from the result.
@@ -190,10 +196,16 @@ export class NotificationCenterService {
     const severity = input.severity ?? setting.defaultSeverity;
     const center = await this.getOrCreateCenterSetting();
 
-    // The floor gates push only: below-floor deliveries are still recorded so
-    // the in-app bell keeps every signal (and every recovery pairing with its
-    // firing record).
-    const pushSuppressed = SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high);
+    // Lifecycle phase (ADR-051); "firing" when the caller omits it.
+    const recovered = input.status === "recovered";
+
+    // The floor gates push only (ADR-060) and only for firing records
+    // (ADR-061). Recovery is a lifecycle state, not an alert level: a recovered
+    // delivery is decided solely by the notification key's push switch, which
+    // is kept in sync with its firing counterpart so an alert and its recovery
+    // are either both pushed or both kept in-app.
+    const pushSuppressed =
+      !recovered && SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high);
     if (pushSuppressed) {
       this.logger.debug(
         `Notification ${input.notificationKey} recorded without push: severity ${severity} is below the configured minimum ${center.minimumSeverity}`,
@@ -203,7 +215,6 @@ export class NotificationCenterService {
     // ADR-051: recovered-phase notifications prefer the declaration's recovered
     // template overrides so a recovered alert reads "…recovered" instead of
     // rendering the firing template with a zero count.
-    const recovered = input.status === "recovered";
     const titleTemplate = (recovered && declared.recoveredTitleTemplate) || declared.titleTemplate;
     const detailTemplate = (recovered && declared.recoveredDetailTemplate) || declared.detailTemplate;
     const title = renderTemplate(titleTemplate, input.context);
