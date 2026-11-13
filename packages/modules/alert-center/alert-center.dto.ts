@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 import { IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min } from "class-validator";
 import { ALERT_SEVERITIES, ALERT_STATES } from "./alert-center.constants";
 
@@ -156,6 +157,9 @@ export class ListAlertsRequestDto {
 
   @ApiPropertyOptional({ description: "Page size; defaults to 50, at most 200", minimum: 1, maximum: 200 })
   @IsOptional()
+  // Query parameters arrive as strings; without the transform every request
+  // carrying `limit` would be rejected by @IsInt.
+  @Type(() => Number)
   @IsInt()
   @Min(1)
   limit?: number;

@@ -11,6 +11,7 @@ import {
   NOTIFICATION_VISIBILITY_PORT,
   NotificationVisibilityPort,
   type NotificationSeverity,
+  type NotificationState,
 } from "./notification-center.constants";
 import {
   CreateDeliveryRuleDto,
@@ -67,6 +68,7 @@ export class NotificationCenterController {
     return this.notificationCenter.notify({
       ...body,
       severity: body.severity as NotificationSeverity,
+      state: body.state as NotificationState | undefined,
       visibleProjectIds,
     });
   }

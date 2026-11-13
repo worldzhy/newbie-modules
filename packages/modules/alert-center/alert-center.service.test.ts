@@ -4,8 +4,12 @@ import { BadRequestException } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { AlertCenterService } from "./alert-center.service";
 import { AlertSourceRegistryService } from "./alert-source-registry.service";
+import { buildAlertFingerprint } from "./alert-center.constants";
 
 type Row = Record<string, any>;
+
+/** Identity of the single alert the behavior tests drive, as stored in the map. */
+const SITE_1 = buildAlertFingerprint({ source: "url-check", alertKey: "site-1" });
 
 function newHarness(options: { pausedUntil?: Date | null } = {}) {
   const alerts = new Map<string, Row>();
@@ -69,6 +73,9 @@ function newHarness(options: { pausedUntil?: Date | null } = {}) {
       findMany: async ({ where }: any) =>
         [...alerts.values()]
           .filter((row) => row.state === where.state && row.nextNotificationAt <= where.nextNotificationAt.lte)
+          // Real Prisma returns snapshots, so the reminder dispatch must not see
+          // the claim's own mutation through a shared reference.
+          .map((row) => ({ ...row }))
           .sort((a, b) => a.nextNotificationAt.getTime() - b.nextNotificationAt.getTime()),
     },
     alertSource: {
@@ -134,14 +141,14 @@ test("raise rejects a severity outside the fixed vocabulary", async () => {
 test("a repeated raise advances occurrences without notifying or resetting the rhythm", async () => {
   const { service, alerts, events } = newHarness();
   const first = await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
-  const dueAt = alerts.get("url-check:site-1")!.nextNotificationAt;
+  const dueAt = alerts.get(SITE_1)!.nextNotificationAt;
 
   const second = await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
 
   assert.equal(second.isNew, false);
   assert.equal(second.id, first.id);
-  assert.equal(alerts.get("url-check:site-1")!.occurrences, 2);
-  assert.equal(alerts.get("url-check:site-1")!.nextNotificationAt, dueAt);
+  assert.equal(alerts.get(SITE_1)!.occurrences, 2);
+  assert.equal(alerts.get(SITE_1)!.nextNotificationAt, dueAt);
   assert.equal(events.length, 1);
 });
 
@@ -153,9 +160,9 @@ test("raise after resolve reopens the lifecycle and notifies again", async () =>
   const reopened = await service.raise({ source: "url-check", alertKey: "site-1", severity: "critical" });
 
   assert.equal(reopened.isNew, true);
-  assert.equal(alerts.get("url-check:site-1")!.state, "firing");
-  assert.equal(alerts.get("url-check:site-1")!.occurrences, 1);
-  assert.equal(alerts.get("url-check:site-1")!.resolvedAt, null);
+  assert.equal(alerts.get(SITE_1)!.state, "firing");
+  assert.equal(alerts.get(SITE_1)!.occurrences, 1);
+  assert.equal(alerts.get(SITE_1)!.resolvedAt, null);
   assert.equal(events.length, 3);
   assert.equal(events[2].severity, "critical");
 });
@@ -167,8 +174,8 @@ test("resolve closes a firing alert and clears the next reminder", async () => {
   const resolved = await service.resolve({ source: "url-check", alertKey: "site-1" });
 
   assert.ok(resolved);
-  assert.equal(alerts.get("url-check:site-1")!.state, "resolved");
-  assert.equal(alerts.get("url-check:site-1")!.nextNotificationAt, null);
+  assert.equal(alerts.get(SITE_1)!.state, "resolved");
+  assert.equal(alerts.get(SITE_1)!.nextNotificationAt, null);
   assert.equal(events[events.length - 1].state, "resolved");
 });
 
@@ -182,11 +189,11 @@ test("resolve is idempotent on an already resolved alert", async () => {
   const { service, alerts, events } = newHarness();
   await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
   await service.resolve({ source: "url-check", alertKey: "site-1" });
-  const resolvedAt = alerts.get("url-check:site-1")!.resolvedAt;
+  const resolvedAt = alerts.get(SITE_1)!.resolvedAt;
 
   await service.resolve({ source: "url-check", alertKey: "site-1" });
 
-  assert.equal(alerts.get("url-check:site-1")!.resolvedAt, resolvedAt);
+  assert.equal(alerts.get(SITE_1)!.resolvedAt, resolvedAt);
   assert.equal(events.length, 2);
 });
 
@@ -197,7 +204,7 @@ test("a paused source records the alert but keeps it off the wire", async () => 
   await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
 
   assert.equal(events.length, 0);
-  const dueAt = alerts.get("url-check:site-1")!.nextNotificationAt as Date;
+  const dueAt = alerts.get(SITE_1)!.nextNotificationAt as Date;
   // The first reminder lands after the pause, not inside it.
   assert.ok(dueAt > pausedUntil);
 });
@@ -205,7 +212,7 @@ test("a paused source records the alert but keeps it off the wire", async () => 
 test("dispatchDueReminders sends one reminder, advances the rhythm and counts it", async () => {
   const { service, alerts, events } = newHarness();
   await service.raise({ source: "url-check", alertKey: "site-1", severity: "high", repeatIntervalMinutes: 5 });
-  const row = alerts.get("url-check:site-1")!;
+  const row = alerts.get(SITE_1)!;
   row.nextNotificationAt = new Date(Date.now() - 1000);
 
   const result = await service.dispatchDueReminders();
@@ -221,7 +228,7 @@ test("dispatchDueReminders skips a source that is paused", async () => {
   const pausedUntil = new Date(Date.now() + 60 * 60_000);
   const { service, alerts, events } = newHarness({ pausedUntil });
   await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
-  alerts.get("url-check:site-1")!.nextNotificationAt = new Date(Date.now() - 1000);
+  alerts.get(SITE_1)!.nextNotificationAt = new Date(Date.now() - 1000);
 
   const result = await service.dispatchDueReminders();
 
