@@ -3,6 +3,7 @@
 状态：已采纳（P3 抑制部分由 ADR-063 暂缓）
 日期：2026-11-13
 更新：2026-11-13 — P3 拆为静默与抑制两段；静默的实时求值与投递原因落库见 ADR-063，抑制等待告警状态机收敛
+更新：2026-11-14 — 补记告警与通知的域边界判断（见文末补充）；解耦本身需另立 ADR，不在本 ADR 内变更
 
 取代：ADR-060（severity floor 门控推送）、ADR-061（恢复投递与 severity 解耦）
 
@@ -128,6 +129,22 @@ if (result.decision !== "delivered") return;
 - `suppress` 规则归入"例外"分区，主流程只写 deliver 规则。
 - **模拟器为必需项**：选中一条最近通知，跑同一求值函数，显示命中第几条规则。这是有序规则模型唯一可靠的纠错手段。
 - seed 两条默认规则，使默认用户零操作：`{ priority: 10, condition: { severityAtLeast: "high" }, action: "deliver" }` 与 `{ priority: 20, condition: { phase: "recovered" }, action: "deliver" }`。第二条保留"恢复必达"这一既有可用行为（旧实现靠 `recoveryOf` 继承 firing 级别实现），否则升级后所有恢复推送会被静默。最后一条规则不允许删除，因此"空表"只存在于首次 seed 之前。
+
+## 补充：告警与通知的域边界（2026-11-14）
+
+本节只记录判断，不改动上面的决策。
+
+**两域本质不同。** Alert 是状态机：有身份（`fingerprint`）、有生命周期（`firstSeenAt` → `lastSeenAt` → `resolvedAt`）、持有一份冻结的裁决；它回答"这件事现在是不是还坏着"。Notification 是一次投递事件：渲染、去重、路由、推送、已读；它回答"这一刻要不要打扰谁"。两者的变更驱动也不同——改规则、改 TTL、改对账策略属于告警域；改模板、加渠道、改静默属于通知域。
+
+**依赖是单向的。** 通知需要向告警问三件事：firing 与 recovered 落在同一行（ADR-064 的 `alertKey`）、同一告警的两个阶段复用同一份裁决（§4）、静默归属到具体告警窗口（ADR-063）。告警不需要知道通知长什么样。因此合理的边界是 **Notification → Alert 单向依赖，Notification 可选挂载 `alertId`**。
+
+**当前实现是强制 1:1 耦合，且这个假设已被宿主数据推翻。** §4 的"every delivery opens an alert instance"加上 `notify()` 无条件创建告警行，意味着通知与告警一一对应。但宿主共有 13 处 `notify()` 调用点（不含 `project-notification-push` 自身的透传），其中只有 4 处传 `status` / `alertKey`（url-check 的 down、recovered 与 heartbeat 的 offline、recovered），其余 9 处覆盖 8 个生产者（digest、weekly report、task-status-changed、job.run-failed、error spike 等）都是纯事件：它们的告警行 `state` 永远停在 `firing`、没有 recovered 阶段，却照样占用 `fingerprint`、进入 `@@index([state, lastSeenAt])`，并会落入未来任何 TTL / 自动 resolved 的扫描面。也就是说，告警运维语义正在承载不属于它的数据。
+
+**解耦的形状（留给后续 ADR）。** 告警域持身份、状态机、规则裁决与冻结、静默归属；通知域持模板渲染、去重投递、推送与未读。接口上，`alertKey` / `status` 从"每次投递的隐含结果"改为"显式开启告警语义的开关"：调用方不传，就只产生投递记录，`alertId` 为空。
+
+**为什么不在本 ADR 内改。** 上述形状要求 `NotificationRecord.alertId` 可空、`notify()` 不再必然建告警，属于 schema 与跨宿主契约变更，直接推翻 §4 的核心断言。按 workspace 约定，这需要另立 ADR（并同步修订 §4 表述），不能靠增量修改本 ADR 完成。
+
+**近期约束。** 在解耦 ADR 落地前，保持现状不动，但不再把告警运维语义继续叠加到 `NotificationAlert` 上：R39-11（Alert TTL / 自动 resolved）因此暂缓——TTL 只对真正的告警有意义，先修边界再加策略。
 
 ## 跨宿主 / 演进检验（registry 模块设计必填）
 
