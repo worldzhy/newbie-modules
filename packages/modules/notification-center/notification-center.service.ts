@@ -116,8 +116,8 @@ export interface NotifyResult {
   id: string;
   /** True when the deduplication key already existed and no row was created. */
   deduplicated: boolean;
-  /** True when the notification was dropped (below minimum severity). */
-  dropped: boolean;
+  /** True when the delivery was recorded in-app but skipped push (below the center floor). */
+  pushSuppressed: boolean;
 }
 
 /**
@@ -154,11 +154,14 @@ export class NotificationCenterService {
 
   /**
    * Produce one notification record from a registered notification. The
-   * notification's templates are rendered with `context`, severity is resolved
-   * from the override or the notification default, and delivery respects the
-   * center minimum-severity floor. System-scope notifications are pushed
-   * through the host-provided push port; project-scope push routing is owned
-   * by the host (per-project chat bindings) and does not pass through here.
+   * notification's templates are rendered with `context` and severity is
+   * resolved from the override or the notification default. The record is
+   * always persisted: the center minimum-severity floor only gates push
+   * delivery (the in-app bell is the base layer), so a closure or low-severity
+   * signal never disappears while its firing counterpart stays visible.
+   * System-scope notifications are pushed through the host-provided push port;
+   * project-scope push routing is owned by the host (per-project chat bindings)
+   * and reads `pushSuppressed` from the result.
    */
   async notify(input: NotifyInput): Promise<NotifyResult> {
     const declared = this.registry.get(input.notificationKey);
@@ -187,14 +190,14 @@ export class NotificationCenterService {
     const severity = input.severity ?? setting.defaultSeverity;
     const center = await this.getOrCreateCenterSetting();
 
-    // Drop deliveries below the center severity floor before any write.
-    if (SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high)) {
-      // Below the floor the record never lands; log at debug so a missing
-      // notification stays explainable after the fact.
+    // The floor gates push only: below-floor deliveries are still recorded so
+    // the in-app bell keeps every signal (and every recovery pairing with its
+    // firing record).
+    const pushSuppressed = SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high);
+    if (pushSuppressed) {
       this.logger.debug(
-        `Notification ${input.notificationKey} dropped: severity ${severity} is below the configured minimum ${center.minimumSeverity}`,
+        `Notification ${input.notificationKey} recorded without push: severity ${severity} is below the configured minimum ${center.minimumSeverity}`,
       );
-      return { id: "", deduplicated: false, dropped: true };
     }
 
     // ADR-051: recovered-phase notifications prefer the declaration's recovered
@@ -244,21 +247,22 @@ export class NotificationCenterService {
     }
 
     if (!deduplicated) {
-      await this.dispatchPush(setting.scope, setting.isPushEnabled, center, title, detail, recordId);
+      await this.dispatchPush(setting.scope, setting.isPushEnabled, center, pushSuppressed, title, detail, recordId);
     }
 
-    return { id: recordId, deduplicated, dropped: false };
+    return { id: recordId, deduplicated, pushSuppressed };
   }
 
   private async dispatchPush(
     scope: string,
     notificationPushEnabled: boolean,
     center: { isPushEnabled: boolean },
+    pushSuppressed: boolean,
     title: string,
     detail: string | null,
     recordId: string,
   ): Promise<void> {
-    if (!notificationPushEnabled || !center.isPushEnabled || !this.pushPort) {
+    if (pushSuppressed || !notificationPushEnabled || !center.isPushEnabled || !this.pushPort) {
       return;
     }
     // Only system-scope notifications push through the center; project-scope

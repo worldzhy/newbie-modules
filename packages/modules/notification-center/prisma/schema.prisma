@@ -121,7 +121,7 @@ model NotificationCenterSetting {
   // notification push only fires when both this switch and the notification's
   // own isPushEnabled are on.
   isPushEnabled Boolean @default(false)
-  // Notifications below this severity are dropped before delivery.
+  // Notifications below this severity are recorded in-app but skip push.
   minimumSeverity String @default("high") @db.VarChar(10)
 
   createdAt DateTime @default(now())

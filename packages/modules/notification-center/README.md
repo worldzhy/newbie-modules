@@ -16,7 +16,7 @@ Platform notification center. Business modules declare notifications in code, th
 `NotificationCenterService.notify({ notificationKey, context, ... })`:
 
 1. Looks up the declaration in `NotificationRegistryService` and the row in `NotificationSetting`.
-2. Resolves severity (explicit override wins over the row default) and drops deliveries below the center `minimumSeverity` floor before any write.
+2. Resolves severity (explicit override wins over the row default), always persists the record, and marks the delivery `pushSuppressed` when severity is below the center `minimumSeverity` floor so the push legs skip it.
 3. Renders the Handlebars-style title/detail templates with `context` and inserts a `NotificationRecord` (idempotent when a `deduplicationKey` is provided).
 4. Push: when the notification's scope is `system` and both its and the center's `isPushEnabled` are on, the rendered text is pushed through the host-provided `NotificationPushPort`. Project-scope notifications are routed to the owning project's bound chats by the host and do not pass through here.
 

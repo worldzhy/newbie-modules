@@ -93,8 +93,8 @@ export class NotifyResultDto {
   @ApiProperty({ description: "True when the deduplication key already existed" })
   deduplicated!: boolean;
 
-  @ApiProperty({ description: "True when the delivery was dropped (below minimum severity)" })
-  dropped!: boolean;
+  @ApiProperty({ description: "True when the delivery was recorded in-app but skipped push (below minimum severity)" })
+  pushSuppressed!: boolean;
 }
 
 export class ListNotificationsRequestDto extends CommonListRequestDto {
