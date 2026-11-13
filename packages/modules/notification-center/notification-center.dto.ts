@@ -233,7 +233,7 @@ export class DeliveryConditionDto {
   severityAtLeast?: string;
 
   @ApiPropertyOptional({
-    type: [String],
+    type: String,
     isArray: true,
     description: "Notification keys the rule applies to; an empty array never matches",
   })
@@ -243,7 +243,7 @@ export class DeliveryConditionDto {
   notificationKeys?: string[];
 
   @ApiPropertyOptional({
-    type: [String],
+    type: String,
     isArray: true,
     description: "Project ids the rule applies to; an empty array never matches",
   })
@@ -314,7 +314,7 @@ export class UpdateDeliveryRuleDto {
 
 export class ReorderDeliveryRulesDto {
   @ApiProperty({
-    type: [String],
+    type: String,
     isArray: true,
     description: "Every rule id exactly once, in the new evaluation order",
   })
