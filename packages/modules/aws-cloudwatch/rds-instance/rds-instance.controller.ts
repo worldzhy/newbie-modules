@@ -21,8 +21,8 @@ export class RdsInstanceController {
   @ApiOperation({ summary: "List RDS instances with optional filters" })
   @ApiResponse({ type: RdsInstanceResponseDto, isArray: true })
   async listRDSInstances(@Query() query: ListRDSInstancesRequestDto) {
-    const { projectId, status, isWatching } = query;
-    return await this.rdsInstanceService.listRDSInstances({ projectId, status, isWatching });
+    const { accountId, status, isWatching } = query;
+    return await this.rdsInstanceService.listRDSInstances({ accountId, status, isWatching });
   }
 
   @Get("fetch")
@@ -30,7 +30,7 @@ export class RdsInstanceController {
   @ApiOperation({ summary: "Fetch RDS instances from AWS and sync to DB" })
   @ApiResponse({ type: Boolean })
   async fetchRDSInstances(@Query() query: FetchRDSInstancesDto) {
-    return await this.rdsInstanceService.fetchRDSInstances(query.projectId);
+    return await this.rdsInstanceService.fetchRDSInstances(query.accountId);
   }
 
   @Patch("syncWatch")

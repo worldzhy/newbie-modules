@@ -5,23 +5,24 @@
 // * RdsInstance                                                   //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// CloudWatch data collection resolves the project-shared cross-account
-// binding provided by aws-identity (AwsCrossAccountBinding) at runtime;
-// the region scope lives on the binding as well. Instances are scoped
-// directly by projectId (plain column, no foreign key — the host scope
-// is owned by the host application, not by this module).
+// CloudWatch data collection resolves the cross-account binding provided by
+// aws-identity (AwsCrossAccountBinding) for the account it addresses at
+// runtime; the region scope lives on the binding as well. Instances are scoped
+// directly by accountId (plain column, no foreign key — the AWS account is the
+// resource's real host and the binding row is identity, not ownership).
 model Ec2Instance {
   id          String   @id @default(uuid()) @db.Uuid
-  instanceId  String   @unique
+  instanceId  String
   name        String
   status      String?
   region      String
   isWatching  Boolean  @default(false)
-  projectId   String   @db.Uuid
+  accountId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@index([projectId])
+  @@unique([instanceId, accountId])
+  @@index([accountId])
   @@schema("module/aws-cloudwatch")
 }
 
@@ -32,11 +33,11 @@ model RdsInstance {
   status      String
   region      String
   isWatching  Boolean  @default(false)
-  projectId   String   @db.Uuid
+  accountId   String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  @@unique([name, region, projectId])
-  @@index([projectId])
+  @@unique([name, region, accountId])
+  @@index([accountId])
   @@schema("module/aws-cloudwatch")
 }

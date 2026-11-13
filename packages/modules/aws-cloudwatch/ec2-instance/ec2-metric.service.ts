@@ -15,10 +15,10 @@ export class Ec2MetricService {
   ) {}
 
   async getWatchedInstancesMetric(data: GetWatchedEC2InstancesMetricRequestDto) {
-    const { projectId, metricName, startTime, endTime, period, statistics } = data;
-    const { regions, credentials } = await this.bindings.resolveProjectCredential(projectId);
+    const { accountId, metricName, startTime, endTime, period, statistics } = data;
+    const { regions, credentials } = await this.bindings.resolveAccountCredential(accountId);
     const watchedInstances = await this.prisma.ec2Instance.findMany({
-      where: { projectId, isWatching: true },
+      where: { accountId, isWatching: true },
       orderBy: { createdAt: "asc" },
     });
 

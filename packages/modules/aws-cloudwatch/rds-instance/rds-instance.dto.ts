@@ -8,11 +8,15 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { BooleanTransformer } from "@devbie/newbie/transformers/boolean.transformer";
 import { CloudwatchMetricRDSMetricName, CloudwatchMetricStatistics } from "../aws-cloudwatch.enum";
+
+/** AWS account ids are 12 digits; the account is this module's scope key. */
+const AWS_ACCOUNT_ID_PATTERN = /^\d{12}$/;
 
 /**
  * Response DTO for an RDS instance record.
@@ -44,9 +48,10 @@ export class RdsInstanceResponseDto {
 }
 
 export class ListRDSInstancesRequestDto {
-  @ApiProperty()
-  @IsUUID()
-  projectId!: string;
+  @ApiProperty({ description: "12-digit AWS account id" })
+  @IsNotEmpty()
+  @Matches(AWS_ACCOUNT_ID_PATTERN, { message: "accountId must be a 12-digit AWS account id" })
+  accountId!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -61,15 +66,17 @@ export class ListRDSInstancesRequestDto {
 }
 
 export class FetchRDSInstancesDto {
-  @ApiProperty()
-  @IsUUID()
-  projectId!: string;
+  @ApiProperty({ description: "12-digit AWS account id" })
+  @IsNotEmpty()
+  @Matches(AWS_ACCOUNT_ID_PATTERN, { message: "accountId must be a 12-digit AWS account id" })
+  accountId!: string;
 }
 
 export class SyncRDSInstancesWatchDto {
-  @ApiProperty({ type: String })
-  @IsUUID()
-  projectId!: string;
+  @ApiProperty({ type: String, description: "12-digit AWS account id" })
+  @IsNotEmpty()
+  @Matches(AWS_ACCOUNT_ID_PATTERN, { message: "accountId must be a 12-digit AWS account id" })
+  accountId!: string;
 
   @ApiProperty({ type: String, minLength: 0, isArray: true })
   @IsArray()
@@ -85,10 +92,10 @@ export class SyncRDSInstancesWatchDto {
 }
 
 export class GetWatchedRDSInstancesMetricRequestDto {
-  @ApiProperty()
+  @ApiProperty({ description: "12-digit AWS account id" })
   @IsNotEmpty()
-  @IsUUID("4")
-  projectId!: string;
+  @Matches(AWS_ACCOUNT_ID_PATTERN, { message: "accountId must be a 12-digit AWS account id" })
+  accountId!: string;
 
   @ApiProperty({ enum: CloudwatchMetricRDSMetricName, enumName: "CloudwatchMetricRDSMetricName" })
   @IsNotEmpty()

@@ -21,8 +21,8 @@ export class Ec2InstanceController {
   @ApiOperation({ summary: "List EC2 instances with optional filters" })
   @ApiResponse({ type: Ec2InstanceResponseDto, isArray: true })
   async listEC2Instances(@Query() query: ListEC2InstancesRequestDto) {
-    const { projectId, status, isWatching } = query;
-    return await this.ec2InstanceService.listEC2Instances({ projectId, status, isWatching });
+    const { accountId, status, isWatching } = query;
+    return await this.ec2InstanceService.listEC2Instances({ accountId, status, isWatching });
   }
 
   @Get("fetch")
@@ -30,7 +30,7 @@ export class Ec2InstanceController {
   @ApiOperation({ summary: "Fetch EC2 instances from AWS and sync to DB" })
   @ApiResponse({ type: Boolean })
   async fetchEC2Instances(@Query() query: FetchEC2InstancesDto) {
-    return await this.ec2InstanceService.fetchEC2Instances(query.projectId);
+    return await this.ec2InstanceService.fetchEC2Instances(query.accountId);
   }
 
   @Patch("syncWatch")

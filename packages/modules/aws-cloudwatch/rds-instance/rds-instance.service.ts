@@ -10,22 +10,22 @@ export class RdsInstanceService {
     private readonly bindings: AwsCrossAccountBindingsService,
   ) {}
 
-  async listRDSInstances(params: { projectId: string; status?: string; isWatching?: boolean }) {
-    const { projectId, status, isWatching } = params;
+  async listRDSInstances(params: { accountId: string; status?: string; isWatching?: boolean }) {
+    const { accountId, status, isWatching } = params;
     return await this.prisma.rdsInstance.findMany({
-      where: { projectId, status, isWatching },
+      where: { accountId, status, isWatching },
       orderBy: { name: "asc" },
     });
   }
 
-  async fetchRDSInstances(projectId: string) {
-    const { credentials, regions } = await this.bindings.resolveProjectCredential(projectId);
+  async fetchRDSInstances(accountId: string) {
+    const { credentials, regions } = await this.bindings.resolveAccountCredential(accountId);
     const rdsInstances: {
       instanceId: string;
       name: string;
       status: string;
       region: string;
-      projectId: string;
+      accountId: string;
     }[] = [];
 
     for (let i = 0; i < regions.length; i++) {
@@ -50,7 +50,7 @@ export class RdsInstanceService {
             name: instance.DBInstanceIdentifier ?? name ?? instance.DbiResourceId!,
             status: instance.DBInstanceStatus!,
             region: regions[i],
-            projectId,
+            accountId,
           });
         }
       }
@@ -59,7 +59,7 @@ export class RdsInstanceService {
     if (rdsInstances.length) {
       await this.prisma.$transaction(async (tx) => {
         const currentRemoteIdObjs = await tx.rdsInstance.findMany({
-          where: { projectId },
+          where: { accountId },
           select: { instanceId: true },
         });
         const rdsInstanceRemoteIds = rdsInstances.map((item) => item.instanceId);
@@ -67,22 +67,26 @@ export class RdsInstanceService {
           .filter((item) => !rdsInstanceRemoteIds.includes(item.instanceId))
           .map((item) => item.instanceId);
         if (deleteIds.length) {
-          await tx.rdsInstance.deleteMany({ where: { projectId, instanceId: { in: deleteIds } } });
+          await tx.rdsInstance.deleteMany({ where: { accountId, instanceId: { in: deleteIds } } });
         }
         for (const rdsInstance of rdsInstances) {
+          // instanceId (DbiResourceId) is globally unique and stable across renames,
+          // so it remains the upsert key; the (name, region, accountId) constraint
+          // encodes the account-scoped identity (ADR-059).
           await tx.rdsInstance.upsert({
             where: { instanceId: rdsInstance.instanceId },
             update: {
               name: rdsInstance.name,
               status: rdsInstance.status,
               region: rdsInstance.region,
+              accountId,
             },
             create: {
               instanceId: rdsInstance.instanceId,
               name: rdsInstance.name,
               status: rdsInstance.status,
               region: rdsInstance.region,
-              projectId,
+              accountId,
             },
           });
         }
@@ -93,16 +97,16 @@ export class RdsInstanceService {
   }
 
   async syncRDSInstancesWatch(params: {
-    projectId: string;
+    accountId: string;
     watchRDSInstanceIds: string[];
     unwatchRDSInstanceIds: string[];
   }) {
-    const { projectId, watchRDSInstanceIds, unwatchRDSInstanceIds } = params;
+    const { accountId, watchRDSInstanceIds, unwatchRDSInstanceIds } = params;
     let needWatch = false;
     let needUnwatch = false;
     if (watchRDSInstanceIds.length) {
       const watchRDSInstances = await this.prisma.rdsInstance.findMany({
-        where: { id: { in: watchRDSInstanceIds }, projectId },
+        where: { id: { in: watchRDSInstanceIds }, accountId },
       });
       if (watchRDSInstances.length !== watchRDSInstanceIds.length) {
         throw new HttpException("The number of RDS instance IDs to watch does not match", HttpStatus.BAD_REQUEST);
@@ -111,7 +115,7 @@ export class RdsInstanceService {
     }
     if (unwatchRDSInstanceIds.length) {
       const unwatchRDSInstances = await this.prisma.rdsInstance.findMany({
-        where: { id: { in: unwatchRDSInstanceIds }, projectId },
+        where: { id: { in: unwatchRDSInstanceIds }, accountId },
       });
       if (unwatchRDSInstances.length !== unwatchRDSInstanceIds.length) {
         throw new HttpException("The number of RDS instance IDs to unwatch does not match", HttpStatus.BAD_REQUEST);
