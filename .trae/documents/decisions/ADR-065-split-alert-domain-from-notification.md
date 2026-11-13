@@ -53,7 +53,7 @@ model Alert {
   source                String    @db.VarChar(100)         // 生产者标识，如 url-check / heartbeat / cloudwatch
   scopeId               String?   @db.VarChar(100)         // 作用域（项目 / 租户 / 平台），对模块不透明
   severity              String    @db.VarChar(20)          // 告警影响面，生命周期内稳定
-  labels                Json                               // 可匹配维度（路由、筛选）
+  labels                Json                               // 标签：供通知侧路由与详情展示，不参与告警列表筛选
   data                  Json?                              // 消息渲染上下文，模块不解释
   state                 String    @db.VarChar(20)          // firing | resolved
   repeatIntervalMinutes Int       @default(60)             // 未恢复期间的提醒间隔
@@ -69,13 +69,14 @@ model Alert {
   @@index([scopeId, source])
 }
 
+// 来源清单由代码注册（key / displayName / defaultRepeatMinutes），
+// 本表只为「被改过」的来源建行，存可变状态。
 model AlertSource {
-  key                  String    @id @db.VarChar(100) // frontend-threshold / backend-error-spike / health / url-check / cloudwatch
-  displayName          String    @db.VarChar(200)
-  defaultRepeatMinutes Int       @default(60)        // 新告警继承的提醒间隔
-  notifyPausedUntil    DateTime?                     // 暂停外发到这个时刻，到期自动失效
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  key                      String    @id @db.VarChar(100) // 注册表中已声明的来源 key
+  repeatMinutes            Int?                           // 覆盖注册表默认节奏；null = 继承
+  notificationPausedUntil  DateTime?                      // 暂停外发到这个时刻，到期自动失效
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 }
 ```
 
@@ -83,10 +84,12 @@ model AlertSource {
 
 - **没有 verdict 列**。投递策略属于通知域，不写进告警表。
 - **severity 在告警上稳定**。firing 与 resolved 用同一个 severity，通知规则按 severity 匹配时两侧自然一致，不需要冻结裁决。
-- `labels` 与 `data` 分工：`labels` 供匹配与筛选（可索引、可枚举），`data` 是给消息渲染用的不透明上下文（URL、错误文本、恢复时间等）。
+- `labels` 与 `data` 分工：`labels` 是通知侧按标签路由与详情展示用的键值对，告警列表只按一等列（`state` / `source` / `scopeId` / `severity`）筛选，不承诺按任意 label 键过滤；`data` 是给消息渲染用的不透明上下文（URL、错误文本、恢复时间等）。
 - `source` 是一等身份，不是自由文本备注：它决定提醒间隔的默认值、暂停开关的作用范围，也是通知侧 `(source, state) → notificationKey` 映射的左键。
-- `AlertSource` 由 `raise` 惰性 upsert（只写 `key` 与默认值），不需要宿主预注册；`displayName`、`defaultRepeatMinutes`、`notifyPausedUntil` 由用户或宿主后续编辑。未声明的来源自动出现在设置面上，代价是首次噪声，收益是零配置即可接入。
+- **来源清单是代码注册制**。`alert-center` 导出来源注册表（`key` / `displayName` / `defaultRepeatMinutes`），宿主在装配时注入本宿主的来源；`raise` 遇到未注册的 `source` 直接抛错，拼写错误与漏映射在启动期或首次调用处即暴露，数据库不会长出幽灵来源。
+- `AlertSource` 表退化为**可变状态载体**：只在用户改默认节奏或暂停时建行，`repeatMinutes` 为 null 时继承注册表值；`displayName` 与默认节奏的唯一真源是代码注册表。
 - `AlertSource` **不设 `enabled`**。暂停只停外发不停记录；若拒收 `raise`，后续 `resolve` 将找不到行，状态机会出现无法闭合的窗口。
+- **跨来源不合并**。`fingerprint` 含 `source`，每个来源的每条 `alertKey` 独立成一条告警；「同一应用多个来源同时异常」的聚合属于通知侧分组，不进告警实体。
 - 无跨域外键；通知侧要溯源时只存 `(sourceType="alert", sourceRef=<Alert.id>)` 字符串。
 
 ### 3. 告警域接口
@@ -139,20 +142,20 @@ dispatchDueReminders({ now?, limit? })                           -> { dispatched
 新建与重开时的初值计算：
 
 ```text
-nextNotificationAt = max(source.notifyPausedUntil ?? now, now) + repeatIntervalMinutes
+nextNotificationAt = max(source.notificationPausedUntil ?? now, now) + repeatIntervalMinutes
 ```
 
 **提醒要可区分**。提醒复用 `firing` 的 `notificationKey` 与模板（否则按 key 静音、规则分流都会随提醒次数分裂），但端口额外携带 `reminderCount`（第几次提醒，首次为 0）。模板据此把标题改成「仍未恢复（第 3 次提醒）」并附首次发生时间。`reminderCount` 只进渲染上下文，不进 `notificationKey`、不进规则条件。
 
-按来源暂停的精确语义（`AlertSource.notifyPausedUntil`）：
+按来源暂停的精确语义（`AlertSource.notificationPausedUntil`）：
 
 1. **停外发不停记录**。暂停期间 `raise` 照常建行、推进 `lastSeenAt` 与 `occurrences`，`resolve` 照常落 `resolvedAt`；只是不调用通知端口。
 2. **到期最多一条迟到提醒**。恢复外发后只命中当前一次的提醒，不补发暂停期内错过的每一条。
 3. **期间发生的恢复不外发**。暂停期内 `resolve` 不发 resolved 消息，但状态照常变为 `resolved`，宿主查询可见。
 
-`notifyPausedUntil` 只放在 `AlertSource` 上。单条告警的「延后提醒」直接写 `nextNotificationAt`，不重复设同义字段。
+`notificationPausedUntil` 只放在 `AlertSource` 上。单条告警的「延后提醒」直接写 `nextNotificationAt`，不重复设同义字段。
 
-**按来源暂停取代模块级总开关**。生产者已有五个且持续增加（frontend monitor、backend monitor、health、url-check、heartbeat，之后还有 CloudWatch），全局开关的爆炸半径过大；纯布尔没有结束时间；而「这个来源这段时间别吵我」天然以来源为粒度。批量静默（如「本项目 warning 以上安静 2 小时」）在交互层落成批量修改这些来源的 `notifyPausedUntil`，不需要额外的静默窗口实体。
+**按来源暂停取代模块级总开关**。生产者已有五个且持续增加（frontend monitor、backend monitor、health、url-check、heartbeat，之后还有 CloudWatch），全局开关的爆炸半径过大；纯布尔没有结束时间；而「这个来源这段时间别吵我」天然以来源为粒度。批量静默（如「本项目 warning 以上安静 2 小时」）在交互层落成批量修改这些来源的 `notificationPausedUntil`，不需要额外的静默窗口实体。
 
 外部源适配语义：CloudWatch 之类自带 ALARM / OK 状态的生产者，由宿主适配器映射成 `raise` / `resolve`；映射属于宿主业务，registry 侧零外部 API 知识。
 
@@ -244,6 +247,9 @@ sourceRef  String? @db.VarChar(100) // Alert.id 或其他来源 id，无外键
 - **模块级告警总开关 / `quietWindow`**：爆炸半径覆盖所有生产者，且没有结束时间语义；维护窗口内新产生的告警只能靠额外规则兜底。
 - **保留静默实体，只收窄适用范围**：静默与提醒节奏是同一件事的两种说法，并存会产生「静默窗口 + 节奏」两套时间语义互相覆盖。
 - **`pausedUntil` / `notifyPausedUntil` / `mutedUntil` 命名**：`pausedUntil` 看不出暂停的是什么；`notifyPausedUntil` 与方法动词族混用。最终取名词族 `notificationPausedUntil`，与 `nextNotificationAt`、`lastNotificationAt` 一致；方法侧继续用 `notify*`、`raise`、`resolve`。
+- **`AlertSource` 惰性 upsert（数据制）**：来源只能由代码调用 `raise` 产生，数据库再当第二真源只会让拼写错误变成合法来源，且默认值出现代码与数据两处口径；取注册制。
+- **`labels` 按任意键筛选**：`labels` 是载荷，一旦进入筛选契约就变成第二套 schema，且无法保证跨来源键一致；筛选只用一等列，确需新维度时加列而不是放开标签查询。
+- **跨来源告警合并**：合并会让「A 来源已恢复、B 来源仍异常」无法表达，并要求告警域理解来源语义；聚合留在通知侧。
 
 ## 后果
 

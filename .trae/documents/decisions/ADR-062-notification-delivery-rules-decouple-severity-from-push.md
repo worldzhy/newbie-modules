@@ -211,8 +211,8 @@ if (result.decision !== "delivered") return;
 
 **调用方必传，删除兜底。** 删除 `NotificationDeclaration` 上的 per-key 默认严重度（设置页的「默认严重度」下拉同步移除）。缺省即视为调用方缺陷，抛错而不是落一个默认值——兜底值会让通知域重新充当严重度的定义者。
 
-**封闭词表。** severity 取 `critical | high | medium | low | info` 五档，是所有生产者与规则共用的词汇表。模块之间不能共享 TypeScript 类型，实际契约是字符串 + 宿主保证：registry 侧各自声明同构的字面量联合类型，宿主确保生产者只发这五档。遇到词表外的值，通知域落到默认规则并在投递记录中写 `reason = unknown-severity`，不静默丢弃。
+**封闭词表，入口强校验。** severity 取 `critical | high | medium | low | info` 五档，是所有生产者与规则共用的词汇表。模块之间不能共享 TypeScript 类型，实际契约是字符串 + 宿主保证：registry 侧各自声明同构的字面量联合类型，并在 `raise()` / `notify()` 入口做运行时校验。词表外的值直接抛错，不落默认规则、不做 `unknown-severity` 兜底——宿主持有的是空库，不存在需要宽容解析的存量数据，兜底只会掩盖调用方缺陷。
 
-**通道选择只发生一次。** 宿主适配器把 `(source, phase)` 映射成 `notificationKey` 后，severity 原样透传；适配器与告警域都不得再按 severity 选通道。否则两处策略会互相覆盖，且投递记录无法解释「最后是哪里决定的」。
+**通道选择只发生一次。** 宿主适配器把 `(source, state)` 映射成 `notificationKey` 后，severity 原样透传；适配器与告警域都不得再按 severity 选通道。否则两处策略会互相覆盖，且投递记录无法解释「最后是哪里决定的」。
 
 **与告警域的边界。** 通知域按标签（severity / key / project / tags）决定发不发、发给谁；告警域只在时间轴上决定什么时候再提醒（节奏、暂停、认领）。两者不重叠，也不互为兜底。
