@@ -62,6 +62,17 @@ export class NotificationRecordDto {
   @ApiProperty({ enum: NOTIFICATION_STATES, description: "Lifecycle state; event-kind messages stay firing" })
   status!: string;
 
+  @ApiProperty({ type: String, required: false, nullable: true, description: "Origin kind: alert or event" })
+  sourceType!: string | null;
+
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    description: "Origin object id (Alert.id for alerts); lets the inbox link back to its domain page",
+  })
+  sourceRef!: string | null;
+
   @ApiProperty({ type: Date, required: false, nullable: true, description: "Delivery time of the resolved event" })
   recoveredAt!: Date | null;
 
