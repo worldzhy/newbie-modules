@@ -22,6 +22,8 @@ export abstract class Notification implements OnModuleInit {
   /** Optional ADR-051 phase overrides, used when notify() passes status "recovered". */
   protected readonly recoveredTitleTemplate?: string;
   protected readonly recoveredDetailTemplate?: string;
+  /** Optional ADR-061 firing key this declaration closes; set on dedicated recovered declarations. */
+  protected readonly recoveryOf?: string;
   protected readonly defaultPushEnabled?: boolean;
   protected abstract readonly logger: Logger;
 
@@ -37,6 +39,7 @@ export abstract class Notification implements OnModuleInit {
       detailTemplate: this.detailTemplate,
       recoveredTitleTemplate: this.recoveredTitleTemplate,
       recoveredDetailTemplate: this.recoveredDetailTemplate,
+      recoveryOf: this.recoveryOf,
       defaultSeverity: this.defaultSeverity,
       defaultPushEnabled: this.defaultPushEnabled,
     });

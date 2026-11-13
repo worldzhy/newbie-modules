@@ -199,16 +199,24 @@ export class NotificationCenterService {
     // Lifecycle phase (ADR-051); "firing" when the caller omits it.
     const recovered = input.status === "recovered";
 
-    // The floor gates push only (ADR-060) and only for firing records
-    // (ADR-061). Recovery is a lifecycle state, not an alert level: a recovered
-    // delivery is decided solely by the notification key's push switch, which
-    // is kept in sync with its firing counterpart so an alert and its recovery
-    // are either both pushed or both kept in-app.
+    // The floor gates push only (ADR-060) and answers "is this alert level
+    // worth interrupting someone". Recovery has no alert level of its own
+    // (ADR-061), so a dedicated recovered declaration is judged at the level of
+    // the firing key it points at through recoveryOf; a lifecycle-phase
+    // delivery on a shared key already carries the firing severity. Either way
+    // an alert and its recovery land on the same side of the floor.
+    const firingDeclaration = recovered && declared.recoveryOf ? this.registry.get(declared.recoveryOf) : undefined;
+    if (recovered && declared.recoveryOf && !firingDeclaration) {
+      this.logger.warn(
+        `Notification ${input.notificationKey} declares recoveryOf ${declared.recoveryOf}, which is not registered; falling back to its own severity`,
+      );
+    }
+    const floorSeverity = firingDeclaration?.defaultSeverity ?? severity;
     const pushSuppressed =
-      !recovered && SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high);
+      SEVERITY_LEVEL[floorSeverity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high);
     if (pushSuppressed) {
       this.logger.debug(
-        `Notification ${input.notificationKey} recorded without push: severity ${severity} is below the configured minimum ${center.minimumSeverity}`,
+        `Notification ${input.notificationKey} recorded without push: severity ${floorSeverity} is below the configured minimum ${center.minimumSeverity}`,
       );
     }
 

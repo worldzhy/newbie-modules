@@ -61,7 +61,11 @@ test("an empty resolved scope rejects every project instead of widening to all",
   assert.equal(state.settingQueried, false);
 });
 
-function newServiceWithCenter(severity: string, floor: string) {
+function newServiceWithCenter(
+  severity: string,
+  floor: string,
+  opts: { recoveryOf?: string; firingSeverity?: string } = {},
+) {
   const created: Record<string, unknown>[] = [];
   let pushed = false;
   const prisma = {
@@ -85,7 +89,17 @@ function newServiceWithCenter(severity: string, floor: string) {
     },
   };
   const registry = {
-    get: () => ({ titleTemplate: "title", detailTemplate: null, defaultSeverity: severity }),
+    get: (key: string) => {
+      if (opts.recoveryOf && key === opts.recoveryOf) {
+        return { titleTemplate: "title", detailTemplate: null, defaultSeverity: opts.firingSeverity ?? severity };
+      }
+      return {
+        titleTemplate: "title",
+        detailTemplate: null,
+        defaultSeverity: severity,
+        ...(opts.recoveryOf ? { recoveryOf: opts.recoveryOf } : {}),
+      };
+    },
   };
   const pushPort = {
     pushSystemText: async () => {
@@ -114,11 +128,24 @@ test("a delivery at or above the center floor is recorded and pushed", async () 
   assert.equal(pushed(), true);
 });
 
-test("a recovered delivery is never suppressed by the center floor", async () => {
-  // Recovery is a lifecycle state, not an alert level (ADR-061): its severity
-  // sits below the floor, yet the push still follows the key's own switch.
-  const { service, created, pushed } = newServiceWithCenter("low", "high");
+test("a recovered delivery on a shared key keeps the firing floor verdict", async () => {
+  // The recovery record inherits the key's alert level (ADR-061), so a medium
+  // alert that stays in-app keeps its recovery in-app too.
+  const { service, created, pushed } = newServiceWithCenter("medium", "high");
   const result = await service.notify({ notificationKey: "k", status: "recovered" });
+  assert.equal(result.pushSuppressed, true);
+  assert.equal(created.length, 1);
+  assert.equal(pushed(), false);
+});
+
+test("a dedicated recovered declaration is judged at its firing key's severity", async () => {
+  // The recovery itself is declared "low", but recoveryOf points at a critical
+  // firing alert, so the pair is pushed together (ADR-061).
+  const { service, created, pushed } = newServiceWithCenter("low", "high", {
+    recoveryOf: "k.firing",
+    firingSeverity: "critical",
+  });
+  const result = await service.notify({ notificationKey: "k.recovered", status: "recovered" });
   assert.equal(result.pushSuppressed, false);
   assert.equal(created.length, 1);
   assert.equal(created[0].status, "recovered");

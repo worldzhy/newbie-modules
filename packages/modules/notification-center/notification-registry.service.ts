@@ -25,10 +25,17 @@ export interface NotificationDeclaration {
   recoveredTitleTemplate?: string;
   recoveredDetailTemplate?: string;
   /**
-   * Severity applied when notify() does not pass an explicit override. A
-   * declaration whose records are always recovered-phase declares "low":
-   * recovery has no alert level and is never gated by the center floor
-   * (ADR-061).
+   * Key of the firing notification this declaration closes, set on dedicated
+   * recovered declarations. Recovery carries no alert level of its own, so the
+   * center evaluates the floor against this firing declaration's severity and
+   * an alert and its recovery always land on the same side of it (ADR-061).
+   */
+  recoveryOf?: string;
+  /**
+   * Severity applied when notify() does not pass an explicit override. On a
+   * dedicated recovered declaration this is a placeholder ("low"): recovery has
+   * no alert level and the floor is evaluated against recoveryOf's severity
+   * instead (ADR-061).
    */
   defaultSeverity: (typeof SEVERITIES)[number];
   /**
