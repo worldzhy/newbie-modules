@@ -13,11 +13,13 @@ import {
   CENTER_SETTING_SINGLETON_ID,
   DEFAULT_MINIMUM_SEVERITY,
   DEFAULT_PUSH_ENABLED,
+  matchesDeliveryCondition,
   NOTIFICATION_PUSH_PORT,
   PG_UNIQUE_VIOLATION,
   SEVERITIES,
   SEVERITY_LEVEL,
 } from "./notification-center.constants";
+import type { DeliveryLabels, DeliveryRuleAction } from "./notification-center.constants";
 import {
   ListNotificationsRequestDto,
   ListNotificationsResponseDto,
@@ -199,24 +201,50 @@ export class NotificationCenterService {
     // Lifecycle phase (ADR-051); "firing" when the caller omits it.
     const recovered = input.status === "recovered";
 
-    // The floor gates push only (ADR-060) and answers "is this alert level
-    // worth interrupting someone". Recovery has no alert level of its own
-    // (ADR-061), so a dedicated recovered declaration is judged at the level of
-    // the firing key it points at through recoveryOf; a lifecycle-phase
-    // delivery on a shared key already carries the firing severity. Either way
-    // an alert and its recovery land on the same side of the floor.
+    // The alert level used for rule matching. Recovery has no alert level of
+    // its own (ADR-061), so a dedicated recovered declaration is judged at the
+    // level of the firing key it points at through recoveryOf; a lifecycle
+    // delivery on a shared key already carries the firing severity.
     const firingDeclaration = recovered && declared.recoveryOf ? this.registry.get(declared.recoveryOf) : undefined;
     if (recovered && declared.recoveryOf && !firingDeclaration) {
       this.logger.warn(
         `Notification ${input.notificationKey} declares recoveryOf ${declared.recoveryOf}, which is not registered; falling back to its own severity`,
       );
     }
-    const floorSeverity = firingDeclaration?.defaultSeverity ?? severity;
-    const pushSuppressed =
-      SEVERITY_LEVEL[floorSeverity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high);
+    const alertSeverity = firingDeclaration?.defaultSeverity ?? severity;
+
+    // ADR-062: the rule verdict is frozen on the alert instance. The firing
+    // event decides it; its recovered event reuses it, so an alert and its
+    // recovery always land on the same side of the rules.
+    const alert = await this.upsertAlert({
+      notificationKey: input.notificationKey,
+      fingerprint: input.deduplicationKey ?? input.notificationKey,
+      projectId: input.projectId,
+      severity,
+      phase: input.status ?? "firing",
+    });
+    const verdict = alert.verdictAction
+      ? { action: alert.verdictAction as DeliveryRuleAction, ruleId: alert.verdictRuleId }
+      : await this.freezeVerdict(
+          alert.id,
+          await this.resolveVerdict(
+            {
+              phase: input.status ?? "firing",
+              severity: alertSeverity,
+              notificationKey: input.notificationKey,
+              projectId: input.projectId,
+            },
+            center.minimumSeverity,
+          ),
+        );
+    const pushSuppressed = verdict.action === "suppress";
     if (pushSuppressed) {
       this.logger.debug(
-        `Notification ${input.notificationKey} recorded without push: severity ${floorSeverity} is below the configured minimum ${center.minimumSeverity}`,
+        `Notification ${input.notificationKey} recorded without push: ${
+          verdict.ruleId
+            ? `rule ${verdict.ruleId} suppressed it`
+            : `severity ${alertSeverity} is below the configured minimum ${center.minimumSeverity}`
+        }`,
       );
     }
 
@@ -239,6 +267,7 @@ export class NotificationCenterService {
       link: input.link ?? null,
       status: input.status ?? "firing",
       recoveredAt: input.status === "recovered" ? (input.recoveredAt ?? new Date()) : null,
+      alertId: alert.id,
     };
 
     let recordId: string;
@@ -270,6 +299,94 @@ export class NotificationCenterService {
     }
 
     return { id: recordId, deduplicated, pushSuppressed };
+  }
+
+  /**
+   * Open or advance the alert instance of one alert lifecycle (ADR-062). A
+   * firing after a resolved cycle clears the frozen verdict because it starts
+   * a new lifecycle; a recovered event keeps the verdict of the cycle it ends.
+   */
+  private async upsertAlert(input: {
+    notificationKey: string;
+    fingerprint: string;
+    projectId?: string;
+    severity: string;
+    phase: "firing" | "recovered";
+  }): Promise<{ id: string; verdictAction: string | null; verdictRuleId: string | null }> {
+    const select = { id: true, verdictAction: true, verdictRuleId: true } as const;
+    const existing = await this.prisma.notificationAlert.findUnique({
+      where: {
+        notificationKey_fingerprint: {
+          notificationKey: input.notificationKey,
+          fingerprint: input.fingerprint,
+        },
+      },
+      select: { ...select, state: true },
+    });
+    if (!existing) {
+      return this.prisma.notificationAlert.create({
+        data: {
+          notificationKey: input.notificationKey,
+          fingerprint: input.fingerprint,
+          projectId: input.projectId ?? null,
+          severity: input.severity,
+          state: input.phase,
+          resolvedAt: input.phase === "recovered" ? new Date() : null,
+        },
+        select,
+      });
+    }
+    const reopens = input.phase === "firing" && existing.state === "resolved";
+    return this.prisma.notificationAlert.update({
+      where: { id: existing.id },
+      data: {
+        projectId: input.projectId ?? null,
+        severity: input.severity,
+        state: input.phase,
+        resolvedAt: input.phase === "recovered" ? new Date() : null,
+        ...(reopens ? { verdictAction: null, verdictRuleId: null, verdictAt: null } : {}),
+      },
+      select,
+    });
+  }
+
+  /**
+   * Decide whether one alert is worth a push (ADR-062). Rules are evaluated in
+   * ascending priority and the first match wins. While no rule is configured,
+   * the center minimum severity keeps deciding, so phase P0 of ADR-062 changes
+   * no behaviour; once a rule table exists, an unmatched event is suppressed.
+   */
+  private async resolveVerdict(
+    labels: DeliveryLabels,
+    minimumSeverity: string,
+  ): Promise<{ action: DeliveryRuleAction; ruleId: string | null }> {
+    const rules = await this.prisma.notificationDeliveryRule.findMany({
+      where: { isEnabled: true },
+      orderBy: { priority: "asc" },
+      select: { id: true, condition: true, action: true },
+    });
+    for (const rule of rules) {
+      if (matchesDeliveryCondition(rule.condition, labels)) {
+        return { action: rule.action as DeliveryRuleAction, ruleId: rule.id };
+      }
+    }
+    if (rules.length > 0) {
+      return { action: "suppress", ruleId: null };
+    }
+    const belowMinimum = SEVERITY_LEVEL[labels.severity] < (SEVERITY_LEVEL[minimumSeverity] ?? SEVERITY_LEVEL.high);
+    return { action: belowMinimum ? "suppress" : "deliver", ruleId: null };
+  }
+
+  /** Persist the verdict on the alert so its recovery reuses it. */
+  private async freezeVerdict(
+    alertId: string,
+    verdict: { action: DeliveryRuleAction; ruleId: string | null },
+  ): Promise<{ action: DeliveryRuleAction; ruleId: string | null }> {
+    await this.prisma.notificationAlert.update({
+      where: { id: alertId },
+      data: { verdictAction: verdict.action, verdictRuleId: verdict.ruleId, verdictAt: new Date() },
+    });
+    return verdict;
   }
 
   private async dispatchPush(

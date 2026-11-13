@@ -5,6 +5,9 @@
 // * NotificationRecord                                           //
 // * NotificationReceipt                                          //
 // * NotificationCenterSetting                                    //
+// * NotificationDeliveryRule                                     //
+// * NotificationAlert                                            //
+// * NotificationDeliveryAttempt                                  //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
 // Per-notification delivery settings. Business code declares a notification
@@ -64,9 +67,13 @@ model NotificationRecord {
   status    String    @db.VarChar(10) @default("firing")
   // When this record represents a recovered alert.
   recoveredAt DateTime?
+  // Alert instance this record belongs to (ADR-062). Null for plain
+  // notifications and for records written before the alert table existed.
+  alertId   String?  @db.Uuid
   createdAt DateTime @default(now())
 
-  receipts NotificationReceipt[]
+  alert        NotificationAlert?        @relation(fields: [alertId], references: [id], onDelete: SetNull)
+  receipts     NotificationReceipt[]
   pushFailures NotificationPushFailure[]
 
   @@unique([deduplicationKey])
@@ -74,6 +81,7 @@ model NotificationRecord {
   @@index([notificationKey])
   @@index([projectId])
   @@index([status])
+  @@index([alertId])
   @@schema("module/notification-center")
 }
 
@@ -127,5 +135,74 @@ model NotificationCenterSetting {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@schema("module/notification-center")
+}
+
+// Ordered delivery rules (ADR-062). The first enabled rule whose condition
+// matches decides the delivery; when nothing matches, delivery is suppressed.
+// An empty table means "no rule configured yet": the legacy center minimum
+// severity keeps deciding until the first rule is written (ADR-062 phase P0).
+model NotificationDeliveryRule {
+  id        String   @id @default(uuid()) @db.Uuid
+  // Ascending evaluation order; lower runs first.
+  priority  Int      @unique
+  // DeliveryCondition object: phase, severityAtLeast, notificationKeys,
+  // projectIds, tags. Absent fields do not filter; `[]` never matches.
+  condition Json
+  action    String   @db.VarChar(10)
+  isEnabled Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/notification-center")
+}
+
+// One alert lifecycle (ADR-062). A firing event opens the cycle and freezes
+// the rule verdict for this instance; its recovered event reuses that verdict
+// so an alert and its recovery always land on the same side of the rules. A
+// firing after a resolved cycle starts a new one and recomputes the verdict.
+model NotificationAlert {
+  id              String    @id @default(uuid()) @db.Uuid
+  notificationKey String    @db.VarChar(100)
+  // Pairs the firing and recovered events of one alert. Defaults to the
+  // notification key when the caller supplies no deduplication key.
+  fingerprint     String    @db.VarChar(255)
+  projectId       String?   @db.Uuid
+  // Alert level label; for recovered events the record keeps the placeholder
+  // level while the verdict stays that of the firing cycle.
+  severity        String    @db.VarChar(10)
+  state           String    @db.VarChar(10) @default("firing")
+
+  verdictAction   String?   @db.VarChar(10)
+  verdictRuleId   String?   @db.Uuid
+  verdictAt       DateTime?
+
+  firstSeenAt     DateTime  @default(now())
+  lastSeenAt      DateTime  @updatedAt
+  resolvedAt      DateTime?
+
+  records NotificationRecord[]
+
+  @@unique([notificationKey, fingerprint])
+  @@index([state, lastSeenAt])
+  @@schema("module/notification-center")
+}
+
+// One row per delivery decision (ADR-062). Makes every push or suppression
+// explainable: which rule decided it and, when suppressed, why.
+model NotificationDeliveryAttempt {
+  id       String   @id @default(uuid()) @db.Uuid
+  alertId  String?  @db.Uuid
+  recordId String   @db.Uuid
+  decision String   @db.VarChar(10)
+  reason   String?  @db.VarChar(40)
+  ruleId   String?  @db.Uuid
+
+  createdAt DateTime @default(now())
+
+  @@index([recordId])
+  @@index([alertId])
+  @@index([createdAt])
   @@schema("module/notification-center")
 }

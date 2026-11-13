@@ -18,6 +18,76 @@ export const DEFAULT_PUSH_ENABLED = false;
 export const DEFAULT_MINIMUM_SEVERITY = "high";
 export const DEFAULT_NOTIFICATION_PUSH_ENABLED = true;
 
+// --- Delivery rules (ADR-062) ----------------------------------------------
+
+export const DELIVERY_RULE_ACTIONS = ["deliver", "suppress"] as const;
+export type DeliveryRuleAction = (typeof DELIVERY_RULE_ACTIONS)[number];
+
+/**
+ * Condition of one delivery rule. Absent fields do not filter; an empty
+ * collection never matches, so clearing a selector can only narrow the rule
+ * (never widen it to "all"). Single values appear only for enumerations and
+ * thresholds; collections appear only for multi-select matching.
+ */
+export interface DeliveryCondition {
+  phase?: "firing" | "recovered";
+  severityAtLeast?: NotificationSeverity;
+  notificationKeys?: string[];
+  projectIds?: string[];
+  tags?: Record<string, string>;
+}
+
+/** Labels of one delivery event, matched against a rule condition. */
+export interface DeliveryLabels {
+  phase: "firing" | "recovered";
+  severity: string;
+  notificationKey: string;
+  projectId?: string;
+  tags?: Record<string, string>;
+}
+
+/**
+ * True when the event labels satisfy every condition field. An absent or
+ * non-object condition matches everything (a rule without a condition is a
+ * catch-all).
+ */
+export function matchesDeliveryCondition(condition: unknown, labels: DeliveryLabels): boolean {
+  if (!condition || typeof condition !== "object") {
+    return true;
+  }
+  const rule = condition as DeliveryCondition;
+  if (rule.phase && rule.phase !== labels.phase) {
+    return false;
+  }
+  if (rule.severityAtLeast) {
+    const required = SEVERITY_LEVEL[rule.severityAtLeast];
+    const actual = SEVERITY_LEVEL[labels.severity];
+    if (required === undefined || actual === undefined || actual < required) {
+      return false;
+    }
+  }
+  if (rule.notificationKeys) {
+    if (rule.notificationKeys.length === 0 || !rule.notificationKeys.includes(labels.notificationKey)) {
+      return false;
+    }
+  }
+  if (rule.projectIds) {
+    if (rule.projectIds.length === 0 || !labels.projectId || !rule.projectIds.includes(labels.projectId)) {
+      return false;
+    }
+  }
+  if (rule.tags) {
+    const entries = Object.entries(rule.tags);
+    if (entries.length === 0 || !labels.tags) {
+      return false;
+    }
+    if (!entries.every(([key, value]) => labels.tags?.[key] === value)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // Delivery scope of a notification. "system" notifications are platform-wide
 // (no owning project) and are configured at the top level; "project"
 // notifications are produced by a project and routed to that project's bound
