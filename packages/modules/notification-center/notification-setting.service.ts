@@ -1,10 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, OnApplicationBootstrap } from "@nestjs/common";
+import { Injectable, NotFoundException, OnApplicationBootstrap } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   DEFAULT_NOTIFICATION_PUSH_ENABLED,
   DEFAULT_NOTIFICATION_SCOPE,
   PG_UNIQUE_VIOLATION,
-  SEVERITIES,
 } from "./notification-center.constants";
 import { NotificationRegistryService } from "./notification-registry.service";
 
@@ -13,7 +12,6 @@ export interface NotificationSettingListItem {
   name: string;
   titleTemplate: string;
   detailTemplate: string | null;
-  defaultSeverity: string;
   isPushEnabled: boolean;
   scope: string;
 }
@@ -22,7 +20,8 @@ export interface NotificationSettingListItem {
  * Database-side declaration lifecycle for notifications. Mirrors
  * job-scheduler's JobSchedulerService.upsertScheduleDeclaration: declarations
  * only create missing rows, never override runtime edits made by operators in
- * the settings UI.
+ * the settings UI. Severity is not part of the row: it belongs to the producer
+ * and is passed on every notify() (ADR-062 "severity contract").
  */
 @Injectable()
 export class NotificationSettingService implements OnApplicationBootstrap {
@@ -43,8 +42,8 @@ export class NotificationSettingService implements OnApplicationBootstrap {
   /**
    * Persist default settings for every notification registered in memory. Only
    * rows that do not exist yet are created; existing rows (including their
-   * runtime-edited defaultSeverity / isPushEnabled) are left untouched so
-   * operator edits survive restarts.
+   * runtime-edited isPushEnabled) are left untouched so operator edits survive
+   * restarts.
    */
   async reconcileDeclarations(): Promise<void> {
     for (const declared of this.registry.getAll()) {
@@ -59,7 +58,6 @@ export class NotificationSettingService implements OnApplicationBootstrap {
             name: declared.name,
             titleTemplate: declared.titleTemplate,
             detailTemplate: declared.detailTemplate ?? null,
-            defaultSeverity: declared.defaultSeverity,
             isPushEnabled: declared.defaultPushEnabled ?? DEFAULT_NOTIFICATION_PUSH_ENABLED,
             scope: declared.scope ?? DEFAULT_NOTIFICATION_SCOPE,
           },
@@ -79,7 +77,6 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       name: row.name,
       titleTemplate: row.titleTemplate,
       detailTemplate: row.detailTemplate,
-      defaultSeverity: row.defaultSeverity,
       isPushEnabled: row.isPushEnabled,
       scope: row.scope,
     }));
@@ -88,7 +85,6 @@ export class NotificationSettingService implements OnApplicationBootstrap {
   async updateSetting(
     key: string,
     updates: {
-      defaultSeverity?: string;
       isPushEnabled?: boolean;
     },
   ): Promise<NotificationSettingListItem> {
@@ -97,16 +93,9 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       throw new NotFoundException(`Notification setting not found: ${key}`);
     }
 
-    if (updates.defaultSeverity !== undefined && !(SEVERITIES as readonly string[]).includes(updates.defaultSeverity)) {
-      throw new BadRequestException(
-        `Invalid defaultSeverity: ${updates.defaultSeverity}. Must be one of ${SEVERITIES.join(", ")}.`,
-      );
-    }
-
     const updated = await this.prisma.notificationSetting.update({
       where: { key },
       data: {
-        ...(updates.defaultSeverity !== undefined ? { defaultSeverity: updates.defaultSeverity } : {}),
         ...(updates.isPushEnabled !== undefined ? { isPushEnabled: updates.isPushEnabled } : {}),
       },
     });
@@ -116,7 +105,6 @@ export class NotificationSettingService implements OnApplicationBootstrap {
       name: updated.name,
       titleTemplate: updated.titleTemplate,
       detailTemplate: updated.detailTemplate,
-      defaultSeverity: updated.defaultSeverity,
       isPushEnabled: updated.isPushEnabled,
       scope: updated.scope,
     };

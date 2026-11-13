@@ -3,7 +3,6 @@ import { Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
-  IsDateString,
   IsIn,
   IsNumber,
   IsObject,
@@ -19,6 +18,7 @@ import {
   DELIVERY_RULE_ACTIONS,
   DELIVERY_RUNTIME_REASONS,
   NOTIFICATION_SCOPES,
+  NOTIFICATION_STATES,
   SEVERITIES,
 } from "./notification-center.constants";
 
@@ -59,10 +59,10 @@ export class NotificationRecordDto {
   @ApiProperty({ type: String, required: false, nullable: true })
   link!: string | null;
 
-  @ApiProperty({ enum: ["firing", "recovered"], description: "Alert lifecycle phase (ADR-051)" })
+  @ApiProperty({ enum: NOTIFICATION_STATES, description: "Lifecycle state; event-kind messages stay firing" })
   status!: string;
 
-  @ApiProperty({ type: Date, required: false, nullable: true, description: "Recovery timestamp for recovered alerts" })
+  @ApiProperty({ type: Date, required: false, nullable: true, description: "Delivery time of the resolved event" })
   recoveredAt!: Date | null;
 
   @ApiProperty({ description: "Read state for the requesting user" })
@@ -83,10 +83,9 @@ export class NotifyDto {
   @IsObject()
   context?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ enum: SEVERITIES, description: "Override the notification default severity" })
-  @IsOptional()
+  @ApiProperty({ enum: SEVERITIES, description: "Severity of this delivery; required" })
   @IsIn(SEVERITIES as unknown as string[])
-  severity?: string;
+  severity!: string;
 
   @ApiPropertyOptional({ type: String })
   @IsOptional()
@@ -106,29 +105,24 @@ export class NotifyDto {
   deduplicationKey?: string;
 
   @ApiPropertyOptional({
-    type: String,
-    description: "Pairing key for one alert lifecycle (ADR-064); a firing and its recovery must pass the same value",
+    enum: NOTIFICATION_STATES,
+    description: "Lifecycle state of an alert-kind notification; ignored for events. Defaults to firing",
   })
+  @IsOptional()
+  @IsIn(NOTIFICATION_STATES as unknown as string[])
+  state?: string;
+
+  @ApiPropertyOptional({ type: String, maxLength: 20, description: "Origin kind: alert or event" })
   @IsOptional()
   @IsString()
-  alertKey?: string;
+  @MaxLength(20)
+  sourceType?: string;
 
-  @ApiPropertyOptional({
-    enum: ["firing", "recovered"],
-    description: "Alert lifecycle phase (ADR-051); defaults to firing",
-  })
+  @ApiPropertyOptional({ type: String, maxLength: 100, description: "Origin object id (Alert.id for alerts)" })
   @IsOptional()
-  @IsIn(["firing", "recovered"])
-  status?: "firing" | "recovered";
-
-  @ApiPropertyOptional({
-    type: String,
-    format: "date-time",
-    description: "Recovery timestamp for recovered events; defaults to now",
-  })
-  @IsOptional()
-  @IsDateString()
-  recoveredAt?: string;
+  @IsString()
+  @MaxLength(100)
+  sourceRef?: string;
 }
 
 export class NotifyResultDto {
@@ -138,13 +132,13 @@ export class NotifyResultDto {
   @ApiProperty({ description: "True when the deduplication key already existed" })
   deduplicated!: boolean;
 
-  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS, description: "Delivery verdict of the alert this event belongs to" })
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS, description: "Rule decision for this delivery" })
   decision!: string;
 
   @ApiProperty({
     enum: DELIVERY_DECISION_REASONS,
     nullable: true,
-    description: "Why the verdict came out that way; null for verdicts frozen before the reason was recorded",
+    description: "Why the decision came out that way",
   })
   reason!: string | null;
 
@@ -220,9 +214,6 @@ export class NotificationSettingDto {
   @ApiProperty({ type: String, required: false, nullable: true })
   detailTemplate!: string | null;
 
-  @ApiProperty({ enum: SEVERITIES })
-  defaultSeverity!: string;
-
   @ApiProperty()
   isPushEnabled!: boolean;
 
@@ -235,12 +226,6 @@ export class NotificationSettingDto {
 }
 
 export class UpdateNotificationSettingDto {
-  @ApiPropertyOptional({ enum: SEVERITIES })
-  @IsOptional()
-  @IsString()
-  @IsIn(SEVERITIES as unknown as string[])
-  defaultSeverity?: string;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
@@ -268,10 +253,10 @@ export class UpdateNotificationCenterSettingDto {
 // ---------------------------------------------------------------------------
 
 export class DeliveryConditionDto {
-  @ApiPropertyOptional({ enum: ["firing", "recovered"], description: "Lifecycle phase the rule applies to" })
+  @ApiPropertyOptional({ enum: NOTIFICATION_STATES, description: "Lifecycle state the rule applies to" })
   @IsOptional()
-  @IsIn(["firing", "recovered"])
-  phase?: string;
+  @IsIn(NOTIFICATION_STATES as unknown as string[])
+  state?: string;
 
   @ApiPropertyOptional({ enum: SEVERITIES, description: "Minimum severity label the event must carry" })
   @IsOptional()
@@ -387,10 +372,10 @@ export class SimulateDeliveryRequestDto {
   @IsIn(SEVERITIES as unknown as string[])
   severity?: string;
 
-  @ApiPropertyOptional({ enum: ["firing", "recovered"], description: "Manual mode: defaults to firing" })
+  @ApiPropertyOptional({ enum: NOTIFICATION_STATES, description: "Manual mode: defaults to firing" })
   @IsOptional()
-  @IsIn(["firing", "recovered"])
-  phase?: string;
+  @IsIn(NOTIFICATION_STATES as unknown as string[])
+  state?: string;
 
   @ApiPropertyOptional({ description: "Manual mode: project id to evaluate" })
   @IsOptional()
@@ -399,8 +384,8 @@ export class SimulateDeliveryRequestDto {
 }
 
 export class DeliveryLabelsDto {
-  @ApiProperty({ enum: ["firing", "recovered"] })
-  phase!: string;
+  @ApiProperty({ enum: NOTIFICATION_STATES })
+  state!: string;
 
   @ApiProperty({ enum: SEVERITIES })
   severity!: string;
@@ -434,14 +419,11 @@ export class SimulateDeliveryResultDto {
   @ApiProperty({
     enum: DELIVERY_RUNTIME_REASONS,
     nullable: true,
-    description: "Real-time interception found while replaying; today the simulator evaluates active silences",
+    description: "Real-time interception found while replaying; the simulator evaluates the rule segment only",
   })
   runtimeReason!: string | null;
 
-  @ApiProperty({ type: String, nullable: true, description: "Silence that would intercept; null when none is active" })
-  silenceId!: string | null;
-
-  @ApiProperty({ description: "Final outcome: the rules deliver and no real-time interception applies" })
+  @ApiProperty({ description: "Final outcome: the rule table decided deliver" })
   delivered!: boolean;
 }
 
@@ -458,92 +440,8 @@ export class NotificationDeliveryAttemptDto {
   @ApiProperty({ enum: DELIVERY_RUNTIME_REASONS, nullable: true })
   runtimeReason!: string | null;
 
-  @ApiProperty({ type: String, nullable: true, description: "Silence that intercepted; null unless silenced" })
-  silenceId!: string | null;
-
   @ApiProperty()
   createdAt!: Date;
-}
-
-// ---------------------------------------------------------------------------
-// Silence DTOs (ADR-063)
-// ---------------------------------------------------------------------------
-
-export class SilenceDto {
-  @ApiProperty()
-  id!: string;
-
-  @ApiProperty({ type: () => DeliveryConditionDto, description: "Matchers; an empty object silences everything" })
-  condition!: DeliveryConditionDto;
-
-  @ApiProperty({ type: Date })
-  startsAt!: Date;
-
-  @ApiProperty({ type: Date })
-  endsAt!: Date;
-
-  @ApiProperty({ type: String, required: false, nullable: true })
-  comment!: string | null;
-
-  @ApiProperty({ type: String, required: false, nullable: true })
-  createdBy!: string | null;
-
-  @ApiProperty({ description: "True while startsAt <= now < endsAt" })
-  isActive!: boolean;
-
-  @ApiProperty()
-  createdAt!: Date;
-
-  @ApiProperty()
-  updatedAt!: Date;
-}
-
-export class CreateSilenceDto {
-  @ApiPropertyOptional({
-    type: () => DeliveryConditionDto,
-    description: "Matchers reused from delivery rules; omitted means silence everything",
-  })
-  @IsOptional()
-  @IsObject()
-  condition?: DeliveryConditionDto;
-
-  @ApiPropertyOptional({ type: String, format: "date-time", description: "Defaults to now" })
-  @IsOptional()
-  @IsDateString()
-  startsAt?: string;
-
-  @ApiProperty({ type: String, format: "date-time" })
-  @IsDateString()
-  endsAt!: string;
-
-  @ApiPropertyOptional({ type: String, maxLength: 512 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(512)
-  comment?: string;
-}
-
-export class UpdateSilenceDto {
-  @ApiPropertyOptional({ type: () => DeliveryConditionDto })
-  @IsOptional()
-  @IsObject()
-  condition?: DeliveryConditionDto;
-
-  @ApiPropertyOptional({ type: String, format: "date-time" })
-  @IsOptional()
-  @IsDateString()
-  startsAt?: string;
-
-  @ApiPropertyOptional({ type: String, format: "date-time" })
-  @IsOptional()
-  @IsDateString()
-  endsAt?: string;
-
-  @ApiPropertyOptional({ type: String, maxLength: 512 })
-  @IsOptional()
-  @IsString()
-  @MaxLength(512)
-  comment?: string;
 }
 
 export class PushDeliveryResultDto {

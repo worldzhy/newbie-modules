@@ -6,17 +6,16 @@
 // * NotificationReceipt                                          //
 // * NotificationCenterSetting                                    //
 // * NotificationDeliveryRule                                     //
-// * NotificationAlert                                            //
 // * NotificationDeliveryAttempt                                  //
-// * NotificationSilence                                          //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// Per-notification delivery settings. Business code declares a notification
-// at startup (a Notification subclass registering itself through
-// NotificationRegistryService) and NotificationSettingService persists one
-// row per key. The database row wins for runtime-editable fields
-// (defaultSeverity, isPushEnabled): declarations only create
-// missing rows, never override operator edits.
+// Per-notification delivery settings. Business code declares a notification at
+// startup (a Notification subclass registering itself through
+// NotificationRegistryService) and NotificationSettingService persists one row
+// per key. The database row wins for the runtime-editable field
+// (isPushEnabled): declarations only create missing rows, never override
+// operator edits. Severity is not stored here: it belongs to the producer and
+// is passed on every notify() (ADR-062 "severity contract").
 model NotificationSetting {
   key            String    @id @db.VarChar(100)
   name           String    @db.VarChar(255)
@@ -24,7 +23,6 @@ model NotificationSetting {
   titleTemplate  String    @db.VarChar(512)
   // Optional multi-line detail template.
   detailTemplate String?   @db.Text
-  defaultSeverity String   @db.VarChar(10)
   // Per-notification push master switch; the center master switch must also
   // be on for a push to fire.
   isPushEnabled  Boolean   @default(true)
@@ -46,8 +44,7 @@ model NotificationRecord {
   id        String   @id @default(uuid()) @db.Uuid
   // Key of the notification this record was produced from.
   notificationKey String @db.VarChar(100)
-  // Resolved severity for this delivery (notification default or an explicit
-  // override passed to notify()).
+  // Severity supplied by the producer for this delivery (ADR-062).
   severity  String   @db.VarChar(10)
   title     String   @db.VarChar(512)
   detail    String?  @db.Text
@@ -62,18 +59,19 @@ model NotificationRecord {
   projectId String?  @db.Uuid
   // Frontend relative path the notification deep-links to.
   link      String?  @db.VarChar(512)
-  // Lifecycle phase for alert-style notifications: "firing" (default) or
-  // "recovered". Plain notifications ignore it; the frontend uses it to pair
-  // firing/recovered records and dim recovered ones (ADR-051).
+  // Lifecycle state of alert-kind messages: "firing" (default) or "resolved".
+  // Plain event notifications keep "firing"; the frontend uses it to pair and
+  // dim resolved records (ADR-051, ADR-065).
   status    String    @db.VarChar(10) @default("firing")
-  // When this record represents a recovered alert.
+  // Delivery time of the resolved event of this record.
   recoveredAt DateTime?
-  // Alert instance this record belongs to (ADR-062). Null for plain
-  // notifications and for records written before the alert table existed.
-  alertId   String?  @db.Uuid
+  // Where this delivery came from (ADR-065): "alert" for records produced by
+  // the alert domain, "event" for plain event producers. No database foreign
+  // key crosses domains — the id is a string.
+  sourceType String? @db.VarChar(20)
+  sourceRef  String? @db.VarChar(100)
   createdAt DateTime @default(now())
 
-  alert        NotificationAlert?        @relation(fields: [alertId], references: [id], onDelete: SetNull)
   receipts     NotificationReceipt[]
   pushFailures NotificationPushFailure[]
 
@@ -82,7 +80,7 @@ model NotificationRecord {
   @@index([notificationKey])
   @@index([projectId])
   @@index([status])
-  @@index([alertId])
+  @@index([sourceType, sourceRef])
   @@schema("module/notification-center")
 }
 
@@ -139,13 +137,16 @@ model NotificationCenterSetting {
 
 // Ordered delivery rules (ADR-062). The first enabled rule whose condition
 // matches decides the delivery; when nothing matches, delivery is suppressed.
-// One default rule is seeded on a fresh install so high and critical signals
-// keep pushing without any operator action.
+// Rules are evaluated per delivery instead of being frozen on an alert: the
+// alert lives in its own domain (ADR-065) and its severity is stable across
+// firing and resolved, so both land on the same side of the rules. Two default
+// rules are seeded on a fresh install so high and critical signals keep pushing
+// without any operator action.
 model NotificationDeliveryRule {
   id        String   @id @default(uuid()) @db.Uuid
   // Ascending evaluation order; lower runs first.
   priority  Int      @unique
-  // DeliveryCondition object: phase, severityAtLeast, notificationKeys,
+  // DeliveryCondition object: state, severityAtLeast, notificationKeys,
   // projectIds, tags. Absent fields do not filter; `[]` never matches.
   condition Json
   action    String   @db.VarChar(10)
@@ -157,90 +158,22 @@ model NotificationDeliveryRule {
   @@schema("module/notification-center")
 }
 
-// One alert lifecycle (ADR-062). A firing event opens the cycle and freezes
-// the rule verdict for this instance; its recovered event reuses that verdict
-// so an alert and its recovery always land on the same side of the rules. A
-// firing after a resolved cycle starts a new one and recomputes the verdict.
-model NotificationAlert {
-  id              String    @id @default(uuid()) @db.Uuid
-  notificationKey String    @db.VarChar(100)
-  // Global pairing key of one alert lifecycle (ADR-064): the notifying
-  // project, then the caller's alertKey, else its deduplication key, else the
-  // notification key. Long values are truncated and suffixed with a sha256 so
-  // the column stays inside VarChar(255). Unique on its own, so the database
-  // guarantees that a firing and its recovery share one row.
-  fingerprint     String    @db.VarChar(255)
-  projectId       String?   @db.Uuid
-  // Alert level label; for recovered events the record keeps the placeholder
-  // level while the verdict stays that of the firing cycle.
-  severity        String    @db.VarChar(10)
-  state           String    @db.VarChar(10) @default("firing")
-
-  verdictAction   String?   @db.VarChar(10)
-  verdictRuleId   String?   @db.Uuid
-  // Why that verdict came out the way it did, so the recovery of this cycle and
-  // the audit rows explain themselves without replaying the rule table.
-  verdictReason   String?   @db.VarChar(40)
-  verdictAt       DateTime?
-
-  firstSeenAt     DateTime  @default(now())
-  lastSeenAt      DateTime  @updatedAt
-  resolvedAt      DateTime?
-
-  records NotificationRecord[]
-
-  @@unique([fingerprint])
-  @@index([state, lastSeenAt])
-  @@schema("module/notification-center")
-}
-
 // One row per delivery decision (ADR-062). Makes every push or suppression
 // explainable: which rule decided it and, when suppressed, why.
 model NotificationDeliveryAttempt {
   id       String   @id @default(uuid()) @db.Uuid
-  alertId  String?  @db.Uuid
   recordId String   @db.Uuid
   decision String   @db.VarChar(10)
   reason   String?  @db.VarChar(40)
   ruleId   String?  @db.Uuid
-  // Real-time interception reason (ADR-063): silenced | subscription-off |
+  // Real-time interception reason (ADR-063): subscription-off |
   // recovery-opt-out | channel-off | no-port. Kept apart from `reason` so a
   // rule can deliver while the runtime segment keeps the push in-app.
   runtimeReason String? @db.VarChar(40)
-  // Silence that intercepted this delivery; set only for runtimeReason
-  // "silenced", so the notification can be traced back to one maintenance
-  // window. Restrict makes that trail unerasable: a window with audit rows can
-  // only be ended (endsAt), never deleted (ADR-063).
-  silenceId     String? @db.Uuid
 
   createdAt DateTime @default(now())
-
-  silence NotificationSilence? @relation(fields: [silenceId], references: [id], onDelete: Restrict)
 
   @@index([recordId])
-  @@index([alertId])
-  @@index([silenceId])
   @@index([createdAt])
-  @@schema("module/notification-center")
-}
-
-// A maintenance window that keeps matching notifications in-app (ADR-063).
-// Active while startsAt <= now < endsAt, so a window can be announced ahead of
-// time and expires without a scheduled job. Matchers reuse DeliveryCondition
-// and matchesDeliveryCondition(); an empty collection never matches.
-model NotificationSilence {
-  id        String   @id @default(uuid()) @db.Uuid
-  condition Json
-  startsAt  DateTime @default(now())
-  endsAt    DateTime
-  comment   String?  @db.VarChar(512)
-  createdBy String?  @db.Uuid
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  attempts NotificationDeliveryAttempt[]
-
-  @@index([endsAt])
   @@schema("module/notification-center")
 }

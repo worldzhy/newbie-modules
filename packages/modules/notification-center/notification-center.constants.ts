@@ -27,17 +27,18 @@ export type DeliveryRuleAction = (typeof DELIVERY_RULE_ACTIONS)[number];
 export const DELIVERY_DECISION_REASONS = ["rule", "no-rule-matched"] as const;
 export type DeliveryDecisionReason = (typeof DELIVERY_DECISION_REASONS)[number];
 
+/** Outcome of evaluating the rule table for one delivery event. */
+export interface DeliveryVerdict {
+  action: DeliveryRuleAction;
+  ruleId: string | null;
+  reason: DeliveryDecisionReason | null;
+}
+
 // Why a notification that the rules allowed to deliver was nonetheless kept
 // in-app (ADR-063). These are environment facts read at delivery time, kept
-// apart from the frozen rule verdict. Listed in evaluation order: the first
-// match wins.
-export const DELIVERY_RUNTIME_REASONS = [
-  "subscription-off",
-  "recovery-opt-out",
-  "channel-off",
-  "silenced",
-  "no-port",
-] as const;
+// apart from the rule decision. Listed in evaluation order: the first match
+// wins.
+export const DELIVERY_RUNTIME_REASONS = ["subscription-off", "recovery-opt-out", "channel-off", "no-port"] as const;
 export type DeliveryRuntimeReason = (typeof DELIVERY_RUNTIME_REASONS)[number];
 
 // Priority of the rule seeded on first boot, and the gap between adjacent
@@ -54,14 +55,29 @@ export const DELIVERY_RULE_PRIORITY_STEP = 10;
  */
 export const DEFAULT_DELIVERY_RULE_CONDITION: DeliveryCondition = { severityAtLeast: "high" };
 export const DEFAULT_RECOVERY_RULE_PRIORITY = 20;
-export const DEFAULT_RECOVERY_RULE_CONDITION: DeliveryCondition = { phase: "recovered" };
+export const DEFAULT_RECOVERY_RULE_CONDITION: DeliveryCondition = { state: "resolved" };
 
-/** Outcome of the rule judgement for one alert; frozen on the alert instance. */
-export interface DeliveryVerdict {
-  action: DeliveryRuleAction;
-  ruleId: string | null;
-  reason: DeliveryDecisionReason | null;
+/**
+ * Kind of a registered notification (ADR-065 §6). `alert` messages may carry
+ * a lifecycle state and use the recovered templates; `event` messages are
+ * one-shot and ignore both. Kind only shapes the templates — delivery rules
+ * match on the state label, not on the kind.
+ */
+export const NOTIFICATION_KINDS = ["alert", "event"] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+/**
+ * Runtime guard for a severity crossing the public boundary. The vocabulary is
+ * closed and shared with the alert domain; a value outside it is a caller
+ * defect, so it is rejected instead of falling back to a default (ADR-062).
+ */
+export function isNotificationSeverity(value: unknown): value is NotificationSeverity {
+  return typeof value === "string" && (SEVERITIES as readonly string[]).includes(value);
 }
+
+/** Lifecycle values shared with the alert domain and used by rule conditions. */
+export const NOTIFICATION_STATES = ["firing", "resolved"] as const;
+export type NotificationState = (typeof NOTIFICATION_STATES)[number];
 
 /**
  * Condition of one delivery rule. Absent fields do not filter; an empty
@@ -70,7 +86,7 @@ export interface DeliveryVerdict {
  * thresholds; collections appear only for multi-select matching.
  */
 export interface DeliveryCondition {
-  phase?: "firing" | "recovered";
+  state?: "firing" | "resolved";
   severityAtLeast?: NotificationSeverity;
   notificationKeys?: string[];
   projectIds?: string[];
@@ -79,7 +95,7 @@ export interface DeliveryCondition {
 
 /** Labels of one delivery event, matched against a rule condition. */
 export interface DeliveryLabels {
-  phase: "firing" | "recovered";
+  state: "firing" | "resolved";
   severity: string;
   notificationKey: string;
   projectId?: string;
@@ -96,7 +112,7 @@ export function matchesDeliveryCondition(condition: unknown, labels: DeliveryLab
     return true;
   }
   const rule = condition as DeliveryCondition;
-  if (rule.phase && rule.phase !== labels.phase) {
+  if (rule.state && rule.state !== labels.state) {
     return false;
   }
   if (rule.severityAtLeast) {
@@ -128,8 +144,8 @@ export function matchesDeliveryCondition(condition: unknown, labels: DeliveryLab
   return true;
 }
 
-const CONDITION_FIELDS = ["phase", "severityAtLeast", "notificationKeys", "projectIds", "tags"] as const;
-const CONDITION_PHASES = ["firing", "recovered"] as const;
+const CONDITION_FIELDS = ["state", "severityAtLeast", "notificationKeys", "projectIds", "tags"] as const;
+const CONDITION_STATES = ["firing", "resolved"] as const;
 
 /**
  * Validate a condition submitted through the API. `condition` is a JSON column,
@@ -147,8 +163,8 @@ export function validateDeliveryCondition(condition: unknown): string[] {
       problems.push(`unknown condition field: ${key}`);
     }
   }
-  if (rule.phase !== undefined && !(CONDITION_PHASES as readonly unknown[]).includes(rule.phase)) {
-    problems.push(`phase must be one of ${CONDITION_PHASES.join(", ")}`);
+  if (rule.state !== undefined && !(CONDITION_STATES as readonly unknown[]).includes(rule.state)) {
+    problems.push(`state must be one of ${CONDITION_STATES.join(", ")}`);
   }
   if (rule.severityAtLeast !== undefined && !(SEVERITIES as readonly unknown[]).includes(rule.severityAtLeast)) {
     problems.push(`severityAtLeast must be one of ${SEVERITIES.join(", ")}`);

@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { SEVERITIES, type NotificationScope } from "./notification-center.constants";
+import { NOTIFICATION_KINDS, type NotificationKind, type NotificationScope } from "./notification-center.constants";
 
 /**
  * Shape a business module passes when declaring a notification at startup.
@@ -11,35 +11,32 @@ export interface NotificationDeclaration {
   key: string;
   /** Human-readable name shown in the settings UI. */
   name: string;
+  /**
+   * Alert-kind notifications accept a lifecycle state and may use the recovered
+   * templates; event-kind ones are one-shot. Defaults to "event".
+   */
+  kind?: NotificationKind;
   /** Title template, e.g. "{{project}} added {{count}} risks" (runtime templates may be localized data). */
   titleTemplate: string;
   /** Optional multi-line detail template. */
   detailTemplate?: string;
   /**
-   * Lifecycle-phase template overrides (ADR-051): when notify() is called with
-   * `status: "recovered"`, these replace titleTemplate/detailTemplate so a
-   * recovered alert reads "…recovered" instead of rendering the firing
-   * template with a zero count. Absent overrides fall back to the base
-   * templates.
+   * Template overrides used when notify() is called with `state: "resolved"`
+   * on an alert-kind notification (ADR-051 / ADR-065 §6): a resolved message
+   * reads "…recovered" instead of rendering the firing template with a zero
+   * count. Absent overrides fall back to the base templates.
    */
   recoveredTitleTemplate?: string;
   recoveredDetailTemplate?: string;
   /**
-   * Severity label applied when notify() does not pass an explicit override.
-   * Severity is a matching label for delivery rules (ADR-062), not a gate: a
-   * recovered declaration carries the same label as the alert it closes so a
-   * rule matches the pair consistently.
-   */
-  defaultSeverity: (typeof SEVERITIES)[number];
-  /**
-   * Whether push is on for this notification by default. A dedicated recovered
+   * Whether push is on for this notification by default. A dedicated resolved
    * declaration must mirror its firing counterpart's switch so an alert and
-   * its recovery are either both pushed or both kept in-app (ADR-061).
+   * its resolution are either both pushed or both kept in-app (ADR-061).
    */
   defaultPushEnabled?: boolean;
   /**
-   * Whether a recovered event is pushed. Declared once and read by both
-   * phases; defaults to true (ADR-062 §4, ADR-063).
+   * Whether a resolved event is pushed. Declared once and read by both states;
+   * defaults to true (ADR-062 §4, ADR-063).
    */
   notifyOnRecovery?: boolean;
   /**
@@ -58,7 +55,7 @@ export type RegisteredNotification = NotificationDeclaration;
  * code-side counterpart to the database NotificationSetting rows: it holds the
  * templates and defaults that cannot be safely edited at runtime. The database
  * row (see NotificationSettingService) owns the runtime-editable delivery
- * settings (defaultSeverity, isPushEnabled).
+ * setting (isPushEnabled).
  *
  * Business code typically declares a notification by subclassing the abstract
  * Notification base class, which registers itself here on module init.
@@ -74,12 +71,12 @@ export class NotificationRegistryService {
     if (this.notifications.has(declaration.key)) {
       throw new Error(`Notification is already registered: ${declaration.key}`);
     }
-    if (!SEVERITIES.includes(declaration.defaultSeverity)) {
+    if (declaration.kind && !(NOTIFICATION_KINDS as readonly string[]).includes(declaration.kind)) {
       throw new Error(
-        `Invalid defaultSeverity for ${declaration.key}: ${declaration.defaultSeverity}. Must be one of ${SEVERITIES.join(", ")}.`,
+        `Invalid kind for ${declaration.key}: ${declaration.kind}. Must be one of ${NOTIFICATION_KINDS.join(", ")}.`,
       );
     }
-    this.notifications.set(declaration.key, { ...declaration });
+    this.notifications.set(declaration.key, { ...declaration, kind: declaration.kind ?? "event" });
     this.logger.log(`Notification registered: ${declaration.key}`);
   }
 

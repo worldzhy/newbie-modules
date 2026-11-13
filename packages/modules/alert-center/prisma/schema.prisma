@@ -1,0 +1,71 @@
+// !! ------------------------------------------------------------ //
+// !!                 [Module] Alert Center models            //
+// !! ------------------------------------------------------------ //
+// * Alert                                                        //
+// * AlertSource                                                  //
+// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+
+// One alert lifecycle (ADR-065). A firing event opens the cycle; repeated
+// reports advance lastSeenAt/occurrences without resetting the reminder
+// rhythm; a resolve closes it. No delivery verdict lives here: delivery policy
+// belongs to the notification domain, which this module only calls.
+model Alert {
+  id        String  @id @default(uuid()) @db.Uuid
+  // scopeId + source + alertKey, hashed when longer than the column width.
+  // Unique on its own, so the database arbitrates concurrent first reports.
+  fingerprint String @unique @db.VarChar(255)
+  // Registered producer key, e.g. url-check / heartbeat / cloudwatch.
+  source      String  @db.VarChar(100)
+  // Opaque scope (project / tenant / platform) owned by the host.
+  scopeId     String? @db.VarChar(100)
+  // Severity of the current lifecycle; stable across firing and resolved so
+  // both messages are judged by the same delivery rules.
+  severity    String  @db.VarChar(20)
+  // Routing and display labels for the notification domain. Never used to
+  // filter the alert list, which only relies on first-class columns.
+  labels      Json
+  // Opaque rendering context (url, error text, counts); not interpreted here.
+  data        Json?
+
+  // firing | resolved.
+  state       String  @db.VarChar(20) @default("firing")
+  // Reminder rhythm of this lifecycle, in minutes.
+  repeatIntervalMinutes Int  @default(60)
+  // Next due external reminder; null once resolved.
+  nextNotificationAt   DateTime?
+  // Last external reminder actually sent.
+  lastNotificationAt   DateTime?
+  // Reminders sent in this lifecycle; 0 means only the initial firing message
+  // went out. Reminders reuse the firing template and only change the rendered
+  // title, so this counter is not part of any notification key (ADR-065 §4).
+  reminderCount        Int    @default(0)
+
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @updatedAt
+  resolvedAt  DateTime?
+  occurrences Int       @default(1)
+  createdAt   DateTime  @default(now())
+
+  @@index([state, nextNotificationAt])
+  @@index([scopeId, source])
+  @@schema("module/alert-center")
+}
+
+// Operator-overridden source state. Sources themselves are registered in code
+// (key / displayName / defaultRepeatMinutes); this table only exists for the
+// ones an operator changed, so a typo can never invent a source and a default
+// never lives in two places.
+model AlertSource {
+  // Key declared in the code-side source registry.
+  key                     String    @id @db.VarChar(100)
+  // Overrides the registered rhythm; null inherits it.
+  repeatMinutes           Int?
+  // External delivery is paused until this moment, then expires on its own.
+  // Recording and resolving keep working while paused.
+  notificationPausedUntil DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/alert-center")
+}

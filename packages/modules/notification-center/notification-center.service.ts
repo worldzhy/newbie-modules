@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import {
   BadRequestException,
   ConflictException,
@@ -17,13 +16,13 @@ import {
   NOTIFICATION_PUSH_PORT,
   PG_UNIQUE_VIOLATION,
   SEVERITIES,
+  isNotificationSeverity,
 } from "./notification-center.constants";
 import type {
   DeliveryDecisionReason,
-  DeliveryLabels,
   DeliveryRuleAction,
   DeliveryRuntimeReason,
-  DeliveryVerdict,
+  NotificationState,
 } from "./notification-center.constants";
 import {
   ListNotificationsRequestDto,
@@ -40,7 +39,6 @@ import {
 import { NotificationRegistryService } from "./notification-registry.service";
 import type { RegisteredNotification } from "./notification-registry.service";
 import { NotificationDeliveryRuleService } from "./notification-delivery-rule.service";
-import { NotificationSilenceService } from "./notification-silence.service";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 // Upper bound for the unresolved push-failure admin listing (R5-P2-07).
@@ -65,33 +63,6 @@ function isSafeNotificationLink(link: string): boolean {
   } catch {
     return false;
   }
-}
-
-// Width of NotificationAlert.fingerprint (VarChar(255)).
-const ALERT_FINGERPRINT_MAX_LENGTH = 255;
-const ALERT_FINGERPRINT_HASH_LENGTH = 64;
-
-/**
- * Pairing key of one alert lifecycle (ADR-064). The caller-supplied alertKey
- * wins, so a firing and its recovery can pair even when they carry different
- * notification keys and deduplication keys (url-check, heartbeat); otherwise
- * the deduplication key, then the notification key. The project prefix keeps
- * two projects that reuse the same key on separate alert rows, so a verdict
- * frozen for one project can never decide another project's event (R39-03).
- * Values beyond the column width are hashed instead of failing the insert.
- */
-function buildAlertFingerprint(input: {
-  projectId?: string;
-  notificationKey: string;
-  deduplicationKey?: string;
-  alertKey?: string;
-}): string {
-  const scoped = `${input.projectId ?? "-"}:${input.alertKey ?? input.deduplicationKey ?? input.notificationKey}`;
-  if (scoped.length <= ALERT_FINGERPRINT_MAX_LENGTH) {
-    return scoped;
-  }
-  const prefixLength = ALERT_FINGERPRINT_MAX_LENGTH - ALERT_FINGERPRINT_HASH_LENGTH - 1;
-  return `${scoped.slice(0, prefixLength)}:${createHash("sha256").update(scoped).digest("hex")}`;
 }
 
 /**
@@ -120,8 +91,11 @@ export interface NotifyInput {
   notificationKey: string;
   /** Values interpolated into the notification's title/detail templates. */
   context?: Record<string, unknown>;
-  /** Override the notification's default severity for this delivery. */
-  severity?: (typeof SEVERITIES)[number];
+  /**
+   * Severity of this delivery. Required: the producer owns the value and a
+   * missing one is a caller defect, not a case for a default (ADR-062).
+   */
+  severity: (typeof SEVERITIES)[number];
   /** Optional project/tenant scope used for filtering. */
   projectId?: string;
   /** Deep-link the frontend opens when the notification is clicked. */
@@ -132,22 +106,15 @@ export interface NotifyInput {
    */
   deduplicationKey?: string;
   /**
-   * Optional pairing key for alert lifecycles (ADR-064). Use it when the firing
-   * and recovered events carry different notification keys or deduplication
-   * keys; both events must pass the same value. Falls back to
-   * `deduplicationKey`, then `notificationKey`.
+   * Lifecycle state of an alert-kind notification (ADR-065 §6). Drives the
+   * recovered templates and the `state` label matched by delivery rules.
+   * Ignored for event-kind notifications; defaults to "firing".
    */
-  alertKey?: string;
-  /**
-   * Lifecycle phase for alert-style notifications ("firing" | "recovered").
-   * Defaults to "firing" (ADR-051).
-   */
-  status?: "firing" | "recovered";
-  /**
-   * Recovery timestamp for recovered-phase notifications; defaults to now()
-   * when status is "recovered" and this is omitted.
-   */
-  recoveredAt?: Date;
+  state?: NotificationState;
+  /** Where this delivery came from (ADR-065): "alert" or "event". */
+  sourceType?: string;
+  /** Id of the origin object (Alert.id for alert deliveries); no foreign key. */
+  sourceRef?: string;
   /**
    * Project scope resolved by the calling controller for the HTTP delivery
    * endpoint. Internal job callers omit it because they act on behalf of the
@@ -190,16 +157,11 @@ function renderTemplate(template: string, context?: Record<string, unknown>): st
   });
 }
 
-/** Human-readable form of a suppress verdict, for the debug log. */
-function describeSuppression(verdict: DeliveryVerdict): string {
-  switch (verdict.reason) {
-    case "no-rule-matched":
-      return "no enabled rule matched the event";
-    case "rule":
-      return `rule ${verdict.ruleId} decided suppress`;
-    default:
-      return "the alert carried a frozen suppress verdict";
-  }
+/** Human-readable form of a suppress decision, for the debug log. */
+function describeSuppression(verdict: { reason: DeliveryDecisionReason | null; ruleId: string | null }): string {
+  return verdict.reason === "no-rule-matched"
+    ? "no enabled rule matched the event"
+    : `rule ${verdict.ruleId} decided suppress`;
 }
 
 @Injectable()
@@ -210,7 +172,6 @@ export class NotificationCenterService {
     private readonly prisma: PrismaService,
     private readonly registry: NotificationRegistryService,
     private readonly deliveryRules: NotificationDeliveryRuleService,
-    private readonly silences: NotificationSilenceService,
     @Optional()
     @Inject(NOTIFICATION_PUSH_PORT)
     private readonly pushPort?: NotificationPushPort,
@@ -220,14 +181,14 @@ export class NotificationCenterService {
 
   /**
    * Produce one notification record from a registered notification. The
-   * notification's templates are rendered with `context` and severity is
-   * resolved from the override or the notification default. The record is
-   * always persisted: the delivery verdict only gates push, so a suppressed
+   * notification's templates are rendered with `context`; the record is always
+   * persisted, and the delivery decision only gates push, so a suppressed
    * low-severity signal never disappears from the in-app bell.
    *
-   * ADR-062: every delivery opens an alert instance and freezes the rule
-   * verdict on it, so one alert and its recovery land on the same side of the
-   * rules. Each recorded delivery also writes one audit attempt. System-scope
+   * Rules are evaluated per delivery (ADR-065 §6): the alert lives in its own
+   * domain and its severity is stable across firing and resolved, so both
+   * messages land on the same side of the rules unless the operator separates
+   * them by state. Each recorded delivery writes one audit attempt. System-scope
    * notifications are pushed through the host-provided push port; project-scope
    * push routing is owned by the host (per-project chat bindings) and reads
    * `decision` from the result.
@@ -237,6 +198,14 @@ export class NotificationCenterService {
     if (!declared) {
       throw new NotFoundException(`Notification is not registered: ${input.notificationKey}`);
     }
+
+    // Severity is owned by the producer and is required (ADR-062). A missing or
+    // unknown value is a caller defect; falling back to a default would let the
+    // notification domain define severity again.
+    if (!isNotificationSeverity(input.severity)) {
+      throw new BadRequestException(`Invalid notification severity: ${String(input.severity)}`);
+    }
+    const severity = input.severity;
 
     // The HTTP delivery endpoint accepts a client-supplied projectId: it must
     // be the caller's own project, otherwise a permission holder could inject
@@ -256,46 +225,28 @@ export class NotificationCenterService {
       throw new NotFoundException(`Notification declaration missing in database: ${input.notificationKey}`);
     }
 
-    const severity = input.severity ?? setting.defaultSeverity;
     const center = await this.getOrCreateCenterSetting();
 
-    // Lifecycle phase (ADR-051); "firing" when the caller omits it.
-    const recovered = input.status === "recovered";
+    // Lifecycle state (ADR-065 §6). Event-kind notifications have no lifecycle,
+    // so a state passed for one is ignored.
+    const state: NotificationState = declared.kind === "alert" ? (input.state ?? "firing") : "firing";
+    const resolved = state === "resolved";
 
-    // ADR-062: the rule verdict is frozen on the alert instance. The firing
-    // event decides it; its recovered event reuses it, so an alert and its
-    // recovery always land on the same side of the rules.
-    const alert = await this.upsertAlert({
-      notificationKey: input.notificationKey,
-      fingerprint: buildAlertFingerprint(input),
-      projectId: input.projectId,
+    const verdict = await this.deliveryRules.evaluate({
+      state,
       severity,
-      phase: input.status ?? "firing",
+      notificationKey: input.notificationKey,
+      projectId: input.projectId,
     });
-    const verdict: DeliveryVerdict = alert.verdictAction
-      ? {
-          action: alert.verdictAction as DeliveryRuleAction,
-          ruleId: alert.verdictRuleId,
-          reason: (alert.verdictReason as DeliveryDecisionReason | null) ?? null,
-        }
-      : await this.freezeVerdict(
-          alert.id,
-          await this.deliveryRules.evaluate({
-            phase: input.status ?? "firing",
-            severity,
-            notificationKey: input.notificationKey,
-            projectId: input.projectId,
-          }),
-        );
     if (verdict.action === "suppress") {
       this.logger.debug(`Notification ${input.notificationKey} recorded without push: ${describeSuppression(verdict)}`);
     }
 
-    // ADR-051: recovered-phase notifications prefer the declaration's recovered
-    // template overrides so a recovered alert reads "…recovered" instead of
-    // rendering the firing template with a zero count.
-    const titleTemplate = (recovered && declared.recoveredTitleTemplate) || declared.titleTemplate;
-    const detailTemplate = (recovered && declared.recoveredDetailTemplate) || declared.detailTemplate;
+    // ADR-051: resolved messages prefer the declaration's recovered template
+    // overrides so a recovery reads "…recovered" instead of rendering the
+    // firing template with a zero count.
+    const titleTemplate = (resolved && declared.recoveredTitleTemplate) || declared.titleTemplate;
+    const detailTemplate = (resolved && declared.recoveredDetailTemplate) || declared.detailTemplate;
     const title = renderTemplate(titleTemplate, input.context);
     const detail = detailTemplate ? renderTemplate(detailTemplate, input.context) : null;
 
@@ -308,9 +259,10 @@ export class NotificationCenterService {
       deduplicationKey: input.deduplicationKey ?? null,
       projectId: input.projectId ?? null,
       link: input.link ?? null,
-      status: input.status ?? "firing",
-      recoveredAt: input.status === "recovered" ? (input.recoveredAt ?? new Date()) : null,
-      alertId: alert.id,
+      status: state,
+      recoveredAt: resolved ? new Date() : null,
+      sourceType: input.sourceType ?? null,
+      sourceRef: input.sourceRef ?? null,
     };
 
     let recordId: string;
@@ -349,25 +301,16 @@ export class NotificationCenterService {
 
     if (!deduplicated) {
       // ADR-063: the real-time segment runs only when the rules allow delivery.
-      // The first matching environment fact wins, and it is recorded next to the
-      // frozen verdict so "delivered by the rules but kept in-app" is explainable.
-      let silenceId: string | null = null;
+      // The first matching environment fact wins and is recorded next to the
+      // rule decision, so "delivered by the rules but kept in-app" is explainable.
       if (verdict.action === "deliver") {
-        const runtime = await this.resolveRuntime({
+        runtimeReason = this.resolveRuntime({
           scope: setting.scope,
           notificationPushEnabled: setting.isPushEnabled,
           centerPushEnabled: center.isPushEnabled,
-          recovered,
+          resolved,
           declaration: declared,
-          labels: {
-            phase: input.status ?? "firing",
-            severity,
-            notificationKey: input.notificationKey,
-            projectId: input.projectId,
-          },
         });
-        runtimeReason = runtime.reason;
-        silenceId = runtime.silenceId;
       }
       if (runtimeReason) {
         this.logger.debug(`Notification ${input.notificationKey} kept in-app: ${runtimeReason}`);
@@ -377,13 +320,11 @@ export class NotificationCenterService {
       // suppression or real-time interception is explainable after the fact.
       await this.prisma.notificationDeliveryAttempt.create({
         data: {
-          alertId: alert.id,
           recordId,
           decision: verdict.action,
           reason: verdict.reason,
           ruleId: verdict.ruleId,
           runtimeReason,
-          silenceId,
         },
       });
       await this.dispatchPush(setting.scope, verdict.action, runtimeReason, title, detail, recordId);
@@ -399,120 +340,33 @@ export class NotificationCenterService {
   }
 
   /**
-   * Open or advance the alert instance of one alert lifecycle (ADR-062). A
-   * firing after a resolved cycle clears the frozen verdict because it starts
-   * a new lifecycle; a recovered event keeps the verdict of the cycle it ends.
-   */
-  private async upsertAlert(input: {
-    notificationKey: string;
-    fingerprint: string;
-    projectId?: string;
-    severity: string;
-    phase: "firing" | "recovered";
-  }): Promise<{
-    id: string;
-    verdictAction: string | null;
-    verdictRuleId: string | null;
-    verdictReason: string | null;
-  }> {
-    const select = {
-      id: true,
-      verdictAction: true,
-      verdictRuleId: true,
-      verdictReason: true,
-    } as const;
-    const findAlert = () =>
-      this.prisma.notificationAlert.findUnique({
-        where: { fingerprint: input.fingerprint },
-        select: { ...select, state: true },
-      });
-    let existing = await findAlert();
-    if (!existing) {
-      try {
-        return await this.prisma.notificationAlert.create({
-          data: {
-            notificationKey: input.notificationKey,
-            fingerprint: input.fingerprint,
-            projectId: input.projectId ?? null,
-            severity: input.severity,
-            state: input.phase,
-            resolvedAt: input.phase === "recovered" ? new Date() : null,
-          },
-          select,
-        });
-      } catch (error) {
-        // Two first deliveries of one fingerprint can race between the read and
-        // the insert; the winner's row is the alert to advance, so re-read it
-        // instead of failing the loser (R41-01).
-        if (!(error instanceof Prisma.PrismaClientKnownRequestError && error.code === PG_UNIQUE_VIOLATION)) {
-          throw error;
-        }
-        existing = await findAlert();
-        if (!existing) {
-          throw error;
-        }
-      }
-    }
-    const reopens = input.phase === "firing" && existing.state === "resolved";
-    return this.prisma.notificationAlert.update({
-      where: { id: existing.id },
-      data: {
-        projectId: input.projectId ?? null,
-        severity: input.severity,
-        state: input.phase,
-        resolvedAt: input.phase === "recovered" ? new Date() : null,
-        ...(reopens ? { verdictAction: null, verdictRuleId: null, verdictReason: null, verdictAt: null } : {}),
-      },
-      select,
-    });
-  }
-
-  /** Persist the verdict on the alert so its recovery reuses it. */
-  private async freezeVerdict(alertId: string, verdict: DeliveryVerdict): Promise<DeliveryVerdict> {
-    await this.prisma.notificationAlert.update({
-      where: { id: alertId },
-      data: {
-        verdictAction: verdict.action,
-        verdictRuleId: verdict.ruleId,
-        verdictReason: verdict.reason,
-        verdictAt: new Date(),
-      },
-    });
-    return verdict;
-  }
-
-  /**
    * Real-time segment of the delivery decision (ADR-063). Environment facts
    * read at delivery time, in fixed order: the first match wins. Only runs
-   * when the rule verdict is "deliver".
+   * when the rule decision is "deliver". Timing windows live in the alert
+   * domain now (rhythm and per-source pause); there is no silence reason here.
    */
-  private async resolveRuntime(input: {
+  private resolveRuntime(input: {
     scope: string;
     notificationPushEnabled: boolean;
     centerPushEnabled: boolean;
-    recovered: boolean;
+    resolved: boolean;
     declaration: RegisteredNotification;
-    labels: DeliveryLabels;
-  }): Promise<{ reason: DeliveryRuntimeReason | null; silenceId: string | null }> {
+  }): DeliveryRuntimeReason | null {
     if (!input.notificationPushEnabled) {
-      return { reason: "subscription-off", silenceId: null };
+      return "subscription-off";
     }
-    if (input.recovered && input.declaration.notifyOnRecovery === false) {
-      return { reason: "recovery-opt-out", silenceId: null };
+    if (input.resolved && input.declaration.notifyOnRecovery === false) {
+      return "recovery-opt-out";
     }
     if (!input.centerPushEnabled) {
-      return { reason: "channel-off", silenceId: null };
-    }
-    const silenceId = await this.silences.findActiveId(input.labels);
-    if (silenceId) {
-      return { reason: "silenced", silenceId };
+      return "channel-off";
     }
     // Only system-scope deliveries go through the center's port; project-scope
     // ones are routed by the host, so an absent port is not an interception.
     if (input.scope === "system" && !this.pushPort) {
-      return { reason: "no-port", silenceId: null };
+      return "no-port";
     }
-    return { reason: null, silenceId: null };
+    return null;
   }
 
   private async dispatchPush(
@@ -754,7 +608,7 @@ export class NotificationCenterService {
     const attempt = await this.prisma.notificationDeliveryAttempt.findFirst({
       where: { recordId: id },
       orderBy: { createdAt: "desc" },
-      select: { decision: true, reason: true, ruleId: true, runtimeReason: true, silenceId: true, createdAt: true },
+      select: { decision: true, reason: true, ruleId: true, runtimeReason: true, createdAt: true },
     });
     return attempt ?? null;
   }

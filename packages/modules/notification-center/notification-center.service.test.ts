@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
-import { Prisma } from "@generated/prisma/client";
 import { NotificationCenterService } from "./notification-center.service";
 import { NotificationDeliveryRuleService } from "./notification-delivery-rule.service";
 import { matchesDeliveryCondition, validateDeliveryCondition } from "./notification-center.constants";
@@ -17,21 +16,20 @@ function newService(state: { settingQueried: boolean }) {
   };
   const registry = {
     get: () => ({
+      kind: "event",
       titleTemplate: "title",
       detailTemplate: null,
-      defaultSeverity: "high",
     }),
   };
   const deliveryRules = { evaluate: async () => ({ action: "deliver", ruleId: "r1", reason: "rule" }) };
-  const silences = { findActiveId: async () => null };
-  return new NotificationCenterService(prisma as never, registry as never, deliveryRules as never, silences as never);
+  return new NotificationCenterService(prisma as never, registry as never, deliveryRules as never);
 }
 
 test("notify rejects a project outside the resolved scope before reading settings", async () => {
   const state = { settingQueried: false };
   const service = newService(state);
   await assert.rejects(
-    service.notify({ notificationKey: "k", projectId: "p2", visibleProjectIds: ["p1"] }),
+    service.notify({ notificationKey: "k", severity: "high", projectId: "p2", visibleProjectIds: ["p1"] }),
     ForbiddenException,
   );
   assert.equal(state.settingQueried, false);
@@ -43,7 +41,7 @@ test("notify proceeds for a project inside the resolved scope", async () => {
   // Reaching the setting lookup means the visibility gate passed; the stub
   // returns null so delivery stops with NotFound instead of writing a record.
   await assert.rejects(
-    service.notify({ notificationKey: "k", projectId: "p2", visibleProjectIds: ["p1", "p2"] }),
+    service.notify({ notificationKey: "k", severity: "high", projectId: "p2", visibleProjectIds: ["p1", "p2"] }),
     NotFoundException,
   );
   assert.equal(state.settingQueried, true);
@@ -52,7 +50,7 @@ test("notify proceeds for a project inside the resolved scope", async () => {
 test("notify stays platform-wide when no scope is supplied by the caller", async () => {
   const state = { settingQueried: false };
   const service = newService(state);
-  await assert.rejects(service.notify({ notificationKey: "k", projectId: "p9" }), NotFoundException);
+  await assert.rejects(service.notify({ notificationKey: "k", severity: "high", projectId: "p9" }), NotFoundException);
   assert.equal(state.settingQueried, true);
 });
 
@@ -60,37 +58,33 @@ test("an empty resolved scope rejects every project instead of widening to all",
   const state = { settingQueried: false };
   const service = newService(state);
   await assert.rejects(
-    service.notify({ notificationKey: "k", projectId: "p1", visibleProjectIds: [] }),
+    service.notify({ notificationKey: "k", severity: "high", projectId: "p1", visibleProjectIds: [] }),
     ForbiddenException,
   );
   assert.equal(state.settingQueried, false);
 });
 
+test("notify rejects a missing severity before reading settings", async () => {
+  const state = { settingQueried: false };
+  const service = newService(state);
+  await assert.rejects(service.notify({ notificationKey: "k", severity: undefined as never }), BadRequestException);
+  assert.equal(state.settingQueried, false);
+});
+
+test("notify rejects a severity outside the vocabulary", async () => {
+  const state = { settingQueried: false };
+  const service = newService(state);
+  await assert.rejects(service.notify({ notificationKey: "k", severity: "urgent" as never }), BadRequestException);
+  assert.equal(state.settingQueried, false);
+});
+
 type RuleSeed = { priority: number; condition: unknown; action: string; isEnabled?: boolean };
 
-function newServiceWithCenter(
-  severity: string,
-  rules: RuleSeed[] = [],
-  activeSilenceId: string | null = null,
-  raceFirstAlertInsert = false,
-) {
+function newServiceWithCenter(severity: string, rules: RuleSeed[] = [], kind: "alert" | "event" = "event") {
+  void severity;
   const created: Record<string, unknown>[] = [];
   const attempts: Record<string, unknown>[] = [];
-  const alerts = new Map<string, Record<string, any>>();
-  let alertReads = 0;
-  if (raceFirstAlertInsert) {
-    // Another delivery already committed the first alert of this fingerprint.
-    alerts.set("-:k", {
-      id: "alert-winner",
-      notificationKey: "k",
-      fingerprint: "-:k",
-      state: "firing",
-      verdictAction: null,
-      verdictRuleId: null,
-      verdictReason: null,
-    });
-  }
-  const silences = { findActiveId: async () => activeSilenceId };
+  let evaluateInput: Record<string, unknown> | null = null;
   const ruleRows = rules.map((rule, index) => ({
     id: `rule-${index + 1}`,
     updatedAt: new Date(0),
@@ -100,12 +94,7 @@ function newServiceWithCenter(
   let pushed = false;
   const prisma = {
     notificationSetting: {
-      findUnique: async () => ({
-        key: "k",
-        scope: "system",
-        isPushEnabled: true,
-        defaultSeverity: severity,
-      }),
+      findUnique: async () => ({ key: "k", scope: "system", isPushEnabled: true }),
     },
     notificationCenterSetting: {
       findUnique: async () => ({ id: 1, isPushEnabled: true }),
@@ -115,41 +104,6 @@ function newServiceWithCenter(
       findMany: async ({ where }: any = {}) => {
         const rows = ruleRows.filter((rule) => (where?.isEnabled ? rule.isEnabled : true));
         return [...rows].sort((a, b) => a.priority - b.priority);
-      },
-    },
-    notificationAlert: {
-      // The alert table is keyed by fingerprint alone (ADR-064).
-      findUnique: async ({ where }: any) => {
-        alertReads += 1;
-        // The racing delivery sees "no alert" on its first read.
-        if (raceFirstAlertInsert && alertReads === 1) {
-          return null;
-        }
-        return alerts.get(where.fingerprint) ?? null;
-      },
-      create: async ({ data }: any) => {
-        if (raceFirstAlertInsert) {
-          // The concurrent delivery committed first, so this insert loses.
-          throw new Prisma.PrismaClientKnownRequestError("Unique constraint failed on the fields: (`fingerprint`)", {
-            code: "P2002",
-            clientVersion: "test",
-            meta: { target: ["fingerprint"] },
-          });
-        }
-        const row = {
-          id: `alert-${alerts.size + 1}`,
-          verdictAction: null,
-          verdictRuleId: null,
-          verdictReason: null,
-          ...data,
-        };
-        alerts.set(data.fingerprint, row);
-        return row;
-      },
-      update: async ({ where, data }: any) => {
-        const row = [...alerts.values()].find((candidate) => candidate.id === where.id)!;
-        Object.assign(row, data);
-        return row;
       },
     },
     notificationDeliveryAttempt: {
@@ -167,9 +121,11 @@ function newServiceWithCenter(
   };
   const registry = {
     get: () => ({
-      titleTemplate: "title",
+      kind,
+      titleTemplate: "firing title",
       detailTemplate: null,
-      defaultSeverity: severity,
+      recoveredTitleTemplate: "recovered title",
+      recoveredDetailTemplate: null,
     }),
   };
   const pushPort = {
@@ -178,35 +134,33 @@ function newServiceWithCenter(
       return [];
     },
   };
-  const ruleService = new NotificationDeliveryRuleService(prisma as never, silences as never);
+  const ruleService = new NotificationDeliveryRuleService(prisma as never);
+  const evaluate = ruleService.evaluate.bind(ruleService);
+  ruleService.evaluate = (async (labels: Record<string, unknown>) => {
+    evaluateInput = labels;
+    return evaluate(labels as never);
+  }) as never;
   const service = new NotificationCenterService(
     prisma as never,
     registry as never,
     ruleService as never,
-    silences as never,
     pushPort as never,
   );
-  return { service, ruleService, created, attempts, alerts, pushed: () => pushed };
+  return {
+    service,
+    ruleService,
+    created,
+    attempts,
+    pushed: () => pushed,
+    evaluated: () => evaluateInput,
+  };
 }
 
 const HIGH_RULE: RuleSeed[] = [{ priority: 10, condition: { severityAtLeast: "high" }, action: "deliver" }];
 
-test("an active silence keeps a deliverable notification in-app", async () => {
-  const { service, created, attempts, pushed } = newServiceWithCenter("critical", HIGH_RULE, "silence-1");
-  const result = await service.notify({ notificationKey: "k" });
-  assert.equal(result.decision, "deliver");
-  assert.equal(result.runtimeReason, "silenced");
-  // The record still lands in the bell; only the push is intercepted.
-  assert.equal(created.length, 1);
-  assert.equal(attempts.length, 1);
-  assert.equal(attempts[0].runtimeReason, "silenced");
-  assert.equal(attempts[0].silenceId, "silence-1");
-  assert.equal(pushed(), false);
-});
-
 test("an event matching a rule is recorded and pushed", async () => {
-  const { service, created, attempts, pushed } = newServiceWithCenter("critical", HIGH_RULE);
-  const result = await service.notify({ notificationKey: "k" });
+  const { service, created, attempts, pushed, evaluated } = newServiceWithCenter("critical", HIGH_RULE);
+  const result = await service.notify({ notificationKey: "k", severity: "critical" });
   assert.equal(result.decision, "deliver");
   assert.equal(result.reason, "rule");
   assert.equal(result.deduplicated, false);
@@ -214,12 +168,14 @@ test("an event matching a rule is recorded and pushed", async () => {
   assert.equal(attempts.length, 1);
   assert.equal(attempts[0].decision, "deliver");
   assert.equal(attempts[0].reason, "rule");
+  assert.equal(attempts[0].alertId, undefined);
   assert.equal(pushed(), true);
+  assert.deepEqual(evaluated(), { state: "firing", severity: "critical", notificationKey: "k", projectId: undefined });
 });
 
 test("an event no rule matches is recorded in-app but not pushed", async () => {
   const { service, created, attempts, pushed } = newServiceWithCenter("medium", HIGH_RULE);
-  const result = await service.notify({ notificationKey: "k" });
+  const result = await service.notify({ notificationKey: "k", severity: "medium" });
   assert.equal(result.decision, "suppress");
   assert.equal(result.reason, "no-rule-matched");
   assert.equal(created.length, 1);
@@ -232,7 +188,7 @@ test("the first matching rule wins in priority order", async () => {
     { priority: 20, condition: { notificationKeys: ["k"] }, action: "deliver" },
     { priority: 10, condition: { notificationKeys: ["k"] }, action: "suppress" },
   ]);
-  const result = await service.notify({ notificationKey: "k" });
+  const result = await service.notify({ notificationKey: "k", severity: "critical" });
   assert.equal(result.decision, "suppress");
   assert.equal(result.reason, "rule");
 });
@@ -241,94 +197,71 @@ test("a disabled rule is skipped", async () => {
   const { service } = newServiceWithCenter("critical", [
     { priority: 10, condition: { severityAtLeast: "info" }, action: "suppress", isEnabled: false },
   ]);
-  const result = await service.notify({ notificationKey: "k" });
+  const result = await service.notify({ notificationKey: "k", severity: "critical" });
   assert.equal(result.decision, "suppress");
   assert.equal(result.reason, "no-rule-matched");
 });
 
-test("each recorded delivery writes one audit attempt on the same alert", async () => {
-  const { service, created, attempts } = newServiceWithCenter("critical", HIGH_RULE);
-  await service.notify({ notificationKey: "k" });
-  await service.notify({ notificationKey: "k", status: "recovered" });
+test("each recorded delivery writes one audit attempt, per delivery", async () => {
+  const { service, created, attempts } = newServiceWithCenter("critical", HIGH_RULE, "alert");
+  await service.notify({ notificationKey: "k", severity: "critical", state: "firing" });
+  await service.notify({ notificationKey: "k", severity: "critical", state: "resolved" });
   assert.equal(created.length, 2);
   assert.equal(attempts.length, 2);
-  assert.equal(attempts[1].alertId, attempts[0].alertId);
   assert.equal(attempts[1].reason, "rule");
 });
 
-test("a recovery reuses the verdict frozen on its alert", async () => {
-  const { service, pushed } = newServiceWithCenter("medium", HIGH_RULE);
-  assert.equal((await service.notify({ notificationKey: "k" })).decision, "suppress");
-  // The recovered event is judged by the frozen verdict, not by its own labels.
-  const recovery = await service.notify({ notificationKey: "k", status: "recovered" });
-  assert.equal(recovery.decision, "suppress");
-  assert.equal(pushed(), false);
+test("rules are evaluated per delivery, so a resolved state can match its own rule", async () => {
+  const { service, pushed } = newServiceWithCenter(
+    "medium",
+    [
+      { priority: 10, condition: { severityAtLeast: "high" }, action: "deliver" },
+      { priority: 20, condition: { state: "resolved" }, action: "deliver" },
+    ],
+    "alert",
+  );
+  assert.equal(
+    (await service.notify({ notificationKey: "k", severity: "medium", state: "firing" })).decision,
+    "suppress",
+  );
+  const recovery = await service.notify({ notificationKey: "k", severity: "medium", state: "resolved" });
+  assert.equal(recovery.decision, "deliver");
+  assert.equal(pushed(), true);
 });
 
-test("alerts without a deduplication key are still split per project (R39-03)", async () => {
-  const { service, attempts } = newServiceWithCenter("critical", HIGH_RULE);
-  await service.notify({ notificationKey: "k", projectId: "p1" });
-  await service.notify({ notificationKey: "k", projectId: "p2" });
-  assert.equal(attempts.length, 2);
-  // One project's frozen verdict must never decide another project's event.
-  assert.notEqual(attempts[0].alertId, attempts[1].alertId);
-});
-
-test("the same project and deduplication key keep one alert lifecycle (R39-03)", async () => {
-  const { service, attempts } = newServiceWithCenter("critical", HIGH_RULE);
-  await service.notify({ notificationKey: "k", projectId: "p1", deduplicationKey: "task:1" });
-  await service.notify({ notificationKey: "k", projectId: "p1", deduplicationKey: "task:1" });
-  assert.equal(attempts[0].alertId, attempts[1].alertId);
-
-  await service.notify({ notificationKey: "k", projectId: "p2", deduplicationKey: "task:1" });
-  assert.notEqual(attempts[0].alertId, attempts[2].alertId);
-});
-
-test("the fingerprint, not the notification key, pairs the alert lifecycle (ADR-064)", async () => {
-  const { service, alerts } = newServiceWithCenter("critical", HIGH_RULE);
-  // Two different notification kinds that share one deduplication key describe
-  // the same incident, so they must land on one alert row.
-  await service.notify({ notificationKey: "url-check", projectId: "p1", deduplicationKey: "task:1" });
-  await service.notify({ notificationKey: "heartbeat", projectId: "p1", deduplicationKey: "task:1" });
-  assert.equal(alerts.size, 1);
-});
-
-test("an explicit alertKey pairs events whose notification and deduplication keys both differ (ADR-064)", async () => {
-  const { service, alerts } = newServiceWithCenter("critical", HIGH_RULE);
-  // The url-check shape: down and recovered carry different keys, so only
-  // alertKey can tie them to one lifecycle.
+test("an alert-kind delivery with resolved state uses the recovered template and records the state", async () => {
+  const { service, created, attempts } = newServiceWithCenter("critical", HIGH_RULE, "alert");
   await service.notify({
-    notificationKey: "url-check.down",
-    projectId: "p1",
-    deduplicationKey: "url-check:t1:100",
-    alertKey: "url-check:t1:100",
+    notificationKey: "k",
+    severity: "critical",
+    state: "resolved",
+    sourceType: "alert",
+    sourceRef: "a1",
   });
-  await service.notify({
-    notificationKey: "url-check.recovered",
-    projectId: "p1",
-    deduplicationKey: "url-check:t1:recovered:100",
-    alertKey: "url-check:t1:100",
-  });
-  assert.equal(alerts.size, 1);
-});
-
-test("a delivery that loses the first-alert insert race advances the winner's row (R41-01)", async () => {
-  const { service, attempts } = newServiceWithCenter("critical", HIGH_RULE, null, true);
-  const result = await service.notify({ notificationKey: "k" });
-  assert.equal(result.decision, "deliver");
+  assert.equal(created[0].title, "recovered title");
+  assert.equal(created[0].status, "resolved");
+  assert.ok(created[0].recoveredAt instanceof Date);
+  assert.equal(created[0].sourceType, "alert");
+  assert.equal(created[0].sourceRef, "a1");
   assert.equal(attempts.length, 1);
-  // The row created by the concurrent winner is the lifecycle this delivery
-  // belongs to; a P2002 must not fail the notification outright.
-  assert.equal(attempts[0].alertId, "alert-winner");
+});
+
+test("an event-kind delivery ignores a state it was given", async () => {
+  const { service, created } = newServiceWithCenter("critical", HIGH_RULE, "event");
+  await service.notify({ notificationKey: "k", severity: "critical", state: "resolved" });
+  assert.equal(created[0].title, "firing title");
+  assert.equal(created[0].status, "firing");
+  assert.equal(created[0].recoveredAt, null);
 });
 
 test("matchesDeliveryCondition treats absent fields as unfiltered and empty collections as never matching", () => {
-  const labels = { phase: "firing" as const, severity: "high", notificationKey: "k", projectId: "p1" };
+  const labels = { state: "firing" as const, severity: "high", notificationKey: "k", projectId: "p1" };
   assert.equal(matchesDeliveryCondition(undefined, labels), true);
   assert.equal(matchesDeliveryCondition({}, labels), true);
   assert.equal(matchesDeliveryCondition({ severityAtLeast: "critical" }, labels), false);
   assert.equal(matchesDeliveryCondition({ severityAtLeast: "medium" }, labels), true);
-  assert.equal(matchesDeliveryCondition({ phase: "recovered" }, labels), false);
+  assert.equal(matchesDeliveryCondition({ state: "resolved" }, labels), false);
+  assert.equal(matchesDeliveryCondition({ state: "firing" }, labels), true);
   assert.equal(matchesDeliveryCondition({ notificationKeys: [] }, labels), false);
   assert.equal(matchesDeliveryCondition({ notificationKeys: ["k"] }, labels), true);
   assert.equal(matchesDeliveryCondition({ notificationKeys: ["other"] }, labels), false);
@@ -337,16 +270,18 @@ test("matchesDeliveryCondition treats absent fields as unfiltered and empty coll
   assert.equal(matchesDeliveryCondition({ projectIds: ["p2"] }, labels), false);
   // A rule scoped to projects can never match an event without a project.
   assert.equal(
-    matchesDeliveryCondition({ projectIds: ["p1"] }, { phase: "firing", severity: "high", notificationKey: "k" }),
+    matchesDeliveryCondition({ projectIds: ["p1"] }, { state: "firing", severity: "high", notificationKey: "k" }),
     false,
   );
 });
 
 test("validateDeliveryCondition keeps malformed rules out of the JSON column", () => {
   assert.deepEqual(validateDeliveryCondition({ severityAtLeast: "high" }), []);
+  assert.deepEqual(validateDeliveryCondition({ state: "resolved" }), []);
   assert.deepEqual(validateDeliveryCondition(null), ["condition must be an object"]);
   assert.equal(validateDeliveryCondition({ severityAtLeast: "urgent" }).length, 1);
-  assert.equal(validateDeliveryCondition({ phase: "resolved" }).length, 1);
+  assert.equal(validateDeliveryCondition({ state: "recovered" }).length, 1);
+  assert.equal(validateDeliveryCondition({ phase: "firing" }).length, 1);
   assert.equal(validateDeliveryCondition({ notificationKeys: [""] }).length, 1);
   assert.equal(validateDeliveryCondition({ unknownField: 1 }).length, 1);
   assert.equal(validateDeliveryCondition({ tags: { env: 1 } }).length, 1);
@@ -389,7 +324,7 @@ function newRuleStore(initial: Array<{ condition: unknown; action: string; isEna
     $transaction: async (operations: Promise<unknown>[]) => Promise.all(operations),
   };
   return {
-    service: new NotificationDeliveryRuleService(prisma as never, { findActiveId: async () => null } as never),
+    service: new NotificationDeliveryRuleService(prisma as never),
     rows,
   };
 }

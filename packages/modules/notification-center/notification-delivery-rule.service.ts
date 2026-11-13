@@ -20,7 +20,6 @@ import {
   SimulateDeliveryResultDto,
   UpdateDeliveryRuleDto,
 } from "./notification-center.dto";
-import { NotificationSilenceService } from "./notification-silence.service";
 
 function toRuleDto(rule: {
   id: string;
@@ -49,10 +48,7 @@ function toRuleDto(rule: {
 export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
   private readonly logger = new Logger(NotificationDeliveryRuleService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly silences: NotificationSilenceService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Seed the default rules when the table is empty, so a fresh install keeps
@@ -82,7 +78,7 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
           },
         }),
       ]);
-      this.logger.log("Seeded the default delivery rules (high+ deliver, recovered deliver)");
+      this.logger.log("Seeded the default delivery rules (high+ deliver, resolved deliver)");
     } catch (error: unknown) {
       // A concurrent instance seeded first; the unique priority settles it.
       if ((error as { code?: string })?.code !== PG_UNIQUE_VIOLATION) {
@@ -175,8 +171,8 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
   }
 
   /**
-   * The frozen verdict for one alert (ADR-062): the first enabled rule whose
-   * condition matches wins; no match suppresses.
+   * The rule decision for one delivery event (ADR-062): the first enabled rule
+   * whose condition matches wins; no match suppresses.
    */
   async evaluate(labels: DeliveryLabels): Promise<DeliveryVerdict> {
     const rules = await this.prisma.notificationDeliveryRule.findMany({
@@ -216,10 +212,10 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
       verdict = { action: rule.action as DeliveryRuleAction, ruleId: rule.id, reason: "rule" };
       break;
     }
-    // ADR-063: replay the real-time segment too, so the simulator answers the
-    // operator's real question ("will this be pushed?") and not just which rule
-    // matches. Today the only environment fact it can evaluate is silences.
-    const silenceId = verdict.action === "deliver" ? await this.silences.findActiveId(labels) : null;
+    // ADR-065 §6: the decision is evaluated per delivery and never frozen.
+    // Runtime interception (subscription switch, center switch, push port) is
+    // owned by NotificationCenterService; the simulator answers the rule
+    // question, which is the order-sensitive part an operator cannot eyeball.
     return {
       labels,
       decision: verdict.action,
@@ -227,9 +223,8 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
       matchedRuleId: verdict.ruleId,
       matchedRuleIndex: matchedIndex,
       ruleCount: rules.length,
-      runtimeReason: silenceId ? "silenced" : null,
-      silenceId,
-      delivered: verdict.action === "deliver" && silenceId === null,
+      runtimeReason: null,
+      delivered: verdict.action === "deliver",
     };
   }
 
@@ -245,7 +240,7 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
       throw new NotFoundException(`Notification not found: ${recordId}`);
     }
     return {
-      phase: record.status === "recovered" ? "recovered" : "firing",
+      state: record.status === "resolved" ? "resolved" : "firing",
       severity: record.severity,
       notificationKey: record.notificationKey,
       projectId: record.projectId ?? undefined,
@@ -257,7 +252,7 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
       throw new BadRequestException("Provide either recordId, or both notificationKey and severity.");
     }
     return {
-      phase: input.phase === "recovered" ? "recovered" : "firing",
+      state: input.state === "resolved" ? "resolved" : "firing",
       severity: input.severity,
       notificationKey: input.notificationKey,
       projectId: input.projectId,
