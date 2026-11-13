@@ -112,6 +112,16 @@ dispatchDueReminders({ now?, limit? })                           -> { dispatched
 | resolved | resolve | 幂等返回，不改数据 | 否 |
 | 无 | resolve | 返回 null 并记日志（迟到的恢复不凭空造告警） | 否 |
 
+术语映射（唯一翻译点）：告警域用状态词，通知域用事件词，映射只允许发生在宿主适配器里。
+
+| 告警域 | 通知端口 `phase` | 用户看到 |
+| --- | --- | --- |
+| `raise` 新建或重开（`state=firing`） | `firing` | 「发生」 |
+| 提醒到点（`state=firing`） | `firing` + `reminderCount` | 「仍未恢复（第 N 次提醒）」 |
+| `resolve`（`state=resolved`） | `recovered` | 「已恢复」 |
+
+`phase` 只取 `firing | recovered` 两值，是通知域的模板轴与规则维度；不扩成三态，否则 `notificationKey` 会随提醒分裂，按 key 静音与规则分流也跟着拆开。`resolved` 与 `recovered` 指同一时刻，只在适配器边界换一次词。
+
 并发：`fingerprint` 唯一约束是唯一仲裁点；`raise` 捕获唯一冲突后重读 winner 行继续推进，不向调用方抛错。
 
 `dispatchDueReminders` 是幂等扫描：取 `state=firing AND nextNotificationAt <= now AND 来源未暂停` 的行，逐条外发并推进节奏。**模块不内置调度器**（与静默窗口「到期自动失效、无定时任务」的既有约定一致），由宿主用自己的 job 机制周期调用。
@@ -131,6 +141,8 @@ dispatchDueReminders({ now?, limit? })                           -> { dispatched
 ```text
 nextNotificationAt = max(source.notifyPausedUntil ?? now, now) + repeatIntervalMinutes
 ```
+
+**提醒要可区分**。提醒复用 `firing` 的 `notificationKey` 与模板（否则按 key 静音、规则分流都会随提醒次数分裂），但端口额外携带 `reminderCount`（第几次提醒，首次为 0）。模板据此把标题改成「仍未恢复（第 3 次提醒）」并附首次发生时间。`reminderCount` 只进渲染上下文，不进 `notificationKey`、不进规则条件。
 
 按来源暂停的精确语义（`AlertSource.notifyPausedUntil`）：
 
@@ -158,6 +170,7 @@ interface AlertNotificationPort {
     severity: string;
     labels: Record<string, string>;
     data: Record<string, unknown> | null;
+    reminderCount?: number; // 提醒复用 firing 模板，次数只用于渲染
   }): Promise<void>;
 }
 ```
