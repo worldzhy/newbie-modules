@@ -101,13 +101,6 @@ export class NotificationSilenceService {
     return toSilenceDto(updated, now);
   }
 
-  /** Delete a silence outright; used for typo cleanup before it ever ran. */
-  async remove(id: string): Promise<{ id: string }> {
-    await this.getOrThrow(id);
-    await this.prisma.notificationSilence.delete({ where: { id } });
-    return { id };
-  }
-
   /**
    * The active silence that matches these labels, if any. The first matching
    * window (earliest start) wins so overlapping silences resolve predictably.

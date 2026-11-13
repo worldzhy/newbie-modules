@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -65,6 +67,33 @@ function isSafeNotificationLink(link: string): boolean {
   }
 }
 
+// Width of NotificationAlert.fingerprint (VarChar(255)).
+const ALERT_FINGERPRINT_MAX_LENGTH = 255;
+const ALERT_FINGERPRINT_HASH_LENGTH = 64;
+
+/**
+ * Pairing key of one alert lifecycle (ADR-064). The caller-supplied alertKey
+ * wins, so a firing and its recovery can pair even when they carry different
+ * notification keys and deduplication keys (url-check, heartbeat); otherwise
+ * the deduplication key, then the notification key. The project prefix keeps
+ * two projects that reuse the same key on separate alert rows, so a verdict
+ * frozen for one project can never decide another project's event (R39-03).
+ * Values beyond the column width are hashed instead of failing the insert.
+ */
+function buildAlertFingerprint(input: {
+  projectId?: string;
+  notificationKey: string;
+  deduplicationKey?: string;
+  alertKey?: string;
+}): string {
+  const scoped = `${input.projectId ?? "-"}:${input.alertKey ?? input.deduplicationKey ?? input.notificationKey}`;
+  if (scoped.length <= ALERT_FINGERPRINT_MAX_LENGTH) {
+    return scoped;
+  }
+  const prefixLength = ALERT_FINGERPRINT_MAX_LENGTH - ALERT_FINGERPRINT_HASH_LENGTH - 1;
+  return `${scoped.slice(0, prefixLength)}:${createHash("sha256").update(scoped).digest("hex")}`;
+}
+
 /**
  * Host-provided push adapter, injected under the NOTIFICATION_PUSH_PORT token.
  * The notification-center module owns in-app delivery and per-notification
@@ -102,6 +131,13 @@ export interface NotifyInput {
    * key is a no-op (the existing record is returned).
    */
   deduplicationKey?: string;
+  /**
+   * Optional pairing key for alert lifecycles (ADR-064). Use it when the firing
+   * and recovered events carry different notification keys or deduplication
+   * keys; both events must pass the same value. Falls back to
+   * `deduplicationKey`, then `notificationKey`.
+   */
+  alertKey?: string;
   /**
    * Lifecycle phase for alert-style notifications ("firing" | "recovered").
    * Defaults to "firing" (ADR-051).
@@ -231,7 +267,7 @@ export class NotificationCenterService {
     // recovery always land on the same side of the rules.
     const alert = await this.upsertAlert({
       notificationKey: input.notificationKey,
-      fingerprint: input.deduplicationKey ?? input.notificationKey,
+      fingerprint: buildAlertFingerprint(input),
       projectId: input.projectId,
       severity,
       phase: input.status ?? "firing",
@@ -290,7 +326,15 @@ export class NotificationCenterService {
             where: { deduplicationKey: input.deduplicationKey },
             select: { id: true },
           });
-          recordId = existing?.id ?? "";
+          // The unique violation proved another writer won the race; if that
+          // row is gone by now the result is ambiguous, so report it instead of
+          // returning an empty id marked as deduplicated (R39-09).
+          if (!existing) {
+            throw new ConflictException(
+              `Notification ${input.deduplicationKey} was written concurrently and is no longer readable.`,
+            );
+          }
+          recordId = existing.id;
           deduplicated = true;
         } else {
           throw error;
@@ -378,12 +422,7 @@ export class NotificationCenterService {
       verdictReason: true,
     } as const;
     const existing = await this.prisma.notificationAlert.findUnique({
-      where: {
-        notificationKey_fingerprint: {
-          notificationKey: input.notificationKey,
-          fingerprint: input.fingerprint,
-        },
-      },
+      where: { fingerprint: input.fingerprint },
       select: { ...select, state: true },
     });
     if (!existing) {
@@ -571,12 +610,26 @@ export class NotificationCenterService {
     if (existing) {
       return existing;
     }
-    return this.prisma.notificationCenterSetting.create({
-      data: {
-        id: CENTER_SETTING_SINGLETON_ID,
-        isPushEnabled: DEFAULT_PUSH_ENABLED,
-      },
-    });
+    try {
+      return await this.prisma.notificationCenterSetting.create({
+        data: {
+          id: CENTER_SETTING_SINGLETON_ID,
+          isPushEnabled: DEFAULT_PUSH_ENABLED,
+        },
+      });
+    } catch (error) {
+      // Two deliveries can race on the first read of the singleton row. The
+      // winner's row is the answer; anything else is a real failure (R39-10).
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === PG_UNIQUE_VIOLATION) {
+        const raced = await this.prisma.notificationCenterSetting.findUnique({
+          where: { id: CENTER_SETTING_SINGLETON_ID },
+        });
+        if (raced) {
+          return raced;
+        }
+      }
+      throw error;
+    }
   }
 
   // --- Notification reads --------------------------------------------------

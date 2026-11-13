@@ -192,8 +192,14 @@ export class NotificationCenterController {
   @RequirePermission(PermissionAction.List, Prisma.ModelName.NotificationDeliveryRule)
   @ApiOperation({ summary: "Replay the rule table for one notification without changing state" })
   @ApiResponse({ status: 201, type: SimulateDeliveryResultDto })
-  simulateDelivery(@Body() body: SimulateDeliveryRequestDto): Promise<SimulateDeliveryResultDto> {
-    return this.deliveryRules.simulate(body);
+  async simulateDelivery(
+    @Req() req: AuthenticatedRequest,
+    @Body() body: SimulateDeliveryRequestDto,
+  ): Promise<SimulateDeliveryResultDto> {
+    // Replaying a persisted record must respect the caller's project scope,
+    // exactly like every other read of notification records (R39-06).
+    const visibleProjectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
+    return this.deliveryRules.simulate(body, visibleProjectIds);
   }
 
   // Declared before the ":id" route so the literal segment wins.
@@ -255,13 +261,9 @@ export class NotificationCenterController {
     return this.silences.cancel(id);
   }
 
-  @Delete("notification-silences/:id")
-  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.NotificationSilence)
-  @ApiOperation({ summary: "Delete a maintenance window outright" })
-  @ApiResponse({ status: 200, description: "The deleted silence id" })
-  deleteSilence(@Param("id") id: string): Promise<{ id: string }> {
-    return this.silences.remove(id);
-  }
+  // No DELETE route: a window that already intercepted deliveries owns the
+  // audit rows that point at it, so the only supported disposition is ending
+  // it early (ADR-063).
 
   // --- Push failures --------------------------------------------------------
 

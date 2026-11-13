@@ -164,8 +164,11 @@ model NotificationDeliveryRule {
 model NotificationAlert {
   id              String    @id @default(uuid()) @db.Uuid
   notificationKey String    @db.VarChar(100)
-  // Pairs the firing and recovered events of one alert. Defaults to the
-  // notification key when the caller supplies no deduplication key.
+  // Global pairing key of one alert lifecycle (ADR-064): the notifying
+  // project, then the caller's alertKey, else its deduplication key, else the
+  // notification key. Long values are truncated and suffixed with a sha256 so
+  // the column stays inside VarChar(255). Unique on its own, so the database
+  // guarantees that a firing and its recovery share one row.
   fingerprint     String    @db.VarChar(255)
   projectId       String?   @db.Uuid
   // Alert level label; for recovered events the record keeps the placeholder
@@ -186,7 +189,7 @@ model NotificationAlert {
 
   records NotificationRecord[]
 
-  @@unique([notificationKey, fingerprint])
+  @@unique([fingerprint])
   @@index([state, lastSeenAt])
   @@schema("module/notification-center")
 }
@@ -206,10 +209,13 @@ model NotificationDeliveryAttempt {
   runtimeReason String? @db.VarChar(40)
   // Silence that intercepted this delivery; set only for runtimeReason
   // "silenced", so the notification can be traced back to one maintenance
-  // window.
+  // window. Restrict makes that trail unerasable: a window with audit rows can
+  // only be ended (endsAt), never deleted (ADR-063).
   silenceId     String? @db.Uuid
 
   createdAt DateTime @default(now())
+
+  silence NotificationSilence? @relation(fields: [silenceId], references: [id], onDelete: Restrict)
 
   @@index([recordId])
   @@index([alertId])
@@ -232,6 +238,8 @@ model NotificationSilence {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  attempts NotificationDeliveryAttempt[]
 
   @@index([endsAt])
   @@schema("module/notification-center")

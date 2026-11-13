@@ -52,7 +52,7 @@ model NotificationDeliveryAttempt {
 ```
 
 - `reason` 保持规则段语义不变，`runtimeReason` 记录实时拦截原因，两者可同时存在：规则判 deliver、实时段被静默。
-- `silenceId` 指向命中的静默，便于从通知反查是哪次维护窗口拦的。
+- `silenceId` 指向命中的静默，便于从通知反查是哪次维护窗口拦的；该关系在建表时声明 `onDelete: Restrict`，这条溯源链不可被删除抹掉。
 - 补齐既有缺口：`subscription-off`、`recovery-opt-out`、`channel-off`、`no-port` 一并写入 `runtimeReason`，不再被 `dispatchPush()` 静默丢弃。
 
 ### 3. 术语三层，一词一职
@@ -87,7 +87,7 @@ subscription-off → recovery-opt-out → channel-off → silenced → no-port
 
 ## 影响
 
-- registry `notification-center`：schema 新增 `NotificationSilence` 与两个审计列；`notify()` 增加实时段求值，`dispatchPush()` 改读求值结果；新增静默 CRUD 与提前结束接口；模拟器返回实时拦截结果。
+- registry `notification-center`：schema 新增 `NotificationSilence` 与两个审计列；`notify()` 增加实时段求值，`dispatchPush()` 改读求值结果；新增静默创建 / 查询 / 结束接口（不提供删除：已产生投递记录的窗口只能提前结束），模拟器返回实时拦截结果。
 - 宿主（nightwatch-backend）：`project-notification-push.service.ts` 追加读 `runtimeReason`，对 `silenced` 与 `recovery-opt-out` 跳过推送。中心通道原因（`channel-off`、`no-port`）不适用于项目轨道——绑定聊天即该轨道的订阅，这是既有语义；`subscription-off` 仍由该轨道自己的 `isPushEnabled` 检查。
 - 前端：本轮不做静默管理 UI；apits 重新生成以同步新增 DTO 字段。
 

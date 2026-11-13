@@ -99,10 +99,8 @@ function newServiceWithCenter(severity: string, rules: RuleSeed[] = [], activeSi
       },
     },
     notificationAlert: {
-      findUnique: async ({ where }: any) => {
-        const { notificationKey, fingerprint } = where.notificationKey_fingerprint;
-        return alerts.get(`${notificationKey}::${fingerprint}`) ?? null;
-      },
+      // The alert table is keyed by fingerprint alone (ADR-064).
+      findUnique: async ({ where }: any) => alerts.get(where.fingerprint) ?? null,
       create: async ({ data }: any) => {
         const row = {
           id: `alert-${alerts.size + 1}`,
@@ -111,7 +109,7 @@ function newServiceWithCenter(severity: string, rules: RuleSeed[] = [], activeSi
           verdictReason: null,
           ...data,
         };
-        alerts.set(`${data.notificationKey}::${data.fingerprint}`, row);
+        alerts.set(data.fingerprint, row);
         return row;
       },
       update: async ({ where, data }: any) => {
@@ -154,7 +152,7 @@ function newServiceWithCenter(severity: string, rules: RuleSeed[] = [], activeSi
     silences as never,
     pushPort as never,
   );
-  return { service, ruleService, created, attempts, pushed: () => pushed };
+  return { service, ruleService, created, attempts, alerts, pushed: () => pushed };
 }
 
 const HIGH_RULE: RuleSeed[] = [{ priority: 10, condition: { severityAtLeast: "high" }, action: "deliver" }];
@@ -231,6 +229,53 @@ test("a recovery reuses the verdict frozen on its alert", async () => {
   const recovery = await service.notify({ notificationKey: "k", status: "recovered" });
   assert.equal(recovery.decision, "suppress");
   assert.equal(pushed(), false);
+});
+
+test("alerts without a deduplication key are still split per project (R39-03)", async () => {
+  const { service, attempts } = newServiceWithCenter("critical", HIGH_RULE);
+  await service.notify({ notificationKey: "k", projectId: "p1" });
+  await service.notify({ notificationKey: "k", projectId: "p2" });
+  assert.equal(attempts.length, 2);
+  // One project's frozen verdict must never decide another project's event.
+  assert.notEqual(attempts[0].alertId, attempts[1].alertId);
+});
+
+test("the same project and deduplication key keep one alert lifecycle (R39-03)", async () => {
+  const { service, attempts } = newServiceWithCenter("critical", HIGH_RULE);
+  await service.notify({ notificationKey: "k", projectId: "p1", deduplicationKey: "task:1" });
+  await service.notify({ notificationKey: "k", projectId: "p1", deduplicationKey: "task:1" });
+  assert.equal(attempts[0].alertId, attempts[1].alertId);
+
+  await service.notify({ notificationKey: "k", projectId: "p2", deduplicationKey: "task:1" });
+  assert.notEqual(attempts[0].alertId, attempts[2].alertId);
+});
+
+test("the fingerprint, not the notification key, pairs the alert lifecycle (ADR-064)", async () => {
+  const { service, alerts } = newServiceWithCenter("critical", HIGH_RULE);
+  // Two different notification kinds that share one deduplication key describe
+  // the same incident, so they must land on one alert row.
+  await service.notify({ notificationKey: "url-check", projectId: "p1", deduplicationKey: "task:1" });
+  await service.notify({ notificationKey: "heartbeat", projectId: "p1", deduplicationKey: "task:1" });
+  assert.equal(alerts.size, 1);
+});
+
+test("an explicit alertKey pairs events whose notification and deduplication keys both differ (ADR-064)", async () => {
+  const { service, alerts } = newServiceWithCenter("critical", HIGH_RULE);
+  // The url-check shape: down and recovered carry different keys, so only
+  // alertKey can tie them to one lifecycle.
+  await service.notify({
+    notificationKey: "url-check.down",
+    projectId: "p1",
+    deduplicationKey: "url-check:t1:100",
+    alertKey: "url-check:t1:100",
+  });
+  await service.notify({
+    notificationKey: "url-check.recovered",
+    projectId: "p1",
+    deduplicationKey: "url-check:t1:recovered:100",
+    alertKey: "url-check:t1:100",
+  });
+  assert.equal(alerts.size, 1);
 });
 
 test("matchesDeliveryCondition treats absent fields as unfiltered and empty collections as never matching", () => {
@@ -355,13 +400,13 @@ test("simulate reports the index of the deciding rule", async () => {
     { condition: { notificationKeys: ["other"] }, action: "deliver" },
     { condition: { severityAtLeast: "high" }, action: "deliver" },
   ]);
-  const result = await service.simulate({ notificationKey: "k", severity: "critical" });
+  const result = await service.simulate({ notificationKey: "k", severity: "critical" }, []);
   assert.equal(result.decision, "deliver");
   assert.equal(result.matchedRuleIndex, 2);
   assert.equal(result.matchedRuleId, "r2");
   assert.equal(result.ruleCount, 2);
 
-  const unmatched = await service.simulate({ notificationKey: "k", severity: "low" });
+  const unmatched = await service.simulate({ notificationKey: "k", severity: "low" }, []);
   assert.equal(unmatched.decision, "suppress");
   assert.equal(unmatched.reason, "no-rule-matched");
   assert.equal(unmatched.matchedRuleIndex, null);
@@ -369,5 +414,5 @@ test("simulate reports the index of the deciding rule", async () => {
 
 test("simulate requires either a record or a key with severity", async () => {
   const { service } = newRuleStore([{ condition: {}, action: "deliver" }]);
-  await assert.rejects(service.simulate({ notificationKey: "k" }), BadRequestException);
+  await assert.rejects(service.simulate({ notificationKey: "k" }, []), BadRequestException);
 });

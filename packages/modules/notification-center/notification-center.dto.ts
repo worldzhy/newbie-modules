@@ -11,6 +11,7 @@ import {
   IsString,
   IsUUID,
   Allow,
+  MaxLength,
 } from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import {
@@ -491,6 +492,7 @@ export class CreateSilenceDto {
   @ApiPropertyOptional({ type: String, maxLength: 512 })
   @IsOptional()
   @IsString()
+  @MaxLength(512)
   comment?: string;
 }
 
@@ -513,6 +515,7 @@ export class UpdateSilenceDto {
   @ApiPropertyOptional({ type: String, maxLength: 512 })
   @IsOptional()
   @IsString()
+  @MaxLength(512)
   comment?: string;
 }
 

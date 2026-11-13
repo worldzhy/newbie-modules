@@ -197,8 +197,10 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
    * ordered model is order-sensitive, so this is the operator's only reliable
    * way to see which rule (if any) decides a real notification.
    */
-  async simulate(input: SimulateDeliveryRequestDto): Promise<SimulateDeliveryResultDto> {
-    const labels = input.recordId ? await this.labelsFromRecord(input.recordId) : this.labelsFromInput(input);
+  async simulate(input: SimulateDeliveryRequestDto, visibleProjectIds: string[]): Promise<SimulateDeliveryResultDto> {
+    const labels = input.recordId
+      ? await this.labelsFromRecord(input.recordId, visibleProjectIds)
+      : this.labelsFromInput(input);
     const rules = await this.prisma.notificationDeliveryRule.findMany({
       where: { isEnabled: true },
       orderBy: { priority: "asc" },
@@ -231,12 +233,15 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
     };
   }
 
-  private async labelsFromRecord(recordId: string): Promise<DeliveryLabels> {
+  private async labelsFromRecord(recordId: string, visibleProjectIds: string[]): Promise<DeliveryLabels> {
     const record = await this.prisma.notificationRecord.findUnique({
       where: { id: recordId },
       select: { notificationKey: true, severity: true, projectId: true, status: true },
     });
-    if (!record) {
+    // A record outside the caller's visible projects reads as not-found, the
+    // same way reads and delivery attempts behave, so the simulator cannot be
+    // used to inspect another project's events (R39-06).
+    if (!record || (record.projectId && !visibleProjectIds.includes(record.projectId))) {
       throw new NotFoundException(`Notification not found: ${recordId}`);
     }
     return {

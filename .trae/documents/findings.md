@@ -304,3 +304,36 @@ round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents
 | R36-07 | nightwatch-backend | prompt-sections 仅 backend/frontend monitoring 两域（`ls prompt-sections/` 2 文件），其余功能域无领域知识注入 | P2 | live | 全体用户 | fixed（随 R36-03 各域 skill 同提交落地 10 个领域 prompt-section（security-evaluation/audit-log/llm/job-scheduler/backups/event-emitter/iam/lark-bindings/jdy/work-evaluation），均注册进 AgentRunner 工厂数组；现 prompt-sections 共 12  providers） |
 
 反驳轮（本轮）：「@RequireOwner 等于无鉴权」REFUTED（self-by-token 构造成立，逐技能授权在 skill 内）；「task 写技能无权限检查」REFUTED（项目可见性过滤 + 服务层 forbidden + 全量确认门）；「/security-evaluation 页完全无 skill」REFUTED（aws/dependency 4 个 skill 声明该页路由）。本轮为静态评审，未跑 tsc/测试。
+
+## round39（2026-11-13，scope=`modules: [notification-center]`）
+
+报告：`newbie-modules/.trae/documents/reviews/expert-review-2026-11-13-round39.md`。锚点：newbie-modules `60b2a20`（干净）、nightwatch-backend `8d67da2`（干净）、nightwatch-frontend `b271eb6`（dirty 8 文件均在 3D 全景域，非被审域）；装配面 `diff -rq` 零差异；门禁 20/20 单测、backend `tsc`、三端 prettier 全绿。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R39-01 | newbie-modules + nightwatch-backend | ADR-062 的 firing/recovered 配对在真实调用方失效：Alert 键为 `(notificationKey, fingerprint)`（`prisma/schema.prisma:189`、`notification-center.service.ts:232-238`），而 url-check/heartbeat 的恢复用不同 notificationKey 与 dedupKey（`url-check-alerts.notifications.service.ts:38-55`/`:73-92`、`heartbeat-offline.notification.ts:16`/`heartbeat-recovered.notification.ts:21`）→ 恢复新建 Alert 并命中默认恢复规则，被 suppress 的 firing 其恢复仍推送，违背 ADR-062 `:86`/`:135` | P1 | live | 常规事件触发 | fixed（ADR-064：fingerprint 单列唯一 + `alertKey` 显式配对；url-check/heartbeat 两侧已传同值，见 `expert-review-2026-11-14-round40.md`） |
+| R39-02 | newbie-modules + nightwatch-backend | 全局告警控制面（静默/投递规则/中心开关/广播）对默认 MEMBER 全量开放：`Notifications` 组命名空间派生全部模型动作（`prisma/seeds/permission-groups.ts:210-216`），MEMBER 继承该组（`:429-441`）；任一成员可开匹配一切的静默、删规则（`notification-center.controller.ts:216-218`/`:234-236`）、关推送（`:157-158`）、`POST /notifications` 向全员广播任意模板上下文（`:57-58`） | P1 | live | MEMBER（默认组织成员） | withdrawn（2026-11-14 用户确认信任 MEMBER：运维面整体保留给默认成员，不拆组、不写 ADR-044） |
+| R39-03 | newbie-modules | Alert 唯一键不含 projectId：`@@unique([notificationKey, fingerprint])`（`prisma/schema.prisma:189`）+ fingerprint 默认 notificationKey（`notification-center.service.ts:234`），不传 dedupKey 的调用方（`task-status-changed.notifications.service.ts:45-55` 传 projectId）让所有项目共用一行 Alert，projectId/severity 被覆盖、裁决永久冻结，带 projectIds 条件的规则跨项目误用 | P1 | live | 常规事件触发 | fixed（fingerprint 带 projectId 前缀，唯一键收窄为 `@@unique([fingerprint])`，ADR-064） |
+| R39-04 | newbie-modules | `NotificationDeliveryAttempt.silenceId` 无外键（`prisma/schema.prisma:210`/`:225-236`），`notification-silence.service.ts:105-107` 直接删除 → 已抑制的投递审计指向不存在的静默行 | P2 | live | 持 Delete 权限者 | fixed（`silenceId` 加 relation + `onDelete: Restrict`，删除路由整体移除，只能 end；迁移 `20261114003000_alert_fingerprint_unique_silence_restrict`） |
+| R39-05 | newbie-modules | `comment` 仅 Swagger `maxLength: 512`，无 `@MaxLength`（`notification-center.dto.ts:491-494`/`:513-516`），列 `VarChar(512)`（schema `:230`）→ 超长 500 而非 400 | P2 | live | 持 Create/Update 权限者 | fixed（`@MaxLength(512)`） |
+| R39-06 | newbie-modules | `simulate({recordId})` 的 `labelsFromRecord` 无项目可见性校验（`notification-delivery-rule.service.ts:234-241`），与 `getDeliveryAttempt`（`notification-center.service.ts:678-685`）不一致 | P2 | live | 持 List 权限者 + 已知 record UUID | fixed（`labelsFromRecord` 增加 visibleProjectIds 校验） |
+| R39-07 | nightwatch-frontend | 静默卡只能从现在开始（`silence-card.tsx:107` 仅传 endsAt；服务端 `notification-silence.service.ts:52` 支持 startsAt），列表却渲染 `scheduled`（`:154-158`） | P2 | live | 设置页访客 | fixed（表单补 `startsAt` 输入，默认当前时间） |
+| R39-08 | newbie-modules + nightwatch-frontend | 后端允许绝对 http(s) 链接（`notification-center.service.ts:53-66`），前端谓词仅站内路径（`use-open-notification.ts:23-24`）→ 按钮可见但点击无跳转 | P2 | live | 全体用户 | fixed（`openNotificationLink` 统一内外部跳转） |
+| R39-09 | newbie-modules | dedup 竞态兜底 `recordId = existing?.id ?? ""`（`notification-center.service.ts:293`）返回空 id + `deduplicated: true` | P2 | live | 并发投递 | fixed（P2002 后重查；竞态行已被删改抛 `ConflictException`，不再返回空 id） |
+| R39-10 | newbie-modules | `getOrCreateCenterSetting` 先查后建无 P2002 兜底（`notification-center.service.ts:567-580`），首次并发投递可能 500 | P2 | live | 首次并发 | fixed（`create` 捕获 `PG_UNIQUE_VIOLATION` 后重查单例行，非唯一冲突继续抛出） |
+| R39-11 | newbie-modules | `NotificationAlert` 无 TTL/自动 resolved（schema `:164-190`、`upsertAlert` `:402`），永久 firing 的告警裁决永不重算——inhibition 暂缓的同一前置（`devbie/.trae/documents/backlog.md:84`） | P2 | live | 常规事件 | open |
+| R39-12 | newbie-modules | 模拟器 `runtimeReason` 只判静默（`notification-delivery-rule.service.ts:217-229`），忽略 channel-off/subscription-off/no-port，可能给出「会推送」的错误结论 | P2 | live | 设置页访客 | open |
+
+反驳轮（本轮）：「恢复永远新建 Alert」原句被收窄（同键场景复合唯一键确实复用，单测 `:227-233`；生产调用方全部不同键，故结论按真实调用方成立）；「静默拦截站内记录」「项目轨道忽略 channel-off 是缺陷」「`//`/`/\\` 链接绕过」「设置端点缺鉴权」「前端直接渲染 link href」均 REFUTED，理由见报告 §7。
+
+## round40（2026-11-14，plan scope：R39-01/R39-02 方案 vs ADR-062/063）
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R40-01 | newbie-modules | `prisma/schema.prisma:167-169` 注释仍称 fingerprint 缺省为 notificationKey，与 R39-03 已落地的 `projectId:dedupKey` 漂移；`alertKey` 落地后需再次更新 | P2 | live | 文档 | fixed（注释改为 `projectId:alertKey ?? dedupKey ?? notificationKey` 全回退链，含长值 sha256 截断说明；ADR-064 同口径） |
+| R40-02 | newbie-modules | ADR-063:90「新增静默 CRUD」与 R39-04 的「被引用静默删除返回 409」有字面偏差，需增补删除语义 | P2 | live | 文档 | fixed（ADR-063:90 改为「创建 / 查询 / 结束接口（不提供删除：已产生投递记录的窗口只能提前结束）」） |
+
+方案判定（详见 `reviews/expert-review-2026-11-14-round40.md`）：C2 与 ADR-062:86「由数据模型保证」矛盾（`findFirst` 方案下唯一键不再承担配对）；C6 与 ADR-043:19/42 的 MEMBER 绑定规则矛盾；C8 不成立（用现有 `useCanSee` 精确匹配即可，无需新 hook）；C10 不成立（需 newbie-modules ADR-064 + nightwatch-backend ADR-044 两份）。
+
+落地结论（2026-11-14）：C2 以「唯一键收窄为 `@@unique([fingerprint])` + `alertKey` 显式配对」消解（ADR-064），ADR-062:86 字面不变；C6/C8/C10 随 R39-02 withdrawn 整体作废（用户确认信任 MEMBER，不拆权限组、不写 ADR-044、前端不加门禁）。
+
