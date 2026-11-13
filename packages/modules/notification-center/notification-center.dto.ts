@@ -351,9 +351,23 @@ export class SimulateDeliveryRequestDto {
   projectId?: string;
 }
 
+export class DeliveryLabelsDto {
+  @ApiProperty({ enum: ["firing", "recovered"] })
+  phase!: string;
+
+  @ApiProperty({ enum: SEVERITIES })
+  severity!: string;
+
+  @ApiProperty()
+  notificationKey!: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  projectId?: string;
+}
+
 export class SimulateDeliveryResultDto {
-  @ApiProperty({ type: Object, description: "Labels the rules were evaluated against" })
-  labels!: Record<string, unknown>;
+  @ApiProperty({ type: () => DeliveryLabelsDto, description: "Labels the rules were evaluated against" })
+  labels!: DeliveryLabelsDto;
 
   @ApiProperty({ enum: DELIVERY_RULE_ACTIONS })
   decision!: string;

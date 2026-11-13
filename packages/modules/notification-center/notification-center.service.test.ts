@@ -307,7 +307,7 @@ test("the last remaining rule cannot be deleted", async () => {
 });
 
 test("reorder rewrites priorities from the submitted order", async () => {
-  const { service, rows } = newRuleStore([
+  const { service } = newRuleStore([
     { condition: {}, action: "deliver" },
     { condition: {}, action: "deliver" },
     { condition: {}, action: "deliver" },
@@ -318,8 +318,8 @@ test("reorder rewrites priorities from the submitted order", async () => {
     ["r3", "r1", "r2"],
   );
   assert.deepEqual(
-    rows.map((rule) => rule.priority),
-    [30, 10, 20],
+    reordered.map((rule) => rule.priority),
+    [10, 20, 30],
   );
 });
 
