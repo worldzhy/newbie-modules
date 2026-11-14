@@ -1,4 +1,4 @@
-# ADR-066: security-evaluation 以 web-endpoint subject kind 承载 Web 基线评估
+# ADR-066: security-evaluation 以 web-origin subject kind 承载 Web 基线评估
 
 状态：提议中
 日期：2026-11-14
@@ -22,22 +22,23 @@
 
 ## 决策
 
-### 1. 新增 subject kind `web-endpoint`
+### 1. 新增 subject kind `web-origin`
 
 ```ts
-export const SECURITY_EVALUATION_SUBJECT_KIND_WEB_ENDPOINT = "web-endpoint";
+export const SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN = "web-origin";
 
 export const SECURITY_EVALUATION_SUBJECT_KINDS = [
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
-  SECURITY_EVALUATION_SUBJECT_KIND_WEB_ENDPOINT,
+  SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
 ] as const;
 ```
 
 - `subjectKey` = 规范化 origin（`scheme://host[:port]`），不含路径、查询串与末尾斜杠。
+- 名字取 RFC 6454 的 origin（scheme + host + port），与 `subjectKey` 一一对应；不取 `endpoint`（HTTP 语义指带路径的端点，会让读者以为 subject 是 path 级）、不取 `site`（eTLD+1 语义，装不下子域）。此处的 "origin" 与 git remote 无关。
 - 理由：响应头、TLS、证书都是 origin 级属性；path 级目标（`/login`、`/api/session`）是**规则的目标清单**，不是 subject 身份。
 - subject 身份沿用 skeleton 的 `(kind, scopeType, scopeId, subjectKey)`（`evaluation-subject.service.ts:24,39-44`）。本 kind 是**平台级资产**：提交时固定传 `scopeType/scopeId = "platform"`，与 repository / aws-account 的写入路径一致（`security-evaluation-asset.service.ts:99-100`）。因此同一 origin 全部署只有**一个 subject、一套 run 历史、一套 finding**；多个项目注册同一 origin 时，provenance（`EvaluationSubjectSource`）留多行，只记"谁提交过"。
-- 推论：suppress / resolve 是**资产级**风险接受，不是项目级偏好——任一项目 suppress 后其余项目同样看不到该 finding。隔离不靠 subject 身份，靠宿主提交门禁（未通过归属验证的端点不进入 ingest）；见 §非目标。
+- 推论：suppress / resolve 是**资产级**风险接受，不是项目级偏好——任一项目 suppress 后其余项目同样看不到该 finding。隔离不靠 subject 身份，靠宿主提交门禁（未通过归属验证的 origin 不进入 ingest）；见 §非目标。
 
 ### 2. 新增两个 evaluation key
 
@@ -63,7 +64,7 @@ export interface WebProbeAccess {
 - 模块只定义**观测数据形状**与**预算上限**，不实现传输、不持有 URL 白名单、不做 DNS 校验。
 - 宿主负责 SSRF 校验、超时、并发、User-Agent、重定向策略与出网控制（ADR-044 §3）。
 - 三个方法合一个端口而不是拆三个：它们共享同一套出网策略与预算，拆开会给"绑一半"留下静默降级的空间。
-- 未绑定该端口而跑 `web-endpoint` 的 run，以 wiring error 失败（沿用 ADR-022 的失败语义与 `module.ts:66-69` 注释）。
+- 未绑定该端口而跑 `web-origin` 的 run，以 wiring error 失败（沿用 ADR-022 的失败语义与 `module.ts:66-69` 注释）。
 
 ### 4. criteria 版本
 
@@ -126,16 +127,16 @@ sha256(criteriaId + "\u0000" + subjectKey + "\u0000" + discriminator)
 ### 7. schedules
 
 ```ts
-{ evaluationKey: SECURITY_EVALUATION_KEY_WEB_BASELINE, subjectKind: WEB_ENDPOINT, recommendedInterval: "daily" },
-{ evaluationKey: SECURITY_EVALUATION_KEY_WEB_BEHAVIOR, subjectKind: WEB_ENDPOINT, recommendedInterval: "daily" },
+{ evaluationKey: SECURITY_EVALUATION_KEY_WEB_BASELINE, subjectKind: WEB_ORIGIN, recommendedInterval: "daily" },
+{ evaluationKey: SECURITY_EVALUATION_KEY_WEB_BEHAVIOR, subjectKind: WEB_ORIGIN, recommendedInterval: "daily" },
 ```
 
 不引入 `weekly`：宿主派发只认 `daily` / `hourly`（`security-evaluation.scan.job.ts:20-25`），新增枚举值会让未升级的宿主静默漏跑。主动探测的强度由端口预算约束，不由频率约束。
 
 ## 跨宿主 / 演进检验（registry 模块设计必填）
 
-- **无宿主词**：`web-endpoint`、`origin`、`path`、`observation` 均为领域通用；模块不出现 `project`、`environment`、`domain` 等宿主概念，资产归属留在宿主。
-- **对所有消费方一致**：不装配 `web-endpoint` 的宿主，其余 kind 的行为零变化；端口未绑定只在跑该 kind 时报错。
+- **无宿主词**：`web-origin`、`path`、`observation` 均为领域通用；模块不出现 `project`、`environment`、`domain` 等宿主概念，资产归属留在宿主。
+- **对所有消费方一致**：不装配 `web-origin` 的宿主，其余 kind 的行为零变化；端口未绑定只在跑该 kind 时报错。
 - **演进路径**：新增检查项 = 新 criteria 版本 + 可能的新 discriminator；替换扫描工具 = 只改宿主适配器，finding 语义与 fingerprint 不变；新增 kind 仍走同一套 criterion/key/mechanism 机制。
 
 ## 影响
@@ -143,7 +144,7 @@ sha256(criteriaId + "\u0000" + subjectKey + "\u0000" + discriminator)
 - registry 变更点共 8 处，缺一即失效：
   1. `constants.ts`：kind 常量与 `SECURITY_EVALUATION_SUBJECT_KINDS`、两个 key、两个规则集版本、两条 schedules。
   2. `ports/web-probe.access.ts`：新增端口与观测数据结构。
-  3. `criteria/security-evaluation-criteria.provider.ts`：`selectVersion` 的 `switch (subject.kind)` **必须新增 `web-endpoint` case**——现有 `default: return null`（`:40,74-75`）会让该 kind 的 run 取不到 criteria。
+  3. `criteria/security-evaluation-criteria.provider.ts`：`selectVersion` 的 `switch (subject.kind)` **必须新增 `web-origin` case**——现有 `default: return null`（`:40,74-75`）会让该 kind 的 run 取不到 criteria。
   4. `criteria/security-evaluation-criteria.seed.ts`：两个规则集版本的 seed。
   5. `evidence/`：新增 `SecurityEvaluationWebBaselineEvidenceProvider` 与 `...WebBehaviorEvidenceProvider`（或一个按 key 分派的实现），实现 `EvidenceProvider.collect()`（`evidence.provider.ts:26-36`）并调用 `WebProbeAccess`——**端口是它的下游依赖，不是 run 的直接输入**。
   6. `judgment/`：两个确定性 mechanism。
