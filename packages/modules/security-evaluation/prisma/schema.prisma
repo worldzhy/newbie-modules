@@ -11,7 +11,7 @@
 // !!            [Module] Security Evaluation models             //
 // !! ----------------------------------------------------------- //
 // * SecurityEvaluationAsset                                   //
-// * SecurityEvaluationAssetSource                             //
+// * SecurityEvaluationAssetProvenance                         //
 // * SecurityEvaluationAwsConfigKnowledgeItem                  //
 // * SecurityEvaluationNpmPackageKnowledgeItem                 //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
@@ -45,7 +45,7 @@ model SecurityEvaluationAsset {
 /// `sourceType` / `sourceId` are opaque strings: the module never resolves them
 /// to a host entity, it only stores and filters them. Provenance is used for
 /// display and remediation routing, never for authorization.
-model SecurityEvaluationAssetSource {
+model SecurityEvaluationAssetProvenance {
   id              String   @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK
   subjectId       String   @db.Uuid
@@ -157,7 +157,7 @@ model SecurityEvaluationThreatKnowledgeItem {
 /// LLM "not-relevant" verdicts (TTL 7 days by default, filtered out of
 /// subsequent pipelines) and hard-recall "hard-hit" verdicts (audit-only,
 /// always re-computed per run).
-enum SecurityEvaluationVerdictKind {
+enum SecurityEvaluationThreatVerdictKind {
   notRelevant @map("not-relevant")
   hardHit     @map("hard-hit")
 
@@ -183,7 +183,7 @@ model SecurityEvaluationThreatVerdictCache {
   knowledgeItemId  String                             @db.Uuid
   // Cache scope, stored verbatim: "<subject.kind>:<subject.subjectKey>" (ADR-058).
   scopeKey        String                             @db.VarChar(512)
-  verdict         SecurityEvaluationVerdictKind      @default(notRelevant)
+  verdict         SecurityEvaluationThreatVerdictKind @default(notRelevant)
   reason          String?                            @db.Text           // LLM reason for not-relevant; null on hard-hit
   matchedEntity   String?                            @db.VarChar(512)   // Entity string that matched on hard-hit; null otherwise
   // Content address of the exact re-rank request that produced this verdict

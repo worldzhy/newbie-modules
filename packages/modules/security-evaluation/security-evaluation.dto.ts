@@ -111,7 +111,7 @@ export class ListSecurityEvaluationAssetsRequestDto extends CommonListRequestDto
 }
 
 /** One provenance row of an asset (ADR-039). */
-export class SecurityEvaluationAssetSourceResponseDto {
+export class SecurityEvaluationAssetProvenanceResponseDto {
   @ApiProperty() sourceType!: string;
   @ApiProperty() sourceId!: string;
   @ApiProperty() firstSubmittedAt!: Date;
@@ -130,11 +130,11 @@ export class SecurityEvaluationAssetResponseDto {
   @ApiProperty({ description: "Last run that actually observed this asset's inventory" })
   lastSeenAt!: Date;
   @ApiProperty({
-    type: [SecurityEvaluationAssetSourceResponseDto],
+    type: [SecurityEvaluationAssetProvenanceResponseDto],
     isArray: true,
     description: "Who submitted this asset",
   })
-  sources!: SecurityEvaluationAssetSourceResponseDto[];
+  sources!: SecurityEvaluationAssetProvenanceResponseDto[];
 }
 
 export class ListSecurityEvaluationAssetsResponseDto extends CommonListResponseDto<SecurityEvaluationAssetResponseDto> {}

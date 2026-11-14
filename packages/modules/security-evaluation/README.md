@@ -35,7 +35,7 @@ also carry a `credentialRef` — an opaque pointer the module stores verbatim an
 threads to the evidence port; it is captured at this registration point so
 collection never rediscovers credentials through provenance. The module upserts
 the platform-level subject, materialises its asset
-and records a `SecurityEvaluationAssetSource` row; a second project referencing
+and records a `SecurityEvaluationAssetProvenance` row; a second project referencing
 the same repository adds provenance instead of a second subject. Ingest is
 upsert-only: a subject that disappears from the host is not deleted, because
 removal semantics are still an open decision (ADR-022).

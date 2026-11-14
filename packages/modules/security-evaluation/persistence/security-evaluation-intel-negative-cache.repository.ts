@@ -6,7 +6,7 @@ import type {
   SecurityEvaluationIntelCacheCandidate,
   SecurityEvaluationIntelNegativeCachePort,
   SecurityEvaluationIntelVerdictRecord,
-  SecurityEvaluationVerdictKind,
+  SecurityEvaluationThreatVerdictKind,
 } from "../judgment/intel/security-evaluation-intel-negative-cache.port";
 
 const TTL_DAYS_KEY = "modules.security-evaluation.ttlDays";
@@ -28,7 +28,7 @@ export function requirePositiveInteger(value: number, name: string): number {
  * vocabulary (`not-relevant` / `hard-hit`) as `@map`ped database values.
  * Translate at this adapter boundary only.
  */
-const PRISMA_VERDICT: Record<SecurityEvaluationVerdictKind, "notRelevant" | "hardHit"> = {
+const PRISMA_VERDICT: Record<SecurityEvaluationThreatVerdictKind, "notRelevant" | "hardHit"> = {
   "not-relevant": "notRelevant",
   "hard-hit": "hardHit",
 };

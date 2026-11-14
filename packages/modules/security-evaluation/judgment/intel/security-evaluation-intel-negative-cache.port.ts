@@ -15,7 +15,7 @@
  */
 export const securityEvaluationIntelNegativeCacheToken = "SECURITY_EVALUATION_INTEL_NEGATIVE_CACHE";
 
-export type SecurityEvaluationVerdictKind = "not-relevant" | "hard-hit";
+export type SecurityEvaluationThreatVerdictKind = "not-relevant" | "hard-hit";
 
 /** One pair whose cached verdict is being tested against a current signature. */
 export interface SecurityEvaluationIntelCacheCandidate {
@@ -31,7 +31,7 @@ export interface SecurityEvaluationIntelCacheCandidate {
 export interface SecurityEvaluationIntelVerdictRecord {
   knowledgeItemId: string;
   scopeKey: string;
-  verdict: SecurityEvaluationVerdictKind;
+  verdict: SecurityEvaluationThreatVerdictKind;
   /** Content address of the input that produced this verdict. */
   signature: string;
   reason?: string | null;

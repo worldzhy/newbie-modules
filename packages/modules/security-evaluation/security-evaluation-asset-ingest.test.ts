@@ -102,7 +102,7 @@ function fakePrisma() {
         return created;
       },
     },
-    securityEvaluationAssetSource: {
+    securityEvaluationAssetProvenance: {
       upsert: async (args: {
         where: { subjectId_sourceType_sourceId: { subjectId: string; sourceType: string; sourceId: string } };
         create: Omit<FakeSourceRow, "id">;

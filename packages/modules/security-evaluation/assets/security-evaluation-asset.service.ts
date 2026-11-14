@@ -73,7 +73,7 @@ const KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE = 100;
  * Subjects are platform-level: `subjectKey` alone identifies the asset across
  * the deployment, so several projects referencing the same repository share one
  * subject, one run history and one finding set. Who supplied it is recorded on
- * `SecurityEvaluationAssetSource` rows — provenance for display and routing,
+ * `SecurityEvaluationAssetProvenance` rows — provenance for display and routing,
  * never an authorization boundary.
  */
 @Injectable()
@@ -105,7 +105,7 @@ export class SecurityEvaluationAssetService {
       });
       const asset = await this.getOrCreateAsset(toSubjectRef(subject));
       const now = new Date();
-      await this.prisma.securityEvaluationAssetSource.upsert({
+      await this.prisma.securityEvaluationAssetProvenance.upsert({
         where: {
           subjectId_sourceType_sourceId: {
             subjectId: subject.id,
@@ -134,7 +134,7 @@ export class SecurityEvaluationAssetService {
    */
   async listSubjectIdsBySource(filter: SecurityEvaluationSourceFilter): Promise<string[] | null> {
     if (!filter.scopeType && !filter.scopeId) return null;
-    const sources = await this.prisma.securityEvaluationAssetSource.findMany({
+    const sources = await this.prisma.securityEvaluationAssetProvenance.findMany({
       where: {
         ...(filter.scopeType ? { sourceType: filter.scopeType } : {}),
         ...(filter.scopeId ? { sourceId: filter.scopeId } : {}),
@@ -262,7 +262,7 @@ export class SecurityEvaluationAssetService {
         where: { id: { in: pageSubjectIds } },
         select: { id: true, kind: true },
       }),
-      this.prisma.securityEvaluationAssetSource.findMany({
+      this.prisma.securityEvaluationAssetProvenance.findMany({
         where: { subjectId: { in: pageSubjectIds } },
         select: { subjectId: true, sourceType: true, sourceId: true, firstSubmittedAt: true, lastSubmittedAt: true },
         orderBy: [{ firstSubmittedAt: "asc" }, { sourceType: "asc" }, { sourceId: "asc" }],
