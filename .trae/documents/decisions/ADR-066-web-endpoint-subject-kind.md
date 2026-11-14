@@ -36,7 +36,8 @@ export const SECURITY_EVALUATION_SUBJECT_KINDS = [
 
 - `subjectKey` = 规范化 origin（`scheme://host[:port]`），不含路径、查询串与末尾斜杠。
 - 理由：响应头、TLS、证书都是 origin 级属性；path 级目标（`/login`、`/api/session`）是**规则的目标清单**，不是 subject 身份。
-- subject 身份沿用 skeleton 的 `(kind, scopeType, scopeId, subjectKey)`（`evaluation-subject.service.ts:24,39-44`）：同一 origin 在两个项目下是**两个 subject、两套历史、两套 finding**。本 ADR 不做跨项目合并（见 §非目标）。
+- subject 身份沿用 skeleton 的 `(kind, scopeType, scopeId, subjectKey)`（`evaluation-subject.service.ts:24,39-44`）。本 kind 是**平台级资产**：提交时固定传 `scopeType/scopeId = "platform"`，与 repository / aws-account 的写入路径一致（`security-evaluation-asset.service.ts:99-100`）。因此同一 origin 全部署只有**一个 subject、一套 run 历史、一套 finding**；多个项目注册同一 origin 时，provenance（`EvaluationSubjectSource`）留多行，只记"谁提交过"。
+- 推论：suppress / resolve 是**资产级**风险接受，不是项目级偏好——任一项目 suppress 后其余项目同样看不到该 finding。隔离不靠 subject 身份，靠宿主提交门禁（未通过归属验证的端点不进入 ingest）；见 §非目标。
 
 ### 2. 新增两个 evaluation key
 
@@ -142,7 +143,7 @@ sha256(criteriaId + "\u0000" + subjectKey + "\u0000" + discriminator)
 - 不做认证后爬取、不做漏洞利用、不做口令暴力破解、不做端口扫描。
 - 不新建 `web-security` 模块（会与 evaluation skeleton 的 run / finding 生命周期重复）。
 - 不改 subject / run / finding 的 skeleton 契约。
-- **不做跨项目 subject 合并**：同一 origin 被两个项目引用时保持两个 subject、两套 run 历史与 finding 集。合并需要改 `EvaluationSubject` 的身份契约（把 `scopeId` 从身份里去掉或引入 canonical row），属独立的架构决策；本 ADR 明确不承担，避免"看起来是平台级"的误读。
+- **不做按项目的 subject 拆分，也不做按项目的 finding 状态**：同一 origin 被多个项目引用时共用一份 run 历史、一份 finding、一个 suppress 状态。理由：域名是同一组织的同一资产，重复 triage 无收益；提交侧用归属验证门禁，而不是身份拆分来保证"谁能评估这个域名"。
 - 不在模块内实现任何出网逻辑或域名白名单。
 - 不评价第三方报告的检测方法论。
 
