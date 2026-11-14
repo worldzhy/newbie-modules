@@ -39,6 +39,10 @@ function toRuleDto(rule: {
   };
 }
 
+// Retries for a priority collision on rule creation. Concurrent creation is
+// operator-scale, so a small bounded retry is enough (R44-09).
+const DELIVERY_RULE_PRIORITY_MAX_ATTEMPTS = 3;
+
 /**
  * The ordered delivery rule table (ADR-062). This is the only configuration
  * entity: the first enabled rule whose condition matches decides whether an
@@ -95,19 +99,32 @@ export class NotificationDeliveryRuleService implements OnApplicationBootstrap {
   async create(input: CreateDeliveryRuleDto): Promise<DeliveryRuleDto> {
     this.assertCondition(input.condition);
     this.assertAction(input.action);
-    const last = await this.prisma.notificationDeliveryRule.findFirst({
-      orderBy: { priority: "desc" },
-      select: { priority: true },
-    });
-    const created = await this.prisma.notificationDeliveryRule.create({
-      data: {
-        priority: (last?.priority ?? 0) + DELIVERY_RULE_PRIORITY_STEP,
-        condition: input.condition as unknown as Prisma.InputJsonValue,
-        action: input.action,
-        isEnabled: input.isEnabled ?? true,
-      },
-    });
-    return toRuleDto(created);
+    // Priority comes from the current maximum, so two concurrent creates can
+    // read the same value and race on the unique index. The loser re-reads and
+    // retries instead of surfacing a 500 to the operator (R44-09).
+    for (let attempt = 1; ; attempt += 1) {
+      const last = await this.prisma.notificationDeliveryRule.findFirst({
+        orderBy: { priority: "desc" },
+        select: { priority: true },
+      });
+      try {
+        const created = await this.prisma.notificationDeliveryRule.create({
+          data: {
+            priority: (last?.priority ?? 0) + DELIVERY_RULE_PRIORITY_STEP,
+            condition: input.condition as unknown as Prisma.InputJsonValue,
+            action: input.action,
+            isEnabled: input.isEnabled ?? true,
+          },
+        });
+        return toRuleDto(created);
+      } catch (error) {
+        const retryable =
+          (error as { code?: string })?.code === PG_UNIQUE_VIOLATION && attempt < DELIVERY_RULE_PRIORITY_MAX_ATTEMPTS;
+        if (!retryable) {
+          throw error;
+        }
+      }
+    }
   }
 
   async update(id: string, input: UpdateDeliveryRuleDto): Promise<DeliveryRuleDto> {

@@ -3,6 +3,7 @@ import test from "node:test";
 import { BadRequestException, ForbiddenException, NotFoundException } from "@nestjs/common";
 import { NotificationCenterService } from "./notification-center.service";
 import { NotificationDeliveryRuleService } from "./notification-delivery-rule.service";
+import { NotificationSettingService } from "./notification-setting.service";
 import { matchesDeliveryCondition, validateDeliveryCondition } from "./notification-center.constants";
 
 function newService(state: { settingQueried: boolean }) {
@@ -336,6 +337,29 @@ test("create appends the new rule after the last priority", async () => {
   assert.equal(rows.length, 2);
 });
 
+test("create retries after a priority collision instead of failing the request", async () => {
+  let attempts = 0;
+  const prisma = {
+    notificationDeliveryRule: {
+      findFirst: async () => ({ priority: attempts === 0 ? 10 : 20 }),
+      create: async ({ data }: any) => {
+        attempts += 1;
+        if (attempts === 1) {
+          // The unique index settles the race; the retry re-reads the maximum.
+          throw { code: "P2002" };
+        }
+        return { id: "r-new", updatedAt: new Date(0), ...data };
+      },
+    },
+  };
+  const service = new NotificationDeliveryRuleService(prisma as never);
+
+  const created = await service.create({ condition: { severityAtLeast: "high" }, action: "deliver" });
+
+  assert.equal(attempts, 2);
+  assert.equal(created.priority, 30);
+});
+
 test("create rejects a condition the matcher cannot understand", async () => {
   const { service } = newRuleStore([{ condition: { severityAtLeast: "high" }, action: "deliver" }]);
   await assert.rejects(
@@ -394,4 +418,68 @@ test("simulate reports the index of the deciding rule", async () => {
 test("simulate requires either a record or a key with severity", async () => {
   const { service } = newRuleStore([{ condition: {}, action: "deliver" }]);
   await assert.rejects(service.simulate({ notificationKey: "k" }, []), BadRequestException);
+});
+
+test("markAllRead pages through unread records instead of materialising them all", async () => {
+  const total = 1_201;
+  const unread = new Set(Array.from({ length: total }, (_, index) => `n-${index}`));
+  let scans = 0;
+  const prisma = {
+    user: { findUnique: async () => ({ createdAt: new Date(0) }) },
+    notificationRecord: {
+      findMany: async ({ take }: any) => {
+        scans += 1;
+        return [...unread].slice(0, take).map((id) => ({ id }));
+      },
+    },
+    notificationReceipt: {
+      createMany: async ({ data }: any) => {
+        for (const row of data) {
+          unread.delete(row.notificationId);
+        }
+        return { count: data.length };
+      },
+    },
+  };
+  const service = new NotificationCenterService(prisma as never, {} as never, {} as never);
+
+  const result = await service.markAllRead("u1", ["p1"]);
+
+  assert.equal(result.marked, total);
+  // 500 + 500 + 201: the short page ends the loop.
+  assert.equal(scans, 3);
+  assert.equal(unread.size, 0);
+});
+
+test("reconcileDeclarations realigns declared fields but leaves the operator toggle alone", async () => {
+  const calls: any[] = [];
+  const prisma = {
+    notificationSetting: {
+      upsert: async (args: any) => {
+        calls.push(args);
+        return args.create;
+      },
+    },
+  };
+  const registry = {
+    getAll: () => [
+      {
+        key: "k",
+        name: "Renamed",
+        titleTemplate: "new title",
+        detailTemplate: "new detail",
+        scope: "system",
+        defaultPushEnabled: false,
+      },
+    ],
+  };
+  const service = new NotificationSettingService(prisma as never, registry as never);
+
+  await service.reconcileDeclarations();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].create.isPushEnabled, false);
+  assert.equal(calls[0].update.titleTemplate, "new title");
+  // The operator-owned flag is only written on create, never on update.
+  assert.equal("isPushEnabled" in calls[0].update, false);
 });

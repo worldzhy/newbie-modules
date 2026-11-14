@@ -1,10 +1,6 @@
 import { Injectable, NotFoundException, OnApplicationBootstrap } from "@nestjs/common";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import {
-  DEFAULT_NOTIFICATION_PUSH_ENABLED,
-  DEFAULT_NOTIFICATION_SCOPE,
-  PG_UNIQUE_VIOLATION,
-} from "./notification-center.constants";
+import { DEFAULT_NOTIFICATION_PUSH_ENABLED, DEFAULT_NOTIFICATION_SCOPE } from "./notification-center.constants";
 import { NotificationRegistryService } from "./notification-registry.service";
 
 export interface NotificationSettingListItem {
@@ -18,10 +14,11 @@ export interface NotificationSettingListItem {
 
 /**
  * Database-side declaration lifecycle for notifications. Mirrors
- * job-scheduler's JobSchedulerService.upsertScheduleDeclaration: declarations
- * only create missing rows, never override runtime edits made by operators in
- * the settings UI. Severity is not part of the row: it belongs to the producer
- * and is passed on every notify() (ADR-062 "severity contract").
+ * job-scheduler's JobSchedulerService.upsertScheduleDeclaration: the fields
+ * owned by the code declaration are realigned on every start, while the
+ * operator-owned `isPushEnabled` is never overridden. Severity is not part of
+ * the row: it belongs to the producer and is passed on every notify()
+ * (ADR-062 "severity contract").
  */
 @Injectable()
 export class NotificationSettingService implements OnApplicationBootstrap {
@@ -33,40 +30,38 @@ export class NotificationSettingService implements OnApplicationBootstrap {
   /**
    * Runs after every module has finished its onModuleInit (where consumers
    * register their notifications), so all declared notifications are
-   * persisted. Existing rows are left untouched to preserve runtime edits.
+   * persisted and their declaration-owned fields are up to date.
    */
   async onApplicationBootstrap(): Promise<void> {
     await this.reconcileDeclarations();
   }
 
   /**
-   * Persist default settings for every notification registered in memory. Only
-   * rows that do not exist yet are created; existing rows (including their
-   * runtime-edited isPushEnabled) are left untouched so operator edits survive
-   * restarts.
+   * Align the declaration-owned fields (`name`, `titleTemplate`,
+   * `detailTemplate`, `scope`) of every registered notification with the code
+   * declaration on each start, so edits to a declaration stop showing stale
+   * text in the settings page. `isPushEnabled` is operator-owned: it is written
+   * only when the row is created, so runtime edits survive restarts (R44-10).
    */
   async reconcileDeclarations(): Promise<void> {
     for (const declared of this.registry.getAll()) {
-      const existing = await this.prisma.notificationSetting.findUnique({ where: { key: declared.key } });
-      if (existing) {
-        continue;
-      }
-      try {
-        await this.prisma.notificationSetting.create({
-          data: {
-            key: declared.key,
-            name: declared.name,
-            titleTemplate: declared.titleTemplate,
-            detailTemplate: declared.detailTemplate ?? null,
-            isPushEnabled: declared.defaultPushEnabled ?? DEFAULT_NOTIFICATION_PUSH_ENABLED,
-            scope: declared.scope ?? DEFAULT_NOTIFICATION_SCOPE,
-          },
-        });
-      } catch (error: unknown) {
-        if ((error as { code?: string })?.code !== PG_UNIQUE_VIOLATION) {
-          throw error;
-        }
-      }
+      const fields = {
+        name: declared.name,
+        titleTemplate: declared.titleTemplate,
+        detailTemplate: declared.detailTemplate ?? null,
+        scope: declared.scope ?? DEFAULT_NOTIFICATION_SCOPE,
+      };
+      // Upsert compiles to INSERT ... ON CONFLICT DO UPDATE, so concurrent
+      // instances converge on the same row without racing the unique key.
+      await this.prisma.notificationSetting.upsert({
+        where: { key: declared.key },
+        create: {
+          key: declared.key,
+          ...fields,
+          isPushEnabled: declared.defaultPushEnabled ?? DEFAULT_NOTIFICATION_PUSH_ENABLED,
+        },
+        update: fields,
+      });
     }
   }
 

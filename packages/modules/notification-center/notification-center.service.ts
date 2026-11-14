@@ -44,6 +44,10 @@ import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 // Upper bound for the unresolved push-failure admin listing (R5-P2-07).
 const MAX_UNRESOLVED_PUSH_FAILURES = 200;
 
+// Page size for the "mark all read" scan: receipts are written page by page, so
+// memory stays flat regardless of the unread count (R44-08).
+const MARK_ALL_READ_BATCH_SIZE = 500;
+
 // Links stored on a notification are rendered as anchors. Site-relative paths
 // and http(s) URLs are the only forms the UI can open safely (R5-P2-02).
 // The path checks mirror isSafeInternalPath / isSafeRedirectPath (R34-15):
@@ -572,23 +576,40 @@ export class NotificationCenterService {
     return { read: true };
   }
 
+  /**
+   * Mark every unread record the caller can see. The scan is paginated: the
+   * earlier single-shot read materialised every unread id before writing, which
+   * grew unbounded with the record table. Each page writes its receipts before
+   * the next read, so `receipts: none` stops matching them and the loop
+   * converges.
+   */
   async markAllRead(userId: string, visibleProjectIds: string[]): Promise<MarkAllNotificationsReadResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
-    const unread = await this.prisma.notificationRecord.findMany({
-      where: {
-        createdAt: { gte: visibleSince },
-        ...this.buildProjectVisibilityWhere(visibleProjectIds),
-        receipts: { none: { userId } },
-      },
-      select: { id: true },
-    });
-    if (unread.length > 0) {
+    const where = {
+      createdAt: { gte: visibleSince },
+      ...this.buildProjectVisibilityWhere(visibleProjectIds),
+      receipts: { none: { userId } },
+    };
+    let marked = 0;
+    for (;;) {
+      const batch = await this.prisma.notificationRecord.findMany({
+        where,
+        select: { id: true },
+        take: MARK_ALL_READ_BATCH_SIZE,
+      });
+      if (batch.length === 0) {
+        break;
+      }
       await this.prisma.notificationReceipt.createMany({
-        data: unread.map((record) => ({ userId, notificationId: record.id })),
+        data: batch.map((record) => ({ userId, notificationId: record.id })),
         skipDuplicates: true,
       });
+      marked += batch.length;
+      if (batch.length < MARK_ALL_READ_BATCH_SIZE) {
+        break;
+      }
     }
-    return { marked: unread.length };
+    return { marked };
   }
 
   // --- Delivery audit -------------------------------------------------------
