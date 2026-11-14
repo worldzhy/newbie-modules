@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { JobHandlerRegistryService } from "./handler-registry.service";
 import { JobSchedulerService } from "./job-scheduler.service";
-import { JOB_RUN_FAILED_EVENT } from "../job-scheduler.events";
+import { JOB_RUN_FAILED_EVENT, JOB_RUN_SUCCEEDED_EVENT } from "../job-scheduler.events";
 
 type Row = Record<string, any>;
 
@@ -43,6 +43,14 @@ function newHarness(options: { runs?: Row[]; schedules?: Row[] } = {}) {
         }
         Object.assign(row, data);
         return { count: 1 };
+      },
+      update: async ({ where, data }: any) => {
+        const row = runs.find((candidate) => candidate.id === where.id);
+        if (!row) {
+          throw new Error(`JobRun not found: ${where.id}`);
+        }
+        Object.assign(row, data);
+        return row;
       },
       deleteMany: async ({ where }: any) => {
         const before = runs.length;
@@ -100,17 +108,27 @@ function runningRun(overrides: Row = {}): Row {
   return { id: 10, scheduleId: 1, trigger: "schedule", status: "running", startedAt: new Date(), ...overrides };
 }
 
-/// The sweep is private and runs from the first reconcile tick, so tests drive
-/// it directly instead of waiting a full interval.
-function runStartupRecovery(service: JobSchedulerService): Promise<void> {
-  return (service as unknown as { recoverStuckRunsOnce(): Promise<void> }).recoverStuckRunsOnce();
+/// The sweep is private and runs from every reconcile tick, so tests drive it
+/// directly instead of waiting a full interval.
+function runStuckSweep(service: JobSchedulerService): Promise<void> {
+  return (service as unknown as { sweepStuckRuns(): Promise<void> }).sweepStuckRuns();
 }
 
-test("boot closes running rows abandoned by a previous process", async () => {
+async function until(condition: () => boolean): Promise<void> {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    if (condition()) {
+      return;
+    }
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  throw new Error("condition was not met");
+}
+
+test("the sweep closes running rows abandoned by a previous process", async () => {
   const stale = runningRun({ startedAt: new Date(Date.now() - 31 * 60_000) });
   const { service, emitted } = newHarness({ runs: [stale], schedules: [schedule()] });
 
-  await runStartupRecovery(service);
+  await runStuckSweep(service);
 
   assert.equal(stale.status, "failed");
   assert.match(stale.error, /stuck-run threshold of 30 minutes/);
@@ -120,14 +138,71 @@ test("boot closes running rows abandoned by a previous process", async () => {
   assert.equal(emitted[0].payload.runId, 10);
 });
 
-test("boot leaves a run younger than the threshold untouched", async () => {
+test("the sweep leaves a run younger than the threshold untouched", async () => {
   const fresh = runningRun({ startedAt: new Date(Date.now() - 5 * 60_000) });
   const { service, emitted } = newHarness({ runs: [fresh], schedules: [schedule()] });
 
-  await runStartupRecovery(service);
+  await runStuckSweep(service);
 
   assert.equal(fresh.status, "running");
   assert.equal(emitted.length, 0);
+});
+
+test("the sweep closes an orphan once it crosses the threshold on a later tick", async () => {
+  const fresh = runningRun({ startedAt: new Date(Date.now() - 5 * 60_000) });
+  const { service, emitted } = newHarness({ runs: [fresh], schedules: [schedule()] });
+
+  await runStuckSweep(service);
+  assert.equal(fresh.status, "running");
+  assert.equal(emitted.length, 0);
+
+  // Time passes without a restart, so the next tick sees it past the threshold.
+  fresh.startedAt = new Date(Date.now() - 45 * 60_000);
+  await runStuckSweep(service);
+
+  assert.equal(fresh.status, "failed");
+  assert.equal(emitted.length, 1);
+  assert.equal(emitted[0].event, JOB_RUN_FAILED_EVENT);
+  assert.equal(emitted[0].payload.runId, 10);
+});
+
+test("runs older than the retention window are pruned", async () => {
+  const expired = runningRun({ id: 20, status: "success", startedAt: new Date(Date.now() - 31 * 24 * 60 * 60_000) });
+  const kept = runningRun({ id: 21, status: "success", startedAt: new Date(Date.now() - 29 * 24 * 60 * 60_000) });
+  const { service, runs } = newHarness({ runs: [expired, kept], schedules: [schedule()] });
+
+  await (service as unknown as { pruneExpiredRuns(): Promise<void> }).pruneExpiredRuns();
+
+  assert.deepEqual(
+    runs.map((run) => run.id),
+    [21],
+  );
+});
+
+test("a run closed as stuck is rewritten to success when its handler finally returns", async () => {
+  const { service, runs, emitted } = newHarness({ schedules: [schedule()] });
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const handlers = (service as unknown as { jobHandlerRegistry: JobHandlerRegistryService }).jobHandlerRegistry;
+  handlers.registerHandler("demo", async () => {
+    await gate;
+  });
+
+  const pending = service.triggerSchedule("demo");
+  await until(() => runs.some((run) => run.status === "running"));
+  const run = runs.find((candidate) => candidate.status === "running")!;
+  // Simulate the sweep closing the run while the handler is still awaited.
+  Object.assign(run, { status: "failed", error: "stuck by scheduler", finishedAt: new Date() });
+
+  release();
+  await pending;
+
+  assert.equal(run.status, "success");
+  assert.equal(emitted.length, 1);
+  assert.equal(emitted[0].event, JOB_RUN_SUCCEEDED_EVENT);
+  assert.equal(emitted[0].payload.runId, run.id);
 });
 
 test("the reentry guard closes a hung run and still records the trigger as skipped", async () => {

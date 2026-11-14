@@ -79,7 +79,6 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly stuckTimeoutMinutes: number;
   private readonly retentionDays: number;
   private lastRunPruneAt = 0;
-  private startupRecoveryDone = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -101,28 +100,27 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     await this.reconcile();
     this.reconcileTimer = setInterval(() => {
-      void this.recoverStuckRunsOnce();
+      void this.sweepStuckRuns();
       this.reconcile().catch((error) => {
         this.logger.error(`Schedule reconcile failed: ${getErrorMessage(error)}`);
       });
     }, RECONCILE_INTERVAL_MS);
   }
 
-  /// Rows left `running` by a previous process can never complete on their own;
-  /// close them so their failure events still reach their listeners (ADR-067
-  /// addendum). This runs on the first reconcile tick rather than in
-  /// `onApplicationBootstrap`: bootstrap hooks are awaited in module order, and
-  /// `@nestjs/event-emitter` attaches `@OnEvent` handlers in its own hook, so an
-  /// emit from an earlier module reaches zero listeners and is silently
-  /// dropped. The tick also runs after downstream declarations (notification
-  /// settings and delivery rules) are reconciled.
-  private async recoverStuckRunsOnce(): Promise<void> {
-    if (this.startupRecoveryDone) {
-      return;
-    }
+  /// Close `running` rows past the stuck threshold so their failure events still
+  /// reach their listeners (ADR-067 addendum). This runs on every reconcile tick
+  /// rather than only the first: a run that started just before a restart is
+  /// still below the threshold on the first tick, and a one-shot sweep would
+  /// leave it invisible for the rest of this process's lifetime. The scan is
+  /// bounded and the update is conditional, so repeated ticks are cheap and
+  /// idempotent. It also runs on a tick rather than in `onApplicationBootstrap`:
+  /// bootstrap hooks are awaited in module order, and `@nestjs/event-emitter`
+  /// attaches its `@OnEvent` handlers in its own hook, so an emit from an
+  /// earlier module reaches zero listeners and is silently dropped. The tick
+  /// also runs after downstream declarations are reconciled.
+  private async sweepStuckRuns(): Promise<void> {
     try {
       await this.failStuckRuns();
-      this.startupRecoveryDone = true;
     } catch (error) {
       this.logger.error(`Stale run recovery failed: ${getErrorMessage(error)}`);
     }
@@ -442,10 +440,10 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     return `${CRON_JOB_NAME_PREFIX}${key}`;
   }
 
-  /// Close `running` rows older than the stuck threshold. Called at boot (for
-  /// rows a previous process left behind) and from the reentry guard (for a
-  /// handler that never returns). The conditional update keeps a run that
-  /// finished meanwhile untouched.
+  /// Close `running` rows older than the stuck threshold. Called on every
+  /// reconcile tick (for rows a previous process left behind) and from the
+  /// reentry guard (for a handler that never returns). The conditional update
+  /// keeps a run that finished meanwhile untouched.
   private async failStuckRuns(scheduleId?: number): Promise<void> {
     const cutoff = new Date(Date.now() - this.stuckTimeoutMinutes * 60_000);
     const stale = await this.prisma.jobRun.findMany({
