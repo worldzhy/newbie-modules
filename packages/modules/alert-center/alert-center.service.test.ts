@@ -156,7 +156,12 @@ test("raise after resolve reopens the lifecycle and notifies again", async () =>
   const { service, alerts, events } = newHarness();
   await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
   await service.resolve({ source: "url-check", alertKey: "site-1" });
+  const firstLifecycle = (alerts.get(SITE_1)!.firstSeenAt as Date).getTime();
 
+  // A reopen must advance the lifecycle start: it is the occurrence dimension
+  // of the delivery identity, so a stale value would make the notification
+  // domain treat this firing as a replay of the first cycle (ADR-065 §3).
+  await new Promise((resolve) => setTimeout(resolve, 5));
   const reopened = await service.raise({ source: "url-check", alertKey: "site-1", severity: "critical" });
 
   assert.equal(reopened.isNew, true);
@@ -165,6 +170,10 @@ test("raise after resolve reopens the lifecycle and notifies again", async () =>
   assert.equal(alerts.get(SITE_1)!.resolvedAt, null);
   assert.equal(events.length, 3);
   assert.equal(events[2].severity, "critical");
+  assert.equal((events[0].lifecycleStartedAt as Date).getTime(), firstLifecycle);
+  assert.equal((events[1].lifecycleStartedAt as Date).getTime(), firstLifecycle);
+  assert.equal((events[2].lifecycleStartedAt as Date).getTime(), (alerts.get(SITE_1)!.firstSeenAt as Date).getTime());
+  assert.notEqual((events[2].lifecycleStartedAt as Date).getTime(), firstLifecycle);
 });
 
 test("resolve closes a firing alert and clears the next reminder", async () => {

@@ -37,7 +37,8 @@ model Alert {
   lastNotificationAt   DateTime?
   // Reminders sent in this lifecycle; 0 means only the initial firing message
   // went out. Reminders reuse the firing template and only change the rendered
-  // title, so this counter is not part of any notification key (ADR-065 §4).
+  // title, so this counter stays out of the template `notificationKey`; it is
+  // part of the record-level deduplication key (ADR-065 §4).
   reminderCount        Int    @default(0)
 
   firstSeenAt DateTime  @default(now())

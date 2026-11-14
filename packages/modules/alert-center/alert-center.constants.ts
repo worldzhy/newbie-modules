@@ -76,9 +76,19 @@ export interface AlertNotificationPort {
     labels: Record<string, string>;
     data: Record<string, unknown> | null;
     /**
+     * Start of the current lifecycle (`Alert.firstSeenAt`): constant across the
+     * firing message, its reminders and the matching resolve, and advanced when
+     * a resolved alert reopens. It is the occurrence dimension of the delivery
+     * identity, so the adapter must carry it into `deduplicationKey` instead of
+     * deriving uniqueness from the alert row, whose id survives a reopen
+     * (ADR-065 §3/§4).
+     */
+    lifecycleStartedAt: Date;
+    /**
      * 0 for the first firing delivery, then 1-based reminder number. Reminders
-     * reuse the firing notification key; only the rendered title changes, so
-     * per-key switches and delivery rules stay stable (ADR-065 §4).
+     * reuse the firing `notificationKey` and template; only the rendered title
+     * and the record-level deduplication key change, so per-key switches and
+     * delivery rules stay stable (ADR-065 §4).
      */
     reminderCount: number;
   }): Promise<void>;

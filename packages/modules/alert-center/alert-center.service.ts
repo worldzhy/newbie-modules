@@ -424,6 +424,9 @@ export class AlertCenterService {
     try {
       await this.notificationPort.notify({
         alertId: alert.id,
+        // The row id outlives a reopen, so the lifecycle start is what tells the
+        // notification domain that this is a new occurrence, not a replay.
+        lifecycleStartedAt: alert.firstSeenAt,
         source: alert.source,
         scopeId: alert.scopeId ?? undefined,
         state: alert.state as AlertState,
