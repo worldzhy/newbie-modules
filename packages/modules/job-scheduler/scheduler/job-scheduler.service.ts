@@ -25,7 +25,7 @@ const RECONCILE_INTERVAL_MS = 30_000;
 const CRON_JOB_NAME_PREFIX = "job-scheduler:";
 export const DEFAULT_TIMEZONE = "Asia/Shanghai";
 const PG_UNIQUE_VIOLATION = "P2002";
-const STUCK_RUN_TIMEOUT_KEY = "modules.job-scheduler.stuckRunTimeoutMinutes";
+const STUCK_RUN_AFTER_KEY = "modules.job-scheduler.stuckRunAfterMinutes";
 const RETENTION_DAYS_KEY = "modules.job-scheduler.retentionDays";
 /// The stale-run sweeps are bounded: a boot that finds more than this many
 /// hung rows still starts, and the next trigger of each schedule converges the
@@ -76,7 +76,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   private reconcileTimer?: NodeJS.Timeout;
   /// A running row older than this is declared failed by the scheduler itself
   /// (ADR-067 addendum), so a hung handler cannot stay invisible forever.
-  private readonly stuckTimeoutMinutes: number;
+  private readonly stuckRunAfterMinutes: number;
   private readonly retentionDays: number;
   private lastRunPruneAt = 0;
 
@@ -87,9 +87,9 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly eventEmitter: EventEmitter2,
     private readonly config: ConfigService,
   ) {
-    this.stuckTimeoutMinutes = requirePositiveInteger(
-      Number(this.config.getOrThrow<string>(STUCK_RUN_TIMEOUT_KEY)),
-      STUCK_RUN_TIMEOUT_KEY,
+    this.stuckRunAfterMinutes = requirePositiveInteger(
+      Number(this.config.getOrThrow<string>(STUCK_RUN_AFTER_KEY)),
+      STUCK_RUN_AFTER_KEY,
     );
     this.retentionDays = requirePositiveInteger(
       Number(this.config.getOrThrow<string>(RETENTION_DAYS_KEY)),
@@ -445,7 +445,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   /// reentry guard (for a handler that never returns). The conditional update
   /// keeps a run that finished meanwhile untouched.
   private async failStuckRuns(scheduleId?: number): Promise<void> {
-    const cutoff = new Date(Date.now() - this.stuckTimeoutMinutes * 60_000);
+    const cutoff = new Date(Date.now() - this.stuckRunAfterMinutes * 60_000);
     const stale = await this.prisma.jobRun.findMany({
       where: {
         status: "running",
@@ -460,7 +460,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     for (const run of stale) {
       const finishedAt = new Date();
       const durationMs = finishedAt.getTime() - run.startedAt.getTime();
-      const error = `Run exceeded the stuck-run threshold of ${this.stuckTimeoutMinutes} minutes; marked failed by the scheduler.`;
+      const error = `Run exceeded the stuck-run threshold of ${this.stuckRunAfterMinutes} minutes; marked failed by the scheduler.`;
       const claimed = await this.prisma.jobRun.updateMany({
         where: { id: run.id, status: "running" },
         data: { status: "failed", finishedAt, durationMs, error },
@@ -469,7 +469,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
         continue;
       }
       this.logger.error(
-        `Marked stuck run ${run.id} of schedule ${run.schedule.key} as failed after ${durationMs}ms (limit ${this.stuckTimeoutMinutes}m).`,
+        `Marked stuck run ${run.id} of schedule ${run.schedule.key} as failed after ${durationMs}ms (limit ${this.stuckRunAfterMinutes}m).`,
       );
       // Reuse the existing failure event: the host already maps it to a
       // lifecycle alert, and a second event type would need its own contract.

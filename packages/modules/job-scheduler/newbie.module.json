@@ -10,12 +10,12 @@
     "modules": ["event-emitter", "security"],
     "config": {
       "job-scheduler": {
-        "stuckRunTimeoutMinutes": "process.env.JOB_RUN_STUCK_TIMEOUT_MINUTES",
+        "stuckRunAfterMinutes": "process.env.JOB_RUN_STUCK_AFTER_MINUTES",
         "retentionDays": "process.env.JOB_RUN_RETENTION_DAYS"
       }
     },
     "env": {
-      "JOB_RUN_STUCK_TIMEOUT_MINUTES": {
+      "JOB_RUN_STUCK_AFTER_MINUTES": {
         "type": "int",
         "example": 30,
         "description": "Minutes a run may stay in status=running before the scheduler marks it failed and emits the existing run-failed event (ADR-067 addendum)."

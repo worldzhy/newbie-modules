@@ -98,7 +98,7 @@ round47 评审（R47-03 / R47-04）发现：handler 永久挂起时，重入守�
 
 ### 1. 卡死判定
 
-- 阈值：`modules.job-scheduler.stuckRunTimeoutMinutes`（env `JOB_RUN_STUCK_TIMEOUT_MINUTES`），
+- 阈值：`modules.job-scheduler.stuckRunAfterMinutes`（env `JOB_RUN_STUCK_AFTER_MINUTES`），
   按 ADR-033 的纪律由宿主声明，manifest 示例值 30 分钟；不提供代码内回退。
 - 每次进入重入守卫（上一轮仍在 `runningScheduleKeys` 中）时，先查该 schedule 的
   `status="running"` 行；`startedAt` 早于 `now - 阈值` 的行用条件更新

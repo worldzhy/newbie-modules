@@ -7,7 +7,7 @@ import { JOB_RUN_FAILED_EVENT, JOB_RUN_SUCCEEDED_EVENT } from "../job-scheduler.
 type Row = Record<string, any>;
 
 const CONFIG: Row = {
-  "modules.job-scheduler.stuckRunTimeoutMinutes": "30",
+  "modules.job-scheduler.stuckRunAfterMinutes": "30",
   "modules.job-scheduler.retentionDays": "30",
 };
 
