@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-local";
 import type { Request } from "express";
@@ -8,7 +8,7 @@ import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/
 import { UserStatus } from "@generated/prisma/client";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "../login-audit";
-import { INACTIVE_ACCOUNT_MESSAGE } from "../inactive-account";
+import { inactiveAccountError } from "../inactive-account";
 
 @Injectable()
 export class PasswordStrategy extends PassportStrategy(Strategy, "local.password") {
@@ -42,7 +42,7 @@ export class PasswordStrategy extends PassportStrategy(Strategy, "local.password
         actorId: null,
         detail: { account, reason: "unknown_account" },
       });
-      throw new NewbieException(NewbieExceptionType.Login_WrongInput);
+      throw new NewbieException(NewbieExceptionType.Credential_Invalid);
     }
 
     // [step 2] Check if the account is active.
@@ -50,9 +50,9 @@ export class PasswordStrategy extends PassportStrategy(Strategy, "local.password
       await recordLoginFailure(this.auditLogService, {
         request,
         actorId: user.id,
-        detail: { account, reason: "inactive_user" },
+        detail: { account, reason: "account_disabled" },
       });
-      throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
+      throw inactiveAccountError();
     }
 
     // [step 3] Handle no password situation.
@@ -62,7 +62,7 @@ export class PasswordStrategy extends PassportStrategy(Strategy, "local.password
         actorId: user.id,
         detail: { account, reason: "no_password" },
       });
-      throw new NewbieException(NewbieExceptionType.Login_NoPassword);
+      throw new NewbieException(NewbieExceptionType.Credential_NotSet);
     }
 
     // [step 4] Validate password.
@@ -73,7 +73,7 @@ export class PasswordStrategy extends PassportStrategy(Strategy, "local.password
         actorId: user.id,
         detail: { account, reason: "wrong_password" },
       });
-      throw new NewbieException(NewbieExceptionType.Login_WrongInput);
+      throw new NewbieException(NewbieExceptionType.Credential_Invalid);
     }
 
     // [step 5] OK.

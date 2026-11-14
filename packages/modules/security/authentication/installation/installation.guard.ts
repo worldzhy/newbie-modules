@@ -76,7 +76,7 @@ export class InstallationAuthGuard implements CanActivate {
 
     const bucketKey = createHash("sha256").update(token).digest("hex");
     if (!(await this.limitInstallationByTokenService.isAllowed(bucketKey))) {
-      throw new NewbieException(NewbieExceptionType.Access_HighFrequency);
+      throw new NewbieException(NewbieExceptionType.Request_RateLimited);
     }
     await this.limitInstallationByTokenService.increment(bucketKey);
 

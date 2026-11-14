@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from "@nestjs/common";
+import { BadRequestException, Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-local";
 import type { Request } from "express";
@@ -8,7 +8,7 @@ import { UserService } from "@modules/account/modules/user/user.service";
 import { verifyEmail, verifyPhone } from "@modules/account/helpers/validator";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "../login-audit";
-import { INACTIVE_ACCOUNT_MESSAGE } from "../inactive-account";
+import { inactiveAccountError } from "../inactive-account";
 
 @Injectable()
 export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.verification-code") {
@@ -57,9 +57,9 @@ export class VerificationCodeStrategy extends PassportStrategy(Strategy, "local.
       await recordLoginFailure(this.auditLogService, {
         request,
         actorId: user.id,
-        detail: { account, channel, reason: "inactive_user" },
+        detail: { account, channel, reason: "account_disabled" },
       });
-      throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
+      throw inactiveAccountError();
     }
 
     // [step 3] Handle invalid account situation.

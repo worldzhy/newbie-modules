@@ -198,7 +198,7 @@ export class AccountController {
       }
     }
 
-    throw new NewbieException(NewbieExceptionType.ResetPassword_WrongInput);
+    throw new NewbieException(NewbieExceptionType.ResetPassword_InvalidInput);
   }
 
   /* End */

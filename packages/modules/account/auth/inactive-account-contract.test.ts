@@ -2,16 +2,18 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { NewbieException, NewbieExceptionType, newbieExceptionCode } from "@devbie/newbie/exceptions/newbie.exception";
+import { inactiveAccountError, isInactiveAccountError } from "./inactive-account";
 
 /**
- * Inactive-account rejection contract.
+ * Inactive-account rejection contract (devbie ADR-048).
  *
  * INACTIVE means an administrator disabled the account; a rejected
- * application is deleted instead. The state must therefore read the same to
- * the client on every channel. Before this contract it did not: password and
- * verification-code logins raised NewbieException(Login_InactiveUser) with a
- * "you have closed your account" message, and Lark OAuth answered 401, so one
- * account state surfaced as three different outcomes.
+ * application is deleted instead. Every channel must surface it as the coded
+ * 403 `Account_Disabled` (1008), so the client treats it as an account block
+ * and can tell it apart from `Account_Closed` (1007), which the owner may
+ * recover. Before this contract one account state surfaced as three different
+ * outcomes depending on the login channel.
  */
 
 const AUTH_DIR = __dirname;
@@ -32,25 +34,47 @@ const INACTIVE_REJECTION_FILES = [
  */
 const OAUTH_CALLBACK_FILES = ["login-by-lark.controller.ts", "login-by-google.controller.ts"];
 
-const SHARED_REJECTION_PATTERN = /new ForbiddenException\(INACTIVE_ACCOUNT_MESSAGE\)/;
-const LEGACY_REJECTION_PATTERN =
-  /new (UnauthorizedException|NewbieException)\(.*(Login_InactiveUser|account is not active)/;
+const SHARED_REJECTION_PATTERN = /throw inactiveAccountError\(\);/;
+const LEGACY_REJECTION_PATTERN = /INACTIVE_ACCOUNT_MESSAGE|Login_InactiveUser|reason: "inactive_user"/;
 
 describe("inactive-account rejection contract", () => {
+  it("the shared rejection carries the coded 403 disabled-account contract", () => {
+    const error = inactiveAccountError();
+
+    assert.ok(error instanceof NewbieException);
+    assert.equal(error.getStatus(), 403);
+
+    const response = error.getResponse() as { code: number; error: { message: string } };
+    assert.equal(response.code, newbieExceptionCode(NewbieExceptionType.Account_Disabled));
+    assert.equal(response.code, 1008);
+    assert.ok(response.error.message.length > 0);
+  });
+
+  it("recognises both closed and disabled account rejections", () => {
+    assert.equal(isInactiveAccountError(inactiveAccountError()), true);
+    assert.equal(isInactiveAccountError(new NewbieException(NewbieExceptionType.Account_Closed)), true);
+  });
+
+  it("does not treat unrelated failures as an inactive account", () => {
+    assert.equal(isInactiveAccountError(new NewbieException(NewbieExceptionType.Session_Revoked)), false);
+    assert.equal(isInactiveAccountError(new Error("boom")), false);
+    assert.equal(isInactiveAccountError(undefined), false);
+  });
+
   for (const relativePath of INACTIVE_REJECTION_FILES) {
-    it(`${relativePath}: INACTIVE is rejected with the shared 403 body`, () => {
+    it(`${relativePath}: INACTIVE is rejected with the shared coded body`, () => {
       const content = readFileSync(join(AUTH_DIR, relativePath), "utf8");
       assert.match(
         content,
         SHARED_REJECTION_PATTERN,
-        `${relativePath} must reject an INACTIVE account with ` +
-          `ForbiddenException(INACTIVE_ACCOUNT_MESSAGE) so every channel reports the same 403 body.`,
+        `${relativePath} must reject an INACTIVE account with inactiveAccountError() so every ` +
+          `channel reports the same Account_Disabled (1008) body.`,
       );
       assert.doesNotMatch(
         content,
         LEGACY_REJECTION_PATTERN,
-        `${relativePath} still rejects INACTIVE with a legacy status/message; converge it on ` +
-          `ForbiddenException(INACTIVE_ACCOUNT_MESSAGE).`,
+        `${relativePath} still uses a legacy inactive-account status/message/audit reason; converge it ` +
+          `on inactiveAccountError() and the account_disabled audit reason.`,
       );
     });
   }

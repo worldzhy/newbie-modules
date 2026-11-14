@@ -1,16 +1,16 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-custom";
 import { Request } from "express";
 import { UserStatus } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { NO_TOKEN_PROVIDED } from "@devbie/newbie/exceptions/errors.constants";
+import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { TokenService } from "@modules/security/token/token.service";
 import { CookieName } from "@modules/security/cookie/cookie.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
 import { recordLoginFailure } from "@modules/account/auth/login-audit";
-import { INACTIVE_ACCOUNT_MESSAGE } from "@modules/account/auth/inactive-account";
+import { inactiveAccountError } from "@modules/account/auth/inactive-account";
 
 @Injectable()
 export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.refresh-token") {
@@ -36,7 +36,7 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.ref
     // [step 1] No token at all means no identity to attribute a failure to —
     // audit: not required (handshake).
     if (!refreshToken) {
-      throw new UnauthorizedException(NO_TOKEN_PROVIDED);
+      throw new NewbieException(NewbieExceptionType.Session_RefreshRejected);
     }
 
     // [step 2] Verify signature and expiry. Expired refresh is routine session
@@ -50,25 +50,32 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.ref
       await this.sessionService.destroy(refreshToken);
       // audit: not required — routine expiry or a forged token; no identity
       // can be reliably attributed to a failed signature check.
-      throw new UnauthorizedException("Token is incorrect or expired.");
+      throw new NewbieException(NewbieExceptionType.Session_RefreshRejected);
     }
 
-    // [step 3] The account must still be active. Unlike expiry, a disabled
-    // account still presenting a live refresh token is a security-relevant
-    // signal (e.g. a leaked token outliving the deactivation), so it is
-    // audited like every other inactive-account rejection in this module.
+    // [step 3] The account must still exist. The credential verified but the
+    // account row is gone (deleted); there is no actor left to audit against.
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { status: true },
     });
-    if (!user || user.status !== UserStatus.ACTIVE) {
+    if (!user) {
+      // audit: not required — deleted account, no actor to attribute.
+      throw new NewbieException(NewbieExceptionType.Account_Missing);
+    }
+
+    // [step 4] A disabled account still presenting a live refresh token is a
+    // security-relevant signal (e.g. a leaked token outliving the
+    // deactivation), so it is audited like every other inactive-account
+    // rejection in this module.
+    if (user.status !== UserStatus.ACTIVE) {
       await recordLoginFailure(this.auditLogService, {
         actorId: userId,
         ipAddress: req.ip,
         userAgent: req.headers["user-agent"],
-        detail: { reason: "inactive_user", provider: "refresh_token" },
+        detail: { reason: "account_disabled", provider: "refresh_token" },
       });
-      throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
+      throw inactiveAccountError();
     }
 
     return true;

@@ -1,9 +1,9 @@
-import { Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { GeolocationService } from "@modules/audit/helpers/geolocation.service";
 import { UAParser } from "ua-parser-js";
-import { SESSION_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
+import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { secondsUntilUnixTimestamp } from "@devbie/newbie/utilities/datetime.util";
 import { TokenService } from "@modules/security/token/token.service";
 import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
@@ -119,7 +119,7 @@ export class SessionService {
       // token pair we already minted, unsealing the credential held for exactly
       // this window.
       if (!rotatedSession.refreshTokenNextSealed) {
-        throw new UnauthorizedException(SESSION_NOT_FOUND);
+        throw new NewbieException(NewbieExceptionType.Session_RefreshRejected);
       }
       return {
         ...rotatedSession,
@@ -139,7 +139,7 @@ export class SessionService {
         detail: { reason: "refresh_token_reuse", sessionId: rotatedSession.id },
       });
     }
-    throw new UnauthorizedException(SESSION_NOT_FOUND);
+    throw new NewbieException(NewbieExceptionType.Session_RefreshRejected);
   }
 
   async destroy(token: string) {
