@@ -70,19 +70,31 @@ function newHarness(options: { pausedUntil?: Date | null } = {}) {
         Object.assign(row, data, { reminderCount });
         return { count: 1 };
       },
-      findMany: async ({ where }: any) =>
-        [...alerts.values()]
-          .filter((row) => row.state === where.state && row.nextNotificationAt <= where.nextNotificationAt.lte)
-          // Real Prisma returns snapshots, so the reminder dispatch must not see
-          // the claim's own mutation through a shared reference.
-          .map((row) => ({ ...row }))
-          .sort((a, b) => a.nextNotificationAt.getTime() - b.nextNotificationAt.getTime()),
+      findMany: async ({ where }: any) => {
+        const excluded: string[] = where.source?.notIn ?? [];
+        return (
+          [...alerts.values()]
+            .filter((row) => row.state === where.state && row.nextNotificationAt <= where.nextNotificationAt.lte)
+            .filter((row) => !excluded.includes(row.source))
+            // Real Prisma returns snapshots, so the reminder dispatch must not see
+            // the claim's own mutation through a shared reference.
+            .map((row) => ({ ...row }))
+            .sort((a, b) => a.nextNotificationAt.getTime() - b.nextNotificationAt.getTime())
+        );
+      },
     },
     alertSource: {
       findUnique: async ({ where }: any) => sourceRows.get(where.key) ?? null,
       findMany: async ({ where }: any = {}) => {
-        const rows = [...sourceRows.values()];
-        return where?.key?.in ? rows.filter((row) => where.key.in.includes(row.key)) : rows;
+        let rows = [...sourceRows.values()];
+        if (where?.key?.in) {
+          rows = rows.filter((row) => where.key.in.includes(row.key));
+        }
+        if (where?.notificationPausedUntil?.gt) {
+          const gt: Date = where.notificationPausedUntil.gt;
+          rows = rows.filter((row) => row.notificationPausedUntil && row.notificationPausedUntil > gt);
+        }
+        return rows;
       },
       upsert: async ({ where, create, update }: any) => {
         const existing = sourceRows.get(where.key);
@@ -243,6 +255,42 @@ test("dispatchDueReminders skips a source that is paused", async () => {
 
   assert.equal(result.dispatched, 0);
   assert.equal(events.length, 0);
+});
+
+test("dispatchDueReminders does not let paused rows starve an unpaused source", async () => {
+  const pausedUntil = new Date(Date.now() + 60 * 60_000);
+  const { service, alerts, events } = newHarness({ pausedUntil });
+  const dueAt = new Date(Date.now() - 1000);
+  const row = (id: string, source: string): Row => ({
+    id,
+    fingerprint: id,
+    source,
+    scopeId: null,
+    severity: "high",
+    labels: {},
+    data: null,
+    state: "firing",
+    repeatIntervalMinutes: 5,
+    reminderCount: 0,
+    occurrences: 1,
+    firstSeenAt: dueAt,
+    lastSeenAt: dueAt,
+    createdAt: dueAt,
+    resolvedAt: null,
+    nextNotificationAt: dueAt,
+    lastNotificationAt: null,
+  });
+  // A full page of paused rows older than the only unpaused one.
+  for (let index = 0; index < 50; index += 1) {
+    alerts.set(`paused-${index}`, row(`paused-${index}`, "url-check"));
+  }
+  alerts.set("live-1", row("live-1", "heartbeat"));
+
+  const result = await service.dispatchDueReminders({ limit: 50 });
+
+  assert.equal(result.dispatched, 1);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].source, "heartbeat");
 });
 
 test("two concurrent first raises settle on the winner row", async () => {

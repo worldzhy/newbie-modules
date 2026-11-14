@@ -251,8 +251,20 @@ export class AlertCenterService {
   async dispatchDueReminders(input: { now?: Date; limit?: number } = {}): Promise<{ dispatched: number }> {
     const now = input.now ?? new Date();
     const limit = Math.min(Math.max(input.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
+    // Paused rows are excluded before the limit is applied. Skipping them in the
+    // loop instead would let a whole page of paused rows starve every other
+    // source until the pause ends.
+    const pausedSources = await this.prisma.alertSource.findMany({
+      where: { notificationPausedUntil: { gt: now } },
+      select: { key: true },
+    });
+    const pausedKeys = pausedSources.map((row) => row.key);
     const due = await this.prisma.alert.findMany({
-      where: { state: "firing", nextNotificationAt: { lte: now } },
+      where: {
+        state: "firing",
+        nextNotificationAt: { lte: now },
+        ...(pausedKeys.length > 0 ? { source: { notIn: pausedKeys } } : {}),
+      },
       orderBy: { nextNotificationAt: "asc" },
       take: limit,
     });

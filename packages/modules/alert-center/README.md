@@ -32,7 +32,7 @@ Concurrency: the `fingerprint` unique index is the only arbitration point. A los
 | remind me tomorrow              | move `nextNotificationAt` to `now + 24h` |
 | stop reminding after I claim it | clear `nextNotificationAt`               |
 
-Opening or reopening computes `nextNotificationAt = max(notificationPausedUntil ?? now, now) + rhythm`. A paused source still records raises and resolves; only external delivery stops, and the first reminder after the pause is a single late one rather than a burst of the missed ones.
+Opening or reopening computes `nextNotificationAt = max(notificationPausedUntil ?? now, now) + rhythm`. A paused source still stores raises and resolves — the alert row keeps its lifecycle and occurrence counts — but nothing is handed to the notification domain while paused: no in-app notification record and no external push. Nothing is lost from the alert list, and the first reminder after the pause is a single late one rather than a burst of the missed ones.
 
 `dispatchDueReminders({ now?, limit? })` is an idempotent scan: it claims each due row with a conditional update before calling the port, so concurrent scans never message the same reminder twice. **The module ships no scheduler** — the host calls this from its own job runner. A host that never calls it gets no reminders.
 
