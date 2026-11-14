@@ -382,8 +382,11 @@ round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents
 | R47-04 | newbie-modules | `JobRun` 无保留期（≈8,524 行/天、≈311 万/年），`NotificationRecord` / `NotificationDeliveryAttempt` 亦无清理；仅 `eventEmission` 有 30 天摊还清理，同一条「运行→事件→通知」链三表寿命不一致 | P2 | live | 运行时长线性 | fixed |
 | R47-05 | newbie-modules | `EventEmission` 全量保存 payload（无脱敏/无大小上限）并保留 30 天；`module/event-emitter` 缺省授予全部动词、MEMBER 被绑定，任一成员可读 job error、url-check 目标 URL 等上下文（`event-emitter.service.ts:125-145`；`permission-groups.ts:229-236,457-459`） | P2 | live | 任意 MEMBER | partial (payload capped; read access kept by decision) |
 | R47-06 | newbie-modules + nightwatch-backend | notification severity 词表派生自 `evaluation`（`notification-center.constants.ts:1-8`），alert 域另立 union（`alert-center.constants.ts:9`）；宿主 adapter 无校验 cast（`alert-notification.adapter.ts:60`），词表漂移时 `notify()` 抛 400 又被 `deliver` 吞掉 → 通知静默丢失 | P2 | artifact | 词表演化 | fixed |
+| R47-12 | newbie-modules | 启动回收 `failStuckRuns` 挂在 `onApplicationBootstrap`，而 Nest 按模块注册顺序 await 各钩子、`@nestjs/event-emitter` 在自己的钩子里才挂载 `@OnEvent`；job-scheduler 模块排在 event-emitter 之前，emit 落到零监听器且不报错 → 重启时被收敛的卡死 run 只标 `failed`，无告警、无通知（运行时冒烟实测：`Alert` 表为空且日志无错） | P2 | live | 进程重启 | fixed |
 
 修复：R47-01/02/03/04/06 已修复，提交 `94f8d6b`（R47-01 / R47-06 的宿主半边随 nightwatch-backend `f97f92e`）。R47-05 按决策只做 payload 上限与截断，`EventEmission` 的 MEMBER 读权限保留。三张审计表的保留期默认值统一为 90 天。
+
+R47-12 为 2026-11-14 运行时冒烟新发现，随 `46624cf` 修复（宿主半边 `4942942`）：回收改到启动后首个 `reconcile` tick 执行，同时保证下游通知声明已就绪；ADR-067 增补已同步改写。宿主机实测重启后 30s 内 `Marked stuck run … as failed`、告警 `firing`、通知 `🟠 Job failed: …`，下一秒调度成功即 `resolved` 并追加 `🟢 Job recovered`。
 
 误报剔除：`raise()` 重入分支不写 `lastSeenAt` —— 被 `Alert.lastSeenAt @updatedAt`（`alert-center/prisma/schema.prisma:45`）反驳，撤销；`evaluation.run-failed` 无监听方 —— 已被 `security-evaluation-notifications.service.ts` 的 `events.on(...)` 推翻，撤销。正面不变量与命令出处见报告 §2/§8。
 
