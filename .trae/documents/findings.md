@@ -390,3 +390,13 @@ R47-12 为 2026-11-14 运行时冒烟新发现，随 `46624cf` 修复（宿主�
 
 误报剔除：`raise()` 重入分支不写 `lastSeenAt` —— 被 `Alert.lastSeenAt @updatedAt`（`alert-center/prisma/schema.prisma:45`）反驳，撤销；`evaluation.run-failed` 无监听方 —— 已被 `security-evaluation-notifications.service.ts` 的 `events.on(...)` 推翻，撤销。正面不变量与命令出处见报告 §2/§8。
 
+
+## round48（2026-11-14，plan scope：本会话改动批次）
+
+报告：`.trae/documents/reviews/expert-review-2026-11-14-round48-session-changes.md`。锚点：newbie-modules `ec91dc6`（0 dirty）、nightwatch-backend `4942942`（3 个未跟踪项均非被审域）；四模块装配 `diff -rq` 零差异；consumer 全量 1386/1386 单测；两仓 format / eslint / `modules lint` 全绿。宿主侧部署条目（R48-03）见 `nightwatch-backend/.trae/documents/findings.md`。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R48-01 | newbie-modules | 启动回收是一次性的（`startupRecoveryDone`），且只收 `startedAt` 已超阈值的行；重启时低于阈值的孤儿 `running` 行在**本次生命周期内**不再被扫描（重入守卫的 `failStuckRuns(scheduleId)` 只在同进程 key 在飞时命中），只能等下一次进程重启（届时已超阈值）兜住，或 90 天后被 `pruneExpiredRuns` 静默删除。ADR-067:108-110 的「本次生命周期内被标为 failed」与 README 第 7 条 "once at boot for rows a previous process left behind" 只对首个 tick 时已超阈值的行成立（`job-scheduler.service.ts:101-129,334-358,449-516`；探针复现：5 分钟行过首个 tick 后改为 45 分钟，后续触发与二次 sweep 均不改状态） | P2 | live | 进程重启 + 阈值窗口 | open |
+| R48-02 | newbie-modules | `pruneExpiredRuns` 按 `startedAt < cutoff` 删除，但 `JobRun` 只有 `@@index([scheduleId, startedAt])`，非前导列 range 无法索引扫描；90 天保留期下峰值约 76 万行，每小时一次全表/全索引扫描（`job-scheduler.service.ts:501-516`；`job-scheduler/prisma/schema.prisma:48`） | P2 | source | 运行时长线性 | open |
+| R48-04 | newbie-modules | 本轮修复缺回归测试指针：`pruneExpiredRuns`、「标 failed 后 handler 迟到返回改写成 success」、宿主 adapter 的非法 severity 降级分支均无用例（`job-scheduler.service.test.ts` 3 条；`alert-notification.adapter.test.ts` 无 unknown/invalid 断言），台账 R47-04 状态列无回归指针（`job-scheduler.service.test.ts:109-141`；ADR-067:115-117） | P2 | source | 维护期 | open |
