@@ -1,6 +1,7 @@
 # ADR-066: security-evaluation 以 web-origin subject kind 承载 Web 基线评估
 
 状态：已采纳（2026-11-14 用户批准；round45 评审缺口 R45-01~09 已同批闭合，宿主实施见 nightwatch-backend ADR-044）
+更新：2026-11-14 — round46 R46-09：前端硬编码映射由「三处」订正为四处，补 `runOptionsFor` 与默认选项 409 后果（§影响）。
 日期：2026-11-14
 关系：扩展 ADR-022（security-evaluation 重建）的 kind 集合、ADR-037（evaluation key 与 criteria 版本化）、ADR-046（judgment mechanism 组合）、ADR-039（platform-level subject）；不取代任何既有 ADR。
 
@@ -167,7 +168,7 @@ sha256(criteriaId + "\u0000" + discriminator)
   7. `module.ts`：kind-scoped 的 criteria / evidence / judgment 绑定与 exports，加上 mechanism 注册表项。
   8. `README` 与单元测试（谓词真值表、fingerprint 稳定性、未知 `evaluationKey` 必须返回 `null`）。
 - 宿主：见 nightwatch-backend ADR-044。
-- 前端：`EVALUATION_KEYS`、`EVALUATION_KEY_LABEL_KEYS`、`EVALUATION_KEY_OPTIONS` 三处映射（`src/app/(dashboard)/security-evaluation/page.tsx:163-171`、`212-219`）与 `en.json` / `zh.json` 的 `evaluationKeyWebBaseline` / `evaluationKeyWebBehavior`。
+- 前端：按 key 的硬编码映射共**四处**——`EVALUATION_KEYS`、`EVALUATION_KEY_LABEL_KEYS`、`EVALUATION_KEY_OPTIONS`（`src/app/(dashboard)/security-evaluation/page.tsx:163-171`、`212-219`）与 `runOptionsFor`（`:1150-1165`，连同它的 `RunOption.labelKey` 联合类型）。`runOptionsFor` 的 `web-origin` 分支必须返回带 `evaluationKey` 的选项，落到 `runOptionDefault` 会让 `selectVersion` 返回 `null` 并抛 409（`evaluation/evaluation-run.service.ts:268-272`）。另需 `en.json` / `zh.json` 的 `evaluationKeyWebBaseline` / `evaluationKeyWebBehavior` 与 `runOptionWebBaseline` / `runOptionWebBehavior`。宿主实施细节见 nightwatch-backend ADR-044 §7。
 
 ## 迁移阶段
 
