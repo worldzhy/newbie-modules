@@ -10,6 +10,11 @@ export class JwtAuthGuard extends AuthGuard(GuardType.JWT) {
    * token would otherwise surface as an unlabelled 401. Only expiry carries the
    * refreshable code (ADR-048); every other verification failure keeps the
    * default behaviour, which terminates the session client-side.
+   *
+   * The same early rejection means the "no credential" case never reaches
+   * `validate()`: passport-jwt calls `fail()` with a plain info object (not an
+   * Error) when the Authorization header carries no bearer token. Map that one
+   * shape to Session_Missing (1105) so the caller still gets a code.
    */
   handleRequest<TUser = unknown>(
     err: unknown,
@@ -20,6 +25,10 @@ export class JwtAuthGuard extends AuthGuard(GuardType.JWT) {
   ): TUser {
     if (info instanceof Error && info.name === "TokenExpiredError") {
       throw new NewbieException(NewbieExceptionType.Session_AccessExpired);
+    }
+
+    if (!user && info && !(info instanceof Error)) {
+      throw new NewbieException(NewbieExceptionType.Session_Missing);
     }
 
     return super.handleRequest(err, user, info, context, status);

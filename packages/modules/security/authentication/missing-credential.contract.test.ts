@@ -2,11 +2,13 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import type { ConfigService } from "@nestjs/config";
+import type { ExecutionContext } from "@nestjs/common";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 
 import type { TokenService } from "../token/token.service";
 
 import { ApiKeyStrategy } from "./api-key/api-key.strategy";
+import { JwtAuthGuard } from "./jwt/jwt.guard";
 import { JwtStrategy } from "./jwt/jwt.strategy";
 
 /**
@@ -41,6 +43,18 @@ describe("auth strategies without a credential", () => {
 
     await assert.rejects(strategy.validate({ headers: {} } as never), assertSessionMissing);
     await assert.rejects(strategy.validate({ headers: { key: "k" } } as never), assertSessionMissing);
+  });
+
+  it("jwt guard maps passport's no-token info to Session_Missing", () => {
+    // passport-jwt rejects before validate() and reports "no token" as a plain
+    // object, so the strategy's own branch is unreachable for that case; the
+    // guard is where the code has to be attached.
+    const guard = new JwtAuthGuard();
+
+    assert.throws(
+      () => guard.handleRequest(null, false, { message: "No auth token" }, {} as ExecutionContext),
+      (error: unknown) => assertSessionMissing(error),
+    );
   });
 
   it("keeps Session_Missing registered as 1105 / HTTP 401", () => {
