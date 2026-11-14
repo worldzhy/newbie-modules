@@ -108,14 +108,14 @@ test("create writes subject, asset, web-origin and provenance in one transaction
   const calls: string[] = [];
   const transactionClient = {
     securityEvaluationWebOrigin: {
-      upsert: async (args: { where: { assetId: string } }) => {
+      upsert: async (args: { where: { assetId: string }; create: { verificationToken: string } }) => {
         calls.push("origin:upsert");
         assert.equal(args.where.assetId, "asset-1");
         return {
           id: "web-origin-1",
           assetId: "asset-1",
           verificationStatus: "PENDING",
-          verificationToken: "token-1",
+          verificationToken: args.create.verificationToken,
         };
       },
     },
