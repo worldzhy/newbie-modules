@@ -50,8 +50,11 @@ export const DELIVERY_RULE_PRIORITY_STEP = 10;
 /**
  * Default rules seeded when the table is empty, so a fresh install keeps
  * pushing high and critical signals instead of starting from "everything
- * suppressed", and a recovery still announces itself even when its alert was
- * kept in-app. They are ordinary rules: operators can edit or delete them.
+ * suppressed". The recovery rule deliberately carries no severity floor: a
+ * closure must reach the chat even when the firing message stayed in-app, and
+ * checking recovery against the then-current table could swallow the closure
+ * of an alert announced under an earlier one. They are ordinary rules:
+ * operators can edit or delete them.
  */
 export const DEFAULT_DELIVERY_RULE_CONDITION: DeliveryCondition = { severityAtLeast: "high" };
 export const DEFAULT_RECOVERY_RULE_PRIORITY = 20;

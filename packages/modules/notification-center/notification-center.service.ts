@@ -190,9 +190,11 @@ export class NotificationCenterService {
    * low-severity signal never disappears from the in-app bell.
    *
    * Rules are evaluated per delivery (ADR-065 §6): the alert lives in its own
-   * domain and its severity is stable across firing and resolved, so both
-   * messages land on the same side of the rules unless the operator separates
-   * them by state. Each recorded delivery writes one audit attempt. System-scope
+   * domain, so firing and resolved carry the same severity and the same rule
+   * table judges both. The seeded table separates them by state all the same —
+   * the recovery rule has no severity floor — so a closure is announced even
+   * for a signal that stayed in-app; losing a recovery is worse than an extra
+   * one. Each recorded delivery writes one audit attempt. System-scope
    * notifications are pushed through the host-provided push port; project-scope
    * push routing is owned by the host (per-project chat bindings) and reads
    * `decision` from the result.

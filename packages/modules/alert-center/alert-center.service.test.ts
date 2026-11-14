@@ -326,3 +326,32 @@ test("two concurrent first raises settle on the winner row", async () => {
   assert.equal(result.isNew, false);
   assert.equal(events.length, 0);
 });
+
+test("listFiring caps the projection and exposes only the stable fields", async () => {
+  const captured: { args?: Row } = {};
+  const prisma = {
+    alert: {
+      findMany: async (args: Row) => {
+        captured.args = args;
+        return [{ id: "a1", scopeId: "p1", labels: { evaluationKey: "k" } }];
+      },
+    },
+  };
+  const service = new AlertCenterService(prisma as never, {} as never);
+
+  const rows = await service.listFiring({ source: "security-evaluation", limit: 5_000 });
+
+  // A caller-supplied limit can never widen the bound (R44-11).
+  assert.equal(captured.args!.take, 500);
+  assert.deepEqual(captured.args!.where, { source: "security-evaluation", state: "firing" });
+  assert.deepEqual(rows, [{ id: "a1", scopeId: "p1", labels: { evaluationKey: "k" } }]);
+});
+
+test("listFiring normalises a null label payload", async () => {
+  const prisma = { alert: { findMany: async () => [{ id: "a1", scopeId: null, labels: null }] } };
+  const service = new AlertCenterService(prisma as never, {} as never);
+
+  assert.deepEqual(await service.listFiring({ source: "security-evaluation" }), [
+    { id: "a1", scopeId: null, labels: {} },
+  ]);
+});

@@ -24,6 +24,11 @@ import {
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
+// Upper bound on the firing-alert projection a producer reconciles at once
+// (R44-11). Producers converge run by run, so this is a safety valve rather
+// than a pagination cursor.
+const MAX_FIRING_ALERTS = 500;
+
 export interface RaiseAlertInput {
   /** Registered producer key, e.g. "url-check". */
   source: string;
@@ -52,6 +57,13 @@ export interface ResolveAlertInput {
   alertKey: string;
   scopeId?: string;
   resolvedAt?: Date;
+}
+
+export interface FiringAlertRef {
+  id: string;
+  scopeId: string | null;
+  /** Producer-owned labels; the module never interprets them. */
+  labels: Record<string, string>;
 }
 
 interface AlertRow {
@@ -308,6 +320,29 @@ export class AlertCenterService {
   }
 
   // --- Reads ---------------------------------------------------------------
+
+  /**
+   * Bounded projection of the firing alerts of one source. A producer that
+   * reconciles its own lifecycle (a successful run closes the failures it
+   * owns) asks here instead of reading the alert table directly: the row shape
+   * belongs to this module, and a direct scan is unbounded (R44-11). `labels`
+   * are the producer's own data, so the caller may match its key there; the
+   * module never interprets them.
+   */
+  async listFiring(input: { source: string; limit?: number }): Promise<FiringAlertRef[]> {
+    const limit = Math.min(Math.max(input.limit ?? MAX_FIRING_ALERTS, 1), MAX_FIRING_ALERTS);
+    const rows = await this.prisma.alert.findMany({
+      where: { source: input.source, state: "firing" },
+      orderBy: { createdAt: "asc" },
+      take: limit,
+      select: { id: true, scopeId: true, labels: true },
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      scopeId: row.scopeId,
+      labels: (row.labels ?? {}) as Record<string, string>,
+    }));
+  }
 
   async list(query: ListAlertsRequestDto): Promise<ListAlertsResponseDto> {
     const limit = Math.min(Math.max(query.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
