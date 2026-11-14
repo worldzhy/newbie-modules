@@ -376,12 +376,14 @@ round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents
 
 | ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| R47-01 | newbie-modules + nightwatch-backend | `resolve()` 只按含 scope 的 fingerprint 命中，producer 被迫用 `listFiringAlerts`（上限 500、`createdAt asc`）全源扫描恢复；某源 firing 超 500 后最新告警永不 resolve、提醒无限重复。宿主 job 成功侧每事件扫一次（≈8,524 次/天），而 job 源专用、`alertKey` 已知，扫描本可省略（`alert-center.service.ts:236-243,332-345`；`job-failure-notifications.service.ts:63-78`） | P2 | live / latent | 自动路径 | open |
-| R47-02 | newbie-modules | `dispatchDueReminders` 先条件 claim 后 deliver，`deliver` 内部吞异常；投递失败仍消耗本次提醒（`nextNotificationAt` 前移、`reminderCount+1`）并把 `dispatched` 计为成功（`:297-317,471-487`；探针：notify 抛错返回 `{dispatched:1}`） | P2 | live | 任意投递失败 | open |
-| R47-03 | newbie-modules | 重入守卫的 `skipped` 不 emit 事件，全仓无 stale `running` reconcile；handler 永久挂起后每次触发只写 skipped，告警链永不触发（`job-scheduler.service.ts:281-294`） | P2 | live | handler 卡死 | open |
-| R47-04 | newbie-modules | `JobRun` 无保留期（≈8,524 行/天、≈311 万/年），`NotificationRecord` / `NotificationDeliveryAttempt` 亦无清理；仅 `eventEmission` 有 30 天摊还清理，同一条「运行→事件→通知」链三表寿命不一致 | P2 | live | 运行时长线性 | open |
-| R47-05 | newbie-modules | `EventEmission` 全量保存 payload（无脱敏/无大小上限）并保留 30 天；`module/event-emitter` 缺省授予全部动词、MEMBER 被绑定，任一成员可读 job error、url-check 目标 URL 等上下文（`event-emitter.service.ts:125-145`；`permission-groups.ts:229-236,457-459`） | P2 | live | 任意 MEMBER | open |
-| R47-06 | newbie-modules + nightwatch-backend | notification severity 词表派生自 `evaluation`（`notification-center.constants.ts:1-8`），alert 域另立 union（`alert-center.constants.ts:9`）；宿主 adapter 无校验 cast（`alert-notification.adapter.ts:60`），词表漂移时 `notify()` 抛 400 又被 `deliver` 吞掉 → 通知静默丢失 | P2 | artifact | 词表演化 | open |
+| R47-01 | newbie-modules + nightwatch-backend | `resolve()` 只按含 scope 的 fingerprint 命中，producer 被迫用 `listFiringAlerts`（上限 500、`createdAt asc`）全源扫描恢复；某源 firing 超 500 后最新告警永不 resolve、提醒无限重复。宿主 job 成功侧每事件扫一次（≈8,524 次/天），而 job 源专用、`alertKey` 已知，扫描本可省略（`alert-center.service.ts:236-243,332-345`；`job-failure-notifications.service.ts:63-78`） | P2 | live / latent | 自动路径 | fixed |
+| R47-02 | newbie-modules | `dispatchDueReminders` 先条件 claim 后 deliver，`deliver` 内部吞异常；投递失败仍消耗本次提醒（`nextNotificationAt` 前移、`reminderCount+1`）并把 `dispatched` 计为成功（`:297-317,471-487`；探针：notify 抛错返回 `{dispatched:1}`） | P2 | live | 任意投递失败 | fixed |
+| R47-03 | newbie-modules | 重入守卫的 `skipped` 不 emit 事件，全仓无 stale `running` reconcile；handler 永久挂起后每次触发只写 skipped，告警链永不触发（`job-scheduler.service.ts:281-294`） | P2 | live | handler 卡死 | fixed |
+| R47-04 | newbie-modules | `JobRun` 无保留期（≈8,524 行/天、≈311 万/年），`NotificationRecord` / `NotificationDeliveryAttempt` 亦无清理；仅 `eventEmission` 有 30 天摊还清理，同一条「运行→事件→通知」链三表寿命不一致 | P2 | live | 运行时长线性 | fixed |
+| R47-05 | newbie-modules | `EventEmission` 全量保存 payload（无脱敏/无大小上限）并保留 30 天；`module/event-emitter` 缺省授予全部动词、MEMBER 被绑定，任一成员可读 job error、url-check 目标 URL 等上下文（`event-emitter.service.ts:125-145`；`permission-groups.ts:229-236,457-459`） | P2 | live | 任意 MEMBER | partial (payload capped; read access kept by decision) |
+| R47-06 | newbie-modules + nightwatch-backend | notification severity 词表派生自 `evaluation`（`notification-center.constants.ts:1-8`），alert 域另立 union（`alert-center.constants.ts:9`）；宿主 adapter 无校验 cast（`alert-notification.adapter.ts:60`），词表漂移时 `notify()` 抛 400 又被 `deliver` 吞掉 → 通知静默丢失 | P2 | artifact | 词表演化 | fixed |
+
+修复：R47-01/02/03/04/06 已修复，提交 `94f8d6b`（R47-01 / R47-06 的宿主半边随 nightwatch-backend `f97f92e`）。R47-05 按决策只做 payload 上限与截断，`EventEmission` 的 MEMBER 读权限保留。三张审计表的保留期默认值统一为 90 天。
 
 误报剔除：`raise()` 重入分支不写 `lastSeenAt` —— 被 `Alert.lastSeenAt @updatedAt`（`alert-center/prisma/schema.prisma:45`）反驳，撤销；`evaluation.run-failed` 无监听方 —— 已被 `security-evaluation-notifications.service.ts` 的 `events.on(...)` 推翻，撤销。正面不变量与命令出处见报告 §2/§8。
 
