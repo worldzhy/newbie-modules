@@ -76,7 +76,27 @@ export const SECURITY_EVALUATION_WEB_BEHAVIOR_RULE_SET_VERSION = "v1";
 
 - 每条 criterion 只声明：`criteriaId`、`severity`、判定谓词标识、目标粒度（origin / path）、证据字段名。
 - 规则变更 = 新版本，不改已发布版本（ADR-037）。
-- severity 按报告口径分布，不按"缺失即高危"一刀切：缺失 `X-Content-Type-Options` = LOW、缺失 HSTS = MEDIUM、弱套件 = HIGH、明文协议 = CRITICAL。
+- severity **不照抄报告**：按「外部可观测事实单独能造成的后果」定级，报告级别只作对照列，不一致处写明理由。可用级别为 `INFO / LOW / MEDIUM / HIGH / CRITICAL`（`evaluation.prisma:56-64`）。
+
+  | 规则 | 我们的 severity | 报告 | 依据 / 升级条件 |
+  | --- | --- | --- | --- |
+  | 缺失 `X-Content-Type-Options`（HTML） | LOW | LOW | 仅在已有 XSS 或可上传内容时才被利用，自身只是缓解层缺失 |
+  | 缺失 `X-Content-Type-Options`（API） | INFO | LOW | 响应是 `application/json`，浏览器不渲染；无可利用面，降级 |
+  | 缺失 HSTS | LOW | LOW | 只有首次访问与子资源可被降级；若 HTTP 明文可达（无跳转），由独立规则判 CRITICAL，不叠在 HSTS 上 |
+  | `X-Powered-By` 暴露（Express / Next.js） | INFO | LOW | 纯技术指纹，自身不构成可利用面；降级 |
+  | 缺失 `X-Frame-Options` 且无 `frame-ancestors` | MEDIUM | LOW | 未认证观测到的缺失是 host-wide 的，受保护页面同样可被嵌入，点击劫持可直接发起；报告给 CVSS 6.5 却评 Low，自相矛盾。若受保护页面的状态变更无 CSRF 保护，升 HIGH（组合判定，不单条升） |
+  | 缺失 CSP | LOW | LOW | 纵深防御；没有 XSS 就不可利用 |
+  | 缺失 `Permissions-Policy` | INFO | LOW | 报告自称 "no direct exploitation path"；降级 |
+  | 缺失 `Referrer-Policy` | LOW | LOW | 仅当 URL 携带 token 时泄漏面扩大；观测不到就维持 LOW |
+  | 弱套件：仅 CBC（TLS1.2+、ECDHE） | LOW | LOW | Lucky13 类攻击成本高，维持 LOW |
+  | 弱套件：TLS1.0/1.1 仍可用 | MEDIUM | LOW | 协议早已弃用，降级路径现实存在；同一规则按证据升级 |
+  | 弱套件：出现 NULL / anon / export / RC4 / 3DES / DES / MD5 | HIGH | LOW | 可直接破解或中间人；这才是"弱套件"应有的级别 |
+  | User Enumeration | MEDIUM | CRITICAL | 单独只泄漏账号存在性，是凭据填充与定向钓鱼的前置，不导致接管；报告按业务欺诈风险评 Critical，我们不跟 |
+  | Email Flooding via OTP | HIGH | HIGH | 未认证即可触发发信成本与邮箱轰炸，且可自动化滥用；若 OTP 校验端点同样无尝试上限，另立规则判 CRITICAL |
+  | Client-Side Only Authorization | MEDIUM | MEDIUM | 只是页面壳被渲染，数据仍受服务端鉴权约束；若观测到 API 未认证返回数据，属于 broken access control，另立规则判 CRITICAL，不并入本条 |
+
+- 定级原则：单条规则只对自己能证明的事实负责。跨规则的放大效应（枚举 × 无限制 OTP、客户端鉴权 × 无鉴权 API）不作为单条升级理由，否则同一条 finding 会随组合漂移，趋势与 MTTR 失去意义。
+- 报告未涉及的规则（如明文 HTTP 仍可达、证书过期/链不完整）同样按此原则自定级别，用 `origin: "nightwatch"` 标注来源，不计入覆盖条目数。
 
 ### 5. judgment mechanism
 
@@ -92,12 +112,16 @@ sha256(criteriaId + "\u0000" + subjectKey + "\u0000" + discriminator)
 
 ### 6. 覆盖矩阵（对第三方报告 14 条未覆盖项）
 
-| 报告条目 | key | 覆盖 |
-| --- | --- | --- |
-| 11 条响应头/TLS（X-Content-Type-Options ×2、HSTS、X-Powered-By ×2、X-Frame-Options、CSP、Permissions-Policy、Referrer-Policy、弱套件 ×2） | `web-baseline` | 完整 |
-| User Enumeration | `web-behavior` | 完整（同参数在存在/不存在账号下的响应差分） |
-| Email Flooding via OTP | `web-behavior` | 完整（阈值内连续请求，观察是否被限速） |
-| Client-Side Only Authorization | `web-behavior` | **部分**（仅未认证可达子集；认证后越权不在本 ADR 范围） |
+| 报告条目 | 我们的 severity | key | 覆盖 |
+| --- | --- | --- | --- |
+| 11 条响应头/TLS（X-Content-Type-Options ×2、HSTS、X-Powered-By ×2、X-Frame-Options、CSP、Permissions-Policy、Referrer-Policy、弱套件 ×2） | INFO ×4、LOW ×4、MEDIUM ×1、按证据升级 ×2 | `web-baseline` | 完整 |
+| User Enumeration | MEDIUM | `web-behavior` | 完整（同参数在存在/不存在账号下的响应差分） |
+| Email Flooding via OTP | HIGH | `web-behavior` | 完整（阈值内连续请求，观察是否被限速） |
+| Client-Side Only Authorization | MEDIUM | `web-behavior` | **部分**（仅未认证可达子集；认证后越权不在本 ADR 范围） |
+
+覆盖指**条目**覆盖；级别按 §4 自定，与报告的级别不一致是刻意的，逐条理由已在表中给出。
+
+报告第 15 条（Next.js 16.2.11 AVIF RCE，报告评 Medium 并注明 GHSA 原文为 Critical）已由 `npm-osv` 以两条依赖 finding 命中，不属于本 ADR 的新增能力面，也不计入上表的 14 条。
 
 ### 7. schedules
 
