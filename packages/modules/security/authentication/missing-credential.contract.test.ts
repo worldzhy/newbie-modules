@@ -45,14 +45,18 @@ describe("auth strategies without a credential", () => {
     await assert.rejects(strategy.validate({ headers: { key: "k" } } as never), assertSessionMissing);
   });
 
-  it("jwt guard maps passport's no-token info to Session_Missing", () => {
-    // passport-jwt rejects before validate() and reports "no token" as a plain
-    // object, so the strategy's own branch is unreachable for that case; the
-    // guard is where the code has to be attached.
+  it("jwt guard maps a request without a bearer token to Session_Missing", () => {
+    // passport-jwt rejects before validate() runs, so the strategy's own branch
+    // is unreachable for that case; the guard is where the code has to be
+    // attached. It re-runs the same extractor to tell "no credential" apart
+    // from a malformed token.
     const guard = new JwtAuthGuard();
+    const context = {
+      switchToHttp: () => ({ getRequest: () => ({ headers: {} }) }),
+    } as unknown as ExecutionContext;
 
     assert.throws(
-      () => guard.handleRequest(null, false, { message: "No auth token" }, {} as ExecutionContext),
+      () => guard.handleRequest(null, false, new Error("No auth token"), context),
       (error: unknown) => assertSessionMissing(error),
     );
   });

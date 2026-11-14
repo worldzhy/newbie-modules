@@ -1,5 +1,7 @@
 import { ExecutionContext, Injectable } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
+import { ExtractJwt } from "passport-jwt";
+import { Request } from "express";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { GuardType } from "../guard.types";
 
@@ -12,9 +14,9 @@ export class JwtAuthGuard extends AuthGuard(GuardType.JWT) {
    * default behaviour, which terminates the session client-side.
    *
    * The same early rejection means the "no credential" case never reaches
-   * `validate()`: passport-jwt calls `fail()` with a plain info object (not an
-   * Error) when the Authorization header carries no bearer token. Map that one
-   * shape to Session_Missing (1105) so the caller still gets a code.
+   * `validate()`. Re-run the strategy's own extractor here: when it finds no
+   * bearer token the request carried no credential at all, which is
+   * Session_Missing (1105) rather than a generic 401.
    */
   handleRequest<TUser = unknown>(
     err: unknown,
@@ -27,8 +29,11 @@ export class JwtAuthGuard extends AuthGuard(GuardType.JWT) {
       throw new NewbieException(NewbieExceptionType.Session_AccessExpired);
     }
 
-    if (!user && info && !(info instanceof Error)) {
-      throw new NewbieException(NewbieExceptionType.Session_Missing);
+    if (!err && !user) {
+      const request = context.switchToHttp().getRequest<Request>();
+      if (!ExtractJwt.fromAuthHeaderAsBearerToken()(request)) {
+        throw new NewbieException(NewbieExceptionType.Session_Missing);
+      }
     }
 
     return super.handleRequest(err, user, info, context, status);
