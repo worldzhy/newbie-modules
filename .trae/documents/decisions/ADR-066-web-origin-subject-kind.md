@@ -1,6 +1,6 @@
 # ADR-066: security-evaluation 以 web-origin subject kind 承载 Web 基线评估
 
-状态：提议中
+状态：已采纳（2026-11-14 用户批准；round45 评审缺口 R45-01~09 已同批闭合，宿主实施见 nightwatch-backend ADR-044）
 日期：2026-11-14
 关系：扩展 ADR-022（security-evaluation 重建）的 kind 集合、ADR-037（evaluation key 与 criteria 版本化）、ADR-046（judgment mechanism 组合）、ADR-039（platform-level subject）；不取代任何既有 ADR。
 
@@ -34,18 +34,30 @@ export const SECURITY_EVALUATION_SUBJECT_KINDS = [
 ] as const;
 ```
 
-- `subjectKey` = 规范化 origin（`scheme://host[:port]`），不含路径、查询串与末尾斜杠。
+- `subjectKey` = 规范化 origin（`scheme://host[:port]`），不含路径、查询串与片段。归一化规则唯一、在写入前执行：scheme 与 host 转小写；host 为 IDN 时转 ASCII（punycode）并去掉末尾的点；省略默认端口（`http` 80 / `https` 443）；不加末尾斜杠。同一 origin 的不同写法必须落到同一 `subjectKey`，否则 finding 会按写法分裂成多份。
 - 名字取 RFC 6454 的 origin（scheme + host + port），与 `subjectKey` 一一对应；不取 `endpoint`（HTTP 语义指带路径的端点，会让读者以为 subject 是 path 级）、不取 `site`（eTLD+1 语义，装不下子域）。此处的 "origin" 与 git remote 无关。
 - 理由：响应头、TLS、证书都是 origin 级属性；path 级目标（`/login`、`/api/session`）是**规则的目标清单**，不是 subject 身份。
-- subject 身份沿用 skeleton 的 `(kind, scopeType, scopeId, subjectKey)`（`evaluation-subject.service.ts:24,39-44`）。本 kind 是**平台级资产**：提交时固定传 `scopeType/scopeId = "platform"`，与 repository / aws-account 的写入路径一致（`security-evaluation-asset.service.ts:99-100`）。因此同一 origin 全部署只有**一个 subject、一套 run 历史、一套 finding**；多个项目注册同一 origin 时，provenance（`EvaluationSubjectSource`）留多行，只记"谁提交过"。
+- **path 级目标由路径角色承载**：规则不嵌入 URL，只声明所需**路径角色**（如 `auth.login`、`auth.otp-request`、`api.session`）；宿主资产持有「角色 → 相对路径」映射，探测时把解析后的路径随请求下发（nightwatch-backend ADR-044 §1 的 `WebOrigin.targetPaths`）。这样路径仍是资产属性（见「被否掉的方案」末条），规则集不随资产分叉；某资产缺某角色时，依赖该角色的 criterion 记为「未配置目标」并跳过，不产出 finding。
+- subject 身份沿用 skeleton 的 `(kind, scopeType, scopeId, subjectKey)`（`evaluation/evaluation-subject.service.ts:24,39-44`）。本 kind 是**平台级资产**：提交时固定传 `scopeType = SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE`（`"platform"`）与 `scopeId = SECURITY_EVALUATION_PLATFORM_SCOPE_ID`（`"deployment"`）（`constants.ts:18-19`），与 repository / aws-account 的写入路径一致（`assets/security-evaluation-asset.service.ts:99-100`）。两者不是同一个字符串——写成 `scopeType/scopeId = "platform"` 会让该 kind 落到空 scopeId 的伪作用域，与既有 subject 无法对齐。因此同一 origin 全部署只有**一个 subject、一套 run 历史、一套 finding**；多个项目注册同一 origin 时，provenance（`EvaluationSubjectSource`）留多行，只记"谁提交过"。
 - 推论：suppress / resolve 是**资产级**风险接受，不是项目级偏好——任一项目 suppress 后其余项目同样看不到该 finding。隔离不靠 subject 身份，靠宿主提交门禁（未通过归属验证的 origin 不进入 ingest）；见 §非目标。
 
 ### 2. 新增两个 evaluation key
+
+```ts
+export const SECURITY_EVALUATION_KEY_WEB_BASELINE = "web-baseline";
+export const SECURITY_EVALUATION_KEY_WEB_BEHAVIOR = "web-behavior";
+```
 
 | key | 手段 | 频率 | 判定对象 |
 | --- | --- | --- | --- |
 | `web-baseline` | 被动：单次 HEAD/GET + TLS 握手记录，跟随重定向并逐跳留证 | daily | 安全响应头存在性与取值、HSTS 参数、CSP 指令覆盖面、cookie 标志、TLS 协议与套件、证书链、`Server` / `X-Powered-By` 暴露 |
 | `web-behavior` | 受控主动：有界请求序列，单资产单 run ≤ 20 请求 | daily | 用户枚举差分、OTP/登录限速阈值、未认证访问特权接口 |
+
+`web-behavior` 的允许形态是**可判定**条款，不留解释空间：
+
+- **允许**：对宿主资产已配置的路径角色发起固定、无凭据、有界的请求（GET / POST）；请求体仅含白名单字段与占位值（如一次性邮箱格式的字符串）；单资产单 run 总请求数 ≤ 20。
+- **禁止**：真实凭据或任何账号登录、多步浏览器流程（导航 / 点击 / JS 执行）、文件上传、口令或 OTP 猜测、路径与参数爆破、副作用不可控的写请求（向非受控地址发信、建单、删除）。
+- 宿主侧同一边界见 nightwatch-backend ADR-044 §3；两份文档必须落在同一交集上，任一侧单独保留更宽的禁令即视为契约冲突（「覆盖承诺」与「不做清单」互相打脸）。
 
 不引入第三个 key：`Client-Side Only Authorization` 的完整判定需要认证后爬取与响应形状对比，超出"外部黑盒"边界；`web-behavior` 只覆盖"未认证即可读到特权数据"这一子集（见 §6）。
 
@@ -106,10 +118,12 @@ export const SECURITY_EVALUATION_WEB_BEHAVIOR_RULE_SET_VERSION = "v1";
 fingerprint 构造：
 
 ```
-sha256(criteriaId + "\u0000" + subjectKey + "\u0000" + discriminator)
+sha256(criteriaId + "\u0000" + discriminator)
 ```
 
 `discriminator` 按维度取：响应头类 = header 名；TLS 类 = 协议或套件标识；行为类 = 探测场景 id。这样"同一个头今年和明年缺失"是同一个 finding，"换了套件"是新 finding。
+
+`subjectKey` 不进哈希：与仓内既有三份 identity helper（dependency / code-scan / aws-config，均为 `sha256(parts.join("\u0000"))`）一致——finding 的唯一键是 `(subjectId, evaluationKey, fingerprint)`，subject 作用域由行承担；再拼一份 `subjectKey` 只会让同一缺陷在不同 origin 上算出看似不同的指纹，掩盖它是同一个问题。
 
 ### 6. 覆盖矩阵（对第三方报告 14 条未覆盖项）
 
@@ -125,6 +139,8 @@ sha256(criteriaId + "\u0000" + subjectKey + "\u0000" + discriminator)
 报告第 15 条（Next.js 16.2.11 AVIF RCE，报告评 Medium 并注明 GHSA 原文为 Critical）已由 `npm-osv` 以两条依赖 finding 命中，不属于本 ADR 的新增能力面，也不计入上表的 14 条。
 
 ### 7. schedules
+
+`WEB_ORIGIN` 即 `SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN` 的简写。
 
 ```ts
 { evaluationKey: SECURITY_EVALUATION_KEY_WEB_BASELINE, subjectKind: WEB_ORIGIN, recommendedInterval: "daily" },
@@ -144,14 +160,14 @@ sha256(criteriaId + "\u0000" + subjectKey + "\u0000" + discriminator)
 - registry 变更点共 8 处，缺一即失效：
   1. `constants.ts`：kind 常量与 `SECURITY_EVALUATION_SUBJECT_KINDS`、两个 key、两个规则集版本、两条 schedules。
   2. `ports/web-probe.access.ts`：新增端口与观测数据结构。
-  3. `criteria/security-evaluation-criteria.provider.ts`：`selectVersion` 的 `switch (subject.kind)` **必须新增 `web-origin` case**——现有 `default: return null`（`:40,74-75`）会让该 kind 的 run 取不到 criteria。
+  3. `criteria/security-evaluation-criteria.provider.ts`：`selectVersion` 的 `switch (subject.kind)` 新增 `web-origin` case，**且 case 内必须再按 `runConfig.evaluationKey` 二分支**返回 `web-baseline` / `web-behavior` 各自的版本；未知 key 返回 `null`，与现有 `default: return null`（`:40,74-75`）同语义。只加 case 不加内层分支，两个 key 会拿到同一份 criteria。
   4. `criteria/security-evaluation-criteria.seed.ts`：两个规则集版本的 seed。
-  5. `evidence/`：新增 `SecurityEvaluationWebBaselineEvidenceProvider` 与 `...WebBehaviorEvidenceProvider`（或一个按 key 分派的实现），实现 `EvidenceProvider.collect()`（`evidence.provider.ts:26-36`）并调用 `WebProbeAccess`——**端口是它的下游依赖，不是 run 的直接输入**。
+  5. `evidence/`：新增 `SecurityEvaluationWebBaselineEvidenceProvider` 与 `...WebBehaviorEvidenceProvider`（或一个按 key 分派的实现），实现 `EvidenceProvider.collect()`（`evaluation/ports/evidence.provider.ts:26-36`）并调用 `WebProbeAccess`——**端口是它的下游依赖，不是 run 的直接输入**。
   6. `judgment/`：两个确定性 mechanism。
   7. `module.ts`：kind-scoped 的 criteria / evidence / judgment 绑定与 exports，加上 mechanism 注册表项。
-  8. `README` 与单元测试（谓词真值表 + fingerprint 稳定性）。
+  8. `README` 与单元测试（谓词真值表、fingerprint 稳定性、未知 `evaluationKey` 必须返回 `null`）。
 - 宿主：见 nightwatch-backend ADR-044。
-- 前端：`EVALUATION_KEYS`、`EVALUATION_KEY_LABEL_KEYS`、`EVALUATION_KEY_OPTIONS` 三处映射（`page.tsx:163-171`、`212-219`）与 `en.json` / `zh.json` 的 `evaluationKeyWebBaseline` / `evaluationKeyWebBehavior`。
+- 前端：`EVALUATION_KEYS`、`EVALUATION_KEY_LABEL_KEYS`、`EVALUATION_KEY_OPTIONS` 三处映射（`src/app/(dashboard)/security-evaluation/page.tsx:163-171`、`212-219`）与 `en.json` / `zh.json` 的 `evaluationKeyWebBaseline` / `evaluationKeyWebBehavior`。
 
 ## 迁移阶段
 
