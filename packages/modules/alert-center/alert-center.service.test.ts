@@ -327,7 +327,7 @@ test("two concurrent first raises settle on the winner row", async () => {
   assert.equal(events.length, 0);
 });
 
-test("listFiring caps the projection and exposes only the stable fields", async () => {
+test("listFiringAlerts caps the projection and exposes only the stable fields", async () => {
   const captured: { args?: Row } = {};
   const prisma = {
     alert: {
@@ -339,7 +339,7 @@ test("listFiring caps the projection and exposes only the stable fields", async 
   };
   const service = new AlertCenterService(prisma as never, {} as never);
 
-  const rows = await service.listFiring({ source: "security-evaluation", limit: 5_000 });
+  const rows = await service.listFiringAlerts({ source: "security-evaluation", limit: 5_000 });
 
   // A caller-supplied limit can never widen the bound (R44-11).
   assert.equal(captured.args!.take, 500);
@@ -347,11 +347,11 @@ test("listFiring caps the projection and exposes only the stable fields", async 
   assert.deepEqual(rows, [{ id: "a1", scopeId: "p1", labels: { evaluationKey: "k" } }]);
 });
 
-test("listFiring normalises a null label payload", async () => {
+test("listFiringAlerts normalises a null label payload", async () => {
   const prisma = { alert: { findMany: async () => [{ id: "a1", scopeId: null, labels: null }] } };
   const service = new AlertCenterService(prisma as never, {} as never);
 
-  assert.deepEqual(await service.listFiring({ source: "security-evaluation" }), [
+  assert.deepEqual(await service.listFiringAlerts({ source: "security-evaluation" }), [
     { id: "a1", scopeId: null, labels: {} },
   ]);
 });

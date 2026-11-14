@@ -329,7 +329,7 @@ export class AlertCenterService {
    * are the producer's own data, so the caller may match its key there; the
    * module never interprets them.
    */
-  async listFiring(input: { source: string; limit?: number }): Promise<FiringAlertRef[]> {
+  async listFiringAlerts(input: { source: string; limit?: number }): Promise<FiringAlertRef[]> {
     const limit = Math.min(Math.max(input.limit ?? MAX_FIRING_ALERTS, 1), MAX_FIRING_ALERTS);
     const rows = await this.prisma.alert.findMany({
       where: { source: input.source, state: "firing" },

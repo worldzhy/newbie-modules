@@ -9,7 +9,7 @@ Alert identity, state machine, reminder rhythm and per-source pause (ADR-065). A
 - **AlertSourceRegistryService** (code): the source registry. `raise()` and `resolve()` reject unregistered keys, so a typo surfaces at the call site instead of creating a ghost source.
 - **AlertNotificationPort** (host-provided, optional): turns one lifecycle event into a notification. The host maps `(source, state)` to a notification key and calls `NotificationCenterService.notify()`. Without an adapter alerts are still recorded; only external delivery is skipped.
 - **AlertScopeVisibilityPort** (host-provided, required): `visibleScopeIds(userId)` answers which scopes a caller may write into. The HTTP write endpoints (`POST /alerts`, `POST /alerts/resolve`) reject a `scopeId` outside that set, so the write permission cannot reach another tenant. The controller injects it without `@Optional`: a host that forgets to bind it fails at startup instead of accepting an unbound scope. In-process producers call `raise()`/`resolve()` directly and are not subject to this guard.
-- **`listFiring({ source, limit? })`** (service read): bounded projection of one source's firing alerts (`id`, `scopeId`, `labels`), capped at 500 rows. A producer that reconciles its own lifecycle asks here instead of reading the `Alert` table, so the row shape stays private to the module and the scan stays bounded.
+- **`listFiringAlerts({ source, limit? })`** (service read): bounded projection of one source's firing alerts (`id`, `scopeId`, `labels`), capped at 500 rows. A producer that reconciles its own lifecycle asks here instead of reading the `Alert` table, so the row shape stays private to the module and the scan stays bounded.
 
 ## State machine
 
