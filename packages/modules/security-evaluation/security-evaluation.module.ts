@@ -5,6 +5,7 @@ import { evidenceProviderToken } from "@modules/evaluation/ports/evidence.provid
 import { judgmentPortToken } from "@modules/evaluation/ports/judgment.port";
 
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
+import { SecurityEvaluationWebOriginService } from "./assets/security-evaluation-web-origin.service";
 import { SecurityEvaluationCriteriaProvider } from "./criteria/security-evaluation-criteria.provider";
 import { SecurityEvaluationCriteriaSeed } from "./criteria/security-evaluation-criteria.seed";
 import { SecurityEvaluationAwsConfigEvidenceProvider } from "./evidence/security-evaluation-aws-config-evidence.provider";
@@ -67,6 +68,10 @@ import {
  * here: the host binds them (nightwatch uses its github and aws-identity
  * modules). An unbound port fails the run with a wiring error rather than
  * silently reporting a clean result.
+ *
+ * `SECURITY_EVALUATION_VERIFICATION_FETCH_ACCESS` (ADR-044) is optional and
+ * only needed by deployments that register web origins; the port is injected
+ * optionally so a host without web origins boots unchanged.
  */
 @Global()
 @Module({
@@ -74,6 +79,7 @@ import {
   controllers: [SecurityEvaluationController],
   providers: [
     SecurityEvaluationAssetService,
+    SecurityEvaluationWebOriginService,
     SecurityEvaluationCriteriaSeed,
     SecurityEvaluationCriteriaProvider,
     SecurityEvaluationEvidenceProvider,
@@ -178,6 +184,7 @@ import {
   ],
   exports: [
     SecurityEvaluationAssetService,
+    SecurityEvaluationWebOriginService,
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,
     SecurityEvaluationKnowledgeService,

@@ -12,8 +12,9 @@ lands in a later slice on the same run and finding lifecycle.
 
 | Term           | Meaning                                                                                                                                                                                                                                                                                                                                        |
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subject        | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; the coordinate is the module's `platform` constant (ADR-039) — projects are provenance, not scope. Subjects of kinds that need host credentials carry an opaque `credentialRef` registered at ingest.                                                         |
+| Subject        | The skeleton's `EvaluationSubject` row. `kind` is `repository`, `aws-account` or `web-origin`; the coordinate is the module's `platform` constant (ADR-039) — projects are provenance, not scope. Subjects of kinds that need host credentials carry an opaque `credentialRef` registered at ingest.                                           |
 | Asset          | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state knowledge items.                                                                                                                                                                                                   |
+| Web origin     | `SecurityEvaluationWebOrigin`, one-to-one with a web-origin asset. Owns `environment`, the `targetPaths` role map, and the ownership-verification lifecycle (token, method, status, timestamps). Identity stays on the asset (`naturalKey` = normalized origin, `displayName` = label).                                                        |
 | Knowledge item | `SecurityEvaluationAwsConfigKnowledgeItem` / `SecurityEvaluationNpmPackageKnowledgeItem`: something observed about an asset right now (`type`, `key`, small intrinsic `value`); `SecurityEvaluationThreatKnowledgeItem` is the world-scoped intel sibling. Items are upserted, never deleted here; history lives in the archived run manifest. |
 | Criteria       | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                                                                                                                                                    |
 | Finding        | Skeleton `EvaluationFinding` with identity `(subjectId, evaluationKey, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                                                                                                                                                |
@@ -27,6 +28,14 @@ lands in a later slice on the same run and finding lifecycle.
   configured `awsCrossAccountBinding` to one subject and registers the
   binding's credential reference (`aws-binding:<id>`) on the subject at ingest;
   evidence collection resolves exactly that reference, never a derived one.
+- `web-origin` — a deployment registered by `SecurityEvaluationWebOriginService`.
+  `create` writes the platform subject, its asset and the web-origin record in
+  one transaction; `origin` is normalized to `scheme://host[:port]` (lowercase,
+  punycode, default ports omitted) and becomes the asset's `naturalKey`.
+  Evaluation is gated on ownership verification: only `isActive` and `VERIFIED`
+  origins are submitted, and `listActiveVerified` lazily re-verifies them after
+  the configured interval (ADR-044). Verification reads go through the optional
+  host-bound `SECURITY_EVALUATION_VERIFICATION_FETCH_ACCESS` port.
 
 Hosts declare subjects by calling `POST /security-evaluation/subjects/sync` with
 one subject and the source that supplied it (`sourceType` / `sourceId`, opaque

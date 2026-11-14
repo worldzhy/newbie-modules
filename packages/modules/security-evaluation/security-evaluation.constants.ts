@@ -1,13 +1,47 @@
 /** Subject kinds owned by this feature (ADR-022). Kebab-case, like "work". */
 export const SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY = "repository";
 export const SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT = "aws-account";
+export const SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN = "web-origin";
 
 export const SECURITY_EVALUATION_SUBJECT_KINDS = [
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
+  SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
 ] as const;
 
 export type SecurityEvaluationSubjectKind = (typeof SECURITY_EVALUATION_SUBJECT_KINDS)[number];
+
+/**
+ * Path roles a rule may target on a web origin (ADR-066 §1). Rules never embed
+ * URLs: they declare the semantic slot they need, and the asset owns the
+ * "role → relative path" map, so a ruleset change never forks per asset and an
+ * unconfigured role simply skips the criterion.
+ */
+export const SECURITY_EVALUATION_WEB_ORIGIN_PATH_ROLES = ["auth.login", "auth.otp-request", "api.session"] as const;
+
+export type SecurityEvaluationWebOriginPathRole = (typeof SECURITY_EVALUATION_WEB_ORIGIN_PATH_ROLES)[number];
+
+/** Ownership-verification states of a web-origin asset (ADR-044 §2). */
+export const SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_STATUSES = [
+  "PENDING",
+  "VERIFIED",
+  "FAILED",
+  "REVOKED",
+] as const;
+
+export type SecurityEvaluationWebOriginVerificationStatus =
+  (typeof SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_STATUSES)[number];
+
+/** How a host proves it controls an origin (ADR-044 §2). */
+export const SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS = ["DNS_TXT", "WELL_KNOWN"] as const;
+
+export type SecurityEvaluationWebOriginVerificationMethod =
+  (typeof SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS)[number];
+
+/** Protocol constants of the two verification channels. */
+export const SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX = "_nightwatch-verify";
+export const SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX = "nightwatch-verify=";
+export const SECURITY_EVALUATION_WEB_ORIGIN_WELL_KNOWN_PATH = "/.well-known/nightwatch-verification.txt";
 
 /**
  * The feature is platform-level (ADR-039 nightwatch-backend): one subject per

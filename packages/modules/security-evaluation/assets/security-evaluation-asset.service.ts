@@ -146,8 +146,8 @@ export class SecurityEvaluationAssetService {
   }
 
   /** Idempotent: one asset row per subject, forever. */
-  async getOrCreateAsset(subject: EvaluationSubjectRef) {
-    return this.prisma.securityEvaluationAsset.upsert({
+  async getOrCreateAsset(subject: EvaluationSubjectRef, client?: Prisma.TransactionClient) {
+    return (client ?? this.prisma).securityEvaluationAsset.upsert({
       where: { subjectId: subject.id },
       create: {
         subjectId: subject.id,

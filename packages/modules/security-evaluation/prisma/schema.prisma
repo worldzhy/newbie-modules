@@ -3,22 +3,25 @@
 // consumer prisma tree on `newbie modules apply`.
 //
 // The run / result / criteria / finding tables belong to the evaluation
-// skeleton (`module/evaluation`, ADR-020). This feature only owns the asset
-// inventory: `subjectId` is a plain scalar with no relation — foreign keys
-// never cross schema boundaries.
+// skeleton (`module/evaluation`, ADR-020). This feature owns the asset
+// inventory and the web-origin ownership-verification record: `subjectId` is
+// a plain scalar with no relation — foreign keys never cross schema
+// boundaries.
 
 // !! ----------------------------------------------------------- //
 // !!            [Module] Security Evaluation models             //
 // !! ----------------------------------------------------------- //
 // * SecurityEvaluationAsset                                   //
 // * SecurityEvaluationAssetProvenance                         //
+// * SecurityEvaluationWebOrigin                               //
 // * SecurityEvaluationAwsConfigKnowledgeItem                  //
 // * SecurityEvaluationNpmPackageKnowledgeItem                 //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 /// One evaluated asset, one-to-one with an EvaluationSubject row of this
-/// feature's kinds ("repository" / "aws-account"). The skeleton owns the
-/// subject coordinate; this table owns the asset's inventory lifecycle.
+/// feature's kinds ("repository" / "aws-account" / "web-origin"). The skeleton
+/// owns the subject coordinate; this table owns the asset's inventory
+/// lifecycle.
 /// `naturalKey` is the feature's stable identity inside its scope — a
 /// repository full name or an AWS account id.
 model SecurityEvaluationAsset {
@@ -32,12 +35,13 @@ model SecurityEvaluationAsset {
 
   awsConfigKnowledgeItems   SecurityEvaluationAwsConfigKnowledgeItem[]
   npmPackageKnowledgeItems  SecurityEvaluationNpmPackageKnowledgeItem[]
+  webOrigin                 SecurityEvaluationWebOrigin?
 
   @@index([naturalKey])
   @@schema("module/security-evaluation")
 }
 
-/// Provenance of a subject: which host source submitted it (ADR-039). A
+/// Provenance of a subject: which host source attributed it (ADR-039). A
 /// platform-level subject may be supplied by several sources — the same
 /// repository can back applications of two projects, so the relation is many
 /// to many and the row set is what "who contributed this asset" means.
@@ -56,6 +60,46 @@ model SecurityEvaluationAssetProvenance {
 
   @@unique([subjectId, sourceType, sourceId])
   @@index([sourceType, sourceId])
+  @@schema("module/security-evaluation")
+}
+
+/// Ownership-verification record of a web-origin asset (ADR-066, ADR-044).
+///
+/// One row per asset: the asset carries the identity (`naturalKey` is the
+/// normalized origin, `displayName` the label) and the provenance rows carry
+/// who attributed it — this table owns only what is specific to a web origin:
+/// where it runs, which path roles the rules can target, and whether the
+/// deployment still controls the origin.
+///
+/// Only `verificationStatus = VERIFIED` and `isActive` assets are submitted for
+/// evaluation. Re-verification is lazy (the host calls `listActiveVerified`),
+/// so the module needs no scheduler; consecutive failures beyond the configured
+/// threshold move the row to `FAILED` and stop evaluation of a domain that may
+/// have changed hands.
+model SecurityEvaluationWebOrigin {
+  id                   String    @id @default(uuid()) @db.Uuid
+  assetId              String    @unique @db.Uuid
+  // Free-form deployment slot chosen by the host ("production", "staging"…).
+  environment          String    @db.VarChar(32)
+  // Path role → relative path, e.g. { "auth.login": "/login" }. Dropping a
+  // role makes criteria that depend on it report "target not configured".
+  targetPaths          Json      @default("{}") @db.JsonB
+  // PENDING | VERIFIED | FAILED | REVOKED.
+  verificationStatus   String    @default("PENDING") @db.VarChar(16)
+  verificationToken    String    @db.VarChar(64)
+  // DNS_TXT | WELL_KNOWN; null until the host requests a verification method.
+  verificationMethod   String?   @db.VarChar(16)
+  // Consecutive failed re-verifications; reset on success.
+  verificationFailures Int       @default(0)
+  verifiedAt           DateTime?
+  lastVerifiedAt       DateTime?
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([verificationStatus, isActive])
   @@schema("module/security-evaluation")
 }
 

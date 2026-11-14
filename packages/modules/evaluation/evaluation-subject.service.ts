@@ -32,9 +32,15 @@ export class EvaluationSubjectService {
     private readonly providers: EvaluationProviderRegistry,
   ) {}
 
-  /** Idempotent: the same natural key always resolves to the same row. */
-  async getOrCreateSubject(descriptor: EvaluationSubjectDescriptor) {
-    return this.prisma.evaluationSubject.upsert({
+  /**
+   * Idempotent: the same natural key always resolves to the same row.
+   *
+   * `client` lets a feature compose subject creation into its own transaction
+   * (e.g. registering an asset and its per-kind record atomically) without
+   * duplicating the upsert semantics.
+   */
+  async getOrCreateSubject(descriptor: EvaluationSubjectDescriptor, client?: Prisma.TransactionClient) {
+    return (client ?? this.prisma).evaluationSubject.upsert({
       where: {
         kind_scopeType_scopeId_subjectKey: {
           kind: descriptor.kind,
