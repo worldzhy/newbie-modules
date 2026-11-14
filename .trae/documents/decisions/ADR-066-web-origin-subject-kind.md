@@ -1,8 +1,8 @@
-# ADR-066: security-evaluation 以 web-origin subject kind 承载 Web 基线评估
+# ADR-066: security-evaluation 以 web-origin subject kind 承载 Web 外部姿态与行为评估
 
 状态：已采纳（2026-11-14 用户批准；round45 评审缺口 R45-01~09 已同批闭合，宿主实施见 nightwatch-backend ADR-044）
 更新：2026-11-14 — round46 R46-09：前端硬编码映射由「三处」订正为四处，补 `runOptionsFor` 与默认选项 409 后果（§影响）。
-勘误：2026-11-14 — **资产表与归属验证记录从宿主下移到本模块**。本模块新增 `SecurityEvaluationWebOrigin` 表（`@@schema("module/security-evaluation")`，与 `SecurityEvaluationAsset` 一对一，`assetId @unique` + `onDelete: Cascade`）、`SecurityEvaluationWebOriginService`（`create` / `requestVerification` / `verify` / `listActiveVerified` / `pathRoles`）与可选端口 `VerificationFetchAccess`，并新增三个配置键 `webOriginVerificationIntervalDays` / `webOriginReverifyFailureThreshold` / `webOriginTokenBytes`。宿主不再建 `application.WebOrigin` 表，只保留 HTTP 入口、出网实现与项目来源上报（nightwatch-backend ADR-044 同步改写）。同批改名：模型 `SecurityEvaluationAssetSource` → `SecurityEvaluationAssetProvenance`（DTO `SecurityEvaluationAssetProvenanceResponseDto`，JSON 字段 `sources` 不变）、枚举 `SecurityEvaluationVerdictKind` → `SecurityEvaluationThreatVerdictKind`，Prisma 访问器统一为 `securityEvaluationAssetProvenance`。§1 的 `targetPaths` 因此落在本模块表上，不再是宿主 `WebOrigin.targetPaths`。
+勘误：2026-11-14 — **资产表与归属验证记录从宿主下移到本模块**。本模块新增 `SecurityEvaluationWebOrigin` 表（`@@schema("module/security-evaluation")`，与 `SecurityEvaluationAsset` 一对一，`assetId @unique` + `onDelete: Cascade`）、`SecurityEvaluationWebOriginService`（`create` / `requestVerification` / `verify` / `listActiveVerified` / `pathRoles`）与可选端口 `VerificationFetchAccess`，并新增三个配置键 `webOriginVerificationIntervalDays` / `webOriginReverifyFailureThreshold` / `webOriginTokenBytes`。宿主不再建 `application.WebOrigin` 表，只保留 HTTP 入口、出网实现与项目来源上报（nightwatch-backend ADR-044 同步改写）。同批改名：模型 `SecurityEvaluationAssetSource` → `SecurityEvaluationAssetProvenance`（DTO `SecurityEvaluationAssetProvenanceResponseDto`，JSON 字段 `sources` 不变）、枚举 `SecurityEvaluationVerdictKind` → `SecurityEvaluationThreatVerdictKind`，Prisma 访问器统一为 `securityEvaluationAssetProvenance`。§1 的 `targetPaths` 因此落在本模块表上，不再是宿主 `WebOrigin.targetPaths`。同批评估 key 命名校正：`web-baseline` → `web-posture`（`baseline` 与 criteria seed 的 `BaselineSeed` 撞词，且该 key 判的是当下外部姿态而非对比基线），`web-behavior` 不变。
 日期：2026-11-14
 关系：扩展 ADR-022（security-evaluation 重建）的 kind 集合、ADR-037（evaluation key 与 criteria 版本化）、ADR-046（judgment mechanism 组合）、ADR-039（platform-level subject）；不取代任何既有 ADR。
 
@@ -46,13 +46,13 @@ export const SECURITY_EVALUATION_SUBJECT_KINDS = [
 ### 2. 新增两个 evaluation key
 
 ```ts
-export const SECURITY_EVALUATION_KEY_WEB_BASELINE = "web-baseline";
+export const SECURITY_EVALUATION_KEY_WEB_POSTURE = "web-posture";
 export const SECURITY_EVALUATION_KEY_WEB_BEHAVIOR = "web-behavior";
 ```
 
 | key | 手段 | 频率 | 判定对象 |
 | --- | --- | --- | --- |
-| `web-baseline` | 被动：单次 HEAD/GET + TLS 握手记录，跟随重定向并逐跳留证 | daily | 安全响应头存在性与取值、HSTS 参数、CSP 指令覆盖面、cookie 标志、TLS 协议与套件、证书链、`Server` / `X-Powered-By` 暴露 |
+| `web-posture` | 被动：单次 HEAD/GET + TLS 握手记录，跟随重定向并逐跳留证 | daily | 安全响应头存在性与取值、HSTS 参数、CSP 指令覆盖面、cookie 标志、TLS 协议与套件、证书链、`Server` / `X-Powered-By` 暴露 |
 | `web-behavior` | 受控主动：有界请求序列，单资产单 run ≤ 20 请求 | daily | 用户枚举差分、OTP/登录限速阈值、未认证访问特权接口 |
 
 `web-behavior` 的允许形态是**可判定**条款，不留解释空间：
@@ -85,7 +85,7 @@ export interface WebProbeAccess {
 新增两个 code-defined 规则集，版本串沿用现有 `"v1"` 惯例（`constants.ts:33-64`）：
 
 ```ts
-export const SECURITY_EVALUATION_WEB_BASELINE_RULE_SET_VERSION = "v1";
+export const SECURITY_EVALUATION_WEB_POSTURE_RULE_SET_VERSION = "v1";
 export const SECURITY_EVALUATION_WEB_BEHAVIOR_RULE_SET_VERSION = "v1";
 ```
 
@@ -115,7 +115,7 @@ export const SECURITY_EVALUATION_WEB_BEHAVIOR_RULE_SET_VERSION = "v1";
 
 ### 5. judgment mechanism
 
-在 `SECURITY_EVALUATION_JUDGMENT_MECHANISMS`（`module.ts:97-111`）注册两个确定性 mechanism：`web-baseline`、`web-behavior`。二者是纯函数——输入 observation，输出 verdict + evidence，不调用 LLM、不读数据库。
+在 `SECURITY_EVALUATION_JUDGMENT_MECHANISMS`（`module.ts:97-111`）注册两个确定性 mechanism：`web-posture`、`web-behavior`。二者是纯函数——输入 observation，输出 verdict + evidence，不调用 LLM、不读数据库。
 
 fingerprint 构造：
 
@@ -131,7 +131,7 @@ sha256(criteriaId + "\u0000" + discriminator)
 
 | 报告条目 | 我们的 severity | key | 覆盖 |
 | --- | --- | --- | --- |
-| 11 条响应头/TLS（X-Content-Type-Options ×2、HSTS、X-Powered-By ×2、X-Frame-Options、CSP、Permissions-Policy、Referrer-Policy、弱套件 ×2） | INFO ×4、LOW ×4、MEDIUM ×1、按证据升级 ×2 | `web-baseline` | 完整 |
+| 11 条响应头/TLS（X-Content-Type-Options ×2、HSTS、X-Powered-By ×2、X-Frame-Options、CSP、Permissions-Policy、Referrer-Policy、弱套件 ×2） | INFO ×4、LOW ×4、MEDIUM ×1、按证据升级 ×2 | `web-posture` | 完整 |
 | User Enumeration | MEDIUM | `web-behavior` | 完整（同参数在存在/不存在账号下的响应差分） |
 | Email Flooding via OTP | HIGH | `web-behavior` | 完整（阈值内连续请求，观察是否被限速） |
 | Client-Side Only Authorization | MEDIUM | `web-behavior` | **部分**（仅未认证可达子集；认证后越权不在本 ADR 范围） |
@@ -145,7 +145,7 @@ sha256(criteriaId + "\u0000" + discriminator)
 `WEB_ORIGIN` 即 `SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN` 的简写。
 
 ```ts
-{ evaluationKey: SECURITY_EVALUATION_KEY_WEB_BASELINE, subjectKind: WEB_ORIGIN, recommendedInterval: "daily" },
+{ evaluationKey: SECURITY_EVALUATION_KEY_WEB_POSTURE, subjectKind: WEB_ORIGIN, recommendedInterval: "daily" },
 { evaluationKey: SECURITY_EVALUATION_KEY_WEB_BEHAVIOR, subjectKind: WEB_ORIGIN, recommendedInterval: "daily" },
 ```
 
@@ -162,15 +162,15 @@ sha256(criteriaId + "\u0000" + discriminator)
 - registry 变更点共 8 处，缺一即失效：
   1. `constants.ts`：kind 常量与 `SECURITY_EVALUATION_SUBJECT_KINDS`、两个 key、两个规则集版本、两条 schedules。
   2. `ports/web-probe.access.ts`：新增端口与观测数据结构。
-  3. `criteria/security-evaluation-criteria.provider.ts`：`selectVersion` 的 `switch (subject.kind)` 新增 `web-origin` case，**且 case 内必须再按 `runConfig.evaluationKey` 二分支**返回 `web-baseline` / `web-behavior` 各自的版本；未知 key 返回 `null`，与现有 `default: return null`（`:40,74-75`）同语义。只加 case 不加内层分支，两个 key 会拿到同一份 criteria。
+  3. `criteria/security-evaluation-criteria.provider.ts`：`selectVersion` 的 `switch (subject.kind)` 新增 `web-origin` case，**且 case 内必须再按 `runConfig.evaluationKey` 二分支**返回 `web-posture` / `web-behavior` 各自的版本；未知 key 返回 `null`，与现有 `default: return null`（`:40,74-75`）同语义。只加 case 不加内层分支，两个 key 会拿到同一份 criteria。
   4. `criteria/security-evaluation-criteria.seed.ts`：两个规则集版本的 seed。
-  5. `evidence/`：新增 `SecurityEvaluationWebBaselineEvidenceProvider` 与 `...WebBehaviorEvidenceProvider`（或一个按 key 分派的实现），实现 `EvidenceProvider.collect()`（`evaluation/ports/evidence.provider.ts:26-36`）并调用 `WebProbeAccess`——**端口是它的下游依赖，不是 run 的直接输入**。
+  5. `evidence/`：新增 `SecurityEvaluationWebPostureEvidenceProvider` 与 `...WebBehaviorEvidenceProvider`（或一个按 key 分派的实现），实现 `EvidenceProvider.collect()`（`evaluation/ports/evidence.provider.ts:26-36`）并调用 `WebProbeAccess`——**端口是它的下游依赖，不是 run 的直接输入**。
   6. `judgment/`：两个确定性 mechanism。
   7. `module.ts`：kind-scoped 的 criteria / evidence / judgment 绑定与 exports，加上 mechanism 注册表项。
   8. `README` 与单元测试（谓词真值表、fingerprint 稳定性、未知 `evaluationKey` 必须返回 `null`）。
 - 勘误（2026-11-14）追加的 registry 变更点：`prisma/schema.prisma` 的 `SecurityEvaluationWebOrigin`（1:1 Asset，含 `verificationFailures` 支撑失败阈值）、`assets/security-evaluation-web-origin.service.ts`、`ports/web-origin-verification-access.port.ts`、`security-evaluation.constants.ts` 的 `web-origin` 常量族、`newbie.module.json` 三个配置键、`security-evaluation.module.ts` 的 provider/export，以及 `security-evaluation-web-origin.test.ts`。
 - 宿主：见 nightwatch-backend ADR-044。
-- 前端：按 key 的硬编码映射共**四处**——`EVALUATION_KEYS`、`EVALUATION_KEY_LABEL_KEYS`、`EVALUATION_KEY_OPTIONS`（`src/app/(dashboard)/security-evaluation/page.tsx:163-171`、`212-219`）与 `runOptionsFor`（`:1150-1165`，连同它的 `RunOption.labelKey` 联合类型）。`runOptionsFor` 的 `web-origin` 分支必须返回带 `evaluationKey` 的选项，落到 `runOptionDefault` 会让 `selectVersion` 返回 `null` 并抛 409（`evaluation/evaluation-run.service.ts:268-272`）。另需 `en.json` / `zh.json` 的 `evaluationKeyWebBaseline` / `evaluationKeyWebBehavior` 与 `runOptionWebBaseline` / `runOptionWebBehavior`。宿主实施细节见 nightwatch-backend ADR-044 §7。
+- 前端：按 key 的硬编码映射共**四处**——`EVALUATION_KEYS`、`EVALUATION_KEY_LABEL_KEYS`、`EVALUATION_KEY_OPTIONS`（`src/app/(dashboard)/security-evaluation/page.tsx:163-171`、`212-219`）与 `runOptionsFor`（`:1150-1165`，连同它的 `RunOption.labelKey` 联合类型）。`runOptionsFor` 的 `web-origin` 分支必须返回带 `evaluationKey` 的选项，落到 `runOptionDefault` 会让 `selectVersion` 返回 `null` 并抛 409（`evaluation/evaluation-run.service.ts:268-272`）。另需 `en.json` / `zh.json` 的 `evaluationKeyWebPosture` / `evaluationKeyWebBehavior` 与 `runOptionWebPosture` / `runOptionWebBehavior`。宿主实施细节见 nightwatch-backend ADR-044 §7。
 
 ## 迁移阶段
 
@@ -179,7 +179,7 @@ sha256(criteriaId + "\u0000" + discriminator)
 | P0a | 勘误：模块 `SecurityEvaluationWebOrigin` 表 + 迁移 + 注册/验证 service + `VerificationFetchAccess` 端口 + 三个配置键 + 单测（已完成，无 HTTP 面） | 无（无资产） |
 | P0b | 本 ADR 契约：kind / key / criteria / evidence / judgment / schedules | 无（未接入探测端口） |
 | P1 | 宿主 HTTP 入口、`VerificationFetchAccess` 适配器、探测适配器、sidecar（ADR-044） | 无（无 `VERIFIED` 资产即无 subject） |
-| P2 | `web-baseline` 上线，首批资产观察一轮 | 新增响应头/TLS finding |
+| P2 | `web-posture` 上线，首批资产观察一轮 | 新增响应头/TLS finding |
 | P3 | `web-behavior` 上线，预算与误报调优 | 新增行为类 finding |
 | P4 | 前端 key 展示与筛选；资产配置页 | 可见 |
 
