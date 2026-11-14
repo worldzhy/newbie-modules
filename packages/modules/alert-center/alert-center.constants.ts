@@ -19,6 +19,14 @@ export const DEFAULT_REPEAT_MINUTES = 60;
 /** Injection token of the host-provided notification adapter (ADR-065 §5). */
 export const ALERT_NOTIFICATION_PORT = "ALERT_NOTIFICATION_PORT";
 
+/**
+ * Injection token of the host-provided resolver answering which scopes a user
+ * may write alerts into. The HTTP write endpoints require it: taking `scopeId`
+ * at face value would let any member holding the write permission reach
+ * another tenant's alert and push track (R5-P2-02).
+ */
+export const ALERT_SCOPE_VISIBILITY_PORT = "ALERT_SCOPE_VISIBILITY_PORT";
+
 /** Postgres unique violation, used as the fingerprint arbitration point. */
 export const PG_UNIQUE_VIOLATION = "P2002";
 
@@ -63,6 +71,16 @@ export function isNotificationPaused(pausedUntil: Date | null | undefined, now: 
 export function nextNotificationAt(pausedUntil: Date | null | undefined, repeatMinutes: number, now: Date): Date {
   const base = isNotificationPaused(pausedUntil, now) && pausedUntil ? pausedUntil : now;
   return new Date(base.getTime() + repeatMinutes * 60_000);
+}
+
+/**
+ * Host-provided scope resolver. `scopeId` stays opaque to this module: the host
+ * decides what a scope denotes (a project in the reference host) and which ones
+ * a user owns.
+ */
+export interface AlertScopeVisibilityPort {
+  /** Scopes the user may write alerts into. */
+  visibleScopeIds(userId: string): Promise<string[]>;
 }
 
 /** Host-provided adapter that turns one alert lifecycle event into a notification. */

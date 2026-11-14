@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Put, Query } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Inject, Param, Post, Put, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
@@ -14,19 +14,32 @@ import {
   ResolveAlertResultDto,
   UpdateAlertSourceDto,
 } from "./alert-center.dto";
-import type { AlertSeverity } from "./alert-center.constants";
+import {
+  ALERT_SCOPE_VISIBILITY_PORT,
+  type AlertScopeVisibilityPort,
+  type AlertSeverity,
+} from "./alert-center.constants";
+
+interface AuthenticatedRequest {
+  user: { userId: string };
+}
 
 @ApiTags("Alert Center")
 @ApiBearerAuth()
 @Controller()
 export class AlertCenterController {
-  constructor(private readonly alerts: AlertCenterService) {}
+  constructor(
+    private readonly alerts: AlertCenterService,
+    @Inject(ALERT_SCOPE_VISIBILITY_PORT)
+    private readonly scopeVisibility: AlertScopeVisibilityPort,
+  ) {}
 
   @Post("alerts")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Alert)
   @ApiOperation({ summary: "Raise or advance one alert lifecycle" })
   @ApiResponse({ status: 201, type: RaiseAlertResultDto })
-  raise(@Body() body: RaiseAlertDto): Promise<RaiseAlertResultDto> {
+  async raise(@Req() req: AuthenticatedRequest, @Body() body: RaiseAlertDto): Promise<RaiseAlertResultDto> {
+    await this.assertScopeWritable(req.user.userId, body.scopeId);
     return this.alerts.raise({
       source: body.source,
       alertKey: body.alertKey,
@@ -42,7 +55,8 @@ export class AlertCenterController {
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.Alert)
   @ApiOperation({ summary: "Resolve one alert lifecycle; a late resolve returns a null id" })
   @ApiResponse({ status: 201, type: ResolveAlertResultDto })
-  async resolve(@Body() body: ResolveAlertDto): Promise<ResolveAlertResultDto> {
+  async resolve(@Req() req: AuthenticatedRequest, @Body() body: ResolveAlertDto): Promise<ResolveAlertResultDto> {
+    await this.assertScopeWritable(req.user.userId, body.scopeId);
     const result = await this.alerts.resolve({
       source: body.source,
       alertKey: body.alertKey,
@@ -82,5 +96,21 @@ export class AlertCenterController {
   @ApiResponse({ status: 200, type: AlertSourceDto })
   updateSource(@Param("key") key: string, @Body() body: UpdateAlertSourceDto): Promise<AlertSourceDto> {
     return this.alerts.updateSource(key, body ?? {});
+  }
+
+  /**
+   * Bind one HTTP write to the caller's own scopes. Only checked when the body
+   * names a scope: a scope-less (platform) write never reaches a project's push
+   * track, matching the notification endpoint's rule. In-process producers call
+   * the service directly and are not subject to this guard.
+   */
+  private async assertScopeWritable(userId: string, scopeId: string | undefined): Promise<void> {
+    if (!scopeId) {
+      return;
+    }
+    const visible = await this.scopeVisibility.visibleScopeIds(userId);
+    if (!visible.includes(scopeId)) {
+      throw new ForbiddenException(`Alert scope is not visible to the caller: ${scopeId}`);
+    }
   }
 }
