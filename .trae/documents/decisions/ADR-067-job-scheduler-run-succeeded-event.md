@@ -105,9 +105,13 @@ round47 评审（R47-03 / R47-04）发现：handler 永久挂起时，重入守�
   （`where status="running"`）改成 `failed`，`error` 写入超时说明，`durationMs` 按实际
   经过时间计算，并复用既有 `job-scheduler.run-failed` 事件（不新增事件类型）。
   本次触发仍写一行 `skipped`——守卫语义不变，`skipped` 不是任务结果（§1）。
-- 模块启动（`onApplicationBootstrap`）对 `status="running" AND startedAt < now - 阈值`
+- 模块启动后的首个 `reconcile` tick（30s 内）对 `status="running" AND startedAt < now - 阈值`
   的全表行执行同一收敛：上次进程崩溃留下的 running 行在本次生命周期内被标为 failed
-  并告警，避免它们永久悬挂。扫描有界（单次上限 100 行），失败只记日志不阻断启动。
+  并告警，避免它们永久悬挂。扫描有界（单次上限 100 行），失败只记日志，下个 tick 重试，
+  不阻断启动。不在 `onApplicationBootstrap` 里执行：Nest 按模块注册顺序 await 各模块的
+  bootstrap 钩子，而 `@nestjs/event-emitter` 在自己的钩子里才挂载 `@OnEvent` 监听器，
+  早于它的模块 emit 会落到零监听器且不报错；首个 tick 同时保证下游（通知设置与投递规则）
+  的 bootstrap 声明已完成。
 - 「标 failed 后 handler 又返回」视为迟到完成：既有成功分支照常把该行改写为 success
   并发出 `run-succeeded`，由宿主按 ADR-067 §2 闭合告警。超时阶段的 failed 记录保留在
   告警与事件历史里，JobRun 的最终状态以真实完成为准。

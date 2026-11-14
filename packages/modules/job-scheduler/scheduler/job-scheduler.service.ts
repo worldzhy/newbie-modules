@@ -3,7 +3,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  OnApplicationBootstrap,
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
@@ -67,7 +66,7 @@ interface JobScheduleRecord {
 }
 
 @Injectable()
-export class JobSchedulerService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
+export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(JobSchedulerService.name);
   /// Per-process reentry guard: keys of schedules whose run is still in progress.
   private readonly runningScheduleKeys = new Set<string>();
@@ -80,6 +79,7 @@ export class JobSchedulerService implements OnModuleInit, OnApplicationBootstrap
   private readonly stuckTimeoutMinutes: number;
   private readonly retentionDays: number;
   private lastRunPruneAt = 0;
+  private startupRecoveryDone = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -101,6 +101,7 @@ export class JobSchedulerService implements OnModuleInit, OnApplicationBootstrap
   async onModuleInit() {
     await this.reconcile();
     this.reconcileTimer = setInterval(() => {
+      void this.recoverStuckRunsOnce();
       this.reconcile().catch((error) => {
         this.logger.error(`Schedule reconcile failed: ${getErrorMessage(error)}`);
       });
@@ -108,11 +109,20 @@ export class JobSchedulerService implements OnModuleInit, OnApplicationBootstrap
   }
 
   /// Rows left `running` by a previous process can never complete on their own;
-  /// close them once the module is fully wired so the failure events still
-  /// reach their listeners (ADR-067 addendum).
-  async onApplicationBootstrap() {
+  /// close them so their failure events still reach their listeners (ADR-067
+  /// addendum). This runs on the first reconcile tick rather than in
+  /// `onApplicationBootstrap`: bootstrap hooks are awaited in module order, and
+  /// `@nestjs/event-emitter` attaches `@OnEvent` handlers in its own hook, so an
+  /// emit from an earlier module reaches zero listeners and is silently
+  /// dropped. The tick also runs after downstream declarations (notification
+  /// settings and delivery rules) are reconciled.
+  private async recoverStuckRunsOnce(): Promise<void> {
+    if (this.startupRecoveryDone) {
+      return;
+    }
     try {
       await this.failStuckRuns();
+      this.startupRecoveryDone = true;
     } catch (error) {
       this.logger.error(`Stale run recovery failed: ${getErrorMessage(error)}`);
     }

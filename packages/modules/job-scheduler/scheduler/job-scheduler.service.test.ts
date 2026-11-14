@@ -100,11 +100,17 @@ function runningRun(overrides: Row = {}): Row {
   return { id: 10, scheduleId: 1, trigger: "schedule", status: "running", startedAt: new Date(), ...overrides };
 }
 
+/// The sweep is private and runs from the first reconcile tick, so tests drive
+/// it directly instead of waiting a full interval.
+function runStartupRecovery(service: JobSchedulerService): Promise<void> {
+  return (service as unknown as { recoverStuckRunsOnce(): Promise<void> }).recoverStuckRunsOnce();
+}
+
 test("boot closes running rows abandoned by a previous process", async () => {
   const stale = runningRun({ startedAt: new Date(Date.now() - 31 * 60_000) });
   const { service, emitted } = newHarness({ runs: [stale], schedules: [schedule()] });
 
-  await service.onApplicationBootstrap();
+  await runStartupRecovery(service);
 
   assert.equal(stale.status, "failed");
   assert.match(stale.error, /stuck-run threshold of 30 minutes/);
@@ -118,7 +124,7 @@ test("boot leaves a run younger than the threshold untouched", async () => {
   const fresh = runningRun({ startedAt: new Date(Date.now() - 5 * 60_000) });
   const { service, emitted } = newHarness({ runs: [fresh], schedules: [schedule()] });
 
-  await service.onApplicationBootstrap();
+  await runStartupRecovery(service);
 
   assert.equal(fresh.status, "running");
   assert.equal(emitted.length, 0);
