@@ -1,9 +1,10 @@
-import { Inject, Injectable, InternalServerErrorException, UnauthorizedException } from "@nestjs/common";
+import { Inject, Injectable, InternalServerErrorException } from "@nestjs/common";
 import { Optional } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { Request } from "express";
+import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { TokenService } from "../../token/token.service";
 import { ACCESS_TOKEN_SESSION_RESOLVER, AccessTokenSessionResolver } from "../../ports/access-token-session.resolver";
 
@@ -41,7 +42,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   async validate(req: Request) {
     const accessToken = this.tokenService.getTokenFromHttpRequest(req);
     if (!accessToken) {
-      throw new UnauthorizedException("No access token");
+      // No credential at all (ADR-048 §3, 1105): distinct from an account that
+      // was deleted (1101) and from a revoked session (1104), so clients and
+      // metrics can tell "the caller sent nothing" apart from "the caller's
+      // session died".
+      throw new NewbieException(NewbieExceptionType.Session_Missing);
     }
 
     const accessTokenInfo = this.tokenService.verifyUserAccessToken(accessToken);
