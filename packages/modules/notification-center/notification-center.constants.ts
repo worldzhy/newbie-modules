@@ -1,17 +1,21 @@
-import type { EvaluationFindingSeverity } from "@modules/evaluation/ports/evaluation.contracts";
-import { SEVERITIES as EVALUATION_SEVERITIES, SEVERITY_RANK } from "@modules/evaluation/evaluation-severity.util";
-
-/** Lower-case notification vocabulary derived from the shared evaluation set. */
-export type NotificationSeverity = Lowercase<EvaluationFindingSeverity>;
-export const SEVERITIES: NotificationSeverity[] = EVALUATION_SEVERITIES.map(
-  (severity) => severity.toLowerCase() as NotificationSeverity,
-);
+/**
+ * Severity vocabulary owned by the notification domain (ADR-062). It stays
+ * deliberately aligned with the alert domain's five levels, but it is not
+ * derived from another module: a vocabulary cross-import would make a change
+ * on one side a silent contract change on the other (R47-06).
+ */
+export const SEVERITIES = ["info", "low", "medium", "high", "critical"] as const;
+export type NotificationSeverity = (typeof SEVERITIES)[number];
 
 // Severity ranking for threshold comparisons; info is treated as the
 // weakest signal so it never pushes an alert on its own.
-export const SEVERITY_LEVEL: Record<string, number> = Object.fromEntries(
-  EVALUATION_SEVERITIES.map((severity) => [severity.toLowerCase(), SEVERITY_RANK[severity]]),
-);
+export const SEVERITY_LEVEL: Record<string, number> = {
+  info: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+  critical: 4,
+};
 
 export const CENTER_SETTING_SINGLETON_ID = 1;
 export const DEFAULT_PUSH_ENABLED = false;
@@ -71,8 +75,9 @@ export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
 /**
  * Runtime guard for a severity crossing the public boundary. The vocabulary is
- * closed and shared with the alert domain; a value outside it is a caller
- * defect, so it is rejected instead of falling back to a default (ADR-062).
+ * closed and deliberately aligned with the alert domain, but each domain owns
+ * its own list; a value outside it is a caller defect, so it is rejected
+ * instead of falling back to a default (ADR-062, R47-06).
  */
 export function isNotificationSeverity(value: unknown): value is NotificationSeverity {
   return typeof value === "string" && (SEVERITIES as readonly string[]).includes(value);

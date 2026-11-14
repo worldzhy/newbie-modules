@@ -13,6 +13,17 @@ As a convenience, a concrete scheduled job can instead extend the abstract `Sche
 4. **Execution and reentrancy guard**: when due, the corresponding job handler fires; if the previous run of the same schedule has not finished, the current run is recorded as `skipped` (in-process reentrancy guard, no distributed lock). Manual triggers go through `POST /job-scheduler/schedules/:key/trigger`.
 5. **Runtime editing**: `PATCH /job-scheduler/schedules/:key` can change `isEnabled` / `cronExpr` / `timezone` (invalid cron/timezone returns 400). Changes trigger an immediate reconcile without waiting for the next 30s tick; `key`/`handlerKey`/`payload` remain owned by the declaration side.
 6. **Execution history**: `JobRun` records trigger (schedule/manual), status (running/success/failed/skipped), duration, and error message.
+7. **Hung runs**: a run still `running` past `JOB_RUN_STUCK_TIMEOUT_MINUTES` is marked `failed` with a timeout message and announced through the existing `run-failed` event — once from the next trigger that hits the reentrancy guard, and once at boot for rows a previous process left behind (ADR-067 addendum). The interrupted trigger still records `skipped`.
+8. **Retention**: `JobRun` rows older than `JOB_RUN_RETENTION_DAYS` are pruned lazily on the run insert path, at most once per hour.
+
+## Configuration
+
+| Env                             | Default example | Meaning                                                        |
+| ------------------------------- | --------------- | -------------------------------------------------------------- |
+| `JOB_RUN_STUCK_TIMEOUT_MINUTES` | `30`            | Minutes a run may stay `running` before it is declared failed. |
+| `JOB_RUN_RETENTION_DAYS`        | `90`            | Days to keep `JobRun` rows.                                    |
+
+Both values are declared by the host manifest (ADR-033) and must be positive integers; there is no built-in fallback.
 
 ## Assembly conventions
 

@@ -8,6 +8,7 @@ import {
   NotFoundException,
   Optional,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
@@ -47,6 +48,20 @@ const MAX_UNRESOLVED_PUSH_FAILURES = 200;
 // Page size for the "mark all read" scan: receipts are written page by page, so
 // memory stays flat regardless of the unread count (R44-08).
 const MARK_ALL_READ_BATCH_SIZE = 500;
+
+const RETENTION_DAYS_KEY = "modules.notification-center.retentionDays";
+// The prune walks every old row, so it runs on the notify path at most once an
+// hour instead of once per delivery (R47-04 follows the event-emitter pattern).
+const RECORD_PRUNE_INTERVAL_MS = 60 * 60_000;
+
+/// Validates the retention window resolved from the assembler's bare env
+/// mapping (ADR-033): a declared positive integer, no built-in fallback.
+function requirePositiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer; received '${value}'.`);
+  }
+  return value;
+}
 
 // Links stored on a notification are rendered as anchors. Site-relative paths
 // and http(s) URLs are the only forms the UI can open safely (R5-P2-02).
@@ -171,15 +186,23 @@ function describeSuppression(verdict: { reason: DeliveryDecisionReason | null; r
 @Injectable()
 export class NotificationCenterService {
   private readonly logger = new Logger(NotificationCenterService.name);
+  private readonly retentionDays: number;
+  private lastPruneAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly registry: NotificationRegistryService,
     private readonly deliveryRules: NotificationDeliveryRuleService,
+    private readonly config: ConfigService,
     @Optional()
     @Inject(NOTIFICATION_PUSH_PORT)
     private readonly pushPort?: NotificationPushPort,
-  ) {}
+  ) {
+    this.retentionDays = requirePositiveInteger(
+      Number(this.config.getOrThrow<string>(RETENTION_DAYS_KEY)),
+      RETENTION_DAYS_KEY,
+    );
+  }
 
   // --- Delivery ------------------------------------------------------------
 
@@ -306,6 +329,7 @@ export class NotificationCenterService {
     let runtimeReason: DeliveryRuntimeReason | null = null;
 
     if (!deduplicated) {
+      await this.pruneExpiredRecords();
       // ADR-063: the real-time segment runs only when the rules allow delivery.
       // The first matching environment fact wins and is recorded next to the
       // rule decision, so "delivered by the rules but kept in-app" is explainable.
@@ -508,6 +532,34 @@ export class NotificationCenterService {
   }
 
   // --- Notification reads --------------------------------------------------
+
+  /**
+   * Lazy retention, following the event-emitter module: prune on the notify
+   * path, throttled in-process so a busy producer does not scan the history on
+   * every delivery. Attempts carry no foreign key to the record, so they are
+   * deleted explicitly; receipts and push failures cascade with the record.
+   */
+  private async pruneExpiredRecords(): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastPruneAt < RECORD_PRUNE_INTERVAL_MS) {
+      return;
+    }
+    this.lastPruneAt = now;
+    const cutoff = new Date(now - this.retentionDays * 24 * 60 * 60_000);
+    try {
+      const attempts = await this.prisma.notificationDeliveryAttempt.deleteMany({
+        where: { createdAt: { lt: cutoff } },
+      });
+      const records = await this.prisma.notificationRecord.deleteMany({ where: { createdAt: { lt: cutoff } } });
+      if (attempts.count > 0 || records.count > 0) {
+        this.logger.log(
+          `Pruned ${records.count} notification record(s) and ${attempts.count} delivery attempt(s) older than ${this.retentionDays} days.`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Notification retention prune failed: ${getErrorMessage(error)}`);
+    }
+  }
 
   async list(
     userId: string,

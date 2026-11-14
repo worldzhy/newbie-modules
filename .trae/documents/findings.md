@@ -354,3 +354,34 @@ round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents
 
 反驳轮（本轮）：R41-02 初判「永久卡死、完全不可编辑、会产生错误静默」被推翻，保留不变量破坏与 scheduled 显示，降为 P2；R41-03/R41-04 结论成立，R41-04 定性收窄为「契约悬空、无现存消费者」。已核验通过：装配零差异、fingerprint 含 projectId 前缀、宿主 url-check/heartbeat 两侧 alertKey 一致、删除链彻底移除、Restrict 生效、读面可见性、写面归属、并发兜底（R39-09/10）、链接安全第二向量、端点计数一致。R39-11/R39-12 仍 open；R40-03/04 withdrawn。
 
+## round46（2026-11-14，plan scope：ADR-066 / ADR-044 采纳后复评）
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R46-01 | newbie-modules | 路径角色词汇表未进入契约与影响清单：ADR-066 §1:40 只举例 `auth.login` / `auth.otp-request` / `api.session`，无导出常量、无入口校验、§影响（`:160-168`）自称穷举也未列；`Grep 'auth\.login|otp-request|api\.session|PATH_ROLE|pathRole'` 在 `packages/modules` 仅 4 条命中且全属 audit 模块 | P1 | docs | 读者/实现者 | open |
+| R46-02 | newbie-modules | OTP 占位邮箱与「禁止向非受控地址发信」互斥：ADR-066 §2:56-60 允许「占位值（如一次性邮箱格式的字符串）」又禁止「向非受控地址发信」，`web-behavior` 的 OTP 场景（§6:134）必然触发生信，实现者只能违反其一 | P1 | docs | 读者/实现者 | open |
+| R46-04 | newbie-modules | fingerprint 主张两处失实：字段名应为 `criterionKey`（非 `criteriaId`）；「三份 helper 均为 `sha256(parts.join("\u0000"))`」不成立——`judgment/dependency/security-evaluation-dependency.identity.ts:26-28` 返回 `${npm}:${name}:${vulnId}`、`judgment/aws-config/security-evaluation-aws-config.identity.ts:18-20` 返回 `aws:${criterionKey}:${resourceKey}`，仅 `judgment/code-scan/security-evaluation-code-scan.identity.ts:25-29` 为 sha256 | P2 | docs | 读者 | open |
+| R46-05 | newbie-modules / nightwatch-backend | origin 归一化「在写入前执行」未指定执行侧（registry `ingest()` 还是宿主入库），跨宿主归一化可能不一致 | P2 | docs | 读者 | open |
+| R46-06 | newbie-modules | 缺路径角色时「记为未配置目标并跳过」未指向 skeleton 的 `EvidenceCollection.skipped` 契约（要求 note + item ids），实现者可静默过滤 criteria | P2 | docs | 读者 | open |
+| R46-07 | newbie-modules / nightwatch-backend | 「模块只定义观测数据形状与预算上限」与 §3 接口、§影响第 2 项不符（无预算常量），ADR-044 §3 又给了宿主预算 → 两个权威源 | P2 | docs | 读者 | open |
+| R46-11 | newbie-modules | §2:53 判定对象列出 cookie 标志、证书链、`Server` 头，但 §4 规则表 11 行无对应规则，`:112` 只把证书过期/链不完整列为待定举例，cookie 与 `Server` 完全未提 | P2 | docs | 读者 | open |
+| R46-12 | newbie-modules / nightwatch-backend | 跨仓 `file:line` 仍不可定位（R45-08 残留）：ADR-066 的 `evaluation.prisma:56-64` 未标仓（实为 `nightwatch-backend/prisma/models/evaluation.prisma`）；ADR-044 的 `job.ts:20-25` 文件不存在（实为 `security-evaluation.scan.job.ts`） | P2 | docs | 读者 | open |
+
+结论：ADR-066 **有条件通过**——消掉 R46-01 / R46-02，并改准 R46-04 后可进入 P0；其余 P2 随对应阶段落地。
+主张判定与命令出处见 `nightwatch-backend/.trae/documents/reviews/expert-review-2026-11-14-round46-adr066-adr044.md`。
+
+## round47（2026-11-14，module scope：notification-center / alert-center / job-scheduler / event-emitter）
+
+报告：`.trae/documents/reviews/expert-review-2026-11-14-round47-alert-notification-job-event.md`。锚点：newbie-modules `100b13a`（dirty 1：本台账）、nightwatch-backend `6f91e0f`（4 个未跟踪项均非被审域）；四模块装配 `diff -rq` 零差异；59/59 单测通过。宿主侧条目（R47-07..11）见 `nightwatch-backend/.trae/documents/findings.md`。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R47-01 | newbie-modules + nightwatch-backend | `resolve()` 只按含 scope 的 fingerprint 命中，producer 被迫用 `listFiringAlerts`（上限 500、`createdAt asc`）全源扫描恢复；某源 firing 超 500 后最新告警永不 resolve、提醒无限重复。宿主 job 成功侧每事件扫一次（≈8,524 次/天），而 job 源专用、`alertKey` 已知，扫描本可省略（`alert-center.service.ts:236-243,332-345`；`job-failure-notifications.service.ts:63-78`） | P2 | live / latent | 自动路径 | open |
+| R47-02 | newbie-modules | `dispatchDueReminders` 先条件 claim 后 deliver，`deliver` 内部吞异常；投递失败仍消耗本次提醒（`nextNotificationAt` 前移、`reminderCount+1`）并把 `dispatched` 计为成功（`:297-317,471-487`；探针：notify 抛错返回 `{dispatched:1}`） | P2 | live | 任意投递失败 | open |
+| R47-03 | newbie-modules | 重入守卫的 `skipped` 不 emit 事件，全仓无 stale `running` reconcile；handler 永久挂起后每次触发只写 skipped，告警链永不触发（`job-scheduler.service.ts:281-294`） | P2 | live | handler 卡死 | open |
+| R47-04 | newbie-modules | `JobRun` 无保留期（≈8,524 行/天、≈311 万/年），`NotificationRecord` / `NotificationDeliveryAttempt` 亦无清理；仅 `eventEmission` 有 30 天摊还清理，同一条「运行→事件→通知」链三表寿命不一致 | P2 | live | 运行时长线性 | open |
+| R47-05 | newbie-modules | `EventEmission` 全量保存 payload（无脱敏/无大小上限）并保留 30 天；`module/event-emitter` 缺省授予全部动词、MEMBER 被绑定，任一成员可读 job error、url-check 目标 URL 等上下文（`event-emitter.service.ts:125-145`；`permission-groups.ts:229-236,457-459`） | P2 | live | 任意 MEMBER | open |
+| R47-06 | newbie-modules + nightwatch-backend | notification severity 词表派生自 `evaluation`（`notification-center.constants.ts:1-8`），alert 域另立 union（`alert-center.constants.ts:9`）；宿主 adapter 无校验 cast（`alert-notification.adapter.ts:60`），词表漂移时 `notify()` 抛 400 又被 `deliver` 吞掉 → 通知静默丢失 | P2 | artifact | 词表演化 | open |
+
+误报剔除：`raise()` 重入分支不写 `lastSeenAt` —— 被 `Alert.lastSeenAt @updatedAt`（`alert-center/prisma/schema.prisma:45`）反驳，撤销；`evaluation.run-failed` 无监听方 —— 已被 `security-evaluation-notifications.service.ts` 的 `events.on(...)` 推翻，撤销。正面不变量与命令出处见报告 §2/§8。
+

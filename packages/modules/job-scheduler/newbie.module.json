@@ -8,6 +8,24 @@
   },
   "requires": {
     "modules": ["event-emitter", "security"],
+    "config": {
+      "job-scheduler": {
+        "stuckRunTimeoutMinutes": "process.env.JOB_RUN_STUCK_TIMEOUT_MINUTES",
+        "retentionDays": "process.env.JOB_RUN_RETENTION_DAYS"
+      }
+    },
+    "env": {
+      "JOB_RUN_STUCK_TIMEOUT_MINUTES": {
+        "type": "int",
+        "example": 30,
+        "description": "Minutes a run may stay in status=running before the scheduler marks it failed and emits the existing run-failed event (ADR-067 addendum)."
+      },
+      "JOB_RUN_RETENTION_DAYS": {
+        "type": "int",
+        "example": 90,
+        "description": "Days to keep JobRun rows. Rows older than this are pruned lazily on the run insert path, at most once per hour."
+      }
+    },
     "dependencies": {
       "@nestjs/event-emitter": "latest",
       "@nestjs/schedule": "latest"

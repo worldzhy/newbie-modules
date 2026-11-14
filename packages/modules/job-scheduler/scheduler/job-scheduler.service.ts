@@ -3,9 +3,11 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnApplicationBootstrap,
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { EventEmitter2 } from "@nestjs/event-emitter";
@@ -24,6 +26,22 @@ const RECONCILE_INTERVAL_MS = 30_000;
 const CRON_JOB_NAME_PREFIX = "job-scheduler:";
 export const DEFAULT_TIMEZONE = "Asia/Shanghai";
 const PG_UNIQUE_VIOLATION = "P2002";
+const STUCK_RUN_TIMEOUT_KEY = "modules.job-scheduler.stuckRunTimeoutMinutes";
+const RETENTION_DAYS_KEY = "modules.job-scheduler.retentionDays";
+/// The stale-run sweeps are bounded: a boot that finds more than this many
+/// hung rows still starts, and the next trigger of each schedule converges the
+/// rest.
+const STUCK_RUN_SCAN_LIMIT = 100;
+const RUN_PRUNE_INTERVAL_MS = 60 * 60_000;
+
+/// Validates settings resolved from the assembler's bare env mapping
+/// (ADR-033): declared positive integers, no built-in fallback.
+function requirePositiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer; received '${value}'.`);
+  }
+  return value;
+}
 
 export type JobTrigger = "schedule" | "manual";
 
@@ -49,7 +67,7 @@ interface JobScheduleRecord {
 }
 
 @Injectable()
-export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
+export class JobSchedulerService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(JobSchedulerService.name);
   /// Per-process reentry guard: keys of schedules whose run is still in progress.
   private readonly runningScheduleKeys = new Set<string>();
@@ -57,13 +75,28 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   /// database-side cron/timezone drift without touching cron internals.
   private readonly registeredJobs = new Map<string, { cronExpr: string; timezone: string }>();
   private reconcileTimer?: NodeJS.Timeout;
+  /// A running row older than this is declared failed by the scheduler itself
+  /// (ADR-067 addendum), so a hung handler cannot stay invisible forever.
+  private readonly stuckTimeoutMinutes: number;
+  private readonly retentionDays: number;
+  private lastRunPruneAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly jobHandlerRegistry: JobHandlerRegistryService,
     private readonly eventEmitter: EventEmitter2,
-  ) {}
+    private readonly config: ConfigService,
+  ) {
+    this.stuckTimeoutMinutes = requirePositiveInteger(
+      Number(this.config.getOrThrow<string>(STUCK_RUN_TIMEOUT_KEY)),
+      STUCK_RUN_TIMEOUT_KEY,
+    );
+    this.retentionDays = requirePositiveInteger(
+      Number(this.config.getOrThrow<string>(RETENTION_DAYS_KEY)),
+      RETENTION_DAYS_KEY,
+    );
+  }
 
   async onModuleInit() {
     await this.reconcile();
@@ -72,6 +105,17 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`Schedule reconcile failed: ${getErrorMessage(error)}`);
       });
     }, RECONCILE_INTERVAL_MS);
+  }
+
+  /// Rows left `running` by a previous process can never complete on their own;
+  /// close them once the module is fully wired so the failure events still
+  /// reach their listeners (ADR-067 addendum).
+  async onApplicationBootstrap() {
+    try {
+      await this.failStuckRuns();
+    } catch (error) {
+      this.logger.error(`Stale run recovery failed: ${getErrorMessage(error)}`);
+    }
   }
 
   onModuleDestroy() {
@@ -278,8 +322,18 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async executeSchedule(schedule: JobScheduleRecord, trigger: JobTrigger) {
+    await this.pruneExpiredRuns();
     if (this.runningScheduleKeys.has(schedule.key)) {
       this.logger.warn(`Skipping ${trigger} run of schedule ${schedule.key}: previous run is still in progress.`);
+      // The guard is process-local, so a hung handler never gets a chance to
+      // report itself. A run that has been running past the threshold is
+      // closed here and announced through the existing failure event
+      // (ADR-067 addendum); this trigger still records `skipped`.
+      try {
+        await this.failStuckRuns(schedule.id);
+      } catch (error) {
+        this.logger.error(`Stuck run check for ${schedule.key} failed: ${getErrorMessage(error)}`);
+      }
       return this.prisma.jobRun.create({
         data: {
           scheduleId: schedule.id,
@@ -376,5 +430,78 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
 
   private cronJobName(key: string): string {
     return `${CRON_JOB_NAME_PREFIX}${key}`;
+  }
+
+  /// Close `running` rows older than the stuck threshold. Called at boot (for
+  /// rows a previous process left behind) and from the reentry guard (for a
+  /// handler that never returns). The conditional update keeps a run that
+  /// finished meanwhile untouched.
+  private async failStuckRuns(scheduleId?: number): Promise<void> {
+    const cutoff = new Date(Date.now() - this.stuckTimeoutMinutes * 60_000);
+    const stale = await this.prisma.jobRun.findMany({
+      where: {
+        status: "running",
+        startedAt: { lt: cutoff },
+        ...(scheduleId === undefined ? {} : { scheduleId }),
+      },
+      orderBy: { startedAt: "asc" },
+      take: STUCK_RUN_SCAN_LIMIT,
+      include: { schedule: { select: { key: true, handlerKey: true } } },
+    });
+
+    for (const run of stale) {
+      const finishedAt = new Date();
+      const durationMs = finishedAt.getTime() - run.startedAt.getTime();
+      const error = `Run exceeded the stuck-run threshold of ${this.stuckTimeoutMinutes} minutes; marked failed by the scheduler.`;
+      const claimed = await this.prisma.jobRun.updateMany({
+        where: { id: run.id, status: "running" },
+        data: { status: "failed", finishedAt, durationMs, error },
+      });
+      if (claimed.count === 0) {
+        continue;
+      }
+      this.logger.error(
+        `Marked stuck run ${run.id} of schedule ${run.schedule.key} as failed after ${durationMs}ms (limit ${this.stuckTimeoutMinutes}m).`,
+      );
+      // Reuse the existing failure event: the host already maps it to a
+      // lifecycle alert, and a second event type would need its own contract.
+      try {
+        this.eventEmitter.emit(JOB_RUN_FAILED_EVENT, {
+          runId: run.id,
+          scheduleId: run.scheduleId,
+          scheduleKey: run.schedule.key,
+          handlerKey: run.schedule.handlerKey,
+          trigger: run.trigger as JobTrigger,
+          startedAt: run.startedAt.toISOString(),
+          finishedAt: finishedAt.toISOString(),
+          durationMs,
+          error,
+        } satisfies JobRunFailedEvent);
+      } catch (listenerError) {
+        this.logger.error(
+          `Failed to emit ${JOB_RUN_FAILED_EVENT} for stuck run ${run.id}: ${getErrorMessage(listenerError)}`,
+        );
+      }
+    }
+  }
+
+  /// Lazy retention, following event-emitter: prune on the write path, but at
+  /// most once per hour so a job running every minute does not scan the whole
+  /// history on every run.
+  private async pruneExpiredRuns(): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastRunPruneAt < RUN_PRUNE_INTERVAL_MS) {
+      return;
+    }
+    this.lastRunPruneAt = now;
+    const cutoff = new Date(now - this.retentionDays * 24 * 60 * 60_000);
+    try {
+      const { count } = await this.prisma.jobRun.deleteMany({ where: { startedAt: { lt: cutoff } } });
+      if (count > 0) {
+        this.logger.log(`Pruned ${count} job run(s) older than ${this.retentionDays} days.`);
+      }
+    } catch (error) {
+      this.logger.error(`Job run retention prune failed: ${getErrorMessage(error)}`);
+    }
   }
 }

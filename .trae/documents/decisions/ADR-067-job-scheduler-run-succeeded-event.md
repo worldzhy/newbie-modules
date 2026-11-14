@@ -88,3 +88,39 @@ export interface JobRunSucceededEvent {
 - **把两个事件合并成 `run-finished`（带 status）**：破坏既有失败订阅方的契约，收益只是少一个常量。
 - **调度器直接 `raise / resolve` 告警**：违反 ADR-065 §5，模块会同时依赖 alert-center 与通知域。
 - **每次成功都发 resolve**：没有 firing 行时会产生大量「迟到恢复」日志，且把常态成功当生命周期事件。
+
+## 增补（2026-11-14）：卡死运行检测与 JobRun 保留期
+
+round47 评审（R47-03 / R47-04）发现：handler 永久挂起时，重入守卫只写 `skipped` 行，
+`JobRun` 里没有「卡死中的 running」被闭合，失败事件链永不触发；同时 `JobRun` 与
+`EventEmission`、`NotificationRecord` 的保留期不一致。本增补只闭合这两点，不改变
+§1–§3 的事件契约与生命周期语义。
+
+### 1. 卡死判定
+
+- 阈值：`modules.job-scheduler.stuckRunTimeoutMinutes`（env `JOB_RUN_STUCK_TIMEOUT_MINUTES`），
+  按 ADR-033 的纪律由宿主声明，manifest 示例值 30 分钟；不提供代码内回退。
+- 每次进入重入守卫（上一轮仍在 `runningScheduleKeys` 中）时，先查该 schedule 的
+  `status="running"` 行；`startedAt` 早于 `now - 阈值` 的行用条件更新
+  （`where status="running"`）改成 `failed`，`error` 写入超时说明，`durationMs` 按实际
+  经过时间计算，并复用既有 `job-scheduler.run-failed` 事件（不新增事件类型）。
+  本次触发仍写一行 `skipped`——守卫语义不变，`skipped` 不是任务结果（§1）。
+- 模块启动（`onApplicationBootstrap`）对 `status="running" AND startedAt < now - 阈值`
+  的全表行执行同一收敛：上次进程崩溃留下的 running 行在本次生命周期内被标为 failed
+  并告警，避免它们永久悬挂。扫描有界（单次上限 100 行），失败只记日志不阻断启动。
+- 「标 failed 后 handler 又返回」视为迟到完成：既有成功分支照常把该行改写为 success
+  并发出 `run-succeeded`，由宿主按 ADR-067 §2 闭合告警。超时阶段的 failed 记录保留在
+  告警与事件历史里，JobRun 的最终状态以真实完成为准。
+- 不改 `JobRun` 表结构、controller、DTO；不新增「卡死」状态或事件。
+
+### 2. JobRun 保留期
+
+- `modules.job-scheduler.retentionDays`（env `JOB_RUN_RETENTION_DAYS`），宿主声明，示例 90 天。
+- 懒清理，参照 event-emitter：每次创建运行行时按 `startedAt < now - 保留期` 删除旧行；
+  进程内按小时节流，避免每条运行都做一次全表删除。没有额外调度器或依赖。
+
+### 3. 与通知域的边界
+
+宿主侧看门狗（检测提醒调度最近一次成功运行是否过旧）属于宿主业务，不进本模块；
+本模块只保证「卡死 / 崩溃残留会被标 failed 并发出既有失败事件」，告警与通知映射仍按
+ADR-065 §5 留在宿主。

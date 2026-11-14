@@ -16,7 +16,7 @@
     "env": {
       "EVENT_EMISSION_RETENTION_DAYS": {
         "type": "int",
-        "example": 30,
+        "example": 90,
         "description": "Days to keep EventEmission rows. Rows older than this are pruned lazily on each new emission insert."
       }
     },

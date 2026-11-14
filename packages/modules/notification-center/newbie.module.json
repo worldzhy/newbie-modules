@@ -7,6 +7,18 @@
     "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
-    "modules": ["security", "evaluation"]
+    "modules": ["security"],
+    "config": {
+      "notification-center": {
+        "retentionDays": "process.env.NOTIFICATION_RECORD_RETENTION_DAYS"
+      }
+    },
+    "env": {
+      "NOTIFICATION_RECORD_RETENTION_DAYS": {
+        "type": "int",
+        "example": 90,
+        "description": "Days to keep NotificationRecord and NotificationDeliveryAttempt rows. Older rows are pruned lazily on the notify path, at most once per hour."
+      }
+    }
   }
 }

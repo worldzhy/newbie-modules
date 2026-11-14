@@ -60,13 +60,17 @@ function newHarness(options: { pausedUntil?: Date | null } = {}) {
         const row = [...alerts.values()].find(
           (candidate) =>
             candidate.id === where.id &&
-            candidate.state === where.state &&
-            candidate.nextNotificationAt <= where.nextNotificationAt.lte,
+            (where.state === undefined || candidate.state === where.state) &&
+            (where.nextNotificationAt === undefined || candidate.nextNotificationAt <= where.nextNotificationAt.lte) &&
+            (where.reminderCount === undefined || candidate.reminderCount === where.reminderCount),
         );
         if (!row) {
           return { count: 0 };
         }
-        const reminderCount = row.reminderCount + (data.reminderCount?.increment ?? 0);
+        const reminderCount =
+          data.reminderCount && typeof data.reminderCount === "object"
+            ? row.reminderCount + (data.reminderCount.increment ?? 0) - (data.reminderCount.decrement ?? 0)
+            : (data.reminderCount ?? row.reminderCount);
         Object.assign(row, data, { reminderCount });
         return { count: 1 };
       },
@@ -347,6 +351,28 @@ test("listFiringAlerts caps the projection and exposes only the stable fields", 
   assert.deepEqual(rows, [{ id: "a1", scopeId: "p1", labels: { evaluationKey: "k" } }]);
 });
 
+test("dispatchDueReminders gives the reminder back when the adapter throws", async () => {
+  const { service, alerts } = newHarness();
+  await service.raise({ source: "url-check", alertKey: "site-1", severity: "high", repeatIntervalMinutes: 5 });
+  const row = alerts.get(SITE_1)!;
+  row.nextNotificationAt = new Date(Date.now() - 1000);
+  const lastNotificationBefore = row.lastNotificationAt;
+  (service as unknown as { notificationPort: { notify: () => Promise<void> } }).notificationPort = {
+    notify: async () => {
+      throw new Error("chat adapter is down");
+    },
+  };
+
+  const result = await service.dispatchDueReminders();
+
+  // A failed delivery must not consume the reminder nor be counted (R47-02).
+  assert.equal(result.dispatched, 0);
+  assert.equal(row.reminderCount, 0);
+  // The claim is rolled back and re-armed for a later scan, not one interval ahead.
+  assert.ok(row.nextNotificationAt.getTime() <= Date.now());
+  assert.equal(row.lastNotificationAt, lastNotificationBefore);
+});
+
 test("listFiringAlerts normalises a null label payload", async () => {
   const prisma = { alert: { findMany: async () => [{ id: "a1", scopeId: null, labels: null }] } };
   const service = new AlertCenterService(prisma as never, {} as never);
@@ -354,4 +380,29 @@ test("listFiringAlerts normalises a null label payload", async () => {
   assert.deepEqual(await service.listFiringAlerts({ source: "security-evaluation" }), [
     { id: "a1", scopeId: null, labels: {} },
   ]);
+});
+
+test("listFiringAlerts narrows by exact fingerprints when the caller knows its keys", async () => {
+  const captured: { args?: Row } = {};
+  const prisma = {
+    alert: {
+      findMany: async (args: Row) => {
+        captured.args = args;
+        return [];
+      },
+    },
+  };
+  const service = new AlertCenterService(prisma as never, {} as never);
+
+  await service.listFiringAlerts({ source: "job-scheduler", alertKeys: ["alert.dispatch-reminders"] });
+
+  // The filter reuses the raise() fingerprint, so a producer never has to
+  // scan its whole source to find one lifecycle (R47-01).
+  assert.deepEqual(captured.args!.where, {
+    source: "job-scheduler",
+    state: "firing",
+    fingerprint: {
+      in: [buildAlertFingerprint({ source: "job-scheduler", alertKey: "alert.dispatch-reminders" })],
+    },
+  });
 });

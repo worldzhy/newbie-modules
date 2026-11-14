@@ -305,7 +305,7 @@ export class AlertCenterService {
       if (claimed.count === 0) {
         continue;
       }
-      await this.deliver(
+      const delivered = await this.deliver(
         { ...alert, reminderCount: alert.reminderCount + 1 },
         alert.reminderCount + 1,
         pausedUntil,
@@ -314,6 +314,22 @@ export class AlertCenterService {
           skipPauseCheck: true,
         },
       );
+      if (!delivered) {
+        // A failed delivery must not consume the reminder (R47-02): give the
+        // claim back and retry on a later scan. The row is re-armed at `now`
+        // instead of its original due time so other overdue rows keep their
+        // place in the queue. The count guard keeps a concurrent raise from
+        // being overwritten.
+        await this.prisma.alert.updateMany({
+          where: { id: alert.id, reminderCount: alert.reminderCount + 1 },
+          data: {
+            lastNotificationAt: alert.lastNotificationAt,
+            nextNotificationAt: now,
+            reminderCount: { decrement: 1 },
+          },
+        });
+        continue;
+      }
       dispatched += 1;
     }
     return { dispatched };
@@ -328,11 +344,32 @@ export class AlertCenterService {
    * belongs to this module, and a direct scan is unbounded (R44-11). `labels`
    * are the producer's own data, so the caller may match its key there; the
    * module never interprets them.
+   *
+   * `alertKeys` narrows the projection to the lifecycles the caller already
+   * knows about (R47-01). The filter is built with the same fingerprint
+   * function `raise()` used, so it stays exact for long keys that are hashed
+   * into the fingerprint column. Omit it only when the caller really has to
+   * reconcile every firing alert of the source.
    */
-  async listFiringAlerts(input: { source: string; limit?: number }): Promise<FiringAlertRef[]> {
+  async listFiringAlerts(input: {
+    source: string;
+    scopeId?: string;
+    alertKeys?: string[];
+    limit?: number;
+  }): Promise<FiringAlertRef[]> {
     const limit = Math.min(Math.max(input.limit ?? MAX_FIRING_ALERTS, 1), MAX_FIRING_ALERTS);
+    const fingerprints = input.alertKeys?.map((alertKey) =>
+      buildAlertFingerprint({ scopeId: input.scopeId, source: input.source, alertKey }),
+    );
+    if (fingerprints && fingerprints.length === 0) {
+      return [];
+    }
     const rows = await this.prisma.alert.findMany({
-      where: { source: input.source, state: "firing" },
+      where: {
+        source: input.source,
+        state: "firing",
+        ...(fingerprints ? { fingerprint: { in: fingerprints } } : {}),
+      },
       orderBy: { createdAt: "asc" },
       take: limit,
       select: { id: true, scopeId: true, labels: true },
@@ -452,7 +489,9 @@ export class AlertCenterService {
   /**
    * Hand one lifecycle event to the notification domain. The alert is already
    * persisted at this point, so a failing adapter is logged and never fails
-   * the producer's call.
+   * the producer's call. Returns false only when the adapter itself failed: a
+   * missing adapter is a wiring state, not a delivery failure, so the caller
+   * consumes the reminder instead of retrying forever.
    */
   private async deliver(
     alert: AlertRow,
@@ -460,13 +499,13 @@ export class AlertCenterService {
     pausedUntil: Date | null,
     now: Date,
     options: { skipPauseCheck?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (!options.skipPauseCheck && isNotificationPaused(pausedUntil, now)) {
-      return;
+      return false;
     }
     if (!this.notificationPort) {
       this.logger.warn(`No alert notification adapter is bound; dropping ${alert.id} (${alert.state}).`);
-      return;
+      return true;
     }
     try {
       await this.notificationPort.notify({
@@ -482,8 +521,10 @@ export class AlertCenterService {
         data: (alert.data ?? null) as Record<string, unknown> | null,
         reminderCount,
       });
+      return true;
     } catch (error) {
       this.logger.error(`Alert notification adapter failed for ${alert.id}: ${getErrorMessage(error)}`);
+      return false;
     }
   }
 

@@ -35,7 +35,7 @@ Platform notification center. Business modules declare notifications in code, th
 
 ## Configuration
 
-No env vars. Both ports above are Nest injection tokens bound by the host application: `NOTIFICATION_VISIBILITY_PORT` is mandatory (startup fails without it) and `NOTIFICATION_PUSH_PORT` is optional (only push delivery is skipped). Absolute links in push messages reuse the host's existing `APP_FRONTEND_URL`.
+`NOTIFICATION_RECORD_RETENTION_DAYS` (declared by the host manifest, ADR-033; example `90`) bounds the lifetime of `NotificationRecord` and `NotificationDeliveryAttempt` rows. Expired rows are pruned lazily on the notify path, at most once per hour; `NotificationReceipt` and `NotificationPushFailure` cascade with their record. Both ports above are Nest injection tokens bound by the host application: `NOTIFICATION_VISIBILITY_PORT` is mandatory (startup fails without it) and `NOTIFICATION_PUSH_PORT` is optional (only push delivery is skipped). Absolute links in push messages reuse the host's existing `APP_FRONTEND_URL`.
 
 ## Upgrading
 

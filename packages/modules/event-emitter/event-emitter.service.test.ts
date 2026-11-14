@@ -62,3 +62,30 @@ test("the pruning cut point follows the configured retention days", async () => 
   const ageDays = (Date.now() - cutoff.getTime()) / 86_400_000;
   assert.ok(Math.abs(ageDays - 45) < 0.01, `expected a 45-day cutoff, got ${ageDays}`);
 });
+
+test("emission payloads are bounded: long strings are cut and oversized blobs degrade to a preview", async () => {
+  const created: { payload?: unknown }[] = [];
+  const prisma = {
+    eventEmission: {
+      deleteMany: async () => ({ count: 0 }),
+      create: async ({ data }: { data: { payload?: unknown } }) => {
+        created.push(data);
+        return {};
+      },
+    },
+  } as unknown as PrismaService;
+  const service = build(prisma, configReturning(30));
+  const record = (key: string, payload: unknown) =>
+    (service as unknown as { record: (key: string, payload: unknown) => Promise<void> }).record(key, payload);
+
+  await record("evt.key", { message: "x".repeat(5_000) });
+  const truncated = created[0].payload as { message: string };
+  assert.ok(truncated.message.length < 2_100);
+  assert.match(truncated.message, /\[truncated\]$/);
+
+  await record("evt.key", {
+    blob: "y".repeat(20_000),
+    rows: Array.from({ length: 100 }, () => "z".repeat(1_000)),
+  });
+  assert.deepEqual(Object.keys(created[1].payload as object).sort(), ["preview", "truncated"]);
+});
