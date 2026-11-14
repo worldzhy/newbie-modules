@@ -2,6 +2,7 @@
 
 状态：已采纳（2026-11-14 用户批准；round45 评审缺口 R45-01~09 已同批闭合，宿主实施见 nightwatch-backend ADR-044）
 更新：2026-11-14 — round46 R46-09：前端硬编码映射由「三处」订正为四处，补 `runOptionsFor` 与默认选项 409 后果（§影响）。
+勘误：2026-11-14 — **资产表与归属验证记录从宿主下移到本模块**。本模块新增 `SecurityEvaluationWebOrigin` 表（`@@schema("module/security-evaluation")`，与 `SecurityEvaluationAsset` 一对一，`assetId @unique` + `onDelete: Cascade`）、`SecurityEvaluationWebOriginService`（`create` / `requestVerification` / `verify` / `listActiveVerified` / `pathRoles`）与可选端口 `VerificationFetchAccess`，并新增三个配置键 `webOriginVerificationIntervalDays` / `webOriginReverifyFailureThreshold` / `webOriginTokenBytes`。宿主不再建 `application.WebOrigin` 表，只保留 HTTP 入口、出网实现与项目来源上报（nightwatch-backend ADR-044 同步改写）。同批改名：模型 `SecurityEvaluationAssetSource` → `SecurityEvaluationAssetProvenance`（DTO `SecurityEvaluationAssetProvenanceResponseDto`，JSON 字段 `sources` 不变）、枚举 `SecurityEvaluationVerdictKind` → `SecurityEvaluationThreatVerdictKind`，Prisma 访问器统一为 `securityEvaluationAssetProvenance`。§1 的 `targetPaths` 因此落在本模块表上，不再是宿主 `WebOrigin.targetPaths`。
 日期：2026-11-14
 关系：扩展 ADR-022（security-evaluation 重建）的 kind 集合、ADR-037（evaluation key 与 criteria 版本化）、ADR-046（judgment mechanism 组合）、ADR-039（platform-level subject）；不取代任何既有 ADR。
 
@@ -38,8 +39,8 @@ export const SECURITY_EVALUATION_SUBJECT_KINDS = [
 - `subjectKey` = 规范化 origin（`scheme://host[:port]`），不含路径、查询串与片段。归一化规则唯一、在写入前执行：scheme 与 host 转小写；host 为 IDN 时转 ASCII（punycode）并去掉末尾的点；省略默认端口（`http` 80 / `https` 443）；不加末尾斜杠。同一 origin 的不同写法必须落到同一 `subjectKey`，否则 finding 会按写法分裂成多份。
 - 名字取 RFC 6454 的 origin（scheme + host + port），与 `subjectKey` 一一对应；不取 `endpoint`（HTTP 语义指带路径的端点，会让读者以为 subject 是 path 级）、不取 `site`（eTLD+1 语义，装不下子域）。此处的 "origin" 与 git remote 无关。
 - 理由：响应头、TLS、证书都是 origin 级属性；path 级目标（`/login`、`/api/session`）是**规则的目标清单**，不是 subject 身份。
-- **path 级目标由路径角色承载**：规则不嵌入 URL，只声明所需**路径角色**（如 `auth.login`、`auth.otp-request`、`api.session`）；宿主资产持有「角色 → 相对路径」映射，探测时把解析后的路径随请求下发（nightwatch-backend ADR-044 §1 的 `WebOrigin.targetPaths`）。这样路径仍是资产属性（见「被否掉的方案」末条），规则集不随资产分叉；某资产缺某角色时，依赖该角色的 criterion 记为「未配置目标」并跳过，不产出 finding。
-- subject 身份沿用 skeleton 的 `(kind, scopeType, scopeId, subjectKey)`（`evaluation/evaluation-subject.service.ts:24,39-44`）。本 kind 是**平台级资产**：提交时固定传 `scopeType = SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE`（`"platform"`）与 `scopeId = SECURITY_EVALUATION_PLATFORM_SCOPE_ID`（`"deployment"`）（`constants.ts:18-19`），与 repository / aws-account 的写入路径一致（`assets/security-evaluation-asset.service.ts:99-100`）。两者不是同一个字符串——写成 `scopeType/scopeId = "platform"` 会让该 kind 落到空 scopeId 的伪作用域，与既有 subject 无法对齐。因此同一 origin 全部署只有**一个 subject、一套 run 历史、一套 finding**；多个项目注册同一 origin 时，provenance（`EvaluationSubjectSource`）留多行，只记"谁提交过"。
+- **path 级目标由路径角色承载**：规则不嵌入 URL，只声明所需**路径角色**（如 `auth.login`、`auth.otp-request`、`api.session`）；资产持有「角色 → 相对路径」映射（本模块 `SecurityEvaluationWebOrigin.targetPaths`，勘误 2026-11-14 由宿主下移），探测时把解析后的路径随请求下发。这样路径仍是资产属性（见「被否掉的方案」末条），规则集不随资产分叉；某资产缺某角色时，依赖该角色的 criterion 记为「未配置目标」并跳过，不产出 finding。
+- subject 身份沿用 skeleton 的 `(kind, scopeType, scopeId, subjectKey)`（`evaluation/evaluation-subject.service.ts:24,39-44`）。本 kind 是**平台级资产**：提交时固定传 `scopeType = SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE`（`"platform"`）与 `scopeId = SECURITY_EVALUATION_PLATFORM_SCOPE_ID`（`"deployment"`）（`constants.ts:18-19`），与 repository / aws-account 的写入路径一致（`assets/security-evaluation-asset.service.ts:99-100`）。两者不是同一个字符串——写成 `scopeType/scopeId = "platform"` 会让该 kind 落到空 scopeId 的伪作用域，与既有 subject 无法对齐。因此同一 origin 全部署只有**一个 subject、一套 run 历史、一套 finding**；多个项目注册同一 origin 时，provenance（`SecurityEvaluationAssetProvenance`，勘误 2026-11-14 由 `SecurityEvaluationAssetSource` 改名）留多行，只记"谁提交过"。
 - 推论：suppress / resolve 是**资产级**风险接受，不是项目级偏好——任一项目 suppress 后其余项目同样看不到该 finding。隔离不靠 subject 身份，靠宿主提交门禁（未通过归属验证的 origin 不进入 ingest）；见 §非目标。
 
 ### 2. 新增两个 evaluation key
@@ -152,7 +153,7 @@ sha256(criteriaId + "\u0000" + discriminator)
 
 ## 跨宿主 / 演进检验（registry 模块设计必填）
 
-- **无宿主词**：`web-origin`、`path`、`observation` 均为领域通用；模块不出现 `project`、`environment`、`domain` 等宿主概念，资产归属留在宿主。
+- **无宿主词**：`web-origin`、`path`、`observation` 均为领域通用；模块不出现 consumer 实体名、状态机名或项目枚举，`environment` 只是 `VarChar(32)` 自由字符串（取值由宿主约定），项目归属以不透明 `sourceType` / `sourceId` 落在 provenance 行，不由模块解释（勘误 2026-11-14）。
 - **对所有消费方一致**：不装配 `web-origin` 的宿主，其余 kind 的行为零变化；端口未绑定只在跑该 kind 时报错。
 - **演进路径**：新增检查项 = 新 criteria 版本 + 可能的新 discriminator；替换扫描工具 = 只改宿主适配器，finding 语义与 fingerprint 不变；新增 kind 仍走同一套 criterion/key/mechanism 机制。
 
@@ -167,6 +168,7 @@ sha256(criteriaId + "\u0000" + discriminator)
   6. `judgment/`：两个确定性 mechanism。
   7. `module.ts`：kind-scoped 的 criteria / evidence / judgment 绑定与 exports，加上 mechanism 注册表项。
   8. `README` 与单元测试（谓词真值表、fingerprint 稳定性、未知 `evaluationKey` 必须返回 `null`）。
+- 勘误（2026-11-14）追加的 registry 变更点：`prisma/schema.prisma` 的 `SecurityEvaluationWebOrigin`（1:1 Asset，含 `verificationFailures` 支撑失败阈值）、`assets/security-evaluation-web-origin.service.ts`、`ports/web-origin-verification-access.port.ts`、`security-evaluation.constants.ts` 的 `web-origin` 常量族、`newbie.module.json` 三个配置键、`security-evaluation.module.ts` 的 provider/export，以及 `security-evaluation-web-origin.test.ts`。
 - 宿主：见 nightwatch-backend ADR-044。
 - 前端：按 key 的硬编码映射共**四处**——`EVALUATION_KEYS`、`EVALUATION_KEY_LABEL_KEYS`、`EVALUATION_KEY_OPTIONS`（`src/app/(dashboard)/security-evaluation/page.tsx:163-171`、`212-219`）与 `runOptionsFor`（`:1150-1165`，连同它的 `RunOption.labelKey` 联合类型）。`runOptionsFor` 的 `web-origin` 分支必须返回带 `evaluationKey` 的选项，落到 `runOptionDefault` 会让 `selectVersion` 返回 `null` 并抛 409（`evaluation/evaluation-run.service.ts:268-272`）。另需 `en.json` / `zh.json` 的 `evaluationKeyWebBaseline` / `evaluationKeyWebBehavior` 与 `runOptionWebBaseline` / `runOptionWebBehavior`。宿主实施细节见 nightwatch-backend ADR-044 §7。
 
@@ -174,8 +176,9 @@ sha256(criteriaId + "\u0000" + discriminator)
 
 | 阶段 | 内容 | 行为变化 |
 | --- | --- | --- |
-| P0 | 本 ADR：kind / key / 端口 / criteria / mechanism 契约 + 单元测试 | 无（未装配） |
-| P1 | 宿主资产、归属验证、探测适配器、sidecar（ADR-044） | 无（无资产即无 subject） |
+| P0a | 勘误：模块 `SecurityEvaluationWebOrigin` 表 + 迁移 + 注册/验证 service + `VerificationFetchAccess` 端口 + 三个配置键 + 单测（已完成，无 HTTP 面） | 无（无资产） |
+| P0b | 本 ADR 契约：kind / key / criteria / evidence / judgment / schedules | 无（未接入探测端口） |
+| P1 | 宿主 HTTP 入口、`VerificationFetchAccess` 适配器、探测适配器、sidecar（ADR-044） | 无（无 `VERIFIED` 资产即无 subject） |
 | P2 | `web-baseline` 上线，首批资产观察一轮 | 新增响应头/TLS finding |
 | P3 | `web-behavior` 上线，预算与误报调优 | 新增行为类 finding |
 | P4 | 前端 key 展示与筛选；资产配置页 | 可见 |
