@@ -12,7 +12,12 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { JobHandlerRegistryService, JobHandler } from "./handler-registry.service";
-import { JOB_RUN_FAILED_EVENT, type JobRunFailedEvent } from "../job-scheduler.events";
+import {
+  JOB_RUN_FAILED_EVENT,
+  JOB_RUN_SUCCEEDED_EVENT,
+  type JobRunFailedEvent,
+  type JobRunSucceededEvent,
+} from "../job-scheduler.events";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 const RECONCILE_INTERVAL_MS = 30_000;
@@ -302,14 +307,34 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
       await handler(schedule.payload ?? undefined);
 
       const finishedAt = new Date();
-      return this.prisma.jobRun.update({
+      const durationMs = finishedAt.getTime() - startedAt.getTime();
+      const succeededRun = await this.prisma.jobRun.update({
         where: { id: run.id },
         data: {
           status: "success",
           finishedAt,
-          durationMs: finishedAt.getTime() - startedAt.getTime(),
+          durationMs,
         },
       });
+      // Fire only after the successful run is persisted; a failing listener
+      // must never turn a recorded success into a failed run (ADR-067).
+      try {
+        this.eventEmitter.emit(JOB_RUN_SUCCEEDED_EVENT, {
+          runId: succeededRun.id,
+          scheduleId: schedule.id,
+          scheduleKey: schedule.key,
+          handlerKey: schedule.handlerKey,
+          trigger,
+          startedAt: startedAt.toISOString(),
+          finishedAt: finishedAt.toISOString(),
+          durationMs,
+        } satisfies JobRunSucceededEvent);
+      } catch (listenerError) {
+        this.logger.error(
+          `Failed to emit ${JOB_RUN_SUCCEEDED_EVENT} for run ${run.id}: ${getErrorMessage(listenerError)}`,
+        );
+      }
+      return succeededRun;
     } catch (error) {
       const finishedAt = new Date();
       const errorMessage = getErrorMessage(error);
