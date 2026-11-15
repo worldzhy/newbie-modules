@@ -15,10 +15,10 @@ export class RdsMetricService {
   ) {}
 
   async getWatchedInstancesMetric(data: GetWatchedRDSInstancesMetricRequestDto) {
-    const { projectId, startTime, endTime, period, metricName, statistics } = data;
-    const { regions, credentials } = await this.bindings.resolveProjectCredential(projectId);
+    const { accountId, startTime, endTime, period, metricName, statistics } = data;
+    const { regions, credentials } = await this.bindings.resolveAccountCredential(accountId);
     const watchedInstances = await this.prisma.rdsInstance.findMany({
-      where: { projectId, isWatching: true },
+      where: { accountId, isWatching: true },
       orderBy: { createdAt: "asc" },
     });
     if (!watchedInstances.length) {

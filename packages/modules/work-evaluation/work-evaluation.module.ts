@@ -27,7 +27,7 @@ import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
  *
  * The module owns:
  * - period / home-ground administration and rule-set-version administration
- *   for subject kind "work",
+ *   for subject kind "developer",
  * - installation enrollment (one token per evaluatee installation, soft
  *   revocation) and the token-authenticated ingest endpoints
  *   (session index → PG, transcript → ClickHouse),
@@ -62,7 +62,7 @@ import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
       provide: installationResolverToken("work-evaluation"),
       useExisting: WorkEvaluationInstallationTokenResolver,
     },
-    // Kind-scoped skeleton ports for subject kind "work" (ADR-020 D4).
+    // Kind-scoped skeleton ports for subject kind "developer" (ADR-020 D4).
     {
       provide: criteriaProviderToken(WORK_EVALUATION_SUBJECT_KIND),
       useExisting: WorkEvaluationCriteriaProvider,

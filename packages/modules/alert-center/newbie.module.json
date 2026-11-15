@@ -1,0 +1,12 @@
+{
+  "key": "alert-center",
+  "layer": "capability",
+  "wiring": {
+    "file": "alert-center.module",
+    "className": "AlertCenterModule",
+    "prismaSchema": "prisma/schema.prisma"
+  },
+  "requires": {
+    "modules": ["security"]
+  }
+}

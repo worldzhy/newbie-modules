@@ -11,26 +11,23 @@ import { SecurityEvaluationAssetService } from "./assets/security-evaluation-ass
 import { SecurityEvaluationCodeScanExcerptService } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
+import { SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS } from "./security-evaluation.constants";
 import {
-  SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS,
-  SECURITY_EVALUATION_SUBJECT_KINDS,
-} from "./security-evaluation.constants";
-import {
-  GetSecurityEvaluationAssetRequestDto,
   GetSecurityEvaluationFindingRequestDto,
   GetSecurityEvaluationReportRequestDto,
+  GetSecurityEvaluationSubjectRequestDto,
   IngestSecurityEvaluationSubjectRequestDto,
   IngestSecurityEvaluationSubjectResponseDto,
   ListSecurityEvaluationAssetKnowledgeItemsRequestDto,
   ListSecurityEvaluationAssetKnowledgeItemsResponseDto,
-  ListSecurityEvaluationAssetsRequestDto,
-  ListSecurityEvaluationAssetsResponseDto,
   ListSecurityEvaluationFindingsRequestDto,
   ListSecurityEvaluationFindingsResponseDto,
   ListSecurityEvaluationResultsRequestDto,
   ListSecurityEvaluationResultsResponseDto,
   ListSecurityEvaluationRunsRequestDto,
   ListSecurityEvaluationRunsResponseDto,
+  ListSecurityEvaluationSubjectsRequestDto,
+  ListSecurityEvaluationSubjectsResponseDto,
   SecurityEvaluationFindingDetailResponseDto,
   SecurityEvaluationFindingResponseDto,
   SecurityEvaluationReportResponseDto,
@@ -39,16 +36,16 @@ import {
 } from "./security-evaluation.dto";
 
 /**
- * Security-evaluation HTTP surface (ADR-022, ADR-039).
+ * Security-evaluation HTTP surface (ADR-022, ADR-039, ADR-068).
  *
- * Asset inventory reads, platform-level subject ingest, run triggering,
- * archived result reads, the finding list and the single-axis report. The run
- * lifecycle and finding lifecycle belong to the evaluation skeleton; this
- * controller only bridges the feature's DTO surface.
+ * Platform-level subject ingest, run triggering, archived result reads, the
+ * finding list and the single-axis report. The run lifecycle and finding
+ * lifecycle belong to the evaluation skeleton; this controller only bridges the
+ * feature's DTO surface.
  *
- * Every read is a platform view: the optional `scopeType` / `scopeId` pair is a
- * provenance filter, not an authorization boundary. Access is decided by the
- * system-level permission grant alone (ADR-039 D3).
+ * Every read is a platform view; there is no provenance filter and no scope
+ * coordinate (ADR-068 D8). Access is decided by the system-level permission
+ * grant alone (ADR-039 D3).
  *
  * There is deliberately no finding-suppression endpoint here: human decisions
  * on findings are skeleton-level operations, not this feature's vocabulary.
@@ -73,7 +70,7 @@ export class SecurityEvaluationController {
   @HttpCode(HttpStatus.OK)
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.EvaluationSubject)
   @ApiOperation({
-    summary: "Ingest one subject and its asset row (platform-level, idempotent) with the submitting source",
+    summary: "Ingest one subject (platform-level, idempotent)",
   })
   @ApiResponse({ status: 200, type: IngestSecurityEvaluationSubjectResponseDto })
   async ingestSubject(@Body() body: IngestSecurityEvaluationSubjectRequestDto) {
@@ -81,32 +78,26 @@ export class SecurityEvaluationController {
     return result;
   }
 
-  // --- Assets ------------------------------------------------------------
+  // --- Knowledge items ---------------------------------------------------
 
-  @Get("assets")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.SecurityEvaluationAsset)
-  @ApiOperation({ summary: "List asset inventory rows (platform view, optionally filtered by provenance source)" })
-  @ApiResponse({ status: 200, type: ListSecurityEvaluationAssetsResponseDto })
-  listAssets(@Query() query: ListSecurityEvaluationAssetsRequestDto) {
-    return this.assets.listAssets({
-      scopeType: query.scopeType,
-      scopeId: query.scopeId,
-      kinds: [...SECURITY_EVALUATION_SUBJECT_KINDS],
-      page: query.page,
-      pageSize: query.pageSize,
-    });
+  @Get("subjects")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({ summary: "List stored subjects (platform view), optionally filtered by kind" })
+  @ApiResponse({ status: 200, type: ListSecurityEvaluationSubjectsResponseDto })
+  listSubjects(@Query() query: ListSecurityEvaluationSubjectsRequestDto) {
+    return this.assets.listSubjects({ kind: query.kind, page: query.page, pageSize: query.pageSize });
   }
 
-  @Get("assets/:assetId/knowledge-items")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.SecurityEvaluationAsset)
-  @ApiOperation({ summary: "List the current-state knowledge items of one asset" })
+  @Get("subjects/:subjectId/knowledge-items")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({ summary: "List the current-state knowledge items of one subject" })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationAssetKnowledgeItemsResponseDto })
-  listAssetKnowledgeItems(
-    @Param() params: GetSecurityEvaluationAssetRequestDto,
+  listSubjectKnowledgeItems(
+    @Param() params: GetSecurityEvaluationSubjectRequestDto,
     @Query() query: ListSecurityEvaluationAssetKnowledgeItemsRequestDto,
   ) {
     return this.assets.listKnowledgeItems({
-      assetId: params.assetId,
+      subjectId: params.subjectId,
       type: query.type,
       page: query.page,
       pageSize: query.pageSize,
@@ -128,7 +119,7 @@ export class SecurityEvaluationController {
   ): Promise<SecurityEvaluationRunAcceptedResponseDto> {
     await this.runs.startRun({
       ...body,
-      requestedByRef: request.user.userId,
+      requestedBy: request.user.userId,
     });
     return { accepted: true };
   }
@@ -136,13 +127,11 @@ export class SecurityEvaluationController {
   @Get("runs")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationRun)
   @ApiOperation({
-    summary: "List runs (platform view, optionally filtered by provenance source or subject), newest first",
+    summary: "List runs (platform view, optionally filtered by subject), newest first",
   })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationRunsResponseDto })
   async listRuns(@Query() query: ListSecurityEvaluationRunsRequestDto) {
-    const subjectIds = query.subjectId ? null : await this.assets.listSubjectIdsBySource(query);
     return this.runs.listRuns({
-      subjectIds: subjectIds ?? undefined,
       subjectId: query.subjectId,
       ruleSetVersionId: query.ruleSetVersionId,
       status: query.status,
@@ -172,11 +161,10 @@ export class SecurityEvaluationController {
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationFinding)
   @ApiOperation({
     summary:
-      "List findings (platform view), optionally filtered by provenance source, subject, run, evaluationKey, status, severity, urgency, staleness",
+      "List findings (platform view), optionally filtered by subject, run, standardKey, status, severity, urgency, staleness",
   })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationFindingsResponseDto })
   async listFindings(@Query() query: ListSecurityEvaluationFindingsRequestDto) {
-    const subjectIds = query.subjectId ? null : await this.assets.listSubjectIdsBySource(query);
     // Stale = OPEN but not re-observed within the window: the run that used to
     // reproduce the finding stopped covering it without resolving it. An
     // explicit status filter always wins over the implied OPEN.
@@ -184,10 +172,9 @@ export class SecurityEvaluationController {
       ? new Date(Date.now() - SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS * 24 * 60 * 60 * 1000)
       : undefined;
     return this.findings.listFindings({
-      subjectIds: subjectIds ?? undefined,
       subjectId: query.subjectId,
       runId: query.runId,
-      evaluationKey: query.evaluationKey,
+      standardKey: query.standardKey,
       status: query.status ?? (staleBefore ? EvaluationFindingStatus.OPEN : undefined),
       severity: query.severity,
       urgency: query.urgency,
@@ -219,16 +206,16 @@ export class SecurityEvaluationController {
     // Result may be missing (run status FAILED before judgment) — tolerate gracefully.
     let manifest: unknown[] = [];
     let ruleSetVersion: string | null = null;
-    let evaluationKey: string | null = null;
+    let standardKey: string | null = null;
     let subjectId: string | null = null;
     try {
       const runResult = await this.results.getResultForRun(finding.lastSeenRunId);
       subjectId = runResult.subjectId;
       const manifestResult = await this.results.getResultManifest(runResult.id);
-      manifest = manifestResult.manifest as unknown[];
+      manifest = manifestResult.evidenceManifest as unknown[];
       const version = await this.criteria.getVersion(runResult.ruleSetVersionId);
       ruleSetVersion = version.version ?? null;
-      evaluationKey = version.evaluationKey ?? null;
+      standardKey = version.standardKey ?? null;
     } catch {
       // No result / run — return finding alone.
     }
@@ -241,7 +228,7 @@ export class SecurityEvaluationController {
     return {
       finding: finding as unknown as SecurityEvaluationFindingResponseDto,
       ruleSetVersion,
-      evaluationKey,
+      standardKey,
       evidenceItems,
     };
   }
@@ -323,10 +310,9 @@ export class SecurityEvaluationController {
 
   @Get("report")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationFinding)
-  @ApiOperation({ summary: "Single-axis security report (platform view, optionally filtered by provenance source)" })
+  @ApiOperation({ summary: "Single-axis security report (platform view)" })
   @ApiResponse({ status: 200, type: SecurityEvaluationReportResponseDto })
   async getReport(@Query() query: GetSecurityEvaluationReportRequestDto) {
-    const subjectIds = await this.assets.listSubjectIdsBySource(query);
-    return this.reports.getReport(subjectIds, query.days);
+    return this.reports.getReport(null, query.days);
   }
 }

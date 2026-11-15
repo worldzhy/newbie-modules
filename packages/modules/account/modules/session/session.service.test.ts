@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { UnauthorizedException } from "@nestjs/common";
+import { NewbieException, NewbieExceptionType, newbieExceptionCode } from "@devbie/newbie/exceptions/newbie.exception";
 import { SessionService } from "./session.service";
 
 /**
@@ -110,7 +110,10 @@ test("a replayed refresh outside the window revokes only that session and 401s",
 
   await assert.rejects(
     () => service.refresh("old-refresh"),
-    (err: any) => err instanceof UnauthorizedException,
+    (err: any) =>
+      err instanceof NewbieException &&
+      err.getStatus() === 401 &&
+      (err.getResponse() as { code: number }).code === newbieExceptionCode(NewbieExceptionType.Session_RefreshRejected),
   );
   // Only the offending session was deleted, not every session of the user.
   assert.equal(db[1], undefined);

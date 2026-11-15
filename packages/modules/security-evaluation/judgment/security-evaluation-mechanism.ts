@@ -2,7 +2,7 @@ import type { EvaluationJudgment, JudgmentInput } from "@modules/evaluation/port
 
 /**
  * One judgment mechanism (ADR-046): a unit of judgment logic that can be
- * composed per evaluationKey. `name` is a module-local constant used for
+ * composed per standardKey. `name` is a module-local constant used for
  * result namespacing and conflict messages — it carries no host vocabulary.
  */
 export interface SecurityEvaluationJudgmentMechanism {

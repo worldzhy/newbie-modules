@@ -48,7 +48,6 @@ import {
   SecurityEvaluationIntelNegativeCachePort,
 } from "../judgment/intel/security-evaluation-intel-negative-cache.port";
 import { buildSecurityEvaluationIntelReRankRequest } from "../judgment/intel/security-evaluation-intel-request";
-import { securityEvaluationIntelScopeKey } from "../judgment/intel/security-evaluation-intel-scope-key";
 import { SECURITY_EVALUATION_INTEL_LLM_SCOPE } from "../judgment/intel/security-evaluation-intel-re-ranker";
 import { RepositoryAccess, securityEvaluationRepositoryAccessToken } from "../ports/repository-access.port";
 import {
@@ -105,14 +104,13 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     subject: EvaluationSubjectRef,
     ruleSetVersion: EvaluationRuleSetVersionRef,
   ): Promise<EvidenceCollection> {
-    if (ruleSetVersion.evaluationKey === SECURITY_EVALUATION_KEY_THREAT_INTEL) {
+    if (ruleSetVersion.standardKey === SECURITY_EVALUATION_KEY_THREAT_INTEL) {
       return this.collectIntel(subject);
     }
-    if (ruleSetVersion.evaluationKey === SECURITY_EVALUATION_KEY_CODE_SCAN) {
+    if (ruleSetVersion.standardKey === SECURITY_EVALUATION_KEY_CODE_SCAN) {
       return this.collectCodeScan(subject);
     }
 
-    const asset = await this.assets.getOrCreateAsset(subject);
     const observedAt = new Date();
     const lockfile = await this.resolveLockfile(subject);
     const manifest = await this.readManifestDependencies(subject);
@@ -120,7 +118,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     const items = this.buildItems(packages, observedAt);
 
     await this.assets.upsertNpmPackageKnowledgeItems(
-      asset.id,
+      subject.id,
       packages.map((pkg) => ({
         type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE,
         key: dependencyKnowledgeKey(pkg.name, pkg.version),
@@ -128,7 +126,6 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       })),
       observedAt,
     );
-    await this.assets.touchObserved(asset.id, observedAt);
 
     return {
       items,
@@ -163,7 +160,6 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     if (entities.length === 0) return this.emptyCollection();
 
     const observedAt = new Date();
-    const scopeKey = securityEvaluationIntelScopeKey(subject.kind, subject.subjectKey);
     const declaredItems = entities.map((entity, index): EvaluationEvidenceItem => ({
       id: `scope-entity:${index}`,
       layer: "declared",
@@ -175,16 +171,16 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
 
     const since = new Date(observedAt.getTime() - SECURITY_EVALUATION_INTEL_EVIDENCE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
     const candidates = await this.prisma.securityEvaluationThreatKnowledgeItem.findMany({
-      where: { fetchedAt: { gte: since } },
-      orderBy: [{ fetchedAt: "desc" }, { id: "desc" }],
+      where: { firstSeenAt: { gte: since } },
+      orderBy: [{ firstSeenAt: "desc" }, { id: "desc" }],
       select: {
         id: true,
-        source: true,
+        feed: true,
         title: true,
         summary: true,
         severity: true,
         signalTags: true,
-        fetchedAt: true,
+        firstSeenAt: true,
       },
     });
 
@@ -199,7 +195,8 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     const projectedEntities = entities.map((entity) => ({ value: entity.value }));
     const uncached = new Set(
       await this.negativeCache.filterUncached(
-        scopeKey,
+        subject.kind,
+        subject.subjectKey,
         candidates.map((candidate) => ({
           knowledgeItemId: candidate.id,
           signature: buildSecurityEvaluationIntelReRankRequest(
@@ -220,9 +217,9 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     const knowledgeItems = withinBudget.map((candidate): EvaluationEvidenceItem => ({
       id: `threat-knowledge:${candidate.id}`,
       layer: "knowledge",
-      source: candidate.source,
+      source: candidate.feed,
       summary: candidate.title,
-      observedAt: candidate.fetchedAt,
+      observedAt: candidate.firstSeenAt,
       refs: [candidate.id],
       payload: {
         knowledgeItemId: candidate.id,

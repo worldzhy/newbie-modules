@@ -3,7 +3,7 @@
 Evidence-driven evaluation of one person's actual work over one period: period
 administration, evidence ingest from member-side installations, and blind
 three-phase model judgment. This is the first feature module built on the
-`evaluation` skeleton (ADR-020) with subject kind `"work"`, and it replaces the
+`evaluation` skeleton (ADR-020) with subject kind `"developer"`, and it replaces the
 frozen `people-evaluation` module as the go-forward implementation
 (ADR-021, ADR-024). The design sources are devbie ADR-030 (vocabulary) and
 ADR-032 (result-centric evidence).
@@ -20,7 +20,7 @@ One concept, one word.
   CLI product name only; it is never a module concept.
 - `workspace`, `session`, `declared document` — the three reported evidence
   kinds. All of it is `declared`-layer evidence.
-- `subject` — the evaluatee inside the evaluation skeleton, kind `"work"`.
+- `subject` — the evaluatee inside the evaluation skeleton, kind `"developer"`.
 - `run` / `result` — one evaluation attempt and its immutable archived outcome.
   Both live in the skeleton (`EvaluationRun` / `EvaluationResult`); this module
   owns no run or result table.
@@ -29,7 +29,7 @@ One concept, one word.
 - `home ground` — the evaluatee's declared specialty circle: a set of
   criterion keys that is context for the judgment, never a scoring input.
 
-The person being evaluated is `evaluateeUserId` everywhere.
+The person being evaluated is `developerId` everywhere.
 
 ## Module dependencies
 
@@ -70,14 +70,13 @@ ClickHouse table for transcripts:
 | `work_evaluation_session_messages` (ClickHouse) | session transcripts the judgment drills into on demand               |
 
 `WorkEvaluationPeriod.ruleSetVersionId` pins each period to exactly one
-published criteria version of kind `"work"`. It is a plain scalar with no
+published criteria version of kind `"developer"`. It is a plain scalar with no
 relation — foreign keys never cross schema boundaries.
 
 ## Subject convention
 
-For kind `"work"`, `subjectKey = "<evaluateeUserId>"` and the scope coordinate
-is the member themself (`scopeType = "user"`, `scopeId = userId`). Subjects are
-registered lazily: `POST /work-evaluation/runs` takes `{ evaluateeUserId,
+For kind `"developer"`, `subjectKey = "<developerId>"` — the member themself.
+Subjects are registered lazily: `POST /work-evaluation/runs` takes `{ developerId,
 periodId }` and upserts the subject row on first trigger (ADR-026 D2). The
 period is a **run-level** parameter carried on `run.config.periodId` — it picks
 the evidence window and resolves the pinned criteria version, and it never
@@ -92,11 +91,11 @@ at judgment time. The subject `displayName` is masked too.
 The module binds the three kind-scoped feature ports of the evaluation skeleton
 via `useExisting`:
 
-- `criteriaProviderToken("work")` — resolves the run's `config.periodId` to the
-  period's pinned `{ evaluationKey, version }` of its criteria version.
-- `evidenceProviderToken("work")` — collects the evidence manifest for one run
+- `criteriaProviderToken("developer")` — resolves the run's `config.periodId` to the
+  period's pinned `{ standardKey, version }` of its criteria version.
+- `evidenceProviderToken("developer")` — collects the evidence manifest for one run
   over the period's window.
-- `judgmentPortToken("work")` — the three-phase model judgment below.
+- `judgmentPortToken("developer")` — the three-phase model judgment below.
 
 The installation-token resolver binds `installationResolverToken("work-evaluation")`,
 so ingest endpoints authenticate with the module's own installation tokens.
@@ -166,7 +165,7 @@ The authoritative route list is the module spec
 | `/work-evaluation/runs`                                             | platform JWT                                    | Trigger and list runs                                        |
 | `/work-evaluation/results`                                          | platform JWT                                    | Read archived results                                        |
 
-`POST /work-evaluation/runs { evaluateeUserId, periodId, requestedByRef?, config? }`
+`POST /work-evaluation/runs { developerId, periodId, requestedBy?, judgmentConfig? }`
 follows the skeleton's two-phase contract (ADR-029): admission — period
 eligibility, evaluatee existence, published criteria version, no active run —
 is answered synchronously as 400/404/409 before the 202; the judgment

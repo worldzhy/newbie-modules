@@ -43,9 +43,9 @@ export interface SecurityEvaluationCodeScanVerdictCacheEntry {
   /** ConnectionScope.id of the LLM that produced this verdict. Nullable for rows written before the column existed. */
   connectionId?: string | null;
   promptVersion: string;
-  ruleSetVersion: string;
+  ruleSetVersionLabel: string;
   /** The call's findings for THIS criterion (empty when the call found none). */
-  findings: SecurityEvaluationCodeScanCachedFinding[];
+  cachedFindings: SecurityEvaluationCodeScanCachedFinding[];
   /** Content address of the request that produced this verdict. */
   signature: string;
 }
@@ -56,7 +56,7 @@ export interface SecurityEvaluationCodeScanVerdictLookup {
   /** ConnectionScope.id to disambiguate connections that happen to share a modelId. */
   connectionId?: string | null;
   promptVersion: string;
-  ruleSetVersion: string;
+  ruleSetVersionLabel: string;
   files: readonly { path: string; contentHash: string }[];
 }
 

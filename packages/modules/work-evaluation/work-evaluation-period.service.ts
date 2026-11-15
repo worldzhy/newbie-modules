@@ -18,7 +18,7 @@ import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
  * WorkEvaluationPeriodService — evaluation periods and the home-ground
  * declaration (ADR-024). Criteria content itself lives in the evaluation
  * skeleton (ADR-020); a period only pins one published criteria version of
- * kind "work" by scalar id. These are the ex ante anchors: when members are
+ * kind "developer" by scalar id. These are the ex ante anchors: when members are
  * judged, and against which declared specialty circle.
  */
 @Injectable()
@@ -31,7 +31,7 @@ export class WorkEvaluationPeriodService {
   // --- Evaluation periods ------------------------------------------------
 
   async listPeriods(query: ListWorkEvaluationPeriodsRequestDto) {
-    const where = query.type ? { type: query.type } : {};
+    const where = query.phase ? { phase: query.phase } : {};
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.WorkEvaluationPeriod,
       pagination: { page: query.page, pageSize: query.pageSize },
@@ -48,17 +48,17 @@ export class WorkEvaluationPeriodService {
   }
 
   async createPeriod(input: CreateWorkEvaluationPeriodRequestDto): Promise<WorkEvaluationPeriod> {
-    // The pinned criteria version must exist, judge kind "work", and be
+    // The pinned criteria version must exist, judge kind "developer", and be
     // published — a period can never anchor on a draft.
     const version = await this.criteria.getVersion(input.ruleSetVersionId);
-    if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
+    if (version.subjectKind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new BadRequestException(
-        `Criteria version ${version.evaluationKey}/${version.version} judges kind "${version.kind}", not "${WORK_EVALUATION_SUBJECT_KIND}"`,
+        `Criteria version ${version.standardKey}/${version.version} judges kind "${version.subjectKind}", not "${WORK_EVALUATION_SUBJECT_KIND}"`,
       );
     }
     if (!version.publishedAt) {
       throw new ConflictException(
-        `Criteria version ${version.evaluationKey}/${version.version} is a draft and cannot anchor a period`,
+        `Criteria version ${version.standardKey}/${version.version} is a draft and cannot anchor a period`,
       );
     }
     if (input.periodStart.getTime() >= input.periodEnd.getTime()) {
@@ -67,12 +67,12 @@ export class WorkEvaluationPeriodService {
     // Ex ante anchor: a period cannot start before its criteria were published.
     if (input.periodStart.getTime() < version.publishedAt.getTime()) {
       throw new BadRequestException(
-        `Period cannot start before criteria version ${version.evaluationKey}/${version.version} was published at ${version.publishedAt.toISOString()}`,
+        `Period cannot start before criteria version ${version.standardKey}/${version.version} was published at ${version.publishedAt.toISOString()}`,
       );
     }
 
     const overlappingWhere = {
-      type: input.type,
+      phase: input.phase,
       periodStart: { lt: input.periodEnd },
       periodEnd: { gt: input.periodStart },
     };
@@ -88,13 +88,13 @@ export class WorkEvaluationPeriodService {
           });
           if (overlapping) {
             throw new ConflictException(
-              `Period overlaps existing ${input.type} period ${overlapping.id} (${overlapping.periodStart.toISOString()} – ${overlapping.periodEnd.toISOString()})`,
+              `Period overlaps existing ${input.phase} period ${overlapping.id} (${overlapping.periodStart.toISOString()} – ${overlapping.periodEnd.toISOString()})`,
             );
           }
           return tx.workEvaluationPeriod.create({
             data: {
               ruleSetVersionId: input.ruleSetVersionId,
-              type: input.type,
+              phase: input.phase,
               periodStart: input.periodStart,
               periodEnd: input.periodEnd,
             },
@@ -147,7 +147,7 @@ export class WorkEvaluationPeriodService {
    */
   async declareHomeGround(input: UpdateWorkEvaluationHomeGroundRequestDto) {
     const period = await this.getPeriodById(input.collectionPeriodId);
-    if (period.type !== WorkEvaluationPeriodType.COLLECTION) {
+    if (period.phase !== WorkEvaluationPeriodType.COLLECTION) {
       throw new BadRequestException("Home ground can only be declared on COLLECTION periods");
     }
     const criteria = await this.criteria.listCriteria(period.ruleSetVersionId);
@@ -160,13 +160,13 @@ export class WorkEvaluationPeriodService {
     }
     return this.prisma.workEvaluationHomeGround.upsert({
       where: {
-        evaluateeUserId_collectionPeriodId: {
-          evaluateeUserId: input.evaluateeUserId,
+        developerId_collectionPeriodId: {
+          developerId: input.developerId,
           collectionPeriodId: input.collectionPeriodId,
         },
       },
       create: {
-        evaluateeUserId: input.evaluateeUserId,
+        developerId: input.developerId,
         collectionPeriodId: input.collectionPeriodId,
         homeCriteria: input.homeCriteria,
       },
@@ -174,16 +174,14 @@ export class WorkEvaluationPeriodService {
     });
   }
 
-  async getHomeGround(evaluateeUserId: string, collectionPeriodId: string) {
+  async getHomeGround(developerId: string, collectionPeriodId: string) {
     const homeGround = await this.prisma.workEvaluationHomeGround.findUnique({
       where: {
-        evaluateeUserId_collectionPeriodId: { evaluateeUserId, collectionPeriodId },
+        developerId_collectionPeriodId: { developerId, collectionPeriodId },
       },
     });
     if (!homeGround) {
-      throw new NotFoundException(
-        `Home ground for evaluatee ${evaluateeUserId} in period ${collectionPeriodId} not found`,
-      );
+      throw new NotFoundException(`Home ground for evaluatee ${developerId} in period ${collectionPeriodId} not found`);
     }
     return homeGround;
   }

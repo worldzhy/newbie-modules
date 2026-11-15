@@ -38,7 +38,7 @@ interface CriterionSeed {
 
 interface BaselineSeed {
   kind: string;
-  evaluationKey: string;
+  standardKey: string;
   version: string;
   description: string;
   metadata: Record<string, unknown>;
@@ -73,7 +73,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   async seedDependencyBaseline(): Promise<void> {
     await this.seedBaselineIfMissing({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
-      evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV,
+      standardKey: SECURITY_EVALUATION_KEY_NPM_OSV,
       version: SECURITY_EVALUATION_DEPENDENCY_RULE_SET_VERSION,
       description: "Dependency vulnerability baseline: installed npm packages are matched against OSV.",
       metadata: { ecosystem: "npm", dataSource: "https://osv.dev" },
@@ -91,11 +91,11 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   /** CIS AWS Foundations Benchmark v1.5 initial set (ADR-027 D3). */
   async seedAwsConfigBaseline(): Promise<void> {
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
-      (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+      (entry) => entry.standardKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     );
     await this.seedBaselineIfMissing({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
-      evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+      standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
       version: SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,
       description: `${SECURITY_EVALUATION_AWS_CIS_BENCHMARK}: collected account configuration items are asserted per control.`,
       metadata: { benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK },
@@ -117,11 +117,11 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   /** aws-custom rules inherited from the predecessor aws-audit module (ADR-033/ADR-037). */
   async seedAwsCustomBaseline(): Promise<void> {
     const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
-      (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+      (entry) => entry.standardKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     );
     await this.seedBaselineIfMissing({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
-      evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+      standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
       version: SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION,
       description:
         "aws-custom: non-benchmark cloud configuration checks (access keys, IAM policies, RDS/S3/EC2 hardening) inherited from the predecessor aws-audit module.",
@@ -143,7 +143,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   async seedIntelligenceBaseline(): Promise<void> {
     await this.seedBaselineIfMissing({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
-      evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
+      standardKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
       version: SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
       description:
         "Threat-intel relevance: recently collected threat-intelligence items are matched against the subject's scope entity set (hard entity recall + LLM structured re-rank).",
@@ -169,7 +169,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   async seedCodeScanBaseline(): Promise<void> {
     await this.seedBaselineIfMissing({
       kind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
-      evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+      standardKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
       version: SECURITY_EVALUATION_CODE_SCAN_RULE_SET_VERSION,
       description:
         "Code scan: every source file of the repository snapshot is judged by an LLM against five risk categories (full scan; a finding's identity is its criterion + path + symbol, not the content).",
@@ -231,22 +231,22 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   }
 
   private async seedBaselineIfMissing(baseline: BaselineSeed): Promise<void> {
-    const seedKey = `${baseline.kind}/${baseline.evaluationKey}/${baseline.version}`;
+    const seedKey = `${baseline.kind}/${baseline.standardKey}/${baseline.version}`;
     if (this.seededFamilies.has(seedKey)) return;
 
-    let row = await this.findVersion(baseline.kind, baseline.evaluationKey, baseline.version);
+    let row = await this.findVersion(baseline.kind, baseline.standardKey, baseline.version);
     if (!row) {
       try {
         row = await this.criteria.createVersion({
-          kind: baseline.kind,
-          evaluationKey: baseline.evaluationKey,
+          subjectKind: baseline.kind,
+          standardKey: baseline.standardKey,
           version: baseline.version,
           description: baseline.description,
           metadata: baseline.metadata,
         });
       } catch (error) {
         if (!isUniqueViolation(error)) throw error;
-        row = await this.findVersion(baseline.kind, baseline.evaluationKey, baseline.version);
+        row = await this.findVersion(baseline.kind, baseline.standardKey, baseline.version);
         if (!row) throw error;
       }
     }
@@ -269,10 +269,10 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
       }
     }
 
-    const latest = await this.findVersion(baseline.kind, baseline.evaluationKey, baseline.version);
+    const latest = await this.findVersion(baseline.kind, baseline.standardKey, baseline.version);
     if (!latest) {
       throw new Error(
-        `Criteria version ${baseline.kind}/${baseline.evaluationKey}/${baseline.version} disappeared during seeding`,
+        `Criteria version ${baseline.kind}/${baseline.standardKey}/${baseline.version} disappeared during seeding`,
       );
     }
     if (!latest.publishedAt) {
@@ -286,8 +286,8 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     this.seededFamilies.add(seedKey);
   }
 
-  private findVersion(kind: string, evaluationKey: string, version: string) {
-    return this.prisma.evaluationRuleSetVersion.findFirst({ where: { kind, evaluationKey, version } });
+  private findVersion(kind: string, standardKey: string, version: string) {
+    return this.prisma.evaluationRuleSetVersion.findFirst({ where: { subjectKind: kind, standardKey, version } });
   }
 }
 

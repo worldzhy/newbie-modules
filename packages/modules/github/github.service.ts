@@ -32,6 +32,30 @@ export class RepoNameConflictError extends Error {
   }
 }
 
+/**
+ * Thrown when GitHub rejects a call for credential reasons (403). Carries the
+ * permission the operation needs, so the failure surfaces as an actionable
+ * provisioning error instead of GitHub's terse "Resource not accessible by
+ * personal access token".
+ */
+export class GitHubPermissionError extends Error {
+  readonly status = 403;
+
+  constructor(
+    readonly permission: string,
+    readonly operation: string,
+  ) {
+    super(`GitHub credentials lack ${permission} permission; cannot ${operation}`);
+    this.name = "GitHubPermissionError";
+  }
+}
+
+/**
+ * State of a deterministic provisioning target repo, see
+ * `GitHubService.probeProvisioningTarget`.
+ */
+export type ProvisioningTargetState = "absent" | "adoptable" | "foreign";
+
 // Extract the env-var key from a placeholder line. Accepts:
 //   "# FOO=..." / "# FOO = ..." / "FOO=..." / "  #FOO=..."
 // Returns null for lines without an `KEY=` pattern.
@@ -266,6 +290,14 @@ export class GitHubService {
       gen = resp.data;
     } catch (e: unknown) {
       if (getErrorStatus(e) === 422) throw new RepoNameConflictError(org, name);
+      // Fine-grained PATs need Administration (write) for this endpoint;
+      // surface the missing permission instead of GitHub's opaque 403 body.
+      if (getErrorStatus(e) === 403) {
+        throw new GitHubPermissionError(
+          "Administration (write)",
+          `create repository from template ${tplOwner}/${tplRepo}`,
+        );
+      }
       throw e;
     }
 
@@ -284,6 +316,23 @@ export class GitHubService {
       }
     }
     return { cloneUrl: gen.clone_url, generated: true };
+  }
+
+  /**
+   * Classify the deterministic target repo before a mode-A create:
+   *   - `absent`: no repo under that name — a fresh generate.
+   *   - `adoptable`: the repo exists and carries a root package.json, the shape
+   *     an interrupted provisioning run leaves behind; retry may resume.
+   *   - `foreign`: the repo exists without a root package.json (hand-made,
+   *     docs-only, or another project's repo). Template provisioning cannot
+   *     adopt it, so creation must fail fast instead of failing in the
+   *     background after generate is skipped.
+   */
+  async probeProvisioningTarget(owner: string, repo: string): Promise<ProvisioningTargetState> {
+    const info = await this.getRepository(owner, repo);
+    if (!info) return "absent";
+    const packageJson = await this.getFileContent(owner, repo, "package.json");
+    return packageJson ? "adoptable" : "foreign";
   }
 
   /**

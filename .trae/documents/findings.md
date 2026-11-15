@@ -304,3 +304,113 @@ round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents
 | R36-07 | nightwatch-backend | prompt-sections 仅 backend/frontend monitoring 两域（`ls prompt-sections/` 2 文件），其余功能域无领域知识注入 | P2 | live | 全体用户 | fixed（随 R36-03 各域 skill 同提交落地 10 个领域 prompt-section（security-evaluation/audit-log/llm/job-scheduler/backups/event-emitter/iam/lark-bindings/jdy/work-evaluation），均注册进 AgentRunner 工厂数组；现 prompt-sections 共 12  providers） |
 
 反驳轮（本轮）：「@RequireOwner 等于无鉴权」REFUTED（self-by-token 构造成立，逐技能授权在 skill 内）；「task 写技能无权限检查」REFUTED（项目可见性过滤 + 服务层 forbidden + 全量确认门）；「/security-evaluation 页完全无 skill」REFUTED（aws/dependency 4 个 skill 声明该页路由）。本轮为静态评审，未跑 tsc/测试。
+
+## round39（2026-11-13，scope=`modules: [notification-center]`）
+
+报告：`newbie-modules/.trae/documents/reviews/expert-review-2026-11-13-round39.md`。锚点：newbie-modules `60b2a20`（干净）、nightwatch-backend `8d67da2`（干净）、nightwatch-frontend `b271eb6`（dirty 8 文件均在 3D 全景域，非被审域）；装配面 `diff -rq` 零差异；门禁 20/20 单测、backend `tsc`、三端 prettier 全绿。
+
+| ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R39-01 | newbie-modules + nightwatch-backend | ADR-062 的 firing/recovered 配对在真实调用方失效：Alert 键为 `(notificationKey, fingerprint)`（`prisma/schema.prisma:189`、`notification-center.service.ts:232-238`），而 url-check/heartbeat 的恢复用不同 notificationKey 与 dedupKey（`url-check-alerts.notifications.service.ts:38-55`/`:73-92`、`heartbeat-offline.notification.ts:16`/`heartbeat-recovered.notification.ts:21`）→ 恢复新建 Alert 并命中默认恢复规则，被 suppress 的 firing 其恢复仍推送，违背 ADR-062 `:86`/`:135` | P1 | live | 常规事件触发 | fixed（ADR-064：fingerprint 单列唯一 + `alertKey` 显式配对；url-check/heartbeat 两侧已传同值，见 `expert-review-2026-11-14-round40.md`） |
+| R39-02 | newbie-modules + nightwatch-backend | 全局告警控制面（静默/投递规则/中心开关/广播）对默认 MEMBER 全量开放：`Notifications` 组命名空间派生全部模型动作（`prisma/seeds/permission-groups.ts:210-216`），MEMBER 继承该组（`:429-441`）；任一成员可开匹配一切的静默、删规则（`notification-center.controller.ts:216-218`/`:234-236`）、关推送（`:157-158`）、`POST /notifications` 向全员广播任意模板上下文（`:57-58`） | P1 | live | MEMBER（默认组织成员） | withdrawn（2026-11-14 用户确认信任 MEMBER：运维面整体保留给默认成员，不拆组、不写 ADR-044） |
+| R39-03 | newbie-modules | Alert 唯一键不含 projectId：`@@unique([notificationKey, fingerprint])`（`prisma/schema.prisma:189`）+ fingerprint 默认 notificationKey（`notification-center.service.ts:234`），不传 dedupKey 的调用方（`task-status-changed.notifications.service.ts:45-55` 传 projectId）让所有项目共用一行 Alert，projectId/severity 被覆盖、裁决永久冻结，带 projectIds 条件的规则跨项目误用 | P1 | live | 常规事件触发 | fixed（fingerprint 带 projectId 前缀，唯一键收窄为 `@@unique([fingerprint])`，ADR-064） |
+| R39-04 | newbie-modules | `NotificationDeliveryAttempt.silenceId` 无外键（`prisma/schema.prisma:210`/`:225-236`），`notification-silence.service.ts:105-107` 直接删除 → 已抑制的投递审计指向不存在的静默行 | P2 | live | 持 Delete 权限者 | fixed（`silenceId` 加 relation + `onDelete: Restrict`，删除路由整体移除，只能 end；迁移 `20261114003000_alert_fingerprint_unique_silence_restrict`） |
+| R39-05 | newbie-modules | `comment` 仅 Swagger `maxLength: 512`，无 `@MaxLength`（`notification-center.dto.ts:491-494`/`:513-516`），列 `VarChar(512)`（schema `:230`）→ 超长 500 而非 400 | P2 | live | 持 Create/Update 权限者 | fixed（`@MaxLength(512)`） |
+| R39-06 | newbie-modules | `simulate({recordId})` 的 `labelsFromRecord` 无项目可见性校验（`notification-delivery-rule.service.ts:234-241`），与 `getDeliveryAttempt`（`notification-center.service.ts:678-685`）不一致 | P2 | live | 持 List 权限者 + 已知 record UUID | fixed（`labelsFromRecord` 增加 visibleProjectIds 校验） |
+| R39-07 | nightwatch-frontend | 静默卡只能从现在开始（`silence-card.tsx:107` 仅传 endsAt；服务端 `notification-silence.service.ts:52` 支持 startsAt），列表却渲染 `scheduled`（`:154-158`） | P2 | live | 设置页访客 | fixed（表单补 `startsAt` 输入，默认当前时间） |
+| R39-08 | newbie-modules + nightwatch-frontend | 后端允许绝对 http(s) 链接（`notification-center.service.ts:53-66`），前端谓词仅站内路径（`use-open-notification.ts:23-24`）→ 按钮可见但点击无跳转 | P2 | live | 全体用户 | fixed（`openNotificationLink` 统一内外部跳转） |
+| R39-09 | newbie-modules | dedup 竞态兜底 `recordId = existing?.id ?? ""`（`notification-center.service.ts:293`）返回空 id + `deduplicated: true` | P2 | live | 并发投递 | fixed（P2002 后重查；竞态行已被删改抛 `ConflictException`，不再返回空 id） |
+| R39-10 | newbie-modules | `getOrCreateCenterSetting` 先查后建无 P2002 兜底（`notification-center.service.ts:567-580`），首次并发投递可能 500 | P2 | live | 首次并发 | fixed（`create` 捕获 `PG_UNIQUE_VIOLATION` 后重查单例行，非唯一冲突继续抛出） |
+| R39-11 | newbie-modules | `NotificationAlert` 无 TTL/自动 resolved（schema `:164-190`、`upsertAlert` `:402`），永久 firing 的告警裁决永不重算——inhibition 暂缓的同一前置（`devbie/.trae/documents/backlog.md:84`） | P2 | live | 常规事件 | open |
+| R39-12 | newbie-modules | 模拟器 `runtimeReason` 只判静默（`notification-delivery-rule.service.ts:217-229`），忽略 channel-off/subscription-off/no-port，可能给出「会推送」的错误结论 | P2 | live | 设置页访客 | open |
+
+反驳轮（本轮）：「恢复永远新建 Alert」原句被收窄（同键场景复合唯一键确实复用，单测 `:227-233`；生产调用方全部不同键，故结论按真实调用方成立）；「静默拦截站内记录」「项目轨道忽略 channel-off 是缺陷」「`//`/`/\\` 链接绕过」「设置端点缺鉴权」「前端直接渲染 link href」均 REFUTED，理由见报告 §7。
+
+## round40（2026-11-14，plan scope：R39-01/R39-02 方案 vs ADR-062/063）
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R40-01 | newbie-modules | `prisma/schema.prisma:167-169` 注释仍称 fingerprint 缺省为 notificationKey，与 R39-03 已落地的 `projectId:dedupKey` 漂移；`alertKey` 落地后需再次更新 | P2 | live | 文档 | fixed（注释改为 `projectId:alertKey ?? dedupKey ?? notificationKey` 全回退链，含长值 sha256 截断说明；ADR-064 同口径） |
+| R40-02 | newbie-modules | ADR-063:90「新增静默 CRUD」与 R39-04 的「被引用静默删除返回 409」有字面偏差，需增补删除语义 | P2 | live | 文档 | fixed（ADR-063:90 改为「创建 / 查询 / 结束接口（不提供删除：已产生投递记录的窗口只能提前结束）」） |
+
+方案判定（详见 `reviews/expert-review-2026-11-14-round40.md`）：C2 与 ADR-062:86「由数据模型保证」矛盾（`findFirst` 方案下唯一键不再承担配对）；C6 与 ADR-043:19/42 的 MEMBER 绑定规则矛盾；C8 不成立（用现有 `useCanSee` 精确匹配即可，无需新 hook）；C10 不成立（需 newbie-modules ADR-064 + nightwatch-backend ADR-044 两份）。
+
+落地结论（2026-11-14）：C2 以「唯一键收窄为 `@@unique([fingerprint])` + `alertKey` 显式配对」消解（ADR-064），ADR-062:86 字面不变；C6/C8/C10 随 R39-02 withdrawn 整体作废（用户确认信任 MEMBER，不拆权限组、不写 ADR-044、前端不加门禁）。
+
+## round41（2026-11-14，module scope：`notification-center`）
+
+报告：`newbie-modules/.trae/documents/reviews/expert-review-2026-11-14-round41.md`。锚点：newbie-modules `0b7c416`（干净）、nightwatch-backend `d723247`（干净）、nightwatch-frontend `09e74e6`（dirty 9 文件均在 3D 全景/docs 域，非被审域）；装配面与 `prisma/models` `diff` 零差异；门禁 24/24 单测、backend `tsc` exit 0、22 个端点和 controller 一致。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R41-01 | newbie-modules | `upsertAlert` 先查后建无 P2002 兜底（`notification-center.service.ts:424-437`）：同 fingerprint 首次并发投递一路 500；与 R39-10 同类 | P2 | live | 首次并发 | fixed（`create` 捕获 P2002 后重读 winner 行并沿该行 update；单测「a delivery that loses the first-alert insert race...」） |
+| R41-02 | newbie-modules + nightwatch-frontend | `cancel()` 对 `startsAt` 在未来的窗口写 `endsAt=now`（`notification-silence.service.ts:91-102`，不重跑 `assertWindow`），产生 `endsAt<startsAt`；startsAt 前列表显示 scheduled、重复 cancel 空转却提示成功；无错误静默、可经 PUT 自愈 | P2 | live | MEMBER/ADMIN | fixed（未开始窗口的 `startsAt` 一并压到 `now`，不再写出反向窗口；scheduled/active 两条单测） |
+| R41-03 | newbie-modules | `update()` 可改写已被 `NotificationDeliveryAttempt.silenceId` 引用的窗口（`notification-silence.service.ts:67-85`，attempt 无窗口快照），绕过 ADR-063:90「已产生投递记录的窗口只能提前结束」；Restrict 只封删除不封改写 | P2 | live | MEMBER/ADMIN | fixed（存在 attempt 时冻结 condition/startsAt，`endsAt` 仅可前移；四条单测） |
+| R41-04 | newbie-modules | HTTP `NotifyDto` 未暴露 `alertKey`（及 `status`/`recoveredAt`）（`notification-center.dto.ts:75-105`），HTTP 投递无法配对或产生 recovery；当前无 HTTP 消费者，属契约悬空 | P2 | artifact | 持 Create 权限者（无现存调用方） | fixed（DTO 增 `alertKey`/`status`/`recoveredAt`，controller 将 ISO 串转 Date；apits 重新生成 api.ts +12 行；README 同步） |
+| R41-05 | newbie-modules | README:10 的 fingerprint 构造仍写「project id + deduplication key，回退 notification key」，漏 `alertKey`，与 ADR-064/schema/实现漂移 | P2 | docs | 文档 | fixed（README 改为 project id + alertKey → dedupKey → notificationKey 全回退链） |
+| R41-06 | newbie-modules | ADR-064 背景把复合唯一键归因给 ADR-062，但 ADR-062 全文无 fingerprint（`grep` 取证），复合键实际来自 schema | P2 | docs | 文档 | fixed（背景改为「上一轮落地时 schema 用复合键」，并注明 ADR-062 §4 只声明配对保证） |
+| R41-07 | newbie-modules | `NotifyDto` 的 `link`/`deduplicationKey`/`notificationKey` 无长度上界，DB VarChar 溢出触发 P2000 → 500（宿主无 Prisma 异常过滤器） | P2 | live | 持 Create 权限者 | fixed（`notificationKey` 100 / `link` 512 / `deduplicationKey` 255，与 VarChar 对齐） |
+| R41-08 | newbie-modules | fingerprint 唯一索引迁移无去重前置步骤（`20261114003000.../migration.sql`），其它消费仓若已有重复 fingerprint 会迁移失败；本宿主已成功应用 | P2 | ops | 其它消费仓 | fixed（迁移已应用，改文件会触发 Prisma checksum 不符，故走文档：README「Upgrading」要求升级前清空 `NotificationAlert`，说明 `alertId` 为 `SetNull`） |
+
+反驳轮（本轮）：R41-02 初判「永久卡死、完全不可编辑、会产生错误静默」被推翻，保留不变量破坏与 scheduled 显示，降为 P2；R41-03/R41-04 结论成立，R41-04 定性收窄为「契约悬空、无现存消费者」。已核验通过：装配零差异、fingerprint 含 projectId 前缀、宿主 url-check/heartbeat 两侧 alertKey 一致、删除链彻底移除、Restrict 生效、读面可见性、写面归属、并发兜底（R39-09/10）、链接安全第二向量、端点计数一致。R39-11/R39-12 仍 open；R40-03/04 withdrawn。
+
+## round46（2026-11-14，plan scope：ADR-066 / ADR-044 采纳后复评）
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R46-01 | newbie-modules | 路径角色词汇表未进入契约与影响清单：ADR-066 §1:40 只举例 `auth.login` / `auth.otp-request` / `api.session`，无导出常量、无入口校验、§影响（`:160-168`）自称穷举也未列；`Grep 'auth\.login|otp-request|api\.session|PATH_ROLE|pathRole'` 在 `packages/modules` 仅 4 条命中且全属 audit 模块 | P1 | docs | 读者/实现者 | open |
+| R46-02 | newbie-modules | OTP 占位邮箱与「禁止向非受控地址发信」互斥：ADR-066 §2:56-60 允许「占位值（如一次性邮箱格式的字符串）」又禁止「向非受控地址发信」，`web-behavior` 的 OTP 场景（§6:134）必然触发生信，实现者只能违反其一 | P1 | docs | 读者/实现者 | open |
+| R46-04 | newbie-modules | fingerprint 主张两处失实：字段名应为 `criterionKey`（非 `criteriaId`）；「三份 helper 均为 `sha256(parts.join("\u0000"))`」不成立——`judgment/dependency/security-evaluation-dependency.identity.ts:26-28` 返回 `${npm}:${name}:${vulnId}`、`judgment/aws-config/security-evaluation-aws-config.identity.ts:18-20` 返回 `aws:${criterionKey}:${resourceKey}`，仅 `judgment/code-scan/security-evaluation-code-scan.identity.ts:25-29` 为 sha256 | P2 | docs | 读者 | open |
+| R46-05 | newbie-modules / nightwatch-backend | origin 归一化「在写入前执行」未指定执行侧（registry `ingest()` 还是宿主入库），跨宿主归一化可能不一致 | P2 | docs | 读者 | open |
+| R46-06 | newbie-modules | 缺路径角色时「记为未配置目标并跳过」未指向 skeleton 的 `EvidenceCollection.skipped` 契约（要求 note + item ids），实现者可静默过滤 criteria | P2 | docs | 读者 | open |
+| R46-07 | newbie-modules / nightwatch-backend | 「模块只定义观测数据形状与预算上限」与 §3 接口、§影响第 2 项不符（无预算常量），ADR-044 §3 又给了宿主预算 → 两个权威源 | P2 | docs | 读者 | open |
+| R46-11 | newbie-modules | §2:53 判定对象列出 cookie 标志、证书链、`Server` 头，但 §4 规则表 11 行无对应规则，`:112` 只把证书过期/链不完整列为待定举例，cookie 与 `Server` 完全未提 | P2 | docs | 读者 | open |
+| R46-12 | newbie-modules / nightwatch-backend | 跨仓 `file:line` 仍不可定位（R45-08 残留）：ADR-066 的 `evaluation.prisma:56-64` 未标仓（实为 `nightwatch-backend/prisma/models/evaluation.prisma`）；ADR-044 的 `job.ts:20-25` 文件不存在（实为 `security-evaluation.scan.job.ts`） | P2 | docs | 读者 | open |
+
+结论：ADR-066 **有条件通过**——消掉 R46-01 / R46-02，并改准 R46-04 后可进入 P0；其余 P2 随对应阶段落地。
+主张判定与命令出处见 `nightwatch-backend/.trae/documents/reviews/expert-review-2026-11-14-round46-adr066-adr044.md`。
+
+## round47（2026-11-14，module scope：notification-center / alert-center / job-scheduler / event-emitter）
+
+报告：`.trae/documents/reviews/expert-review-2026-11-14-round47-alert-notification-job-event.md`。锚点：newbie-modules `100b13a`（dirty 1：本台账）、nightwatch-backend `6f91e0f`（4 个未跟踪项均非被审域）；四模块装配 `diff -rq` 零差异；59/59 单测通过。宿主侧条目（R47-07..11）见 `nightwatch-backend/.trae/documents/findings.md`。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R47-01 | newbie-modules + nightwatch-backend | `resolve()` 只按含 scope 的 fingerprint 命中，producer 被迫用 `listFiringAlerts`（上限 500、`createdAt asc`）全源扫描恢复；某源 firing 超 500 后最新告警永不 resolve、提醒无限重复。宿主 job 成功侧每事件扫一次（≈8,524 次/天），而 job 源专用、`alertKey` 已知，扫描本可省略（`alert-center.service.ts:236-243,332-345`；`job-failure-notifications.service.ts:63-78`） | P2 | live / latent | 自动路径 | fixed |
+| R47-02 | newbie-modules | `dispatchDueReminders` 先条件 claim 后 deliver，`deliver` 内部吞异常；投递失败仍消耗本次提醒（`nextNotificationAt` 前移、`reminderCount+1`）并把 `dispatched` 计为成功（`:297-317,471-487`；探针：notify 抛错返回 `{dispatched:1}`） | P2 | live | 任意投递失败 | fixed |
+| R47-03 | newbie-modules | 重入守卫的 `skipped` 不 emit 事件，全仓无 stale `running` reconcile；handler 永久挂起后每次触发只写 skipped，告警链永不触发（`job-scheduler.service.ts:281-294`） | P2 | live | handler 卡死 | fixed |
+| R47-04 | newbie-modules | `JobRun` 无保留期（≈8,524 行/天、≈311 万/年），`NotificationRecord` / `NotificationDeliveryAttempt` 亦无清理；仅 `eventEmission` 有 30 天摊还清理，同一条「运行→事件→通知」链三表寿命不一致 | P2 | live | 运行时长线性 | fixed |
+| R47-05 | newbie-modules | `EventEmission` 全量保存 payload（无脱敏/无大小上限）并保留 30 天；`module/event-emitter` 缺省授予全部动词、MEMBER 被绑定，任一成员可读 job error、url-check 目标 URL 等上下文（`event-emitter.service.ts:125-145`；`permission-groups.ts:229-236,457-459`） | P2 | live | 任意 MEMBER | partial (payload capped; read access kept by decision) |
+| R47-06 | newbie-modules + nightwatch-backend | notification severity 词表派生自 `evaluation`（`notification-center.constants.ts:1-8`），alert 域另立 union（`alert-center.constants.ts:9`）；宿主 adapter 无校验 cast（`alert-notification.adapter.ts:60`），词表漂移时 `notify()` 抛 400 又被 `deliver` 吞掉 → 通知静默丢失 | P2 | artifact | 词表演化 | fixed |
+| R47-12 | newbie-modules | 启动回收 `failStuckRuns` 挂在 `onApplicationBootstrap`，而 Nest 按模块注册顺序 await 各钩子、`@nestjs/event-emitter` 在自己的钩子里才挂载 `@OnEvent`；job-scheduler 模块排在 event-emitter 之前，emit 落到零监听器且不报错 → 重启时被收敛的卡死 run 只标 `failed`，无告警、无通知（运行时冒烟实测：`Alert` 表为空且日志无错） | P2 | live | 进程重启 | fixed |
+
+修复：R47-01/02/03/04/06 已修复，提交 `94f8d6b`（R47-01 / R47-06 的宿主半边随 nightwatch-backend `f97f92e`）。R47-05 按决策只做 payload 上限与截断，`EventEmission` 的 MEMBER 读权限保留。三张审计表的保留期默认值统一为 90 天。
+
+R47-12 为 2026-11-14 运行时冒烟新发现，随 `46624cf` 修复（宿主半边 `4942942`）：回收改到启动后首个 `reconcile` tick 执行，同时保证下游通知声明已就绪；ADR-067 增补已同步改写。宿主机实测重启后 30s 内 `Marked stuck run … as failed`、告警 `firing`、通知 `🟠 Job failed: …`，下一秒调度成功即 `resolved` 并追加 `🟢 Job recovered`。
+
+误报剔除：`raise()` 重入分支不写 `lastSeenAt` —— 被 `Alert.lastSeenAt @updatedAt`（`alert-center/prisma/schema.prisma:45`）反驳，撤销；`evaluation.run-failed` 无监听方 —— 已被 `security-evaluation-notifications.service.ts` 的 `events.on(...)` 推翻，撤销。正面不变量与命令出处见报告 §2/§8。
+
+
+## round48（2026-11-14，plan scope：本会话改动批次）
+
+报告：`.trae/documents/reviews/expert-review-2026-11-14-round48-session-changes.md`。锚点：newbie-modules `ec91dc6`（0 dirty）、nightwatch-backend `4942942`（3 个未跟踪项均非被审域）；四模块装配 `diff -rq` 零差异；consumer 全量 1386/1386 单测；两仓 format / eslint / `modules lint` 全绿。宿主侧部署条目（R48-03）见 `nightwatch-backend/.trae/documents/findings.md`。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R48-01 | newbie-modules | 启动回收是一次性的（`startupRecoveryDone`），且只收 `startedAt` 已超阈值的行；重启时低于阈值的孤儿 `running` 行在**本次生命周期内**不再被扫描（重入守卫的 `failStuckRuns(scheduleId)` 只在同进程 key 在飞时命中），只能等下一次进程重启（届时已超阈值）兜住，或 90 天后被 `pruneExpiredRuns` 静默删除。ADR-067:108-110 的「本次生命周期内被标为 failed」与 README 第 7 条 "once at boot for rows a previous process left behind" 只对首个 tick 时已超阈值的行成立（`job-scheduler.service.ts:101-129,334-358,449-516`；探针复现：5 分钟行过首个 tick 后改为 45 分钟，后续触发与二次 sweep 均不改状态） | P2 | live | 进程重启 + 阈值窗口 | fixed |
+| R48-02 | newbie-modules | `pruneExpiredRuns` 按 `startedAt < cutoff` 删除，但 `JobRun` 只有 `@@index([scheduleId, startedAt])`，非前导列 range 无法索引扫描；90 天保留期下峰值约 76 万行，每小时一次全表/全索引扫描（`job-scheduler.service.ts:501-516`；`job-scheduler/prisma/schema.prisma:48`） | P2 | source | 运行时长线性 | accepted（决策见 ADR-067 增补 §2：表体积被保留期钉住，顺序扫描代价可忽略；日运行量约 8 万条/天时随下一次表结构变更补索引） |
+| R48-04 | newbie-modules | 本轮修复缺回归测试指针：`pruneExpiredRuns`、「标 failed 后 handler 迟到返回改写成 success」、宿主 adapter 的非法 severity 降级分支均无用例（`job-scheduler.service.test.ts` 3 条；`alert-notification.adapter.test.ts` 无 unknown/invalid 断言），台账 R47-04 状态列无回归指针（`job-scheduler.service.test.ts:109-141`；ADR-067:115-117） | P2 | source | 维护期 | fixed |
+
+修复（同一提交）：R48-01 删掉 `startupRecoveryDone`，回收改为每个 `reconcile` tick 执行（`sweepStuckRuns`），ADR-067 增补段与 README 第 7 条同步改写；回归指针——`job-scheduler.service.test.ts` 的 "the sweep closes an orphan once it crosses the threshold on a later tick"（R48-01）、"runs older than the retention window are pruned"（R47-04/保留期）、"a run closed as stuck is rewritten to success when its handler finally returns"（ADR-067 迟到完成）、`alert-notification.adapter.test.ts` 的 "an unknown severity is kept in-app…"（R47-06 降级分支）。
+
+## round50（2026-11-15，module scope：`alert-center`，source definitions 批次）
+
+报告：`.trae/documents/reviews/expert-review-2026-11-15-round50-alert-center-definitions.md`。锚点：newbie-modules `64f2c3f`（0 dirty）、nightwatch-backend `554379a`（20 dirty，全为并行会话 security-evaluation 在途）、nightwatch-frontend `045b696`（5 dirty，同上）；装配 `diff -rq` 零差异；后端 tsc/eslint/22 单测、前端 tsc 全绿。本轮无 P0/P1，全部为 static 级 P2。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R50-01 | newbie-modules + nightwatch-backend | `definitions` 与 producer 的 alertKey 无任何运行时/编译期绑定：registry 只校验结构（`alert-source-registry.service.ts:56-87`），`raise()` 不查 definitions（`alert-center.service.ts:136-150`），而 README 宣称列出“真正发出的生命周期”（`README.md:9`）；9 个 producer 的 alertKey 形态与声明键无对应关系，source key 另有两处裸字面量重复（`url-check.alert.ts:32,59`；`heartbeat-offline.alert.ts:43,70,92`） | P2 | source / live | 自动路径 | open |
+| R50-02 | newbie-modules + nightwatch-backend | definition 的 pinned `repeatMinutes` 只约束来源覆盖，不约束写入 API：优先级为 requested > override > default（`alert-center.service.ts:144-148,528-538`），`POST /alerts` 透传 `repeatIntervalMinutes`（`alert-center.controller.ts:43-51`；`alert-center.dto.ts:40-43`），reopen 按请求值重置节奏（`:196-214`），使 settings 面 “Fixed {minutes} min”（`alert-source-settings-card.tsx:71-73`）可被同权限调用者改写；MEMBER 组经 Projects/Alert Center 两组持有 `module/alert-center` 全动作（`permission-groups.ts:104-105,211-217`；`roles.ts:6-8`） | P2 | live | MEMBER（登录用户） | open |
+| R50-03 | nightwatch-backend | job-scheduler 的 `run-failed` 与 `dispatch-watchdog` 实际是同一生命周期：看门狗复用 `ALERT_DISPATCH_REMINDERS_JOB_KEY` 作为 alertKey，与普通失败共用 alertKey 空间和 `JOB_RUN_FAILED_NOTIFICATION_KEY`（`job-run-failure.alert.ts:17-30,57-82`；`alert.watch-reminder-dispatch.job.ts:62`），但 registrar 列为两个 lifecycle family（`alert-source.registrar.ts:61-68`） | P2 | live | 自动路径 | fixed：`2e6910a` 合并为单一 `run-failed` definition，看门狗改为触发原因注释 |
+| R50-04 | newbie-modules | 新增 4 条启动期校验分支零测试：重复 source / 非法 default rhythm / 非法 definition rhythm / 重复 definition key（`alert-source-registry.service.ts:57-79`），`grep -rn "Duplicate alert definition\|Invalid repeatMinutes\|Invalid defaultRepeatMinutes" src/**/*.test.ts` 0 命中；现有 22 用例只覆盖 definitions 映射（`alert-center.service.test.ts:410-437`） | P2 | source | 维护期 | fixed：`71b6106` 新增 `alert-source-registry.service.test.ts`（4 条校验分支 + 归一化，全套 27/27） |
+| R50-05 | newbie-modules | 契约文档滞后：ADR-065 仍写 `key / displayName / defaultRepeatMinutes` 三元组、无 definitions（ADR-065:72-73,89-90），模块 schema 注释示例仍含未注册的 `cloudwatch`（`alert-center/prisma/schema.prisma:17`） | P2 | template / docs | 维护期与新宿主接入期 | fixed：`71b6106` 增补 ADR-065 §2 的 definitions 语义锚点并去掉 cloudwatch 示例；装配副本随 `2e6910a` 同步 |

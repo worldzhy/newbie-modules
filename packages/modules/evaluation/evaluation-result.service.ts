@@ -8,23 +8,22 @@ import { EvaluationCoverageStats, EvaluationEvidenceItem, EvaluationVerdict } fr
 import { hashManifest, validateCoverageStats, validateJudgment } from "./evaluation-invariants";
 
 /**
- * Fields returned by every result read. The archived `manifest` snapshot is
- * excluded on purpose — it is a large JSON blob served only by the dedicated
- * manifest read. The supervisor review columns (ADR-031) ride along so every
- * read face shows the current review state.
+ * Fields returned by every result read. The archived `evidenceManifest`
+ * snapshot is excluded on purpose — it is a large JSON blob served only by the
+ * dedicated manifest read. The supervisor review columns (ADR-031) ride along
+ * so every read face shows the current review state.
  */
 const RESULT_SELECT = {
   id: true,
   runId: true,
   subjectId: true,
   ruleSetVersionId: true,
-  contentHash: true,
+  manifestHash: true,
   coverageStats: true,
   verdicts: true,
   summary: true,
   metadata: true,
   reviewStatus: true,
-  reviewedByRef: true,
   reviewedAt: true,
   reviewNote: true,
   createdAt: true,
@@ -32,7 +31,7 @@ const RESULT_SELECT = {
 
 export interface CreateEvaluationResultInput {
   runId: string;
-  manifest: readonly EvaluationEvidenceItem[];
+  evidenceManifest: readonly EvaluationEvidenceItem[];
   coverageStats: EvaluationCoverageStats;
   verdicts: readonly EvaluationVerdict[];
   summary?: string;
@@ -76,7 +75,7 @@ export class EvaluationResultService {
       throw new ConflictException(`Evaluation run ${input.runId} already finished as ${run.status}`);
     }
 
-    const manifestIds = new Set(input.manifest.map((item) => item.id));
+    const manifestIds = new Set(input.evidenceManifest.map((item) => item.id));
     const coverageProblems = validateCoverageStats(input.coverageStats, manifestIds);
     if (coverageProblems.length > 0) throw new BadRequestException(coverageProblems);
 
@@ -95,8 +94,8 @@ export class EvaluationResultService {
           runId: input.runId,
           subjectId: run.subjectId,
           ruleSetVersionId: run.ruleSetVersionId,
-          manifest: input.manifest as unknown as Prisma.InputJsonValue,
-          contentHash: hashManifest(input.manifest),
+          evidenceManifest: input.evidenceManifest as unknown as Prisma.InputJsonValue,
+          manifestHash: hashManifest(input.evidenceManifest),
           coverageStats: input.coverageStats as unknown as Prisma.InputJsonValue,
           verdicts: input.verdicts as unknown as Prisma.InputJsonValue,
           summary: input.summary,
@@ -128,7 +127,7 @@ export class EvaluationResultService {
   async getResultManifest(id: string) {
     const result = await this.prisma.evaluationResult.findUnique({
       where: { id },
-      select: { contentHash: true, coverageStats: true, manifest: true },
+      select: { manifestHash: true, coverageStats: true, evidenceManifest: true },
     });
     if (!result) throw new NotFoundException(`Evaluation result ${id} not found`);
     return result;
@@ -183,7 +182,6 @@ export class EvaluationResultService {
       where: { id: input.id },
       data: {
         reviewStatus: input.reviewStatus,
-        reviewedByRef: input.reviewedByRef,
         reviewedAt: new Date(),
         reviewNote: input.note ?? null,
       },
@@ -195,7 +193,6 @@ export class EvaluationResultService {
 export interface ReviewEvaluationResultInput {
   id: string;
   reviewStatus: EvaluationResultReviewStatus;
-  reviewedByRef: string;
   note?: string;
 }
 

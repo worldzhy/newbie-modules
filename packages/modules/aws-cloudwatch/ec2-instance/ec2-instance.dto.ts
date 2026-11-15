@@ -1,7 +1,10 @@
-import { ArrayMinSize, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID } from "class-validator";
+import { ArrayMinSize, IsArray, IsBoolean, IsNotEmpty, IsOptional, IsString, IsUUID, Matches } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
 import { BooleanTransformer } from "@devbie/newbie/transformers/boolean.transformer";
+
+/** AWS account ids are 12 digits; the account is this module's scope key. */
+const AWS_ACCOUNT_ID_PATTERN = /^\d{12}$/;
 
 /**
  * Response DTO for an EC2 instance record.
@@ -33,9 +36,10 @@ export class Ec2InstanceResponseDto {
 }
 
 export class ListEC2InstancesRequestDto {
-  @ApiProperty()
-  @IsUUID()
-  projectId!: string;
+  @ApiProperty({ description: "12-digit AWS account id" })
+  @IsNotEmpty()
+  @Matches(AWS_ACCOUNT_ID_PATTERN, { message: "accountId must be a 12-digit AWS account id" })
+  accountId!: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -50,15 +54,17 @@ export class ListEC2InstancesRequestDto {
 }
 
 export class FetchEC2InstancesDto {
-  @ApiProperty()
-  @IsUUID()
-  projectId!: string;
+  @ApiProperty({ description: "12-digit AWS account id" })
+  @IsNotEmpty()
+  @Matches(AWS_ACCOUNT_ID_PATTERN, { message: "accountId must be a 12-digit AWS account id" })
+  accountId!: string;
 }
 
 export class SyncEC2InstancesWatchDto {
-  @ApiProperty({ type: String })
-  @IsUUID()
-  projectId!: string;
+  @ApiProperty({ type: String, description: "12-digit AWS account id" })
+  @IsNotEmpty()
+  @Matches(AWS_ACCOUNT_ID_PATTERN, { message: "accountId must be a 12-digit AWS account id" })
+  accountId!: string;
 
   @ApiProperty({ type: String, minLength: 0, isArray: true })
   @IsNotEmpty()

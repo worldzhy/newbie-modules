@@ -32,15 +32,13 @@ function inputFor(items: EvaluationEvidenceItem[]): JudgmentInput {
   return {
     subject: {
       id: "11111111-1111-4111-8111-111111111111",
-      scopeType: "project",
-      scopeId: "22222222-2222-4222-8222-222222222222",
       subjectKey: "repo",
       displayName: "repo",
     },
     ruleSetVersion: {
       id: "33333333-3333-4333-8333-333333333333",
-      kind: "repository",
-      evaluationKey: "npm-osv",
+      subjectKind: "repository",
+      standardKey: "npm-osv",
       version: "1",
     },
     criteria: [],

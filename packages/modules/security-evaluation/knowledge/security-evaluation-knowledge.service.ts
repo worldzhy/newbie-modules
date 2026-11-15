@@ -90,7 +90,7 @@ export class SecurityEvaluationKnowledgeService {
     const publishedAt =
       item.publishedAt instanceof Date && !Number.isNaN(item.publishedAt.getTime()) ? item.publishedAt : null;
     await this.prisma.securityEvaluationThreatKnowledgeItem.upsert({
-      where: { source_externalId: { source: item.source, externalId: item.externalId } },
+      where: { feed_externalId: { feed: item.source, externalId: item.externalId } },
       update: {
         title: item.title,
         summary: item.summary ?? null,
@@ -102,7 +102,7 @@ export class SecurityEvaluationKnowledgeService {
         lastSeenAt: new Date(),
       },
       create: {
-        source: item.source,
+        feed: item.source,
         category: item.category,
         externalId: item.externalId,
         title: item.title,
@@ -131,12 +131,12 @@ export class SecurityEvaluationKnowledgeService {
     });
 
     let deletedByCap = 0;
-    const sources = await this.prisma.securityEvaluationThreatKnowledgeItem.groupBy({ by: ["source"], _count: true });
+    const sources = await this.prisma.securityEvaluationThreatKnowledgeItem.groupBy({ by: ["feed"], _count: true });
     for (const group of sources) {
       if (group._count <= maxItemsPerSource) continue;
       const overflow = group._count - maxItemsPerSource;
       const toDelete = await this.prisma.securityEvaluationThreatKnowledgeItem.findMany({
-        where: { source: group.source },
+        where: { feed: group.feed },
         orderBy: { lastSeenAt: "asc" },
         take: overflow,
         select: { id: true },

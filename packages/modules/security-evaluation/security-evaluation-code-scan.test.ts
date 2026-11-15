@@ -59,17 +59,16 @@ import {
 
 const SUBJECT: EvaluationSubjectRef = {
   id: "11111111-1111-4111-8111-111111111111",
+  subjectType: "security-evaluation",
   kind: "repository",
-  scopeType: "project",
-  scopeId: "22222222-2222-4222-8222-222222222222",
   subjectKey: "application-1",
   displayName: "nightwatch-backend",
 };
 
 const CODE_SCAN_VERSION: EvaluationRuleSetVersionRef = {
   id: "33333333-3333-4333-8333-333333333333",
-  kind: "repository",
-  evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+  subjectKind: "repository",
+  standardKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
   version: "v1",
 };
 
@@ -178,8 +177,8 @@ function cacheRowsFor(
     contentHash: payload.contentHash,
     modelId: "test-model",
     promptVersion: codeScanPromptVersion(),
-    ruleSetVersion: "v1",
-    findings: findings.filter((finding) => finding.criterionKey === criterion.criterionKey),
+    ruleSetVersionLabel: "v1",
+    cachedFindings: findings.filter((finding) => finding.criterionKey === criterion.criterionKey),
     signature: "sig-cached",
   }));
 }
@@ -340,12 +339,12 @@ test("code-scan mechanism discards out-of-range entries and caches per-criterion
   const rows = cache.recorded[0];
   assert.equal(rows.length, CRITERIA.length);
   const injectionRow = rows.find((row) => row.criterionKey === "code-scan.injection");
-  assert.equal(injectionRow?.findings.length, 1);
-  assert.equal(injectionRow?.findings[0].symbol, "findUser");
+  assert.equal(injectionRow?.cachedFindings.length, 1);
+  assert.equal(injectionRow?.cachedFindings[0].symbol, "findUser");
   for (const row of rows) {
     assert.equal(row.modelId, "test-model");
     assert.equal(row.promptVersion, codeScanPromptVersion());
-    assert.equal(row.ruleSetVersion, "v1");
+    assert.equal(row.ruleSetVersionLabel, "v1");
     assert.ok(row.signature.length > 0);
   }
 });
@@ -393,7 +392,7 @@ test("code-scan mechanism fails the run when the LLM scope is unbound (no vacuou
   assert.equal(cache.recorded.length, 0);
 });
 
-test("code-scan mechanism ignores other evaluationKeys", async () => {
+test("code-scan mechanism ignores other standardKeys", async () => {
   const item = codeScanItem("src/a.ts", "const a = 1;");
   const cache = stubCache();
   const { resolver, calls } = stubResolver(() => "{}");
@@ -401,7 +400,7 @@ test("code-scan mechanism ignores other evaluationKeys", async () => {
   const input = judgmentInput([item]);
   const judgment = await mechanism.judge({
     ...input,
-    ruleSetVersion: { ...input.ruleSetVersion, evaluationKey: "npm-osv" },
+    ruleSetVersion: { ...input.ruleSetVersion, standardKey: "npm-osv" },
   });
   assert.deepEqual(judgment.evaluatedRefs, []);
   assert.equal(calls.length, 0);

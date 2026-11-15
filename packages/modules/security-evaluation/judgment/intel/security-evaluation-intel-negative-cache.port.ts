@@ -15,7 +15,7 @@
  */
 export const securityEvaluationIntelNegativeCacheToken = "SECURITY_EVALUATION_INTEL_NEGATIVE_CACHE";
 
-export type SecurityEvaluationVerdictKind = "not-relevant" | "hard-hit";
+export type SecurityEvaluationThreatVerdictKind = "not-relevant" | "hard-hit";
 
 /** One pair whose cached verdict is being tested against a current signature. */
 export interface SecurityEvaluationIntelCacheCandidate {
@@ -30,8 +30,10 @@ export interface SecurityEvaluationIntelCacheCandidate {
 
 export interface SecurityEvaluationIntelVerdictRecord {
   knowledgeItemId: string;
-  scopeKey: string;
-  verdict: SecurityEvaluationVerdictKind;
+  /** Cache scope, the subject identity columns verbatim (ADR-068 D6). */
+  subjectKind: string;
+  subjectKey: string;
+  verdict: SecurityEvaluationThreatVerdictKind;
   /** Content address of the input that produced this verdict. */
   signature: string;
   reason?: string | null;
@@ -46,7 +48,11 @@ export interface SecurityEvaluationIntelNegativeCachePort {
    * rows are intentionally not filtered — they are audit-only, the pair
    * re-enters the pipeline each run.
    */
-  filterUncached(scopeKey: string, candidates: readonly SecurityEvaluationIntelCacheCandidate[]): Promise<string[]>;
+  filterUncached(
+    subjectKind: string,
+    subjectKey: string,
+    candidates: readonly SecurityEvaluationIntelCacheCandidate[],
+  ): Promise<string[]>;
   /** Record a verdict for this (knowledge item, scope) pair. */
   record(entry: SecurityEvaluationIntelVerdictRecord): Promise<void>;
 }

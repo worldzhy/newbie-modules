@@ -32,7 +32,7 @@ export class RateLimiterGuard {
       if (isAllowed) {
         await this.limitAccessByIpService.increment(ipAddress);
       } else {
-        throw new NewbieException(NewbieExceptionType.Access_HighFrequency);
+        throw new NewbieException(NewbieExceptionType.Request_RateLimited);
       }
     }
 
@@ -48,7 +48,7 @@ export class RateLimiterGuard {
       if (isAllowed) {
         await this.limitLoginByIpService.increment(ipAddress);
       } else {
-        throw new NewbieException(NewbieExceptionType.Login_HighFrequency);
+        throw new NewbieException(NewbieExceptionType.Login_IpRateLimited);
       }
     }
 
@@ -72,7 +72,7 @@ export class RateLimiterGuard {
         if (isAllowed) {
           await this.limitLoginByUserService.increment(userId);
         } else {
-          throw new NewbieException(NewbieExceptionType.Login_ExceededAttempts);
+          throw new NewbieException(NewbieExceptionType.Login_UserRateLimited);
         }
       }
     }

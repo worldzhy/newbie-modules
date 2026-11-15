@@ -29,12 +29,12 @@ export class WorkEvaluationEvidenceService {
    * Every read must name an evaluatee. An absent id would otherwise widen the
    * query to every member's evidence, so it is rejected rather than defaulted.
    */
-  private evaluateeId(query: { evaluateeUserId?: string }): string {
-    const evaluateeUserId = query.evaluateeUserId;
-    if (!evaluateeUserId) {
-      throw new BadRequestException("evaluateeUserId is required for evidence reads.");
+  private evaluateeId(query: { developerId?: string }): string {
+    const developerId = query.developerId;
+    if (!developerId) {
+      throw new BadRequestException("developerId is required for evidence reads.");
     }
-    return evaluateeUserId;
+    return developerId;
   }
 
   // --- Reported workspaces ------------------------------------------------
@@ -43,16 +43,16 @@ export class WorkEvaluationEvidenceService {
    * Upsert a workspace report. Called by the evidence ingest path only — the
    * workspace split is self-declared by the member and never adjudicated here.
    */
-  async reportWorkspace(evaluateeUserId: string, installationId: string, input: WorkEvaluationWorkspaceDto) {
+  async reportWorkspace(developerId: string, installationId: string, input: WorkEvaluationWorkspaceDto) {
     return this.prisma.workEvaluationWorkspace.upsert({
       where: {
-        evaluateeUserId_workspaceKey: {
-          evaluateeUserId,
+        developerId_workspaceKey: {
+          developerId,
           workspaceKey: input.workspaceKey,
         },
       },
       create: {
-        evaluateeUserId,
+        developerId,
         workspaceKey: input.workspaceKey,
         rootPath: input.rootPath,
         installationId,
@@ -67,9 +67,9 @@ export class WorkEvaluationEvidenceService {
   }
 
   async listWorkspaces(query: ListWorkEvaluationWorkspacesRequestDto) {
-    const evaluateeUserId = this.evaluateeId(query);
+    const developerId = this.evaluateeId(query);
     return this.prisma.workEvaluationWorkspace.findMany({
-      where: { evaluateeUserId },
+      where: { developerId },
       orderBy: { reportedAt: "desc" },
     });
   }
@@ -82,7 +82,7 @@ export class WorkEvaluationEvidenceService {
    * session is attributed in memory. Transcript chunks land in ClickHouse;
    * these rows are what the evaluation agent lists and drills into.
    */
-  async reportSessions(evaluateeUserId: string, inputs: Omit<WorkEvaluationSessionDto, "messages">[]) {
+  async reportSessions(developerId: string, inputs: Omit<WorkEvaluationSessionDto, "messages">[]) {
     if (inputs.length === 0) return [];
     const starts = inputs.map((input) => input.startedAt.getTime());
     const periods = await this.prisma.workEvaluationPeriod.findMany({
@@ -100,31 +100,31 @@ export class WorkEvaluationEvidenceService {
         periods.find(
           (candidate) => candidate.periodStart.getTime() <= startedAt && candidate.periodEnd.getTime() > startedAt,
         ) ?? null;
-      return this.upsertSessionIndex(evaluateeUserId, input, period?.id ?? null);
+      return this.upsertSessionIndex(developerId, input, period?.id ?? null);
     });
     return Promise.all(upserts);
   }
 
-  /** Upsert one session index row, keyed by (evaluateeUserId, externalSessionId). */
+  /** Upsert one session index row, keyed by (developerId, externalSessionId). */
   private async upsertSessionIndex(
-    evaluateeUserId: string,
+    developerId: string,
     input: Omit<WorkEvaluationSessionDto, "messages">,
     collectionPeriodId: string | null,
   ) {
     return this.prisma.workEvaluationSession.upsert({
       where: {
-        evaluateeUserId_externalSessionId: {
-          evaluateeUserId,
+        developerId_externalSessionId: {
+          developerId,
           externalSessionId: input.externalSessionId,
         },
       },
       create: {
-        evaluateeUserId,
+        developerId,
         collectionPeriodId,
         workspaceKey: input.workspaceKey,
         externalSessionId: input.externalSessionId,
-        source: input.source ?? "claude",
-        model: input.model ?? "",
+        transcriptSource: input.transcriptSource ?? "claude",
+        modelId: input.modelId ?? "",
         turnCount: input.turnCount,
         messageCount: input.messageCount,
         toolCallCount: input.toolCallCount,
@@ -137,8 +137,8 @@ export class WorkEvaluationEvidenceService {
       update: {
         collectionPeriodId,
         workspaceKey: input.workspaceKey,
-        source: input.source ?? "claude",
-        model: input.model ?? "",
+        transcriptSource: input.transcriptSource ?? "claude",
+        modelId: input.modelId ?? "",
         turnCount: input.turnCount,
         messageCount: input.messageCount,
         toolCallCount: input.toolCallCount,
@@ -154,24 +154,24 @@ export class WorkEvaluationEvidenceService {
   async listSessions(
     query: ListWorkEvaluationSessionsRequestDto,
   ): Promise<CommonListResponseDto<WorkEvaluationSessionResponseDto>> {
-    const evaluateeUserId = this.evaluateeId(query);
+    const developerId = this.evaluateeId(query);
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.WorkEvaluationSession,
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
         where: {
-          evaluateeUserId,
+          developerId,
           ...(query.collectionPeriodId ? { collectionPeriodId: query.collectionPeriodId } : {}),
         },
         orderBy: [{ startedAt: "asc" }, { id: "asc" }],
         select: {
           id: true,
-          evaluateeUserId: true,
+          developerId: true,
           collectionPeriodId: true,
           externalSessionId: true,
           workspaceKey: true,
-          model: true,
-          source: true,
+          modelId: true,
+          transcriptSource: true,
           turnCount: true,
           messageCount: true,
           toolCallCount: true,
@@ -187,20 +187,20 @@ export class WorkEvaluationEvidenceService {
 
   // --- Declared documents --------------------------------------------------
   /** Upsert a declared work artifact reported by the installation agent. */
-  async reportDocument(evaluateeUserId: string, input: WorkEvaluationDeclaredDocumentDto) {
+  async reportDocument(developerId: string, input: WorkEvaluationDeclaredDocumentDto) {
     return this.prisma.workEvaluationDeclaredDocument.upsert({
       where: {
-        evaluateeUserId_workspaceKey_refPath: {
-          evaluateeUserId,
+        developerId_workspaceKey_path: {
+          developerId,
           workspaceKey: input.workspaceKey,
-          refPath: input.refPath,
+          path: input.path,
         },
       },
       create: {
-        evaluateeUserId,
+        developerId,
         workspaceKey: input.workspaceKey,
         title: input.title,
-        refPath: input.refPath,
+        path: input.path,
         description: input.description,
         content: input.content,
         capturedAt: input.capturedAt,
@@ -217,19 +217,19 @@ export class WorkEvaluationEvidenceService {
   async listDocuments(
     query: ListWorkEvaluationDeclaredDocumentsRequestDto,
   ): Promise<CommonListResponseDto<WorkEvaluationDeclaredDocumentResponseDto>> {
-    const evaluateeUserId = this.evaluateeId(query);
+    const developerId = this.evaluateeId(query);
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.WorkEvaluationDeclaredDocument,
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
-        where: { evaluateeUserId },
+        where: { developerId },
         orderBy: { capturedAt: "desc" },
         select: {
           id: true,
-          evaluateeUserId: true,
+          developerId: true,
           workspaceKey: true,
           title: true,
-          refPath: true,
+          path: true,
           description: true,
           capturedAt: true,
           createdAt: true,
@@ -239,15 +239,15 @@ export class WorkEvaluationEvidenceService {
   }
 
   /**
-   * Read one declared document. When `evaluateeUserId` is provided the lookup
-   * is bound to that evaluatee (`(evaluateeUserId, id)`), so a document id
+   * Read one declared document. When `developerId` is provided the lookup
+   * is bound to that evaluatee (`(developerId, id)`), so a document id
    * guessed from elsewhere resolves to nothing instead of another member's
    * content. Internal callers (the judgment tools) already pin the id to the
    * evaluation manifest and may omit it.
    */
-  async getDocument(id: string, evaluateeUserId?: string) {
+  async getDocument(id: string, developerId?: string) {
     const document = await this.prisma.workEvaluationDeclaredDocument.findFirst({
-      where: { id, ...(evaluateeUserId ? { evaluateeUserId } : {}) },
+      where: { id, ...(developerId ? { developerId } : {}) },
     });
     if (!document) {
       throw new NotFoundException(`Declared document ${id} not found`);

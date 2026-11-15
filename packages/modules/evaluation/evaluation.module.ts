@@ -16,7 +16,7 @@ import { EvaluationSubjectService } from "./evaluation-subject.service";
  * The module owns the seven tables, the run lifecycle and the invariants. Its
  * HTTP surface is deliberately minimal (ADR-029): the decision controller for
  * suppression/reopening, result review (ADR-031) and remediation — lifecycle
- * operations over skeleton-owned aggregates that every feature evaluationKey shares.
+ * operations over skeleton-owned aggregates that every feature standardKey shares.
  * Read models, feature-specific endpoints and scheduling belong to the feature
  * that builds on it.
  *
@@ -26,11 +26,11 @@ import { EvaluationSubjectService } from "./evaluation-subject.service";
  * decisions (suppression, result review, remediation); a feature must not
  * drive the run state machine through `EvaluationRunService` directly.
  *
- * The four ports (SubjectProvider, EvidenceProvider, CriteriaProvider,
- * JudgmentPort) are bound by the host and by features under the tokens in
- * `ports/`; the optional EvaluationObserver port reports run completions and
- * finding lifecycle changes to whoever binds it. Runner tuning goes through
- * `evaluationRunOptionsToken`. This module only ever looks bindings up.
+ * The three ports (EvidenceProvider, CriteriaProvider, JudgmentPort) are bound
+ * by the host and by features under the tokens in `ports/`; the optional
+ * EvaluationObserver port reports run completions and finding lifecycle changes
+ * to whoever binds it. Runner tuning goes through `evaluationRunOptionsToken`.
+ * This module only ever looks bindings up.
  */
 @Global()
 @Module({

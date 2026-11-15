@@ -56,7 +56,7 @@ const LOGIN_ENTRY_FILES = [
 ];
 
 const REJECTION_PATTERN =
-  /throw new (UnauthorizedException|BadRequestException|ForbiddenException|NewbieException|NotFoundException)/;
+  /throw (new (UnauthorizedException|BadRequestException|ForbiddenException|NewbieException|NotFoundException)|inactiveAccountError\(\))/;
 const AUDIT_CALL_PATTERN = /recordLoginFailure\(|auditLogService\.record\(/;
 const EXEMPTION_COMMENT_PATTERN = /handshake|audit: not required/i;
 const LOOKBACK_LINES = 8;

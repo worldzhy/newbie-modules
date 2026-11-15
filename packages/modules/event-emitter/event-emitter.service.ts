@@ -8,6 +8,13 @@ import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 const RETENTION_DAYS_KEY = "modules.event-emitter.retentionDays";
 
+// Bounds on the audit payload (R47-05). The emission table is an audit trail,
+// not a data store: long strings are cut, and a payload that still exceeds the
+// budget degrades to a preview marker so one producer cannot bloat the table
+// or the list API.
+const MAX_PAYLOAD_STRING_LENGTH = 2_000;
+const MAX_PAYLOAD_JSON_LENGTH = 16_000;
+
 /// Validates the retention days resolved from the assembler's bare env
 /// mapping (ADR-033): the value must be a declared positive integer — there
 /// is no built-in fallback, so a host that forgets it fails to boot instead
@@ -147,12 +154,25 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
   /// Persist exactly what JSON can represent: normalize through a stringify
   /// round-trip so functions and class instances degrade to their JSON shape;
   /// unserializable payloads (circular, BigInt) degrade to a marker object.
+  /// Strings are capped per value, and an oversized payload is stored as a
+  /// preview instead of the raw blob (R47-05).
   private toJsonPayload(payload: unknown): Prisma.InputJsonValue | typeof Prisma.DbNull {
     if (payload === undefined || payload === null) {
       return Prisma.DbNull;
     }
     try {
-      return JSON.parse(JSON.stringify(payload)) as Prisma.InputJsonValue;
+      const json = JSON.stringify(payload, (_key, value: unknown) =>
+        typeof value === "string" && value.length > MAX_PAYLOAD_STRING_LENGTH
+          ? `${value.slice(0, MAX_PAYLOAD_STRING_LENGTH)}…[truncated]`
+          : value,
+      );
+      if (json === undefined) {
+        return Prisma.DbNull;
+      }
+      if (json.length > MAX_PAYLOAD_JSON_LENGTH) {
+        return { truncated: true, preview: json.slice(0, MAX_PAYLOAD_JSON_LENGTH) };
+      }
+      return JSON.parse(json) as Prisma.InputJsonValue;
     } catch {
       return { serializationError: "Payload is not JSON-serializable" };
     }

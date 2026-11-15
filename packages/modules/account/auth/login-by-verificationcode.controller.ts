@@ -103,7 +103,7 @@ export class LoginByVerificationCodeController {
         });
       }
     } else {
-      throw new NewbieException(NewbieExceptionType.ResetPassword_WrongInput);
+      throw new NewbieException(NewbieExceptionType.ResetPassword_InvalidInput);
     }
 
     // One uniform response for every identifier: the countdown is identical

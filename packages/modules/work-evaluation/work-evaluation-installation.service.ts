@@ -33,7 +33,7 @@ const AUDIT_RESOURCE_TYPE = "work-evaluation-installation";
 /** Domain columns stored next to the credential (ADR-019). */
 interface WorkEvaluationInstallationDraft {
   label: string;
-  evaluateeUserId: string;
+  developerId: string;
   hostname: string | null;
 }
 
@@ -81,20 +81,20 @@ export class WorkEvaluationInstallationService extends BaseInstallationService<W
       this.credentials,
       {
         label: input.label,
-        evaluateeUserId: input.evaluateeUserId,
+        developerId: input.developerId,
         hostname: input.hostname ?? null,
       },
       {
         ...this.credentialAudit(actor),
-        detail: { label: input.label, evaluateeUserId: input.evaluateeUserId },
+        detail: { label: input.label, developerId: input.developerId },
       },
     );
     return { ...this.withDerivedState(record), token };
   }
 
-  async list(query: { evaluateeUserId?: string }) {
+  async list(query: { developerId?: string }) {
     const rows = await this.prisma.workEvaluationInstallation.findMany({
-      where: query.evaluateeUserId ? { evaluateeUserId: query.evaluateeUserId } : undefined,
+      where: query.developerId ? { developerId: query.developerId } : undefined,
       orderBy: { createdAt: "desc" },
     });
     return rows.map((row) => this.withDerivedState(row));

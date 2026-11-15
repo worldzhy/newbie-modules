@@ -24,16 +24,14 @@ const EVIDENCE_ID = "pkg:npm:lodash@4.17.20";
 const SUBJECT = {
   id: SUBJECT_ID,
   kind: "repository",
-  scopeType: "project",
-  scopeId: "scope-1",
   subjectKey: "repo",
   displayName: "repo",
 };
 
 const VERSION = {
   id: VERSION_ID,
-  kind: "repository",
-  evaluationKey: "npm-osv",
+  subjectKind: "repository",
+  standardKey: "npm-osv",
   version: "1.0.0",
   publishedAt: new Date(),
 };
@@ -70,7 +68,7 @@ function buildRunner(options: BuildOptions = {}) {
     id: "run-1",
     subjectId: SUBJECT_ID,
     ruleSetVersionId: VERSION_ID,
-    config: null,
+    judgmentConfig: null,
     startedAt: new Date(),
     status: "RUNNING",
   } as unknown as EvaluationRun;
@@ -130,7 +128,7 @@ function buildRunner(options: BuildOptions = {}) {
     },
     findById: async () => {
       if (options.rowLookupFails) throw new Error("Evaluation run run-1 not found");
-      return { ...running, status: "FAILED", error: options.reapedError ?? null };
+      return { ...running, status: "FAILED", failureReason: options.reapedError ?? null };
     },
   };
 
@@ -170,7 +168,7 @@ const EXPECTED_IDENTITY = {
   subjectId: SUBJECT_ID,
   subjectKind: "repository",
   ruleSetVersionId: VERSION_ID,
-  evaluationKey: "npm-osv",
+  standardKey: "npm-osv",
 };
 
 test("a successful run publishes evaluation.run-succeeded once with its identity", async () => {

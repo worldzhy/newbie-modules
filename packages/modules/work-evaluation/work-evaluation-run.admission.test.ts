@@ -16,7 +16,7 @@ function buildService(overrides?: {
   user?: Record<string, unknown> | null;
   openError?: Error;
 }) {
-  const period = overrides?.period ?? { id: "period-1", type: "COLLECTION", status: "ACTIVE" };
+  const period = overrides?.period ?? { id: "period-1", phase: "COLLECTION", status: "ACTIVE" };
   const user = overrides?.user === undefined ? { id: "user-1", name: "Ada", email: "ada@dev.test" } : overrides?.user;
   const calls: { open: unknown[]; execute: unknown[] } = { open: [], execute: [] };
   const runner = {
@@ -44,9 +44,9 @@ function buildService(overrides?: {
 }
 
 const input = {
-  evaluateeUserId: "user-1",
+  developerId: "user-1",
   periodId: "period-1",
-  config: { modelScope: "kimi-k3" },
+  judgmentConfig: { modelScope: "kimi-k3" },
 };
 
 describe("WorkEvaluationRunService.startRun admission", () => {
@@ -54,10 +54,10 @@ describe("WorkEvaluationRunService.startRun admission", () => {
     const { service, calls } = buildService();
     await service.startRun(input);
     assert.equal(calls.open.length, 1);
-    const opened = calls.open[0] as { subjectId: string; config: Record<string, unknown> };
+    const opened = calls.open[0] as { subjectId: string; judgmentConfig: Record<string, unknown> };
     assert.equal(opened.subjectId, "subject-1");
-    assert.equal(opened.config.periodId, "period-1");
-    assert.equal(opened.config.modelScope, "kimi-k3");
+    assert.equal(opened.judgmentConfig.periodId, "period-1");
+    assert.equal(opened.judgmentConfig.modelScope, "kimi-k3");
     assert.deepEqual(calls.execute, [{ id: "run-1" }]);
   });
 

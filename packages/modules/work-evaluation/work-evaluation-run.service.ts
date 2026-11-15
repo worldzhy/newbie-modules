@@ -10,17 +10,17 @@ import {
 import { EvaluationRunnerService } from "@modules/evaluation/evaluation-runner.service";
 import { EvaluationSubjectService, ListEvaluationSubjectsInput } from "@modules/evaluation/evaluation-subject.service";
 
-import { WORK_EVALUATION_SUBJECT_KIND, WORK_EVALUATION_SUBJECT_SCOPE_TYPE } from "./work-evaluation.constants";
+import { WORK_EVALUATION_SUBJECT_KIND, WORK_EVALUATION_SUBJECT_TYPE } from "./work-evaluation.constants";
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 
 export interface StartWorkEvaluationRunInput {
   /** The member to evaluate; the subject row is registered lazily (ADR-026 D2). */
-  evaluateeUserId: string;
+  developerId: string;
   /** COLLECTION period that has started; pins the criteria version and evidence window. */
   periodId: string;
-  requestedByRef?: string;
-  /** Opaque per-run config (ADR-023), e.g. modelScope for multi-model runs. */
-  config?: Record<string, unknown>;
+  requestedBy?: string;
+  /** Opaque per-run judgment config (ADR-023), e.g. modelScope for multi-model runs. */
+  judgmentConfig?: Record<string, unknown>;
 }
 
 /**
@@ -54,9 +54,9 @@ export class WorkEvaluationRunService {
    */
   async startRun(input: StartWorkEvaluationRunInput): Promise<string> {
     const period = await this.periods.getPeriodById(input.periodId);
-    if (period.type !== WorkEvaluationPeriodType.COLLECTION) {
+    if (period.phase !== WorkEvaluationPeriodType.COLLECTION) {
       throw new BadRequestException(
-        `Runs can only be dispatched against COLLECTION periods; period ${period.id} is ${period.type}`,
+        `Runs can only be dispatched against COLLECTION periods; period ${period.id} is ${period.phase}`,
       );
     }
     if (period.status === WorkEvaluationPeriodStatus.UPCOMING) {
@@ -66,23 +66,22 @@ export class WorkEvaluationRunService {
     }
 
     const user = await this.prisma.user.findUnique({
-      where: { id: input.evaluateeUserId },
+      where: { id: input.developerId },
       select: { id: true, name: true, email: true },
     });
-    if (!user) throw new NotFoundException(`User ${input.evaluateeUserId} not found`);
+    if (!user) throw new NotFoundException(`User ${input.developerId} not found`);
 
     const subject = await this.subjects.getOrCreateSubject({
+      subjectType: WORK_EVALUATION_SUBJECT_TYPE,
       kind: WORK_EVALUATION_SUBJECT_KIND,
-      scopeType: WORK_EVALUATION_SUBJECT_SCOPE_TYPE,
-      scopeId: user.id,
       subjectKey: user.id,
       displayName: user.name ?? user.email ?? user.id,
     });
 
     const built: StartEvaluationRunInput = {
       subjectId: subject.id,
-      requestedByRef: input.requestedByRef,
-      config: { ...input.config, periodId: period.id },
+      requestedBy: input.requestedBy,
+      judgmentConfig: { ...input.judgmentConfig, periodId: period.id },
     };
     // Admission happens on the request path via `open`; only the judgment
     // execution is detached. The runner records every terminal state on the
@@ -124,7 +123,11 @@ export class WorkEvaluationRunService {
   }
 
   /** Subject listing is pinned to this feature's kind. */
-  listSubjects(query: Omit<ListEvaluationSubjectsInput, "kind">) {
-    return this.subjects.listSubjects({ ...query, kind: WORK_EVALUATION_SUBJECT_KIND });
+  listSubjects(query: Omit<ListEvaluationSubjectsInput, "subjectType" | "kind">) {
+    return this.subjects.listSubjects({
+      ...query,
+      subjectType: WORK_EVALUATION_SUBJECT_TYPE,
+      kind: WORK_EVALUATION_SUBJECT_KIND,
+    });
   }
 }

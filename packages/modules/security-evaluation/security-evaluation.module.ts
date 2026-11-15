@@ -5,6 +5,7 @@ import { evidenceProviderToken } from "@modules/evaluation/ports/evidence.provid
 import { judgmentPortToken } from "@modules/evaluation/ports/judgment.port";
 
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
+import { SecurityEvaluationWebOriginService } from "./assets/security-evaluation-web-origin.service";
 import { SecurityEvaluationCriteriaProvider } from "./criteria/security-evaluation-criteria.provider";
 import { SecurityEvaluationCriteriaSeed } from "./criteria/security-evaluation-criteria.seed";
 import { SecurityEvaluationAwsConfigEvidenceProvider } from "./evidence/security-evaluation-aws-config-evidence.provider";
@@ -50,8 +51,8 @@ import {
  * Slice 1 owns the asset inventory, the dependency criteria and the DEPENDENCY
  * judgment; slice 2 (ADR-027) adds the AWS_CONFIG mechanism: the CIS AWS
  * Foundations criteria for subject kind "aws-account", its evidence provider
- * and its rulebook judgment, dispatched by evaluationKey through the same judgment
- * service. INTEL arrives in a later slice with its own evaluationKey dispatch.
+ * and its rulebook judgment, dispatched by standardKey through the same judgment
+ * service. INTEL arrives in a later slice with its own standardKey dispatch.
  * ADR-046 turns that dispatch into a mechanism registry: each key declares a
  * mechanism list, executed in parallel and merged under a single contract.
  *
@@ -67,6 +68,10 @@ import {
  * here: the host binds them (nightwatch uses its github and aws-identity
  * modules). An unbound port fails the run with a wiring error rather than
  * silently reporting a clean result.
+ *
+ * `SECURITY_EVALUATION_VERIFICATION_FETCH_ACCESS` (ADR-044) is optional and
+ * only needed by deployments that register web origins; the port is injected
+ * optionally so a host without web origins boots unchanged.
  */
 @Global()
 @Module({
@@ -74,6 +79,7 @@ import {
   controllers: [SecurityEvaluationController],
   providers: [
     SecurityEvaluationAssetService,
+    SecurityEvaluationWebOriginService,
     SecurityEvaluationCriteriaSeed,
     SecurityEvaluationCriteriaProvider,
     SecurityEvaluationEvidenceProvider,
@@ -150,7 +156,7 @@ import {
       ],
     },
     // Kind-scoped skeleton ports (ADR-020 D4). One judgment dispatcher serves
-    // both kinds; the evaluationKey on the criteria version routes the mechanism.
+    // both kinds; the standardKey on the criteria version routes the mechanism.
     {
       provide: criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
       useExisting: SecurityEvaluationCriteriaProvider,
@@ -178,6 +184,7 @@ import {
   ],
   exports: [
     SecurityEvaluationAssetService,
+    SecurityEvaluationWebOriginService,
     SecurityEvaluationRunService,
     SecurityEvaluationReportService,
     SecurityEvaluationKnowledgeService,

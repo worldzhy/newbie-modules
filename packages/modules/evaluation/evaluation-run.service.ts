@@ -67,25 +67,22 @@ export interface StartEvaluationRunInput {
   subjectId: string;
   /** Omit to let the feature's CriteriaProvider pick the applicable version. */
   ruleSetVersionId?: string;
-  requestedByRef?: string;
+  requestedBy?: string;
   /**
    * Opaque per-run feature config (ADR-023), stored on the row and threaded to
    * the judgment port verbatim. Small knobs only — the skeleton never reads it.
    */
-  config?: Record<string, unknown>;
+  judgmentConfig?: Record<string, unknown>;
 }
 
 export interface ListEvaluationRunsInput {
   /** Omitted lists every run (of `kind`, when given) newest first. */
   subjectId?: string;
-  /** Narrow to an explicit subject set (feature-level provenance filters). */
+  /** Narrow to an explicit subject set (host-resolved provenance filters). */
   subjectIds?: readonly string[];
   ruleSetVersionId?: string;
   /** When present, only runs whose subject matches this kind are returned. */
   kind?: string;
-  /** Host scope coordinate on the subject; narrows the list to one scope. */
-  scopeType?: string;
-  scopeId?: string;
   /** Restrict to one run status, e.g. FAILED for a latest-failure banner. */
   status?: EvaluationRunStatus;
   page?: number;
@@ -126,11 +123,11 @@ export class EvaluationRunService {
     if (!subject) throw new NotFoundException(`Evaluation subject ${input.subjectId} not found`);
 
     const ruleSetVersionId =
-      input.ruleSetVersionId ?? (await this.resolveVersionId(toSubjectRef(subject), input.config ?? null));
+      input.ruleSetVersionId ?? (await this.resolveVersionId(toSubjectRef(subject), input.judgmentConfig ?? null));
     const version = await this.requirePublishedVersion(ruleSetVersionId);
-    if (version.kind !== subject.kind) {
+    if (version.subjectKind !== subject.kind) {
       throw new BadRequestException(
-        `Criteria version ${version.evaluationKey}/${version.version} judges kind "${version.kind}", not "${subject.kind}"`,
+        `Criteria version ${version.standardKey}/${version.version} judges kind "${version.subjectKind}", not "${subject.kind}"`,
       );
     }
 
@@ -139,8 +136,8 @@ export class EvaluationRunService {
         data: {
           subjectId: input.subjectId,
           ruleSetVersionId,
-          requestedByRef: input.requestedByRef,
-          config: input.config as Prisma.InputJsonValue | undefined,
+          requestedBy: input.requestedBy,
+          judgmentConfig: input.judgmentConfig as Prisma.InputJsonValue | undefined,
           status: EvaluationRunStatus.QUEUED,
         },
       });
@@ -177,7 +174,7 @@ export class EvaluationRunService {
       where: { id, status: { in: ACTIVE_RUN_STATUSES } },
       data: {
         status: EvaluationRunStatus.FAILED,
-        error: formatRunError(error),
+        failureReason: formatRunError(error),
         finishedAt: new Date(),
       },
     });
@@ -245,15 +242,7 @@ export class EvaluationRunService {
           ...(query.subjectIds ? { subjectId: { in: [...query.subjectIds] } } : {}),
           ...(query.ruleSetVersionId ? { ruleSetVersionId: query.ruleSetVersionId } : {}),
           ...(query.status ? { status: query.status } : {}),
-          ...(query.kind || query.scopeType || query.scopeId
-            ? {
-                subject: {
-                  ...(query.kind ? { kind: query.kind } : {}),
-                  ...(query.scopeType ? { scopeType: query.scopeType } : {}),
-                  ...(query.scopeId ? { scopeId: query.scopeId } : {}),
-                },
-              }
-            : {}),
+          ...(query.kind ? { subject: { kind: query.kind } } : {}),
         },
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       },
@@ -273,15 +262,15 @@ export class EvaluationRunService {
     }
     const version = await this.prisma.evaluationRuleSetVersion.findFirst({
       where: {
-        kind: subject.kind,
-        evaluationKey: selection.evaluationKey,
+        subjectKind: subject.kind,
+        standardKey: selection.standardKey,
         version: selection.version,
         publishedAt: { not: null },
       },
     });
     if (!version) {
       throw new NotFoundException(
-        `Criteria version ${selection.evaluationKey}/${selection.version} is not published for kind "${subject.kind}"`,
+        `Criteria version ${selection.standardKey}/${selection.version} is not published for kind "${subject.kind}"`,
       );
     }
     return version.id;
@@ -315,10 +304,10 @@ export class EvaluationRunService {
       const finishedAt = new Date();
       const updated = await this.prisma.evaluationRun.updateMany({
         where: { id: candidate.id, status: { in: ACTIVE_RUN_STATUSES }, updatedAt: candidate.updatedAt },
-        data: { status: EvaluationRunStatus.FAILED, error: STALE_RUN_ERROR, finishedAt },
+        data: { status: EvaluationRunStatus.FAILED, failureReason: STALE_RUN_ERROR, finishedAt },
       });
       if (updated.count === 1) {
-        reaped.push({ ...candidate, status: EvaluationRunStatus.FAILED, error: STALE_RUN_ERROR, finishedAt });
+        reaped.push({ ...candidate, status: EvaluationRunStatus.FAILED, failureReason: STALE_RUN_ERROR, finishedAt });
       }
     }
     return reaped;

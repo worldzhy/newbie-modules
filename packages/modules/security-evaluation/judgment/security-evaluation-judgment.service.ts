@@ -12,10 +12,10 @@ import { resolveSecurityEvaluationJudgmentMechanisms } from "./security-evaluati
  * SecurityEvaluationJudgmentService — the single JudgmentPort binding for this
  * feature (ADR-022 D3, ADR-046).
  *
- * Dispatch is a table lookup: the evaluationKey's declared mechanism list is
+ * Dispatch is a table lookup: the standardKey's declared mechanism list is
  * executed in parallel and the results merged under the composition contract.
- * Adding an evaluationKey or a second mechanism dimension changes the registry
- * data, not this class. An unknown evaluationKey is a contract error, not a
+ * Adding an standardKey or a second mechanism dimension changes the registry
+ * data, not this class. An unknown standardKey is a contract error, not a
  * silent pass.
  */
 @Injectable()
@@ -26,10 +26,10 @@ export class SecurityEvaluationJudgmentService implements JudgmentPort {
   ) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    const mechanisms = resolveSecurityEvaluationJudgmentMechanisms(input.ruleSetVersion.evaluationKey, this.mechanisms);
+    const mechanisms = resolveSecurityEvaluationJudgmentMechanisms(input.ruleSetVersion.standardKey, this.mechanisms);
     if (!mechanisms) {
       throw new BadRequestException(
-        `No security-evaluation judgment is implemented for criteria evaluationKey "${input.ruleSetVersion.evaluationKey}".`,
+        `No security-evaluation judgment is implemented for criteria standardKey "${input.ruleSetVersion.standardKey}".`,
       );
     }
 

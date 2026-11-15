@@ -3,63 +3,109 @@
 // consumer prisma tree on `newbie modules apply`.
 //
 // The run / result / criteria / finding tables belong to the evaluation
-// skeleton (`module/evaluation`, ADR-020). This feature only owns the asset
-// inventory: `subjectId` is a plain scalar with no relation — foreign keys
-// never cross schema boundaries.
+// skeleton (`module/evaluation`, ADR-020). This feature owns the subject-scoped
+// knowledge, the web-origin ownership-verification record, the repository /
+// aws-account material rows and the code-scan caches: `subjectId` is a plain
+// scalar with no relation — foreign keys never cross schema boundaries.
+// Identity is the subject coordinate `(subjectType, kind, subjectKey)`
+// (ADR-068 D7, ADR-069); the material rows below hold only what is specific to
+// their kind and are keyed by the same natural coordinate (ADR-070 D1, D2).
 
 // !! ----------------------------------------------------------- //
 // !!            [Module] Security Evaluation models             //
 // !! ----------------------------------------------------------- //
-// * SecurityEvaluationAsset                                   //
-// * SecurityEvaluationAssetSource                             //
+// * SecurityEvaluationWebOrigin                               //
+// * SecurityEvaluationRepository                              //
+// * SecurityEvaluationAwsAccount                              //
 // * SecurityEvaluationAwsConfigKnowledgeItem                  //
 // * SecurityEvaluationNpmPackageKnowledgeItem                 //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-/// One evaluated asset, one-to-one with an EvaluationSubject row of this
-/// feature's kinds ("repository" / "aws-account"). The skeleton owns the
-/// subject coordinate; this table owns the asset's inventory lifecycle.
-/// `naturalKey` is the feature's stable identity inside its scope — a
-/// repository full name or an AWS account id.
-model SecurityEvaluationAsset {
-  id          String   @id @default(uuid()) @db.Uuid
-  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
-  subjectId   String   @unique @db.Uuid
-  naturalKey  String   @db.VarChar(512)
-  displayName String   @db.VarChar(255)
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
-
-  awsConfigKnowledgeItems   SecurityEvaluationAwsConfigKnowledgeItem[]
-  npmPackageKnowledgeItems  SecurityEvaluationNpmPackageKnowledgeItem[]
-
-  @@index([naturalKey])
-  @@schema("module/security-evaluation")
-}
-
-/// Provenance of a subject: which host source submitted it (ADR-039). A
-/// platform-level subject may be supplied by several sources — the same
-/// repository can back applications of two projects, so the relation is many
-/// to many and the row set is what "who contributed this asset" means.
+/// Ownership-verification record of a web-origin subject (ADR-066, ADR-044).
 ///
-/// `sourceType` / `sourceId` are opaque strings: the module never resolves them
-/// to a host entity, it only stores and filters them. Provenance is used for
-/// display and remediation routing, never for authorization.
-model SecurityEvaluationAssetSource {
-  id              String   @id @default(uuid()) @db.Uuid
+/// One row per subject: the subject carries the identity (`subjectKey` is the
+/// normalized origin, `displayName` the label) and provenance lives in the host
+/// (ADR-068 D8) — this table owns only what is specific to a web origin: where
+/// it runs, which path roles the rules can target, and whether the deployment
+/// still controls the origin.
+///
+/// Only `verificationStatus = VERIFIED` and `isActive` subjects are submitted
+/// for evaluation. Re-verification is lazy (the host calls `listActiveVerified`),
+/// so the module needs no scheduler; consecutive failures beyond the configured
+/// threshold move the row to `FAILED` and stop evaluation of a domain that may
+/// have changed hands.
+model SecurityEvaluationWebOrigin {
+  id                   String    @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK
-  subjectId       String   @db.Uuid
-  sourceType      String   @db.VarChar(64)
-  sourceId        String   @db.VarChar(128)
-  firstSubmittedAt DateTime @default(now())
-  lastSubmittedAt  DateTime @default(now())
+  subjectId            String    @unique @db.Uuid
+  // Free-form deployment slot chosen by the host ("production", "staging"…).
+  environment          String    @db.VarChar(32)
+  // Path role → relative path, e.g. { "auth.login": "/login" }. Dropping a
+  // role makes criteria that depend on it report "target not configured".
+  targetPaths          Json      @default("{}") @db.JsonB
+  // PENDING | VERIFIED | FAILED | REVOKED.
+  verificationStatus   String    @default("PENDING") @db.VarChar(16)
+  verificationToken    String    @db.VarChar(64)
+  // DNS_TXT | WELL_KNOWN; null until the host requests a verification method.
+  verificationMethod   String?   @db.VarChar(16)
+  // Consecutive failed re-verifications; reset on success.
+  verificationFailureCount Int  @default(0)
+  verifiedAt           DateTime?
+  lastVerifiedAt       DateTime?
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  @@unique([subjectId, sourceType, sourceId])
-  @@index([sourceType, sourceId])
+  @@index([verificationStatus, isActive])
   @@schema("module/security-evaluation")
 }
 
-/// A current-state AWS configuration knowledge item collected from an asset:
+/// Repository material of a repository subject (ADR-070 D1).
+///
+/// The host's own repository record stays the host's truth (it is referenced by
+/// application provisioning); this row is the evaluation-side copy of the
+/// coordinate, so evidence collection knows which code host and which
+/// `namespace/name` a subject names without reading a host table. Rows are
+/// written by ingest only and are keyed by the natural coordinate, not by a host
+/// id — several projects declaring the same repository share one row.
+model SecurityEvaluationRepository {
+  id        String   @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId String   @unique @db.Uuid
+  provider  String   @db.VarChar(32)
+  // Vendor-neutral first segment of the coordinate: GitHub owner, Bitbucket
+  // workspace, … Lowercased; the subject display name keeps the original case.
+  namespace String   @db.VarChar(255)
+  name      String   @db.VarChar(255)
+  url       String?  @db.VarChar(255)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, namespace, name])
+  @@schema("module/security-evaluation")
+}
+
+/// AWS account material of an aws-account subject (ADR-070 D1).
+///
+/// The account id is the natural key (a cross-account binding can be recreated
+/// without changing it). Credentials stay a host concern: the opaque
+/// `credentialRef` lives on the subject, never here.
+model SecurityEvaluationAwsAccount {
+  id            String   @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId     String   @unique @db.Uuid
+  accountId     String   @unique @db.VarChar(12)
+  defaultRegion String?  @db.VarChar(32)
+  regions       String[]
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@schema("module/security-evaluation")
+}
+
+/// A current-state AWS configuration knowledge item collected from a subject:
 /// a password policy, an access key, a bucket's security posture… Items are
 /// upserted on collection and never deleted here; history lives in the
 /// archived run manifest, and a stale `observedAt` is what "not observed
@@ -67,38 +113,36 @@ model SecurityEvaluationAssetSource {
 ///
 /// The KnowledgeItem suffix marks the knowledge family — collected/external
 /// knowledge consumed by judgment — not schema isomorphism across the
-/// family: this table is asset-scoped while SecurityEvaluationThreatKnowledgeItem
+/// family: this table is subject-scoped while SecurityEvaluationThreatKnowledgeItem
 /// is world-scoped (ADR-037 D9.1).
 model SecurityEvaluationAwsConfigKnowledgeItem {
   id         String   @id @default(uuid()) @db.Uuid
-  assetId    String   @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId  String   @db.Uuid
   type       String   @db.VarChar(64) // "aws.iam.account-password-policy" | ...
   key        String   @db.VarChar(512) // stable identity within the type
   value      Json?    @db.JsonB // small intrinsic values: region, mfaEnabled…
   observedAt DateTime
 
-  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  @@unique([assetId, type, key])
-  @@index([assetId, type])
+  @@unique([subjectId, type, key])
+  @@index([subjectId, type])
   @@schema("module/security-evaluation")
 }
 
 /// A current-state npm package knowledge item collected from a repository
-/// asset: the package installed at a version. Same lifecycle and family
+/// subject: the package installed at a version. Same lifecycle and family
 /// semantics as SecurityEvaluationAwsConfigKnowledgeItem.
 model SecurityEvaluationNpmPackageKnowledgeItem {
   id         String   @id @default(uuid()) @db.Uuid
-  assetId    String   @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId  String   @db.Uuid
   type       String   @db.VarChar(64) // "npm.package"
   key        String   @db.VarChar(512) // "npm:lodash@4.17.20"
   value      Json?    @db.JsonB // small intrinsic values: version, isDev, ecosystem…
   observedAt DateTime
 
-  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  @@unique([assetId, type, key])
-  @@index([assetId, type])
+  @@unique([subjectId, type, key])
+  @@index([subjectId, type])
   @@schema("module/security-evaluation")
 }
 
@@ -109,8 +153,8 @@ model SecurityEvaluationNpmPackageKnowledgeItem {
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 /// One piece of external threat intelligence, deduplicated by
-/// (source, externalId). One row per unique intel item; re-fetching the
-/// same item refreshes rawPayload and bumps lastSeenAt. fetchedAt stays at
+/// (feed, externalId). One row per unique intel item; re-fetching the
+/// same item refreshes rawPayload and bumps lastSeenAt. firstSeenAt stays at
 /// the first-seen time on purpose: the match pipeline walks it oldest-first
 /// so every collection batch eventually gets evaluated.
 ///
@@ -118,14 +162,14 @@ model SecurityEvaluationNpmPackageKnowledgeItem {
 /// indexes are unchanged.
 ///
 /// World-scoped: unlike the asset-scoped knowledge tables above, a threat
-/// item belongs to no asset — it exists once per source and is matched
+/// item belongs to no asset — it exists once per feed and is matched
 /// against every asset's knowledge during judgment.
 model SecurityEvaluationThreatKnowledgeItem {
   id          String   @id @default(uuid()) @db.Uuid
-  source      String   @db.VarChar(50)
+  feed        String   @db.VarChar(50)
   category    String   @db.VarChar(30)
-  // Stable identifier within the source: CVE ID, ecosystem+package,
-  // vendor+event-id, or a title fingerprint. Together with `source` it
+  // Stable identifier within the feed: CVE ID, ecosystem+package,
+  // vendor+event-id, or a title fingerprint. Together with `feed` it
   // forms the deduplication key.
   externalId  String   @db.VarChar(512)
   title       String   @db.VarChar(1024)
@@ -136,19 +180,19 @@ model SecurityEvaluationThreatKnowledgeItem {
   // Signal tags: kev, has-exploit, exploited-in-wild.
   signalTags  String[]
   rawPayload  Json?
-  fetchedAt   DateTime @default(now())
+  firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   verdictCaches SecurityEvaluationThreatVerdictCache[]
 
-  @@unique([source, externalId])
+  @@unique([feed, externalId])
   @@index([category])
   @@index([severity])
   @@index([publishedAt])
-  // Match-pipeline keyset scan: WHERE fetchedAt >= since ORDER BY fetchedAt DESC, id.
-  @@index([fetchedAt])
+  // Match-pipeline keyset scan: WHERE firstSeenAt >= since ORDER BY firstSeenAt DESC, id.
+  @@index([firstSeenAt])
   @@schema("module/security-evaluation")
 }
 
@@ -157,7 +201,7 @@ model SecurityEvaluationThreatKnowledgeItem {
 /// LLM "not-relevant" verdicts (TTL 7 days by default, filtered out of
 /// subsequent pipelines) and hard-recall "hard-hit" verdicts (audit-only,
 /// always re-computed per run).
-enum SecurityEvaluationVerdictKind {
+enum SecurityEvaluationThreatVerdictKind {
   notRelevant @map("not-relevant")
   hardHit     @map("hard-hit")
 
@@ -181,9 +225,10 @@ enum SecurityEvaluationVerdictKind {
 model SecurityEvaluationThreatVerdictCache {
   id              String                              @id @default(uuid()) @db.Uuid
   knowledgeItemId  String                             @db.Uuid
-  // Cache scope, stored verbatim: "<subject.kind>:<subject.subjectKey>" (ADR-058).
-  scopeKey        String                             @db.VarChar(512)
-  verdict         SecurityEvaluationVerdictKind      @default(notRelevant)
+  // Cache scope, the subject identity columns verbatim (ADR-058, ADR-068 D6).
+  subjectKind     String                             @db.VarChar(64)
+  subjectKey      String                             @db.VarChar(255)
+  verdict         SecurityEvaluationThreatVerdictKind @default(notRelevant)
   reason          String?                            @db.Text           // LLM reason for not-relevant; null on hard-hit
   matchedEntity   String?                            @db.VarChar(512)   // Entity string that matched on hard-hit; null otherwise
   // Content address of the exact re-rank request that produced this verdict
@@ -194,8 +239,8 @@ model SecurityEvaluationThreatVerdictCache {
 
   knowledgeItem SecurityEvaluationThreatKnowledgeItem @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
 
-  @@unique([knowledgeItemId, scopeKey])
-  @@index([scopeKey])
+  @@unique([knowledgeItemId, subjectKind, subjectKey])
+  @@index([subjectKind, subjectKey])
   @@index([verdict, updatedAt])
   @@schema("module/security-evaluation")
 }
@@ -233,15 +278,15 @@ model SecurityEvaluationCodeScanVerdictCache {
   connectionId   String?  @db.Uuid
   // SHA-256 of the system prompt bytes; editing the prompt invalidates rows.
   promptVersion  String   @db.VarChar(64)
-  ruleSetVersion String   @db.VarChar(32)
+  ruleSetVersionLabel String @db.VarChar(32)
   // Finding entries of this criterion from the cached call (JSON array).
-  findings       Json     @db.JsonB
+  cachedFindings Json     @db.JsonB
   // Content address of the exact request that produced this verdict.
   inputSignature String?  @db.VarChar(64)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  @@unique([subjectId, criterionKey, path, contentHash, modelId, connectionId, promptVersion, ruleSetVersion], name: "codeScanVerdictIdentity")
+  @@unique([subjectId, criterionKey, path, contentHash, modelId, connectionId, promptVersion, ruleSetVersionLabel], name: "codeScanVerdictIdentity")
   @@index([subjectId, updatedAt])
   @@schema("module/security-evaluation")
 }

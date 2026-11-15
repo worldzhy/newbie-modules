@@ -15,9 +15,8 @@ import type { SecurityEvaluationAssetService } from "./assets/security-evaluatio
 
 const SUBJECT: EvaluationSubjectRef = {
   id: "11111111-1111-4111-8111-111111111111",
+  subjectType: "security-evaluation",
   kind: "aws-account",
-  scopeType: "project",
-  scopeId: "22222222-2222-4222-8222-222222222222",
   subjectKey: "123456789012",
   displayName: "123456789012",
   credentialRef: "aws-binding:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
@@ -25,8 +24,8 @@ const SUBJECT: EvaluationSubjectRef = {
 
 const VERSION: EvaluationRuleSetVersionRef = {
   id: "33333333-3333-4333-8333-333333333333",
-  kind: "aws-account",
-  evaluationKey: "aws-cis-1.5",
+  subjectKind: "aws-account",
+  standardKey: "aws-cis-1.5",
   version: "v1",
 };
 

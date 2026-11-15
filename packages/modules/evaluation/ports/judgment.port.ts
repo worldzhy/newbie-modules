@@ -22,8 +22,10 @@ export interface JudgmentInput {
   /**
    * `kind` is dropped on purpose (ADR-037 contract 3): the port is bound per
    * kind through `judgmentPortToken(kind)`, so a judgment may not branch on it.
+   * `subjectType` is feature ownership and stays out of the judgment payload for
+   * the same reason.
    */
-  subject: Omit<EvaluationSubjectRef, "kind">;
+  subject: Omit<EvaluationSubjectRef, "kind" | "subjectType">;
   ruleSetVersion: EvaluationRuleSetVersionRef;
   criteria: EvaluationCriterionRef[];
   evidence: EvaluationEvidenceItem[];

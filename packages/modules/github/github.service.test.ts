@@ -1,6 +1,11 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { GitHubService, GitHubNotConfiguredError, RepoNameConflictError } from "./github.service";
+import {
+  GitHubService,
+  GitHubNotConfiguredError,
+  GitHubPermissionError,
+  RepoNameConflictError,
+} from "./github.service";
 
 /**
  * M8 verification: GithubAdapter with an injected mock Octokit - verifies getOrCreateRepo idempotency,
@@ -517,7 +522,7 @@ describe("GitHubService.getOrCreateRepo", () => {
     await assert.rejects(service.getOrCreateRepo("o", "n", "to", "tr"), (e: any) => e.status === 500);
   });
 
-  it("rethrows non-422 errors from generate", async () => {
+  it("maps a 403 from generate to GitHubPermissionError (missing Administration)", async () => {
     const m = makeOctokitMock({
       "repos.get": async () => {
         throw httpError(404);
@@ -527,7 +532,10 @@ describe("GitHubService.getOrCreateRepo", () => {
       },
     });
     const service = makeService(m);
-    await assert.rejects(service.getOrCreateRepo("o", "n", "to", "tr"), (e: any) => e.status === 403);
+    await assert.rejects(
+      service.getOrCreateRepo("o", "n", "to", "tr"),
+      (e: any) => e instanceof GitHubPermissionError && e.permission === "Administration (write)",
+    );
   });
 
   it("warns and continues when repo not readable after 3 retries", async () => {
@@ -547,6 +555,41 @@ describe("GitHubService.getOrCreateRepo", () => {
     // initial GET + 3 retries = 4 GET calls; generate called once.
     assert.equal(m.calls["repos.get"].length, 4);
     assert.equal(m.calls["repos.createUsingTemplate"].length, 1);
+  });
+});
+
+describe("GitHubService.probeProvisioningTarget", () => {
+  it("reports absent when the repo does not exist", async () => {
+    const m = makeOctokitMock({
+      "repos.get": async () => {
+        throw httpError(404);
+      },
+    });
+    const service = makeService(m);
+    assert.equal(await service.probeProvisioningTarget("o", "r"), "absent");
+    assert.equal(m.calls["repos.getContent"]?.length ?? 0, 0);
+  });
+
+  it("reports adoptable when the repo already carries a root package.json", async () => {
+    const m = makeOctokitMock({
+      "repos.get": async () => ({ data: { full_name: "o/r", clone_url: "https://x/r.git", private: true } }),
+      "repos.getContent": async () => ({
+        data: { type: "file", sha: "abc", content: Buffer.from('{"name":"r"}').toString("base64") },
+      }),
+    });
+    const service = makeService(m);
+    assert.equal(await service.probeProvisioningTarget("o", "r"), "adoptable");
+  });
+
+  it("reports foreign when the repo exists without a root package.json", async () => {
+    const m = makeOctokitMock({
+      "repos.get": async () => ({ data: { full_name: "o/r", clone_url: "https://x/r.git", private: true } }),
+      "repos.getContent": async () => {
+        throw httpError(404);
+      },
+    });
+    const service = makeService(m);
+    assert.equal(await service.probeProvisioningTarget("o", "r"), "foreign");
   });
 });
 

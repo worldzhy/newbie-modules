@@ -21,7 +21,6 @@ import {
   type IntelEvidenceCandidate,
 } from "./security-evaluation-intel-match.service";
 import type { SecurityEvaluationScopeEntity } from "./security-evaluation-scope-entities.port";
-import { securityEvaluationIntelScopeKey } from "./security-evaluation-intel-scope-key";
 
 const SEVERITY_TO_FINDING: Record<SecurityEvaluationKnowledgeSeverity, EvaluationFindingSeverity> = {
   critical: "CRITICAL",
@@ -60,7 +59,7 @@ export class SecurityEvaluationIntelJudgment implements SecurityEvaluationJudgme
   constructor(private readonly matchService: SecurityEvaluationIntelMatchService) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    if (input.ruleSetVersion.evaluationKey !== SECURITY_EVALUATION_KEY_THREAT_INTEL) {
+    if (input.ruleSetVersion.standardKey !== SECURITY_EVALUATION_KEY_THREAT_INTEL) {
       return { verdicts: [], findings: [], evaluatedRefs: [] };
     }
 
@@ -73,8 +72,12 @@ export class SecurityEvaluationIntelJudgment implements SecurityEvaluationJudgme
 
     // The criteria version is published per subject kind (ADR-058), so it
     // supplies the kind the judgment input deliberately drops (ADR-037).
-    const scopeKey = securityEvaluationIntelScopeKey(input.ruleSetVersion.kind, input.subject.subjectKey);
-    const outcome = await this.matchService.match(projection.candidates, entities, scopeKey);
+    const outcome = await this.matchService.match(
+      projection.candidates,
+      entities,
+      input.ruleSetVersion.subjectKind,
+      input.subject.subjectKey,
+    );
     const findings: EvaluationFindingCandidate[] = outcome.matches.map((match) => this.toFinding(match));
 
     const evaluatedRefs = [

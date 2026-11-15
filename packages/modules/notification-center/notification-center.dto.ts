@@ -1,8 +1,26 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsBoolean, IsIn, IsNumber, IsObject, IsOptional, IsString, IsUUID, Allow } from "class-validator";
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsNumber,
+  IsObject,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Allow,
+  MaxLength,
+} from "class-validator";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
-import { NOTIFICATION_SCOPES, SEVERITIES } from "./notification-center.constants";
+import {
+  DELIVERY_DECISION_REASONS,
+  DELIVERY_RULE_ACTIONS,
+  DELIVERY_RUNTIME_REASONS,
+  NOTIFICATION_SCOPES,
+  NOTIFICATION_STATES,
+  SEVERITIES,
+} from "./notification-center.constants";
 
 // ---------------------------------------------------------------------------
 // Notification record DTOs
@@ -41,10 +59,21 @@ export class NotificationRecordDto {
   @ApiProperty({ type: String, required: false, nullable: true })
   link!: string | null;
 
-  @ApiProperty({ enum: ["firing", "recovered"], description: "Alert lifecycle phase (ADR-051)" })
+  @ApiProperty({ enum: NOTIFICATION_STATES, description: "Lifecycle state; event-kind messages stay firing" })
   status!: string;
 
-  @ApiProperty({ type: Date, required: false, nullable: true, description: "Recovery timestamp for recovered alerts" })
+  @ApiProperty({ type: String, required: false, nullable: true, description: "Origin kind: alert or event" })
+  sourceType!: string | null;
+
+  @ApiProperty({
+    type: String,
+    required: false,
+    nullable: true,
+    description: "Origin object id (Alert.id for alerts); lets the inbox link back to its domain page",
+  })
+  sourceRef!: string | null;
+
+  @ApiProperty({ type: Date, required: false, nullable: true, description: "Delivery time of the resolved event" })
   recoveredAt!: Date | null;
 
   @ApiProperty({ description: "Read state for the requesting user" })
@@ -55,8 +84,9 @@ export class NotificationRecordDto {
 }
 
 export class NotifyDto {
-  @ApiProperty({ description: "Key of a registered notification" })
+  @ApiProperty({ description: "Key of a registered notification", maxLength: 100 })
   @IsString()
+  @MaxLength(100)
   notificationKey!: string;
 
   @ApiPropertyOptional({ type: Object, description: "Values interpolated into the notification templates" })
@@ -64,26 +94,46 @@ export class NotifyDto {
   @IsObject()
   context?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ enum: SEVERITIES, description: "Override the notification default severity" })
-  @IsOptional()
-  @IsString()
+  @ApiProperty({ enum: SEVERITIES, description: "Severity of this delivery; required" })
   @IsIn(SEVERITIES as unknown as string[])
-  severity?: string;
+  severity!: string;
 
   @ApiPropertyOptional({ type: String })
   @IsOptional()
   @IsString()
   projectId?: string;
 
-  @ApiPropertyOptional({ type: String })
+  @ApiPropertyOptional({ type: String, maxLength: 512 })
   @IsOptional()
   @IsString()
+  @MaxLength(512)
   link?: string;
 
-  @ApiPropertyOptional({ type: String, description: "Optional idempotency key" })
+  @ApiPropertyOptional({ type: String, description: "Optional idempotency key", maxLength: 255 })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   deduplicationKey?: string;
+
+  @ApiPropertyOptional({
+    enum: NOTIFICATION_STATES,
+    description: "Lifecycle state of an alert-kind notification; ignored for events. Defaults to firing",
+  })
+  @IsOptional()
+  @IsIn(NOTIFICATION_STATES as unknown as string[])
+  state?: string;
+
+  @ApiPropertyOptional({ type: String, maxLength: 20, description: "Origin kind: alert or event" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  sourceType?: string;
+
+  @ApiPropertyOptional({ type: String, maxLength: 100, description: "Origin object id (Alert.id for alerts)" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  sourceRef?: string;
 }
 
 export class NotifyResultDto {
@@ -93,8 +143,22 @@ export class NotifyResultDto {
   @ApiProperty({ description: "True when the deduplication key already existed" })
   deduplicated!: boolean;
 
-  @ApiProperty({ description: "True when the delivery was dropped (below minimum severity)" })
-  dropped!: boolean;
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS, description: "Rule decision for this delivery" })
+  decision!: string;
+
+  @ApiProperty({
+    enum: DELIVERY_DECISION_REASONS,
+    nullable: true,
+    description: "Why the decision came out that way",
+  })
+  reason!: string | null;
+
+  @ApiProperty({
+    enum: DELIVERY_RUNTIME_REASONS,
+    nullable: true,
+    description: "Real-time interception that kept a deliverable notification in-app (ADR-063)",
+  })
+  runtimeReason!: string | null;
 }
 
 export class ListNotificationsRequestDto extends CommonListRequestDto {
@@ -161,9 +225,6 @@ export class NotificationSettingDto {
   @ApiProperty({ type: String, required: false, nullable: true })
   detailTemplate!: string | null;
 
-  @ApiProperty({ enum: SEVERITIES })
-  defaultSeverity!: string;
-
   @ApiProperty()
   isPushEnabled!: boolean;
 
@@ -176,12 +237,6 @@ export class NotificationSettingDto {
 }
 
 export class UpdateNotificationSettingDto {
-  @ApiPropertyOptional({ enum: SEVERITIES })
-  @IsOptional()
-  @IsString()
-  @IsIn(SEVERITIES as unknown as string[])
-  defaultSeverity?: string;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
@@ -195,9 +250,6 @@ export class UpdateNotificationSettingDto {
 export class NotificationCenterSettingDto {
   @ApiProperty({ description: "Master switch for chat push through the host-provided push adapter" })
   isPushEnabled!: boolean;
-
-  @ApiProperty({ enum: SEVERITIES })
-  minimumSeverity!: string;
 }
 
 export class UpdateNotificationCenterSettingDto {
@@ -205,12 +257,202 @@ export class UpdateNotificationCenterSettingDto {
   @IsOptional()
   @IsBoolean()
   isPushEnabled?: boolean;
+}
 
-  @ApiPropertyOptional({ enum: SEVERITIES })
+// ---------------------------------------------------------------------------
+// Delivery rule DTOs (ADR-062)
+// ---------------------------------------------------------------------------
+
+export class DeliveryConditionDto {
+  @ApiPropertyOptional({ enum: NOTIFICATION_STATES, description: "Lifecycle state the rule applies to" })
+  @IsOptional()
+  @IsIn(NOTIFICATION_STATES as unknown as string[])
+  state?: string;
+
+  @ApiPropertyOptional({ enum: SEVERITIES, description: "Minimum severity label the event must carry" })
   @IsOptional()
   @IsString()
   @IsIn(SEVERITIES as unknown as string[])
-  minimumSeverity?: string;
+  severityAtLeast?: string;
+
+  @ApiPropertyOptional({
+    type: String,
+    isArray: true,
+    description: "Notification keys the rule applies to; an empty array never matches",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  notificationKeys?: string[];
+
+  @ApiPropertyOptional({
+    type: String,
+    isArray: true,
+    description: "Project ids the rule applies to; an empty array never matches",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  projectIds?: string[];
+
+  @ApiPropertyOptional({ type: Object, description: "Tag key/value pairs the event must carry" })
+  @IsOptional()
+  @IsObject()
+  tags?: Record<string, string>;
+}
+
+export class DeliveryRuleDto {
+  @ApiProperty()
+  id!: string;
+
+  @ApiProperty({ description: "Ascending evaluation order; lower runs first. The UI shows the row order instead." })
+  priority!: number;
+
+  @ApiProperty({ type: () => DeliveryConditionDto })
+  condition!: DeliveryConditionDto;
+
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS })
+  action!: string;
+
+  @ApiProperty()
+  isEnabled!: boolean;
+
+  @ApiProperty()
+  updatedAt!: Date;
+}
+
+export class CreateDeliveryRuleDto {
+  @ApiProperty({ type: () => DeliveryConditionDto })
+  @IsObject()
+  condition!: DeliveryConditionDto;
+
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS })
+  @IsString()
+  @IsIn(DELIVERY_RULE_ACTIONS as unknown as string[])
+  action!: string;
+
+  @ApiPropertyOptional({ description: "Defaults to true" })
+  @IsOptional()
+  @IsBoolean()
+  isEnabled?: boolean;
+}
+
+export class UpdateDeliveryRuleDto {
+  @ApiPropertyOptional({ type: () => DeliveryConditionDto })
+  @IsOptional()
+  @IsObject()
+  condition?: DeliveryConditionDto;
+
+  @ApiPropertyOptional({ enum: DELIVERY_RULE_ACTIONS })
+  @IsOptional()
+  @IsString()
+  @IsIn(DELIVERY_RULE_ACTIONS as unknown as string[])
+  action?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isEnabled?: boolean;
+}
+
+export class ReorderDeliveryRulesDto {
+  @ApiProperty({
+    type: String,
+    isArray: true,
+    description: "Every rule id exactly once, in the new evaluation order",
+  })
+  @IsArray()
+  @IsUUID(undefined, { each: true })
+  ids!: string[];
+}
+
+export class SimulateDeliveryRequestDto {
+  @ApiPropertyOptional({ description: "Replay a persisted notification record" })
+  @IsOptional()
+  @IsUUID()
+  recordId?: string;
+
+  @ApiPropertyOptional({ description: "Manual mode: notification key to evaluate" })
+  @IsOptional()
+  @IsString()
+  notificationKey?: string;
+
+  @ApiPropertyOptional({ enum: SEVERITIES, description: "Manual mode: severity label to evaluate" })
+  @IsOptional()
+  @IsString()
+  @IsIn(SEVERITIES as unknown as string[])
+  severity?: string;
+
+  @ApiPropertyOptional({ enum: NOTIFICATION_STATES, description: "Manual mode: defaults to firing" })
+  @IsOptional()
+  @IsIn(NOTIFICATION_STATES as unknown as string[])
+  state?: string;
+
+  @ApiPropertyOptional({ description: "Manual mode: project id to evaluate" })
+  @IsOptional()
+  @IsUUID()
+  projectId?: string;
+}
+
+export class DeliveryLabelsDto {
+  @ApiProperty({ enum: NOTIFICATION_STATES })
+  state!: string;
+
+  @ApiProperty({ enum: SEVERITIES })
+  severity!: string;
+
+  @ApiProperty()
+  notificationKey!: string;
+
+  @ApiPropertyOptional({ type: String, nullable: true })
+  projectId?: string;
+}
+
+export class SimulateDeliveryResultDto {
+  @ApiProperty({ type: () => DeliveryLabelsDto, description: "Labels the rules were evaluated against" })
+  labels!: DeliveryLabelsDto;
+
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS })
+  decision!: string;
+
+  @ApiProperty({ enum: DELIVERY_DECISION_REASONS, nullable: true })
+  reason!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: "Rule that decided; null when nothing matched" })
+  matchedRuleId!: string | null;
+
+  @ApiProperty({ type: Number, nullable: true, description: "1-based position of the deciding rule" })
+  matchedRuleIndex!: number | null;
+
+  @ApiProperty({ description: "Number of enabled rules evaluated" })
+  ruleCount!: number;
+
+  @ApiProperty({
+    enum: DELIVERY_RUNTIME_REASONS,
+    nullable: true,
+    description: "Real-time interception found while replaying; the simulator evaluates the rule segment only",
+  })
+  runtimeReason!: string | null;
+
+  @ApiProperty({ description: "Final outcome: the rule table decided deliver" })
+  delivered!: boolean;
+}
+
+export class NotificationDeliveryAttemptDto {
+  @ApiProperty({ enum: DELIVERY_RULE_ACTIONS })
+  decision!: string;
+
+  @ApiProperty({ enum: DELIVERY_DECISION_REASONS, nullable: true })
+  reason!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, description: "Rule that decided; null when nothing matched" })
+  ruleId!: string | null;
+
+  @ApiProperty({ enum: DELIVERY_RUNTIME_REASONS, nullable: true })
+  runtimeReason!: string | null;
+
+  @ApiProperty()
+  createdAt!: Date;
 }
 
 export class PushDeliveryResultDto {

@@ -5,12 +5,11 @@ import { CriteriaProvider, criteriaProviderToken } from "./ports/criteria.provid
 import { EvidenceProvider, evidenceProviderToken } from "./ports/evidence.provider";
 import { JudgmentPort, judgmentPortToken } from "./ports/judgment.port";
 import { EvaluationObserver, evaluationObserverToken } from "./ports/observer.port";
-import { SubjectProvider, subjectProviderToken } from "./ports/subject.provider";
 
 /**
- * Resolves the four evaluation ports by token (ADR-020 D4). Bindings live in
- * the modules that implement them — this module only ever looks them up, so it
- * carries no compile-time dependency on any feature or on the host.
+ * Resolves the three evaluation ports by token (ADR-020 D4, ADR-068). Bindings
+ * live in the modules that implement them — this module only ever looks them
+ * up, so it carries no compile-time dependency on any feature or on the host.
  *
  * A missing binding is a wiring error, not a runtime condition: features must
  * bind every port for the subject kinds they register.
@@ -18,10 +17,6 @@ import { SubjectProvider, subjectProviderToken } from "./ports/subject.provider"
 @Injectable()
 export class EvaluationProviderRegistry {
   constructor(private readonly moduleRef: ModuleRef) {}
-
-  getSubjectProvider(): SubjectProvider {
-    return this.get<SubjectProvider>(subjectProviderToken, "SubjectProvider (evaluation)");
-  }
 
   getCriteriaProvider(kind: string): CriteriaProvider {
     return this.get<CriteriaProvider>(

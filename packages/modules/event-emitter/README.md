@@ -14,5 +14,5 @@ General-purpose in-process event bus with an event catalog and emission history.
 
 - This module is the sole owner of `EventEmitterModule.forRoot({ wildcard: true })` and re-exports it; do not import a second forRoot in the same application — two `EventEmitter2` instances would exist and listeners attached to one never see emissions on the other.
 - Event keys follow `{kebab-module}.{kebab-event}` (e.g. `url-check.down`, `job-scheduler.run-failed`); the wildcard delimiter namespace relies on this convention.
-- Payloads are persisted as JSON; emitters should keep payloads JSON-serializable. Unserializable payloads are recorded as a `serializationError` marker object.
+- Payloads are persisted as JSON; emitters should keep payloads JSON-serializable. Unserializable payloads are recorded as a `serializationError` marker object. Individual strings are cut at 2,000 characters, and a payload whose JSON exceeds 16,000 characters is stored as `{ truncated: true, preview }` — the emission table is an audit trail, not a data store.
 - The bus is process-local. Cross-process event delivery is out of scope.

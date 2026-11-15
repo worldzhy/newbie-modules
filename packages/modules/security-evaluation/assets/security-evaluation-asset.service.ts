@@ -1,14 +1,20 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { EvaluationSubjectService, toSubjectRef } from "@modules/evaluation/evaluation-subject.service";
-import type { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
+import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
+import type { EvaluationSubjectDescriptor } from "@modules/evaluation/ports/evaluation.contracts";
 
 import {
-  SECURITY_EVALUATION_PLATFORM_SCOPE_ID,
-  SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
+  SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+  SECURITY_EVALUATION_SUBJECT_TYPE,
 } from "../security-evaluation.constants";
+import {
+  normalizeAwsAccountId,
+  normalizeAwsRegions,
+  normalizeRepositoryCoordinate,
+  repositorySubjectKey,
+} from "./security-evaluation-subject-coordinate";
 
 export interface SecurityEvaluationAssetKnowledgeItemInput {
   type: string;
@@ -16,44 +22,53 @@ export interface SecurityEvaluationAssetKnowledgeItemInput {
   value: Record<string, unknown> | null;
 }
 
-/** One subject submission, with the provenance of who supplied it (ADR-039). */
+/**
+ * One subject submission (ADR-068 D8, ADR-070 D3). Identity is the platform-level
+ * subject coordinate; there is no provenance row. Kinds that declare a natural
+ * coordinate (`repository`, `aws-account`) also carry their material, and the
+ * module derives the coordinate from it — a submission never supplies a host id.
+ */
 export interface IngestSecurityEvaluationSubjectInput {
   kind: string;
-  subjectKey: string;
+  /** Required for kinds without material; for material kinds it may only echo the derived key. */
+  subjectKey?: string;
   displayName: string;
   metadata?: Record<string, unknown>;
-  sourceType: string;
-  sourceId: string;
   /**
    * Opaque pointer to the host credentials this subject is evaluated with
    * (e.g. `"aws-binding:<id>"` for an aws-account subject). Captured here —
    * the registration point — so evidence collection never has to rediscover
-   * credentials through provenance. The module stores it verbatim and never
-   * resolves it.
+   * credentials. The module stores it verbatim and never resolves it.
    */
   credentialRef?: string | null;
+  /** Repository material of a `repository` subject (ADR-070 D1, D2). */
+  repository?: {
+    provider: string;
+    namespace: string;
+    name: string;
+    url?: string | null;
+  };
+  /** AWS account material of an `aws-account` subject (ADR-070 D1, D2). */
+  awsAccount?: {
+    accountId: string;
+    defaultRegion?: string | null;
+    regions?: readonly string[];
+  };
 }
 
 export interface IngestSecurityEvaluationSubjectResult {
   subjectId: string;
-  assetId: string;
 }
 
-/** Optional provenance filter; omission means the platform view. */
-export interface SecurityEvaluationSourceFilter {
-  scopeType?: string;
-  scopeId?: string;
-}
-
-export interface ListSecurityEvaluationAssetsInput extends SecurityEvaluationSourceFilter {
-  kinds: readonly string[];
+export interface ListSecurityEvaluationAssetKnowledgeItemsInput {
+  subjectId: string;
+  type?: string;
   page?: number;
   pageSize?: number;
 }
 
-export interface ListSecurityEvaluationAssetKnowledgeItemsInput {
-  assetId: string;
-  type?: string;
+export interface ListSecurityEvaluationSubjectsInput {
+  kind?: string;
   page?: number;
   pageSize?: number;
 }
@@ -62,19 +77,15 @@ export interface ListSecurityEvaluationAssetKnowledgeItemsInput {
 const KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE = 100;
 
 /**
- * SecurityEvaluationAssetService — the asset inventory (ADR-022) plus the
- * platform-level ingest contract (ADR-039).
+ * SecurityEvaluationAssetService — the platform-level subject ingest contract
+ * and the current-state knowledge store (ADR-022, ADR-039, ADR-068 D7).
  *
- * `Asset` is the feature's persistent view of an `EvaluationSubject`: the
- * subject coordinate belongs to the skeleton, while this row owns the
- * inventory lifecycle (`firstSeenAt`, `lastSeenAt`) and the current-state
- * knowledge items hanging off it.
- *
- * Subjects are platform-level: `subjectKey` alone identifies the asset across
- * the deployment, so several projects referencing the same repository share one
- * subject, one run history and one finding set. Who supplied it is recorded on
- * `SecurityEvaluationAssetSource` rows — provenance for display and routing,
- * never an authorization boundary.
+ * The subject coordinate belongs to the skeleton; this service no longer keeps
+ * an inventory row of its own. Identity is `(subjectType, kind, subjectKey)`, so
+ * several projects referencing the same repository share one subject, one run
+ * history and one finding set, while a different feature evaluating the same
+ * kind keeps its own row (ADR-069). Knowledge items hang off the subject id with a
+ * plain scalar — foreign keys never cross schema boundaries.
  */
 @Injectable()
 export class SecurityEvaluationAssetService {
@@ -84,86 +95,54 @@ export class SecurityEvaluationAssetService {
   ) {}
 
   /**
-   * Ingest subjects: upsert the platform-level subject, materialise its asset
-   * row and record the submitting source. Idempotent per
-   * `(subjectKey, sourceType, sourceId)`; a repeat submission only bumps
-   * `lastSubmittedAt`.
+   * Ingest subjects: upsert the platform-level subject and, for material kinds,
+   * its material row in the same transaction (ADR-070 D3). Idempotent per
+   * `(subjectType, kind, subjectKey)`.
    */
   async ingest(
     submissions: readonly IngestSecurityEvaluationSubjectInput[],
   ): Promise<IngestSecurityEvaluationSubjectResult[]> {
     const results: IngestSecurityEvaluationSubjectResult[] = [];
     for (const submission of submissions) {
-      const subject = await this.subjects.getOrCreateSubject({
-        kind: submission.kind,
-        scopeType: SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE,
-        scopeId: SECURITY_EVALUATION_PLATFORM_SCOPE_ID,
-        subjectKey: submission.subjectKey,
-        displayName: submission.displayName,
-        metadata: submission.metadata,
-        credentialRef: submission.credentialRef,
+      const prepared = prepareSubmission(submission);
+      const subject = await this.prisma.$transaction(async (transaction) => {
+        const created = await this.subjects.getOrCreateSubject(prepared.descriptor, transaction);
+        if (prepared.repository) {
+          await transaction.securityEvaluationRepository.upsert({
+            where: {
+              provider_namespace_name: {
+                provider: prepared.repository.provider,
+                namespace: prepared.repository.namespace,
+                name: prepared.repository.name,
+              },
+            },
+            create: {
+              subjectId: created.id,
+              ...prepared.repository,
+            },
+            update: {
+              url: prepared.repository.url,
+              isActive: true,
+            },
+          });
+        }
+        if (prepared.awsAccount) {
+          const { accountId, defaultRegion, regions } = prepared.awsAccount;
+          await transaction.securityEvaluationAwsAccount.upsert({
+            where: { accountId },
+            create: { subjectId: created.id, accountId, defaultRegion, regions },
+            update: {
+              isActive: true,
+              ...(defaultRegion !== undefined ? { defaultRegion } : {}),
+              ...(regions !== undefined ? { regions } : {}),
+            },
+          });
+        }
+        return created;
       });
-      const asset = await this.getOrCreateAsset(toSubjectRef(subject));
-      const now = new Date();
-      await this.prisma.securityEvaluationAssetSource.upsert({
-        where: {
-          subjectId_sourceType_sourceId: {
-            subjectId: subject.id,
-            sourceType: submission.sourceType,
-            sourceId: submission.sourceId,
-          },
-        },
-        create: {
-          subjectId: subject.id,
-          sourceType: submission.sourceType,
-          sourceId: submission.sourceId,
-          firstSubmittedAt: now,
-          lastSubmittedAt: now,
-        },
-        update: { lastSubmittedAt: now },
-      });
-      results.push({ subjectId: subject.id, assetId: asset.id });
+      results.push({ subjectId: subject.id });
     }
     return results;
-  }
-
-  /**
-   * Resolve an optional provenance filter to the subjects it contributed.
-   * `null` means "no filter" (the platform view); an empty array means the
-   * filter matched nothing.
-   */
-  async listSubjectIdsBySource(filter: SecurityEvaluationSourceFilter): Promise<string[] | null> {
-    if (!filter.scopeType && !filter.scopeId) return null;
-    const sources = await this.prisma.securityEvaluationAssetSource.findMany({
-      where: {
-        ...(filter.scopeType ? { sourceType: filter.scopeType } : {}),
-        ...(filter.scopeId ? { sourceId: filter.scopeId } : {}),
-      },
-      select: { subjectId: true },
-      distinct: ["subjectId"],
-    });
-    return sources.map((source) => source.subjectId);
-  }
-
-  /** Idempotent: one asset row per subject, forever. */
-  async getOrCreateAsset(subject: EvaluationSubjectRef) {
-    return this.prisma.securityEvaluationAsset.upsert({
-      where: { subjectId: subject.id },
-      create: {
-        subjectId: subject.id,
-        naturalKey: subject.subjectKey,
-        displayName: subject.displayName,
-      },
-      update: {
-        naturalKey: subject.subjectKey,
-        displayName: subject.displayName,
-      },
-    });
-  }
-
-  /** Record that a run actually observed this asset's inventory. */
-  async touchObserved(assetId: string, observedAt: Date): Promise<void> {
-    await this.prisma.securityEvaluationAsset.updateMany({ where: { id: assetId }, data: { lastSeenAt: observedAt } });
   }
 
   /**
@@ -172,7 +151,7 @@ export class SecurityEvaluationAssetService {
    * becomes visible without deleting rows.
    */
   async upsertAwsConfigKnowledgeItems(
-    assetId: string,
+    subjectId: string,
     items: readonly SecurityEvaluationAssetKnowledgeItemInput[],
     observedAt: Date,
   ) {
@@ -181,9 +160,9 @@ export class SecurityEvaluationAssetService {
       await this.prisma.$transaction(
         chunk.map((item) =>
           this.prisma.securityEvaluationAwsConfigKnowledgeItem.upsert({
-            where: { assetId_type_key: { assetId, type: item.type, key: item.key } },
+            where: { subjectId_type_key: { subjectId, type: item.type, key: item.key } },
             create: {
-              assetId,
+              subjectId,
               type: item.type,
               key: item.key,
               value: (item.value ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -201,7 +180,7 @@ export class SecurityEvaluationAssetService {
 
   /** Same lifecycle as upsertAwsConfigKnowledgeItems, for npm package knowledge. */
   async upsertNpmPackageKnowledgeItems(
-    assetId: string,
+    subjectId: string,
     items: readonly SecurityEvaluationAssetKnowledgeItemInput[],
     observedAt: Date,
   ) {
@@ -210,9 +189,9 @@ export class SecurityEvaluationAssetService {
       await this.prisma.$transaction(
         chunk.map((item) =>
           this.prisma.securityEvaluationNpmPackageKnowledgeItem.upsert({
-            where: { assetId_type_key: { assetId, type: item.type, key: item.key } },
+            where: { subjectId_type_key: { subjectId, type: item.type, key: item.key } },
             create: {
-              assetId,
+              subjectId,
               type: item.type,
               key: item.key,
               value: (item.value ?? undefined) as Prisma.InputJsonValue | undefined,
@@ -228,89 +207,38 @@ export class SecurityEvaluationAssetService {
     }
   }
 
-  async getAsset(id: string) {
-    const asset = await this.prisma.securityEvaluationAsset.findUnique({ where: { id } });
-    if (!asset) throw new NotFoundException(`Security evaluation asset ${id} not found`);
-    return asset;
-  }
-
-  async findAssetBySubject(subjectId: string) {
-    return this.prisma.securityEvaluationAsset.findUnique({ where: { subjectId } });
-  }
-
   /**
-   * The platform view, optionally narrowed by provenance. Assets carry no scope
-   * columns of their own; the subject coordinate owns that, and foreign keys
-   * never cross schemas.
+   * This feature's subject directory. There is no asset row any more (ADR-068
+   * D7), so a directory read is a read of the skeleton's subject table; the
+   * `subjectType` filter keeps subjects owned by other features (ADR-069) out.
    */
-  async listAssets(query: ListSecurityEvaluationAssetsInput) {
-    const subjectIds = await this.listSubjectIdsBySource(query);
-    const allowedSubjectIds =
-      query.kinds.length > 0 ? await this.subjectIdsOfKinds(query.kinds, subjectIds ?? undefined) : subjectIds;
-    const page = await this.prisma.findManyInManyPages({
-      model: Prisma.ModelName.SecurityEvaluationAsset,
+  async listSubjects(query: ListSecurityEvaluationSubjectsInput) {
+    return this.prisma.findManyInManyPages({
+      model: Prisma.ModelName.EvaluationSubject,
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
-        where: allowedSubjectIds ? { subjectId: { in: allowedSubjectIds } } : {},
-        orderBy: [{ displayName: "asc" }, { id: "asc" }],
+        where: {
+          subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
+          ...(query.kind ? { kind: query.kind } : {}),
+        },
+        orderBy: [{ kind: "asc" as const }, { subjectKey: "asc" as const }],
       },
     });
-
-    const pageSubjectIds = page.records.map((asset) => asset.subjectId);
-    const [subjects, sources] = await Promise.all([
-      this.prisma.evaluationSubject.findMany({
-        where: { id: { in: pageSubjectIds } },
-        select: { id: true, kind: true },
-      }),
-      this.prisma.securityEvaluationAssetSource.findMany({
-        where: { subjectId: { in: pageSubjectIds } },
-        select: { subjectId: true, sourceType: true, sourceId: true, firstSubmittedAt: true, lastSubmittedAt: true },
-        orderBy: [{ firstSubmittedAt: "asc" }, { sourceType: "asc" }, { sourceId: "asc" }],
-      }),
-    ]);
-    const kindBySubject = new Map(subjects.map((subject) => [subject.id, subject.kind]));
-    const sourcesBySubject = new Map<string, typeof sources>();
-    for (const source of sources) {
-      const existing = sourcesBySubject.get(source.subjectId) ?? [];
-      existing.push(source);
-      sourcesBySubject.set(source.subjectId, existing);
-    }
-
-    return {
-      ...page,
-      records: page.records.map((asset) => ({
-        ...asset,
-        kind: kindBySubject.get(asset.subjectId) ?? "",
-        sources: sourcesBySubject.get(asset.subjectId) ?? [],
-      })),
-    };
-  }
-
-  /** Subjects of the given kinds, intersected with an optional provenance set. */
-  private async subjectIdsOfKinds(kinds: readonly string[], subjectIds?: readonly string[]): Promise<string[]> {
-    const rows = await this.prisma.evaluationSubject.findMany({
-      where: {
-        kind: { in: [...kinds] },
-        ...(subjectIds ? { id: { in: [...subjectIds] } } : {}),
-      },
-      select: { id: true },
-    });
-    return rows.map((row) => row.id);
   }
 
   /**
-   * Knowledge items are split into one table per asset kind; the subject
-   * coordinate decides which delegate serves this asset.
+   * Knowledge items are split into one table per subject kind; the subject
+   * coordinate decides which delegate serves this subject.
    */
   async listKnowledgeItems(query: ListSecurityEvaluationAssetKnowledgeItemsInput) {
-    const asset = await this.getAsset(query.assetId);
     const subject = await this.prisma.evaluationSubject.findUnique({
-      where: { id: asset.subjectId },
+      where: { id: query.subjectId },
       select: { kind: true },
     });
-    const where = { assetId: query.assetId, ...(query.type ? { type: query.type } : {}) };
+    if (!subject) throw new NotFoundException(`Security evaluation subject ${query.subjectId} not found`);
+    const where = { subjectId: query.subjectId, ...(query.type ? { type: query.type } : {}) };
     const orderBy = [{ type: "asc" as const }, { key: "asc" as const }];
-    if (subject?.kind === SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT) {
+    if (subject.kind === SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT) {
       return this.prisma.findManyInManyPages({
         model: Prisma.ModelName.SecurityEvaluationAwsConfigKnowledgeItem,
         pagination: { page: query.page, pageSize: query.pageSize },
@@ -323,4 +251,84 @@ export class SecurityEvaluationAssetService {
       findManyArgs: { where, orderBy },
     });
   }
+}
+
+interface PreparedSubjectSubmission {
+  descriptor: EvaluationSubjectDescriptor;
+  repository?: { provider: string; namespace: string; name: string; url: string | null };
+  awsAccount?: { accountId: string; defaultRegion?: string | null; regions?: string[] };
+}
+
+/**
+ * Turn one submission into the subject descriptor plus its material. The
+ * coordinate is always re-derived from the material, so the module never trusts
+ * a host-side key; a submitted key may only echo the result.
+ */
+function prepareSubmission(submission: IngestSecurityEvaluationSubjectInput): PreparedSubjectSubmission {
+  const displayName = submission.displayName;
+  const base = {
+    subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
+    kind: submission.kind,
+    displayName,
+    metadata: submission.metadata,
+    credentialRef: submission.credentialRef,
+  };
+
+  if (submission.kind === SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY) {
+    if (!submission.repository) {
+      throw new BadRequestException(
+        "A repository subject requires its repository coordinate (provider, namespace, name).",
+      );
+    }
+    const coordinate = normalizeRepositoryCoordinate(submission.repository);
+    const subjectKey = repositorySubjectKey(coordinate);
+    assertSubjectKeyMatches(submission, subjectKey);
+    return {
+      descriptor: { ...base, subjectKey },
+      repository: { ...coordinate, url: normalizeRepositoryUrl(submission.repository.url) },
+    };
+  }
+
+  if (submission.kind === SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT) {
+    if (!submission.awsAccount) {
+      throw new BadRequestException("An aws-account subject requires its accountId.");
+    }
+    const accountId = normalizeAwsAccountId(submission.awsAccount.accountId);
+    assertSubjectKeyMatches(submission, accountId);
+    return {
+      descriptor: { ...base, subjectKey: accountId },
+      awsAccount: {
+        accountId,
+        defaultRegion: submission.awsAccount.defaultRegion?.trim() || null,
+        regions: normalizeAwsRegions(submission.awsAccount.regions),
+      },
+    };
+  }
+
+  if (submission.repository || submission.awsAccount) {
+    throw new BadRequestException(`Subject kind "${submission.kind}" carries no repository or aws-account material.`);
+  }
+  const subjectKey = submission.subjectKey?.trim();
+  if (!subjectKey) {
+    throw new BadRequestException(`A ${submission.kind} subject requires its subjectKey.`);
+  }
+  return { descriptor: { ...base, subjectKey } };
+}
+
+function assertSubjectKeyMatches(submission: IngestSecurityEvaluationSubjectInput, derived: string): void {
+  const submitted = submission.subjectKey?.trim();
+  if (submitted && submitted !== derived) {
+    throw new BadRequestException(
+      `subjectKey "${submitted}" does not match the natural key "${derived}" of this ${submission.kind} subject.`,
+    );
+  }
+}
+
+function normalizeRepositoryUrl(url: string | null | undefined): string | null {
+  const normalized = url?.trim() ?? "";
+  if (!normalized) return null;
+  if (normalized.length > 255) {
+    throw new BadRequestException("Repository url must be at most 255 characters.");
+  }
+  return normalized;
 }

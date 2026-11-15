@@ -15,7 +15,7 @@ import {
 
 /**
  * Declarative mechanism composition (ADR-046): which mechanisms judge each
- * evaluationKey. `aws-cis-1.5` and `aws-custom` share the `aws-config`
+ * standardKey. `aws-cis-1.5` and `aws-custom` share the `aws-config`
  * mechanism explicitly — previously the sharing was implicit in the rulebook
  * filter and a switch fall-through.
  *
@@ -31,15 +31,15 @@ export const SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY: Readonly<Record<str
 };
 
 /**
- * Resolve the mechanisms declared for an evaluationKey. Returns undefined when
+ * Resolve the mechanisms declared for an standardKey. Returns undefined when
  * the key is unknown; throws when the registry names a mechanism the injected
  * set does not provide, or when two mechanisms share a name.
  */
 export function resolveSecurityEvaluationJudgmentMechanisms(
-  evaluationKey: string,
+  standardKey: string,
   mechanisms: readonly SecurityEvaluationJudgmentMechanism[],
 ): readonly SecurityEvaluationJudgmentMechanism[] | undefined {
-  const names = SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY[evaluationKey];
+  const names = SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY[standardKey];
   if (!names) return undefined;
 
   const byName = new Map<string, SecurityEvaluationJudgmentMechanism>();
@@ -53,7 +53,7 @@ export function resolveSecurityEvaluationJudgmentMechanisms(
   return names.map((name) => {
     const mechanism = byName.get(name);
     if (!mechanism) {
-      throw new Error(`Evaluation key "${evaluationKey}" declares unknown judgment mechanism "${name}" (ADR-046).`);
+      throw new Error(`Evaluation key "${standardKey}" declares unknown judgment mechanism "${name}" (ADR-046).`);
     }
     return mechanism;
   });

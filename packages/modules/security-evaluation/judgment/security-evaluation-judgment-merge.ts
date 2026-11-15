@@ -40,7 +40,7 @@ function mergeMetadata(
 }
 
 /**
- * Merge the judgments of the mechanisms declared for one evaluationKey
+ * Merge the judgments of the mechanisms declared for one standardKey
  * (ADR-046). The contract is enforced here rather than left to convention:
  *
  * - verdicts: one owner per criterionKey. Two mechanisms scoring the same

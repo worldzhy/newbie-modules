@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -7,16 +8,22 @@ import {
   NotFoundException,
   Optional,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   CENTER_SETTING_SINGLETON_ID,
-  DEFAULT_MINIMUM_SEVERITY,
   DEFAULT_PUSH_ENABLED,
   NOTIFICATION_PUSH_PORT,
   PG_UNIQUE_VIOLATION,
   SEVERITIES,
-  SEVERITY_LEVEL,
+  isNotificationSeverity,
+} from "./notification-center.constants";
+import type {
+  DeliveryDecisionReason,
+  DeliveryRuleAction,
+  DeliveryRuntimeReason,
+  NotificationState,
 } from "./notification-center.constants";
 import {
   ListNotificationsRequestDto,
@@ -24,16 +31,37 @@ import {
   MarkAllNotificationsReadResponseDto,
   MarkNotificationReadResponseDto,
   NotificationCenterSettingDto,
+  NotificationDeliveryAttemptDto,
   NotificationPushFailureDto,
   TestPushResultDto,
   UnreadCountResponseDto,
   UpdateNotificationCenterSettingDto,
 } from "./notification-center.dto";
 import { NotificationRegistryService } from "./notification-registry.service";
+import type { RegisteredNotification } from "./notification-registry.service";
+import { NotificationDeliveryRuleService } from "./notification-delivery-rule.service";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 // Upper bound for the unresolved push-failure admin listing (R5-P2-07).
 const MAX_UNRESOLVED_PUSH_FAILURES = 200;
+
+// Page size for the "mark all read" scan: receipts are written page by page, so
+// memory stays flat regardless of the unread count (R44-08).
+const MARK_ALL_READ_BATCH_SIZE = 500;
+
+const RETENTION_DAYS_KEY = "modules.notification-center.retentionDays";
+// The prune walks every old row, so it runs on the notify path at most once an
+// hour instead of once per delivery (R47-04 follows the event-emitter pattern).
+const RECORD_PRUNE_INTERVAL_MS = 60 * 60_000;
+
+/// Validates the retention window resolved from the assembler's bare env
+/// mapping (ADR-033): a declared positive integer, no built-in fallback.
+function requirePositiveInteger(value: number, name: string): number {
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new Error(`${name} must be a positive integer; received '${value}'.`);
+  }
+  return value;
+}
 
 // Links stored on a notification are rendered as anchors. Site-relative paths
 // and http(s) URLs are the only forms the UI can open safely (R5-P2-02).
@@ -82,8 +110,11 @@ export interface NotifyInput {
   notificationKey: string;
   /** Values interpolated into the notification's title/detail templates. */
   context?: Record<string, unknown>;
-  /** Override the notification's default severity for this delivery. */
-  severity?: (typeof SEVERITIES)[number];
+  /**
+   * Severity of this delivery. Required: the producer owns the value and a
+   * missing one is a caller defect, not a case for a default (ADR-062).
+   */
+  severity: (typeof SEVERITIES)[number];
   /** Optional project/tenant scope used for filtering. */
   projectId?: string;
   /** Deep-link the frontend opens when the notification is clicked. */
@@ -94,15 +125,15 @@ export interface NotifyInput {
    */
   deduplicationKey?: string;
   /**
-   * Lifecycle phase for alert-style notifications ("firing" | "recovered").
-   * Defaults to "firing" (ADR-051).
+   * Lifecycle state of an alert-kind notification (ADR-065 §6). Drives the
+   * recovered templates and the `state` label matched by delivery rules.
+   * Ignored for event-kind notifications; defaults to "firing".
    */
-  status?: "firing" | "recovered";
-  /**
-   * Recovery timestamp for recovered-phase notifications; defaults to now()
-   * when status is "recovered" and this is omitted.
-   */
-  recoveredAt?: Date;
+  state?: NotificationState;
+  /** Where this delivery came from (ADR-065): "alert" or "event". */
+  sourceType?: string;
+  /** Id of the origin object (Alert.id for alert deliveries); no foreign key. */
+  sourceRef?: string;
   /**
    * Project scope resolved by the calling controller for the HTTP delivery
    * endpoint. Internal job callers omit it because they act on behalf of the
@@ -116,8 +147,15 @@ export interface NotifyResult {
   id: string;
   /** True when the deduplication key already existed and no row was created. */
   deduplicated: boolean;
-  /** True when the notification was dropped (below minimum severity). */
-  dropped: boolean;
+  /** Delivery verdict of the alert this event belongs to (ADR-062). */
+  decision: DeliveryRuleAction;
+  /** Why the verdict came out that way; null only for pre-P1 frozen verdicts. */
+  reason: DeliveryDecisionReason | null;
+  /**
+   * Why a notification the rules allowed to deliver was nonetheless kept
+   * in-app (ADR-063); null when the delivery went through (or was deduplicated).
+   */
+  runtimeReason: DeliveryRuntimeReason | null;
 }
 
 /**
@@ -138,33 +176,65 @@ function renderTemplate(template: string, context?: Record<string, unknown>): st
   });
 }
 
+/** Human-readable form of a suppress decision, for the debug log. */
+function describeSuppression(verdict: { reason: DeliveryDecisionReason | null; ruleId: string | null }): string {
+  return verdict.reason === "no-rule-matched"
+    ? "no enabled rule matched the event"
+    : `rule ${verdict.ruleId} decided suppress`;
+}
+
 @Injectable()
 export class NotificationCenterService {
   private readonly logger = new Logger(NotificationCenterService.name);
+  private readonly retentionDays: number;
+  private lastPruneAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly registry: NotificationRegistryService,
+    private readonly deliveryRules: NotificationDeliveryRuleService,
+    private readonly config: ConfigService,
     @Optional()
     @Inject(NOTIFICATION_PUSH_PORT)
     private readonly pushPort?: NotificationPushPort,
-  ) {}
+  ) {
+    this.retentionDays = requirePositiveInteger(
+      Number(this.config.getOrThrow<string>(RETENTION_DAYS_KEY)),
+      RETENTION_DAYS_KEY,
+    );
+  }
 
   // --- Delivery ------------------------------------------------------------
 
   /**
    * Produce one notification record from a registered notification. The
-   * notification's templates are rendered with `context`, severity is resolved
-   * from the override or the notification default, and delivery respects the
-   * center minimum-severity floor. System-scope notifications are pushed
-   * through the host-provided push port; project-scope push routing is owned
-   * by the host (per-project chat bindings) and does not pass through here.
+   * notification's templates are rendered with `context`; the record is always
+   * persisted, and the delivery decision only gates push, so a suppressed
+   * low-severity signal never disappears from the in-app bell.
+   *
+   * Rules are evaluated per delivery (ADR-065 §6): the alert lives in its own
+   * domain, so firing and resolved carry the same severity and the same rule
+   * table judges both. The seeded table separates them by state all the same —
+   * the recovery rule has no severity floor — so a closure is announced even
+   * for a signal that stayed in-app; losing a recovery is worse than an extra
+   * one. Each recorded delivery writes one audit attempt. System-scope
+   * notifications are pushed through the host-provided push port; project-scope
+   * push routing is owned by the host (per-project chat bindings) and reads
+   * `decision` from the result.
    */
   async notify(input: NotifyInput): Promise<NotifyResult> {
     const declared = this.registry.get(input.notificationKey);
     if (!declared) {
       throw new NotFoundException(`Notification is not registered: ${input.notificationKey}`);
     }
+
+    // Severity is owned by the producer and is required (ADR-062). A missing or
+    // unknown value is a caller defect; falling back to a default would let the
+    // notification domain define severity again.
+    if (!isNotificationSeverity(input.severity)) {
+      throw new BadRequestException(`Invalid notification severity: ${String(input.severity)}`);
+    }
+    const severity = input.severity;
 
     // The HTTP delivery endpoint accepts a client-supplied projectId: it must
     // be the caller's own project, otherwise a permission holder could inject
@@ -184,25 +254,28 @@ export class NotificationCenterService {
       throw new NotFoundException(`Notification declaration missing in database: ${input.notificationKey}`);
     }
 
-    const severity = input.severity ?? setting.defaultSeverity;
     const center = await this.getOrCreateCenterSetting();
 
-    // Drop deliveries below the center severity floor before any write.
-    if (SEVERITY_LEVEL[severity] < (SEVERITY_LEVEL[center.minimumSeverity] ?? SEVERITY_LEVEL.high)) {
-      // Below the floor the record never lands; log at debug so a missing
-      // notification stays explainable after the fact.
-      this.logger.debug(
-        `Notification ${input.notificationKey} dropped: severity ${severity} is below the configured minimum ${center.minimumSeverity}`,
-      );
-      return { id: "", deduplicated: false, dropped: true };
+    // Lifecycle state (ADR-065 §6). Event-kind notifications have no lifecycle,
+    // so a state passed for one is ignored.
+    const state: NotificationState = declared.kind === "alert" ? (input.state ?? "firing") : "firing";
+    const resolved = state === "resolved";
+
+    const verdict = await this.deliveryRules.evaluate({
+      state,
+      severity,
+      notificationKey: input.notificationKey,
+      projectId: input.projectId,
+    });
+    if (verdict.action === "suppress") {
+      this.logger.debug(`Notification ${input.notificationKey} recorded without push: ${describeSuppression(verdict)}`);
     }
 
-    // ADR-051: recovered-phase notifications prefer the declaration's recovered
-    // template overrides so a recovered alert reads "…recovered" instead of
-    // rendering the firing template with a zero count.
-    const recovered = input.status === "recovered";
-    const titleTemplate = (recovered && declared.recoveredTitleTemplate) || declared.titleTemplate;
-    const detailTemplate = (recovered && declared.recoveredDetailTemplate) || declared.detailTemplate;
+    // ADR-051: resolved messages prefer the declaration's recovered template
+    // overrides so a recovery reads "…recovered" instead of rendering the
+    // firing template with a zero count.
+    const titleTemplate = (resolved && declared.recoveredTitleTemplate) || declared.titleTemplate;
+    const detailTemplate = (resolved && declared.recoveredDetailTemplate) || declared.detailTemplate;
     const title = renderTemplate(titleTemplate, input.context);
     const detail = detailTemplate ? renderTemplate(detailTemplate, input.context) : null;
 
@@ -215,8 +288,10 @@ export class NotificationCenterService {
       deduplicationKey: input.deduplicationKey ?? null,
       projectId: input.projectId ?? null,
       link: input.link ?? null,
-      status: input.status ?? "firing",
-      recoveredAt: input.status === "recovered" ? (input.recoveredAt ?? new Date()) : null,
+      status: state,
+      recoveredAt: resolved ? new Date() : null,
+      sourceType: input.sourceType ?? null,
+      sourceRef: input.sourceRef ?? null,
     };
 
     let recordId: string;
@@ -232,7 +307,15 @@ export class NotificationCenterService {
             where: { deduplicationKey: input.deduplicationKey },
             select: { id: true },
           });
-          recordId = existing?.id ?? "";
+          // The unique violation proved another writer won the race; if that
+          // row is gone by now the result is ambiguous, so report it instead of
+          // returning an empty id marked as deduplicated (R39-09).
+          if (!existing) {
+            throw new ConflictException(
+              `Notification ${input.deduplicationKey} was written concurrently and is no longer readable.`,
+            );
+          }
+          recordId = existing.id;
           deduplicated = true;
         } else {
           throw error;
@@ -243,27 +326,93 @@ export class NotificationCenterService {
       recordId = created.id;
     }
 
+    let runtimeReason: DeliveryRuntimeReason | null = null;
+
     if (!deduplicated) {
-      await this.dispatchPush(setting.scope, setting.isPushEnabled, center, title, detail, recordId);
+      await this.pruneExpiredRecords();
+      // ADR-063: the real-time segment runs only when the rules allow delivery.
+      // The first matching environment fact wins and is recorded next to the
+      // rule decision, so "delivered by the rules but kept in-app" is explainable.
+      if (verdict.action === "deliver") {
+        runtimeReason = this.resolveRuntime({
+          scope: setting.scope,
+          notificationPushEnabled: setting.isPushEnabled,
+          centerPushEnabled: center.isPushEnabled,
+          resolved,
+          declaration: declared,
+        });
+      }
+      if (runtimeReason) {
+        this.logger.debug(`Notification ${input.notificationKey} kept in-app: ${runtimeReason}`);
+      }
+
+      // One audit row per delivery decision (ADR-062/063) so every push,
+      // suppression or real-time interception is explainable after the fact.
+      await this.prisma.notificationDeliveryAttempt.create({
+        data: {
+          recordId,
+          decision: verdict.action,
+          reason: verdict.reason,
+          ruleId: verdict.ruleId,
+          runtimeReason,
+        },
+      });
+      await this.dispatchPush(setting.scope, verdict.action, runtimeReason, title, detail, recordId);
     }
 
-    return { id: recordId, deduplicated, dropped: false };
+    return {
+      id: recordId,
+      deduplicated,
+      decision: verdict.action,
+      reason: verdict.reason,
+      runtimeReason,
+    };
+  }
+
+  /**
+   * Real-time segment of the delivery decision (ADR-063). Environment facts
+   * read at delivery time, in fixed order: the first match wins. Only runs
+   * when the rule decision is "deliver". Timing windows live in the alert
+   * domain now (rhythm and per-source pause); there is no silence reason here.
+   */
+  private resolveRuntime(input: {
+    scope: string;
+    notificationPushEnabled: boolean;
+    centerPushEnabled: boolean;
+    resolved: boolean;
+    declaration: RegisteredNotification;
+  }): DeliveryRuntimeReason | null {
+    if (!input.notificationPushEnabled) {
+      return "subscription-off";
+    }
+    if (input.resolved && input.declaration.notifyOnRecovery === false) {
+      return "recovery-opt-out";
+    }
+    if (!input.centerPushEnabled) {
+      return "channel-off";
+    }
+    // Only system-scope deliveries go through the center's port; project-scope
+    // ones are routed by the host, so an absent port is not an interception.
+    if (input.scope === "system" && !this.pushPort) {
+      return "no-port";
+    }
+    return null;
   }
 
   private async dispatchPush(
     scope: string,
-    notificationPushEnabled: boolean,
-    center: { isPushEnabled: boolean },
+    decision: DeliveryRuleAction,
+    runtimeReason: DeliveryRuntimeReason | null,
     title: string,
     detail: string | null,
     recordId: string,
   ): Promise<void> {
-    if (!notificationPushEnabled || !center.isPushEnabled || !this.pushPort) {
+    if (decision !== "deliver" || runtimeReason !== null) {
       return;
     }
     // Only system-scope notifications push through the center; project-scope
     // deliveries are routed to the owning project's bound chats by the host.
-    if (scope !== "system") {
+    if (scope !== "system" || !this.pushPort) {
       return;
     }
     const text = detail ? `${title}\n${detail}` : title;
@@ -296,10 +445,7 @@ export class NotificationCenterService {
 
   async getCenterSettings(): Promise<NotificationCenterSettingDto> {
     const setting = await this.getOrCreateCenterSetting();
-    return {
-      isPushEnabled: setting.isPushEnabled,
-      minimumSeverity: setting.minimumSeverity,
-    };
+    return { isPushEnabled: setting.isPushEnabled };
   }
 
   async updateCenterSettings(body: UpdateNotificationCenterSettingDto): Promise<NotificationCenterSettingDto> {
@@ -309,14 +455,10 @@ export class NotificationCenterService {
       where: { id: setting.id },
       data: {
         ...(body.isPushEnabled !== undefined ? { isPushEnabled: body.isPushEnabled } : {}),
-        ...(body.minimumSeverity !== undefined ? { minimumSeverity: body.minimumSeverity } : {}),
       },
     });
 
-    return {
-      isPushEnabled: updated.isPushEnabled,
-      minimumSeverity: updated.minimumSeverity,
-    };
+    return { isPushEnabled: updated.isPushEnabled };
   }
 
   async testPush(): Promise<TestPushResultDto> {
@@ -367,16 +509,57 @@ export class NotificationCenterService {
     if (existing) {
       return existing;
     }
-    return this.prisma.notificationCenterSetting.create({
-      data: {
-        id: CENTER_SETTING_SINGLETON_ID,
-        isPushEnabled: DEFAULT_PUSH_ENABLED,
-        minimumSeverity: DEFAULT_MINIMUM_SEVERITY,
-      },
-    });
+    try {
+      return await this.prisma.notificationCenterSetting.create({
+        data: {
+          id: CENTER_SETTING_SINGLETON_ID,
+          isPushEnabled: DEFAULT_PUSH_ENABLED,
+        },
+      });
+    } catch (error) {
+      // Two deliveries can race on the first read of the singleton row. The
+      // winner's row is the answer; anything else is a real failure (R39-10).
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === PG_UNIQUE_VIOLATION) {
+        const raced = await this.prisma.notificationCenterSetting.findUnique({
+          where: { id: CENTER_SETTING_SINGLETON_ID },
+        });
+        if (raced) {
+          return raced;
+        }
+      }
+      throw error;
+    }
   }
 
   // --- Notification reads --------------------------------------------------
+
+  /**
+   * Lazy retention, following the event-emitter module: prune on the notify
+   * path, throttled in-process so a busy producer does not scan the history on
+   * every delivery. Attempts carry no foreign key to the record, so they are
+   * deleted explicitly; receipts and push failures cascade with the record.
+   */
+  private async pruneExpiredRecords(): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastPruneAt < RECORD_PRUNE_INTERVAL_MS) {
+      return;
+    }
+    this.lastPruneAt = now;
+    const cutoff = new Date(now - this.retentionDays * 24 * 60 * 60_000);
+    try {
+      const attempts = await this.prisma.notificationDeliveryAttempt.deleteMany({
+        where: { createdAt: { lt: cutoff } },
+      });
+      const records = await this.prisma.notificationRecord.deleteMany({ where: { createdAt: { lt: cutoff } } });
+      if (attempts.count > 0 || records.count > 0) {
+        this.logger.log(
+          `Pruned ${records.count} notification record(s) and ${attempts.count} delivery attempt(s) older than ${this.retentionDays} days.`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Notification retention prune failed: ${getErrorMessage(error)}`);
+    }
+  }
 
   async list(
     userId: string,
@@ -447,23 +630,62 @@ export class NotificationCenterService {
     return { read: true };
   }
 
+  /**
+   * Mark every unread record the caller can see. The scan is paginated: the
+   * earlier single-shot read materialised every unread id before writing, which
+   * grew unbounded with the record table. Each page writes its receipts before
+   * the next read, so `receipts: none` stops matching them and the loop
+   * converges.
+   */
   async markAllRead(userId: string, visibleProjectIds: string[]): Promise<MarkAllNotificationsReadResponseDto> {
     const visibleSince = await this.getVisibilityFloor(userId);
-    const unread = await this.prisma.notificationRecord.findMany({
-      where: {
-        createdAt: { gte: visibleSince },
-        ...this.buildProjectVisibilityWhere(visibleProjectIds),
-        receipts: { none: { userId } },
-      },
-      select: { id: true },
-    });
-    if (unread.length > 0) {
+    const where = {
+      createdAt: { gte: visibleSince },
+      ...this.buildProjectVisibilityWhere(visibleProjectIds),
+      receipts: { none: { userId } },
+    };
+    let marked = 0;
+    for (;;) {
+      const batch = await this.prisma.notificationRecord.findMany({
+        where,
+        select: { id: true },
+        take: MARK_ALL_READ_BATCH_SIZE,
+      });
+      if (batch.length === 0) {
+        break;
+      }
       await this.prisma.notificationReceipt.createMany({
-        data: unread.map((record) => ({ userId, notificationId: record.id })),
+        data: batch.map((record) => ({ userId, notificationId: record.id })),
         skipDuplicates: true,
       });
+      marked += batch.length;
+      if (batch.length < MARK_ALL_READ_BATCH_SIZE) {
+        break;
+      }
     }
-    return { marked: unread.length };
+    return { marked };
+  }
+
+  // --- Delivery audit -------------------------------------------------------
+
+  /**
+   * The recorded delivery decision of one notification record (ADR-062). The
+   * record list stays lean; the detail panel expands this on demand.
+   */
+  async getDeliveryAttempt(id: string, visibleProjectIds: string[]): Promise<NotificationDeliveryAttemptDto | null> {
+    const record = await this.prisma.notificationRecord.findFirst({
+      where: { id, ...this.buildProjectVisibilityWhere(visibleProjectIds) },
+      select: { id: true },
+    });
+    if (!record) {
+      throw new NotFoundException(`Notification not found: ${id}`);
+    }
+    const attempt = await this.prisma.notificationDeliveryAttempt.findFirst({
+      where: { recordId: id },
+      orderBy: { createdAt: "desc" },
+      select: { decision: true, reason: true, ruleId: true, runtimeReason: true, createdAt: true },
+    });
+    return attempt ?? null;
   }
 
   // --- Push failure tracking -------------------------------------------------

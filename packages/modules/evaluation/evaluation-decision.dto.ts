@@ -75,25 +75,25 @@ export class CreateEvaluationRemediationPlanRequestDto {
   @IsUUID()
   subjectId!: string;
 
-  @ApiProperty({ type: [String], isArray: true, description: "Finding or result references the plan responds to" })
+  @ApiProperty({ type: [String], isArray: true, description: "Finding or result ids the plan responds to" })
   @IsArray()
   @IsString({ each: true })
-  triggerRefs!: string[];
+  triggerIds!: string[];
 
   @ApiProperty({ description: "Accountable decision maker as a host actor reference; never derived from the caller" })
   @IsString()
-  deciderRef!: string;
+  decider!: string;
 
-  @ApiProperty({ type: Date })
+  @ApiProperty({ type: Date, description: "Calendar day the plan starts (sent as ISO date, stored date-only)" })
   @Type(() => Date)
   @IsDate()
-  startDate!: Date;
+  startOn!: Date;
 
-  @ApiPropertyOptional({ type: Date })
+  @ApiPropertyOptional({ type: Date, description: "Calendar day the plan is due (stored date-only)" })
   @IsOptional()
   @Type(() => Date)
   @IsDate()
-  dueDate?: Date;
+  dueOn?: Date;
 
   @ApiPropertyOptional({
     type: EvaluationRemediationCheckpointRequestDto,
@@ -149,8 +149,8 @@ export class ListEvaluationRemediationPlansRequestDto extends CommonListRequestD
 export class EvaluationFindingResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty({ description: "Feature evaluationKey that observed the finding, e.g. npm-osv, aws-cis-1.5, work" })
-  evaluationKey!: string;
+  @ApiProperty({ description: "Feature standardKey that observed the finding, e.g. npm-osv, aws-cis-1.5, work" })
+  standardKey!: string;
   @ApiProperty({ description: "Stable logical identity used to dedupe across runs" })
   fingerprint!: string;
   @ApiProperty() criterionKey!: string;
@@ -159,7 +159,8 @@ export class EvaluationFindingResponseDto {
   @ApiProperty({ enum: EvaluationFindingStatus })
   status!: EvaluationFindingStatus;
   @ApiProperty() title!: string;
-  @ApiProperty() detail!: string;
+  @ApiPropertyOptional({ description: "Optional long-form text explaining the finding", type: String })
+  description?: string | null;
   @ApiPropertyOptional({ type: Object }) metadata?: object | null;
   @ApiProperty({ description: "Run that first observed this fingerprint for the subject" })
   firstSeenRunId!: string;
@@ -170,8 +171,8 @@ export class EvaluationFindingResponseDto {
   @ApiPropertyOptional({ type: Date }) resolvedAt?: Date | null;
   @ApiPropertyOptional({ type: String, description: "Human note recorded when the finding was suppressed" })
   suppressionNote?: string | null;
-  @ApiPropertyOptional({ type: String, description: "Host actor reference who suppressed the finding" })
-  suppressedByRef?: string | null;
+  @ApiPropertyOptional({ type: Date, description: "When the finding was suppressed" })
+  suppressedAt?: Date | null;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
 }
@@ -179,18 +180,16 @@ export class EvaluationFindingResponseDto {
 export class EvaluationRemediationPlanResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty({ type: [String], isArray: true }) triggerRefs!: string[];
-  @ApiPropertyOptional({ type: Object, description: "Ordered checkpoints with { description, dueDate, status }" })
+  @ApiProperty({ type: [String], isArray: true }) triggerIds!: string[];
+  @ApiPropertyOptional({ type: Object, description: "Ordered checkpoints with { dueDate, description, status }" })
   checkpoints?: object | null;
   @ApiProperty({ enum: EvaluationRemediationStatus })
   status!: EvaluationRemediationStatus;
-  @ApiProperty({ type: Date }) startDate!: Date;
-  @ApiPropertyOptional({ type: Date }) dueDate?: Date | null;
+  @ApiProperty({ type: Date, description: "Calendar day the plan starts (date-only)" }) startOn!: Date;
+  @ApiPropertyOptional({ type: Date, description: "Calendar day the plan is due (date-only)" }) dueOn?: Date | null;
   @ApiProperty({ description: "Accountable decision maker as a host actor reference" })
-  deciderRef!: string;
+  decider!: string;
   @ApiPropertyOptional({ type: String }) decisionNote?: string | null;
-  @ApiPropertyOptional({ type: String, description: "Host actor reference who recorded the decision" })
-  decidedByRef?: string | null;
   @ApiPropertyOptional({ type: Date }) decidedAt?: Date | null;
   @ApiPropertyOptional({ type: Date }) closedAt?: Date | null;
   @ApiProperty() createdAt!: Date;
@@ -203,7 +202,7 @@ export class EvaluationResultResponseDto {
   @ApiProperty() subjectId!: string;
   @ApiProperty() ruleSetVersionId!: string;
   @ApiProperty({ description: "SHA-256 over the canonical manifest, computed by the skeleton" })
-  contentHash!: string;
+  manifestHash!: string;
   @ApiProperty({
     type: Object,
     description: "{ evaluated, declaredUnlinked, skipped } — what the judgment saw and what it did not",
@@ -221,9 +220,8 @@ export class EvaluationResultResponseDto {
     description: "Supervisor verdict on the archived conclusion (ADR-031)",
   })
   reviewStatus?: EvaluationResultReviewStatus | null;
-  @ApiPropertyOptional({ type: String, description: "Host actor reference who recorded the review" })
-  reviewedByRef?: string | null;
-  @ApiPropertyOptional({ type: Date }) reviewedAt?: Date | null;
+  @ApiPropertyOptional({ type: Date, description: "When the review was recorded" })
+  reviewedAt?: Date | null;
   @ApiPropertyOptional({ type: String, description: "Reviewer's note; cleared when a re-review omits it" })
   reviewNote?: string | null;
   @ApiProperty() createdAt!: Date;

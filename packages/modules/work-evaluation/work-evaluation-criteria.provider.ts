@@ -8,7 +8,7 @@ import { readPeriodId } from "./work-evaluation-run-config";
 
 /**
  * WorkEvaluationCriteriaProvider — the CriteriaProvider for subject kind
- * "work" (ADR-024). The applicable version is never chosen freely: the run's
+ * "developer" (ADR-024). The applicable version is never chosen freely: the run's
  * period (runConfig.periodId, ADR-026) pins exactly one published criteria
  * version, and this port only follows the pin.
  */
@@ -27,6 +27,6 @@ export class WorkEvaluationCriteriaProvider implements CriteriaProvider {
     if (!periodId) return null;
     const period = await this.periods.getPeriodById(periodId);
     const version = await this.criteria.getVersion(period.ruleSetVersionId);
-    return { evaluationKey: version.evaluationKey, version: version.version };
+    return { standardKey: version.standardKey, version: version.version };
   }
 }

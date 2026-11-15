@@ -11,7 +11,10 @@
     "config": {
       "security-evaluation": {
         "ttlDays": "process.env.SECURITY_EVALUATION_NEGATIVE_CACHE_TTL_DAYS",
-        "codeScanVerdictCacheTtlDays": "process.env.SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS"
+        "codeScanVerdictCacheTtlDays": "process.env.SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS",
+        "webOriginVerificationIntervalDays": "process.env.SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_INTERVAL_DAYS",
+        "webOriginReverifyFailureThreshold": "process.env.SECURITY_EVALUATION_WEB_ORIGIN_REVERIFY_FAILURE_THRESHOLD",
+        "webOriginTokenBytes": "process.env.SECURITY_EVALUATION_WEB_ORIGIN_TOKEN_BYTES"
       }
     },
     "env": {
@@ -24,6 +27,21 @@
         "type": "int",
         "example": 30,
         "description": "Days to keep code-scan LLM verdict cache rows before they are re-judged. Content or version changes already invalidate the cache key; the TTL only forces long-unchanged files to be re-judged against model drift (ADR-054)."
+      },
+      "SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_INTERVAL_DAYS": {
+        "type": "int",
+        "example": 30,
+        "description": "Days between ownership re-verifications of a web-origin asset. Re-verification is lazy: it runs the next time the host submits assets, not on a scheduler (ADR-044)."
+      },
+      "SECURITY_EVALUATION_WEB_ORIGIN_REVERIFY_FAILURE_THRESHOLD": {
+        "type": "int",
+        "example": 3,
+        "description": "Consecutive failed re-verifications before a web origin drops to FAILED and stops being evaluated. Protects against scanning a domain that changed hands (ADR-044)."
+      },
+      "SECURITY_EVALUATION_WEB_ORIGIN_TOKEN_BYTES": {
+        "type": "int",
+        "example": 32,
+        "description": "Random bytes of the verification token (base64url-encoded, at most 48 bytes to fit VarChar(64))."
       }
     }
   }

@@ -1,9 +1,9 @@
-import { Inject, Injectable, InternalServerErrorException, UnauthorizedException } from "@nestjs/common";
+import { Inject, Injectable, InternalServerErrorException } from "@nestjs/common";
 import { Optional } from "@nestjs/common";
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-custom";
 import { Request } from "express";
-import { API_KEY_NOT_FOUND } from "@devbie/newbie/exceptions/errors.constants";
+import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { API_KEY_VERIFIER, ApiKeyVerifier } from "../../ports/api-key.verifier";
 
 @Injectable()
@@ -26,7 +26,9 @@ export class ApiKeyStrategy extends PassportStrategy(Strategy, "custom.api-key")
     const key = req.headers["key"] as string;
     const secret = req.headers["secret"] as string;
     if (!key || !secret) {
-      throw new UnauthorizedException(API_KEY_NOT_FOUND);
+      // No credential presented (ADR-048 §3, 1105). Whether a presented key is
+      // valid belongs to the verifier port below.
+      throw new NewbieException(NewbieExceptionType.Session_Missing);
     }
 
     if (!this.apiKeyVerifier) {

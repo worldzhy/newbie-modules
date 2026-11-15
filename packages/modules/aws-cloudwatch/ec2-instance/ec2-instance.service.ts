@@ -11,16 +11,16 @@ export class Ec2InstanceService {
     private readonly bindings: AwsCrossAccountBindingsService,
   ) {}
 
-  async listEC2Instances(params: { projectId: string; status?: string; isWatching?: boolean }) {
-    const { projectId, status, isWatching } = params;
+  async listEC2Instances(params: { accountId: string; status?: string; isWatching?: boolean }) {
+    const { accountId, status, isWatching } = params;
     return await this.prisma.ec2Instance.findMany({
-      where: { projectId, status, isWatching },
+      where: { accountId, status, isWatching },
       orderBy: { name: "asc" },
     });
   }
 
-  async fetchEC2Instances(projectId: string) {
-    const { credentials, regions } = await this.bindings.resolveProjectCredential(projectId);
+  async fetchEC2Instances(accountId: string) {
+    const { credentials, regions } = await this.bindings.resolveAccountCredential(accountId);
     const ec2InstanceCreateManyInputs: Prisma.Ec2InstanceCreateManyInput[] = [];
 
     for (let i = 0; i < regions.length; i++) {
@@ -41,7 +41,7 @@ export class Ec2InstanceService {
                 name: nameTag?.Value ?? instance.InstanceId!,
                 status: instance.State?.Name,
                 region: regions[i],
-                projectId,
+                accountId,
               });
             }
           }
@@ -52,7 +52,7 @@ export class Ec2InstanceService {
     if (ec2InstanceCreateManyInputs.length) {
       await this.prisma.$transaction(async (tx) => {
         const currentInstanceIdObjs = await tx.ec2Instance.findMany({
-          where: { projectId },
+          where: { accountId },
           select: { instanceId: true },
         });
         const ec2InstanceRemoteIds = ec2InstanceCreateManyInputs.map((item) => item.instanceId);
@@ -60,11 +60,13 @@ export class Ec2InstanceService {
           .filter((item) => !ec2InstanceRemoteIds.includes(item.instanceId))
           .map((item) => item.instanceId);
         if (deleteIds.length) {
-          await tx.ec2Instance.deleteMany({ where: { projectId, instanceId: { in: deleteIds } } });
+          await tx.ec2Instance.deleteMany({ where: { accountId, instanceId: { in: deleteIds } } });
         }
         for (const ec2Instance of ec2InstanceCreateManyInputs) {
           await tx.ec2Instance.upsert({
-            where: { instanceId: ec2Instance.instanceId },
+            where: {
+              instanceId_accountId: { instanceId: ec2Instance.instanceId, accountId },
+            },
             update: {
               name: ec2Instance.name,
               status: ec2Instance.status,
@@ -75,7 +77,7 @@ export class Ec2InstanceService {
               name: ec2Instance.name,
               status: ec2Instance.status,
               region: ec2Instance.region,
-              projectId,
+              accountId,
             },
           });
         }
@@ -86,16 +88,16 @@ export class Ec2InstanceService {
   }
 
   async syncEC2InstancesWatch(params: {
-    projectId: string;
+    accountId: string;
     watchEC2InstanceIds: string[];
     unwatchEC2InstanceIds: string[];
   }) {
-    const { projectId, watchEC2InstanceIds, unwatchEC2InstanceIds } = params;
+    const { accountId, watchEC2InstanceIds, unwatchEC2InstanceIds } = params;
     let needWatch = false;
     let needUnwatch = false;
     if (watchEC2InstanceIds.length) {
       const watchEC2Instances = await this.prisma.ec2Instance.findMany({
-        where: { id: { in: watchEC2InstanceIds }, projectId },
+        where: { id: { in: watchEC2InstanceIds }, accountId },
       });
       if (watchEC2Instances.length !== watchEC2InstanceIds.length) {
         throw new HttpException("The number of EC2 instance IDs to watch does not match", HttpStatus.BAD_REQUEST);
@@ -104,7 +106,7 @@ export class Ec2InstanceService {
     }
     if (unwatchEC2InstanceIds.length) {
       const unwatchEC2Instances = await this.prisma.ec2Instance.findMany({
-        where: { id: { in: unwatchEC2InstanceIds }, projectId },
+        where: { id: { in: unwatchEC2InstanceIds }, accountId },
       });
       if (unwatchEC2Instances.length !== unwatchEC2InstanceIds.length) {
         throw new HttpException("The number of EC2 instance IDs to unwatch does not match", HttpStatus.BAD_REQUEST);

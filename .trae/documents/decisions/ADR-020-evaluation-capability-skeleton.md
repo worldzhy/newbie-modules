@@ -1,6 +1,6 @@
 # ADR-020: 抽象 evaluation 能力骨架（registry capability）
 
-状态：已采纳
+状态：已采纳（D1 中 `EvaluationSubject` 的泛化坐标 `scopeType`/`scopeId` 与 D4 的 `SubjectProvider` 端口行由 ADR-068 取代）
 日期：2026-10-25
 
 > 归属：registry 框架契约决策 → 本仓（按 ADR-019 模板的归属规则：治理的代码在 registry 里）。宿主侧实施（主体来源、证据采集、判定器、通知与调度装配）归各宿主与上层 feature 模块，不在本 ADR 决定。本 ADR 不取代任何既有 ADR。

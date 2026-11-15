@@ -35,6 +35,38 @@ const JOB_RUN_FAILED = defineEvent<JobRunFailedEvent>({
   },
 });
 
+/// Emitted after a job run is persisted with status "success". It is the
+/// recovery edge for the failure lifecycle: listeners use it to close whatever
+/// they opened on JOB_RUN_FAILED_EVENT for the same schedule (ADR-067).
+export const JOB_RUN_SUCCEEDED_EVENT = "job-scheduler.run-succeeded";
+
+export interface JobRunSucceededEvent {
+  runId: number;
+  scheduleId: number;
+  scheduleKey: string;
+  handlerKey: string;
+  trigger: JobTrigger;
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+}
+
+const JOB_RUN_SUCCEEDED = defineEvent<JobRunSucceededEvent>({
+  key: JOB_RUN_SUCCEEDED_EVENT,
+  name: "Job run succeeded",
+  description: "Emitted after a scheduled or manual job run is persisted with status success.",
+  payloadExample: {
+    runId: 43,
+    scheduleId: 7,
+    scheduleKey: "report.daily",
+    handlerKey: "report.run",
+    trigger: "schedule",
+    startedAt: "2026-01-02T00:00:00.000Z",
+    finishedAt: "2026-01-02T00:00:05.000Z",
+    durationMs: 5000,
+  },
+});
+
 /// The module's full event contract, activated by the host's
 /// event-declarations wiring (ADR-028). Never self-registered here.
-export const jobSchedulerEventDeclarations = [JOB_RUN_FAILED];
+export const jobSchedulerEventDeclarations = [JOB_RUN_FAILED, JOB_RUN_SUCCEEDED];

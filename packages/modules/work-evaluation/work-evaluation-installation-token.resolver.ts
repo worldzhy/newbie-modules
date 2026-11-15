@@ -6,7 +6,7 @@ import { WorkEvaluationInstallationService } from "./work-evaluation-installatio
 export interface ResolvedWorkEvaluationInstallationToken {
   installationId: string;
   /** Evaluatee the token is allowed to report for (authorization scope). */
-  evaluateeUserId: string;
+  developerId: string;
 }
 
 /**
@@ -14,7 +14,7 @@ export interface ResolvedWorkEvaluationInstallationToken {
  *
  * Implements security's InstallationResolver port (ADR-016) so the
  * InstallationAuthGuard can authenticate the ingest endpoints. The resolved
- * evaluateeUserId is the single authorization fact for ingest: an installation
+ * developerId is the single authorization fact for ingest: an installation
  * agent may only write evidence for its own evaluatee.
  *
  * Verification is the shared security algorithm (ADR-019), which caches only
@@ -33,6 +33,6 @@ export class WorkEvaluationInstallationTokenResolver implements InstallationReso
     if (!installation) {
       throw new UnauthorizedException("Invalid work-evaluation installation token.");
     }
-    return { installationId: installation.id, evaluateeUserId: installation.evaluateeUserId };
+    return { installationId: installation.id, developerId: installation.developerId };
   }
 }

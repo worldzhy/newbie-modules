@@ -3,8 +3,9 @@
 // prisma tree on `newbie modules apply`.
 //
 // The skeleton holds no host vocabulary: no foreign keys point outside this
-// schema, and every host-side identity is an opaque scalar (`requestedByRef`,
-// `deciderRef`, `scopeId`).
+// schema, and every host-side identity is an opaque scalar (`requestedBy`,
+// `decider`). Operator columns are deliberately absent — who performed an
+// action is audited outside the skeleton (ADR-068).
 
 // !! ----------------------------------------------------------- //
 // !!                [Module] Evaluation models                   //
@@ -79,12 +80,13 @@ enum EvaluationResultReviewStatus {
 
 /// A frozen set of criteria a run is judged against (ADR-020 D5.5). A draft is
 /// editable; publishing is one-way, after which every write is rejected and
-/// changes require a new version. `kind` is the subject kind these criteria
-/// apply to; `evaluationKey` is the feature-defined group (rubric, aws-cis-1.5, ...).
+/// changes require a new version. `subjectKind` is the subject kind these
+/// criteria apply to; `standardKey` is the feature-defined group (rubric,
+/// aws-cis-1.5, ...).
 model EvaluationRuleSetVersion {
-  id     String @id @default(uuid()) @db.Uuid
-  kind   String @db.VarChar(64)
-  evaluationKey String @db.VarChar(64)
+  id          String @id @default(uuid()) @db.Uuid
+  subjectKind String @db.VarChar(64)
+  standardKey String @db.VarChar(64)
 
   version     String  @db.VarChar(64)
   description String? @db.Text
@@ -101,8 +103,8 @@ model EvaluationRuleSetVersion {
   runs     EvaluationRun[]
   results  EvaluationResult[]
 
-  @@unique([kind, evaluationKey, version])
-  @@index([kind, evaluationKey, publishedAt])
+  @@unique([subjectKind, standardKey, version])
+  @@index([subjectKind, standardKey, publishedAt])
   @@schema("module/evaluation")
 }
 
@@ -131,9 +133,11 @@ model EvaluationCriterion {
   @@schema("module/evaluation")
 }
 
-/// The object being evaluated (ADR-020 D1). Identity is feature-defined through
-/// `subjectKey`; the host assigns meaning to `scopeType` / `scopeId`, which are
-/// plain scalars with no foreign key — this module knows no host entity.
+/// The object being evaluated (ADR-020 D1, ADR-068, ADR-069). Identity is
+/// `(subjectType, kind, subjectKey)` — all three feature-defined; the skeleton
+/// never derives them and knows no host entity. `subjectType` names the feature
+/// that submits the subject, so two features may evaluate the same kind without
+/// sharing a row.
 ///
 /// `credentialRef` is an opaque pointer the feature may register at ingest time
 /// when evaluating the subject requires host-held credentials (e.g. a cloud
@@ -143,9 +147,9 @@ model EvaluationCriterion {
 model EvaluationSubject {
   id String @id @default(uuid()) @db.Uuid
 
+  // Owning feature key (e.g. "security-evaluation"); opaque to the skeleton
+  subjectType String @db.VarChar(64)
   kind        String @db.VarChar(64)
-  scopeType   String @db.VarChar(64)
-  scopeId     String @db.VarChar(128)
   subjectKey  String @db.VarChar(255)
   displayName String @db.VarChar(255)
 
@@ -162,8 +166,7 @@ model EvaluationSubject {
   findings         EvaluationFinding[]
   remediationPlans EvaluationRemediationPlan[]
 
-  @@unique([kind, scopeType, scopeId, subjectKey])
-  @@index([kind, scopeType, scopeId])
+  @@unique([subjectType, kind, subjectKey])
   @@schema("module/evaluation")
 }
 
@@ -182,12 +185,12 @@ model EvaluationRun {
 
   status EvaluationRunStatus @default(QUEUED)
   // Opaque host-side actor id; no foreign key by design
-  requestedByRef String? @db.VarChar(128)
+  requestedBy String? @db.VarChar(128)
   // Opaque per-run feature config, threaded to the judgment port verbatim
   // (ADR-023). The skeleton never reads a key from it.
-  config Json? @db.JsonB
+  judgmentConfig Json? @db.JsonB
   // Failure reason when status = FAILED. Message only, never a stack trace.
-  error String? @db.Text
+  failureReason String? @db.Text
 
   startedAt  DateTime?
   finishedAt DateTime?
@@ -200,13 +203,16 @@ model EvaluationRun {
   // At most one result per run.
   result EvaluationResult?
 
+  firstSeenFindings EvaluationFinding[] @relation("EvaluationFindingFirstSeenRun")
+  lastSeenFindings  EvaluationFinding[] @relation("EvaluationFindingLastSeenRun")
+
   @@index([subjectId, ruleSetVersionId])
   @@index([status])
   @@schema("module/evaluation")
 }
 
-/// The archived conclusion of one run (ADR-020 D5.1): `manifest`,
-/// `contentHash` and `coverageStats` describe the material it was judged from
+/// The archived conclusion of one run (ADR-020 D5.1): `evidenceManifest`,
+/// `manifestHash` and `coverageStats` describe the material it was judged from
 /// and are never rewritten — a rerun writes a new row. The supervisor review
 /// columns (ADR-031) are the one lifecycle layer above the snapshot and never
 /// touch it. There is deliberately no composite score field (D5.3); multi-axis
@@ -218,9 +224,9 @@ model EvaluationResult {
   ruleSetVersionId String @db.Uuid
 
   // Archived evidence snapshot: [{ id, layer, source, summary, observedAt, refs }]
-  manifest      Json    @db.JsonB
-  // SHA-256 over the canonical manifest, computed by the skeleton
-  contentHash   String  @db.VarChar(64)
+  evidenceManifest Json    @db.JsonB
+  // SHA-256 over the canonical evidence manifest, computed by the skeleton
+  manifestHash    String  @db.VarChar(64)
   // { evaluated, declaredUnlinked, skipped } — each { total, bySource?, note?, items? }
   coverageStats Json    @db.JsonB
 
@@ -230,11 +236,10 @@ model EvaluationResult {
   metadata Json?   @db.JsonB
 
   // Supervisor review of the archived conclusion (ADR-031). Every review is a
-  // full-state write: a re-review overwrites reviewer, time and note, so the
-  // row always reflects exactly the latest say.
+  // full-state write: a re-review overwrites time and note, so the row always
+  // reflects exactly the latest say. The actor is not stored here (ADR-068 D6):
+  // it is always the requester, and the audit log already records it.
   reviewStatus  EvaluationResultReviewStatus?
-  // Opaque host-side actor id; no foreign key by design
-  reviewedByRef String?                       @db.VarChar(128)
   reviewedAt    DateTime?
   reviewNote    String?                       @db.Text
 
@@ -250,26 +255,26 @@ model EvaluationResult {
 }
 
 /// An assertion-type conclusion (ADR-020 D2). Unlike a verdict it has an
-/// identity — `(subjectId, evaluationKey, fingerprint)` — and a lifecycle that spans
+/// identity — `(subjectId, standardKey, fingerprint)` — and a lifecycle that spans
 /// runs: first seen once, last seen by whichever run still observed it,
-/// resolved when it stops appearing. `evaluationKey` is copied from the run's
-/// criteria version, so a rerun under a new version of the same evaluationKey keeps
-/// the finding's identity, and one evaluationKey never resolves another evaluationKey's
+/// resolved when it stops appearing. `standardKey` is copied from the run's
+/// criteria version, so a rerun under a new version of the same standardKey keeps
+/// the finding's identity, and one standardKey never resolves another standardKey's
 /// findings. `firstSeenAt` is never rewritten.
 model EvaluationFinding {
   id        String @id @default(uuid()) @db.Uuid
   subjectId String @db.Uuid
 
-  // Criteria evaluationKey of the run that owns this finding's lifecycle
-  evaluationKey       String                    @db.VarChar(64)
-  // Stable identity of the assertion within the subject and evaluationKey
+  // Criteria standardKey of the run that owns this finding's lifecycle
+  standardKey         String                    @db.VarChar(64)
+  // Stable identity of the assertion within the subject and standardKey
   fingerprint  String                    @db.VarChar(128)
   criterionKey String                    @db.VarChar(64)
   severity     EvaluationFindingSeverity
   status       EvaluationFindingStatus   @default(OPEN)
 
-  title  String  @db.VarChar(255)
-  detail String? @db.Text
+  title       String  @db.VarChar(255)
+  description String? @db.Text
   // Feature-defined extra material (evidence refs, signal tags, urgency inputs)
   metadata Json? @db.JsonB
 
@@ -281,22 +286,23 @@ model EvaluationFinding {
   resolvedAt  DateTime?
   // Mandatory when status = SUPPRESSED: why a human silenced this finding
   suppressionNote String? @db.Text
-  // Opaque host-side actor id of whoever suppressed the finding
-  suppressedByRef String? @db.VarChar(128)
+  suppressedAt    DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  subject EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  subject      EvaluationSubject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  firstSeenRun EvaluationRun?    @relation("EvaluationFindingFirstSeenRun", fields: [firstSeenRunId], references: [id], onDelete: SetNull)
+  lastSeenRun  EvaluationRun?    @relation("EvaluationFindingLastSeenRun", fields: [lastSeenRunId], references: [id], onDelete: SetNull)
 
-  @@unique([subjectId, evaluationKey, fingerprint])
+  @@unique([subjectId, standardKey, fingerprint])
   @@index([subjectId, status])
   @@index([status, severity])
   @@schema("module/evaluation")
 }
 
 /// The remediation object (ADR-020 D1): findings or results a plan answers to,
-/// the checkpoints that track progress, and the named decider. `triggerRefs`
+/// the checkpoints that track progress, and the named decider. `triggerIds`
 /// is validated against this schema's tables by the service — the plan can
 /// never be anchored on material that does not exist.
 model EvaluationRemediationPlan {
@@ -306,21 +312,18 @@ model EvaluationRemediationPlan {
   status EvaluationRemediationStatus @default(OPEN)
 
   // Finding or result ids that triggered the plan; validated by the service
-  triggerRefs Json @db.JsonB
+  triggerIds Json @db.JsonB
   // The named decision maker (opaque host-side actor id) — required by D1
-  deciderRef  String @db.VarChar(128)
+  decider String @db.VarChar(128)
 
-  startDate DateTime
-  dueDate   DateTime?
+  startOn DateTime  @db.Date
+  dueOn   DateTime? @db.Date
   // [{ dueDate, description, status }]
   checkpoints Json? @db.JsonB
 
   // completed / failed / extended, recorded when the plan closes
   decisionNote String?   @db.Text
   decidedAt    DateTime?
-  // Opaque host-side actor id of whoever recorded the decision; `deciderRef`
-  // names the accountable decision maker, this records who actually acted
-  decidedByRef String?   @db.VarChar(128)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

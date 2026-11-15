@@ -20,6 +20,12 @@ export class AwsCrossAccountBindingDto {
   accountId!: string;
 
   @ApiPropertyOptional({
+    description: "Platform-side display name entered by the operator; null when the account is unnamed",
+    type: String,
+  })
+  name?: string | null;
+
+  @ApiPropertyOptional({
     description: "Customer-managed IAM role ARN assumed via STS; null until setup is completed",
     type: String,
   })
@@ -162,6 +168,15 @@ export class VerifyAwsCrossAccountBindingResponseDto extends AwsCrossAccountBind
 }
 
 export class UpsertAwsCrossAccountBindingDto {
+  @ApiPropertyOptional({
+    description: "Platform-side display name for the account; omit to keep the stored name, null or blank to clear it",
+    type: String,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  name?: string | null;
+
   @ApiProperty({ description: "Customer-managed IAM role ARN to assume" })
   @IsNotEmpty()
   @IsString()
@@ -193,6 +208,22 @@ export class UpsertAwsCrossAccountBindingDto {
   @IsString()
   @Matches(LAMBDA_FUNCTION_ARN_PATTERN, { message: "rotationLambdaArn must be a valid Lambda function ARN" })
   rotationLambdaArn?: string | null;
+}
+
+/**
+ * Rename an account. The name is display-only metadata: it is never part of
+ * the identity exchange or the region scope, so an account whose role is not
+ * configured yet can still be named. Null or blank clears the name.
+ */
+export class UpdateAwsCrossAccountBindingNameDto {
+  @ApiPropertyOptional({
+    description: "Platform-side display name for the account; null or blank clears it",
+    type: String,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsString()
+  name?: string | null;
 }
 
 /**

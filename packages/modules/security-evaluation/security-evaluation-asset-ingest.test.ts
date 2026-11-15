@@ -5,68 +5,67 @@ import type { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
 
 /**
- * Behavior-level test for the platform-level ingest contract (ADR-039).
+ * Behavior-level test for the platform-level ingest contract (ADR-039, ADR-068
+ * D8, ADR-070).
  *
- * The fake below is the three tables the service writes (subject, asset,
- * provenance) plus the provenance read; it asserts what the contract promises:
- * one subject per (kind, subjectKey) regardless of how many projects submit it,
- * one provenance row per source, and idempotent re-submission.
+ * The fake below is what the service writes — the subject plus the material row
+ * of the kind. It asserts what the contract promises: identity is the natural
+ * coordinate (never a host id), the coordinate is normalized so casing cannot
+ * fork a subject, and re-submission is idempotent per
+ * `(subjectType, kind, subjectKey)`.
  */
 
 interface FakeSubjectRow {
   id: string;
+  subjectType: string;
   kind: string;
-  scopeType: string;
-  scopeId: string;
   subjectKey: string;
   displayName: string;
   metadata: Record<string, unknown> | undefined;
   credentialRef: string | null;
 }
 
-interface FakeAssetRow {
+interface FakeRepositoryRow {
   id: string;
   subjectId: string;
-  naturalKey: string;
-  displayName: string;
+  provider: string;
+  namespace: string;
+  name: string;
+  url: string | null;
+  isActive: boolean;
 }
 
-interface FakeSourceRow {
+interface FakeAwsAccountRow {
   id: string;
   subjectId: string;
-  sourceType: string;
-  sourceId: string;
-  firstSubmittedAt: Date;
-  lastSubmittedAt: Date;
+  accountId: string;
+  defaultRegion: string | null | undefined;
+  regions: string[];
+  isActive: boolean;
 }
 
 function fakePrisma() {
   const subjects: FakeSubjectRow[] = [];
-  const assets: FakeAssetRow[] = [];
-  const sources: FakeSourceRow[] = [];
+  const repositories: FakeRepositoryRow[] = [];
+  const awsAccounts: FakeAwsAccountRow[] = [];
   let nextId = 1;
 
   const prisma = {
     evaluationSubject: {
       upsert: async (args: {
         where: {
-          kind_scopeType_scopeId_subjectKey: {
+          subjectType_kind_subjectKey: {
+            subjectType: string;
             kind: string;
-            scopeType: string;
-            scopeId: string;
             subjectKey: string;
           };
         };
         create: Omit<FakeSubjectRow, "id">;
         update: { displayName: string; metadata: Record<string, unknown> | undefined; credentialRef?: string | null };
       }) => {
-        const key = args.where.kind_scopeType_scopeId_subjectKey;
+        const key = args.where.subjectType_kind_subjectKey;
         const existing = subjects.find(
-          (row) =>
-            row.kind === key.kind &&
-            row.scopeType === key.scopeType &&
-            row.scopeId === key.scopeId &&
-            row.subjectKey === key.subjectKey,
+          (row) => row.subjectType === key.subjectType && row.kind === key.kind && row.subjectKey === key.subjectKey,
         );
         if (existing) {
           existing.displayName = args.update.displayName;
@@ -82,66 +81,55 @@ function fakePrisma() {
         subjects.push(created);
         return created;
       },
-      findMany: async (args: { where: { id: { in: string[] } } }) =>
-        subjects.filter((row) => args.where.id.in.includes(row.id)),
     },
-    securityEvaluationAsset: {
+    securityEvaluationRepository: {
       upsert: async (args: {
-        where: { subjectId: string };
-        create: Omit<FakeAssetRow, "id">;
-        update: { naturalKey: string; displayName: string };
+        where: { provider_namespace_name: { provider: string; namespace: string; name: string } };
+        create: Omit<FakeRepositoryRow, "id" | "isActive"> & { isActive?: boolean };
+        update: Partial<Omit<FakeRepositoryRow, "id" | "subjectId">>;
       }) => {
-        const existing = assets.find((row) => row.subjectId === args.where.subjectId);
+        const key = args.where.provider_namespace_name;
+        const existing = repositories.find(
+          (row) => row.provider === key.provider && row.namespace === key.namespace && row.name === key.name,
+        );
         if (existing) {
-          existing.naturalKey = args.update.naturalKey;
-          existing.displayName = args.update.displayName;
+          Object.assign(existing, args.update);
           return existing;
         }
-        const created: FakeAssetRow = { id: `asset-${nextId++}`, ...args.create };
-        assets.push(created);
+        // Mirrors the schema default on the material row.
+        const created: FakeRepositoryRow = { id: `repo-${nextId++}`, isActive: true, ...args.create };
+        repositories.push(created);
         return created;
       },
     },
-    securityEvaluationAssetSource: {
+    securityEvaluationAwsAccount: {
       upsert: async (args: {
-        where: { subjectId_sourceType_sourceId: { subjectId: string; sourceType: string; sourceId: string } };
-        create: Omit<FakeSourceRow, "id">;
-        update: { lastSubmittedAt: Date };
+        where: { accountId: string };
+        create: Omit<FakeAwsAccountRow, "id" | "isActive"> & { isActive?: boolean };
+        update: Partial<Omit<FakeAwsAccountRow, "id" | "subjectId" | "accountId">>;
       }) => {
-        const key = args.where.subjectId_sourceType_sourceId;
-        const existing = sources.find(
-          (row) =>
-            row.subjectId === key.subjectId && row.sourceType === key.sourceType && row.sourceId === key.sourceId,
-        );
+        const existing = awsAccounts.find((row) => row.accountId === args.where.accountId);
         if (existing) {
-          existing.lastSubmittedAt = args.update.lastSubmittedAt;
+          Object.assign(existing, args.update);
           return existing;
         }
-        const created: FakeSourceRow = { id: `source-${nextId++}`, ...args.create };
-        sources.push(created);
+        const created: FakeAwsAccountRow = { id: `account-${nextId++}`, isActive: true, ...args.create };
+        awsAccounts.push(created);
         return created;
       },
-      findMany: async (args: { where: { sourceType?: string; sourceId?: string } }) => {
-        const matched = sources.filter(
-          (row) =>
-            (!args.where.sourceType || row.sourceType === args.where.sourceType) &&
-            (!args.where.sourceId || row.sourceId === args.where.sourceId),
-        );
-        return [...new Set(matched.map((row) => row.subjectId))].map((subjectId) => ({ subjectId }));
-      },
     },
+    $transaction: async <T>(work: (client: unknown) => Promise<T>): Promise<T> => work(prisma),
   };
 
-  return { prisma: prisma as unknown as PrismaService, subjects, assets, sources };
+  return { prisma: prisma as unknown as PrismaService, subjects, repositories, awsAccounts };
 }
 
 /** Minimal stand-in for EvaluationSubjectService.getOrCreateSubject. */
 function fakeSubjectService(prisma: PrismaService) {
   return {
     getOrCreateSubject: async (descriptor: {
+      subjectType: string;
       kind: string;
-      scopeType: string;
-      scopeId: string;
       subjectKey: string;
       displayName: string;
       metadata?: Record<string, unknown>;
@@ -152,10 +140,9 @@ function fakeSubjectService(prisma: PrismaService) {
       };
       return evaluationSubject.upsert({
         where: {
-          kind_scopeType_scopeId_subjectKey: {
+          subjectType_kind_subjectKey: {
+            subjectType: descriptor.subjectType,
             kind: descriptor.kind,
-            scopeType: descriptor.scopeType,
-            scopeId: descriptor.scopeId,
             subjectKey: descriptor.subjectKey,
           },
         },
@@ -174,65 +161,122 @@ function serviceWith(fake: ReturnType<typeof fakePrisma>) {
   return new SecurityEvaluationAssetService(fake.prisma, fakeSubjectService(fake.prisma) as never);
 }
 
-test("ingest is idempotent per (subject, source)", async () => {
+test("repository ingest derives the natural key and its material row", async () => {
   const fake = fakePrisma();
   const service = serviceWith(fake);
 
-  const submission = {
-    kind: "repository",
-    subjectKey: "repo-1",
-    displayName: "owner/repo",
-    sourceType: "project",
-    sourceId: "project-1",
-  };
-  const first = await service.ingest([submission]);
-  const second = await service.ingest([submission]);
-
-  assert.equal(fake.subjects.length, 1);
-  assert.equal(fake.assets.length, 1);
-  assert.equal(fake.sources.length, 1);
-  assert.equal(second[0].subjectId, first[0].subjectId);
-  assert.equal(second[0].assetId, first[0].assetId);
-  assert.equal(fake.subjects[0].scopeType, "platform");
-  assert.equal(fake.sources[0].lastSubmittedAt >= fake.sources[0].firstSubmittedAt, true);
-});
-
-test("one subject, two provenance rows when two projects submit the same asset", async () => {
-  const fake = fakePrisma();
-  const service = serviceWith(fake);
-
-  await service.ingest([
-    { kind: "repository", subjectKey: "repo-1", displayName: "owner/repo", sourceType: "project", sourceId: "p-1" },
-    { kind: "repository", subjectKey: "repo-1", displayName: "owner/repo", sourceType: "project", sourceId: "p-2" },
+  const [result] = await service.ingest([
+    {
+      kind: "repository",
+      displayName: "WorldZhy/Devbie",
+      repository: {
+        provider: "GitHub",
+        namespace: "WorldZhy",
+        name: "Devbie",
+        url: "https://github.com/worldzhy/devbie",
+      },
+    },
   ]);
 
   assert.equal(fake.subjects.length, 1);
-  assert.equal(fake.assets.length, 1);
-  assert.equal(fake.sources.length, 2);
-  assert.deepEqual(fake.sources.map((source) => source.sourceId).sort(), ["p-1", "p-2"]);
+  assert.equal(fake.subjects[0].subjectKey, "github:worldzhy/devbie");
+  // The display name keeps the original casing; identity does not.
+  assert.equal(fake.subjects[0].displayName, "WorldZhy/Devbie");
+  assert.equal(fake.repositories.length, 1);
+  assert.equal(fake.repositories[0].subjectId, result.subjectId);
+  assert.deepEqual(
+    { ...fake.repositories[0], id: undefined, subjectId: undefined },
+    {
+      id: undefined,
+      subjectId: undefined,
+      provider: "github",
+      namespace: "worldzhy",
+      name: "devbie",
+      url: "https://github.com/worldzhy/devbie",
+      isActive: true,
+    },
+  );
 });
 
-test("distinct subject keys stay distinct; source filter resolves them", async () => {
+test("ingest is idempotent per natural coordinate, including casing variants", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  const [first] = await service.ingest([
+    {
+      kind: "repository",
+      displayName: "worldzhy/devbie",
+      repository: { provider: "github", namespace: "worldzhy", name: "devbie" },
+    },
+  ]);
+  // Two projects declaring the same repository with different casing.
+  const [second] = await service.ingest([
+    {
+      kind: "repository",
+      displayName: "WorldZhy/Devbie",
+      repository: { provider: "GitHub", namespace: "WorldZhy", name: "Devbie" },
+    },
+  ]);
+
+  assert.equal(fake.subjects.length, 1);
+  assert.equal(fake.repositories.length, 1);
+  assert.equal(second.subjectId, first.subjectId);
+});
+
+test("re-ingest refreshes the material row instead of duplicating it", async () => {
   const fake = fakePrisma();
   const service = serviceWith(fake);
 
   await service.ingest([
-    { kind: "repository", subjectKey: "repo-1", displayName: "one", sourceType: "project", sourceId: "p-1" },
-    { kind: "repository", subjectKey: "repo-2", displayName: "two", sourceType: "project", sourceId: "p-1" },
-    { kind: "aws-account", subjectKey: "123456789012", displayName: "acct", sourceType: "project", sourceId: "p-2" },
+    { kind: "repository", displayName: "o/r", repository: { provider: "github", namespace: "o", name: "r" } },
+  ]);
+  await service.ingest([
+    {
+      kind: "repository",
+      displayName: "o/r",
+      repository: { provider: "github", namespace: "o", name: "r", url: "https://github.com/o/r" },
+    },
+  ]);
+
+  assert.equal(fake.repositories.length, 1);
+  assert.equal(fake.repositories[0].url, "https://github.com/o/r");
+});
+
+test("distinct repositories and aws accounts stay distinct", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  await service.ingest([
+    { kind: "repository", displayName: "one", repository: { provider: "github", namespace: "o", name: "one" } },
+    { kind: "repository", displayName: "two", repository: { provider: "github", namespace: "o", name: "two" } },
+    { kind: "aws-account", displayName: "acct", awsAccount: { accountId: "123456789012" } },
   ]);
 
   assert.equal(fake.subjects.length, 3);
-  assert.equal(fake.assets.length, 3);
-  assert.equal(fake.sources.length, 3);
+  assert.equal(fake.repositories.length, 2);
+  assert.equal(fake.awsAccounts.length, 1);
+});
 
-  assert.equal(await service.listSubjectIdsBySource({}), null);
-  assert.deepEqual(await service.listSubjectIdsBySource({ scopeType: "project", scopeId: "p-1" }), [
-    fake.subjects[0].id,
-    fake.subjects[1].id,
+test("aws-account ingest normalizes regions and the account id", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  await service.ingest([
+    {
+      kind: "aws-account",
+      displayName: "acct",
+      awsAccount: {
+        accountId: " 123456789012 ",
+        defaultRegion: " us-east-1 ",
+        regions: ["us-east-1", " us-east-1 ", "", "eu-west-1"],
+      },
+    },
   ]);
-  assert.deepEqual(await service.listSubjectIdsBySource({ scopeId: "p-2" }), [fake.subjects[2].id]);
-  assert.deepEqual(await service.listSubjectIdsBySource({ scopeType: "project", scopeId: "missing" }), []);
+
+  assert.equal(fake.subjects[0].subjectKey, "123456789012");
+  assert.equal(fake.awsAccounts.length, 1);
+  assert.equal(fake.awsAccounts[0].defaultRegion, "us-east-1");
+  assert.deepEqual(fake.awsAccounts[0].regions, ["us-east-1", "eu-west-1"]);
 });
 
 test("ingest registers the credential reference; a re-registration refreshes it, an omitted one keeps it", async () => {
@@ -241,10 +285,8 @@ test("ingest registers the credential reference; a re-registration refreshes it,
 
   const submission = {
     kind: "aws-account",
-    subjectKey: "123456789012",
     displayName: "acct",
-    sourceType: "project",
-    sourceId: "p-1",
+    awsAccount: { accountId: "123456789012" },
     credentialRef: "aws-binding:binding-1",
   };
   await service.ingest([submission]);
@@ -254,14 +296,40 @@ test("ingest registers the credential reference; a re-registration refreshes it,
   await service.ingest([{ ...submission, credentialRef: "aws-binding:binding-2" }]);
   assert.equal(fake.subjects.length, 1);
   assert.equal(fake.subjects[0].credentialRef, "aws-binding:binding-2");
+});
 
-  // A submission without the field (e.g. a repository ingest) never clears it.
-  await service.ingest([
-    { kind: "repository", subjectKey: "repo-1", displayName: "o/r", sourceType: "project", sourceId: "p-1" },
-  ]);
-  assert.equal(fake.subjects[1].credentialRef, null);
-  await service.ingest([
-    { kind: "repository", subjectKey: "repo-1", displayName: "o/r", sourceType: "project", sourceId: "p-1" },
-  ]);
-  assert.equal(fake.subjects[0].credentialRef, "aws-binding:binding-2");
+test("a submitted key may echo the derived key but never override it", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  const base = {
+    kind: "repository",
+    displayName: "o/r",
+    repository: { provider: "github", namespace: "o", name: "r" },
+  };
+  await service.ingest([{ ...base, subjectKey: "github:o/r" }]);
+  assert.equal(fake.subjects.length, 1);
+
+  await assert.rejects(service.ingest([{ ...base, subjectKey: "repo-1" }]), /does not match the natural key/);
+});
+
+test("material kinds reject submissions without their material", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  await assert.rejects(
+    service.ingest([{ kind: "repository", displayName: "o/r" }]),
+    /requires its repository coordinate/,
+  );
+  await assert.rejects(service.ingest([{ kind: "aws-account", displayName: "acct" }]), /requires its accountId/);
+});
+
+test("other kinds still carry their own subject key", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  await service.ingest([{ kind: "web-origin", subjectKey: "https://example.com", displayName: "example.com" }]);
+  assert.equal(fake.subjects[0].subjectKey, "https://example.com");
+
+  await assert.rejects(service.ingest([{ kind: "web-origin", displayName: "example.com" }]), /requires its subjectKey/);
 });

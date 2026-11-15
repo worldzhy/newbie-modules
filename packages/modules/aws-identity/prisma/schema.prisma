@@ -23,9 +23,13 @@
 // identity and the active identity keeps serving. The pending value is
 // promoted (and the old external ID retired) only after the candidate role
 // has been assumed successfully.
+//
+// name is a platform-side label used to identify the account in the UI. It
+// is never derived from AWS and does not affect credential resolution.
 model AwsCrossAccountBinding {
   id                String                       @id @default(uuid()) @db.Uuid
   accountId         String                       @unique
+  name              String?
   roleArn           String?                      @unique
   externalId        String                       @unique
   pendingExternalId String?

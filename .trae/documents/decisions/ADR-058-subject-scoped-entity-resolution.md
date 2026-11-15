@@ -1,6 +1,6 @@
 # ADR-058: INTEL 实体供给改为按 subject 解析（subject-scoped entity resolution）
 
-状态：已采纳（2026-11-13 用户批准方案 B）
+状态：已采纳（2026-11-13 用户批准方案 B；「跨宿主 / 演进检验」表中主体坐标行与 D2.3 的负缓存键存储由 ADR-068 取代——`${kind}:${subjectKey}` 单列字符串改存为 `subjectKind` + `subjectKey` 两列，逻辑键不变）
 日期：2026-11-13
 
 > 归属：registry 模块契约变更（`packages/modules/security-evaluation` 的 SPI 形状）→ 本仓。宿主侧实施（`ProjectSecurityProfileService` 改为按 subject 解析实体）归 nightwatch-backend，随本决策同步改造。

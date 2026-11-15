@@ -34,7 +34,7 @@ export class GetWorkEvaluationByIdRequestDto {
   id!: string;
 }
 
-// --- Criteria versions (skeleton administration, pinned to kind "work") ---
+// --- Criteria versions (skeleton administration, pinned to kind "developer") ---
 
 /**
  * Structured feature metadata of a criteria version (spec §5): the floor rules
@@ -81,10 +81,10 @@ export class WorkEvaluationCriterionMetadataDto {
 }
 
 export class CreateWorkEvaluationRuleSetVersionRequestDto {
-  @ApiProperty({ description: 'Feature-defined criteria evaluationKey, e.g. "rubric"' })
+  @ApiProperty({ description: 'Feature-defined criteria standardKey, e.g. "rubric"' })
   @IsString()
   @IsNotEmpty()
-  evaluationKey!: string;
+  standardKey!: string;
 
   @ApiProperty({ description: 'Semantic version string, e.g. "v0.1"' })
   @IsString()
@@ -104,10 +104,10 @@ export class CreateWorkEvaluationRuleSetVersionRequestDto {
 }
 
 export class ListWorkEvaluationRuleSetVersionsRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({ description: "Filter by criteria evaluationKey" })
+  @ApiPropertyOptional({ description: "Filter by criteria standardKey" })
   @IsOptional()
   @IsString()
-  evaluationKey?: string;
+  standardKey?: string;
 
   @ApiPropertyOptional({ description: "Include draft (unpublished) versions — defaults to published only" })
   @IsOptional()
@@ -150,7 +150,7 @@ export class CreateWorkEvaluationCriterionRequestDto {
 export class WorkEvaluationRuleSetVersionResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() kind!: string;
-  @ApiProperty() evaluationKey!: string;
+  @ApiProperty() standardKey!: string;
   @ApiProperty() version!: string;
   @ApiPropertyOptional() description?: string | null;
   @ApiPropertyOptional({ type: WorkEvaluationRuleSetVersionMetadataDto })
@@ -177,14 +177,14 @@ export class WorkEvaluationCriterionResponseDto {
 // --- Evaluation periods ------------------------------------------------
 
 export class CreateWorkEvaluationPeriodRequestDto {
-  @ApiProperty({ description: 'Published criteria version (kind "work") this period is judged against' })
+  @ApiProperty({ description: 'Published criteria version (kind "developer") this period is judged against' })
   @IsUUID()
   @IsNotEmpty()
   ruleSetVersionId!: string;
 
   @ApiProperty({ type: String, enum: WorkEvaluationPeriodType })
   @IsEnum(WorkEvaluationPeriodType)
-  type!: WorkEvaluationPeriodType;
+  phase!: WorkEvaluationPeriodType;
 
   @ApiProperty()
   @Type(() => Date)
@@ -204,16 +204,16 @@ export class UpdateWorkEvaluationPeriodStatusRequestDto {
 }
 
 export class ListWorkEvaluationPeriodsRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({ enum: WorkEvaluationPeriodType, description: "Filter by period type" })
+  @ApiPropertyOptional({ enum: WorkEvaluationPeriodType, description: "Filter by period phase" })
   @IsOptional()
   @IsEnum(WorkEvaluationPeriodType)
-  type?: WorkEvaluationPeriodType;
+  phase?: WorkEvaluationPeriodType;
 }
 
 export class WorkEvaluationPeriodResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() ruleSetVersionId!: string;
-  @ApiProperty() type!: WorkEvaluationPeriodType;
+  @ApiProperty() phase!: WorkEvaluationPeriodType;
   @ApiProperty() periodStart!: Date;
   @ApiProperty() periodEnd!: Date;
   @ApiProperty({ enum: WorkEvaluationPeriodStatus }) status!: WorkEvaluationPeriodStatus;
@@ -227,7 +227,7 @@ export class UpdateWorkEvaluationHomeGroundRequestDto {
   @ApiProperty({ description: "Who declares the specialty circle (evaluatee userId)" })
   @IsUUID()
   @IsNotEmpty()
-  evaluateeUserId!: string;
+  developerId!: string;
 
   @ApiProperty()
   @IsUUID()
@@ -242,7 +242,7 @@ export class UpdateWorkEvaluationHomeGroundRequestDto {
 
 export class WorkEvaluationHomeGroundResponseDto {
   @ApiProperty() id!: string;
-  @ApiProperty() evaluateeUserId!: string;
+  @ApiProperty() developerId!: string;
   @ApiProperty() collectionPeriodId!: string;
   @ApiProperty({ type: String, isArray: true }) homeCriteria!: string[];
   @ApiProperty() declaredAt!: Date;
@@ -253,7 +253,7 @@ export class WorkEvaluationHomeGroundResponseDto {
 export class GetWorkEvaluationHomeGroundRequestDto {
   @ApiProperty({ description: "Evaluatee whose home-ground declaration is read" })
   @IsUUID()
-  evaluateeUserId!: string;
+  developerId!: string;
 
   @ApiProperty({ description: "Collection period of the declaration" })
   @IsUUID()
@@ -268,12 +268,12 @@ export class ListWorkEvaluationWorkspacesRequestDto {
   })
   @IsOptional()
   @IsUUID()
-  evaluateeUserId?: string;
+  developerId?: string;
 }
 
 export class WorkEvaluationWorkspaceResponseDto {
   @ApiProperty() id!: string;
-  @ApiProperty() evaluateeUserId!: string;
+  @ApiProperty() developerId!: string;
   @ApiProperty() workspaceKey!: string;
   @ApiProperty() rootPath!: string;
   @ApiPropertyOptional() installationId?: string | null;
@@ -286,7 +286,7 @@ export class ListWorkEvaluationSessionsRequestDto extends CommonListRequestDto {
   })
   @IsOptional()
   @IsUUID()
-  evaluateeUserId?: string;
+  developerId?: string;
 
   @ApiPropertyOptional({ description: "Restrict to one collection period" })
   @IsOptional()
@@ -296,12 +296,12 @@ export class ListWorkEvaluationSessionsRequestDto extends CommonListRequestDto {
 
 export class WorkEvaluationSessionResponseDto {
   @ApiProperty() id!: string;
-  @ApiProperty() evaluateeUserId!: string;
+  @ApiProperty() developerId!: string;
   @ApiPropertyOptional() collectionPeriodId?: string | null;
   @ApiProperty() externalSessionId!: string;
   @ApiProperty() workspaceKey!: string;
-  @ApiProperty() model!: string;
-  @ApiProperty({ description: 'Transcript origin: "claude" / "codex" / "trae-memory"' }) source!: string;
+  @ApiProperty() modelId!: string;
+  @ApiProperty({ description: 'Transcript origin: "claude" / "codex" / "trae-memory"' }) transcriptSource!: string;
   @ApiProperty() turnCount!: number;
   @ApiProperty() messageCount!: number;
   @ApiProperty() toolCallCount!: number;
@@ -320,7 +320,7 @@ export class ListWorkEvaluationDeclaredDocumentsRequestDto extends CommonListReq
   })
   @IsOptional()
   @IsUUID()
-  evaluateeUserId?: string;
+  developerId?: string;
 }
 
 /** Query part of `GET /work-evaluation/evidence/documents/:id` (the path carries the document id). */
@@ -330,15 +330,15 @@ export class GetWorkEvaluationDeclaredDocumentRequestDto {
   })
   @IsOptional()
   @IsUUID()
-  evaluateeUserId?: string;
+  developerId?: string;
 }
 
 export class WorkEvaluationDeclaredDocumentResponseDto {
   @ApiProperty() id!: string;
-  @ApiProperty() evaluateeUserId!: string;
+  @ApiProperty() developerId!: string;
   @ApiProperty() workspaceKey!: string;
   @ApiProperty() title!: string;
-  @ApiProperty() refPath!: string;
+  @ApiProperty() path!: string;
   @ApiPropertyOptional() description?: string | null;
   @ApiPropertyOptional({
     description:
@@ -452,9 +452,9 @@ export class WorkEvaluationSessionDto {
   })
   @IsOptional()
   @IsEnum(WorkEvaluationSessionSource)
-  source?: WorkEvaluationSessionSource;
+  transcriptSource?: WorkEvaluationSessionSource;
 
-  @ApiPropertyOptional() @IsOptional() @IsString() model?: string;
+  @ApiPropertyOptional() @IsOptional() @IsString() modelId?: string;
   @ApiProperty() @IsNumber() turnCount!: number;
   @ApiProperty() @IsNumber() messageCount!: number;
   @ApiProperty() @IsNumber() toolCallCount!: number;
@@ -498,7 +498,7 @@ export class WorkEvaluationDeclaredDocumentDto {
   @ApiProperty({ description: "Workspace-relative path — stable identity of the document" })
   @IsString()
   @IsNotEmpty()
-  refPath!: string;
+  path!: string;
   @ApiPropertyOptional() @IsOptional() @IsString() description?: string;
   @ApiProperty({ description: "Document content, already redacted client-side" })
   @IsString()
@@ -527,7 +527,7 @@ export class CreateWorkEvaluationInstallationRequestDto {
   @ApiProperty({ description: "Evaluatee userId the token is allowed to report for" })
   @IsUUID()
   @IsNotEmpty()
-  evaluateeUserId!: string;
+  developerId!: string;
 
   @ApiPropertyOptional({ description: "Host the installation agent runs on (informational)" })
   @IsOptional()
@@ -539,13 +539,13 @@ export class ListWorkEvaluationInstallationsRequestDto {
   @ApiPropertyOptional({ description: "Filter by evaluatee userId" })
   @IsOptional()
   @IsUUID()
-  evaluateeUserId?: string;
+  developerId?: string;
 }
 
 export class WorkEvaluationInstallationResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() label!: string;
-  @ApiProperty() evaluateeUserId!: string;
+  @ApiProperty() developerId!: string;
   @ApiPropertyOptional() hostname?: string | null;
   @ApiPropertyOptional() firstSeenAt?: Date | null;
   @ApiPropertyOptional() lastSeenAt?: Date | null;
@@ -577,7 +577,7 @@ export class WorkEvaluationInstallationCredentialResponseDto extends WorkEvaluat
 export class StartWorkEvaluationRunRequestDto {
   @ApiProperty({ description: "Member (user id) to evaluate; the work subject is registered lazily" })
   @IsUUID()
-  evaluateeUserId!: string;
+  developerId!: string;
 
   @ApiProperty({ description: "COLLECTION period that has started; pins the criteria version and the evidence window" })
   @IsUUID()
@@ -619,10 +619,10 @@ export class WorkEvaluationRunResponseDto {
   @ApiProperty() subjectId!: string;
   @ApiProperty() ruleSetVersionId!: string;
   @ApiProperty({ enum: EvaluationRunStatus }) status!: EvaluationRunStatus;
-  @ApiPropertyOptional({ type: String }) requestedByRef?: string | null;
-  @ApiPropertyOptional({ type: Object }) config?: object | null;
+  @ApiPropertyOptional({ type: String }) requestedBy?: string | null;
+  @ApiPropertyOptional({ type: Object }) judgmentConfig?: object | null;
   @ApiPropertyOptional({ description: "Failure reason when status is FAILED", type: String })
-  error?: string | null;
+  failureReason?: string | null;
   @ApiPropertyOptional({ type: Date }) startedAt?: Date | null;
   @ApiPropertyOptional({ type: Date }) finishedAt?: Date | null;
   @ApiProperty() createdAt!: Date;
@@ -648,7 +648,7 @@ export class WorkEvaluationResultResponseDto {
   @ApiProperty() runId!: string;
   @ApiProperty() subjectId!: string;
   @ApiProperty() ruleSetVersionId!: string;
-  @ApiProperty({ description: "SHA-256 over the canonical manifest" }) contentHash!: string;
+  @ApiProperty({ description: "SHA-256 over the archived evidence manifest" }) manifestHash!: string;
   @ApiProperty({ type: Object, description: "{ evaluated, declaredUnlinked, skipped } coverage buckets" })
   coverageStats!: object;
   @ApiProperty({ type: Object, isArray: true, description: "Scored verdicts by criterionKey" })
@@ -664,9 +664,8 @@ export class WorkEvaluationResultResponseDto {
     description: "Supervisor verdict on the archived conclusion (ADR-031)",
   })
   reviewStatus?: EvaluationResultReviewStatus | null;
-  @ApiPropertyOptional({ type: String, description: "Host actor reference who recorded the review" })
-  reviewedByRef?: string | null;
-  @ApiPropertyOptional({ type: Date }) reviewedAt?: Date | null;
+  @ApiPropertyOptional({ type: Date, description: "When the review was recorded" })
+  reviewedAt?: Date | null;
   @ApiPropertyOptional({ type: String, description: "Reviewer's note; cleared when a re-review omits it" })
   reviewNote?: string | null;
   @ApiProperty() createdAt!: Date;
@@ -675,25 +674,20 @@ export class WorkEvaluationResultResponseDto {
 export class ListWorkEvaluationResultsResponseDto extends CommonListResponseDto<WorkEvaluationResultResponseDto> {}
 
 export class ListWorkEvaluationSubjectsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Host-assigned scope type the subjects are listed under" })
-  @IsString()
-  @IsNotEmpty()
-  scopeType!: string;
-
   @ApiPropertyOptional({
-    description: "Restrict to one scope coordinate; omitted lists every subject under the scope type",
+    description: "Restrict to one subject's stable natural key; omitted lists every work subject",
   })
   @IsOptional()
   @IsString()
-  scopeId?: string;
+  subjectKey?: string;
 }
 
-/** Mirrors the skeleton's EvaluationSubject row (kind is always "work" here). */
+/** Mirrors the skeleton's EvaluationSubject row (kind is always "developer" here). */
 export class WorkEvaluationSubjectResponseDto {
   @ApiProperty() id!: string;
+  @ApiProperty({ description: 'Owning feature key — always "work-evaluation" in this directory' })
+  subjectType!: string;
   @ApiProperty() kind!: string;
-  @ApiProperty() scopeType!: string;
-  @ApiProperty() scopeId!: string;
   @ApiProperty() subjectKey!: string;
   @ApiProperty() displayName!: string;
   @ApiPropertyOptional({ type: Object }) metadata?: object | null;

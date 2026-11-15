@@ -73,26 +73,23 @@ describe("work-evaluation evidence reads", () => {
     await controller.listDocuments(request(CALLER), {});
 
     assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0].args[0], { evaluateeUserId: CALLER });
+    assert.deepEqual(calls[0].args[0], { developerId: CALLER });
     assert.equal(requirementCalls.length, 0);
   });
 
   it("rejects a cross-member list when the caller holds no manager permission", async () => {
     const { controller } = buildController({ allowed: false });
 
-    await assert.rejects(
-      controller.listSessions(request(CALLER), { evaluateeUserId: OTHER_MEMBER }),
-      ForbiddenException,
-    );
+    await assert.rejects(controller.listSessions(request(CALLER), { developerId: OTHER_MEMBER }), ForbiddenException);
   });
 
   it("allows a cross-member list with the manager permission on the model", async () => {
     const { controller, calls, requirementCalls } = buildController({ allowed: true });
 
-    await controller.listWorkspaces(request(CALLER), { evaluateeUserId: OTHER_MEMBER });
+    await controller.listWorkspaces(request(CALLER), { developerId: OTHER_MEMBER });
 
     assert.equal(calls.length, 1);
-    assert.deepEqual(calls[0].args[0], { evaluateeUserId: OTHER_MEMBER });
+    assert.deepEqual(calls[0].args[0], { developerId: OTHER_MEMBER });
     assert.deepEqual(requirementCalls, [
       { resource: Prisma.ModelName.WorkEvaluationWorkspace, action: PermissionAction.List },
     ]);
@@ -101,7 +98,7 @@ describe("work-evaluation evidence reads", () => {
   it("binds a document read to the resolved evaluatee", async () => {
     const { controller, calls } = buildController({ allowed: true });
 
-    await controller.getDocument({ id: DOCUMENT_ID }, { evaluateeUserId: OTHER_MEMBER }, request(CALLER));
+    await controller.getDocument({ id: DOCUMENT_ID }, { developerId: OTHER_MEMBER }, request(CALLER));
 
     assert.deepEqual(calls[0].args, [DOCUMENT_ID, OTHER_MEMBER]);
   });

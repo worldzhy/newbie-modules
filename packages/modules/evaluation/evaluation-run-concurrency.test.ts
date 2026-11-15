@@ -35,8 +35,6 @@ function fakePrisma() {
           ? {
               id: SUBJECT_ID,
               kind: SUBJECT_KIND,
-              scopeType: "project",
-              scopeId: "scope",
               subjectKey: "repo",
               displayName: "repo",
             }
@@ -45,7 +43,7 @@ function fakePrisma() {
     evaluationRuleSetVersion: {
       findUnique: async ({ where }: { where: { id: string } }) =>
         where.id === VERSION_ID
-          ? { id: VERSION_ID, kind: SUBJECT_KIND, evaluationKey: "npm-osv", publishedAt: new Date() }
+          ? { id: VERSION_ID, subjectKind: SUBJECT_KIND, standardKey: "npm-osv", publishedAt: new Date() }
           : null,
     },
     evaluationRun: {

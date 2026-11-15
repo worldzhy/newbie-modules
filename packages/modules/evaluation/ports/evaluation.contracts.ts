@@ -16,15 +16,11 @@
  */
 export type EvaluationFindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
-/** The host-assigned coordinate that bounds a subject listing (ADR-020 D1). */
-export interface EvaluationScope {
-  scopeType: string;
-  scopeId: string;
-}
-
 /**
- * A subject as its feature describes it. `subjectKey` is the feature's stable
- * natural identity inside the scope — the skeleton never derives it.
+ * A subject as its feature describes it (ADR-068, ADR-069). Identity is
+ * `(subjectType, kind, subjectKey)`; `subjectType` is the feature key that owns
+ * the subject, and `subjectKey` is the feature's stable natural identity inside
+ * the kind — the skeleton never derives any of them.
  *
  * `credentialRef` is an opaque pointer to host-held credentials, captured at
  * registration time when evaluating the subject requires them. The skeleton
@@ -33,9 +29,8 @@ export interface EvaluationScope {
  * previously stored value.
  */
 export interface EvaluationSubjectDescriptor {
+  subjectType: string;
   kind: string;
-  scopeType: string;
-  scopeId: string;
   subjectKey: string;
   displayName: string;
   metadata?: Record<string, unknown>;
@@ -45,9 +40,8 @@ export interface EvaluationSubjectDescriptor {
 /** A stored subject, detached from Prisma. */
 export interface EvaluationSubjectRef {
   id: string;
+  subjectType: string;
   kind: string;
-  scopeType: string;
-  scopeId: string;
   subjectKey: string;
   displayName: string;
   /** Opaque host-side credential pointer registered at ingest; null when none. */
@@ -57,8 +51,8 @@ export interface EvaluationSubjectRef {
 /** A published criteria version, detached from Prisma. */
 export interface EvaluationRuleSetVersionRef {
   id: string;
-  kind: string;
-  evaluationKey: string;
+  subjectKind: string;
+  standardKey: string;
   version: string;
 }
 

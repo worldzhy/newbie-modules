@@ -5,14 +5,17 @@
 // * NotificationRecord                                           //
 // * NotificationReceipt                                          //
 // * NotificationCenterSetting                                    //
+// * NotificationDeliveryRule                                     //
+// * NotificationDeliveryAttempt                                  //
 // * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
 
-// Per-notification delivery settings. Business code declares a notification
-// at startup (a Notification subclass registering itself through
-// NotificationRegistryService) and NotificationSettingService persists one
-// row per key. The database row wins for runtime-editable fields
-// (defaultSeverity, isPushEnabled): declarations only create
-// missing rows, never override operator edits.
+// Per-notification delivery settings. Business code declares a notification at
+// startup (a Notification subclass registering itself through
+// NotificationRegistryService) and NotificationSettingService persists one row
+// per key. The database row wins for the runtime-editable field
+// (isPushEnabled): declarations only create missing rows, never override
+// operator edits. Severity is not stored here: it belongs to the producer and
+// is passed on every notify() (ADR-062 "severity contract").
 model NotificationSetting {
   key            String    @id @db.VarChar(100)
   name           String    @db.VarChar(255)
@@ -20,7 +23,6 @@ model NotificationSetting {
   titleTemplate  String    @db.VarChar(512)
   // Optional multi-line detail template.
   detailTemplate String?   @db.Text
-  defaultSeverity String   @db.VarChar(10)
   // Per-notification push master switch; the center master switch must also
   // be on for a push to fire.
   isPushEnabled  Boolean   @default(true)
@@ -42,8 +44,7 @@ model NotificationRecord {
   id        String   @id @default(uuid()) @db.Uuid
   // Key of the notification this record was produced from.
   notificationKey String @db.VarChar(100)
-  // Resolved severity for this delivery (notification default or an explicit
-  // override passed to notify()).
+  // Severity supplied by the producer for this delivery (ADR-062).
   severity  String   @db.VarChar(10)
   title     String   @db.VarChar(512)
   detail    String?  @db.Text
@@ -58,15 +59,20 @@ model NotificationRecord {
   projectId String?  @db.Uuid
   // Frontend relative path the notification deep-links to.
   link      String?  @db.VarChar(512)
-  // Lifecycle phase for alert-style notifications: "firing" (default) or
-  // "recovered". Plain notifications ignore it; the frontend uses it to pair
-  // firing/recovered records and dim recovered ones (ADR-051).
+  // Lifecycle state of alert-kind messages: "firing" (default) or "resolved".
+  // Plain event notifications keep "firing"; the frontend uses it to pair and
+  // dim resolved records (ADR-051, ADR-065).
   status    String    @db.VarChar(10) @default("firing")
-  // When this record represents a recovered alert.
+  // Delivery time of the resolved event of this record.
   recoveredAt DateTime?
+  // Where this delivery came from (ADR-065): "alert" for records produced by
+  // the alert domain, "event" for plain event producers. No database foreign
+  // key crosses domains — the id is a string.
+  sourceType String? @db.VarChar(20)
+  sourceRef  String? @db.VarChar(100)
   createdAt DateTime @default(now())
 
-  receipts NotificationReceipt[]
+  receipts     NotificationReceipt[]
   pushFailures NotificationPushFailure[]
 
   @@unique([deduplicationKey])
@@ -74,6 +80,7 @@ model NotificationRecord {
   @@index([notificationKey])
   @@index([projectId])
   @@index([status])
+  @@index([sourceType, sourceRef])
   @@schema("module/notification-center")
 }
 
@@ -121,11 +128,52 @@ model NotificationCenterSetting {
   // notification push only fires when both this switch and the notification's
   // own isPushEnabled are on.
   isPushEnabled Boolean @default(false)
-  // Notifications below this severity are dropped before delivery.
-  minimumSeverity String @default("high") @db.VarChar(10)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@schema("module/notification-center")
+}
+
+// Ordered delivery rules (ADR-062). The first enabled rule whose condition
+// matches decides the delivery; when nothing matches, delivery is suppressed.
+// Rules are evaluated per delivery instead of being frozen on an alert: the
+// alert lives in its own domain (ADR-065) and its severity is stable across
+// firing and resolved, so both land on the same side of the rules. Two default
+// rules are seeded on a fresh install so high and critical signals keep pushing
+// without any operator action.
+model NotificationDeliveryRule {
+  id        String   @id @default(uuid()) @db.Uuid
+  // Ascending evaluation order; lower runs first.
+  priority  Int      @unique
+  // DeliveryCondition object: state, severityAtLeast, notificationKeys,
+  // projectIds, tags. Absent fields do not filter; `[]` never matches.
+  condition Json
+  action    String   @db.VarChar(10)
+  isEnabled Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@schema("module/notification-center")
+}
+
+// One row per delivery decision (ADR-062). Makes every push or suppression
+// explainable: which rule decided it and, when suppressed, why.
+model NotificationDeliveryAttempt {
+  id       String   @id @default(uuid()) @db.Uuid
+  recordId String   @db.Uuid
+  decision String   @db.VarChar(10)
+  reason   String?  @db.VarChar(40)
+  ruleId   String?  @db.Uuid
+  // Real-time interception reason (ADR-063): subscription-off |
+  // recovery-opt-out | channel-off | no-port. Kept apart from `reason` so a
+  // rule can deliver while the runtime segment keeps the push in-app.
+  runtimeReason String? @db.VarChar(40)
+
+  createdAt DateTime @default(now())
+
+  @@index([recordId])
+  @@index([createdAt])
   @@schema("module/notification-center")
 }

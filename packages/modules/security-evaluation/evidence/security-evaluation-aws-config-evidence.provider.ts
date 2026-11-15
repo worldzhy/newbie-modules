@@ -55,7 +55,6 @@ export class SecurityEvaluationAwsConfigEvidenceProvider implements EvidenceProv
       );
     }
 
-    const asset = await this.assets.getOrCreateAsset(subject);
     const observedAt = new Date();
     const collection = await access.collect(subject);
 
@@ -68,11 +67,10 @@ export class SecurityEvaluationAwsConfigEvidenceProvider implements EvidenceProv
     }
 
     await this.assets.upsertAwsConfigKnowledgeItems(
-      asset.id,
+      subject.id,
       collection.items.map((item) => ({ type: item.type, key: item.key, value: item.value })),
       observedAt,
     );
-    await this.assets.touchObserved(asset.id, observedAt);
 
     const items = collection.items.map((item): EvaluationEvidenceItem => {
       const region = typeof item.value.region === "string" ? item.value.region : null;
@@ -89,20 +87,20 @@ export class SecurityEvaluationAwsConfigEvidenceProvider implements EvidenceProv
     return {
       items,
       declaredUnlinked: { total: 0 },
-      skipped: this.computeSkipped(collection.failures, ruleSetVersion.evaluationKey),
+      skipped: this.computeSkipped(collection.failures, ruleSetVersion.standardKey),
     };
   }
 
   /**
-   * Map collection failures onto the criteria of the run's evaluationKey that
+   * Map collection failures onto the criteria of the run's standardKey that
    * needed the missing knowledge: account-level failures skip the whole control
    * (`<criterionKey>`), resource-level failures skip one resource of it
    * (`<criterionKey>:<key>`).
    */
-  private computeSkipped(failures: readonly AwsConfigFailure[], evaluationKey: string): EvaluationCoverageBucket {
+  private computeSkipped(failures: readonly AwsConfigFailure[], standardKey: string): EvaluationCoverageBucket {
     const items = new Set<string>();
     const notes: string[] = [];
-    const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
+    const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.standardKey === standardKey);
     for (const failure of failures) {
       const affected = entries.filter((entry) => entry.requiredKnowledgeTypes.includes(failure.type));
       for (const entry of affected) {

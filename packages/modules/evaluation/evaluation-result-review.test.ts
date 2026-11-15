@@ -25,13 +25,12 @@ interface FakeResultRow {
   runId: string;
   subjectId: string;
   ruleSetVersionId: string;
-  contentHash: string;
+  manifestHash: string;
   coverageStats: object;
   verdicts: object;
   summary: string | null;
   metadata: Record<string, unknown> | null;
   reviewStatus: "APPROVED" | "REJECTED" | null;
-  reviewedByRef: string | null;
   reviewedAt: Date | null;
   reviewNote: string | null;
   createdAt: Date;
@@ -43,13 +42,12 @@ function fakePrisma() {
     runId: "run-1",
     subjectId: SUBJECT_ID,
     ruleSetVersionId: VERSION_ID,
-    contentHash: "hash-1",
+    manifestHash: "hash-1",
     coverageStats: {},
     verdicts: {},
     summary: null,
     metadata: null,
     reviewStatus: null,
-    reviewedByRef: null,
     reviewedAt: null,
     reviewNote: null,
     createdAt: CREATED_AT,
@@ -85,29 +83,24 @@ function serviceFor(prisma: PrismaService) {
   return new EvaluationResultService(prisma, {} as never);
 }
 
-test("a review records the supervisor verdict, reviewer and note; the snapshot stays untouched", async () => {
+test("a review records the supervisor verdict and note; the snapshot stays untouched", async () => {
   const { prisma, row, lastWrite } = fakePrisma();
   const service = serviceFor(prisma);
 
   const reviewed = await service.reviewResult({
     id: RESULT_ID,
     reviewStatus: EvaluationResultReviewStatus.APPROVED,
-    reviewedByRef: "user-1",
     note: "Conclusion matches the transcripts I checked",
   });
 
   assert.equal(reviewed.reviewStatus, "APPROVED");
-  assert.equal(reviewed.reviewedByRef, "user-1");
   assert.ok(reviewed.reviewedAt instanceof Date);
   assert.equal(reviewed.reviewNote, "Conclusion matches the transcripts I checked");
 
   // The review write touches only the review columns — the archived snapshot
   // fields are not part of it.
-  assert.deepEqual(
-    Object.keys(lastWrite() ?? {}).sort(),
-    ["reviewNote", "reviewStatus", "reviewedByRef", "reviewedAt"].sort(),
-  );
-  assert.equal(row.contentHash, "hash-1");
+  assert.deepEqual(Object.keys(lastWrite() ?? {}).sort(), ["reviewNote", "reviewStatus", "reviewedAt"].sort());
+  assert.equal(row.manifestHash, "hash-1");
   assert.equal(row.createdAt.getTime(), CREATED_AT.getTime());
 });
 
@@ -118,17 +111,14 @@ test("a re-review overwrites the whole review state; an omitted note clears the 
   await service.reviewResult({
     id: RESULT_ID,
     reviewStatus: EvaluationResultReviewStatus.REJECTED,
-    reviewedByRef: "user-1",
     note: "Not trustworthy — checksum mismatch with the transcript",
   });
   const endorsed = await service.reviewResult({
     id: RESULT_ID,
     reviewStatus: EvaluationResultReviewStatus.APPROVED,
-    reviewedByRef: "user-2",
   });
 
   assert.equal(endorsed.reviewStatus, "APPROVED");
-  assert.equal(endorsed.reviewedByRef, "user-2");
   assert.ok(endorsed.reviewedAt instanceof Date);
   assert.equal(endorsed.reviewNote, null);
   assert.equal(row.reviewStatus, "APPROVED");
@@ -143,7 +133,6 @@ test("REJECTED without a note is a BadRequest — supervisors must justify an ov
     service.reviewResult({
       id: RESULT_ID,
       reviewStatus: EvaluationResultReviewStatus.REJECTED,
-      reviewedByRef: "user-1",
     }),
     (error: unknown) =>
       error instanceof Error && error.message.includes("note is required when reviewStatus is REJECTED"),
@@ -159,7 +148,6 @@ test("REJECTED with a whitespace-only note is also a BadRequest", async () => {
     service.reviewResult({
       id: RESULT_ID,
       reviewStatus: EvaluationResultReviewStatus.REJECTED,
-      reviewedByRef: "user-1",
       note: "   ",
     }),
     (error: unknown) => error instanceof Error && error.message.includes("note is required"),
@@ -175,7 +163,6 @@ test("reviewing an unknown result is a NotFound, not a write", async () => {
     service.reviewResult({
       id: "99999999-9999-4999-8999-999999999999",
       reviewStatus: EvaluationResultReviewStatus.REJECTED,
-      reviewedByRef: "user-1",
       note: "Not trustworthy",
     }),
     (error: unknown) => error instanceof Error && error.message.includes("not found"),

@@ -15,7 +15,7 @@ import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 /**
  * WorkEvaluationEvidenceProvider — the EvidenceProvider for subject kind
- * "work" (ADR-024, spec §4.2). Declared layer only: workspaces, collected
+ * "developer" (ADR-024, spec §4.2). Declared layer only: workspaces, collected
  * sessions, declared documents and the home-ground declaration.
  *
  * The declared workspace set is an allowlist: sessions and documents whose
@@ -25,7 +25,7 @@ import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
  * drills in through its read-only tools (skeleton evidence-payload rule).
  *
  * The manifest is part of what the model sees under a blind subject id, so
- * workspace rootPath and document refPath never enter summaries, refs or
+ * workspace rootPath and document path never enter summaries, refs or
  * payloads — ids and workspace keys only. Session touchedFiles are the one
  * member-supplied path that does enter a payload, because which files a session
  * touched is evidence; the judgment redactor masks their home-directory login
@@ -50,23 +50,23 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
     // the window, and the subject's key is the evaluatee.
     const period = await this.periods.getPeriodById(requirePeriodId(runConfig));
     const window = { since: period.periodStart, until: period.periodEnd };
-    const evaluateeUserId = subject.subjectKey;
+    const developerId = subject.subjectKey;
 
     const [workspaces, sessions, documents, homeGround] = await Promise.all([
-      this.prisma.workEvaluationWorkspace.findMany({ where: { evaluateeUserId } }),
+      this.prisma.workEvaluationWorkspace.findMany({ where: { developerId } }),
       this.prisma.workEvaluationSession.findMany({
-        where: { evaluateeUserId, startedAt: { gte: window.since, lt: window.until } },
+        where: { developerId, startedAt: { gte: window.since, lt: window.until } },
         orderBy: { startedAt: "asc" },
       }),
       this.prisma.workEvaluationDeclaredDocument.findMany({
-        where: { evaluateeUserId, capturedAt: { gte: window.since, lt: window.until } },
+        where: { developerId, capturedAt: { gte: window.since, lt: window.until } },
         orderBy: { capturedAt: "asc" },
         // The manifest needs index fields only; content stays in Postgres and
         // is read back through the judgment drill tools by document id.
         select: { id: true, workspaceKey: true, capturedAt: true },
       }),
       this.prisma.workEvaluationHomeGround.findUnique({
-        where: { evaluateeUserId_collectionPeriodId: { evaluateeUserId, collectionPeriodId: period.id } },
+        where: { developerId_collectionPeriodId: { developerId, collectionPeriodId: period.id } },
       }),
     ]);
 
@@ -92,14 +92,14 @@ export class WorkEvaluationEvidenceProvider implements EvidenceProvider {
         id: `session:${session.id}`,
         layer: "declared",
         source: "session",
-        summary: `${session.messageCount} messages, ${session.turnCount} turns, ${session.toolCallCount} tool calls (${session.model || "unknown model"}, ${session.source})`,
+        summary: `${session.messageCount} messages, ${session.turnCount} turns, ${session.toolCallCount} tool calls (${session.modelId || "unknown model"}, ${session.transcriptSource})`,
         observedAt: session.startedAt,
         payload: {
           sessionId: session.id,
           externalSessionId: session.externalSessionId,
           workspaceKey: session.workspaceKey,
-          source: session.source,
-          model: session.model,
+          source: session.transcriptSource,
+          model: session.modelId,
           toolNames: session.toolNames ?? [],
           touchedFiles: session.touchedFiles ?? [],
           durationMs: session.durationMs,

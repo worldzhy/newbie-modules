@@ -1,24 +1,52 @@
+/** Feature key this module registers subjects under (ADR-069). */
+export const SECURITY_EVALUATION_SUBJECT_TYPE = "security-evaluation";
+
 /** Subject kinds owned by this feature (ADR-022). Kebab-case, like "work". */
 export const SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY = "repository";
 export const SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT = "aws-account";
+export const SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN = "web-origin";
 
 export const SECURITY_EVALUATION_SUBJECT_KINDS = [
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
+  SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
 ] as const;
 
 export type SecurityEvaluationSubjectKind = (typeof SECURITY_EVALUATION_SUBJECT_KINDS)[number];
 
 /**
- * The feature is platform-level (ADR-039 nightwatch-backend): one subject per
- * natural asset in the whole deployment, regardless of which project supplied
- * it. The coordinate is a module constant so hosts never pick the value; the
- * project (or any other supplier) is recorded on the subject's source rows.
+ * Path roles a rule may target on a web origin (ADR-066 §1). Rules never embed
+ * URLs: they declare the semantic slot they need, and the asset owns the
+ * "role → relative path" map, so a ruleset change never forks per asset and an
+ * unconfigured role simply skips the criterion.
  */
-export const SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE = "platform";
-export const SECURITY_EVALUATION_PLATFORM_SCOPE_ID = "deployment";
+export const SECURITY_EVALUATION_WEB_ORIGIN_PATH_ROLES = ["auth.login", "auth.otp-request", "api.session"] as const;
 
-/** Evaluation keys. Each evaluationKey is a versioned rule set within an EvaluationCategory (ADR-037). */
+export type SecurityEvaluationWebOriginPathRole = (typeof SECURITY_EVALUATION_WEB_ORIGIN_PATH_ROLES)[number];
+
+/** Ownership-verification states of a web-origin asset (ADR-044 §2). */
+export const SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_STATUSES = [
+  "PENDING",
+  "VERIFIED",
+  "FAILED",
+  "REVOKED",
+] as const;
+
+export type SecurityEvaluationWebOriginVerificationStatus =
+  (typeof SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_STATUSES)[number];
+
+/** How a host proves it controls an origin (ADR-044 §2). */
+export const SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS = ["DNS_TXT", "WELL_KNOWN"] as const;
+
+export type SecurityEvaluationWebOriginVerificationMethod =
+  (typeof SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS)[number];
+
+/** Protocol constants of the two verification channels. */
+export const SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX = "_nightwatch-verify";
+export const SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX = "nightwatch-verify=";
+export const SECURITY_EVALUATION_WEB_ORIGIN_WELL_KNOWN_PATH = "/.well-known/nightwatch-verification.txt";
+
+/** Evaluation keys. Each standardKey is a versioned rule set within an EvaluationCategory (ADR-037). */
 export const SECURITY_EVALUATION_KEY_NPM_OSV = "npm-osv";
 export const SECURITY_EVALUATION_KEY_AWS_CIS_1_5 = "aws-cis-1.5";
 export const SECURITY_EVALUATION_KEY_AWS_CUSTOM = "aws-custom";
@@ -162,27 +190,27 @@ export const SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS_MAX = 365;
  */
 export const SECURITY_EVALUATION_SCHEDULES = [
   {
-    evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV,
+    standardKey: SECURITY_EVALUATION_KEY_NPM_OSV,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
     recommendedInterval: "daily",
   },
   {
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
     recommendedInterval: "daily",
   },
   {
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
     recommendedInterval: "daily",
   },
   {
-    evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
+    standardKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
     recommendedInterval: "hourly",
   },
   {
-    evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+    standardKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
     recommendedInterval: "daily",
   },

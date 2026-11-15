@@ -3,46 +3,62 @@
 The security feature on the evaluation skeleton (ADR-020), replacing the siloed
 `dependency-scan` / `aws-audit` / `threat-intelligence` reports one mechanism at
 a time (ADR-022). The legacy modules keep running unchanged; this module adds a
-parallel, asset-centred track and never reads or writes their tables.
+parallel, subject-centred track and never reads or writes their tables.
 
-Shipped slices: **assets + DEPENDENCY** and **AWS_CONFIG** (ADR-027). INTEL
+Shipped slices: **subjects + DEPENDENCY** and **AWS_CONFIG** (ADR-027). INTEL
 lands in a later slice on the same run and finding lifecycle.
 
 ## Vocabulary
 
-| Term           | Meaning                                                                                                                                                                                                                                                                                                                                        |
-| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Subject        | The skeleton's `EvaluationSubject` row. `kind` is `repository` or `aws-account`; the coordinate is the module's `platform` constant (ADR-039) — projects are provenance, not scope. Subjects of kinds that need host credentials carry an opaque `credentialRef` registered at ingest.                                                         |
-| Asset          | This module's `SecurityEvaluationAsset`, one-to-one with a subject. Owns `firstSeenAt` / `lastSeenAt` and the current-state knowledge items.                                                                                                                                                                                                   |
-| Knowledge item | `SecurityEvaluationAwsConfigKnowledgeItem` / `SecurityEvaluationNpmPackageKnowledgeItem`: something observed about an asset right now (`type`, `key`, small intrinsic `value`); `SecurityEvaluationThreatKnowledgeItem` is the world-scoped intel sibling. Items are upserted, never deleted here; history lives in the archived run manifest. |
-| Criteria       | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                                                                                                                                                    |
-| Finding        | Skeleton `EvaluationFinding` with identity `(subjectId, evaluationKey, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                                                                                                                                                |
-| Urgency        | Derived band P1–P4 from severity and exposure. Not a stored score and not a composite.                                                                                                                                                                                                                                                         |
+| Term           | Meaning                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Subject        | The skeleton's `EvaluationSubject` row and this feature's only identity. `kind` is `repository`, `aws-account` or `web-origin`; the coordinate is `(subjectType, kind, subjectKey)` with `subjectType = "security-evaluation"` (ADR-068, ADR-069). Subjects of kinds that need host credentials carry an opaque `credentialRef` registered at ingest. Provenance lives in the host, not here. |
+| Web origin     | `SecurityEvaluationWebOrigin`, one-to-one with a web-origin subject. Owns `environment`, the `targetPaths` role map, and the ownership-verification lifecycle (token, method, status, timestamps). Identity stays on the subject (`subjectKey` = normalized origin, `displayName` = label).                                                                                                   |
+| Repository     | `SecurityEvaluationRepository`, one-to-one with a repository subject: the evaluation-side copy of the coordinate (`provider`, `namespace`, `name`, `url`). Natural key `provider:namespace/name` (lowercased); the host's own repository record stays the host's truth (ADR-070 D1, D2).                                                                                                      |
+| AWS account    | `SecurityEvaluationAwsAccount`, one-to-one with an aws-account subject: `accountId` (the natural key, 12 digits), `defaultRegion`, `regions`. Credentials stay a host concern and live on the subject's `credentialRef` (ADR-070 D1, D2).                                                                                                                                                     |
+| Knowledge item | `SecurityEvaluationAwsConfigKnowledgeItem` / `SecurityEvaluationNpmPackageKnowledgeItem`: something observed about a subject right now (`type`, `key`, small intrinsic `value`); `SecurityEvaluationThreatKnowledgeItem` is the world-scoped intel sibling. Items are upserted, never deleted here; history lives in the archived run manifest.                                               |
+| Criteria       | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                                                                                                                                                                                                   |
+| Finding        | Skeleton `EvaluationFinding` with identity `(subjectId, standardKey, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                                                                                                                                                                                                 |
+| Urgency        | Derived band P1–P4 from severity and exposure. Not a stored score and not a composite.                                                                                                                                                                                                                                                                                                        |
 
 ## Subject kinds and scopes
 
-- `repository` — evidence is the repository's `package-lock.json`.
+- `repository` — evidence is the repository's `package-lock.json`. Identity is
+  the natural coordinate `provider:namespace/name` (GitHub owner / Bitbucket
+  workspace both map to `namespace`, all lowercase); a monorepo is one subject
+  no matter how many applications point at it.
 - `aws-account` — evidence is the account's configuration knowledge, collected
-  through the host-bound `AwsConfigAccess` port. Nightwatch maps one
-  configured `awsCrossAccountBinding` to one subject and registers the
-  binding's credential reference (`aws-binding:<id>`) on the subject at ingest;
-  evidence collection resolves exactly that reference, never a derived one.
+  through the host-bound `AwsConfigAccess` port. The 12-digit account id is the
+  subject key, so a binding can be recreated without orphaning history.
+  Nightwatch registers the binding's credential reference
+  (`aws-binding:<id>`) on the subject at ingest; evidence collection resolves
+  exactly that reference, never a derived one.
+- `web-origin` — a deployment registered by `SecurityEvaluationWebOriginService`.
+  `create` writes the platform subject and the web-origin record in one
+  transaction; `origin` is normalized to `scheme://host[:port]` (lowercase,
+  punycode, default ports omitted) and becomes the subject's `subjectKey`.
+  Evaluation is gated on ownership verification: only `isActive` and `VERIFIED`
+  origins are submitted, and `listActiveVerified` lazily re-verifies them after
+  the configured interval (ADR-044). Verification reads go through the optional
+  host-bound `SECURITY_EVALUATION_VERIFICATION_FETCH_ACCESS` port.
 
 Hosts declare subjects by calling `POST /security-evaluation/subjects/sync` with
-one subject and the source that supplied it (`sourceType` / `sourceId`, opaque
-strings). Kinds whose evaluation needs host credentials (today: `aws-account`)
-also carry a `credentialRef` — an opaque pointer the module stores verbatim and
-threads to the evidence port; it is captured at this registration point so
-collection never rediscovers credentials through provenance. The module upserts
-the platform-level subject, materialises its asset
-and records a `SecurityEvaluationAssetSource` row; a second project referencing
-the same repository adds provenance instead of a second subject. Ingest is
-upsert-only: a subject that disappears from the host is not deleted, because
-removal semantics are still an open decision (ADR-022).
+one subject (`kind`, `displayName`). `repository` submissions carry their
+coordinate (`repository: { provider, namespace, name, url? }`) and
+`aws-account` submissions their `awsAccount: { accountId, defaultRegion?,
+regions? }`; the module normalizes it, derives the subject key and upserts the
+material row in the same transaction — a host id is never submitted. Other kinds
+pass `subjectKey` directly. Kinds whose evaluation needs host credentials
+(today: `aws-account`) also carry a `credentialRef` — an opaque pointer the
+module stores verbatim and threads to the evidence port; it is captured at this
+registration point so collection never rediscovers credentials.
+The module upserts the platform-level subject; a second project referencing the
+same repository reuses the same subject, run history and findings. Ingest is
+upsert-only; retiring a material row is not designed (ADR-070 D5).
 
-Reads are platform-wide. The optional `scopeType` / `scopeId` query pair filters
-by provenance (e.g. "only what project X submitted") and never authorizes
-anything — access is the system-level permission grant (ADR-039 D3).
+Reads are platform-wide with an optional `subjectId` filter. There is no
+provenance coordinate and no scope filter (ADR-068 D8) — access is the
+system-level permission grant (ADR-039 D3).
 
 ## Knowledge types
 
@@ -69,7 +85,7 @@ anything — access is the system-level permission grant (ADR-039 D3).
 Each CIS criterion carries `controlId`, `severity`, `remediation` and
 `knowledgeRequirements` in its metadata; the judgment reads severity from there, and
 the seed and the rulebook draw from one source. A rule change ships as a new
-version of the evaluationKey, never an in-place edit.
+version of the standardKey, never an in-place edit.
 
 ## Port bindings
 
@@ -79,7 +95,7 @@ The module implements the skeleton's kind-scoped ports for both kinds:
 - `EVALUATION_EVIDENCE:repository` → `SecurityEvaluationEvidenceProvider`
 - `EVALUATION_EVIDENCE:aws-account` → `SecurityEvaluationAwsConfigEvidenceProvider`
 - `EVALUATION_JUDGMENT:{repository|aws-account}` → `SecurityEvaluationJudgmentService`
-  (looks up the mechanisms declared for `ruleSetVersion.evaluationKey` in the
+  (looks up the mechanisms declared for `ruleSetVersion.standardKey` in the
   registry: `npm-osv` → `dependency`, `aws-cis-1.5` / `aws-custom` → `aws-config`,
   `threat-intel` → `intel`, `code-scan` → `code-llm`, then merges their
   judgments, ADR-046)
@@ -140,9 +156,9 @@ An unreadable lockfile, an unsupported lockfile format, a lockfile resolving
 zero packages, or a cloud account whose knowledge all failed to collect fails the
 run. An empty evaluated set must never surface as a clean result.
 
-The report adds one asset-level bucket beside the per-result buckets:
+The report adds one subject-level bucket beside the per-result buckets:
 
-- `unevaluable` — assets whose subject kind requires a registered credential
+- `unevaluable` — subjects whose kind requires a registered credential
   reference (`aws-account`) and none is stored, so no run over them can collect
   evidence at all. Surfacing them separately keeps an un-integrated subject
   from reading as coverage.
@@ -154,11 +170,11 @@ trigger conditions:
 
 ```ts
 SECURITY_EVALUATION_SCHEDULES = [
-  { evaluationKey: "npm-osv", subjectKind: "repository", recommendedInterval: "daily" },
-  { evaluationKey: "aws-cis-1.5", subjectKind: "aws-account", recommendedInterval: "daily" },
-  { evaluationKey: "aws-custom", subjectKind: "aws-account", recommendedInterval: "daily" },
-  { evaluationKey: "threat-intel", subjectKind: "repository", recommendedInterval: "hourly" },
-  { evaluationKey: "code-scan", subjectKind: "repository", recommendedInterval: "daily" },
+  { standardKey: "npm-osv", subjectKind: "repository", recommendedInterval: "daily" },
+  { standardKey: "aws-cis-1.5", subjectKind: "aws-account", recommendedInterval: "daily" },
+  { standardKey: "aws-custom", subjectKind: "aws-account", recommendedInterval: "daily" },
+  { standardKey: "threat-intel", subjectKind: "repository", recommendedInterval: "hourly" },
+  { standardKey: "code-scan", subjectKind: "repository", recommendedInterval: "daily" },
 ];
 ```
 
@@ -169,7 +185,7 @@ call per file against five risk-category ASSERTION criteria
 (`code-scan.injection`, `code-scan.auth-boundary`, `code-scan.secret-exposure`,
 `code-scan.crypto-misuse`, `code-scan.dangerous-config`). It never auto-fires:
 a repository subject stays on `npm-osv` unless the run carries
-`config.evaluationKey: "code-scan"` (or the host schedules it explicitly).
+`judgmentConfig.standardKey: "code-scan"` (or the host schedules it explicitly).
 
 Judgment identity and caching:
 
@@ -196,16 +212,16 @@ criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
 
 ## Endpoints
 
-| Method | Path                                                   | Purpose                                                                                             |
-| ------ | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
-| POST   | `/security-evaluation/subjects/sync`                   | Ingest one subject with its provenance source (idempotent).                                         |
-| GET    | `/security-evaluation/assets`                          | Asset inventory, platform-wide or provenance-filtered.                                              |
-| GET    | `/security-evaluation/assets/:assetId/knowledge-items` | Current-state knowledge items of one asset.                                                         |
-| POST   | `/security-evaluation/runs`                            | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously. |
-| GET    | `/security-evaluation/runs`                            | Run history, platform-wide or provenance/subject-filtered.                                          |
-| GET    | `/security-evaluation/results`                         | Archived results (manifest excluded).                                                               |
-| GET    | `/security-evaluation/findings`                        | Findings with evaluationKey / status / severity filters (platform-wide or provenance-filtered).     |
-| GET    | `/security-evaluation/report`                          | Single-axis report: assets, coverage, findings, trend, MTTR (platform-wide or provenance-filtered). |
+| Method | Path                                                       | Purpose                                                                                                     |
+| ------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| POST   | `/security-evaluation/subjects/sync`                       | Ingest one platform-level subject plus its material row (idempotent per `(subjectType, kind, subjectKey)`). |
+| GET    | `/security-evaluation/subjects`                            | Subject directory, optionally filtered by kind.                                                             |
+| GET    | `/security-evaluation/subjects/:subjectId/knowledge-items` | Current-state knowledge items of one subject.                                                               |
+| POST   | `/security-evaluation/runs`                                | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously.         |
+| GET    | `/security-evaluation/runs`                                | Run history, platform-wide or subject-filtered.                                                             |
+| GET    | `/security-evaluation/results`                             | Archived results (manifest excluded).                                                                       |
+| GET    | `/security-evaluation/findings`                            | Findings with standardKey / status / severity filters (platform-wide or subject-filtered).                  |
+| GET    | `/security-evaluation/report`                              | Single-axis report: subjects, coverage, findings, trend, MTTR (platform-wide or subject-filtered).          |
 
 ## Limitations
 
@@ -217,9 +233,9 @@ criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
 - Data source is osv.dev; an OSV outage degrades coverage (skipped packages), it
   does not silently pass.
 - The CIS catalog covers the initial ten controls only; catalog growth is a new
-  evaluationKey version. Cloud findings carry exposure `internal` until a reachability
+  standardKey version. Cloud findings carry exposure `internal` until a reachability
   signal exists, so urgency derives no relief.
-- The report has no composite score and no cross-evaluationKey weighting (ADR-020 D5.3,
+- The report has no composite score and no cross-standardKey weighting (ADR-020 D5.3,
   ADR-022 D6). A second axis is a later milestone, not a field to sneak in.
 - CODE_SCAN judgment is per file: there is no cross-file dataflow analysis, so
   a vulnerability whose source and sink live in different files is out of

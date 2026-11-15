@@ -1,11 +1,12 @@
-import { ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { Injectable } from "@nestjs/common";
 import { UserStatus } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import {
   AccessTokenSessionResolver,
   ResolvedAccessTokenSession,
 } from "@modules/security/ports/access-token-session.resolver";
-import { INACTIVE_ACCOUNT_MESSAGE } from "@modules/account/auth/inactive-account";
+import { inactiveAccountError } from "@modules/account/auth/inactive-account";
 
 /**
  * Account-side binding of security's AccessTokenSessionResolver port:
@@ -32,14 +33,17 @@ export class AccountAccessTokenSessionResolver implements AccessTokenSessionReso
       },
     });
 
+    // The token verified, but its session row is gone: signed out, kicked, or
+    // the owning account was deleted (sessions cascade). Nothing can bring this
+    // credential back, so the client must sign in again.
     if (!session) {
-      throw new UnauthorizedException("Invalid access token");
+      throw new NewbieException(NewbieExceptionType.Session_Revoked);
     }
 
     // Disabled/deleted users keep no valid access until re-enabled,
     // regardless of unexpired tokens issued earlier.
     if (session.user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException(INACTIVE_ACCOUNT_MESSAGE);
+      throw inactiveAccountError();
     }
 
     const roles = session.user.roles.map((ur) => ur.role.name);

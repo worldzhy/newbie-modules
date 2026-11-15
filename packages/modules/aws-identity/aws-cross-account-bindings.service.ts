@@ -12,7 +12,7 @@ import { ConfigService } from "@nestjs/config";
 import { defaultProvider } from "@aws-sdk/credential-provider-node";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import type { AwsCrossAccountBinding } from "@generated/prisma/client";
-import { UpsertAwsCrossAccountBindingDto } from "./aws-cross-account-bindings.dto";
+import { UpsertAwsCrossAccountBindingDto, UpdateAwsCrossAccountBindingNameDto } from "./aws-cross-account-bindings.dto";
 import {
   assumeRole,
   AwsCallerIdentity,
@@ -129,6 +129,23 @@ export class AwsCrossAccountBindingsService {
 
   async upsertAccountCredential(accountId: string, dto: UpsertAwsCrossAccountBindingDto) {
     const binding = await this.updateBinding(accountId, dto);
+    return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
+  }
+
+  /**
+   * Rename an account. The display name is platform-side metadata, not part of
+   * the identity exchange or the usage scope, so this path never probes STS and
+   * works for accounts whose role has not been configured yet.
+   */
+  async renameAccount(accountId: string, dto: UpdateAwsCrossAccountBindingNameDto) {
+    const existing = await this.getBindingByAccountId(accountId);
+    if (!existing) {
+      throw new NotFoundException("AWS cross-account binding is not bootstrapped");
+    }
+    const binding = await this.prisma.awsCrossAccountBinding.update({
+      where: { id: existing.id },
+      data: { name: dto.name?.trim() || null },
+    });
     return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());
   }
 
@@ -301,6 +318,11 @@ export class AwsCrossAccountBindingsService {
           ? null
           : dto.rotationLambdaArn.trim();
 
+    // The display name is platform-side metadata, not part of the identity
+    // exchange: omitted keeps the stored name, null or blank clears it. A
+    // rename therefore follows the same scope-edit path as the region list.
+    const name = dto.name === undefined ? (existing?.name ?? null) : dto.name?.trim() || null;
+
     // Identity unchanged: this is a scope edit. Re-probing STS would couple a
     // region edit to STS availability (and to unrelated credential outages),
     // and leaving a draft open would keep the UI in "rebinding" for an
@@ -308,7 +330,7 @@ export class AwsCrossAccountBindingsService {
     if (existing?.roleArn && existing.roleArn === roleArn) {
       return this.prisma.awsCrossAccountBinding.update({
         where: { id: existing.id },
-        data: { defaultRegion, regions, rotationLambdaArn, pendingExternalId: null },
+        data: { name, defaultRegion, regions, rotationLambdaArn, pendingExternalId: null },
       });
     }
 
@@ -342,6 +364,7 @@ export class AwsCrossAccountBindingsService {
             externalId: probeExternalId,
             pendingExternalId: null,
             roleName: identity.iamUserName ?? null,
+            name,
             rotationLambdaArn,
             defaultRegion,
             regions,
@@ -354,6 +377,7 @@ export class AwsCrossAccountBindingsService {
             roleArn,
             externalId: probeExternalId,
             roleName: identity.iamUserName ?? null,
+            name,
             rotationLambdaArn,
             defaultRegion,
             regions,
@@ -460,6 +484,20 @@ export class AwsCrossAccountBindingsService {
     const binding = await this.getBindingByConsumerId(projectId);
     if (!binding?.roleArn) {
       throw new BadRequestException("AWS cross-account role is not configured for this host scope");
+    }
+    return this.toResolvedCredentials(binding);
+  }
+
+  /**
+   * Resolve the cross-account role by AWS account id. Account-scoped consumers
+   * (e.g. aws-cloudwatch) address the binding directly instead of going through
+   * a project usage row, so the account is the scope key end to end.
+   * Throws when the account has no binding or no role configured.
+   */
+  async resolveAccountCredential(accountId: string): Promise<ResolvedAwsCredentials> {
+    const binding = await this.getBindingByAccountId(accountId);
+    if (!binding?.roleArn) {
+      throw new BadRequestException("AWS cross-account role is not configured for this account");
     }
     return this.toResolvedCredentials(binding);
   }
@@ -675,6 +713,7 @@ export class AwsCrossAccountBindingsService {
     return {
       id: binding.id,
       accountId: binding.accountId,
+      name: binding.name,
       roleArn: binding.roleArn,
       externalId: binding.externalId,
       pendingExternalId: binding.pendingExternalId,

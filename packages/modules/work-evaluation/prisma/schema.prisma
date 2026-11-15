@@ -37,14 +37,14 @@ enum WorkEvaluationPeriodStatus {
 
 /// An evaluation period: COLLECTION (monthly, evidence gathering) or
 /// REVIEW (quarterly, decision-making). Each period pins to exactly one
-/// published criteria version of the evaluation skeleton (kind "work") so
+/// published criteria version of the evaluation skeleton (kind "developer") so
 /// all members inside it are judged against the same rules. The pin is a
 /// plain scalar — no cross-schema relation by design.
 model WorkEvaluationPeriod {
   id                String @id @default(uuid()) @db.Uuid
   // EvaluationRuleSetVersion.id in "module/evaluation"; scalar, no FK
   ruleSetVersionId String @db.Uuid
-  type              WorkEvaluationPeriodType
+  phase             WorkEvaluationPeriodType
   periodStart       DateTime
   periodEnd         DateTime
   status            WorkEvaluationPeriodStatus @default(UPCOMING)
@@ -53,7 +53,7 @@ model WorkEvaluationPeriod {
   sessions    WorkEvaluationSession[]
 
   @@index([ruleSetVersionId])
-  @@index([type, periodStart])
+  @@index([phase, periodStart])
   @@schema("module/work-evaluation")
 }
 
@@ -62,7 +62,7 @@ model WorkEvaluationPeriod {
 /// declaration is context for the evaluation agent, never a scoring input.
 model WorkEvaluationHomeGround {
   id                 String @id @default(uuid()) @db.Uuid
-  evaluateeUserId    String @db.Uuid
+  developerId    String @db.Uuid
   collectionPeriodId String @db.Uuid
 
   homeCriteria Json @db.JsonB // criterionKey[]
@@ -70,8 +70,8 @@ model WorkEvaluationHomeGround {
 
   period WorkEvaluationPeriod @relation(fields: [collectionPeriodId], references: [id], onDelete: Cascade)
 
-  @@unique([evaluateeUserId, collectionPeriodId])
-  @@index([evaluateeUserId])
+  @@unique([developerId, collectionPeriodId])
+  @@index([developerId])
   @@schema("module/work-evaluation")
 }
 
@@ -81,7 +81,7 @@ model WorkEvaluationHomeGround {
 /// because undeclared paths are never reported.
 model WorkEvaluationWorkspace {
   id              String @id @default(uuid()) @db.Uuid
-  evaluateeUserId String @db.Uuid
+  developerId String @db.Uuid
 
   // IDE-side workspace identifier (stable across reports)
   workspaceKey String @db.VarChar(128)
@@ -94,8 +94,8 @@ model WorkEvaluationWorkspace {
 
   installation   WorkEvaluationInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
 
-  @@unique([evaluateeUserId, workspaceKey])
-  @@index([evaluateeUserId])
+  @@unique([developerId, workspaceKey])
+  @@index([developerId])
   @@schema("module/work-evaluation")
 }
 
@@ -105,16 +105,16 @@ model WorkEvaluationWorkspace {
 /// evaluation agent needs to decide whether to drill into the transcript.
 model WorkEvaluationSession {
   id                 String  @id @default(uuid()) @db.Uuid
-  evaluateeUserId    String  @db.Uuid
+  developerId    String  @db.Uuid
   collectionPeriodId String? @db.Uuid
 
   // Installation-side session identifier (stable, e.g. the IDE transcript id)
   externalSessionId String @db.VarChar(128)
   workspaceKey      String @db.VarChar(128)
-  model             String @default("") @db.VarChar(128)
+  modelId           String @default("") @db.VarChar(128)
   // Transcript origin: "claude" / "codex" (raw transcripts) or "trae-memory"
   // (the IDE's own session summaries — lower fidelity, never mixed up with raw).
-  source            String @default("claude") @db.VarChar(32)
+  transcriptSource  String @default("claude") @db.VarChar(32)
 
   turnCount     Int @default(0)
   messageCount  Int @default(0)
@@ -129,8 +129,8 @@ model WorkEvaluationSession {
 
   collectionPeriod WorkEvaluationPeriod? @relation(fields: [collectionPeriodId], references: [id], onDelete: SetNull)
 
-  @@unique([evaluateeUserId, externalSessionId])
-  @@index([evaluateeUserId, startedAt])
+  @@unique([developerId, externalSessionId])
+  @@index([developerId, startedAt])
   @@index([collectionPeriodId])
   @@schema("module/work-evaluation")
 }
@@ -141,19 +141,19 @@ model WorkEvaluationSession {
 /// fact-layer evidence before it can support a strong conclusion.
 model WorkEvaluationDeclaredDocument {
   id              String @id @default(uuid()) @db.Uuid
-  evaluateeUserId String @db.Uuid
+  developerId String @db.Uuid
   workspaceKey    String @db.VarChar(128)
 
   title       String  @db.VarChar(255)
-  refPath     String  @db.VarChar(512)
+  path        String  @db.VarChar(512)
   description String? @db.Text
   content     String  @db.Text
 
   capturedAt DateTime
   createdAt  DateTime @default(now())
 
-  @@unique([evaluateeUserId, workspaceKey, refPath])
-  @@index([evaluateeUserId])
+  @@unique([developerId, workspaceKey, path])
+  @@index([developerId])
   @@schema("module/work-evaluation")
 }
 
@@ -165,7 +165,7 @@ model WorkEvaluationDeclaredDocument {
 model WorkEvaluationInstallation {
   id               String  @id @default(uuid()) @db.Uuid
   label            String  @db.VarChar(128)
-  evaluateeUserId  String  @db.Uuid
+  developerId  String  @db.Uuid
   tokenHash        String  @unique @db.VarChar(64)
   hostname         String? @db.VarChar(255)
   firstSeenAt      DateTime?
@@ -176,6 +176,6 @@ model WorkEvaluationInstallation {
 
   workspaces WorkEvaluationWorkspace[]
 
-  @@index([evaluateeUserId])
+  @@index([developerId])
   @@schema("module/work-evaluation")
 }

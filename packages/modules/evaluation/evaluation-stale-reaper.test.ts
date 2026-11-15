@@ -23,16 +23,14 @@ const VERSION_ID = "33333333-3333-4333-8333-333333333333";
 const SUBJECT = {
   id: SUBJECT_ID,
   kind: "repository",
-  scopeType: "project",
-  scopeId: "scope-1",
   subjectKey: "repo",
   displayName: "repo",
 };
 
 const VERSION = {
   id: VERSION_ID,
-  kind: "repository",
-  evaluationKey: "npm-osv",
+  subjectKind: "repository",
+  standardKey: "npm-osv",
   version: "1.0.0",
   publishedAt: new Date(),
 };
@@ -42,10 +40,10 @@ function staleRun(id: string, updatedAt: Date): EvaluationRun {
     id,
     subjectId: SUBJECT_ID,
     ruleSetVersionId: VERSION_ID,
-    requestedByRef: null,
-    config: null,
+    requestedBy: null,
+    judgmentConfig: null,
     status: "RUNNING",
-    error: null,
+    failureReason: null,
     startedAt: new Date(updatedAt.getTime() - 1000),
     finishedAt: null,
     createdAt: new Date(updatedAt.getTime() - 2000),
@@ -87,11 +85,11 @@ test("the sweep selects only stale active rows and closes them with the shared e
   assert.equal(updates.length, 1);
   assert.deepEqual(updates[0].where, { id: "run-1", status: { in: ["QUEUED", "RUNNING"] }, updatedAt });
   assert.equal(updates[0].data.status, "FAILED");
-  assert.equal(updates[0].data.error, STALE_RUN_ERROR);
+  assert.equal(updates[0].data.failureReason, STALE_RUN_ERROR);
 
   assert.equal(reaped.length, 1);
   assert.equal(reaped[0].status, "FAILED");
-  assert.equal(reaped[0].error, STALE_RUN_ERROR);
+  assert.equal(reaped[0].failureReason, STALE_RUN_ERROR);
 });
 
 test("a row that lost the conditional write is not reported as reaped", async () => {
@@ -167,7 +165,7 @@ test("a reaped row publishes evaluation.run-failed with the row's persisted erro
   const row = {
     ...staleRun("run-stale", new Date(Date.now() - 60 * 60 * 1000)),
     status: "FAILED",
-    error: STALE_RUN_ERROR,
+    failureReason: STALE_RUN_ERROR,
     finishedAt: new Date(),
   } as unknown as EvaluationRun;
   const { runner, emitted, observed } = buildRunner({ reaped: [row] });
@@ -181,7 +179,7 @@ test("a reaped row publishes evaluation.run-failed with the row's persisted erro
     subjectId: SUBJECT_ID,
     subjectKind: "repository",
     ruleSetVersionId: VERSION_ID,
-    evaluationKey: "npm-osv",
+    standardKey: "npm-osv",
     status: "FAILED",
     error: STALE_RUN_ERROR,
   });
