@@ -2,28 +2,28 @@
 // This file is managed by @devbie/newbie-cli — assembled into the consumer
 // prisma tree on `newbie modules apply`.
 //
-// The skeleton holds no host vocabulary: no foreign keys point outside this
+// The skeleton holds no host vocabulary: no foreign key points outside this
 // schema, and every host-side identity is an opaque scalar (`requestedBy`,
-// `decider`). Operator columns are deliberately absent — who performed an
-// action is audited outside the skeleton (ADR-068).
+// `decider`). Operator columns are absent; who performed an action is audited
+// outside the skeleton (ADR-068).
 
-// !! ----------------------------------------------------------- //
-// !!                [Module] Evaluation models                   //
-// !! ----------------------------------------------------------- //
-// * EvaluationRuleSetVersion                                    //
-// * EvaluationCriterion                                          //
-// * EvaluationSubject                                            //
-// * EvaluationRun                                                //
-// * EvaluationResult                                             //
-// * EvaluationFinding                                            //
-// * EvaluationRemediationPlan                                    //
-// * EvaluationCriterionKind (enum)                               //
-// * EvaluationRunStatus (enum)                                   //
-// * EvaluationFindingStatus (enum)                               //
-// * EvaluationFindingSeverity (enum)                             //
-// * EvaluationRemediationStatus (enum)                           //
-// * EvaluationResultReviewStatus (enum)                          //
-// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!                  [Module] Evaluation models                  //
+// !! ------------------------------------------------------------ //
+// * EvaluationCriterionKind (enum)                                //
+// * EvaluationRunStatus (enum)                                    //
+// * EvaluationFindingStatus (enum)                                //
+// * EvaluationFindingSeverity (enum)                              //
+// * EvaluationRemediationStatus (enum)                            //
+// * EvaluationResultReviewStatus (enum)                           //
+// * EvaluationRuleSetVersion                                      //
+// * EvaluationCriterion                                           //
+// * EvaluationSubject                                             //
+// * EvaluationRun                                                 //
+// * EvaluationResult                                              //
+// * EvaluationFinding                                             //
+// * EvaluationRemediationPlan                                     //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 enum EvaluationCriterionKind {
   // Produces a verdict inside EvaluationResult.
@@ -78,11 +78,11 @@ enum EvaluationResultReviewStatus {
   @@schema("module/evaluation")
 }
 
-/// A frozen set of criteria a run is judged against (ADR-020 D5.5). A draft is
-/// editable; publishing is one-way, after which every write is rejected and
-/// changes require a new version. `subjectKind` is the subject kind these
-/// criteria apply to; `standardKey` is the feature-defined group (rubric,
-/// aws-cis-1.5, ...).
+/// One version of a criteria set that runs are judged against (ADR-020 D5.5).
+/// A draft is editable; publishing is one-way, after which every write is
+/// rejected and changes require a new version. `subjectKind` is the subject
+/// kind these criteria apply to; `standardKey` is the feature-defined group
+/// (rubric, aws-cis-1.5, ...).
 model EvaluationRuleSetVersion {
   id          String @id @default(uuid()) @db.Uuid
   subjectKind String @db.VarChar(64)
@@ -108,8 +108,8 @@ model EvaluationRuleSetVersion {
   @@schema("module/evaluation")
 }
 
-/// One criterion inside a version. `criterionKey` is unique inside the version
-/// and is the key verdicts and findings reference — never the row id, so a
+/// One criterion in a rule-set version. `criterionKey` is unique inside the
+/// version and is what verdicts and findings reference, never the row id, so a
 /// result stays interpretable after the version is superseded.
 model EvaluationCriterion {
   id                String @id @default(uuid()) @db.Uuid
@@ -133,17 +133,17 @@ model EvaluationCriterion {
   @@schema("module/evaluation")
 }
 
-/// The object being evaluated (ADR-020 D1, ADR-068, ADR-069). Identity is
-/// `(subjectType, kind, subjectKey)` — all three feature-defined; the skeleton
+/// The subject being evaluated (ADR-020 D1, ADR-068, ADR-069). Identity is
+/// `(subjectType, kind, subjectKey)`, all three feature-defined; the skeleton
 /// never derives them and knows no host entity. `subjectType` names the feature
 /// that submits the subject, so two features may evaluate the same kind without
 /// sharing a row.
 ///
-/// `credentialRef` is an opaque pointer the feature may register at ingest time
-/// when evaluating the subject requires host-held credentials (e.g. a cloud
-/// account binding). The skeleton stores and returns it verbatim; it never
-/// parses, resolves or dereferences it, and it plays no role in subject
-/// identity, provenance or authorization.
+/// `credentialRef` is an opaque pointer a feature may register at ingest when
+/// evaluating the subject needs host-held credentials (e.g. a cloud account
+/// binding). The skeleton stores and returns it verbatim; it never parses,
+/// resolves or dereferences it, and it takes no part in subject identity,
+/// provenance or authorization.
 model EvaluationSubject {
   id String @id @default(uuid()) @db.Uuid
 
@@ -170,10 +170,11 @@ model EvaluationSubject {
   @@schema("module/evaluation")
 }
 
-/// One evaluation attempt. Concurrency is enforced in the database, not in
-/// process memory: a partial unique index over the active statuses on
-/// (subjectId, ruleSetVersionId) — the consumer migration must declare it in
-/// raw SQL, Prisma cannot express partial indexes:
+/// One evaluation attempt: a subject judged against one rule-set version.
+/// Concurrency is enforced in the database, not in process memory, by a partial
+/// unique index over the active statuses on (subjectId, ruleSetVersionId). The
+/// consumer migration must declare it in raw SQL; Prisma cannot express partial
+/// indexes:
 ///
 ///   CREATE UNIQUE INDEX "EvaluationRun_one_active_per_subject_version"
 ///     ON "module/evaluation"."EvaluationRun" ("subjectId", "ruleSetVersionId")
@@ -184,12 +185,12 @@ model EvaluationRun {
   ruleSetVersionId String @db.Uuid
 
   status EvaluationRunStatus @default(QUEUED)
-  // Opaque host-side actor id; no foreign key by design
+  // Opaque host-side actor id; no foreign key
   requestedBy String? @db.VarChar(128)
-  // Opaque per-run feature config, threaded to the judgment port verbatim
+  // Opaque per-run feature config, passed verbatim to the judgment port
   // (ADR-023). The skeleton never reads a key from it.
   judgmentConfig Json? @db.JsonB
-  // Failure reason when status = FAILED. Message only, never a stack trace.
+  // Failure reason when status = FAILED; the message only, never a stack trace.
   failureReason String? @db.Text
 
   startedAt  DateTime?
@@ -211,12 +212,12 @@ model EvaluationRun {
   @@schema("module/evaluation")
 }
 
-/// The archived conclusion of one run (ADR-020 D5.1): `evidenceManifest`,
+/// The archived conclusion of one run (ADR-020 D5.1). `evidenceManifest`,
 /// `manifestHash` and `coverageStats` describe the material it was judged from
-/// and are never rewritten — a rerun writes a new row. The supervisor review
+/// and are never rewritten; a rerun writes a new row. The supervisor review
 /// columns (ADR-031) are the one lifecycle layer above the snapshot and never
-/// touch it. There is deliberately no composite score field (D5.3); multi-axis
-/// scores belong to the feature's read model.
+/// touch it. There is no composite score field (D5.3); multi-axis scores belong
+/// to the feature's read model.
 model EvaluationResult {
   id                String @id @default(uuid()) @db.Uuid
   runId             String @unique @db.Uuid
@@ -227,17 +228,18 @@ model EvaluationResult {
   evidenceManifest Json    @db.JsonB
   // SHA-256 over the canonical evidence manifest, computed by the skeleton
   manifestHash    String  @db.VarChar(64)
-  // { evaluated, declaredUnlinked, skipped } — each { total, bySource?, note?, items? }
+  // { evaluated, declaredUnlinked, skipped }, each { total, bySource?, note?, items? }
   coverageStats Json    @db.JsonB
 
-  // Scored verdicts: [{ criterionKey, score, confidence, coverage, evidenceRefs, rationale }]
+  // Scored verdicts:
+  // [{ criterionKey, score, confidence, coverage, evidenceRefs, rationale }]
   verdicts Json    @db.JsonB
   summary  String? @db.Text
   metadata Json?   @db.JsonB
 
   // Supervisor review of the archived conclusion (ADR-031). Every review is a
   // full-state write: a re-review overwrites time and note, so the row always
-  // reflects exactly the latest say. The actor is not stored here (ADR-068 D6):
+  // reflects the latest decision. The actor is not stored here (ADR-068 D6):
   // it is always the requester, and the audit log already records it.
   reviewStatus  EvaluationResultReviewStatus?
   reviewedAt    DateTime?
@@ -255,11 +257,11 @@ model EvaluationResult {
 }
 
 /// An assertion-type conclusion (ADR-020 D2). Unlike a verdict it has an
-/// identity — `(subjectId, standardKey, fingerprint)` — and a lifecycle that spans
-/// runs: first seen once, last seen by whichever run still observed it,
+/// identity, `(subjectId, standardKey, fingerprint)`, and a lifecycle that
+/// spans runs: first seen once, last seen by whichever run still observed it,
 /// resolved when it stops appearing. `standardKey` is copied from the run's
-/// criteria version, so a rerun under a new version of the same standardKey keeps
-/// the finding's identity, and one standardKey never resolves another standardKey's
+/// criteria version, so a rerun under a new version of the same standardKey
+/// keeps the finding's identity and never resolves another standardKey's
 /// findings. `firstSeenAt` is never rewritten.
 model EvaluationFinding {
   id        String @id @default(uuid()) @db.Uuid
@@ -284,7 +286,7 @@ model EvaluationFinding {
   firstSeenAt DateTime
   lastSeenAt  DateTime
   resolvedAt  DateTime?
-  // Mandatory when status = SUPPRESSED: why a human silenced this finding
+  // Required when status = SUPPRESSED: why a human silenced this finding
   suppressionNote String? @db.Text
   suppressedAt    DateTime?
 
@@ -301,10 +303,10 @@ model EvaluationFinding {
   @@schema("module/evaluation")
 }
 
-/// The remediation object (ADR-020 D1): findings or results a plan answers to,
-/// the checkpoints that track progress, and the named decider. `triggerIds`
-/// is validated against this schema's tables by the service — the plan can
-/// never be anchored on material that does not exist.
+/// A remediation plan for one subject (ADR-020 D1): the findings or results it
+/// answers to, the checkpoints that track progress, and the named decider.
+/// `triggerIds` is validated against this schema's tables by the service, so a
+/// plan can never be anchored on material that does not exist.
 model EvaluationRemediationPlan {
   id        String @id @default(uuid()) @db.Uuid
   subjectId String @db.Uuid
@@ -313,7 +315,7 @@ model EvaluationRemediationPlan {
 
   // Finding or result ids that triggered the plan; validated by the service
   triggerIds Json @db.JsonB
-  // The named decision maker (opaque host-side actor id) — required by D1
+  // The named decision maker (opaque host-side actor id), required by D1
   decider String @db.VarChar(128)
 
   startOn DateTime  @db.Date
@@ -321,7 +323,7 @@ model EvaluationRemediationPlan {
   // [{ dueDate, description, status }]
   checkpoints Json? @db.JsonB
 
-  // completed / failed / extended, recorded when the plan closes
+  // Decision note and time, recorded when the plan closes as COMPLETED or CANCELLED
   decisionNote String?   @db.Text
   decidedAt    DateTime?
 

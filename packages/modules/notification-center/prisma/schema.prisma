@@ -1,34 +1,33 @@
 // !! ------------------------------------------------------------ //
-// !!            [Module] Notification Center models         //
+// !!             [Module] Notification Center models              //
 // !! ------------------------------------------------------------ //
-// * NotificationSetting                                          //
-// * NotificationRecord                                           //
-// * NotificationReceipt                                          //
-// * NotificationCenterSetting                                    //
-// * NotificationDeliveryRule                                     //
-// * NotificationDeliveryAttempt                                  //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+// * NotificationSetting                                           //
+// * NotificationRecord                                            //
+// * NotificationReceipt                                           //
+// * NotificationPushFailure                                       //
+// * NotificationCenterSetting                                     //
+// * NotificationDeliveryRule                                      //
+// * NotificationDeliveryAttempt                                   //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// Per-notification delivery settings. Business code declares a notification at
-// startup (a Notification subclass registering itself through
-// NotificationRegistryService) and NotificationSettingService persists one row
-// per key. The database row wins for the runtime-editable field
-// (isPushEnabled): declarations only create missing rows, never override
-// operator edits. Severity is not stored here: it belongs to the producer and
-// is passed on every notify() (ADR-062 "severity contract").
+// Per-notification delivery settings, one row per notification key. Business
+// code declares a notification at startup (a Notification subclass registered
+// through NotificationRegistryService); declarations only create missing rows
+// and never override operator edits. Severity is not stored here: it belongs to
+// the producer and is passed on every notify() (ADR-062 "severity contract").
 model NotificationSetting {
   key            String    @id @db.VarChar(100)
   name           String    @db.VarChar(255)
   // Handlebars-style template rendered with the notify() context.
   titleTemplate  String    @db.VarChar(512)
-  // Optional multi-line detail template.
+  // Optional multi-line body, rendered with the same context as the title.
   detailTemplate String?   @db.Text
-  // Per-notification push master switch; the center master switch must also
-  // be on for a push to fire.
+  // Per-notification push switch; the center master switch must also be on for
+  // a push to fire.
   isPushEnabled  Boolean   @default(true)
   // Delivery scope: "system" notifications are platform-wide and pushed
-  // through the host-provided push port; "project" notifications are routed
-  // to the owning project's bound chats by the host.
+  // through the host-provided push port; "project" notifications are routed to
+  // the owning project's bound chats by the host.
   scope          String    @default("project") @db.VarChar(10)
 
   createdAt DateTime @default(now())
@@ -42,7 +41,7 @@ model NotificationSetting {
 // simply means "unread" for that user.
 model NotificationRecord {
   id        String   @id @default(uuid()) @db.Uuid
-  // Key of the notification this record was produced from.
+  // Registration key of the notification that produced this record.
   notificationKey String @db.VarChar(100)
   // Severity supplied by the producer for this delivery (ADR-062).
   severity  String   @db.VarChar(10)
@@ -51,8 +50,8 @@ model NotificationRecord {
   // Structured context passed to notify(); preserved for the notification
   // detail panels and downstream consumers.
   payload   Json?
-  // Optional idempotency key: when provided, notify() is a no-op if a row with
-  // the same key already exists. Nullable unique allows multiple nulls.
+  // Optional idempotency key: when set, notify() is a no-op if a row already
+  // carries it. Nullable unique allows multiple nulls.
   deduplicationKey String? @db.VarChar(255)
   // Generic scope identifier (project id, tenant id, ...). Meaning is owned by
   // the registering notification.
@@ -63,7 +62,7 @@ model NotificationRecord {
   // Plain event notifications keep "firing"; the frontend uses it to pair and
   // dim resolved records (ADR-051, ADR-065).
   status    String    @db.VarChar(10) @default("firing")
-  // Delivery time of the resolved event of this record.
+  // Delivery time of this record's resolved event.
   recoveredAt DateTime?
   // Where this delivery came from (ADR-065): "alert" for records produced by
   // the alert domain, "event" for plain event producers. No database foreign
@@ -84,7 +83,7 @@ model NotificationRecord {
   @@schema("module/notification-center")
 }
 
-// Lazy per-user read marker, created only when a user opens / marks a
+// Lazy per-user read marker, created only when a user opens or marks a
 // notification. Deleting a record removes its markers.
 model NotificationReceipt {
   id             String       @id @default(uuid()) @db.Uuid
@@ -137,11 +136,11 @@ model NotificationCenterSetting {
 
 // Ordered delivery rules (ADR-062). The first enabled rule whose condition
 // matches decides the delivery; when nothing matches, delivery is suppressed.
-// Rules are evaluated per delivery instead of being frozen on an alert: the
-// alert lives in its own domain (ADR-065) and its severity is stable across
-// firing and resolved, so both land on the same side of the rules. Two default
-// rules are seeded on a fresh install so high and critical signals keep pushing
-// without any operator action.
+// Rules are evaluated per delivery rather than frozen on an alert: the alert
+// lives in its own domain (ADR-065) and its severity is stable across firing
+// and resolved, so both land on the same side of the rules. Two default rules
+// are seeded on a fresh install (high+ severity, all resolved) so signals keep
+// pushing without operator action.
 model NotificationDeliveryRule {
   id        String   @id @default(uuid()) @db.Uuid
   // Ascending evaluation order; lower runs first.

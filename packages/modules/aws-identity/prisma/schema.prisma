@@ -1,31 +1,28 @@
 // !! ------------------------------------------------------------ //
-// !!              [Module] AWS Identity models                   //
+// !!                 [Module] AWS Identity models                 //
 // !! ------------------------------------------------------------ //
 // * AwsCrossAccountBinding                                        //
 // * AwsCrossAccountBindingUsage                                   //
-// * v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v v //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// Cross-account access is delegated through a customer-managed IAM role.
-// The customer's role trust policy allows the host default account to
-// assume the role with this binding's external ID; no long-lived access
-// key is stored. A row may briefly exist with a null roleArn after
-// bootstrap (the external ID has been generated but the role ARN has not
-// been saved yet).
+// Delegated access to one customer AWS account. Access goes through a
+// customer-managed IAM role whose trust policy lets the host default account
+// assume it with this binding's external ID; no long-lived access key is
+// stored. A row can briefly exist with a null roleArn during bootstrap, once
+// the external ID is generated but the role ARN is not yet saved.
 //
-// accountId is the customer AWS account ID and the binding's scope key: an
-// IAM role, its trust policy, the region list and the rotation Lambda are
-// all account-level resources, so one row describes the platform's access
-// relationship with one customer account. Consumers reference the row
-// through AwsCrossAccountBindingUsage.
+// accountId is both the customer account ID and the binding's scope key: the
+// IAM role, its trust policy, the region list and the rotation Lambda are all
+// account-level resources. Consumers reference a row through
+// AwsCrossAccountBindingUsage.
 //
-// Replacing the identity is a two-phase operation: while a rebind is in
-// progress, pendingExternalId holds the external ID of the candidate
-// identity and the active identity keeps serving. The pending value is
-// promoted (and the old external ID retired) only after the candidate role
-// has been assumed successfully.
+// Rebinding is two-phase: while one is in progress, pendingExternalId holds
+// the candidate's external ID and the active identity keeps serving. The
+// pending value is promoted, retiring the old external ID, only after the
+// candidate role has been assumed successfully.
 //
-// name is a platform-side label used to identify the account in the UI. It
-// is never derived from AWS and does not affect credential resolution.
+// name is a UI label for the account: never derived from AWS and irrelevant to
+// credential resolution.
 model AwsCrossAccountBinding {
   id                String                       @id @default(uuid()) @db.Uuid
   accountId         String                       @unique
@@ -45,13 +42,12 @@ model AwsCrossAccountBinding {
   @@schema("module/aws-identity")
 }
 
-// A consumer (project / tenant / organization) references one account
-// binding. consumerId is intentionally a plain column without a foreign key
-// or a Prisma relation: this module never reads host tables and can be
-// assembled into any host application. A missing usage row simply means
-// "this consumer has not attached an AWS account". The relation to the
-// binding restricts deletion so an in-use account cannot be detached
-// silently.
+// Binds one consumer (project / tenant / organization) to one account binding.
+// consumerId is deliberately a plain column with no foreign key or Prisma
+// relation: the module never reads host tables and stays copy-assemblable into
+// any host. A missing row means the consumer has not attached an AWS account.
+// The relation to the binding restricts deletion, so an in-use account cannot
+// be detached silently.
 model AwsCrossAccountBindingUsage {
   id         String                 @id @default(uuid()) @db.Uuid
   consumerId String                 @unique

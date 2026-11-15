@@ -2,15 +2,15 @@
 // !!                    [Module] Audit models                     //
 // !! ------------------------------------------------------------ //
 // * AuditLog                                                      //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// Append-only, immutable audit trail. There is deliberately no update or
-// delete API: rows are created exclusively by explicit
-// AuditLogService.record() business-event calls, and only ever read back.
-// Generic HTTP request tracing lives in the access log channel, never here.
+// One row is a single business event: append-only, immutable, and never
+// updated or deleted through any API. Rows are created only by explicit
+// AuditLogService.record() calls and are read back afterwards. Generic HTTP
+// request tracing lives in the access log channel, never here.
 //
 // The actor is a weak scalar reference (actorType + actorId) rather than a
-// cross-schema relation: users or API keys may be deleted while their audit
+// cross-schema relation, because the actor may be deleted while its audit
 // history must remain intact.
 model AuditLog {
   id             Int      @id @default(autoincrement())

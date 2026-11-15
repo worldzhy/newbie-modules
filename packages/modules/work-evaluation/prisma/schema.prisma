@@ -1,24 +1,24 @@
 // Prisma schema fragment for the work-evaluation module (ADR-021, ADR-024).
-// This file is managed by @devbie/newbie-cli — assembled into the
-// consumer prisma tree on `newbie modules apply`.
+// This file is managed by @devbie/newbie-cli and assembled into the consumer
+// prisma tree on `newbie modules apply`.
 //
-// The run/result/criteria tables belong to the evaluation skeleton
-// (`module/evaluation`, ADR-020); this feature only owns the collection-side
-// tables. `ruleSetVersionId` is a plain scalar with no relation — foreign
-// keys never cross schema boundaries.
+// The run, result and criteria tables belong to the evaluation skeleton
+// (`module/evaluation`, ADR-020); this feature owns only the collection-side
+// tables. `ruleSetVersionId` is a plain scalar with no relation: foreign keys
+// never cross schema boundaries.
 
-// !! ----------------------------------------------------------- //
-// !!             [Module] Work Evaluation models                 //
-// !! ----------------------------------------------------------- //
-// * WorkEvaluationPeriod                                         //
-// * WorkEvaluationHomeGround                                     //
-// * WorkEvaluationWorkspace                                      //
-// * WorkEvaluationSession                                        //
-// * WorkEvaluationDeclaredDocument                               //
-// * WorkEvaluationInstallation                                   //
-// * WorkEvaluationPeriodType (enum)                              //
-// * WorkEvaluationPeriodStatus (enum)                            //
-// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!               [Module] Work Evaluation models                //
+// !! ------------------------------------------------------------ //
+// * WorkEvaluationPeriodType (enum)                               //
+// * WorkEvaluationPeriodStatus (enum)                             //
+// * WorkEvaluationPeriod                                          //
+// * WorkEvaluationHomeGround                                      //
+// * WorkEvaluationWorkspace                                       //
+// * WorkEvaluationSession                                         //
+// * WorkEvaluationDeclaredDocument                                //
+// * WorkEvaluationInstallation                                    //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 enum WorkEvaluationPeriodType {
   COLLECTION
@@ -35,11 +35,11 @@ enum WorkEvaluationPeriodStatus {
   @@schema("module/work-evaluation")
 }
 
-/// An evaluation period: COLLECTION (monthly, evidence gathering) or
-/// REVIEW (quarterly, decision-making). Each period pins to exactly one
-/// published criteria version of the evaluation skeleton (kind "developer") so
-/// all members inside it are judged against the same rules. The pin is a
-/// plain scalar — no cross-schema relation by design.
+/// One evaluation period: COLLECTION (monthly, evidence gathering) or REVIEW
+/// (quarterly, decision-making). A period pins exactly one published criteria
+/// version of the evaluation skeleton (subjectKind "developer"), so every
+/// member inside it is judged against the same rules. The pin is a plain
+/// scalar with no cross-schema relation.
 model WorkEvaluationPeriod {
   id                String @id @default(uuid()) @db.Uuid
   // EvaluationRuleSetVersion.id in "module/evaluation"; scalar, no FK
@@ -58,8 +58,9 @@ model WorkEvaluationPeriod {
 }
 
 /// One evaluatee's home-ground declaration for a period. Dual-circle model:
-/// criteria in `homeCriteria` are the specialty circle. No weights — the
-/// declaration is context for the evaluation agent, never a scoring input.
+/// the criteria in `homeCriteria` are the specialty circle. There are no
+/// weights; the declaration is context for the evaluation agent, never a
+/// scoring input.
 model WorkEvaluationHomeGround {
   id                 String @id @default(uuid()) @db.Uuid
   developerId    String @db.Uuid
@@ -76,9 +77,9 @@ model WorkEvaluationHomeGround {
 }
 
 /// A workspace declared by the member and reported by the installation agent.
-/// The declared set is an allowlist: a workspace either is declared (and in
-/// scope) or does not exist here at all — there is no company/personal field,
-/// because undeclared paths are never reported.
+/// The declared set is an allowlist: a workspace is either declared, and in
+/// scope, or absent from this table; there is no company/personal flag because
+/// undeclared paths are never reported.
 model WorkEvaluationWorkspace {
   id              String @id @default(uuid()) @db.Uuid
   developerId String @db.Uuid
@@ -101,8 +102,8 @@ model WorkEvaluationWorkspace {
 
 /// Index row for one AI-agent coding session collected from a company
 /// workspace. The transcript itself lives in ClickHouse
-/// (`work_evaluation_session_messages`); this row carries everything the
-/// evaluation agent needs to decide whether to drill into the transcript.
+/// (`work_evaluation_session_messages`); this row carries what the evaluation
+/// agent needs in order to decide whether to drill into the transcript.
 model WorkEvaluationSession {
   id                 String  @id @default(uuid()) @db.Uuid
   developerId    String  @db.Uuid
@@ -113,7 +114,7 @@ model WorkEvaluationSession {
   workspaceKey      String @db.VarChar(128)
   modelId           String @default("") @db.VarChar(128)
   // Transcript origin: "claude" / "codex" (raw transcripts) or "trae-memory"
-  // (the IDE's own session summaries — lower fidelity, never mixed up with raw).
+  // (the IDE's own session summaries, lower fidelity, never mixed with raw).
   transcriptSource  String @default("claude") @db.VarChar(32)
 
   turnCount     Int @default(0)
@@ -158,8 +159,8 @@ model WorkEvaluationDeclaredDocument {
 }
 
 /// Enrollment for the member-side installation agent. Same shape as the
-/// backend-monitor installation: random UUID token, SHA-256 hash at rest,
-/// plaintext returned once, soft revocation. The row carries the evaluatee the
+/// backend-monitor installation: a random UUID token, a SHA-256 hash at rest,
+/// plaintext returned once, soft revocation. The row binds the evaluatee the
 /// token may report for, so an installation agent can never write sessions for
 /// someone else.
 model WorkEvaluationInstallation {

@@ -1,36 +1,36 @@
 // !! ------------------------------------------------------------ //
-// !!            [Module] LLM models                               //
+// !!                     [Module] LLM models                      //
 // !! ------------------------------------------------------------ //
-// * LlmConnection (provider + baseUrl + apiKey + current model — one credential endpoint) //
-// * LlmScopeAssignment (scope → connectionId —— consumer-to-connection binding) //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+// * LlmConnection                                                 //
+// * LlmScopeAssignment                                            //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// LLM connection configuration (ADR-006). One row = one upstream credential
-// (provider + baseUrl + apiKey) plus the model it currently serves. The
-// (baseUrl, apiKey) pair is a uniqueness invariant, not the row identity, so
-// the key or model can be edited in place while scope bindings stay attached.
-// `apiKey` is ciphertext at rest (AES-256-GCM, see management/llm-api-key.ts),
-// so the invariant compares the deterministic `apiKeyFingerprint` instead.
-// Multiple consumer scopes can bind to the same connection via LlmScopeAssignment.
+// One upstream credential (ADR-006): provider + baseUrl + apiKey, plus the
+// model it currently serves. The (baseUrl, apiKey) pair is a uniqueness
+// invariant rather than the row identity, so the key or the model can be
+// edited in place while scope bindings stay attached. `apiKey` is ciphertext
+// at rest (AES-256-GCM, see management/llm-api-key.ts), so the check compares
+// the deterministic `apiKeyFingerprint` instead. Many consumer scopes can bind
+// one connection through LlmScopeAssignment.
 model LlmConnection {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String   @db.VarChar(255)
-  // Wire protocol: "openai-compatible" or "anthropic". Kept as a string so
-  // a future provider kind does not require an enum migration.
+  // Wire protocol: "openai-compatible" or "anthropic". A string rather than an
+  // enum so a new provider kind needs no migration.
   provider  String   @default("openai-compatible") @db.VarChar(40)
   model     String   @db.VarChar(255)
-  // Required for openai-compatible. Empty string for anthropic means the
-  // official https://api.anthropic.com endpoint (column stays NOT NULL).
+  // Required for openai-compatible; the empty string selects the official
+  // https://api.anthropic.com endpoint for anthropic. NOT NULL throughout.
   baseUrl   String   @db.VarChar(255)
-  // Ciphertext (`enc:v1:<base64>`), so the column is wider than the 500-char
-  // plaintext cap declared by the DTO. Legacy plaintext rows stay readable.
+  // Ciphertext (`enc:v1:<base64>`), hence wider than the 500-char plaintext
+  // cap declared by the DTO. Legacy plaintext rows remain readable.
   apiKey    String   @db.VarChar(1000)
-  // SHA-256 of the plaintext key: the credential identity used for the
+  // SHA-256 of the plaintext key: the credential identity behind the
   // uniqueness invariant and duplicate pre-checks. Null on legacy rows.
   apiKeyFingerprint String? @db.VarChar(64)
 
-  // Health snapshot — shared across all scopes using this connection.
-  // Null = never called.
+  // Health snapshot shared by every scope using this connection; null means
+  // never called.
   lastCallAt          DateTime?
   lastCallSuccess     Boolean?
   lastFailureCategory String? @db.VarChar(20)
@@ -42,17 +42,17 @@ model LlmConnection {
 
   // One credential against one upstream endpoint exists at most once: a
   // duplicated (baseUrl, apiKey) pair never yields a second row, which keeps
-  // key rotation a single-row update for every scope bound to it. Postgres
+  // key rotation a single-row update for every scope bound to it. PostgreSQL
   // allows multiple NULL fingerprints, so legacy rows coexist with the
-  // encrypted population until an admin re-saves them.
+  // encrypted ones until an admin re-saves them.
   @@unique([baseUrl, apiKeyFingerprint])
   @@schema("module/llm")
 }
 
-// Consumer-scope binding (ADR-006). Maps an opaque scope string ("copilot",
-// "analysis", "jdy", ...) to a connection. One scope binds to exactly one
-// connection (scope is unique); a connection can serve many scopes. Deleting
-// a connection cascades to all its assignments.
+// Binds one opaque consumer scope ("copilot", "analysis", ...) to a connection
+// (ADR-006). `scope` is unique, so a scope binds to exactly one connection
+// while a connection can serve many scopes; deleting a connection cascades to
+// its assignments.
 model LlmScopeAssignment {
   id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   scope        String   @unique @db.VarChar(64)

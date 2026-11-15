@@ -1,59 +1,63 @@
-// ! ------------------------------------------------------------ //
-// !             [Module] Health models                           //
-// ! ------------------------------------------------------------ //
-// * HealthInstallation                                           //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!                    [Module] Health models                    //
+// !! ------------------------------------------------------------ //
+// * HealthInstallation                                            //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// Health installation identity. PostgreSQL schema: "module/health".
-// One Installation = one running deployment endpoint holding a health token
-// (a newbie backend, fewbie SSR process, or any other node service). The
-// module is project-agnostic: platform-side grouping lives in opaque
-// `externalRef` and is never parsed here.
+// One row per running deployment endpoint enrolled with a health token: a
+// newbie backend, a fewbie SSR process, or any other node service. The module
+// is project-agnostic: platform-side grouping stays in opaque `externalRef` and
+// is never parsed here.
 //
-// Unlike heartbeat (pure liveness), health stores the latest dependency
-// snapshot: each indicator's up/down status plus the aggregated status.
-// Health state is derived at read time from lastSnapshotAt + lastSnapshotStatus:
-//   - never seen (lastSnapshotAt null)            → unknown
-//   - snapshot ok and within threshold            → healthy
-//   - snapshot error and within threshold         → degraded
-//   - no snapshot within threshold                → offline
-// Only revocation is an explicit persisted state.
+// Unlike heartbeat, which records liveness only, a health row also keeps the
+// latest dependency snapshot: the aggregated status plus each indicator's
+// up/down result.
+//
+// State is derived at read time from `lastSnapshotAt` and `lastSnapshotStatus`
+// against a 90s online threshold (three missed 30s snapshots):
+// - `lastSnapshotAt` null: unknown
+// - snapshot within the threshold, status "ok": healthy
+// - snapshot within the threshold, any other status: degraded
+// - snapshot older than the threshold: offline
+//
+// Only revocation is persisted explicitly.
 model HealthInstallation {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  // Human-readable label assigned at enrollment, e.g. "nightwatch-prod".
+  // Human-readable label set at enrollment, e.g. "nightwatch-prod".
   label String @db.VarChar(255)
-  // SHA-256 hex of the health token. The plaintext token is returned once
-  // at creation/rotation and never stored.
+  // SHA-256 hex of the health token. The plaintext token is returned once at
+  // creation or rotation and never stored.
   tokenHash String @unique @db.VarChar(64)
 
   // Opaque platform-owned tag (e.g. "projectId/applicationId"); never parsed here.
   externalRef String? @db.VarChar(255)
 
-  // Runtime facts self-reported by the client on snapshot. All informational.
+  // Runtime facts self-reported on each snapshot; informational only.
   appVersion String? @db.VarChar(64)
   env String? @db.VarChar(64)
   instanceId String? @db.VarChar(128)
 
   // Latest dependency health snapshot.
-  // Aggregated status: "ok" | "error".
+  // Aggregated status of the last snapshot: "ok" | "error".
   lastSnapshotStatus String? @db.VarChar(16)
-  // Per-indicator results: { prisma: {status, message}, mongo: {...}, ... }
+  // Per-indicator results: { <name>: { status: "up" | "down", message? } }
   lastSnapshotInfo Json?
   lastSnapshotAt DateTime?
 
   firstSeenAt DateTime?
   lastSeenAt DateTime?
 
-  // Soft revocation: snapshots are rejected (401), rows retained for audit.
+  // Soft revocation: snapshots are rejected (401); rows are retained for audit.
   revokedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Host-side lookups batch by externalRef (application list/status views);
-  // the health monitor scans the lastSnapshotAt range periodically.
+  // Host-side batch lookups key on `externalRef`; the offline sweep filters on
+  // `lastSnapshotAt`, which is written together with `lastSeenAt` on every
+  // snapshot.
   @@index([externalRef])
-  @@index([lastSeenAt])
+  @@index([lastSnapshotAt])
   @@schema("module/health")
 }
