@@ -90,7 +90,7 @@ model SecurityEvaluationWebOrigin {
   // DNS_TXT | WELL_KNOWN; null until the host requests a verification method.
   verificationMethod   String?   @db.VarChar(16)
   // Consecutive failed re-verifications; reset on success.
-  verificationFailures Int       @default(0)
+  verificationFailureCount Int  @default(0)
   verifiedAt           DateTime?
   lastVerifiedAt       DateTime?
   isActive             Boolean   @default(true)
@@ -153,8 +153,8 @@ model SecurityEvaluationNpmPackageKnowledgeItem {
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 /// One piece of external threat intelligence, deduplicated by
-/// (source, externalId). One row per unique intel item; re-fetching the
-/// same item refreshes rawPayload and bumps lastSeenAt. fetchedAt stays at
+/// (feed, externalId). One row per unique intel item; re-fetching the
+/// same item refreshes rawPayload and bumps lastSeenAt. firstSeenAt stays at
 /// the first-seen time on purpose: the match pipeline walks it oldest-first
 /// so every collection batch eventually gets evaluated.
 ///
@@ -162,14 +162,14 @@ model SecurityEvaluationNpmPackageKnowledgeItem {
 /// indexes are unchanged.
 ///
 /// World-scoped: unlike the asset-scoped knowledge tables above, a threat
-/// item belongs to no asset — it exists once per source and is matched
+/// item belongs to no asset — it exists once per feed and is matched
 /// against every asset's knowledge during judgment.
 model SecurityEvaluationThreatKnowledgeItem {
   id          String   @id @default(uuid()) @db.Uuid
-  source      String   @db.VarChar(50)
+  feed        String   @db.VarChar(50)
   category    String   @db.VarChar(30)
-  // Stable identifier within the source: CVE ID, ecosystem+package,
-  // vendor+event-id, or a title fingerprint. Together with `source` it
+  // Stable identifier within the feed: CVE ID, ecosystem+package,
+  // vendor+event-id, or a title fingerprint. Together with `feed` it
   // forms the deduplication key.
   externalId  String   @db.VarChar(512)
   title       String   @db.VarChar(1024)
@@ -180,19 +180,19 @@ model SecurityEvaluationThreatKnowledgeItem {
   // Signal tags: kev, has-exploit, exploited-in-wild.
   signalTags  String[]
   rawPayload  Json?
-  fetchedAt   DateTime @default(now())
+  firstSeenAt DateTime @default(now())
   lastSeenAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   verdictCaches SecurityEvaluationThreatVerdictCache[]
 
-  @@unique([source, externalId])
+  @@unique([feed, externalId])
   @@index([category])
   @@index([severity])
   @@index([publishedAt])
-  // Match-pipeline keyset scan: WHERE fetchedAt >= since ORDER BY fetchedAt DESC, id.
-  @@index([fetchedAt])
+  // Match-pipeline keyset scan: WHERE firstSeenAt >= since ORDER BY firstSeenAt DESC, id.
+  @@index([firstSeenAt])
   @@schema("module/security-evaluation")
 }
 
@@ -225,8 +225,9 @@ enum SecurityEvaluationThreatVerdictKind {
 model SecurityEvaluationThreatVerdictCache {
   id              String                              @id @default(uuid()) @db.Uuid
   knowledgeItemId  String                             @db.Uuid
-  // Cache scope, stored verbatim: "<subject.kind>:<subject.subjectKey>" (ADR-058).
-  scopeKey        String                             @db.VarChar(512)
+  // Cache scope, the subject identity columns verbatim (ADR-058, ADR-068 D6).
+  subjectKind     String                             @db.VarChar(64)
+  subjectKey      String                             @db.VarChar(255)
   verdict         SecurityEvaluationThreatVerdictKind @default(notRelevant)
   reason          String?                            @db.Text           // LLM reason for not-relevant; null on hard-hit
   matchedEntity   String?                            @db.VarChar(512)   // Entity string that matched on hard-hit; null otherwise
@@ -238,8 +239,8 @@ model SecurityEvaluationThreatVerdictCache {
 
   knowledgeItem SecurityEvaluationThreatKnowledgeItem @relation(fields: [knowledgeItemId], references: [id], onDelete: Cascade)
 
-  @@unique([knowledgeItemId, scopeKey])
-  @@index([scopeKey])
+  @@unique([knowledgeItemId, subjectKind, subjectKey])
+  @@index([subjectKind, subjectKey])
   @@index([verdict, updatedAt])
   @@schema("module/security-evaluation")
 }
@@ -277,15 +278,15 @@ model SecurityEvaluationCodeScanVerdictCache {
   connectionId   String?  @db.Uuid
   // SHA-256 of the system prompt bytes; editing the prompt invalidates rows.
   promptVersion  String   @db.VarChar(64)
-  ruleSetVersion String   @db.VarChar(32)
+  ruleSetVersionLabel String @db.VarChar(32)
   // Finding entries of this criterion from the cached call (JSON array).
-  findings       Json     @db.JsonB
+  cachedFindings Json     @db.JsonB
   // Content address of the exact request that produced this verdict.
   inputSignature String?  @db.VarChar(64)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  @@unique([subjectId, criterionKey, path, contentHash, modelId, connectionId, promptVersion, ruleSetVersion], name: "codeScanVerdictIdentity")
+  @@unique([subjectId, criterionKey, path, contentHash, modelId, connectionId, promptVersion, ruleSetVersionLabel], name: "codeScanVerdictIdentity")
   @@index([subjectId, updatedAt])
   @@schema("module/security-evaluation")
 }

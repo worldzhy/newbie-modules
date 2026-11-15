@@ -112,7 +112,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
     try {
       const reaped = await this.runs.reapStaleRuns();
       for (const row of reaped) {
-        const error = row.error ?? STALE_RUN_ERROR;
+        const error = row.failureReason ?? STALE_RUN_ERROR;
         await this.publishRunTerminal(row, undefined, { status: "FAILED", error });
         await this.notifyRunFinished({
           runId: row.id,
@@ -165,8 +165,8 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
       const version = await this.criteria.getVersion(running.ruleSetVersionId);
       const ruleSetVersion: EvaluationRuleSetVersionRef = {
         id: version.id,
-        kind: version.kind,
-        evaluationKey: version.evaluationKey,
+        subjectKind: version.subjectKind,
+        standardKey: version.standardKey,
         version: version.version,
       };
       identity = {
@@ -174,7 +174,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
         subjectId: running.subjectId,
         subjectKind: subject.kind,
         ruleSetVersionId: running.ruleSetVersionId,
-        evaluationKey: version.evaluationKey,
+        standardKey: version.standardKey,
       };
 
       const runConfig = (running.config as Record<string, unknown> | null) ?? null;
@@ -201,7 +201,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
       await this.runs.assertActive(running.id, startedAt);
       const result = await this.results.createResult({
         runId: running.id,
-        manifest: evidence.items,
+        evidenceManifest: evidence.items,
         coverageStats: coverage.stats,
         verdicts: judgment.verdicts,
         summary: judgment.summary,
@@ -264,7 +264,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
       return formatRunError(error);
     } catch {
       const run = await this.runs.findById(id).catch(() => null);
-      return run?.error ?? formatRunError(error);
+      return run?.failureReason ?? formatRunError(error);
     }
   }
 
@@ -325,7 +325,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
       subjectId: running.subjectId,
       subjectKind: subject.kind,
       ruleSetVersionId: running.ruleSetVersionId,
-      evaluationKey: version.evaluationKey,
+      standardKey: version.standardKey,
     };
   }
 }

@@ -26,7 +26,7 @@ export type EvaluationFindingChange = "created" | "reopened" | "resolved" | "sup
 export interface EvaluationFindingChangedEvent {
   findingId: string;
   subjectId: string;
-  evaluationKey: string;
+  standardKey: string;
   fingerprint: string;
   severity: EvaluationFindingSeverity;
   change: EvaluationFindingChange;

@@ -1,8 +1,7 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req } from "@nestjs/common";
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
-import { UserRequest } from "@modules/security/security.interface";
 import { EvaluationFindingService } from "./evaluation-finding.service";
 import { EvaluationRemediationService } from "./evaluation-remediation.service";
 import { EvaluationResultService } from "./evaluation-result.service";
@@ -26,7 +25,7 @@ import {
  * Human decision surface over skeleton-owned evaluation aggregates.
  *
  * Findings, results and remediation plans are skeleton domain objects shared
- * by every feature evaluationKey, so their lifecycle operations (suppression,
+ * by every feature standardKey, so their lifecycle operations (suppression,
  * reopening, result review, remediation planning and checkpoint tracking) live
  * here rather than in any feature vocabulary (ADR-029, ADR-031). Attribution
  * follows the service contracts: the acting user is recorded automatically,
@@ -49,9 +48,8 @@ export class EvaluationDecisionController {
   async suppressFinding(
     @Param() params: GetEvaluationFindingByIdRequestDto,
     @Body() body: SuppressEvaluationFindingRequestDto,
-    @Req() request: UserRequest,
   ) {
-    return this.findings.suppressFinding(params.id, body.note, request.user.userId);
+    return this.findings.suppressFinding(params.id, body.note);
   }
 
   @Post("findings/:id/reopen")
@@ -71,12 +69,10 @@ export class EvaluationDecisionController {
   async reviewResult(
     @Param() params: GetEvaluationResultByIdRequestDto,
     @Body() body: ReviewEvaluationResultRequestDto,
-    @Req() request: UserRequest,
   ) {
     return this.results.reviewResult({
       id: params.id,
       reviewStatus: body.reviewStatus,
-      reviewedByRef: request.user.userId,
       note: body.note,
     });
   }
@@ -88,10 +84,10 @@ export class EvaluationDecisionController {
   async createPlan(@Body() body: CreateEvaluationRemediationPlanRequestDto) {
     return this.remediation.createPlan({
       subjectId: body.subjectId,
-      triggerRefs: body.triggerRefs,
-      deciderRef: body.deciderRef,
-      startDate: body.startDate,
-      dueDate: body.dueDate,
+      triggerIds: body.triggerIds,
+      decider: body.decider,
+      startOn: body.startOn,
+      dueOn: body.dueOn,
       checkpoints: body.checkpoints,
     });
   }
@@ -119,17 +115,15 @@ export class EvaluationDecisionController {
 
   @Post("remediation-plans/:id/decision")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationRemediationPlan)
-  @ApiOperation({ summary: "Complete or cancel an OPEN plan; records the deciding actor" })
+  @ApiOperation({ summary: "Complete or cancel an OPEN plan" })
   @ApiOkResponse({ type: EvaluationRemediationPlanResponseDto })
   async decidePlan(
     @Param() params: GetEvaluationRemediationPlanByIdRequestDto,
     @Body() body: DecideEvaluationRemediationPlanRequestDto,
-    @Req() request: UserRequest,
   ) {
     return this.remediation.decidePlan(params.id, {
       status: body.status,
       decisionNote: body.decisionNote,
-      decidedByRef: request.user.userId,
     });
   }
 

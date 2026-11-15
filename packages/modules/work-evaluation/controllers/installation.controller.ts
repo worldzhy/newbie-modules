@@ -48,7 +48,7 @@ export class WorkEvaluationInstallationController {
   @ApiOperation({ summary: "List the authenticated member's own installations" })
   @ApiOkResponse({ type: WorkEvaluationInstallationResponseDto, isArray: true })
   listMine(@Req() request: UserRequest) {
-    return this.installations.list({ evaluateeUserId: request.user.userId });
+    return this.installations.list({ developerId: request.user.userId });
   }
 
   @Get(":id")

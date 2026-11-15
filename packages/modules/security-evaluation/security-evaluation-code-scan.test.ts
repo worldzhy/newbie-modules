@@ -66,8 +66,8 @@ const SUBJECT: EvaluationSubjectRef = {
 
 const CODE_SCAN_VERSION: EvaluationRuleSetVersionRef = {
   id: "33333333-3333-4333-8333-333333333333",
-  kind: "repository",
-  evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+  subjectKind: "repository",
+  standardKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
   version: "v1",
 };
 
@@ -391,7 +391,7 @@ test("code-scan mechanism fails the run when the LLM scope is unbound (no vacuou
   assert.equal(cache.recorded.length, 0);
 });
 
-test("code-scan mechanism ignores other evaluationKeys", async () => {
+test("code-scan mechanism ignores other standardKeys", async () => {
   const item = codeScanItem("src/a.ts", "const a = 1;");
   const cache = stubCache();
   const { resolver, calls } = stubResolver(() => "{}");
@@ -399,7 +399,7 @@ test("code-scan mechanism ignores other evaluationKeys", async () => {
   const input = judgmentInput([item]);
   const judgment = await mechanism.judge({
     ...input,
-    ruleSetVersion: { ...input.ruleSetVersion, evaluationKey: "npm-osv" },
+    ruleSetVersion: { ...input.ruleSetVersion, standardKey: "npm-osv" },
   });
   assert.deepEqual(judgment.evaluatedRefs, []);
   assert.equal(calls.length, 0);

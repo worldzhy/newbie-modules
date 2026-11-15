@@ -224,7 +224,7 @@ export class SecurityEvaluationWebOriginService {
       data: {
         verificationMethod: method,
         verificationToken: token,
-        ...(regenerate ? { verificationFailures: 0 } : {}),
+        ...(regenerate ? { verificationFailureCount: 0 } : {}),
         ...(row.verificationStatus === "VERIFIED" ? {} : { verificationStatus: "PENDING" }),
       },
     });
@@ -266,17 +266,17 @@ export class SecurityEvaluationWebOriginService {
           verificationStatus: "VERIFIED",
           verifiedAt: row.verifiedAt ?? now,
           lastVerifiedAt: now,
-          verificationFailures: 0,
+          verificationFailureCount: 0,
         },
       });
       return toVerificationResult(assetId, row.asset.naturalKey, updated);
     }
 
-    const failures = row.verificationFailures + 1;
+    const failures = row.verificationFailureCount + 1;
     const updated = await this.prisma.securityEvaluationWebOrigin.update({
       where: { assetId },
       data: {
-        verificationFailures: failures,
+        verificationFailureCount: failures,
         verificationStatus: failures >= this.reverifyFailureThreshold ? "FAILED" : row.verificationStatus,
       },
     });
@@ -452,7 +452,7 @@ function toVerificationResult(
     verificationStatus: string;
     verifiedAt: Date | null;
     lastVerifiedAt: Date | null;
-    verificationFailures: number;
+    verificationFailureCount: number;
   },
 ): SecurityEvaluationWebOriginVerificationResult {
   return {
@@ -461,7 +461,7 @@ function toVerificationResult(
     status: row.verificationStatus as SecurityEvaluationWebOriginVerificationStatus,
     verifiedAt: row.verifiedAt,
     lastVerifiedAt: row.lastVerifiedAt,
-    consecutiveFailures: row.verificationFailures,
+    consecutiveFailures: row.verificationFailureCount,
   };
 }
 

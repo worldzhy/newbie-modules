@@ -23,7 +23,7 @@ interface FindingsInput {
   subjectIds?: string[];
   subjectId?: string;
   runId?: string;
-  evaluationKey?: string;
+  standardKey?: string;
   status?: string;
   severity?: string;
   urgency?: string;
@@ -78,10 +78,10 @@ function createController(subjectIds: string[] | null) {
   };
   const results = {
     getResultForRun: async () => ({ ruleSetVersionId: "v" }),
-    getResultManifest: async () => ({ manifest: [] }),
+    getResultManifest: async () => ({ evidenceManifest: [] }),
   };
   const criteria = {
-    getVersion: async () => ({ version: "v1", evaluationKey: "test" }),
+    getVersion: async () => ({ version: "v1", standardKey: "test" }),
   };
   const reports = {
     getReport: async (ids: string[] | null, days?: number) => {
@@ -127,7 +127,7 @@ test("findings, runs and the report narrow to the subjects the source contribute
       subjectIds,
       subjectId: undefined,
       runId: undefined,
-      evaluationKey: undefined,
+      standardKey: undefined,
       status: undefined,
       severity: undefined,
       urgency: undefined,

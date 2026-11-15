@@ -224,18 +224,18 @@ export class ListSecurityEvaluationRunsRequestDto extends CommonListRequestDto {
   status?: EvaluationRunStatus;
 }
 
-/** Mirrors the skeleton's EvaluationRun row, decorated with the evaluationKey labels. */
+/** Mirrors the skeleton's EvaluationRun row, decorated with the standardKey labels. */
 export class SecurityEvaluationRunResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
   @ApiProperty() ruleSetVersionId!: string;
-  @ApiProperty({ description: 'Evaluation key of the run, e.g. "npm-osv"' }) evaluationKey!: string;
+  @ApiProperty({ description: 'Evaluation key of the run, e.g. "npm-osv"' }) standardKey!: string;
   @ApiProperty({ description: 'Criteria version label of the run, e.g. "v1"' }) ruleSetVersion!: string;
   @ApiProperty({ enum: EvaluationRunStatus }) status!: EvaluationRunStatus;
-  @ApiPropertyOptional({ type: String }) requestedByRef?: string | null;
-  @ApiPropertyOptional({ type: Object }) config?: object | null;
+  @ApiPropertyOptional({ type: String }) requestedBy?: string | null;
+  @ApiPropertyOptional({ type: Object }) judgmentConfig?: object | null;
   @ApiPropertyOptional({ description: "Failure reason when status is FAILED", type: String })
-  error?: string | null;
+  failureReason?: string | null;
   @ApiPropertyOptional({ type: Date }) startedAt?: Date | null;
   @ApiPropertyOptional({ type: Date }) finishedAt?: Date | null;
   @ApiProperty() createdAt!: Date;
@@ -257,13 +257,13 @@ export class ListSecurityEvaluationResultsRequestDto extends CommonListRequestDt
   ruleSetVersionId?: string;
 }
 
-/** Mirrors the skeleton's EvaluationResult read shape (manifest excluded). */
+/** Mirrors the skeleton's EvaluationResult read shape (evidenceManifest excluded). */
 export class SecurityEvaluationResultResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() runId!: string;
   @ApiProperty() subjectId!: string;
   @ApiProperty() ruleSetVersionId!: string;
-  @ApiProperty({ description: "SHA-256 over the archived manifest" }) contentHash!: string;
+  @ApiProperty({ description: "SHA-256 over the archived evidence manifest" }) manifestHash!: string;
   @ApiProperty({ type: Object, description: "{ evaluated, declaredUnlinked, skipped } coverage buckets" })
   coverageStats!: object;
   @ApiProperty({ type: Object, isArray: true, description: "Scored verdicts by criterionKey" })
@@ -304,10 +304,10 @@ export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestD
   @IsUUID()
   runId?: string;
 
-  @ApiPropertyOptional({ description: 'Restrict to one criteria evaluationKey, e.g. "npm-osv"' })
+  @ApiPropertyOptional({ description: 'Restrict to one criteria standardKey, e.g. "npm-osv"' })
   @IsOptional()
   @IsString()
-  evaluationKey?: string;
+  standardKey?: string;
 
   @ApiPropertyOptional({ enum: EvaluationFindingStatus })
   @IsOptional()
@@ -344,7 +344,7 @@ export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestD
 export class SecurityEvaluationFindingResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty() evaluationKey!: string;
+  @ApiProperty() standardKey!: string;
   @ApiProperty() fingerprint!: string;
   @ApiProperty() criterionKey!: string;
   @ApiProperty({ enum: EvaluationFindingSeverity }) severity!: EvaluationFindingSeverity;
@@ -358,7 +358,7 @@ export class SecurityEvaluationFindingResponseDto {
   @ApiProperty() lastSeenAt!: Date;
   @ApiPropertyOptional({ type: Date }) resolvedAt?: Date | null;
   @ApiPropertyOptional({ type: String }) suppressionNote?: string | null;
-  @ApiPropertyOptional({ type: String }) suppressedByRef?: string | null;
+  @ApiPropertyOptional({ type: Date }) suppressedAt?: Date | null;
   @ApiProperty() createdAt!: Date;
   @ApiProperty() updatedAt!: Date;
 }
@@ -369,7 +369,7 @@ export class ListSecurityEvaluationFindingsResponseDto extends CommonListRespons
 
 /**
  * One matched manifest item: the exact shape EvaluationEvidenceItem archives
- * in EvaluationResult.manifest, returned verbatim so the client renders it.
+ * in EvaluationResult.evidenceManifest, returned verbatim so the client renders it.
  */
 export class SecurityEvaluationEvidenceItemResponseDto {
   @ApiProperty({ description: "Stable id of this evidence item inside the manifest" })
@@ -403,8 +403,8 @@ export class SecurityEvaluationFindingDetailResponseDto {
   finding!: SecurityEvaluationFindingResponseDto;
   @ApiPropertyOptional({ description: "Rule set version label the last-seen run evaluated under" })
   ruleSetVersion?: string | null;
-  @ApiPropertyOptional({ description: "Evaluated key of the last-seen run — echoes finding.evaluationKey" })
-  evaluationKey?: string | null;
+  @ApiPropertyOptional({ description: "Evaluated key of the last-seen run — echoes finding.standardKey" })
+  standardKey?: string | null;
   @ApiProperty({
     type: [SecurityEvaluationEvidenceItemResponseDto],
     isArray: true,
@@ -454,7 +454,7 @@ export class SecurityEvaluationReportCoverageDto {
   @ApiProperty() evaluated!: number;
   @ApiProperty() declaredUnlinked!: number;
   @ApiProperty() skipped!: number;
-  @ApiProperty({ description: "Manifest material no rule of this evaluationKey consumed (ADR-037 D7)" })
+  @ApiProperty({ description: "Manifest material no rule of this standardKey consumed (ADR-037 D7)" })
   unconsumed!: number;
   @ApiProperty({ description: "Assets that have at least one archived result" }) assetsWithResult!: number;
   @ApiProperty({ description: "Assets whose subject kind requires a credential reference that is not registered" })
@@ -470,9 +470,9 @@ export class SecurityEvaluationReportTopFindingDto {
   @ApiProperty() firstSeenAt!: Date;
 }
 
-/** Open findings of one evaluationKey, split by severity. */
+/** Open findings of one standardKey, split by severity. */
 export class SecurityEvaluationReportFindingsByKeyDto {
-  @ApiProperty({ description: 'Evaluation key, e.g. "npm-osv"' }) evaluationKey!: string;
+  @ApiProperty({ description: 'Evaluation key, e.g. "npm-osv"' }) standardKey!: string;
   @ApiProperty() open!: number;
   @ApiProperty({ type: Object, description: "Open findings counted per severity" })
   bySeverity!: Record<string, number>;
@@ -487,7 +487,7 @@ export class SecurityEvaluationReportFindingsDto {
   @ApiProperty({
     type: [SecurityEvaluationReportFindingsByKeyDto],
     isArray: true,
-    description: "Open findings counted per evaluationKey and severity",
+    description: "Open findings counted per standardKey and severity",
   })
   byEvaluationKey!: SecurityEvaluationReportFindingsByKeyDto[];
   @ApiProperty({ type: [SecurityEvaluationReportTopFindingDto], isArray: true })
@@ -515,7 +515,7 @@ export class SecurityEvaluationReportTrendPointDto {
 }
 
 export class SecurityEvaluationReportMttrByKeyDto {
-  @ApiProperty({ description: 'Evaluation key, e.g. "npm-osv"' }) evaluationKey!: string;
+  @ApiProperty({ description: 'Evaluation key, e.g. "npm-osv"' }) standardKey!: string;
   @ApiPropertyOptional({ description: "Mean days to resolve inside the window" }) averageDays?: number | null;
   @ApiPropertyOptional({ description: "Median days to resolve inside the window" }) medianDays?: number | null;
   @ApiProperty() resolvedCount!: number;
@@ -529,12 +529,12 @@ export class SecurityEvaluationReportMttrDto {
   @ApiProperty({
     type: [SecurityEvaluationReportMttrByKeyDto],
     isArray: true,
-    description: "The same window split per evaluationKey",
+    description: "The same window split per standardKey",
   })
   byEvaluationKey!: SecurityEvaluationReportMttrByKeyDto[];
 }
 
-/** Single-axis report (ADR-022 D6): no composite score, no cross-evaluationKey weighting. */
+/** Single-axis report (ADR-022 D6): no composite score, no cross-standardKey weighting. */
 export class SecurityEvaluationReportResponseDto {
   @ApiProperty() generatedAt!: Date;
   @ApiProperty({ type: SecurityEvaluationReportAssetsDto }) assets!: SecurityEvaluationReportAssetsDto;

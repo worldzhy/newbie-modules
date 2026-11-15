@@ -15,7 +15,7 @@ import {
 import { awsConfigEvidenceId } from "./security-evaluation-aws-config.identity";
 
 /**
- * The cloud configuration rulebook (ADR-027 D3, ADR-037). Two evaluationKeys
+ * The cloud configuration rulebook (ADR-027 D3, ADR-037). Two standardKeys
  * share one mechanism and one collected item inventory:
  *
  * - `aws-cis-1.5`: CIS AWS Foundations Benchmark v1.5 controls, each one
@@ -160,8 +160,8 @@ export interface AwsConfigRulebookEntry {
   severity: SecurityEvaluationFindingSeverity;
   remediation: string;
   requiredKnowledgeTypes: readonly string[];
-  /** Which evaluationKey this entry belongs to (aws-cis-1.5 or aws-custom). */
-  evaluationKey: string;
+  /** Which standardKey this entry belongs to (aws-cis-1.5 or aws-custom). */
+  standardKey: string;
   judge(items: AwsConfigKnowledgeSet): AwsConfigFindingDraft[];
 }
 
@@ -184,12 +184,12 @@ const HIGH_SEVERITY_WILDCARD_SERVICES = new Set(["iam", "sts", "kms", "organizat
 const PASSWORD_MIN_LENGTH = 14;
 
 function rootCredentialEntry(
-  partial: Omit<AwsConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "evaluationKey">,
+  partial: Omit<AwsConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "standardKey">,
   fail: (item: RootCredentialKnowledgePayload) => string | null,
 ): AwsConfigRulebookEntry {
   return {
     ...partial,
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ROOT_CREDENTIAL],
     judge(items) {
       const item = items.rootCredential;
@@ -210,12 +210,12 @@ function rootCredentialEntry(
 }
 
 function passwordPolicyEntry(
-  partial: Omit<AwsConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "evaluationKey">,
+  partial: Omit<AwsConfigRulebookEntry, "requiredKnowledgeTypes" | "judge" | "standardKey">,
   fail: (item: PasswordPolicyKnowledgePayload) => string | null,
 ): AwsConfigRulebookEntry {
   return {
     ...partial,
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY],
     judge(items) {
       const item = items.passwordPolicy;
@@ -319,7 +319,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "IAM console users have MFA enabled",
     severity: "MEDIUM",
     remediation: "Require MFA for every console-capable IAM user.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL],
     judge(items) {
       return items.userCredentials
@@ -357,7 +357,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "IAM password policy expires passwords and console passwords rotate",
     severity: "MEDIUM",
     remediation: "Set maxPasswordAge so console passwords expire; ensure every console user's password rotates.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [
       SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCOUNT_PASSWORD_POLICY,
       SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_USER_CREDENTIAL,
@@ -417,7 +417,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "S3 buckets have default encryption enabled",
     severity: "MEDIUM",
     remediation: "Enable SSE-S3 or SSE-KMS for default bucket encryption.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY],
     judge(items) {
       return items.buckets
@@ -441,7 +441,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "S3 buckets block public access",
     severity: "HIGH",
     remediation: "Enable every Public Access Block flag and remove public bucket policies or ACL grants.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY],
     judge(items) {
       const drafts: AwsConfigFindingDraft[] = [];
@@ -506,7 +506,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "RDS instances are private and encrypted",
     severity: "HIGH",
     remediation: "Move databases to private subnets and enable storage encryption.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY],
     judge(items) {
       const drafts: AwsConfigFindingDraft[] = [];
@@ -534,7 +534,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "Security groups do not expose management ports to the internet",
     severity: "HIGH",
     remediation: "Restrict SSH/RDP/database ports to trusted internal CIDRs or VPN ingress.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS],
     judge(items) {
       const drafts: AwsConfigFindingDraft[] = [];
@@ -560,7 +560,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "Security groups have no public ingress",
     severity: "MEDIUM",
     remediation: "Review whether each public ingress rule is required.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS],
     judge(items) {
       return items.securityGroups
@@ -584,7 +584,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "Active IAM access keys have been used",
     severity: "LOW",
     remediation: "Remove active access keys that have never been used.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY],
     judge(items) {
       return items.accessKeys
@@ -603,7 +603,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "Active IAM access keys are younger than 90 days",
     severity: "MEDIUM",
     remediation: "Rotate access keys older than 90 days.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY],
     judge(items) {
       const now = new Date();
@@ -630,7 +630,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "IAM users have at most one active access key",
     severity: "MEDIUM",
     remediation: "Reduce each user to at most one active access key.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_ACCESS_KEY],
     judge(items) {
       const activeByUser = new Map<string, AwsConfigKnowledge<AccessKeyKnowledgePayload>[]>();
@@ -661,7 +661,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "IAM policies do not use Allow with NotAction",
     severity: "MEDIUM",
     remediation: "Rewrite Allow+NotAction statements as explicit Allow lists.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(items) {
       const drafts: AwsConfigFindingDraft[] = [];
@@ -688,7 +688,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "IAM policies do not grant Action * on Resource *",
     severity: "HIGH",
     remediation: "Scope broad Allow statements to specific actions and resources.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(items) {
       const drafts: AwsConfigFindingDraft[] = [];
@@ -717,7 +717,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "IAM policies do not grant service-wide actions on all resources",
     severity: "MEDIUM",
     remediation: "Replace service-wide wildcards with the specific actions required.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(items) {
       const drafts: AwsConfigFindingDraft[] = [];
@@ -757,7 +757,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "IAM policies do not grant sensitive actions on all resources",
     severity: "HIGH",
     remediation: "Restrict PassRole/AssumeRole/Decrypt/GetSecretValue to specific resources.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_IAM_POLICY_DOCUMENT],
     judge(items) {
       const drafts: AwsConfigFindingDraft[] = [];
@@ -788,7 +788,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "RDS instances manage the master user password in Secrets Manager",
     severity: "MEDIUM",
     remediation: "Enable RDS managed master user credentials in AWS Secrets Manager.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_RDS_INSTANCE_SECURITY],
     judge(items) {
       return items.rdsInstances
@@ -808,7 +808,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "S3 buckets have versioning enabled",
     severity: "LOW",
     remediation: "Enable versioning on S3 buckets to protect against accidental deletion.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_S3_BUCKET_SECURITY],
     judge(items) {
       return items.buckets
@@ -828,7 +828,7 @@ export const SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK: readonly AwsConfigRulebook
     name: "EC2 instances with a public IP do not expose public ingress",
     severity: "HIGH",
     remediation: "Remove the public IP or restrict the instance's security groups to non-public ingress.",
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     requiredKnowledgeTypes: [
       SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_INSTANCE_NETWORK,
       SECURITY_EVALUATION_KNOWLEDGE_TYPE_AWS_EC2_SECURITY_GROUP_INGRESS,

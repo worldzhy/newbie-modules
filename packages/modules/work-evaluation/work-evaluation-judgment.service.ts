@@ -37,7 +37,7 @@ interface PhaseResult {
 }
 
 /**
- * WorkEvaluationJudgmentService — the JudgmentPort for subject kind "work"
+ * WorkEvaluationJudgmentService — the JudgmentPort for subject kind "developer"
  * (ADR-024). A bounded, read-only, three-phase agent: advocate finds support,
  * skeptic attacks it and names evidence gaps, synthesis must answer every
  * challenge on the record. The subject is presented under a blind id so
@@ -63,7 +63,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
     // subject's key, and the identity tokens are resolved live from the
     // account so a renamed member is masked without re-registering subjects.
     const periodId = requirePeriodId(input.runConfig);
-    const evaluateeUserId = input.subject.subjectKey;
+    const developerId = input.subject.subjectKey;
     const scope = readScopeOverride(input.runConfig) ?? DEFAULT_WORK_EVALUATION_SCOPE;
     const port = await this.resolver.resolve(scope);
 
@@ -74,9 +74,9 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
     // finding pipeline this feature does not declare yet.
     const criteria = input.criteria.filter((criterion) => criterion.kind === "SCORED");
 
-    const homeCriteria = await this.homeCriteria(evaluateeUserId, periodId);
+    const homeCriteria = await this.homeCriteria(developerId, periodId);
     const blindSubjectId = `subject-${randomUUID()}`;
-    const identityTokens = await this.loadIdentityTokens(evaluateeUserId);
+    const identityTokens = await this.loadIdentityTokens(developerId);
     identityTokens.add(input.subject.displayName);
     const state = this.tools.startRun(identityTokens);
 
@@ -115,7 +115,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
       port,
       phase: "advocate",
       budgetTokens: budget.advocate,
-      context: { evaluateeUserId, periodId, manifest: input.evidence },
+      context: { developerId, periodId, manifest: input.evidence },
       specifications,
       tokenUsage,
       system,
@@ -127,7 +127,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
       port,
       phase: "skeptic",
       budgetTokens: budget.skeptic,
-      context: { evaluateeUserId, periodId, manifest: input.evidence },
+      context: { developerId, periodId, manifest: input.evidence },
       specifications,
       tokenUsage,
       system,
@@ -139,7 +139,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
       port,
       phase: "synthesis",
       budgetTokens: budget.synthesis,
-      context: { evaluateeUserId, periodId, manifest: input.evidence },
+      context: { developerId, periodId, manifest: input.evidence },
       specifications,
       tokenUsage,
       system,
@@ -223,7 +223,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
     port: ChatModelPort;
     phase: PhaseName;
     budgetTokens: number;
-    context: { evaluateeUserId: string; periodId: string; manifest: JudgmentInput["evidence"] };
+    context: { developerId: string; periodId: string; manifest: JudgmentInput["evidence"] };
     specifications: ToolSpecification[];
     tokenUsage: { total: number; byPhase: Record<string, number> };
     system: string;
@@ -282,7 +282,7 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
 
   private async executeTool(
     state: WorkEvaluationJudgmentRunState,
-    context: { evaluateeUserId: string; periodId: string; manifest: JudgmentInput["evidence"] },
+    context: { developerId: string; periodId: string; manifest: JudgmentInput["evidence"] },
     call: ModelToolCall,
   ): Promise<ChatMessage> {
     try {
@@ -306,9 +306,9 @@ export class WorkEvaluationJudgmentService implements JudgmentPort {
 
   // --- run inputs ------------------------------------------------------------
 
-  private async homeCriteria(evaluateeUserId: string, periodId: string): Promise<string[]> {
+  private async homeCriteria(developerId: string, periodId: string): Promise<string[]> {
     try {
-      const homeGround = await this.periods.getHomeGround(evaluateeUserId, periodId);
+      const homeGround = await this.periods.getHomeGround(developerId, periodId);
       return Array.isArray(homeGround.homeCriteria) ? (homeGround.homeCriteria as string[]) : [];
     } catch (error) {
       if (error instanceof NotFoundException) return [];

@@ -96,7 +96,8 @@ export class SecurityEvaluationIntelMatchService {
   async match(
     candidates: readonly IntelEvidenceCandidate[],
     entities: readonly SecurityEvaluationScopeEntity[],
-    scopeKey: string,
+    subjectKind: string,
+    subjectKey: string,
   ): Promise<IntelMatchOutcome> {
     if (entities.length === 0 || candidates.length === 0) {
       return { matches: [], examinedRefs: [] };
@@ -130,7 +131,8 @@ export class SecurityEvaluationIntelMatchService {
         // this pair out of subsequent pipelines (entity sets are dynamic).
         await this.negativeCache.record({
           knowledgeItemId: candidate.knowledgeItemId,
-          scopeKey,
+          subjectKind,
+          subjectKey,
           verdict: "hard-hit",
           signature: buildSecurityEvaluationIntelReRankRequest(
             { title: candidate.title, summary: candidate.summary },
@@ -166,7 +168,8 @@ export class SecurityEvaluationIntelMatchService {
         if (verdict.kind === "not-relevant" && verdict.signature) {
           await this.negativeCache.record({
             knowledgeItemId: candidate.knowledgeItemId,
-            scopeKey,
+            subjectKind,
+            subjectKey,
             verdict: "not-relevant",
             signature: verdict.signature,
             reason: verdict.reason,

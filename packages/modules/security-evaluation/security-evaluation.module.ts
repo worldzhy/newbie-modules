@@ -51,8 +51,8 @@ import {
  * Slice 1 owns the asset inventory, the dependency criteria and the DEPENDENCY
  * judgment; slice 2 (ADR-027) adds the AWS_CONFIG mechanism: the CIS AWS
  * Foundations criteria for subject kind "aws-account", its evidence provider
- * and its rulebook judgment, dispatched by evaluationKey through the same judgment
- * service. INTEL arrives in a later slice with its own evaluationKey dispatch.
+ * and its rulebook judgment, dispatched by standardKey through the same judgment
+ * service. INTEL arrives in a later slice with its own standardKey dispatch.
  * ADR-046 turns that dispatch into a mechanism registry: each key declares a
  * mechanism list, executed in parallel and merged under a single contract.
  *
@@ -156,7 +156,7 @@ import {
       ],
     },
     // Kind-scoped skeleton ports (ADR-020 D4). One judgment dispatcher serves
-    // both kinds; the evaluationKey on the criteria version routes the mechanism.
+    // both kinds; the standardKey on the criteria version routes the mechanism.
     {
       provide: criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
       useExisting: SecurityEvaluationCriteriaProvider,

@@ -103,9 +103,9 @@ export class WorkEvaluationEvidenceController {
     @Req() req: Request & { installation: ResolvedWorkEvaluationInstallationToken },
     @Body() body: CreateWorkEvaluationWorkspaceBatchRequestDto,
   ): Promise<void> {
-    const { evaluateeUserId, installationId } = req.installation;
+    const { developerId, installationId } = req.installation;
     for (const workspace of body.workspaces) {
-      await this.evidence.reportWorkspace(evaluateeUserId, installationId, workspace);
+      await this.evidence.reportWorkspace(developerId, installationId, workspace);
     }
     await this.installations.touchOnIngest(installationId);
   }
@@ -122,15 +122,15 @@ export class WorkEvaluationEvidenceController {
     @Req() req: Request & { installation: ResolvedWorkEvaluationInstallationToken },
     @Body() body: CreateWorkEvaluationSessionBatchRequestDto,
   ): Promise<void> {
-    const { evaluateeUserId, installationId } = req.installation;
+    const { developerId, installationId } = req.installation;
 
     // Idempotent re-ingest: the PG index is an upsert keyed by
-    // (evaluateeUserId, externalSessionId), and transcript chunks dedupe on
+    // (developerId, externalSessionId), and transcript chunks dedupe on
     // (session_id, seq) in ClickHouse. If a CH insert fails after its PG
     // upsert succeeded, the agent simply re-posts the batch — the retried
     // upsert is a no-op and the retried chunks collapse on read.
     const indexes = await this.evidence.reportSessions(
-      evaluateeUserId,
+      developerId,
       body.sessions.map(({ messages: _messages, ...index }) => index),
     );
 
@@ -138,7 +138,7 @@ export class WorkEvaluationEvidenceController {
       body.sessions.map((session, position) =>
         this.sessions.insertMessages(
           session.messages.map((message) => ({
-            evaluatee_user_id: evaluateeUserId,
+            developer_id: developerId,
             session_id: indexes[position].id,
             workspace_key: session.workspaceKey,
             seq: message.seq,
@@ -166,9 +166,9 @@ export class WorkEvaluationEvidenceController {
     @Req() req: Request & { installation: ResolvedWorkEvaluationInstallationToken },
     @Body() body: CreateWorkEvaluationDeclaredDocumentBatchRequestDto,
   ): Promise<void> {
-    const { evaluateeUserId, installationId } = req.installation;
+    const { developerId, installationId } = req.installation;
     for (const document of body.documents) {
-      await this.evidence.reportDocument(evaluateeUserId, document);
+      await this.evidence.reportDocument(developerId, document);
     }
     await this.installations.touchOnIngest(installationId);
   }
@@ -180,11 +180,11 @@ export class WorkEvaluationEvidenceController {
   @ApiResponse({ type: WorkEvaluationWorkspaceResponseDto, isArray: true })
   @ApiResponse({ status: 403, description: "Reading another member's evidence without manager permission." })
   async listWorkspaces(@Req() request: UserRequest, @Query() query: ListWorkEvaluationWorkspacesRequestDto) {
-    const evaluateeUserId = await this.resolveReadableEvaluatee(request, query.evaluateeUserId, {
+    const developerId = await this.resolveReadableEvaluatee(request, query.developerId, {
       resource: Prisma.ModelName.WorkEvaluationWorkspace,
       action: PermissionAction.List,
     });
-    return this.evidence.listWorkspaces({ ...query, evaluateeUserId });
+    return this.evidence.listWorkspaces({ ...query, developerId });
   }
 
   @Get("sessions")
@@ -192,11 +192,11 @@ export class WorkEvaluationEvidenceController {
   @ApiResponse({ type: ListWorkEvaluationSessionsResponseDto })
   @ApiResponse({ status: 403, description: "Reading another member's evidence without manager permission." })
   async listSessions(@Req() request: UserRequest, @Query() query: ListWorkEvaluationSessionsRequestDto) {
-    const evaluateeUserId = await this.resolveReadableEvaluatee(request, query.evaluateeUserId, {
+    const developerId = await this.resolveReadableEvaluatee(request, query.developerId, {
       resource: Prisma.ModelName.WorkEvaluationSession,
       action: PermissionAction.List,
     });
-    return this.evidence.listSessions({ ...query, evaluateeUserId });
+    return this.evidence.listSessions({ ...query, developerId });
   }
 
   @Get("documents")
@@ -204,11 +204,11 @@ export class WorkEvaluationEvidenceController {
   @ApiResponse({ type: ListWorkEvaluationDeclaredDocumentsResponseDto })
   @ApiResponse({ status: 403, description: "Reading another member's evidence without manager permission." })
   async listDocuments(@Req() request: UserRequest, @Query() query: ListWorkEvaluationDeclaredDocumentsRequestDto) {
-    const evaluateeUserId = await this.resolveReadableEvaluatee(request, query.evaluateeUserId, {
+    const developerId = await this.resolveReadableEvaluatee(request, query.developerId, {
       resource: Prisma.ModelName.WorkEvaluationDeclaredDocument,
       action: PermissionAction.List,
     });
-    return this.evidence.listDocuments({ ...query, evaluateeUserId });
+    return this.evidence.listDocuments({ ...query, developerId });
   }
 
   @Get("documents/:id")
@@ -220,10 +220,10 @@ export class WorkEvaluationEvidenceController {
     @Query() query: GetWorkEvaluationDeclaredDocumentRequestDto,
     @Req() request: UserRequest,
   ) {
-    const evaluateeUserId = await this.resolveReadableEvaluatee(request, query.evaluateeUserId, {
+    const developerId = await this.resolveReadableEvaluatee(request, query.developerId, {
       resource: Prisma.ModelName.WorkEvaluationDeclaredDocument,
       action: PermissionAction.Get,
     });
-    return this.evidence.getDocument(params.id, evaluateeUserId);
+    return this.evidence.getDocument(params.id, developerId);
   }
 }

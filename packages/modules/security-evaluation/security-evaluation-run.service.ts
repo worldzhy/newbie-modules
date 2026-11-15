@@ -42,9 +42,9 @@ export class SecurityEvaluationRunService {
   }
 
   /**
-   * Runs decorated with their evaluationKey labels: the skeleton row only
+   * Runs decorated with their standardKey labels: the skeleton row only
    * carries ruleSetVersionId, while the API consumer displays the
-   * evaluationKey and version of what the run was judged against.
+   * standardKey and version of what the run was judged against.
    */
   async listRuns(query: ListEvaluationRunsInput) {
     const page = await this.runs.listRuns(query);
@@ -57,7 +57,7 @@ export class SecurityEvaluationRunService {
       ...page,
       records: records.map((run) => {
         const version = versions.get(run.ruleSetVersionId);
-        return { ...run, evaluationKey: version?.evaluationKey ?? "", ruleSetVersion: version?.version ?? "" };
+        return { ...run, standardKey: version?.standardKey ?? "", ruleSetVersion: version?.version ?? "" };
       }),
     };
   }

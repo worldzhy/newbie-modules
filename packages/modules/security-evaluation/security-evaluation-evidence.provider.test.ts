@@ -26,8 +26,8 @@ const subject: EvaluationSubjectRef = {
 
 const ruleSetVersion: EvaluationRuleSetVersionRef = {
   id: "33333333-3333-4333-8333-333333333333",
-  kind: "repository",
-  evaluationKey: "npm-osv",
+  subjectKind: "repository",
+  standardKey: "npm-osv",
   version: "v1",
 };
 
@@ -82,7 +82,8 @@ function stubPrisma(): PrismaService {
 
 function stubNegativeCache(): SecurityEvaluationIntelNegativeCachePort {
   return {
-    filterUncached: async (_scopeKey, candidates) => candidates.map((candidate) => candidate.knowledgeItemId),
+    filterUncached: async (_subjectKind, _subjectKey, candidates) =>
+      candidates.map((candidate) => candidate.knowledgeItemId),
     record: async () => {},
   };
 }

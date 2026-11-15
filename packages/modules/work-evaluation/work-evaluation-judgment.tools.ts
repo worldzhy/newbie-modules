@@ -14,7 +14,7 @@ const MAX_LISTED_RECORDS = 200;
 const MAX_SESSION_MESSAGES = 200;
 
 export interface WorkEvaluationToolContext {
-  evaluateeUserId: string;
+  developerId: string;
   periodId: string;
   manifest: EvaluationEvidenceItem[];
 }
@@ -157,7 +157,7 @@ export class WorkEvaluationJudgmentTools {
     switch (name) {
       case "list_sessions":
         return this.evidence.listSessions({
-          evaluateeUserId: context.evaluateeUserId,
+          developerId: context.developerId,
           collectionPeriodId: context.periodId,
           page: 0,
           pageSize: MAX_LISTED_RECORDS,
@@ -171,7 +171,7 @@ export class WorkEvaluationJudgmentTools {
         );
       case "list_documents":
         return this.evidence.listDocuments({
-          evaluateeUserId: context.evaluateeUserId,
+          developerId: context.developerId,
           page: 0,
           pageSize: MAX_LISTED_RECORDS,
         });

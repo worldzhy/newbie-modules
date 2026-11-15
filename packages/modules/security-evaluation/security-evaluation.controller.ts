@@ -128,7 +128,7 @@ export class SecurityEvaluationController {
   ): Promise<SecurityEvaluationRunAcceptedResponseDto> {
     await this.runs.startRun({
       ...body,
-      requestedByRef: request.user.userId,
+      requestedBy: request.user.userId,
     });
     return { accepted: true };
   }
@@ -172,7 +172,7 @@ export class SecurityEvaluationController {
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationFinding)
   @ApiOperation({
     summary:
-      "List findings (platform view), optionally filtered by provenance source, subject, run, evaluationKey, status, severity, urgency, staleness",
+      "List findings (platform view), optionally filtered by provenance source, subject, run, standardKey, status, severity, urgency, staleness",
   })
   @ApiResponse({ status: 200, type: ListSecurityEvaluationFindingsResponseDto })
   async listFindings(@Query() query: ListSecurityEvaluationFindingsRequestDto) {
@@ -187,7 +187,7 @@ export class SecurityEvaluationController {
       subjectIds: subjectIds ?? undefined,
       subjectId: query.subjectId,
       runId: query.runId,
-      evaluationKey: query.evaluationKey,
+      standardKey: query.standardKey,
       status: query.status ?? (staleBefore ? EvaluationFindingStatus.OPEN : undefined),
       severity: query.severity,
       urgency: query.urgency,
@@ -219,16 +219,16 @@ export class SecurityEvaluationController {
     // Result may be missing (run status FAILED before judgment) — tolerate gracefully.
     let manifest: unknown[] = [];
     let ruleSetVersion: string | null = null;
-    let evaluationKey: string | null = null;
+    let standardKey: string | null = null;
     let subjectId: string | null = null;
     try {
       const runResult = await this.results.getResultForRun(finding.lastSeenRunId);
       subjectId = runResult.subjectId;
       const manifestResult = await this.results.getResultManifest(runResult.id);
-      manifest = manifestResult.manifest as unknown[];
+      manifest = manifestResult.evidenceManifest as unknown[];
       const version = await this.criteria.getVersion(runResult.ruleSetVersionId);
       ruleSetVersion = version.version ?? null;
-      evaluationKey = version.evaluationKey ?? null;
+      standardKey = version.standardKey ?? null;
     } catch {
       // No result / run — return finding alone.
     }
@@ -241,7 +241,7 @@ export class SecurityEvaluationController {
     return {
       finding: finding as unknown as SecurityEvaluationFindingResponseDto,
       ruleSetVersion,
-      evaluationKey,
+      standardKey,
       evidenceItems,
     };
   }

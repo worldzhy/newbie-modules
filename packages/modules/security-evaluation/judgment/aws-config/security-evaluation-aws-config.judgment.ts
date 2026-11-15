@@ -23,7 +23,7 @@ const MAX_DETAIL_LENGTH = 4000;
 /**
  * aws-config judgment — collected account configuration items against the
  * rulebook (ADR-027, ADR-037). One mechanism serves both AWS evaluation keys
- * (`aws-cis-1.5` and `aws-custom`); the run's criteria evaluationKey selects
+ * (`aws-cis-1.5` and `aws-custom`); the run's criteria standardKey selects
  * which entries apply. Deterministic by construction: every FAIL of a
  * rulebook entry becomes one finding per non-compliant resource; PASS emits
  * nothing. Collection failures never reach this class as fake items — the
@@ -35,9 +35,9 @@ export class SecurityEvaluationAwsConfigJudgment implements SecurityEvaluationJu
 
   judge(input: JudgmentInput): Promise<EvaluationJudgment> {
     const { items, skippedRefs } = rebuildAwsConfigKnowledge(input.evidence);
-    const evaluationKey = input.ruleSetVersion.evaluationKey;
+    const standardKey = input.ruleSetVersion.standardKey;
 
-    const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.evaluationKey === evaluationKey);
+    const entries = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter((entry) => entry.standardKey === standardKey);
 
     const severityByKey = new Map(
       input.criteria.map((criterion) => [criterion.criterionKey, readSeverity(criterion.metadata)]),
@@ -78,7 +78,7 @@ export class SecurityEvaluationAwsConfigJudgment implements SecurityEvaluationJu
       .filter((item) => requiredKnowledgeTypes.has(String(item.payload?.type)))
       .map((item) => item.id);
 
-    const isCis = evaluationKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5;
+    const isCis = standardKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5;
     return Promise.resolve({
       verdicts: [],
       findings,
@@ -95,7 +95,7 @@ export class SecurityEvaluationAwsConfigJudgment implements SecurityEvaluationJu
       summary: `Judged ${entries.length} ${isCis ? "CIS controls" : "custom rules"} over ${input.evidence.length} configuration items: ${findings.length} findings.`,
       metadata: {
         ...(isCis ? { benchmark: SECURITY_EVALUATION_AWS_CIS_BENCHMARK } : {}),
-        evaluationKey,
+        standardKey,
         rulesEvaluated: entries.length,
         findingsEmitted: findings.length,
       },

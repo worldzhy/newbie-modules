@@ -38,8 +38,8 @@ const PRISMA_VERDICT: Record<SecurityEvaluationThreatVerdictKind, "notRelevant" 
  *
  * Reads filter to `verdict: "not-relevant"` AND respect TTL — hard-hit rows
  * are intentionally invisible to filterUncached (audit only). The composite
- * unique key `(knowledgeItemId, scopeKey)` makes `record` an upsert, so
- * concurrent scope judgments cannot overwrite each other's rows.
+ * unique key `(knowledgeItemId, subjectKind, subjectKey)` makes `record` an
+ * upsert, so concurrent scope judgments cannot overwrite each other's rows.
  *
  * This adapter lives outside `judgment/` on purpose: the judgment directory
  * is statically enforced to carry no Prisma dependency.
@@ -56,7 +56,8 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
   }
 
   async filterUncached(
-    scopeKey: string,
+    subjectKind: string,
+    subjectKey: string,
     candidates: readonly SecurityEvaluationIntelCacheCandidate[],
   ): Promise<string[]> {
     if (candidates.length === 0) return [];
@@ -67,7 +68,8 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
     const cutoff = new Date(Date.now() - this.ttlMs);
     const cached = await this.prisma.securityEvaluationThreatVerdictCache.findMany({
       where: {
-        scopeKey,
+        subjectKind,
+        subjectKey,
         knowledgeItemId: { in: candidates.map((candidate) => candidate.knowledgeItemId) },
         verdict: PRISMA_VERDICT["not-relevant"],
         updatedAt: { gt: cutoff },
@@ -84,15 +86,23 @@ export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityE
   }
 
   async record(entry: SecurityEvaluationIntelVerdictRecord): Promise<void> {
-    const { knowledgeItemId, scopeKey, verdict, signature } = entry;
+    const { knowledgeItemId, subjectKind, subjectKey, verdict, signature } = entry;
     // Normalize: undefined → null for the optional payload columns.
     const reason = entry.reason ?? null;
     const matchedEntity = entry.matchedEntity ?? null;
 
     const prismaVerdict = PRISMA_VERDICT[verdict];
     await this.prisma.securityEvaluationThreatVerdictCache.upsert({
-      where: { knowledgeItemId_scopeKey: { knowledgeItemId, scopeKey } },
-      create: { knowledgeItemId, scopeKey, verdict: prismaVerdict, inputSignature: signature, reason, matchedEntity },
+      where: { knowledgeItemId_subjectKind_subjectKey: { knowledgeItemId, subjectKind, subjectKey } },
+      create: {
+        knowledgeItemId,
+        subjectKind,
+        subjectKey,
+        verdict: prismaVerdict,
+        inputSignature: signature,
+        reason,
+        matchedEntity,
+      },
       update: { verdict: prismaVerdict, inputSignature: signature, reason, matchedEntity },
     });
   }

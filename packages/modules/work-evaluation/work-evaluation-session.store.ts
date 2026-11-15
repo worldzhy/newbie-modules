@@ -5,7 +5,7 @@ import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 export const SESSION_MESSAGE_TABLE = "work_evaluation_session_messages";
 
 export interface SessionMessageRow {
-  evaluatee_user_id: string;
+  developer_id: string;
   session_id: string;
   workspace_key: string;
   seq: number;
@@ -25,7 +25,7 @@ export interface SessionMessageRow {
  * installation agent before upload and compressed by the ClickHouse column codec.
  *
  * The table engine is ReplacingMergeTree(ingested_at) keyed by
- * (evaluatee_user_id, session_id, seq): re-ingesting the same batch inserts
+ * (developer_id, session_id, seq): re-ingesting the same batch inserts
  * duplicate rows that collapse into the newest version. Reads must use FINAL
  * so duplicates are invisible even before the background merge runs.
  */
@@ -49,7 +49,7 @@ export class WorkEvaluationSessionStore {
   ): Promise<SessionMessageRow[]> {
     const result = await this.clickhouse.query({
       query: [
-        `SELECT evaluatee_user_id, session_id, workspace_key, seq, role, content, tool_name, tool_calls, token_count, created_at`,
+        `SELECT developer_id, session_id, workspace_key, seq, role, content, tool_name, tool_calls, token_count, created_at`,
         `FROM ${SESSION_MESSAGE_TABLE} FINAL`,
         `WHERE session_id = {sessionId:UUID} AND seq >= {fromSeq:UInt32}`,
         `ORDER BY seq ASC`,

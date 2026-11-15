@@ -77,9 +77,9 @@ test("registry: every key declares at least one uniquely named mechanism", () =>
   ];
   assert.deepEqual(Object.keys(SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY).sort(), [...expectedKeys].sort());
 
-  for (const [evaluationKey, names] of Object.entries(SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY)) {
-    assert.ok(names.length >= 1, `${evaluationKey} must declare at least one mechanism`);
-    assert.equal(new Set(names).size, names.length, `${evaluationKey} declares a duplicate mechanism name`);
+  for (const [standardKey, names] of Object.entries(SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY)) {
+    assert.ok(names.length >= 1, `${standardKey} must declare at least one mechanism`);
+    assert.equal(new Set(names).size, names.length, `${standardKey} declares a duplicate mechanism name`);
   }
 
   // The shared aws-config mechanism is explicit for both AWS keys.
@@ -197,10 +197,15 @@ test("merge: an evidence id skipped by two mechanisms is counted once so items.l
   assert.equal(merged.skipped?.note, "a: budget exhausted b: negative cache");
 });
 
-test("dispatcher: unknown evaluationKey is a contract error, known keys run their mechanisms", async () => {
+test("dispatcher: unknown standardKey is a contract error, known keys run their mechanisms", async () => {
   const input = {
     subject: { id: "s-1", subjectKey: "k", displayName: "k" },
-    ruleSetVersion: { id: "v-1", kind: "repository", evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV, version: "v1" },
+    ruleSetVersion: {
+      id: "v-1",
+      subjectKind: "repository",
+      standardKey: SECURITY_EVALUATION_KEY_NPM_OSV,
+      version: "v1",
+    },
     criteria: [],
     evidence: [],
     runConfig: null,
@@ -217,7 +222,7 @@ test("dispatcher: unknown evaluationKey is a contract error, known keys run thei
   assert.equal(result.summary, "dependency judged");
 
   await assert.rejects(
-    () => service.judge({ ...input, ruleSetVersion: { ...input.ruleSetVersion, evaluationKey: "unknown-key" } }),
+    () => service.judge({ ...input, ruleSetVersion: { ...input.ruleSetVersion, standardKey: "unknown-key" } }),
     (error: unknown) => error instanceof BadRequestException,
   );
 });

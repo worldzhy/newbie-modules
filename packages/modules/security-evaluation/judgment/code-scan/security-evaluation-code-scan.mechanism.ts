@@ -161,7 +161,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
   ) {}
 
   async judge(input: JudgmentInput): Promise<EvaluationJudgment> {
-    if (input.ruleSetVersion.evaluationKey !== SECURITY_EVALUATION_KEY_CODE_SCAN) {
+    if (input.ruleSetVersion.standardKey !== SECURITY_EVALUATION_KEY_CODE_SCAN) {
       return { verdicts: [], findings: [], evaluatedRefs: [] };
     }
     const sourceItems = input.evidence.filter((item) => item.layer === "source" && item.source === "repository");
@@ -181,7 +181,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
       };
     });
     const promptVersion = codeScanPromptVersion();
-    const ruleSetVersion = input.ruleSetVersion.version;
+    const ruleSetVersionLabel = input.ruleSetVersion.version;
 
     let chatModel: ChatModelPort | null = null;
     try {
@@ -232,7 +232,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
       modelId,
       connectionId,
       promptVersion,
-      ruleSetVersion,
+      ruleSetVersionLabel,
       files: sourceItems.map((item) => {
         const payload = payloads.get(item.id)!;
         return { path: payload.path, contentHash: payload.contentHash };
@@ -363,8 +363,8 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
             modelId,
             connectionId,
             promptVersion,
-            ruleSetVersion,
-            findings: byCriterion.get(criterion.criterionKey)!,
+            ruleSetVersionLabel,
+            cachedFindings: byCriterion.get(criterion.criterionKey)!,
             signature: request.signature,
           })),
         );

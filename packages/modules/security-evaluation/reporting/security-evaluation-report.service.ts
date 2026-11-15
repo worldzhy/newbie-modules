@@ -69,7 +69,7 @@ export interface SecurityEvaluationReport {
     bySeverity: Record<Severity, number>;
     byUrgency: Record<SecurityEvaluationUrgency, number>;
     byEvaluationKey: {
-      evaluationKey: string;
+      standardKey: string;
       open: number;
       bySeverity: Record<Severity, number>;
     }[];
@@ -97,7 +97,7 @@ export interface SecurityEvaluationReport {
     resolvedCount: number;
     windowDays: number;
     byEvaluationKey: {
-      evaluationKey: string;
+      standardKey: string;
       averageDays: number | null;
       medianDays: number | null;
       resolvedCount: number;
@@ -109,7 +109,7 @@ export interface SecurityEvaluationReport {
  * SecurityEvaluationReportService — the read model of the first slice
  * (ADR-022 D6): assets, coverage, findings, trend and MTTR. Coverage reflects
  * the latest result per subject per evaluation axis (ADR-020 D5.2). There is no
- * composite score and no cross-evaluationKey weighting.
+ * composite score and no cross-standardKey weighting.
  */
 @Injectable()
 export class SecurityEvaluationReportService {
@@ -215,14 +215,14 @@ export class SecurityEvaluationReportService {
         subjectId: true,
         ruleSetVersionId: true,
         coverageStats: true,
-        ruleSetVersion: { select: { evaluationKey: true } },
+        ruleSetVersion: { select: { standardKey: true } },
       },
     });
     for (const result of results) {
       const byAxis = latest.get(result.subjectId) ?? new Map<string, CoverageStatsSummary>();
-      const evaluationKey = result.ruleSetVersion.evaluationKey;
-      if (byAxis.has(evaluationKey)) continue;
-      byAxis.set(evaluationKey, (result.coverageStats ?? {}) as CoverageStatsSummary);
+      const standardKey = result.ruleSetVersion.standardKey;
+      if (byAxis.has(standardKey)) continue;
+      byAxis.set(standardKey, (result.coverageStats ?? {}) as CoverageStatsSummary);
       latest.set(result.subjectId, byAxis);
     }
     return latest;
@@ -234,15 +234,15 @@ export class SecurityEvaluationReportService {
       SecurityEvaluationUrgency,
       number
     >;
-    const byKey = new Map<string, { evaluationKey: string; open: number; bySeverity: Record<Severity, number> }>();
+    const byKey = new Map<string, { standardKey: string; open: number; bySeverity: Record<Severity, number> }>();
     if (subjectIds.length === 0) {
       return { open: 0, bySeverity, byUrgency, byEvaluationKey: [], topOpen: [] };
     }
 
     // One pass over the OPEN set yields the platform severity split and the
-    // per-evaluationKey split: the grouped rows are already keyed by both.
+    // per-standardKey split: the grouped rows are already keyed by both.
     const grouped = await this.prisma.evaluationFinding.groupBy({
-      by: ["evaluationKey", "severity"],
+      by: ["standardKey", "severity"],
       where: { subjectId: { in: [...subjectIds] }, status: EvaluationFindingStatus.OPEN },
       _count: { _all: true },
     });
@@ -252,17 +252,17 @@ export class SecurityEvaluationReportService {
       open += count;
       const severity = row.severity as Severity;
       if (severity in bySeverity) bySeverity[severity] += count;
-      const keyEntry = byKey.get(row.evaluationKey) ?? {
-        evaluationKey: row.evaluationKey,
+      const keyEntry = byKey.get(row.standardKey) ?? {
+        standardKey: row.standardKey,
         open: 0,
         bySeverity: emptySeverityCounts(),
       };
       keyEntry.open += count;
       if (severity in keyEntry.bySeverity) keyEntry.bySeverity[severity] += count;
-      byKey.set(row.evaluationKey, keyEntry);
+      byKey.set(row.standardKey, keyEntry);
     }
     const byEvaluationKey = [...byKey.values()].sort((left, right) =>
-      left.evaluationKey.localeCompare(right.evaluationKey),
+      left.standardKey.localeCompare(right.standardKey),
     );
 
     // Urgency lives in the JSON metadata column, so it cannot be aggregated by
@@ -402,12 +402,12 @@ export class SecurityEvaluationReportService {
         WHERE "subjectId" IN (${Prisma.join([...subjectIds])}) AND "resolvedAt" IS NOT NULL AND "resolvedAt" >= ${since}
       `,
       // Median needs the window function; average alone would hide a long tail
-      // that a few stale findings produce per evaluationKey.
+      // that a few stale findings produce per standardKey.
       this.prisma.$queryRaw<
-        Array<{ evaluationKey: string; averageDays: number | null; medianDays: number | null; resolvedCount: number }>
+        Array<{ standardKey: string; averageDays: number | null; medianDays: number | null; resolvedCount: number }>
       >`
         SELECT
-          "evaluationKey" AS "evaluationKey",
+          "standardKey" AS "standardKey",
           avg(extract(epoch from ("resolvedAt" - "firstSeenAt")) / 86400.0)::float8 AS "averageDays",
           percentile_cont(0.5) WITHIN GROUP (
             ORDER BY extract(epoch from ("resolvedAt" - "firstSeenAt"))::float8 / 86400.0
@@ -425,7 +425,7 @@ export class SecurityEvaluationReportService {
       resolvedCount: row?.resolvedCount ?? 0,
       windowDays,
       byEvaluationKey: perKey.map((entry) => ({
-        evaluationKey: entry.evaluationKey,
+        standardKey: entry.standardKey,
         averageDays: entry.averageDays ?? null,
         medianDays: entry.medianDays ?? null,
         resolvedCount: entry.resolvedCount,

@@ -20,7 +20,7 @@ export interface ListEvaluationFindingsInput {
   subjectIds?: readonly string[];
   /** Only findings last observed by this run. */
   runId?: string;
-  evaluationKey?: string;
+  standardKey?: string;
   status?: EvaluationFindingStatus;
   severity?: FindingSeverity;
   /**
@@ -38,12 +38,12 @@ export interface ListEvaluationFindingsInput {
 /**
  * EvaluationFindingService — the assertion lifecycle (ADR-020 D2).
  *
- * A finding outlives the run that produced it: `(subjectId, evaluationKey,
+ * A finding outlives the run that produced it: `(subjectId, standardKey,
  * fingerprint)` is its identity, `firstSeenAt` is never rewritten, and it is
- * resolved when a later run of the same evaluationKey no longer observes it. The
- * evaluationKey comes from the run's criteria version, so a rerun under a new version
- * of the same evaluationKey keeps the identity, and one evaluationKey's run never resolves
- * another evaluationKey's findings. A suppressed finding keeps its suppression across
+ * resolved when a later run of the same standardKey no longer observes it. The
+ * standardKey comes from the run's criteria version, so a rerun under a new version
+ * of the same standardKey keeps the identity, and one standardKey's run never resolves
+ * another standardKey's findings. A suppressed finding keeps its suppression across
  * runs — reappearance must not resurrect it.
  */
 @Injectable()
@@ -78,31 +78,31 @@ export class EvaluationFindingService {
     });
     if (problems.length > 0) throw new BadRequestException(problems);
 
-    const { evaluationKey } = await this.criteria.getVersion(run.ruleSetVersionId);
+    const { standardKey } = await this.criteria.getVersion(run.ruleSetVersionId);
     const observedAt = run.startedAt ?? run.createdAt;
     const recorded: EvaluationFinding[] = [];
     for (const candidate of candidates) {
-      recorded.push(await this.observe(run, evaluationKey, candidate, observedAt));
+      recorded.push(await this.observe(run, standardKey, candidate, observedAt));
     }
     return recorded;
   }
 
   /**
-   * Close findings the run did not observe, scoped to the run's evaluationKey: a run
-   * of one evaluationKey must never resolve another evaluationKey's findings. The cutoff is
+   * Close findings the run did not observe, scoped to the run's standardKey: a run
+   * of one standardKey must never resolve another standardKey's findings. The cutoff is
    * the run's start time: anything last seen before it was absent from this
    * pass. Runs of one subject and version are serialized by the database, but
-   * two versions of the same evaluationKey may legitimately run concurrently — so the
+   * two versions of the same standardKey may legitimately run concurrently — so the
    * close is a compare-and-set on the listed `lastSeenAt`, and a finding that
    * was re-observed or suppressed after the listing is left untouched.
    */
   async resolveAbsentFindings(run: EvaluationRun): Promise<number> {
     const cutoff = run.startedAt ?? run.createdAt;
-    const { evaluationKey } = await this.criteria.getVersion(run.ruleSetVersionId);
+    const { standardKey } = await this.criteria.getVersion(run.ruleSetVersionId);
     const absent = await this.prisma.evaluationFinding.findMany({
       where: {
         subjectId: run.subjectId,
-        evaluationKey,
+        standardKey,
         status: EvaluationFindingStatus.OPEN,
         lastSeenAt: { lt: cutoff },
         NOT: { lastSeenRunId: run.id },
@@ -114,7 +114,7 @@ export class EvaluationFindingService {
     for (const finding of absent) {
       // Compare-and-set per row: resolve only if nothing touched the row since
       // the listing. A human suppression wins (status changed); a concurrent
-      // run of another version in the same evaluationKey that re-observed the finding
+      // run of another version in the same standardKey that re-observed the finding
       // also wins (lastSeenAt moved) — both leave the row untouched here.
       const resolved = await this.prisma.evaluationFinding.updateMany({
         where: { id: finding.id, status: EvaluationFindingStatus.OPEN, lastSeenAt: finding.lastSeenAt },
@@ -125,7 +125,7 @@ export class EvaluationFindingService {
       await this.notifyFindingChanged({
         findingId: finding.id,
         subjectId: run.subjectId,
-        evaluationKey,
+        standardKey,
         fingerprint: finding.fingerprint,
         severity: finding.severity,
         change: "resolved",
@@ -135,19 +135,18 @@ export class EvaluationFindingService {
   }
 
   /**
-   * Silence a finding until a human reopens it. The reason and the acting
-   * actor are both mandatory — a suppression without an attributable actor is
-   * an audit gap.
+   * Silence a finding until a human reopens it. The reason is mandatory; the
+   * acting actor is not stored (ADR-068 D6) — it is always the requester and
+   * the audit log already records it.
    */
-  async suppressFinding(id: string, note: string, suppressedByRef: string) {
+  async suppressFinding(id: string, note: string) {
     if (!note.trim()) throw new BadRequestException("A suppression note is required");
-    if (!suppressedByRef.trim()) throw new BadRequestException("suppressedByRef is required");
     const updated = await this.prisma.evaluationFinding.updateMany({
       where: { id },
       data: {
         status: EvaluationFindingStatus.SUPPRESSED,
         suppressionNote: note,
-        suppressedByRef,
+        suppressedAt: new Date(),
         resolvedAt: null,
       },
     });
@@ -156,7 +155,7 @@ export class EvaluationFindingService {
     await this.notifyFindingChanged({
       findingId: finding.id,
       subjectId: finding.subjectId,
-      evaluationKey: finding.evaluationKey,
+      standardKey: finding.standardKey,
       fingerprint: finding.fingerprint,
       severity: finding.severity,
       change: "suppressed",
@@ -172,7 +171,7 @@ export class EvaluationFindingService {
         status: EvaluationFindingStatus.OPEN,
         resolvedAt: null,
         suppressionNote: null,
-        suppressedByRef: null,
+        suppressedAt: null,
       },
     });
     if (updated.count === 0) throw new NotFoundException(`Evaluation finding ${id} not found`);
@@ -180,7 +179,7 @@ export class EvaluationFindingService {
     await this.notifyFindingChanged({
       findingId: finding.id,
       subjectId: finding.subjectId,
-      evaluationKey: finding.evaluationKey,
+      standardKey: finding.standardKey,
       fingerprint: finding.fingerprint,
       severity: finding.severity,
       change: "reopened",
@@ -201,7 +200,7 @@ export class EvaluationFindingService {
           ...(query.subjectId ? { subjectId: query.subjectId } : {}),
           ...(query.subjectIds ? { subjectId: { in: [...query.subjectIds] } } : {}),
           ...(query.runId ? { lastSeenRunId: query.runId } : {}),
-          ...(query.evaluationKey ? { evaluationKey: query.evaluationKey } : {}),
+          ...(query.standardKey ? { standardKey: query.standardKey } : {}),
           ...(query.status ? { status: query.status } : {}),
           // Read path goes through the same vocabulary mapping as writes: the
           // two literals are equal today, but a renamed enum member must not
@@ -219,18 +218,18 @@ export class EvaluationFindingService {
 
   private async observe(
     run: EvaluationRun,
-    evaluationKey: string,
+    standardKey: string,
     candidate: EvaluationFindingCandidate,
     observedAt: Date,
   ): Promise<EvaluationFinding> {
-    const existing = await this.findByFingerprint(run.subjectId, evaluationKey, candidate.fingerprint);
-    if (!existing) return this.createFinding(run, evaluationKey, candidate, observedAt);
+    const existing = await this.findByFingerprint(run.subjectId, standardKey, candidate.fingerprint);
+    if (!existing) return this.createFinding(run, standardKey, candidate, observedAt);
     return this.updateFinding(run, existing, candidate, observedAt);
   }
 
   private async createFinding(
     run: EvaluationRun,
-    evaluationKey: string,
+    standardKey: string,
     candidate: EvaluationFindingCandidate,
     observedAt: Date,
   ): Promise<EvaluationFinding> {
@@ -238,13 +237,13 @@ export class EvaluationFindingService {
       const created = await this.prisma.evaluationFinding.create({
         data: {
           subjectId: run.subjectId,
-          evaluationKey,
+          standardKey,
           fingerprint: candidate.fingerprint,
           criterionKey: candidate.criterionKey,
           severity: toPersistedSeverity(candidate.severity),
           status: EvaluationFindingStatus.OPEN,
           title: candidate.title,
-          detail: candidate.detail,
+          description: candidate.detail,
           metadata: candidate.metadata as Prisma.InputJsonValue | undefined,
           firstSeenRunId: run.id,
           lastSeenRunId: run.id,
@@ -255,7 +254,7 @@ export class EvaluationFindingService {
       await this.notifyFindingChanged({
         findingId: created.id,
         subjectId: created.subjectId,
-        evaluationKey: created.evaluationKey,
+        standardKey: created.standardKey,
         fingerprint: created.fingerprint,
         severity: created.severity,
         change: "created",
@@ -265,7 +264,7 @@ export class EvaluationFindingService {
       // A concurrent writer created the same fingerprint first; fall through to
       // the update path rather than failing the whole run.
       if (!isUniqueViolation(error)) throw error;
-      const existing = await this.findByFingerprint(run.subjectId, evaluationKey, candidate.fingerprint);
+      const existing = await this.findByFingerprint(run.subjectId, standardKey, candidate.fingerprint);
       if (!existing) throw error;
       return this.updateFinding(run, existing, candidate, observedAt);
     }
@@ -280,14 +279,14 @@ export class EvaluationFindingService {
     // A suppressed finding stays suppressed: the suppression is a human
     // decision about a known problem, not a cache to be invalidated. The write
     // is a compare-and-set on the status we read, so a suppression (or a
-    // concurrent run of the same evaluationKey) landing between the read and the
+    // concurrent run of the same standardKey) landing between the read and the
     // write is never stomped.
     const reopened = existing.status === EvaluationFindingStatus.RESOLVED;
     const observation = {
       criterionKey: candidate.criterionKey,
       severity: toPersistedSeverity(candidate.severity),
       title: candidate.title,
-      detail: candidate.detail,
+      description: candidate.detail,
       metadata: candidate.metadata as Prisma.InputJsonValue | undefined,
       lastSeenRunId: run.id,
       lastSeenAt: observedAt,
@@ -300,7 +299,7 @@ export class EvaluationFindingService {
             status: EvaluationFindingStatus.OPEN,
             resolvedAt: null,
             suppressionNote: null,
-            suppressedByRef: null,
+            suppressedAt: null,
           }
         : observation,
     });
@@ -315,7 +314,7 @@ export class EvaluationFindingService {
       await this.notifyFindingChanged({
         findingId: updated.id,
         subjectId: updated.subjectId,
-        evaluationKey: updated.evaluationKey,
+        standardKey: updated.standardKey,
         fingerprint: updated.fingerprint,
         severity: updated.severity,
         change: "reopened",
@@ -324,9 +323,9 @@ export class EvaluationFindingService {
     return updated;
   }
 
-  private async findByFingerprint(subjectId: string, evaluationKey: string, fingerprint: string) {
+  private async findByFingerprint(subjectId: string, standardKey: string, fingerprint: string) {
     return this.prisma.evaluationFinding.findUnique({
-      where: { subjectId_evaluationKey_fingerprint: { subjectId, evaluationKey, fingerprint } },
+      where: { subjectId_standardKey_fingerprint: { subjectId, standardKey, fingerprint } },
     });
   }
 
@@ -354,5 +353,5 @@ function isUniqueViolation(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const { code, message } = error as { code?: unknown; message?: unknown };
   if (code === "P2002") return true;
-  return typeof message === "string" && message.includes("EvaluationFinding_subjectId_evaluationKey_fingerprint_key");
+  return typeof message === "string" && message.includes("EvaluationFinding_subjectId_standardKey_fingerprint_key");
 }

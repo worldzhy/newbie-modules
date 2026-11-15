@@ -65,10 +65,10 @@ const CUSTOM_KEYS = [
 
 test("rulebook ships ten CIS controls and ten aws-custom rules, each tagged to its evaluation key", () => {
   const cis = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
-    (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    (entry) => entry.standardKey === SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
   );
   const custom = SECURITY_EVALUATION_AWS_CONFIG_RULEBOOK.filter(
-    (entry) => entry.evaluationKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    (entry) => entry.standardKey === SECURITY_EVALUATION_KEY_AWS_CUSTOM,
   );
   assert.deepEqual(
     cis.map((entry) => entry.criterionKey),

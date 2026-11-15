@@ -73,7 +73,7 @@ export class WorkEvaluationController {
 
   @Get("rule-set-versions")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationRuleSetVersion)
-  @ApiOperation({ summary: 'List criteria versions for kind "work"' })
+  @ApiOperation({ summary: 'List criteria versions for kind "developer"' })
   @ApiResponse({ status: 200, type: ListWorkEvaluationRuleSetVersionsResponseDto })
   async listRuleSetVersions(@Query() query: ListWorkEvaluationRuleSetVersionsRequestDto) {
     return this.criteria.listVersions({ kind: WORK_EVALUATION_SUBJECT_KIND, ...query });
@@ -81,12 +81,12 @@ export class WorkEvaluationController {
 
   @Post("rule-set-versions")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.EvaluationRuleSetVersion)
-  @ApiOperation({ summary: 'Create a new criteria version (draft) for kind "work"' })
+  @ApiOperation({ summary: 'Create a new criteria version (draft) for kind "developer"' })
   @ApiResponse({ status: 201, type: WorkEvaluationRuleSetVersionResponseDto })
   async createRuleSetVersion(@Body() body: CreateWorkEvaluationRuleSetVersionRequestDto) {
     return this.criteria.createVersion({
       kind: WORK_EVALUATION_SUBJECT_KIND,
-      evaluationKey: body.evaluationKey,
+      standardKey: body.standardKey,
       version: body.version,
       description: body.description,
       metadata: body.metadata as Record<string, unknown> | undefined,
@@ -202,14 +202,14 @@ export class WorkEvaluationController {
   @ApiOperation({ summary: "Get one member's home-ground declaration for a collection period" })
   @ApiResponse({ status: 200, type: WorkEvaluationHomeGroundResponseDto })
   getHomeGround(@Query() query: GetWorkEvaluationHomeGroundRequestDto) {
-    return this.periods.getHomeGround(query.evaluateeUserId, query.collectionPeriodId);
+    return this.periods.getHomeGround(query.developerId, query.collectionPeriodId);
   }
 
   // --- Subjects ----------------------------------------------------------
 
   @Get("subjects")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationSubject)
-  @ApiOperation({ summary: 'List evaluation subjects of kind "work" under a scope' })
+  @ApiOperation({ summary: 'List evaluation subjects of kind "developer" under a scope' })
   @ApiResponse({ status: 200, type: ListWorkEvaluationSubjectsResponseDto })
   listSubjects(@Query() query: ListWorkEvaluationSubjectsRequestDto) {
     return this.runs.listSubjects(query);
@@ -230,7 +230,7 @@ export class WorkEvaluationController {
   ): Promise<WorkEvaluationRunAcceptedResponseDto> {
     const runId = await this.runs.startRun({
       ...body,
-      requestedByRef: request.user.userId,
+      requestedBy: request.user.userId,
     });
     return { accepted: true, runId };
   }

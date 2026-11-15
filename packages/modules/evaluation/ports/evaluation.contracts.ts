@@ -48,8 +48,8 @@ export interface EvaluationSubjectRef {
 /** A published criteria version, detached from Prisma. */
 export interface EvaluationRuleSetVersionRef {
   id: string;
-  kind: string;
-  evaluationKey: string;
+  subjectKind: string;
+  standardKey: string;
   version: string;
 }
 

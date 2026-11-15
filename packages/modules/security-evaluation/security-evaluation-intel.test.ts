@@ -42,8 +42,8 @@ const SUBJECT: EvaluationSubjectRef = {
 
 const INTEL_VERSION: EvaluationRuleSetVersionRef = {
   id: "33333333-3333-4333-8333-333333333333",
-  kind: "repository",
-  evaluationKey: "threat-intel",
+  subjectKind: "repository",
+  standardKey: "threat-intel",
   version: "v1",
 };
 
@@ -51,24 +51,24 @@ const SCOPE_KEY = `${SUBJECT.kind}:${SUBJECT.subjectKey}`;
 
 interface IntelRow {
   id: string;
-  source: string;
+  feed: string;
   title: string;
   summary: string | null;
   severity: string;
   signalTags: string[];
-  fetchedAt: Date;
+  firstSeenAt: Date;
   negativeCache: Record<string, string> | null;
 }
 
 function row(id: string, overrides: Partial<IntelRow> = {}): IntelRow {
   return {
     id,
-    source: "ghsa",
+    feed: "ghsa",
     title: `advisory ${id}`,
     summary: null,
     severity: "high",
     signalTags: [],
-    fetchedAt: new Date("2026-10-30T00:00:00.000Z"),
+    firstSeenAt: new Date("2026-10-30T00:00:00.000Z"),
     negativeCache: null,
     ...overrides,
   };
@@ -83,12 +83,18 @@ function stubPrisma(rows: IntelRow[]): PrismaService {
 }
 
 function stubNegativeCache(rows: IntelRow[] = []) {
-  const recorded: { knowledgeItemId: string; scopeKey: string; verdict: string; signature: string }[] = [];
+  const recorded: {
+    knowledgeItemId: string;
+    subjectKind: string;
+    subjectKey: string;
+    verdict: string;
+    signature: string;
+  }[] = [];
   const seenScopeKeys: string[] = [];
   const cachedIds = new Set(rows.filter((row) => row.negativeCache?.[SCOPE_KEY] !== undefined).map((row) => row.id));
   const port: SecurityEvaluationIntelNegativeCachePort = {
-    filterUncached: async (scopeKey, candidates) => {
-      seenScopeKeys.push(scopeKey);
+    filterUncached: async (subjectKind, subjectKey, candidates) => {
+      seenScopeKeys.push(`${subjectKind}:${subjectKey}`);
       return candidates
         .filter((candidate) => !cachedIds.has(candidate.knowledgeItemId))
         .map((candidate) => candidate.knowledgeItemId);
@@ -96,7 +102,8 @@ function stubNegativeCache(rows: IntelRow[] = []) {
     record: async (entry) => {
       recorded.push({
         knowledgeItemId: entry.knowledgeItemId,
-        scopeKey: entry.scopeKey,
+        subjectKind: entry.subjectKind,
+        subjectKey: entry.subjectKey,
         verdict: entry.verdict,
         signature: entry.signature,
       });
@@ -232,7 +239,7 @@ test("the judgment maps examined candidates to manifest ids and budget cut-offs 
     // re-ranked candidate is recorded as "not-relevant".
     ["hard", "not-relevant"],
   );
-  assert.ok(recorded.every((entry) => entry.scopeKey === SCOPE_KEY));
+  assert.ok(recorded.every((entry) => entry.subjectKind === SUBJECT.kind && entry.subjectKey === SUBJECT.subjectKey));
 });
 
 test("the re-rank budget leaves overflow candidates in the judgment skipped bucket", async () => {
@@ -317,7 +324,8 @@ test("unavailable verdicts are never cached and leave the candidate unexamined",
   const outcome = await service.match(
     [{ knowledgeItemId: "kn-1", title: "advisory", severity: "high", signalTags: [] }],
     [{ value: "next" }],
-    SCOPE_KEY,
+    SUBJECT.kind,
+    SUBJECT.subjectKey,
   );
 
   assert.equal(recorded.length, 0);
@@ -406,7 +414,7 @@ test("the verdict cache reuses only rows recorded under the current signature", 
     configReturning(7),
   );
 
-  const uncached = await repository.filterUncached(SCOPE_KEY, [
+  const uncached = await repository.filterUncached(SUBJECT.kind, SUBJECT.subjectKey, [
     { knowledgeItemId: "same", signature: "sig" },
     { knowledgeItemId: "changed", signature: "new" },
     { knowledgeItemId: "legacy", signature: "sig" },

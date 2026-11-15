@@ -45,7 +45,7 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
         modelId: input.modelId,
         connectionId,
         promptVersion: input.promptVersion,
-        ruleSetVersion: input.ruleSetVersion,
+        ruleSetVersionLabel: input.ruleSetVersionLabel,
         path: { in: input.files.map((file) => file.path) },
         updatedAt: { gt: cutoff },
       },
@@ -64,9 +64,9 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
         modelId: row.modelId,
         connectionId: row.connectionId,
         promptVersion: row.promptVersion,
-        ruleSetVersion: row.ruleSetVersion,
+        ruleSetVersionLabel: row.ruleSetVersionLabel,
         // Rows are written from validated finding entries only; the cast is safe.
-        findings: row.findings as unknown as SecurityEvaluationCodeScanCachedFinding[],
+        cachedFindings: row.cachedFindings as unknown as SecurityEvaluationCodeScanCachedFinding[],
         signature: row.inputSignature ?? "",
       };
       const bucket = grouped.get(key);
@@ -91,7 +91,7 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
               modelId: entry.modelId,
               connectionId: connectionId as string,
               promptVersion: entry.promptVersion,
-              ruleSetVersion: entry.ruleSetVersion,
+              ruleSetVersionLabel: entry.ruleSetVersionLabel,
             },
           },
           create: {
@@ -102,12 +102,12 @@ export class SecurityEvaluationCodeScanVerdictCacheRepository implements Securit
             modelId: entry.modelId,
             connectionId,
             promptVersion: entry.promptVersion,
-            ruleSetVersion: entry.ruleSetVersion,
-            findings: entry.findings as unknown as never,
+            ruleSetVersionLabel: entry.ruleSetVersionLabel,
+            cachedFindings: entry.cachedFindings as unknown as never,
             inputSignature: entry.signature,
           },
           update: {
-            findings: entry.findings as unknown as never,
+            cachedFindings: entry.cachedFindings as unknown as never,
             inputSignature: entry.signature,
           },
         });

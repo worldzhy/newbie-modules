@@ -16,7 +16,7 @@ function buildService(overrides?: {
   user?: Record<string, unknown> | null;
   openError?: Error;
 }) {
-  const period = overrides?.period ?? { id: "period-1", type: "COLLECTION", status: "ACTIVE" };
+  const period = overrides?.period ?? { id: "period-1", phase: "COLLECTION", status: "ACTIVE" };
   const user = overrides?.user === undefined ? { id: "user-1", name: "Ada", email: "ada@dev.test" } : overrides?.user;
   const calls: { open: unknown[]; execute: unknown[] } = { open: [], execute: [] };
   const runner = {
@@ -44,7 +44,7 @@ function buildService(overrides?: {
 }
 
 const input = {
-  evaluateeUserId: "user-1",
+  developerId: "user-1",
   periodId: "period-1",
   config: { modelScope: "kimi-k3" },
 };

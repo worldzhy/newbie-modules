@@ -83,7 +83,7 @@ export interface ComposeCoverageResult {
  * never asserted by the caller; skipped buckets are merged so no source of
  * dropped material can disappear; unconsumed is the manifest minus evaluated
  * minus skipped — material registered but needed by no rule of this
- * evaluationKey. An evaluated ref unknown to the manifest is reported as a
+ * standardKey. An evaluated ref unknown to the manifest is reported as a
  * problem instead of being silently bucketed under an "unknown" source.
  */
 export function composeCoverageStats(input: ComposeCoverageInput): ComposeCoverageResult {

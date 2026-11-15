@@ -20,7 +20,7 @@ import {
 } from "./security-evaluation.constants";
 
 /**
- * Behavior-level tests for the criteria provider's evaluationKey dispatch.
+ * Behavior-level tests for the criteria provider's standardKey dispatch.
  * The provider is pure once the seed is stubbed, so the contract is testable
  * without a database.
  */
@@ -58,11 +58,11 @@ function createProvider() {
   return { provider, calls };
 }
 
-test("repository subject defaults to the npm/OSV evaluationKey", async () => {
+test("repository subject defaults to the npm/OSV standardKey", async () => {
   const { provider, calls } = createProvider();
   const selection = await provider.selectVersion(subject(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY), null);
   assert.deepEqual(selection, {
-    evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV,
+    standardKey: SECURITY_EVALUATION_KEY_NPM_OSV,
     version: SECURITY_EVALUATION_DEPENDENCY_RULE_SET_VERSION,
   });
   assert.deepEqual(calls, ["dependency"]);
@@ -71,10 +71,10 @@ test("repository subject defaults to the npm/OSV evaluationKey", async () => {
 test("repository subject switches to threat-intel when requested", async () => {
   const { provider, calls } = createProvider();
   const selection = await provider.selectVersion(subject(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY), {
-    evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
+    standardKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
   });
   assert.deepEqual(selection, {
-    evaluationKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
+    standardKey: SECURITY_EVALUATION_KEY_THREAT_INTEL,
     version: SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
   });
   assert.deepEqual(calls, ["intel"]);
@@ -83,32 +83,32 @@ test("repository subject switches to threat-intel when requested", async () => {
 test("repository subject switches to code-scan only when explicitly requested (ADR-054)", async () => {
   const { provider, calls } = createProvider();
   const selection = await provider.selectVersion(subject(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY), {
-    evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+    standardKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
   });
   assert.deepEqual(selection, {
-    evaluationKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
+    standardKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
     version: SECURITY_EVALUATION_CODE_SCAN_RULE_SET_VERSION,
   });
   assert.deepEqual(calls, ["code-scan"]);
 });
 
-test("aws-account subject defaults to the CIS benchmark evaluationKey", async () => {
+test("aws-account subject defaults to the CIS benchmark standardKey", async () => {
   const { provider, calls } = createProvider();
   const selection = await provider.selectVersion(subject(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT), null);
   assert.deepEqual(selection, {
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
     version: SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,
   });
   assert.deepEqual(calls, ["cis"]);
 });
 
-test("aws-account subject selects the custom hardening evaluationKey when requested", async () => {
+test("aws-account subject selects the custom hardening standardKey when requested", async () => {
   const { provider, calls } = createProvider();
   const selection = await provider.selectVersion(subject(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT), {
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
   });
   assert.deepEqual(selection, {
-    evaluationKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
+    standardKey: SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     version: SECURITY_EVALUATION_AWS_CUSTOM_RULE_SET_VERSION,
   });
   assert.deepEqual(calls, ["custom"]);

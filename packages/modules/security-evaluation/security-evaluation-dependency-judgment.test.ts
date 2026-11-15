@@ -37,8 +37,8 @@ function inputFor(items: EvaluationEvidenceItem[]): JudgmentInput {
     },
     ruleSetVersion: {
       id: "33333333-3333-4333-8333-333333333333",
-      kind: "repository",
-      evaluationKey: "npm-osv",
+      subjectKind: "repository",
+      standardKey: "npm-osv",
       version: "1",
     },
     criteria: [],

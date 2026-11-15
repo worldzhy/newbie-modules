@@ -8,7 +8,7 @@ import { EvaluationFindingService } from "./evaluation-finding.service";
 /**
  * Behavior-level test for the assertion lifecycle (ADR-020 D2): a finding
  * outlives the run that produced it, keeps its first-seen timestamp, resolves
- * when a later run of the same evaluationKey no longer observes it, reopens when it
+ * when a later run of the same standardKey no longer observes it, reopens when it
  * reappears, and never lets a re-run overwrite a human suppression.
  *
  * The fake below is the finding table plus the two criteria lookups the service
@@ -24,13 +24,13 @@ const EVIDENCE_ID = "pkg:npm:lodash@4.17.20";
 interface FakeFindingRow {
   id: string;
   subjectId: string;
-  evaluationKey: string;
+  standardKey: string;
   fingerprint: string;
   criterionKey: string;
   severity: string;
   status: "OPEN" | "RESOLVED" | "SUPPRESSED";
   title: string;
-  detail: string | undefined;
+  description: string | undefined;
   metadata: Record<string, unknown> | undefined;
   firstSeenRunId: string;
   lastSeenRunId: string;
@@ -38,7 +38,7 @@ interface FakeFindingRow {
   lastSeenAt: Date;
   resolvedAt: Date | null;
   suppressionNote: string | null;
-  suppressedByRef: string | null;
+  suppressedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -52,16 +52,16 @@ function fakePrisma() {
       findUnique: async (args: {
         where: {
           id?: string;
-          subjectId_evaluationKey_fingerprint?: { subjectId: string; evaluationKey: string; fingerprint: string };
+          subjectId_standardKey_fingerprint?: { subjectId: string; standardKey: string; fingerprint: string };
         };
       }) => {
-        const unique = args.where.subjectId_evaluationKey_fingerprint;
+        const unique = args.where.subjectId_standardKey_fingerprint;
         if (unique) {
           return (
             rows.find(
               (row) =>
                 row.subjectId === unique.subjectId &&
-                row.evaluationKey === unique.evaluationKey &&
+                row.standardKey === unique.standardKey &&
                 row.fingerprint === unique.fingerprint,
             ) ?? null
           );
@@ -72,12 +72,12 @@ function fakePrisma() {
         const duplicate = rows.some(
           (row) =>
             row.subjectId === data.subjectId &&
-            row.evaluationKey === data.evaluationKey &&
+            row.standardKey === data.standardKey &&
             row.fingerprint === data.fingerprint,
         );
         if (duplicate) {
           const error = new Error(
-            "Unique constraint failed: EvaluationFinding_subjectId_evaluationKey_fingerprint_key",
+            "Unique constraint failed: EvaluationFinding_subjectId_standardKey_fingerprint_key",
           ) as Error & { code: string };
           error.code = "P2002";
           throw error;
@@ -109,7 +109,7 @@ function fakePrisma() {
       findMany: async (args: {
         where: {
           subjectId: string;
-          evaluationKey: string;
+          standardKey: string;
           status?: string;
           lastSeenAt?: { lt: Date };
           NOT?: { lastSeenRunId?: string };
@@ -121,7 +121,7 @@ function fakePrisma() {
           .filter(
             (row) =>
               row.subjectId === where.subjectId &&
-              row.evaluationKey === where.evaluationKey &&
+              row.standardKey === where.standardKey &&
               (!where.status || row.status === where.status) &&
               (!where.lastSeenAt || row.lastSeenAt < where.lastSeenAt.lt) &&
               (!where.NOT?.lastSeenRunId || row.lastSeenRunId !== where.NOT.lastSeenRunId),
@@ -137,7 +137,7 @@ function fakePrisma() {
 function serviceFor(prisma: PrismaService) {
   const criteria = {
     listCriteria: async () => [{ criterionKey: CRITERION_KEY, kind: "ASSERTION", name: "Known vulnerability" }],
-    getVersion: async () => ({ id: VERSION_ID, kind: "repository", evaluationKey: "npm-osv", version: "1" }),
+    getVersion: async () => ({ id: VERSION_ID, subjectKind: "repository", standardKey: "npm-osv", version: "1" }),
   };
   const providers = { getObserver: () => undefined };
   return new EvaluationFindingService(prisma, criteria as never, providers as never);
@@ -149,9 +149,9 @@ function runRow(id: string, startedAt: Date): EvaluationRun {
     subjectId: SUBJECT_ID,
     ruleSetVersionId: VERSION_ID,
     status: "RUNNING",
-    requestedByRef: null,
-    config: null,
-    error: null,
+    requestedBy: null,
+    judgmentConfig: null,
+    failureReason: null,
     startedAt,
     finishedAt: null,
     createdAt: startedAt,
@@ -189,7 +189,7 @@ test("a finding is created once, kept open across runs, resolved when absent and
   assert.deepEqual(reobserved.firstSeenAt, firstRun.startedAt);
   assert.equal(reobserved.lastSeenRunId, "run-2");
 
-  // A later run of the same evaluationKey that does not observe it resolves it.
+  // A later run of the same standardKey that does not observe it resolves it.
   const thirdRun = runRow("run-3", new Date("2026-01-03T00:00:00.000Z"));
   assert.equal(await service.resolveAbsentFindings(thirdRun), 1);
   assert.equal(rows[0].status, "RESOLVED");
@@ -212,7 +212,7 @@ test("a suppressed finding stays suppressed when a later run observes it again",
   await service.recordFindings(firstRun, [candidate], [EVIDENCE_ID]);
   rows[0].status = "SUPPRESSED";
   rows[0].suppressionNote = "Accepted risk for the build toolchain";
-  rows[0].suppressedByRef = "user-1";
+  rows[0].suppressedAt = new Date();
 
   const secondRun = runRow("run-2", new Date("2026-01-02T00:00:00.000Z"));
   await service.recordFindings(secondRun, [candidate], [EVIDENCE_ID]);
@@ -221,7 +221,7 @@ test("a suppressed finding stays suppressed when a later run observes it again",
   assert.equal(rows[0].suppressionNote, "Accepted risk for the build toolchain");
   assert.equal(rows[0].lastSeenRunId, "run-2");
 
-  // A suppression also survives a resolve pass in the same evaluationKey.
+  // A suppression also survives a resolve pass in the same standardKey.
   const thirdRun = runRow("run-3", new Date("2026-01-03T00:00:00.000Z"));
   assert.equal(await service.resolveAbsentFindings(thirdRun), 0);
   assert.equal(rows[0].status, "SUPPRESSED");

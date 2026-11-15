@@ -46,7 +46,7 @@ interface FakeWebOriginRow {
   verificationStatus: string;
   verificationToken: string;
   verificationMethod: string | null;
-  verificationFailures: number;
+  verificationFailureCount: number;
   verifiedAt: Date | null;
   lastVerifiedAt: Date | null;
   isActive: boolean;
@@ -64,7 +64,7 @@ function fakeWebOriginRow(overrides: Partial<FakeWebOriginRow> = {}): FakeWebOri
     verificationStatus: "PENDING",
     verificationToken: "token-1",
     verificationMethod: "DNS_TXT",
-    verificationFailures: 0,
+    verificationFailureCount: 0,
     verifiedAt: null,
     lastVerifiedAt: null,
     isActive: true,
@@ -232,7 +232,7 @@ test("verify marks a matching DNS record VERIFIED and stamps the timestamps", as
           verificationStatus: "VERIFIED",
           verifiedAt: args.data.verifiedAt as Date,
           lastVerifiedAt: args.data.lastVerifiedAt as Date,
-          verificationFailures: 0,
+          verificationFailureCount: 0,
         });
       },
     },
@@ -265,7 +265,7 @@ test("verify counts a mismatching well-known body as a failure but keeps VERIFIE
         updates.push(args);
         return fakeWebOriginRow({
           verificationStatus: "VERIFIED",
-          verificationFailures: args.data.verificationFailures as number,
+          verificationFailureCount: args.data.verificationFailureCount as number,
         });
       },
     },
@@ -290,11 +290,11 @@ test("verify counts a mismatching well-known body as a failure but keeps VERIFIE
 test("verify drops to FAILED once consecutive failures reach the threshold", async () => {
   const prisma = {
     securityEvaluationWebOrigin: {
-      findUnique: async () => fakeWebOriginRow({ verificationStatus: "VERIFIED", verificationFailures: 2 }),
+      findUnique: async () => fakeWebOriginRow({ verificationStatus: "VERIFIED", verificationFailureCount: 2 }),
       update: async (args: { data: Record<string, unknown> }) =>
         fakeWebOriginRow({
           verificationStatus: "FAILED",
-          verificationFailures: args.data.verificationFailures as number,
+          verificationFailureCount: args.data.verificationFailureCount as number,
         }),
     },
   };
