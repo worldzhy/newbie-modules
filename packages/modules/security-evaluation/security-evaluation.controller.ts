@@ -26,6 +26,8 @@ import {
   ListSecurityEvaluationResultsResponseDto,
   ListSecurityEvaluationRunsRequestDto,
   ListSecurityEvaluationRunsResponseDto,
+  ListSecurityEvaluationSubjectsRequestDto,
+  ListSecurityEvaluationSubjectsResponseDto,
   SecurityEvaluationFindingDetailResponseDto,
   SecurityEvaluationFindingResponseDto,
   SecurityEvaluationReportResponseDto,
@@ -77,6 +79,14 @@ export class SecurityEvaluationController {
   }
 
   // --- Knowledge items ---------------------------------------------------
+
+  @Get("subjects")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({ summary: "List stored subjects (platform view), optionally filtered by kind" })
+  @ApiResponse({ status: 200, type: ListSecurityEvaluationSubjectsResponseDto })
+  listSubjects(@Query() query: ListSecurityEvaluationSubjectsRequestDto) {
+    return this.assets.listSubjects({ kind: query.kind, page: query.page, pageSize: query.pageSize });
+  }
 
   @Get("subjects/:subjectId/knowledge-items")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationSubject)
@@ -303,6 +313,6 @@ export class SecurityEvaluationController {
   @ApiOperation({ summary: "Single-axis security report (platform view)" })
   @ApiResponse({ status: 200, type: SecurityEvaluationReportResponseDto })
   async getReport(@Query() query: GetSecurityEvaluationReportRequestDto) {
-    return this.reports.getReport(undefined, query.days);
+    return this.reports.getReport(null, query.days);
   }
 }

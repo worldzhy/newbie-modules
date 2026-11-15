@@ -81,6 +81,34 @@ export class IngestSecurityEvaluationSubjectResponseDto {
   @ApiProperty() subjectId!: string;
 }
 
+// --- Subject directory ---------------------------------------------------
+
+/** Platform subject directory read; the asset inventory row is gone (ADR-068 D7). */
+export class ListSecurityEvaluationSubjectsRequestDto extends CommonListRequestDto {
+  @ApiPropertyOptional({ description: 'Restrict to one subject kind, e.g. "repository"' })
+  @IsOptional()
+  @IsString()
+  kind?: string;
+}
+
+/** Mirrors one stored subject row. */
+export class SecurityEvaluationSubjectResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ description: 'Subject kind, e.g. "repository", "aws-account", "web-origin"' })
+  kind!: string;
+  @ApiProperty({ description: "Stable identity of the subject in the deployment" })
+  subjectKey!: string;
+  @ApiProperty() displayName!: string;
+  @ApiPropertyOptional({ type: Object, description: "Opaque host metadata stored on the subject" })
+  metadata?: object | null;
+  @ApiPropertyOptional({ type: String, description: "Opaque host credential pointer, if any" })
+  credentialRef?: string | null;
+  @ApiProperty() createdAt!: Date;
+  @ApiProperty() updatedAt!: Date;
+}
+
+export class ListSecurityEvaluationSubjectsResponseDto extends CommonListResponseDto<SecurityEvaluationSubjectResponseDto> {}
+
 // --- Knowledge items -----------------------------------------------------
 
 export class ListSecurityEvaluationAssetKnowledgeItemsRequestDto extends CommonListRequestDto {

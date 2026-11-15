@@ -40,6 +40,12 @@ export interface ListSecurityEvaluationAssetKnowledgeItemsInput {
   pageSize?: number;
 }
 
+export interface ListSecurityEvaluationSubjectsInput {
+  kind?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 /** Knowledge items per transaction. A repository can hold a few thousand packages. */
 const KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE = 100;
 
@@ -141,6 +147,21 @@ export class SecurityEvaluationAssetService {
         ),
       );
     }
+  }
+
+  /**
+   * The platform subject directory. There is no asset row any more (ADR-068
+   * D7), so a directory read is a read of the skeleton's subject table.
+   */
+  async listSubjects(query: ListSecurityEvaluationSubjectsInput) {
+    return this.prisma.findManyInManyPages({
+      model: Prisma.ModelName.EvaluationSubject,
+      pagination: { page: query.page, pageSize: query.pageSize },
+      findManyArgs: {
+        where: query.kind ? { kind: query.kind } : {},
+        orderBy: [{ kind: "asc" as const }, { subjectKey: "asc" as const }],
+      },
+    });
   }
 
   /**
