@@ -83,3 +83,7 @@ Unfinished engineering tasks. Completed items are deleted (git history is the ar
 - [x] `[R31-13]` **本文件 `:17`「registry 唯一 package-lock」计数不实（P3）**：实测 2 个（仓根 + `packages/modules/message-tracker/sst/`，`find -name package-lock.json -not -path '*/node_modules/*'`）。**fixed（2026-11-09）**：`message-tracker` 条目改为「根与 sst 各一」（round32 复核订正错名）。
 - [x] `[R31-17]` **本文件 `:25`「`modules.config.ts` 49 处 process.env」计数不实（P3）**：**fixed（2026-11-09）**：实测 46（`grep -c 'process.env' nightwatch-backend/src/modules/modules.config.ts`），行内已改为 46；「无 fallback」部分成立。
 - [x] `[R31-20 备注]` `:41` event-emitter「默认 30 天」表述偏松：代码为 `getOrThrow`（未配置抛错），30 仅 `.env` 与 manifest `example`，非代码默认。
+
+## ADR-068 收尾（2026-11-15）
+
+- [ ] **被取代 ADR 的状态行**：ADR-068 的 D6–D8 与操作者列删除已落地（registry `fd61fa4` / `3781608` / `e442dd1` / `3629f9e`，宿主 `1391197` / `2c95f33`，前端 `22f4c69`）。剩余第 4 项：把 ADR-020 / ADR-022 / ADR-024 / ADR-026 / ADR-027 / ADR-031 / ADR-039 / ADR-045 / ADR-058 的状态行更新为「某章节由 ADR-068 取代」，逐条对应 ADR-068 头部的 Supersedes 与修订行。
