@@ -85,7 +85,7 @@ function fakePrisma() {
     securityEvaluationRepository: {
       upsert: async (args: {
         where: { provider_namespace_name: { provider: string; namespace: string; name: string } };
-        create: Omit<FakeRepositoryRow, "id">;
+        create: Omit<FakeRepositoryRow, "id" | "isActive"> & { isActive?: boolean };
         update: Partial<Omit<FakeRepositoryRow, "id" | "subjectId">>;
       }) => {
         const key = args.where.provider_namespace_name;
@@ -96,7 +96,8 @@ function fakePrisma() {
           Object.assign(existing, args.update);
           return existing;
         }
-        const created: FakeRepositoryRow = { id: `repo-${nextId++}`, ...args.create };
+        // Mirrors the schema default on the material row.
+        const created: FakeRepositoryRow = { id: `repo-${nextId++}`, isActive: true, ...args.create };
         repositories.push(created);
         return created;
       },
@@ -104,7 +105,7 @@ function fakePrisma() {
     securityEvaluationAwsAccount: {
       upsert: async (args: {
         where: { accountId: string };
-        create: Omit<FakeAwsAccountRow, "id">;
+        create: Omit<FakeAwsAccountRow, "id" | "isActive"> & { isActive?: boolean };
         update: Partial<Omit<FakeAwsAccountRow, "id" | "subjectId" | "accountId">>;
       }) => {
         const existing = awsAccounts.find((row) => row.accountId === args.where.accountId);
@@ -112,7 +113,7 @@ function fakePrisma() {
           Object.assign(existing, args.update);
           return existing;
         }
-        const created: FakeAwsAccountRow = { id: `account-${nextId++}`, ...args.create };
+        const created: FakeAwsAccountRow = { id: `account-${nextId++}`, isActive: true, ...args.create };
         awsAccounts.push(created);
         return created;
       },
