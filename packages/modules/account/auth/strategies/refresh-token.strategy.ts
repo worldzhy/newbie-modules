@@ -47,7 +47,7 @@ export class RefreshTokenStrategy extends PassportStrategy(Strategy, "custom.ref
     try {
       userId = this.tokenService.verifyUserRefreshToken(refreshToken).userId;
     } catch {
-      await this.sessionService.destroy(refreshToken);
+      await this.sessionService.revokeByRefreshToken(refreshToken);
       // audit: not required — routine expiry or a forged token; no identity
       // can be reliably attributed to a failed signature check.
       throw new NewbieException(NewbieExceptionType.Session_RefreshRejected);

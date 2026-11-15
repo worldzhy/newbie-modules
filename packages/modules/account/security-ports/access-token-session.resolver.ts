@@ -10,17 +10,17 @@ import { inactiveAccountError } from "@modules/account/auth/inactive-account";
 
 /**
  * Account-side binding of security's AccessTokenSessionResolver port:
- * resolves a JWT access token to its live session row and enforces that the
- * owning user is still active.
+ * resolves the session id carried by an access token to its live session row
+ * and enforces that the owning user is still active.
  */
 @Injectable()
 // eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- bound via the ACCESS_TOKEN_SESSION_RESOLVER useClass provider
 export class AccountAccessTokenSessionResolver implements AccessTokenSessionResolver {
   constructor(private readonly prisma: PrismaService) {}
 
-  async resolve(accessToken: string): Promise<ResolvedAccessTokenSession> {
-    const session = await this.prisma.session.findFirst({
-      where: { accessToken },
+  async resolve(sessionId: number): Promise<ResolvedAccessTokenSession> {
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
       select: {
         id: true,
         user: {

@@ -113,17 +113,20 @@ export class TokenService {
   }
 
   /**
-   * Sign user access token
+   * Sign user access token. The payload carries the session id as the standard
+   * `sid` claim, so authentication resolves the session by id instead of by the
+   * token string (devbie ADR-051).
    */
-  signUserAccessToken(payload: { userId: string }) {
+  signUserAccessToken(payload: { userId: string; sessionId: number }) {
     return this.sign({
-      payload,
+      payload: { userId: payload.userId, sid: payload.sessionId },
       secret: this.tokenConfig.userAccess.secret || this.tokenConfig.defaultSecret,
       options: {
         subject: TokenSubject.USER_ACCESS_TOKEN,
         expiresIn: SECURITY_TOKEN_EXPIRES_IN.userAccess,
         // Unique per issuance so repeated signings in the same second still
-        // produce distinct tokens (sessions are keyed by the token string).
+        // produce distinct tokens, even though several of them now name the
+        // same session through `sid`.
         jwtid: this.generateUuid(),
       },
     });
@@ -131,11 +134,13 @@ export class TokenService {
 
   /**
    * Verify user access token
-   * Returns an object with userId, iat (issued at), and exp (expiration)
+   * Returns an object with userId, the session id (`sid`), iat and exp.
+   * `sid` is optional because tokens signed before devbie ADR-051 do not carry
+   * it; callers must reject such tokens instead of querying with undefined.
    * If the token is invalid, it throws an UnauthorizedException
    */
   verifyUserAccessToken(token: string) {
-    return this.verify<{ userId: string; iat: number; exp: number }>({
+    return this.verify<{ userId: string; sid?: number; iat: number; exp: number }>({
       token,
       secret: this.tokenConfig.userAccess.secret || this.tokenConfig.defaultSecret,
       options: {

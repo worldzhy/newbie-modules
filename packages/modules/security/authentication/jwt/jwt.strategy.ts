@@ -4,6 +4,7 @@ import { ConfigService } from "@nestjs/config";
 import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { Request } from "express";
+import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 import { TokenSubject } from "../../token/token.constants";
 import { ACCESS_TOKEN_SESSION_RESOLVER, AccessTokenSessionResolver } from "../../ports/access-token-session.resolver";
 
@@ -40,10 +41,14 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
    * subject have all been verified, so this resolves the live session rather
    * than re-verifying the token.
    *
+   * The token names its session through the `sid` claim, not through the token
+   * string (devbie ADR-051): the same session keeps authenticating across
+   * refreshes, and revoking the row revokes every token that names it.
+   *
    * The live session/role lookup is delegated to the identity provider via
    * the AccessTokenSessionResolver port: security must not know session tables.
    */
-  async validate(req: Request) {
+  async validate(req: Request, payload: { userId?: string; sid?: number }) {
     // A request without a bearer token never reaches validate(): passport fails
     // it first and JwtAuthGuard reports that as Session_Missing (1105). An
     // empty extraction here therefore means the strategy and its extractor
@@ -59,7 +64,15 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       );
     }
 
-    const session = await this.sessionResolver.resolve(accessToken);
+    // Fail closed on a token that cannot name a session: tokens signed before
+    // ADR-051 carry no `sid`, and passing an undefined id to the resolver would
+    // drop the id filter on the query — an arbitrary session would match.
+    const { sid } = payload;
+    if (typeof sid !== "number" || !Number.isInteger(sid)) {
+      throw new NewbieException(NewbieExceptionType.Session_Revoked);
+    }
+
+    const session = await this.sessionResolver.resolve(sid);
 
     // Unified request.user shape across every authenticated strategy:
     // { userId, sessionId, roles }. userId comes from the resolved session row

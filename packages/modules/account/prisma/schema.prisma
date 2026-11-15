@@ -197,7 +197,9 @@ model VerificationCode {
 
 model Session {
   id              Int      @id @default(autoincrement())
-  accessToken     String   @unique
+  // No access token is stored. The access JWT carries this row's id as `sid`
+  // and authentication resolves the row by id (devbie ADR-051), so a row never
+  // holds a usable bearer credential.
   // SHA-256 hex of the current refresh token. The plaintext is never stored
   // (nightwatch-backend ADR-034); refresh matches by hash and rotates with a
   // CAS update.
@@ -225,7 +227,7 @@ model Session {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId          String   @db.Uuid
 
-  // @unique already indexes accessToken and the hash columns.
+  // @unique already indexes the hash columns.
   @@index([userId])
   @@schema("module/account")
 }
