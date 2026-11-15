@@ -209,7 +209,7 @@ export class WorkEvaluationController {
 
   @Get("subjects")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationSubject)
-  @ApiOperation({ summary: 'List evaluation subjects of kind "developer" under a scope' })
+  @ApiOperation({ summary: 'List this feature\'s evaluation subjects (kind "developer")' })
   @ApiResponse({ status: 200, type: ListWorkEvaluationSubjectsResponseDto })
   listSubjects(@Query() query: ListWorkEvaluationSubjectsRequestDto) {
     return this.runs.listSubjects(query);
