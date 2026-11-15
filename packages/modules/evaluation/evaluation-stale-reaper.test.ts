@@ -22,7 +22,7 @@ const VERSION_ID = "33333333-3333-4333-8333-333333333333";
 
 const SUBJECT = {
   id: SUBJECT_ID,
-  subjectKind: "repository",
+  kind: "repository",
   subjectKey: "repo",
   displayName: "repo",
 };
@@ -181,7 +181,7 @@ test("a reaped row publishes evaluation.run-failed with the row's persisted erro
     ruleSetVersionId: VERSION_ID,
     standardKey: "npm-osv",
     status: "FAILED",
-    failureReason: STALE_RUN_ERROR,
+    error: STALE_RUN_ERROR,
   });
   assert.equal(observed.length, 1);
   assert.deepEqual(observed[0], {
@@ -189,7 +189,7 @@ test("a reaped row publishes evaluation.run-failed with the row's persisted erro
     subjectId: SUBJECT_ID,
     ruleSetVersionId: VERSION_ID,
     status: "FAILED",
-    failureReason: STALE_RUN_ERROR,
+    error: STALE_RUN_ERROR,
   });
 });
 

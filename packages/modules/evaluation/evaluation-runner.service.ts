@@ -177,7 +177,7 @@ export class EvaluationRunnerService implements OnModuleInit, OnModuleDestroy {
         standardKey: version.standardKey,
       };
 
-      const runConfig = (running.config as Record<string, unknown> | null) ?? null;
+      const runConfig = (running.judgmentConfig as Record<string, unknown> | null) ?? null;
       const evidence = await this.providers
         .getEvidenceProvider(subject.kind)
         .collect(subject, ruleSetVersion, runConfig);

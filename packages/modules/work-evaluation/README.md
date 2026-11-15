@@ -92,7 +92,7 @@ The module binds the three kind-scoped feature ports of the evaluation skeleton
 via `useExisting`:
 
 - `criteriaProviderToken("developer")` — resolves the run's `config.periodId` to the
-  period's pinned `{ evaluationKey, version }` of its criteria version.
+  period's pinned `{ standardKey, version }` of its criteria version.
 - `evidenceProviderToken("developer")` — collects the evidence manifest for one run
   over the period's window.
 - `judgmentPortToken("developer")` — the three-phase model judgment below.
@@ -165,7 +165,7 @@ The authoritative route list is the module spec
 | `/work-evaluation/runs`                                             | platform JWT                                    | Trigger and list runs                                        |
 | `/work-evaluation/results`                                          | platform JWT                                    | Read archived results                                        |
 
-`POST /work-evaluation/runs { developerId, periodId, requestedByRef?, config? }`
+`POST /work-evaluation/runs { developerId, periodId, requestedBy?, judgmentConfig? }`
 follows the skeleton's two-phase contract (ADR-029): admission — period
 eligibility, evaluatee existence, published criteria version, no active run —
 is answered synchronously as 400/404/409 before the 202; the judgment

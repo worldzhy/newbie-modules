@@ -51,9 +51,9 @@ export class WorkEvaluationPeriodService {
     // The pinned criteria version must exist, judge kind "developer", and be
     // published — a period can never anchor on a draft.
     const version = await this.criteria.getVersion(input.ruleSetVersionId);
-    if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
+    if (version.subjectKind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new BadRequestException(
-        `Criteria version ${version.standardKey}/${version.version} judges kind "${version.kind}", not "${WORK_EVALUATION_SUBJECT_KIND}"`,
+        `Criteria version ${version.standardKey}/${version.version} judges kind "${version.subjectKind}", not "${WORK_EVALUATION_SUBJECT_KIND}"`,
       );
     }
     if (!version.publishedAt) {

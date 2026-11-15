@@ -31,43 +31,41 @@ One concept, one word.
   overwrites the previous review, so the row always reflects exactly the
   latest say.
 - **finding** (`EvaluationFinding`) — the product of an `ASSERTION` criterion.
-  Identity is `(subject, evaluationKey, fingerprint)`: `evaluationKey` is copied from the
-  run's criteria version, so a rerun under a new version of the same evaluationKey
-  keeps the finding alive, and one evaluationKey's run never resolves another
-  evaluationKey's findings. Two versions of one evaluationKey may run concurrently, so
+  Identity is `(subject, standardKey, fingerprint)`: `standardKey` is copied from the
+  run's criteria version, so a rerun under a new version of the same standardKey
+  keeps the finding alive, and one standardKey's run never resolves another
+  standardKey's findings. Two versions of one standardKey may run concurrently, so
   resolution and re-observation are compare-and-set writes — a human
   suppression, or a re-observation by the concurrent run, is never
   overwritten.
 - **remediation plan** (`EvaluationRemediationPlan`) — the object that answers
   to findings or results of one subject, with a named decider.
 
-Actor references follow the `*ByRef` naming: `requestedByRef` on a run,
-`suppressedByRef` on a suppressed finding, `reviewedByRef` on a reviewed
-result, `decidedByRef` on a closed plan. They are opaque host-side actor ids —
-plain scalars, no foreign keys. Note the distinction on a plan: `deciderRef`
-names the accountable decision maker, `decidedByRef` records who actually
-recorded the decision.
+Attribution is minimal: a plan keeps `decider`, the host-side actor reference
+that names the accountable decision maker. There are no operator columns — who
+suppressed a finding, reviewed a result or recorded a decision is not stored on
+the row; those actions are audited outside the skeleton (ADR-068).
 
 Verdict and finding are deliberately not merged: closing a score makes no
 sense, and tracking a problem inside a JSON blob makes it untrackable.
 
 ## Tables
 
-| Table                       | Owns                                                        |
-| --------------------------- | ----------------------------------------------------------- |
-| `EvaluationRuleSetVersion`  | kind / evaluationKey / version, publication state           |
-| `EvaluationCriterion`       | criterion key, kind, name, feature-defined metadata         |
-| `EvaluationSubject`         | kind, scope coordinate, subject key, display name           |
-| `EvaluationRun`             | state machine, failure reason, actor reference              |
-| `EvaluationResult`          | manifest, content hash, coverage, verdicts, review          |
-| `EvaluationFinding`         | evaluationKey + fingerprint identity, severity, suppression |
-| `EvaluationRemediationPlan` | trigger refs, decider, checkpoints, decision                |
+| Table                       | Owns                                                         |
+| --------------------------- | ------------------------------------------------------------ |
+| `EvaluationRuleSetVersion`  | subjectKind / standardKey / version, publication state       |
+| `EvaluationCriterion`       | criterion key, kind, name, feature-defined metadata          |
+| `EvaluationSubject`         | kind, scope coordinate, subject key, display name            |
+| `EvaluationRun`             | state machine, failure reason, requester                     |
+| `EvaluationResult`          | evidence manifest, manifest hash, coverage, verdicts, review |
+| `EvaluationFinding`         | standardKey + fingerprint identity, severity, suppression    |
+| `EvaluationRemediationPlan` | trigger refs, decider, checkpoints, decision                 |
 
 ## Invariants (ADR-020 D5)
 
 1. **Result snapshots are immutable.** `EvaluationResultService` has no update
    path for the archived snapshot; a rerun is a new run and a new row.
-   `contentHash` is computed by the skeleton from the manifest, never accepted
+   `manifestHash` is computed by the skeleton from the manifest, never accepted
    from the caller. The one write path the service does have is the supervisor
    review (ADR-031), which touches only the review columns and never the
    snapshot.
@@ -180,7 +178,7 @@ terminal row is written (ADR-032):
 | `evaluation.run-failed`    | the run is FAILED and its failure reason is persisted |
 
 The payload carries identity and terminal state only — `runId`, `subjectId`,
-`subjectKind`, `ruleSetVersionId`, `evaluationKey`, `status` and, on failure, `error`
+`subjectKind`, `ruleSetVersionId`, `standardKey`, `status` and, on failure, `failureReason`
 with the same text and truncation as the run row. Findings and coverage are
 deliberately absent: they are mutable read models, so a consumer queries the
 existing endpoints by `runId` / `subjectId` when it needs detail.

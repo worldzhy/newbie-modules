@@ -3,8 +3,9 @@
 // prisma tree on `newbie modules apply`.
 //
 // The skeleton holds no host vocabulary: no foreign keys point outside this
-// schema, and every host-side identity is an opaque scalar (`requestedByRef`,
-// `deciderRef`, `suppressedByRef`).
+// schema, and every host-side identity is an opaque scalar (`requestedBy`,
+// `decider`). Operator columns are deliberately absent — who performed an
+// action is audited outside the skeleton (ADR-068).
 
 // !! ----------------------------------------------------------- //
 // !!                [Module] Evaluation models                   //

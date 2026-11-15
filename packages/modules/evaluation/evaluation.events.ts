@@ -21,7 +21,7 @@ export interface EvaluationRunSucceededEvent extends EvaluationRunEventIdentity 
 
 export interface EvaluationRunFailedEvent extends EvaluationRunEventIdentity {
   status: "FAILED";
-  /** Same text and truncation as the run row's `error` (ADR-032 D5). */
+  /** Same text and truncation as the run row's `failureReason` (ADR-032 D5). */
   error: string;
 }
 

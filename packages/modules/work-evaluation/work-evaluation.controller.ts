@@ -76,7 +76,7 @@ export class WorkEvaluationController {
   @ApiOperation({ summary: 'List criteria versions for kind "developer"' })
   @ApiResponse({ status: 200, type: ListWorkEvaluationRuleSetVersionsResponseDto })
   async listRuleSetVersions(@Query() query: ListWorkEvaluationRuleSetVersionsRequestDto) {
-    return this.criteria.listVersions({ kind: WORK_EVALUATION_SUBJECT_KIND, ...query });
+    return this.criteria.listVersions({ subjectKind: WORK_EVALUATION_SUBJECT_KIND, ...query });
   }
 
   @Post("rule-set-versions")
@@ -85,7 +85,7 @@ export class WorkEvaluationController {
   @ApiResponse({ status: 201, type: WorkEvaluationRuleSetVersionResponseDto })
   async createRuleSetVersion(@Body() body: CreateWorkEvaluationRuleSetVersionRequestDto) {
     return this.criteria.createVersion({
-      kind: WORK_EVALUATION_SUBJECT_KIND,
+      subjectKind: WORK_EVALUATION_SUBJECT_KIND,
       standardKey: body.standardKey,
       version: body.version,
       description: body.description,
@@ -99,7 +99,7 @@ export class WorkEvaluationController {
   @ApiResponse({ status: 200, type: WorkEvaluationRuleSetVersionResponseDto })
   async getRuleSetVersion(@Param() params: GetWorkEvaluationByIdRequestDto) {
     const version = await this.criteria.getVersion(params.id);
-    if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
+    if (version.subjectKind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new NotFoundException(`Criteria version ${params.id} is not of kind "${WORK_EVALUATION_SUBJECT_KIND}"`);
     }
     return version;
@@ -111,7 +111,7 @@ export class WorkEvaluationController {
   @ApiResponse({ status: 200, type: WorkEvaluationRuleSetVersionResponseDto })
   async publishRuleSetVersion(@Param() params: GetWorkEvaluationByIdRequestDto) {
     const version = await this.criteria.getVersion(params.id);
-    if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
+    if (version.subjectKind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new NotFoundException(`Criteria version ${params.id} is not of kind "${WORK_EVALUATION_SUBJECT_KIND}"`);
     }
     return this.criteria.publishVersion(params.id);
@@ -123,7 +123,7 @@ export class WorkEvaluationController {
   @ApiResponse({ type: WorkEvaluationCriterionResponseDto, isArray: true })
   async listCriteria(@Param() params: GetWorkEvaluationByIdRequestDto) {
     const version = await this.criteria.getVersion(params.id);
-    if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
+    if (version.subjectKind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new NotFoundException(`Criteria version ${params.id} is not of kind "${WORK_EVALUATION_SUBJECT_KIND}"`);
     }
     return this.criteria.listCriteria(params.id);
@@ -138,7 +138,7 @@ export class WorkEvaluationController {
     @Body() body: CreateWorkEvaluationCriterionRequestDto,
   ) {
     const version = await this.criteria.getVersion(params.id);
-    if (version.kind !== WORK_EVALUATION_SUBJECT_KIND) {
+    if (version.subjectKind !== WORK_EVALUATION_SUBJECT_KIND) {
       throw new NotFoundException(`Criteria version ${params.id} is not of kind "${WORK_EVALUATION_SUBJECT_KIND}"`);
     }
     return this.criteria.addCriterion(params.id, {

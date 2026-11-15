@@ -46,7 +46,7 @@ function buildService(overrides?: {
 const input = {
   developerId: "user-1",
   periodId: "period-1",
-  config: { modelScope: "kimi-k3" },
+  judgmentConfig: { modelScope: "kimi-k3" },
 };
 
 describe("WorkEvaluationRunService.startRun admission", () => {
@@ -54,10 +54,10 @@ describe("WorkEvaluationRunService.startRun admission", () => {
     const { service, calls } = buildService();
     await service.startRun(input);
     assert.equal(calls.open.length, 1);
-    const opened = calls.open[0] as { subjectId: string; config: Record<string, unknown> };
+    const opened = calls.open[0] as { subjectId: string; judgmentConfig: Record<string, unknown> };
     assert.equal(opened.subjectId, "subject-1");
-    assert.equal(opened.config.periodId, "period-1");
-    assert.equal(opened.config.modelScope, "kimi-k3");
+    assert.equal(opened.judgmentConfig.periodId, "period-1");
+    assert.equal(opened.judgmentConfig.modelScope, "kimi-k3");
     assert.deepEqual(calls.execute, [{ id: "run-1" }]);
   });
 
