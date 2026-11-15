@@ -14,7 +14,7 @@ model Alert {
   // scopeId + source + alertKey, hashed when longer than the column width.
   // Unique on its own, so the database arbitrates concurrent first reports.
   fingerprint String @unique @db.VarChar(255)
-  // Registered producer key, e.g. url-check / heartbeat / cloudwatch.
+  // Registered producer key; the registry declares the concrete sources.
   source      String  @db.VarChar(100)
   // Opaque scope (project / tenant / platform) owned by the host.
   scopeId     String? @db.VarChar(100)

@@ -69,7 +69,7 @@ model Alert {
   @@index([scopeId, source])
 }
 
-// 来源清单由代码注册（key / displayName / defaultRepeatMinutes），
+// 来源清单由代码注册（key / displayName / defaultRepeatMinutes / definitions），
 // 本表只为「被改过」的来源建行，存可变状态。
 model AlertSource {
   key                      String    @id @db.VarChar(100) // 注册表中已声明的来源 key
@@ -86,7 +86,8 @@ model AlertSource {
 - **severity 在告警上稳定**。firing 与 resolved 用同一个 severity，通知规则按 severity 匹配时两侧自然一致，不需要冻结裁决。
 - `labels` 与 `data` 分工：`labels` 是通知侧按标签路由与详情展示用的键值对，告警列表只按一等列（`state` / `source` / `scopeId` / `severity`）筛选，不承诺按任意 label 键过滤；`data` 是给消息渲染用的不透明上下文（URL、错误文本、恢复时间等）。
 - `source` 是一等身份，不是自由文本备注：它决定提醒间隔的默认值、暂停开关的作用范围，也是通知侧 `(source, state) → notificationKey` 映射的左键。
-- **来源清单是代码注册制**。`alert-center` 导出来源注册表（`key` / `displayName` / `defaultRepeatMinutes`），宿主在装配时注入本宿主的来源；`raise` 遇到未注册的 `source` 直接抛错，拼写错误与漏映射在启动期或首次调用处即暴露，数据库不会长出幽灵来源。
+- **来源清单是代码注册制**。`alert-center` 导出来源注册表（`key` / `displayName` / `defaultRepeatMinutes` / `definitions`），宿主在装配时注入本宿主的来源；`raise` 遇到未注册的 `source` 直接抛错，拼写错误与漏映射在启动期或首次调用处即暴露，数据库不会长出幽灵来源。
+- **`definitions` 是描述性清单，不是身份**。它列出该来源会发出的生命周期族（`key` / `displayName` / `repeatMinutes?`），供设置页展示；不落库、不参与 `raise` 校验，`alertKey` 仍是告警唯一身份。definition 的 `repeatMinutes` 只钉住「来源级覆盖」——`raise` 显式传入的 `repeatIntervalMinutes` 仍优先，因此设置页必须把这类节奏展示为固定，而不是可编辑的继承值。同一个 `alertKey` 空间的多个触发原因属于同一族，不得拆成多个 definition。
 - `AlertSource` 表退化为**可变状态载体**：只在用户改默认节奏或暂停时建行，`repeatMinutes` 为 null 时继承注册表值；`displayName` 与默认节奏的唯一真源是代码注册表。
 - `AlertSource` **不设 `enabled`**。暂停只停外发不停记录；若拒收 `raise`，后续 `resolve` 将找不到行，状态机会出现无法闭合的窗口。
 - **跨来源不合并**。`fingerprint` 含 `source`，每个来源的每条 `alertKey` 独立成一条告警；「同一应用多个来源同时异常」的聚合属于通知侧分组，不进告警实体。
