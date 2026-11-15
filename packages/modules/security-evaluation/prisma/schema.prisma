@@ -4,15 +4,19 @@
 //
 // The run / result / criteria / finding tables belong to the evaluation
 // skeleton (`module/evaluation`, ADR-020). This feature owns the subject-scoped
-// knowledge, the web-origin ownership-verification record and the code-scan
-// caches: `subjectId` is a plain scalar with no relation — foreign keys never
-// cross schema boundaries. There is no separate asset table: identity is the
-// subject coordinate `(subjectType, kind, subjectKey)` (ADR-068 D7, ADR-069).
+// knowledge, the web-origin ownership-verification record, the repository /
+// aws-account material rows and the code-scan caches: `subjectId` is a plain
+// scalar with no relation — foreign keys never cross schema boundaries.
+// Identity is the subject coordinate `(subjectType, kind, subjectKey)`
+// (ADR-068 D7, ADR-069); the material rows below hold only what is specific to
+// their kind and are keyed by the same natural coordinate (ADR-070 D1, D2).
 
 // !! ----------------------------------------------------------- //
 // !!            [Module] Security Evaluation models             //
 // !! ----------------------------------------------------------- //
 // * SecurityEvaluationWebOrigin                               //
+// * SecurityEvaluationRepository                              //
+// * SecurityEvaluationAwsAccount                              //
 // * SecurityEvaluationAwsConfigKnowledgeItem                  //
 // * SecurityEvaluationNpmPackageKnowledgeItem                 //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
@@ -53,6 +57,51 @@ model SecurityEvaluationWebOrigin {
   updatedAt            DateTime  @updatedAt
 
   @@index([verificationStatus, isActive])
+  @@schema("module/security-evaluation")
+}
+
+/// Repository material of a repository subject (ADR-070 D1).
+///
+/// The host's own repository record stays the host's truth (it is referenced by
+/// application provisioning); this row is the evaluation-side copy of the
+/// coordinate, so evidence collection knows which code host and which
+/// `namespace/name` a subject names without reading a host table. Rows are
+/// written by ingest only and are keyed by the natural coordinate, not by a host
+/// id — several projects declaring the same repository share one row.
+model SecurityEvaluationRepository {
+  id        String   @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId String   @unique @db.Uuid
+  provider  String   @db.VarChar(32)
+  // Vendor-neutral first segment of the coordinate: GitHub owner, Bitbucket
+  // workspace, … Lowercased; the subject display name keeps the original case.
+  namespace String   @db.VarChar(255)
+  name      String   @db.VarChar(255)
+  url       String?  @db.VarChar(255)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, namespace, name])
+  @@schema("module/security-evaluation")
+}
+
+/// AWS account material of an aws-account subject (ADR-070 D1).
+///
+/// The account id is the natural key (a cross-account binding can be recreated
+/// without changing it). Credentials stay a host concern: the opaque
+/// `credentialRef` lives on the subject, never here.
+model SecurityEvaluationAwsAccount {
+  id            String   @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId     String   @unique @db.Uuid
+  accountId     String   @unique @db.VarChar(12)
+  defaultRegion String?  @db.VarChar(32)
+  regions       String[]
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
   @@schema("module/security-evaluation")
 }
 

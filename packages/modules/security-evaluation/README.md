@@ -14,6 +14,8 @@ lands in a later slice on the same run and finding lifecycle.
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Subject        | The skeleton's `EvaluationSubject` row and this feature's only identity. `kind` is `repository`, `aws-account` or `web-origin`; the coordinate is `(subjectType, kind, subjectKey)` with `subjectType = "security-evaluation"` (ADR-068, ADR-069). Subjects of kinds that need host credentials carry an opaque `credentialRef` registered at ingest. Provenance lives in the host, not here. |
 | Web origin     | `SecurityEvaluationWebOrigin`, one-to-one with a web-origin subject. Owns `environment`, the `targetPaths` role map, and the ownership-verification lifecycle (token, method, status, timestamps). Identity stays on the subject (`subjectKey` = normalized origin, `displayName` = label).                                                                                                   |
+| Repository     | `SecurityEvaluationRepository`, one-to-one with a repository subject: the evaluation-side copy of the coordinate (`provider`, `namespace`, `name`, `url`). Natural key `provider:namespace/name` (lowercased); the host's own repository record stays the host's truth (ADR-070 D1, D2).                                                                                                      |
+| AWS account    | `SecurityEvaluationAwsAccount`, one-to-one with an aws-account subject: `accountId` (the natural key, 12 digits), `defaultRegion`, `regions`. Credentials stay a host concern and live on the subject's `credentialRef` (ADR-070 D1, D2).                                                                                                                                                     |
 | Knowledge item | `SecurityEvaluationAwsConfigKnowledgeItem` / `SecurityEvaluationNpmPackageKnowledgeItem`: something observed about a subject right now (`type`, `key`, small intrinsic `value`); `SecurityEvaluationThreatKnowledgeItem` is the world-scoped intel sibling. Items are upserted, never deleted here; history lives in the archived run manifest.                                               |
 | Criteria       | Code-defined and published idempotently as `EvaluationRuleSetVersion` + `EvaluationCriterion` rows. A rule change is a new version, never an in-place edit.                                                                                                                                                                                                                                   |
 | Finding        | Skeleton `EvaluationFinding` with identity `(subjectId, standardKey, fingerprint)`. The fingerprint is version-free, so an upgrade onto another affected version keeps the same finding open.                                                                                                                                                                                                 |
@@ -21,12 +23,16 @@ lands in a later slice on the same run and finding lifecycle.
 
 ## Subject kinds and scopes
 
-- `repository` — evidence is the repository's `package-lock.json`.
+- `repository` — evidence is the repository's `package-lock.json`. Identity is
+  the natural coordinate `provider:namespace/name` (GitHub owner / Bitbucket
+  workspace both map to `namespace`, all lowercase); a monorepo is one subject
+  no matter how many applications point at it.
 - `aws-account` — evidence is the account's configuration knowledge, collected
-  through the host-bound `AwsConfigAccess` port. Nightwatch maps one
-  configured `awsCrossAccountBinding` to one subject and registers the
-  binding's credential reference (`aws-binding:<id>`) on the subject at ingest;
-  evidence collection resolves exactly that reference, never a derived one.
+  through the host-bound `AwsConfigAccess` port. The 12-digit account id is the
+  subject key, so a binding can be recreated without orphaning history.
+  Nightwatch registers the binding's credential reference
+  (`aws-binding:<id>`) on the subject at ingest; evidence collection resolves
+  exactly that reference, never a derived one.
 - `web-origin` — a deployment registered by `SecurityEvaluationWebOriginService`.
   `create` writes the platform subject and the web-origin record in one
   transaction; `origin` is normalized to `scheme://host[:port]` (lowercase,
@@ -37,14 +43,18 @@ lands in a later slice on the same run and finding lifecycle.
   host-bound `SECURITY_EVALUATION_VERIFICATION_FETCH_ACCESS` port.
 
 Hosts declare subjects by calling `POST /security-evaluation/subjects/sync` with
-one subject (`kind`, `subjectKey`, `displayName`). Kinds whose evaluation needs
-host credentials (today: `aws-account`) also carry a `credentialRef` — an opaque
-pointer the module stores verbatim and threads to the evidence port; it is
-captured at this registration point so collection never rediscovers credentials.
+one subject (`kind`, `displayName`). `repository` submissions carry their
+coordinate (`repository: { provider, namespace, name, url? }`) and
+`aws-account` submissions their `awsAccount: { accountId, defaultRegion?,
+regions? }`; the module normalizes it, derives the subject key and upserts the
+material row in the same transaction — a host id is never submitted. Other kinds
+pass `subjectKey` directly. Kinds whose evaluation needs host credentials
+(today: `aws-account`) also carry a `credentialRef` — an opaque pointer the
+module stores verbatim and threads to the evidence port; it is captured at this
+registration point so collection never rediscovers credentials.
 The module upserts the platform-level subject; a second project referencing the
 same repository reuses the same subject, run history and findings. Ingest is
-upsert-only: a subject that disappears from the host is not deleted, because
-removal semantics are still an open decision (ADR-022).
+upsert-only; retiring a material row is not designed (ADR-070 D5).
 
 Reads are platform-wide with an optional `subjectId` filter. There is no
 provenance coordinate and no scope filter (ADR-068 D8) — access is the
@@ -202,16 +212,16 @@ criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
 
 ## Endpoints
 
-| Method | Path                                                       | Purpose                                                                                             |
-| ------ | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| POST   | `/security-evaluation/subjects/sync`                       | Ingest one platform-level subject (idempotent per `(subjectType, kind, subjectKey)`).               |
-| GET    | `/security-evaluation/subjects`                            | Subject directory, optionally filtered by kind.                                                     |
-| GET    | `/security-evaluation/subjects/:subjectId/knowledge-items` | Current-state knowledge items of one subject.                                                       |
-| POST   | `/security-evaluation/runs`                                | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously. |
-| GET    | `/security-evaluation/runs`                                | Run history, platform-wide or subject-filtered.                                                     |
-| GET    | `/security-evaluation/results`                             | Archived results (manifest excluded).                                                               |
-| GET    | `/security-evaluation/findings`                            | Findings with standardKey / status / severity filters (platform-wide or subject-filtered).          |
-| GET    | `/security-evaluation/report`                              | Single-axis report: subjects, coverage, findings, trend, MTTR (platform-wide or subject-filtered).  |
+| Method | Path                                                       | Purpose                                                                                                     |
+| ------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| POST   | `/security-evaluation/subjects/sync`                       | Ingest one platform-level subject plus its material row (idempotent per `(subjectType, kind, subjectKey)`). |
+| GET    | `/security-evaluation/subjects`                            | Subject directory, optionally filtered by kind.                                                             |
+| GET    | `/security-evaluation/subjects/:subjectId/knowledge-items` | Current-state knowledge items of one subject.                                                               |
+| POST   | `/security-evaluation/runs`                                | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously.         |
+| GET    | `/security-evaluation/runs`                                | Run history, platform-wide or subject-filtered.                                                             |
+| GET    | `/security-evaluation/results`                             | Archived results (manifest excluded).                                                                       |
+| GET    | `/security-evaluation/findings`                            | Findings with standardKey / status / severity filters (platform-wide or subject-filtered).                  |
+| GET    | `/security-evaluation/report`                              | Single-axis report: subjects, coverage, findings, trend, MTTR (platform-wide or subject-filtered).          |
 
 ## Limitations
 

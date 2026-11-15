@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform, Type } from "class-transformer";
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsIn,
@@ -10,9 +11,11 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Matches,
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from "class-validator";
 import { EvaluationFindingSeverity, EvaluationFindingStatus, EvaluationRunStatus } from "@generated/prisma/client";
 import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
@@ -41,10 +44,65 @@ export class GetSecurityEvaluationFindingRequestDto {
 // --- Subject ingest ------------------------------------------------------
 
 /**
- * One subject submission (ADR-068 D8). The subject is platform-level and
- * identified by `(kind, subjectKey)` this feature owns; provenance lives in the
- * host, so no source is declared here. Re-submitting the same subject is
+ * Repository material of a repository subject (ADR-070 D1, D2). The coordinate
+ * is vendor-neutral: `namespace` is the GitHub owner or Bitbucket workspace.
+ * The module lowercases it and derives the subject key; `displayName` keeps the
+ * original casing.
+ */
+export class IngestSecurityEvaluationRepositoryMaterialDto {
+  @ApiProperty({ description: 'Code host provider, e.g. "github" or "bitbucket"' })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(32)
+  provider!: string;
+
+  @ApiProperty({ description: "First segment of the repository coordinate (owner / workspace)" })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  namespace!: string;
+
+  @ApiProperty({ description: "Repository name (last segment of the coordinate)" })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  name!: string;
+
+  @ApiPropertyOptional({ description: "Browsable repository URL, stored verbatim" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  url?: string;
+}
+
+/** AWS account material of an aws-account subject (ADR-070 D1, D2). */
+export class IngestSecurityEvaluationAwsAccountMaterialDto {
+  @ApiProperty({ description: "12-digit AWS account id — the natural key of the subject" })
+  @IsString()
+  @Matches(/^\d{12}$/, { message: "accountId must be 12 digits" })
+  accountId!: string;
+
+  @ApiPropertyOptional({ description: "Region collection default, e.g. us-east-1" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  defaultRegion?: string;
+
+  @ApiPropertyOptional({ type: String, isArray: true, description: "Regions collected for this account" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  regions?: string[];
+}
+
+/**
+ * One subject submission (ADR-068 D8, ADR-070 D3). The subject is platform-level
+ * and identified by `(kind, subjectKey)` this feature owns; provenance lives in
+ * the host, so no source is declared here. Re-submitting the same subject is
  * idempotent.
+ *
+ * `repository` and `aws-account` submissions carry their material and the module
+ * derives the subject key from it; other kinds supply the key directly.
  */
 export class IngestSecurityEvaluationSubjectRequestDto {
   @ApiProperty({ description: 'Subject kind, e.g. "repository" or "aws-account"' })
@@ -52,10 +110,14 @@ export class IngestSecurityEvaluationSubjectRequestDto {
   @IsNotEmpty()
   kind!: string;
 
-  @ApiProperty({ description: "Stable identity of the subject in the deployment" })
+  @ApiPropertyOptional({
+    description:
+      "Stable identity of the subject in the deployment. Derived from the material for repository / aws-account; required for other kinds.",
+  })
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
-  subjectKey!: string;
+  subjectKey?: string;
 
   @ApiProperty({ description: "Human-readable name of the subject" })
   @IsString()
@@ -76,6 +138,18 @@ export class IngestSecurityEvaluationSubjectRequestDto {
   @IsNotEmpty()
   @MaxLength(255)
   credentialRef?: string;
+
+  @ApiPropertyOptional({ type: IngestSecurityEvaluationRepositoryMaterialDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => IngestSecurityEvaluationRepositoryMaterialDto)
+  repository?: IngestSecurityEvaluationRepositoryMaterialDto;
+
+  @ApiPropertyOptional({ type: IngestSecurityEvaluationAwsAccountMaterialDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => IngestSecurityEvaluationAwsAccountMaterialDto)
+  awsAccount?: IngestSecurityEvaluationAwsAccountMaterialDto;
 }
 
 export class IngestSecurityEvaluationSubjectResponseDto {
