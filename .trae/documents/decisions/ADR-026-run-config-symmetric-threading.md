@@ -1,6 +1,6 @@
 # ADR-026: runConfig 三端口对称穿线与 work-evaluation subject 懒注册
 
-状态：已采纳
+状态：已采纳（run config 对称透传决策保持生效；其中「宿主实现 `SubjectProvider` 并给出 scope 坐标」的表述由 ADR-068 取代）
 日期：2026-10-26
 
 > 归属：registry 骨架契约决策 → 本仓。本 ADR 是对 ADR-020 骨架与 ADR-023 run config 透传的增量扩展，不取代其中任何决策；相关 ADR 正文保持原样。ADR-024 D3 中「subject `metadata.periodId`」的表述由本 ADR 取代为 run config。

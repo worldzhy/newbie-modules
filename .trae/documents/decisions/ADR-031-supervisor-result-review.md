@@ -1,6 +1,6 @@
 # ADR-031: result 终审（supervisor review）纳入骨架决策面
 
-状态：已采纳
+状态：已采纳（审核四元组中的 `reviewedByRef` 由 ADR-068 D6 取代，待 D6 落地后仅剩 `reviewStatus` / `reviewedAt` / `reviewNote`）
 日期：2026-10-26
 
 > 归属：evaluation 骨架决策面增量 → 本仓。关闭 ADR-030 的遗留观察（"骨架无 supervisor 对 result 的终审端点；确有需求时补进 decision surface，属增量 ADR"）。决策面边界由 ADR-029 划定，本次在同一控制器内补 result 终审动作；涉及骨架 schema 增列与宿主装配，故在本仓留档。

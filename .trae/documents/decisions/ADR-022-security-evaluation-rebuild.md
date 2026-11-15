@@ -1,6 +1,6 @@
 # ADR-022: 安全评估板块重建为 security-evaluation
 
-状态：已采纳（2026-10-26 用户批准，同日按切片 1 实施）
+状态：已采纳（2026-10-26 用户批准，同日按切片 1 实施；「宿主实现 `SubjectProvider` 并给出 scope 坐标」的表述与第 53 行资产清单的泛化 scope 坐标由 ADR-068 取代）
 日期：2026-10-25
 
 > 归属：registry 模块边界与契约决策 → 本仓。宿主侧实施（主体来源、凭证与外部访问、通知模板、调度装配、读模型与 UI）归 nightwatch-backend / nightwatch-frontend，随本决策同步改造。

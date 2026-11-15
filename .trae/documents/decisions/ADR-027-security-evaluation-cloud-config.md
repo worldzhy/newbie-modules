@@ -1,6 +1,6 @@
 # ADR-027: security-evaluation 切片 2 —— CLOUD_CONFIG 端口契约与 CIS 目录收敛
 
-状态：提议中
+状态：提议中（其中 `SubjectProvider` 扩展 scopeType `project` 的表述由 ADR-068 取代）
 日期：2026-10-26
 前置：ADR-020（evaluation 骨架）、ADR-022（security-evaluation 重建，已采纳）
 
