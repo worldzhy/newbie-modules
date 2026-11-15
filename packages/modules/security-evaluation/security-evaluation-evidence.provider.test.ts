@@ -19,6 +19,7 @@ import type { RepositoryAccess } from "./ports/repository-access.port";
 
 const subject: EvaluationSubjectRef = {
   id: "11111111-1111-4111-8111-111111111111",
+  subjectType: "security-evaluation",
   kind: "repository",
   subjectKey: "application-1",
   displayName: "nightwatch-backend",

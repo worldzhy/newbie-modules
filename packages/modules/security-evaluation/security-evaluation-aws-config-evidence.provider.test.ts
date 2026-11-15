@@ -15,6 +15,7 @@ import type { SecurityEvaluationAssetService } from "./assets/security-evaluatio
 
 const SUBJECT: EvaluationSubjectRef = {
   id: "11111111-1111-4111-8111-111111111111",
+  subjectType: "security-evaluation",
   kind: "aws-account",
   subjectKey: "123456789012",
   displayName: "123456789012",

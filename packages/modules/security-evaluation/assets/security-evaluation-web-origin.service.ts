@@ -15,6 +15,7 @@ import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject
 import { requirePositiveInteger } from "../persistence/security-evaluation-intel-negative-cache.repository";
 import {
   SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
+  SECURITY_EVALUATION_SUBJECT_TYPE,
   SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX,
   SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX,
   SECURITY_EVALUATION_WEB_ORIGIN_PATH_ROLES,
@@ -145,6 +146,7 @@ export class SecurityEvaluationWebOriginService {
     return this.prisma.$transaction(async (transaction) => {
       const subject = await this.subjects.getOrCreateSubject(
         {
+          subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
           kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
           subjectKey: origin,
           displayName: label,

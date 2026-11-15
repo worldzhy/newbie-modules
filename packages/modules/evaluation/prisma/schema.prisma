@@ -133,9 +133,11 @@ model EvaluationCriterion {
   @@schema("module/evaluation")
 }
 
-/// The object being evaluated (ADR-020 D1, ADR-068). Identity is
-/// `(kind, subjectKey)` — both feature-defined; the skeleton never derives
-/// them and knows no host entity.
+/// The object being evaluated (ADR-020 D1, ADR-068, ADR-069). Identity is
+/// `(subjectType, kind, subjectKey)` — all three feature-defined; the skeleton
+/// never derives them and knows no host entity. `subjectType` names the feature
+/// that submits the subject, so two features may evaluate the same kind without
+/// sharing a row.
 ///
 /// `credentialRef` is an opaque pointer the feature may register at ingest time
 /// when evaluating the subject requires host-held credentials (e.g. a cloud
@@ -145,6 +147,8 @@ model EvaluationCriterion {
 model EvaluationSubject {
   id String @id @default(uuid()) @db.Uuid
 
+  // Owning feature key (e.g. "security-evaluation"); opaque to the skeleton
+  subjectType String @db.VarChar(64)
   kind        String @db.VarChar(64)
   subjectKey  String @db.VarChar(255)
   displayName String @db.VarChar(255)
@@ -162,7 +166,7 @@ model EvaluationSubject {
   findings         EvaluationFinding[]
   remediationPlans EvaluationRemediationPlan[]
 
-  @@unique([kind, subjectKey])
+  @@unique([subjectType, kind, subjectKey])
   @@schema("module/evaluation")
 }
 

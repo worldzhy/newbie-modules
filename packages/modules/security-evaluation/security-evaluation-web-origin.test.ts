@@ -10,6 +10,7 @@ import {
 } from "./assets/security-evaluation-web-origin.service";
 import {
   SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
+  SECURITY_EVALUATION_SUBJECT_TYPE,
   SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX,
   SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX,
 } from "./security-evaluation.constants";
@@ -124,12 +125,14 @@ test("create writes the subject and web-origin in one transaction", async () => 
     $transaction: async (callback: (transaction: typeof transactionClient) => unknown) => callback(transactionClient),
   };
   const subjects = {
-    getOrCreateSubject: async (descriptor: { kind: string; subjectKey: string }) => {
+    getOrCreateSubject: async (descriptor: { subjectType: string; kind: string; subjectKey: string }) => {
       calls.push("subject:upsert");
+      assert.equal(descriptor.subjectType, SECURITY_EVALUATION_SUBJECT_TYPE);
       assert.equal(descriptor.kind, SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN);
       assert.equal(descriptor.subjectKey, "https://app.example.com");
       return {
         id: "subject-1",
+        subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
         kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
         subjectKey: "https://app.example.com",
         displayName: "App",

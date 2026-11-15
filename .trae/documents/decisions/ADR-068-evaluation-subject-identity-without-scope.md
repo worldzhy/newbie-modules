@@ -5,7 +5,7 @@
 
 > 归属：registry 契约变更（`packages/modules/evaluation` 的表结构与端口形状）→ 本仓。宿主实施（枚举入口、对外 API、存量数据迁移）归 nightwatch-backend，随本决策同步改造。
 
-Supersedes: ADR-020 D1 中 `EvaluationSubject` 的「`kind` + 泛化坐标（`scopeType`/`scopeId`）」与 D4 的 `SubjectProvider` 端口行，以及背景第 2 段「泛化坐标沿用 ADR-018 先例」的理由；ADR-031 的审核层四元组——删除 `reviewedByRef` 后只剩 `reviewStatus` / `reviewedAt` / `reviewNote`（D6）。ADR-020 其余章节（D2 结论形态、D3 零宿主依赖、D5 不变量）保持生效。
+Supersedes: ADR-020 D1 中 `EvaluationSubject` 的「`kind` + 泛化坐标（`scopeType`/`scopeId`）」与 D4 的 `SubjectProvider` 端口行，以及背景第 2 段「泛化坐标沿用 ADR-018 先例」的理由；ADR-031 的审核层四元组——删除 `reviewedByRef` 后只剩 `reviewStatus` / `reviewedAt` / `reviewNote`（D6）。ADR-020 其余章节（D2 结论形态、D3 零宿主依赖、D5 不变量）保持生效。D1 的 `(kind, subjectKey)` 身份已由 ADR-069 扩展为 `(subjectType, kind, subjectKey)`（功能归属显式化），其余结论不变。
 
 修订：ADR-022、ADR-024、ADR-026、ADR-027 中「宿主实现 `SubjectProvider` 并给出 scope 坐标」的表述（另含 ADR-022 第 53 行资产清单「加 `naturalKey` 与泛化 scope 坐标」，该表由 D7 整表删除）；ADR-039「跨宿主 / 演进检验」表中「`scopeType`/`scopeId` 保持泛化无 FK」与「归属记在 provenance」两句（后者由 D8 删除该表取代）；ADR-058「跨宿主 / 演进检验」表中「主体坐标 = 模块常量 `platform:deployment` 不变」一行，以及 D2.3 的负缓存键存储（`${kind}:${subjectKey}` 单列字符串 → `subjectKind` + `subjectKey` 两列，逻辑键不变）；ADR-045 中「per (knowledge item, scope)」的 scope 表述（`scopeKey` 拆为 `subjectKind` + `subjectKey`，键语义不变）。上述 ADR 正文不改，新语义由本 ADR 承接。
 

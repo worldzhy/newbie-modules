@@ -9,13 +9,14 @@ import { SecurityEvaluationAssetService } from "./assets/security-evaluation-ass
  * D8).
  *
  * The fake below is the one table the service writes (subject); it asserts what
- * the contract promises: one subject per (kind, subjectKey) regardless of how
+ * the contract promises: one subject per (subjectType, kind, subjectKey) regardless of how
  * many projects submit it, and idempotent re-submission. Provenance no longer
  * exists — ownership is enumerated by the host.
  */
 
 interface FakeSubjectRow {
   id: string;
+  subjectType: string;
   kind: string;
   subjectKey: string;
   displayName: string;
@@ -31,7 +32,8 @@ function fakePrisma() {
     evaluationSubject: {
       upsert: async (args: {
         where: {
-          kind_subjectKey: {
+          subjectType_kind_subjectKey: {
+            subjectType: string;
             kind: string;
             subjectKey: string;
           };
@@ -39,8 +41,10 @@ function fakePrisma() {
         create: Omit<FakeSubjectRow, "id">;
         update: { displayName: string; metadata: Record<string, unknown> | undefined; credentialRef?: string | null };
       }) => {
-        const key = args.where.kind_subjectKey;
-        const existing = subjects.find((row) => row.kind === key.kind && row.subjectKey === key.subjectKey);
+        const key = args.where.subjectType_kind_subjectKey;
+        const existing = subjects.find(
+          (row) => row.subjectType === key.subjectType && row.kind === key.kind && row.subjectKey === key.subjectKey,
+        );
         if (existing) {
           existing.displayName = args.update.displayName;
           existing.metadata = args.update.metadata;
@@ -67,6 +71,7 @@ function fakePrisma() {
 function fakeSubjectService(prisma: PrismaService) {
   return {
     getOrCreateSubject: async (descriptor: {
+      subjectType: string;
       kind: string;
       subjectKey: string;
       displayName: string;
@@ -78,7 +83,8 @@ function fakeSubjectService(prisma: PrismaService) {
       };
       return evaluationSubject.upsert({
         where: {
-          kind_subjectKey: {
+          subjectType_kind_subjectKey: {
+            subjectType: descriptor.subjectType,
             kind: descriptor.kind,
             subjectKey: descriptor.subjectKey,
           },
@@ -98,7 +104,7 @@ function serviceWith(fake: ReturnType<typeof fakePrisma>) {
   return new SecurityEvaluationAssetService(fake.prisma, fakeSubjectService(fake.prisma) as never);
 }
 
-test("ingest is idempotent per (kind, subjectKey)", async () => {
+test("ingest is idempotent per (subjectType, kind, subjectKey)", async () => {
   const fake = fakePrisma();
   const service = serviceWith(fake);
 

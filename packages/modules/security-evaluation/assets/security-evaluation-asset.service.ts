@@ -3,7 +3,10 @@ import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
 
-import { SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT } from "../security-evaluation.constants";
+import {
+  SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
+  SECURITY_EVALUATION_SUBJECT_TYPE,
+} from "../security-evaluation.constants";
 
 export interface SecurityEvaluationAssetKnowledgeItemInput {
   type: string;
@@ -54,9 +57,10 @@ const KNOWLEDGE_ITEM_UPSERT_CHUNK_SIZE = 100;
  * and the current-state knowledge store (ADR-022, ADR-039, ADR-068 D7).
  *
  * The subject coordinate belongs to the skeleton; this service no longer keeps
- * an inventory row of its own. Identity is `(kind, subjectKey)` alone, so
+ * an inventory row of its own. Identity is `(subjectType, kind, subjectKey)`, so
  * several projects referencing the same repository share one subject, one run
- * history and one finding set. Knowledge items hang off the subject id with a
+ * history and one finding set, while a different feature evaluating the same
+ * kind keeps its own row (ADR-069). Knowledge items hang off the subject id with a
  * plain scalar — foreign keys never cross schema boundaries.
  */
 @Injectable()
@@ -68,7 +72,7 @@ export class SecurityEvaluationAssetService {
 
   /**
    * Ingest subjects: upsert the platform-level subject. Idempotent per
-   * `(kind, subjectKey)`.
+   * `(subjectType, kind, subjectKey)`.
    */
   async ingest(
     submissions: readonly IngestSecurityEvaluationSubjectInput[],
@@ -76,6 +80,7 @@ export class SecurityEvaluationAssetService {
     const results: IngestSecurityEvaluationSubjectResult[] = [];
     for (const submission of submissions) {
       const subject = await this.subjects.getOrCreateSubject({
+        subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
         kind: submission.kind,
         subjectKey: submission.subjectKey,
         displayName: submission.displayName,
@@ -150,15 +155,19 @@ export class SecurityEvaluationAssetService {
   }
 
   /**
-   * The platform subject directory. There is no asset row any more (ADR-068
-   * D7), so a directory read is a read of the skeleton's subject table.
+   * This feature's subject directory. There is no asset row any more (ADR-068
+   * D7), so a directory read is a read of the skeleton's subject table; the
+   * `subjectType` filter keeps subjects owned by other features (ADR-069) out.
    */
   async listSubjects(query: ListSecurityEvaluationSubjectsInput) {
     return this.prisma.findManyInManyPages({
       model: Prisma.ModelName.EvaluationSubject,
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
-        where: query.kind ? { kind: query.kind } : {},
+        where: {
+          subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
+          ...(query.kind ? { kind: query.kind } : {}),
+        },
         orderBy: [{ kind: "asc" as const }, { subjectKey: "asc" as const }],
       },
     });

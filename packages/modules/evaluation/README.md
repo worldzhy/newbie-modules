@@ -9,10 +9,12 @@ it; this module knows neither of them.
 
 One concept, one word.
 
-- **subject** (`EvaluationSubject`) — the thing being evaluated. `kind` is
-  feature-defined (`work`, `repository`, `cloud-resource`); `subjectKey` is the
-  feature's stable natural identity inside the kind. Identity is
-  `(kind, subjectKey)` — both plain scalars, no foreign key. A feature whose
+- **subject** (`EvaluationSubject`) — the thing being evaluated. `subjectType`
+  names the feature that owns the subject, `kind` is feature-defined (`work`,
+  `repository`, `cloud-resource`) and `subjectKey` is the feature's stable
+  natural identity inside the kind. Identity is `(subjectType, kind, subjectKey)`
+  — all plain scalars, no foreign key, so two features may evaluate the same
+  kind without sharing a row. A feature whose
   evaluation needs host-held credentials may register an opaque `credentialRef`
   on the subject at ingest; the skeleton stores and threads it verbatim and
   never resolves it.
@@ -198,7 +200,7 @@ archived manifest must stay a manifest, not a data dump.
 ## Subject registration
 
 Subjects are submitted by whoever owns their identity: `EvaluationSubjectService
-.getOrCreateSubject` is an idempotent upsert on `(kind, subjectKey)`. The
+.getOrCreateSubject` is an idempotent upsert on `(subjectType, kind, subjectKey)`. The
 skeleton never enumerates subjects on its own; hosts and features decide what
 exists (ADR-068). Removal semantics belong to the first feature that actually
 needs them.

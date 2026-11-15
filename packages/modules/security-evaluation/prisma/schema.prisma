@@ -7,7 +7,7 @@
 // knowledge, the web-origin ownership-verification record and the code-scan
 // caches: `subjectId` is a plain scalar with no relation — foreign keys never
 // cross schema boundaries. There is no separate asset table: identity is the
-// subject coordinate `(kind, subjectKey)` (ADR-068 D7).
+// subject coordinate `(subjectType, kind, subjectKey)` (ADR-068 D7, ADR-069).
 
 // !! ----------------------------------------------------------- //
 // !!            [Module] Security Evaluation models             //

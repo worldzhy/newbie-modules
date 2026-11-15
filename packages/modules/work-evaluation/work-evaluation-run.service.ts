@@ -10,7 +10,7 @@ import {
 import { EvaluationRunnerService } from "@modules/evaluation/evaluation-runner.service";
 import { EvaluationSubjectService, ListEvaluationSubjectsInput } from "@modules/evaluation/evaluation-subject.service";
 
-import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
+import { WORK_EVALUATION_SUBJECT_KIND, WORK_EVALUATION_SUBJECT_TYPE } from "./work-evaluation.constants";
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 
 export interface StartWorkEvaluationRunInput {
@@ -72,6 +72,7 @@ export class WorkEvaluationRunService {
     if (!user) throw new NotFoundException(`User ${input.developerId} not found`);
 
     const subject = await this.subjects.getOrCreateSubject({
+      subjectType: WORK_EVALUATION_SUBJECT_TYPE,
       kind: WORK_EVALUATION_SUBJECT_KIND,
       subjectKey: user.id,
       displayName: user.name ?? user.email ?? user.id,
@@ -122,7 +123,11 @@ export class WorkEvaluationRunService {
   }
 
   /** Subject listing is pinned to this feature's kind. */
-  listSubjects(query: Omit<ListEvaluationSubjectsInput, "kind">) {
-    return this.subjects.listSubjects({ ...query, kind: WORK_EVALUATION_SUBJECT_KIND });
+  listSubjects(query: Omit<ListEvaluationSubjectsInput, "subjectType" | "kind">) {
+    return this.subjects.listSubjects({
+      ...query,
+      subjectType: WORK_EVALUATION_SUBJECT_TYPE,
+      kind: WORK_EVALUATION_SUBJECT_KIND,
+    });
   }
 }

@@ -5,6 +5,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationSubjectDescriptor, EvaluationSubjectRef } from "./ports/evaluation.contracts";
 
 export interface ListEvaluationSubjectsInput {
+  subjectType: string;
   kind: string;
   /** Omitted lists every subject of the kind. */
   subjectKey?: string;
@@ -13,10 +14,12 @@ export interface ListEvaluationSubjectsInput {
 }
 
 /**
- * EvaluationSubjectService — the subject registry (ADR-020 D1, ADR-068).
+ * EvaluationSubjectService — the subject registry (ADR-020 D1, ADR-068,
+ * ADR-069).
  *
- * Identity is `(kind, subjectKey)`. The skeleton stores what the host submits
- * and never enumerates or interprets it: no host entity leaks in here.
+ * Identity is `(subjectType, kind, subjectKey)`. The skeleton stores what the
+ * host submits and never enumerates or interprets it: no host entity leaks in
+ * here.
  */
 @Injectable()
 export class EvaluationSubjectService {
@@ -32,12 +35,14 @@ export class EvaluationSubjectService {
   async getOrCreateSubject(descriptor: EvaluationSubjectDescriptor, client?: Prisma.TransactionClient) {
     return (client ?? this.prisma).evaluationSubject.upsert({
       where: {
-        kind_subjectKey: {
+        subjectType_kind_subjectKey: {
+          subjectType: descriptor.subjectType,
           kind: descriptor.kind,
           subjectKey: descriptor.subjectKey,
         },
       },
       create: {
+        subjectType: descriptor.subjectType,
         kind: descriptor.kind,
         subjectKey: descriptor.subjectKey,
         displayName: descriptor.displayName,
@@ -67,6 +72,7 @@ export class EvaluationSubjectService {
       pagination: { page: query.page, pageSize: query.pageSize },
       findManyArgs: {
         where: {
+          subjectType: query.subjectType,
           kind: query.kind,
           ...(query.subjectKey ? { subjectKey: query.subjectKey } : {}),
         },
@@ -79,6 +85,7 @@ export class EvaluationSubjectService {
 /** Detach a stored subject from Prisma for the ports. */
 export function toSubjectRef(subject: {
   id: string;
+  subjectType: string;
   kind: string;
   subjectKey: string;
   displayName: string;
@@ -86,6 +93,7 @@ export function toSubjectRef(subject: {
 }): EvaluationSubjectRef {
   return {
     id: subject.id,
+    subjectType: subject.subjectType,
     kind: subject.kind,
     subjectKey: subject.subjectKey,
     displayName: subject.displayName,

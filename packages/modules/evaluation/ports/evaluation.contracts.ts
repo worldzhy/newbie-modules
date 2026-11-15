@@ -17,9 +17,10 @@
 export type EvaluationFindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 /**
- * A subject as its feature describes it (ADR-068). Identity is
- * `(kind, subjectKey)`; `subjectKey` is the feature's stable natural identity
- * inside the kind — the skeleton never derives it.
+ * A subject as its feature describes it (ADR-068, ADR-069). Identity is
+ * `(subjectType, kind, subjectKey)`; `subjectType` is the feature key that owns
+ * the subject, and `subjectKey` is the feature's stable natural identity inside
+ * the kind — the skeleton never derives any of them.
  *
  * `credentialRef` is an opaque pointer to host-held credentials, captured at
  * registration time when evaluating the subject requires them. The skeleton
@@ -28,6 +29,7 @@ export type EvaluationFindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CR
  * previously stored value.
  */
 export interface EvaluationSubjectDescriptor {
+  subjectType: string;
   kind: string;
   subjectKey: string;
   displayName: string;
@@ -38,6 +40,7 @@ export interface EvaluationSubjectDescriptor {
 /** A stored subject, detached from Prisma. */
 export interface EvaluationSubjectRef {
   id: string;
+  subjectType: string;
   kind: string;
   subjectKey: string;
   displayName: string;

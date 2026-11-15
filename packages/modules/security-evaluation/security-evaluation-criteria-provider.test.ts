@@ -28,6 +28,7 @@ import {
 function subject(kind: string): EvaluationSubjectRef {
   return {
     id: "subject-1",
+    subjectType: "security-evaluation",
     kind,
     subjectKey: "key-1",
     displayName: "Subject 1",

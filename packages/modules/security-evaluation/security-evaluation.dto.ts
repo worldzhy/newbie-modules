@@ -42,8 +42,9 @@ export class GetSecurityEvaluationFindingRequestDto {
 
 /**
  * One subject submission (ADR-068 D8). The subject is platform-level and
- * identified by `(kind, subjectKey)`; provenance lives in the host, so no
- * source is declared here. Re-submitting the same subject is idempotent.
+ * identified by `(kind, subjectKey)` this feature owns; provenance lives in the
+ * host, so no source is declared here. Re-submitting the same subject is
+ * idempotent.
  */
 export class IngestSecurityEvaluationSubjectRequestDto {
   @ApiProperty({ description: 'Subject kind, e.g. "repository" or "aws-account"' })

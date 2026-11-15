@@ -1,3 +1,6 @@
+/** Feature key this module registers subjects under (ADR-069). */
+export const SECURITY_EVALUATION_SUBJECT_TYPE = "security-evaluation";
+
 /** Subject kinds owned by this feature (ADR-022). Kebab-case, like "work". */
 export const SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY = "repository";
 export const SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT = "aws-account";
