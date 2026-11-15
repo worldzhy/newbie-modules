@@ -4,7 +4,7 @@
 //
 // The skeleton holds no host vocabulary: no foreign keys point outside this
 // schema, and every host-side identity is an opaque scalar (`requestedByRef`,
-// `deciderRef`, `scopeId`).
+// `deciderRef`, `suppressedByRef`).
 
 // !! ----------------------------------------------------------- //
 // !!                [Module] Evaluation models                   //
@@ -131,9 +131,9 @@ model EvaluationCriterion {
   @@schema("module/evaluation")
 }
 
-/// The object being evaluated (ADR-020 D1). Identity is feature-defined through
-/// `subjectKey`; the host assigns meaning to `scopeType` / `scopeId`, which are
-/// plain scalars with no foreign key — this module knows no host entity.
+/// The object being evaluated (ADR-020 D1, ADR-068). Identity is
+/// `(kind, subjectKey)` — both feature-defined; the skeleton never derives
+/// them and knows no host entity.
 ///
 /// `credentialRef` is an opaque pointer the feature may register at ingest time
 /// when evaluating the subject requires host-held credentials (e.g. a cloud
@@ -144,8 +144,6 @@ model EvaluationSubject {
   id String @id @default(uuid()) @db.Uuid
 
   kind        String @db.VarChar(64)
-  scopeType   String @db.VarChar(64)
-  scopeId     String @db.VarChar(128)
   subjectKey  String @db.VarChar(255)
   displayName String @db.VarChar(255)
 
@@ -162,8 +160,7 @@ model EvaluationSubject {
   findings         EvaluationFinding[]
   remediationPlans EvaluationRemediationPlan[]
 
-  @@unique([kind, scopeType, scopeId, subjectKey])
-  @@index([kind, scopeType, scopeId])
+  @@unique([kind, subjectKey])
   @@schema("module/evaluation")
 }
 

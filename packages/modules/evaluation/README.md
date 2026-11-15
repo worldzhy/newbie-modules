@@ -10,12 +10,12 @@ it; this module knows neither of them.
 One concept, one word.
 
 - **subject** (`EvaluationSubject`) — the thing being evaluated. `kind` is
-  feature-defined (`work`, `repository`, `cloud-resource`), `subjectKey` is the
-  feature's stable natural identity inside the host's `scopeType` / `scopeId`
-  coordinate. The coordinate is a plain scalar with no foreign key. A feature
-  whose evaluation needs host-held credentials may register an opaque
-  `credentialRef` on the subject at ingest; the skeleton stores and threads it
-  verbatim and never resolves it.
+  feature-defined (`work`, `repository`, `cloud-resource`); `subjectKey` is the
+  feature's stable natural identity inside the kind. Identity is
+  `(kind, subjectKey)` — both plain scalars, no foreign key. A feature whose
+  evaluation needs host-held credentials may register an opaque `credentialRef`
+  on the subject at ingest; the skeleton stores and threads it verbatim and
+  never resolves it.
 - **criteria version** (`EvaluationRuleSetVersion`) — a frozen set of
   criteria. Drafts are editable; publishing is one-way. Runs only reference
   published versions.
@@ -124,7 +124,6 @@ evidence. Features and hosts bind the ports under these tokens:
 
 | Port                 | Token                         | Bound by | Required |
 | -------------------- | ----------------------------- | -------- | -------- |
-| `SubjectProvider`    | `subjectProviderToken`        | host     | yes      |
 | `CriteriaProvider`   | `criteriaProviderToken(kind)` | feature  | yes      |
 | `EvidenceProvider`   | `evidenceProviderToken(kind)` | feature  | yes      |
 | `JudgmentPort`       | `judgmentPortToken(kind)`     | feature  | yes      |
@@ -149,7 +148,7 @@ request), and `execute` runs the opened row — collect evidence, judge, compose
 coverage, persist the immutable result, upsert findings, resolve absent
 findings, close the run — with the heartbeat and fencing checks described under
 invariant 4. `run` is the convenience pair of both for callers that await the
-whole run. A feature that implements the four ports inherits all of it and must
+whole run. A feature that implements the ports inherits all of it and must
 not drive the run state machine through `EvaluationRunService` directly.
 
 A run may carry an opaque per-run `config` (ADR-023): the trigger passes it to
@@ -198,11 +197,13 @@ string, a flag, a count. Large material (documents, transcripts, scan dumps)
 lives in the feature's own storage and is referenced through `refs`; the
 archived manifest must stay a manifest, not a data dump.
 
-## Subject sync
+## Subject registration
 
-`EvaluationSubjectService.syncSubjects` is upsert-only: subjects the host stops
-listing are not deleted. Removal semantics belong to the first feature that
-actually needs them.
+Subjects are submitted by whoever owns their identity: `EvaluationSubjectService
+.getOrCreateSubject` is an idempotent upsert on `(kind, subjectKey)`. The
+skeleton never enumerates subjects on its own; hosts and features decide what
+exists (ADR-068). Removal semantics belong to the first feature that actually
+needs them.
 
 ## Scope
 

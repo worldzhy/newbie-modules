@@ -75,9 +75,8 @@ relation — foreign keys never cross schema boundaries.
 
 ## Subject convention
 
-For kind `"work"`, `subjectKey = "<evaluateeUserId>"` and the scope coordinate
-is the member themself (`scopeType = "user"`, `scopeId = userId`). Subjects are
-registered lazily: `POST /work-evaluation/runs` takes `{ evaluateeUserId,
+For kind `"work"`, `subjectKey = "<evaluateeUserId>"` — the member themself.
+Subjects are registered lazily: `POST /work-evaluation/runs` takes `{ evaluateeUserId,
 periodId }` and upserts the subject row on first trigger (ADR-026 D2). The
 period is a **run-level** parameter carried on `run.config.periodId` — it picks
 the evidence window and resolves the pinned criteria version, and it never

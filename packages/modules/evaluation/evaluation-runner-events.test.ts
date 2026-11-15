@@ -24,8 +24,6 @@ const EVIDENCE_ID = "pkg:npm:lodash@4.17.20";
 const SUBJECT = {
   id: SUBJECT_ID,
   kind: "repository",
-  scopeType: "project",
-  scopeId: "scope-1",
   subjectKey: "repo",
   displayName: "repo",
 };

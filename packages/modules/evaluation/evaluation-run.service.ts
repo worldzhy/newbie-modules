@@ -78,14 +78,11 @@ export interface StartEvaluationRunInput {
 export interface ListEvaluationRunsInput {
   /** Omitted lists every run (of `kind`, when given) newest first. */
   subjectId?: string;
-  /** Narrow to an explicit subject set (feature-level provenance filters). */
+  /** Narrow to an explicit subject set (host-resolved provenance filters). */
   subjectIds?: readonly string[];
   ruleSetVersionId?: string;
   /** When present, only runs whose subject matches this kind are returned. */
   kind?: string;
-  /** Host scope coordinate on the subject; narrows the list to one scope. */
-  scopeType?: string;
-  scopeId?: string;
   /** Restrict to one run status, e.g. FAILED for a latest-failure banner. */
   status?: EvaluationRunStatus;
   page?: number;
@@ -245,15 +242,7 @@ export class EvaluationRunService {
           ...(query.subjectIds ? { subjectId: { in: [...query.subjectIds] } } : {}),
           ...(query.ruleSetVersionId ? { ruleSetVersionId: query.ruleSetVersionId } : {}),
           ...(query.status ? { status: query.status } : {}),
-          ...(query.kind || query.scopeType || query.scopeId
-            ? {
-                subject: {
-                  ...(query.kind ? { kind: query.kind } : {}),
-                  ...(query.scopeType ? { scopeType: query.scopeType } : {}),
-                  ...(query.scopeId ? { scopeId: query.scopeId } : {}),
-                },
-              }
-            : {}),
+          ...(query.kind ? { subject: { kind: query.kind } } : {}),
         },
         orderBy: [{ createdAt: "desc" }, { id: "asc" }],
       },

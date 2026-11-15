@@ -675,25 +675,18 @@ export class WorkEvaluationResultResponseDto {
 export class ListWorkEvaluationResultsResponseDto extends CommonListResponseDto<WorkEvaluationResultResponseDto> {}
 
 export class ListWorkEvaluationSubjectsRequestDto extends CommonListRequestDto {
-  @ApiProperty({ description: "Host-assigned scope type the subjects are listed under" })
-  @IsString()
-  @IsNotEmpty()
-  scopeType!: string;
-
   @ApiPropertyOptional({
-    description: "Restrict to one scope coordinate; omitted lists every subject under the scope type",
+    description: "Restrict to one subject's stable natural key; omitted lists every work subject",
   })
   @IsOptional()
   @IsString()
-  scopeId?: string;
+  subjectKey?: string;
 }
 
 /** Mirrors the skeleton's EvaluationSubject row (kind is always "work" here). */
 export class WorkEvaluationSubjectResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() kind!: string;
-  @ApiProperty() scopeType!: string;
-  @ApiProperty() scopeId!: string;
   @ApiProperty() subjectKey!: string;
   @ApiProperty() displayName!: string;
   @ApiPropertyOptional({ type: Object }) metadata?: object | null;

@@ -26,11 +26,11 @@ import { EvaluationSubjectService } from "./evaluation-subject.service";
  * decisions (suppression, result review, remediation); a feature must not
  * drive the run state machine through `EvaluationRunService` directly.
  *
- * The four ports (SubjectProvider, EvidenceProvider, CriteriaProvider,
- * JudgmentPort) are bound by the host and by features under the tokens in
- * `ports/`; the optional EvaluationObserver port reports run completions and
- * finding lifecycle changes to whoever binds it. Runner tuning goes through
- * `evaluationRunOptionsToken`. This module only ever looks bindings up.
+ * The three ports (EvidenceProvider, CriteriaProvider, JudgmentPort) are bound
+ * by the host and by features under the tokens in `ports/`; the optional
+ * EvaluationObserver port reports run completions and finding lifecycle changes
+ * to whoever binds it. Runner tuning goes through `evaluationRunOptionsToken`.
+ * This module only ever looks bindings up.
  */
 @Global()
 @Module({

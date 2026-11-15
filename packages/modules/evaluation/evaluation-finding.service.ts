@@ -14,13 +14,10 @@ import { validateJudgment } from "./evaluation-invariants";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 export interface ListEvaluationFindingsInput {
-  /** Omitted lists findings across subjects (narrowed by scope or run when given). */
+  /** Omitted lists findings across subjects (narrowed by run when given). */
   subjectId?: string;
-  /** Narrow to an explicit subject set (feature-level provenance filters). */
+  /** Narrow to an explicit subject set (host-resolved provenance filters). */
   subjectIds?: readonly string[];
-  /** Host scope coordinate on the subject; narrows the list to one scope. */
-  scopeType?: string;
-  scopeId?: string;
   /** Only findings last observed by this run. */
   runId?: string;
   evaluationKey?: string;
@@ -214,14 +211,6 @@ export class EvaluationFindingService {
           // filter goes through a JSON path equality check (JsonB on Postgres).
           ...(query.urgency ? { metadata: { path: ["urgency"], equals: query.urgency } } : {}),
           ...(query.lastSeenBefore ? { lastSeenAt: { lt: query.lastSeenBefore } } : {}),
-          ...(query.scopeType || query.scopeId
-            ? {
-                subject: {
-                  ...(query.scopeType ? { scopeType: query.scopeType } : {}),
-                  ...(query.scopeId ? { scopeId: query.scopeId } : {}),
-                },
-              }
-            : {}),
         },
         orderBy: [{ status: "asc" }, { severity: "desc" }, { lastSeenAt: "desc" }],
       },

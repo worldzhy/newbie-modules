@@ -35,8 +35,6 @@ function fakePrisma() {
           ? {
               id: SUBJECT_ID,
               kind: SUBJECT_KIND,
-              scopeType: "project",
-              scopeId: "scope",
               subjectKey: "repo",
               displayName: "repo",
             }

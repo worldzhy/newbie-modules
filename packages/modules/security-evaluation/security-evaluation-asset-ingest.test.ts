@@ -16,8 +16,6 @@ import { SecurityEvaluationAssetService } from "./assets/security-evaluation-ass
 interface FakeSubjectRow {
   id: string;
   kind: string;
-  scopeType: string;
-  scopeId: string;
   subjectKey: string;
   displayName: string;
   metadata: Record<string, unknown> | undefined;
@@ -50,24 +48,16 @@ function fakePrisma() {
     evaluationSubject: {
       upsert: async (args: {
         where: {
-          kind_scopeType_scopeId_subjectKey: {
+          kind_subjectKey: {
             kind: string;
-            scopeType: string;
-            scopeId: string;
             subjectKey: string;
           };
         };
         create: Omit<FakeSubjectRow, "id">;
         update: { displayName: string; metadata: Record<string, unknown> | undefined; credentialRef?: string | null };
       }) => {
-        const key = args.where.kind_scopeType_scopeId_subjectKey;
-        const existing = subjects.find(
-          (row) =>
-            row.kind === key.kind &&
-            row.scopeType === key.scopeType &&
-            row.scopeId === key.scopeId &&
-            row.subjectKey === key.subjectKey,
-        );
+        const key = args.where.kind_subjectKey;
+        const existing = subjects.find((row) => row.kind === key.kind && row.subjectKey === key.subjectKey);
         if (existing) {
           existing.displayName = args.update.displayName;
           existing.metadata = args.update.metadata;
@@ -140,8 +130,6 @@ function fakeSubjectService(prisma: PrismaService) {
   return {
     getOrCreateSubject: async (descriptor: {
       kind: string;
-      scopeType: string;
-      scopeId: string;
       subjectKey: string;
       displayName: string;
       metadata?: Record<string, unknown>;
@@ -152,10 +140,8 @@ function fakeSubjectService(prisma: PrismaService) {
       };
       return evaluationSubject.upsert({
         where: {
-          kind_scopeType_scopeId_subjectKey: {
+          kind_subjectKey: {
             kind: descriptor.kind,
-            scopeType: descriptor.scopeType,
-            scopeId: descriptor.scopeId,
             subjectKey: descriptor.subjectKey,
           },
         },
@@ -193,7 +179,7 @@ test("ingest is idempotent per (subject, source)", async () => {
   assert.equal(fake.sources.length, 1);
   assert.equal(second[0].subjectId, first[0].subjectId);
   assert.equal(second[0].assetId, first[0].assetId);
-  assert.equal(fake.subjects[0].scopeType, "platform");
+  assert.equal(fake.subjects[0].subjectKey, "repo-1");
   assert.equal(fake.sources[0].lastSubmittedAt >= fake.sources[0].firstSubmittedAt, true);
 });
 

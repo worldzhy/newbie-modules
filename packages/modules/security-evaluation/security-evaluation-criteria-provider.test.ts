@@ -29,8 +29,6 @@ function subject(kind: string): EvaluationSubjectRef {
   return {
     id: "subject-1",
     kind,
-    scopeType: "project",
-    scopeId: "project-1",
     subjectKey: "key-1",
     displayName: "Subject 1",
   };

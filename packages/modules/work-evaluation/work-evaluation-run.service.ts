@@ -10,7 +10,7 @@ import {
 import { EvaluationRunnerService } from "@modules/evaluation/evaluation-runner.service";
 import { EvaluationSubjectService, ListEvaluationSubjectsInput } from "@modules/evaluation/evaluation-subject.service";
 
-import { WORK_EVALUATION_SUBJECT_KIND, WORK_EVALUATION_SUBJECT_SCOPE_TYPE } from "./work-evaluation.constants";
+import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 
 export interface StartWorkEvaluationRunInput {
@@ -73,8 +73,6 @@ export class WorkEvaluationRunService {
 
     const subject = await this.subjects.getOrCreateSubject({
       kind: WORK_EVALUATION_SUBJECT_KIND,
-      scopeType: WORK_EVALUATION_SUBJECT_SCOPE_TYPE,
-      scopeId: user.id,
       subjectKey: user.id,
       displayName: user.name ?? user.email ?? user.id,
     });

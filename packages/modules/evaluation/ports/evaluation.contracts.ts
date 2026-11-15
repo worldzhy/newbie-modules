@@ -16,15 +16,10 @@
  */
 export type EvaluationFindingSeverity = "INFO" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
-/** The host-assigned coordinate that bounds a subject listing (ADR-020 D1). */
-export interface EvaluationScope {
-  scopeType: string;
-  scopeId: string;
-}
-
 /**
- * A subject as its feature describes it. `subjectKey` is the feature's stable
- * natural identity inside the scope — the skeleton never derives it.
+ * A subject as its feature describes it (ADR-068). Identity is
+ * `(kind, subjectKey)`; `subjectKey` is the feature's stable natural identity
+ * inside the kind — the skeleton never derives it.
  *
  * `credentialRef` is an opaque pointer to host-held credentials, captured at
  * registration time when evaluating the subject requires them. The skeleton
@@ -34,8 +29,6 @@ export interface EvaluationScope {
  */
 export interface EvaluationSubjectDescriptor {
   kind: string;
-  scopeType: string;
-  scopeId: string;
   subjectKey: string;
   displayName: string;
   metadata?: Record<string, unknown>;
@@ -46,8 +39,6 @@ export interface EvaluationSubjectDescriptor {
 export interface EvaluationSubjectRef {
   id: string;
   kind: string;
-  scopeType: string;
-  scopeId: string;
   subjectKey: string;
   displayName: string;
   /** Opaque host-side credential pointer registered at ingest; null when none. */

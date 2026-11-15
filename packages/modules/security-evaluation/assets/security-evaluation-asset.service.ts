@@ -4,11 +4,7 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationSubjectService, toSubjectRef } from "@modules/evaluation/evaluation-subject.service";
 import type { EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
 
-import {
-  SECURITY_EVALUATION_PLATFORM_SCOPE_ID,
-  SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE,
-  SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
-} from "../security-evaluation.constants";
+import { SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT } from "../security-evaluation.constants";
 
 export interface SecurityEvaluationAssetKnowledgeItemInput {
   type: string;
@@ -96,8 +92,6 @@ export class SecurityEvaluationAssetService {
     for (const submission of submissions) {
       const subject = await this.subjects.getOrCreateSubject({
         kind: submission.kind,
-        scopeType: SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE,
-        scopeId: SECURITY_EVALUATION_PLATFORM_SCOPE_ID,
         subjectKey: submission.subjectKey,
         displayName: submission.displayName,
         metadata: submission.metadata,

@@ -36,8 +36,6 @@ import {
 const SUBJECT: EvaluationSubjectRef = {
   id: "11111111-1111-4111-8111-111111111111",
   kind: "repository",
-  scopeType: "platform",
-  scopeId: "deployment",
   subjectKey: "application-1",
   displayName: "nightwatch-backend",
 };
@@ -157,8 +155,6 @@ function judgmentInput(evidence: Awaited<ReturnType<typeof buildEvidence>>["item
   return {
     subject: {
       id: SUBJECT.id,
-      scopeType: SUBJECT.scopeType,
-      scopeId: SUBJECT.scopeId,
       subjectKey: SUBJECT.subjectKey,
       displayName: SUBJECT.displayName,
     },

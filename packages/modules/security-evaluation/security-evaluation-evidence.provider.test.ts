@@ -20,8 +20,6 @@ import type { RepositoryAccess } from "./ports/repository-access.port";
 const subject: EvaluationSubjectRef = {
   id: "11111111-1111-4111-8111-111111111111",
   kind: "repository",
-  scopeType: "project",
-  scopeId: "22222222-2222-4222-8222-222222222222",
   subjectKey: "application-1",
   displayName: "nightwatch-backend",
 };

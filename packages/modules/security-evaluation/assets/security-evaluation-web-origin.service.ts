@@ -15,8 +15,6 @@ import { EvaluationSubjectService, toSubjectRef } from "@modules/evaluation/eval
 import { SecurityEvaluationAssetService } from "../assets/security-evaluation-asset.service";
 import { requirePositiveInteger } from "../persistence/security-evaluation-intel-negative-cache.repository";
 import {
-  SECURITY_EVALUATION_PLATFORM_SCOPE_ID,
-  SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE,
   SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
   SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX,
   SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX,
@@ -155,8 +153,6 @@ export class SecurityEvaluationWebOriginService {
       const subject = await this.subjects.getOrCreateSubject(
         {
           kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
-          scopeType: SECURITY_EVALUATION_PLATFORM_SCOPE_TYPE,
-          scopeId: SECURITY_EVALUATION_PLATFORM_SCOPE_ID,
           subjectKey: origin,
           displayName: label,
         },

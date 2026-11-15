@@ -144,8 +144,6 @@ test("create writes subject, asset, web-origin and provenance in one transaction
       return {
         id: "subject-1",
         kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
-        scopeType: "platform",
-        scopeId: "deployment",
         subjectKey: "https://app.example.com",
         displayName: "App",
       };

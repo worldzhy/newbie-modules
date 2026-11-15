@@ -199,7 +199,7 @@ test("merge: an evidence id skipped by two mechanisms is counted once so items.l
 
 test("dispatcher: unknown evaluationKey is a contract error, known keys run their mechanisms", async () => {
   const input = {
-    subject: { id: "s-1", scopeType: "project", scopeId: "p-1", subjectKey: "k", displayName: "k" },
+    subject: { id: "s-1", subjectKey: "k", displayName: "k" },
     ruleSetVersion: { id: "v-1", kind: "repository", evaluationKey: SECURITY_EVALUATION_KEY_NPM_OSV, version: "v1" },
     criteria: [],
     evidence: [],
