@@ -112,6 +112,27 @@ export class AwsCrossAccountBindingsService {
     };
   }
 
+  /**
+   * Credential reference of every configured account: the opaque reference
+   * resolves back through resolveCredentialByRef, so a caller that stores one
+   * never needs the binding record itself. Accounts without a saved role ARN
+   * are omitted because their reference could not be resolved.
+   */
+  async listAccountCredentialRefs() {
+    const bindings = await this.prisma.awsCrossAccountBinding.findMany({
+      where: { roleArn: { not: null } },
+      orderBy: { accountId: "asc" },
+      select: { id: true, accountId: true, name: true },
+    });
+    return {
+      accountCredentialRefs: bindings.map((binding) => ({
+        accountId: binding.accountId,
+        name: binding.name,
+        credentialRef: awsBindingRef(binding.id),
+      })),
+    };
+  }
+
   async getAccountCredential(accountId: string) {
     const binding = await this.getBindingByAccountId(accountId);
     return this.serializeAccount(accountId, binding, await this.resolveDefaultAccountId());

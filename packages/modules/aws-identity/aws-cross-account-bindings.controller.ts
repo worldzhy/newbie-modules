@@ -5,6 +5,7 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { AwsCrossAccountBindingsService } from "./aws-cross-account-bindings.service";
 import {
   AttachAwsCrossAccountBindingConsumerDto,
+  AwsAccountCredentialRefListResponseDto,
   AwsCrossAccountBindingConsumerResponseDto,
   AwsCrossAccountBindingListResponseDto,
   AwsCrossAccountBindingResponseDto,
@@ -18,6 +19,14 @@ import {
 @Controller("aws-cross-account-bindings")
 export class AwsCrossAccountBindingsController {
   constructor(private readonly service: AwsCrossAccountBindingsService) {}
+
+  @Get("account-credential-refs")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsCrossAccountBinding)
+  @ApiOperation({ summary: "List the credential reference of every configured AWS account" })
+  @ApiResponse({ status: 200, type: AwsAccountCredentialRefListResponseDto })
+  async listAccountCredentialRefs() {
+    return await this.service.listAccountCredentialRefs();
+  }
 
   @Get("accounts")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.AwsCrossAccountBinding)
