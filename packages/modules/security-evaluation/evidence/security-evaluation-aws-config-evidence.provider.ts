@@ -55,7 +55,6 @@ export class SecurityEvaluationAwsConfigEvidenceProvider implements EvidenceProv
       );
     }
 
-    const asset = await this.assets.getOrCreateAsset(subject);
     const observedAt = new Date();
     const collection = await access.collect(subject);
 
@@ -68,11 +67,10 @@ export class SecurityEvaluationAwsConfigEvidenceProvider implements EvidenceProv
     }
 
     await this.assets.upsertAwsConfigKnowledgeItems(
-      asset.id,
+      subject.id,
       collection.items.map((item) => ({ type: item.type, key: item.key, value: item.value })),
       observedAt,
     );
-    await this.assets.touchObserved(asset.id, observedAt);
 
     const items = collection.items.map((item): EvaluationEvidenceItem => {
       const region = typeof item.value.region === "string" ? item.value.region : null;

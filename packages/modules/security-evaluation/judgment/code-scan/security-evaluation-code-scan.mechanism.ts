@@ -286,7 +286,7 @@ export class SecurityEvaluationCodeScanMechanism implements SecurityEvaluationJu
         cacheHits++;
         evaluatedRefs.push(item.id);
         for (const row of cachedRows) {
-          for (const cachedFinding of row.findings) pushFinding(cachedFinding, item, payload);
+          for (const cachedFinding of row.cachedFindings) pushFinding(cachedFinding, item, payload);
         }
         continue;
       }

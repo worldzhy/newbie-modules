@@ -176,8 +176,8 @@ function cacheRowsFor(
     contentHash: payload.contentHash,
     modelId: "test-model",
     promptVersion: codeScanPromptVersion(),
-    ruleSetVersion: "v1",
-    findings: findings.filter((finding) => finding.criterionKey === criterion.criterionKey),
+    ruleSetVersionLabel: "v1",
+    cachedFindings: findings.filter((finding) => finding.criterionKey === criterion.criterionKey),
     signature: "sig-cached",
   }));
 }
@@ -338,12 +338,12 @@ test("code-scan mechanism discards out-of-range entries and caches per-criterion
   const rows = cache.recorded[0];
   assert.equal(rows.length, CRITERIA.length);
   const injectionRow = rows.find((row) => row.criterionKey === "code-scan.injection");
-  assert.equal(injectionRow?.findings.length, 1);
-  assert.equal(injectionRow?.findings[0].symbol, "findUser");
+  assert.equal(injectionRow?.cachedFindings.length, 1);
+  assert.equal(injectionRow?.cachedFindings[0].symbol, "findUser");
   for (const row of rows) {
     assert.equal(row.modelId, "test-model");
     assert.equal(row.promptVersion, codeScanPromptVersion());
-    assert.equal(row.ruleSetVersion, "v1");
+    assert.equal(row.ruleSetVersionLabel, "v1");
     assert.ok(row.signature.length > 0);
   }
 });

@@ -24,11 +24,11 @@ import {
 
 // --- Path params ---------------------------------------------------------
 
-/** Path-parameter envelope for asset-scoped routes. */
-export class GetSecurityEvaluationAssetRequestDto {
+/** Path-parameter envelope for subject-scoped routes. */
+export class GetSecurityEvaluationSubjectRequestDto {
   @ApiProperty({ type: String, format: "uuid" })
   @IsUUID()
-  assetId!: string;
+  subjectId!: string;
 }
 
 /** Path-parameter envelope for finding-scoped routes. */
@@ -41,10 +41,9 @@ export class GetSecurityEvaluationFindingRequestDto {
 // --- Subject ingest ------------------------------------------------------
 
 /**
- * One subject submission (ADR-039). The subject is platform-level — the caller
- * does NOT declare a scope; it only says where the material came from, through
- * the opaque `sourceType` / `sourceId` pair. Re-submitting the same subject and
- * source is idempotent; a new source adds a provenance row.
+ * One subject submission (ADR-068 D8). The subject is platform-level and
+ * identified by `(kind, subjectKey)`; provenance lives in the host, so no
+ * source is declared here. Re-submitting the same subject is idempotent.
  */
 export class IngestSecurityEvaluationSubjectRequestDto {
   @ApiProperty({ description: 'Subject kind, e.g. "repository" or "aws-account"' })
@@ -76,70 +75,13 @@ export class IngestSecurityEvaluationSubjectRequestDto {
   @IsNotEmpty()
   @MaxLength(255)
   credentialRef?: string;
-
-  @ApiProperty({ description: 'Opaque provenance type, e.g. "project"' })
-  @IsString()
-  @IsNotEmpty()
-  sourceType!: string;
-
-  @ApiProperty({ description: "Opaque provenance id inside the source type" })
-  @IsString()
-  @IsNotEmpty()
-  sourceId!: string;
 }
 
 export class IngestSecurityEvaluationSubjectResponseDto {
   @ApiProperty() subjectId!: string;
-  @ApiProperty() assetId!: string;
 }
 
-// --- Assets --------------------------------------------------------------
-
-export class ListSecurityEvaluationAssetsRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({
-    description:
-      'Optional provenance filter: only assets submitted by this source type (e.g. "project"). Omit for the platform view.',
-  })
-  @IsOptional()
-  @IsString()
-  scopeType?: string;
-
-  @ApiPropertyOptional({ description: "Optional provenance filter: only assets submitted by this source id" })
-  @IsOptional()
-  @IsString()
-  scopeId?: string;
-}
-
-/** One provenance row of an asset (ADR-039). */
-export class SecurityEvaluationAssetProvenanceResponseDto {
-  @ApiProperty() sourceType!: string;
-  @ApiProperty() sourceId!: string;
-  @ApiProperty() firstSubmittedAt!: Date;
-  @ApiProperty() lastSubmittedAt!: Date;
-}
-
-/** Mirrors the SecurityEvaluationAsset row, decorated with the subject kind. */
-export class SecurityEvaluationAssetResponseDto {
-  @ApiProperty() id!: string;
-  @ApiProperty() subjectId!: string;
-  @ApiProperty({ description: 'Subject kind behind this asset, e.g. "repository" or "aws-account"' }) kind!: string;
-  @ApiProperty({ description: "Stable identity inside the scope: repository full name or AWS account id" })
-  naturalKey!: string;
-  @ApiProperty() displayName!: string;
-  @ApiProperty() firstSeenAt!: Date;
-  @ApiProperty({ description: "Last run that actually observed this asset's inventory" })
-  lastSeenAt!: Date;
-  @ApiProperty({
-    type: [SecurityEvaluationAssetProvenanceResponseDto],
-    isArray: true,
-    description: "Who submitted this asset",
-  })
-  sources!: SecurityEvaluationAssetProvenanceResponseDto[];
-}
-
-export class ListSecurityEvaluationAssetsResponseDto extends CommonListResponseDto<SecurityEvaluationAssetResponseDto> {}
-
-// --- Asset knowledge items -----------------------------------------------
+// --- Knowledge items -----------------------------------------------------
 
 export class ListSecurityEvaluationAssetKnowledgeItemsRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({ description: 'Restrict to one knowledge type, e.g. "npm.package"' })
@@ -148,10 +90,10 @@ export class ListSecurityEvaluationAssetKnowledgeItemsRequestDto extends CommonL
   type?: string;
 }
 
-/** Mirrors one asset-scoped knowledge item row (AWS config or npm package). */
+/** Mirrors one subject-scoped knowledge item row (AWS config or npm package). */
 export class SecurityEvaluationAssetKnowledgeItemResponseDto {
   @ApiProperty() id!: string;
-  @ApiProperty() assetId!: string;
+  @ApiProperty() subjectId!: string;
   @ApiProperty({ description: 'Knowledge vocabulary type, e.g. "npm.package"' }) type!: string;
   @ApiProperty({ description: 'Knowledge identity, e.g. "npm:lodash@4.17.20"' }) key!: string;
   @ApiPropertyOptional({
@@ -182,10 +124,10 @@ export class StartSecurityEvaluationRunRequestDto {
   @IsUUID()
   ruleSetVersionId?: string;
 
-  @ApiPropertyOptional({ type: Object, description: "Opaque per-run config (ADR-023)" })
+  @ApiPropertyOptional({ type: Object, description: "Opaque per-run judgment config (ADR-023, ADR-068)" })
   @IsOptional()
   @IsObject()
-  config?: Record<string, unknown>;
+  judgmentConfig?: Record<string, unknown>;
 }
 
 /** Minimal acknowledgement of a fire-and-forget run trigger (HTTP 202). */
@@ -195,19 +137,6 @@ export class SecurityEvaluationRunAcceptedResponseDto {
 }
 
 export class ListSecurityEvaluationRunsRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({
-    description:
-      "Optional provenance filter: only runs of assets submitted by this source type. Omit for the platform view.",
-  })
-  @IsOptional()
-  @IsString()
-  scopeType?: string;
-
-  @ApiPropertyOptional({ description: "Optional provenance filter: only runs of assets submitted by this source id" })
-  @IsOptional()
-  @IsString()
-  scopeId?: string;
-
   @ApiPropertyOptional({ description: "Restrict to one subject" })
   @IsOptional()
   @IsUUID()
@@ -279,21 +208,6 @@ export class ListSecurityEvaluationResultsResponseDto extends CommonListResponse
 // --- Findings ------------------------------------------------------------
 
 export class ListSecurityEvaluationFindingsRequestDto extends CommonListRequestDto {
-  @ApiPropertyOptional({
-    description:
-      "Optional provenance filter: only findings of assets submitted by this source type. Omit for the platform view.",
-  })
-  @IsOptional()
-  @IsString()
-  scopeType?: string;
-
-  @ApiPropertyOptional({
-    description: "Optional provenance filter: only findings of assets submitted by this source id",
-  })
-  @IsOptional()
-  @IsString()
-  scopeId?: string;
-
   @ApiPropertyOptional({ description: "Restrict to one subject" })
   @IsOptional()
   @IsUUID()
@@ -350,7 +264,7 @@ export class SecurityEvaluationFindingResponseDto {
   @ApiProperty({ enum: EvaluationFindingSeverity }) severity!: EvaluationFindingSeverity;
   @ApiProperty({ enum: EvaluationFindingStatus }) status!: EvaluationFindingStatus;
   @ApiProperty() title!: string;
-  @ApiPropertyOptional({ type: String }) detail?: string | null;
+  @ApiPropertyOptional({ type: String }) description?: string | null;
   @ApiPropertyOptional({ type: Object }) metadata?: object | null;
   @ApiPropertyOptional({ type: String }) firstSeenRunId?: string | null;
   @ApiPropertyOptional({ type: String }) lastSeenRunId?: string | null;
@@ -417,19 +331,6 @@ export class SecurityEvaluationFindingDetailResponseDto {
 
 export class GetSecurityEvaluationReportRequestDto {
   @ApiPropertyOptional({
-    description:
-      "Optional provenance filter: report only assets submitted by this source type. Omit for the platform view.",
-  })
-  @IsOptional()
-  @IsString()
-  scopeType?: string;
-
-  @ApiPropertyOptional({ description: "Optional provenance filter: report only assets submitted by this source id" })
-  @IsOptional()
-  @IsString()
-  scopeId?: string;
-
-  @ApiPropertyOptional({
     description: "Window of the daily severity trend, in days (1…365). Defaults to 30.",
     default: SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS,
     minimum: 1,
@@ -489,7 +390,7 @@ export class SecurityEvaluationReportFindingsDto {
     isArray: true,
     description: "Open findings counted per standardKey and severity",
   })
-  byEvaluationKey!: SecurityEvaluationReportFindingsByKeyDto[];
+  byStandardKey!: SecurityEvaluationReportFindingsByKeyDto[];
   @ApiProperty({ type: [SecurityEvaluationReportTopFindingDto], isArray: true })
   topOpen!: SecurityEvaluationReportTopFindingDto[];
 }
@@ -531,7 +432,7 @@ export class SecurityEvaluationReportMttrDto {
     isArray: true,
     description: "The same window split per standardKey",
   })
-  byEvaluationKey!: SecurityEvaluationReportMttrByKeyDto[];
+  byStandardKey!: SecurityEvaluationReportMttrByKeyDto[];
 }
 
 /** Single-axis report (ADR-022 D6): no composite score, no cross-standardKey weighting. */

@@ -3,7 +3,6 @@ import { test } from "node:test";
 import type { ConfigService } from "@nestjs/config";
 import type { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
-import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
 import {
   SecurityEvaluationWebOriginService,
   normalizeWebOrigin,
@@ -18,8 +17,9 @@ import type { VerificationFetchAccess } from "./ports/web-origin-verification-ac
 
 /**
  * Behavior-level test for web-origin registration and ownership verification
- * (ADR-066 §1, ADR-044 §2): the registration transaction, origin normalization,
- * the two verification channels and the lazy re-verification gate.
+ * (ADR-066 §1, ADR-044 §2, ADR-068 D7): the registration transaction, origin
+ * normalization, the two verification channels and the lazy re-verification
+ * gate. Identity is the subject; there is no asset or provenance row.
  */
 
 const CONFIG_VALUES: Record<string, string> = {
@@ -40,7 +40,7 @@ function fakeConfig(): ConfigService {
 
 interface FakeWebOriginRow {
   id: string;
-  assetId: string;
+  subjectId: string;
   environment: string;
   targetPaths: Record<string, string>;
   verificationStatus: string;
@@ -52,13 +52,12 @@ interface FakeWebOriginRow {
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
-  asset: { id: string; subjectId: string; naturalKey: string; displayName: string };
 }
 
 function fakeWebOriginRow(overrides: Partial<FakeWebOriginRow> = {}): FakeWebOriginRow {
   return {
     id: "web-origin-1",
-    assetId: "asset-1",
+    subjectId: "subject-1",
     environment: "production",
     targetPaths: { "auth.login": "/login" },
     verificationStatus: "PENDING",
@@ -70,21 +69,22 @@ function fakeWebOriginRow(overrides: Partial<FakeWebOriginRow> = {}): FakeWebOri
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
-    asset: { id: "asset-1", subjectId: "subject-1", naturalKey: "https://app.example.com", displayName: "App" },
     ...overrides,
   };
 }
 
-function buildService(overrides: {
-  prisma: unknown;
-  subjects: unknown;
-  assets?: unknown;
-  fetch?: VerificationFetchAccess;
-}): SecurityEvaluationWebOriginService {
+function fakeSubject(overrides: { subjectKey?: string; displayName?: string } = {}) {
+  return {
+    subjectKey: "https://app.example.com",
+    displayName: "App",
+    ...overrides,
+  };
+}
+
+function buildService(overrides: { prisma: unknown; subjects: unknown; fetch?: VerificationFetchAccess }) {
   return new SecurityEvaluationWebOriginService(
     overrides.prisma as PrismaService,
     overrides.subjects as never,
-    (overrides.assets ?? {}) as SecurityEvaluationAssetService,
     fakeConfig(),
     overrides.fetch,
   );
@@ -104,32 +104,19 @@ test("normalizeWebOrigin rejects credentials, paths, queries and fragments", () 
   assert.throws(() => normalizeWebOrigin("ftp://app.example.com"), /http or https/);
 });
 
-test("create writes subject, asset, web-origin and provenance in one transaction", async () => {
+test("create writes the subject and web-origin in one transaction", async () => {
   const calls: string[] = [];
   const transactionClient = {
     securityEvaluationWebOrigin: {
-      upsert: async (args: { where: { assetId: string }; create: { verificationToken: string } }) => {
+      upsert: async (args: { where: { subjectId: string }; create: { verificationToken: string } }) => {
         calls.push("origin:upsert");
-        assert.equal(args.where.assetId, "asset-1");
+        assert.equal(args.where.subjectId, "subject-1");
         return {
           id: "web-origin-1",
-          assetId: "asset-1",
+          subjectId: "subject-1",
           verificationStatus: "PENDING",
           verificationToken: args.create.verificationToken,
         };
-      },
-    },
-    securityEvaluationAssetProvenance: {
-      upsert: async (args: {
-        where: { subjectId_sourceType_sourceId: { subjectId: string; sourceType: string; sourceId: string } };
-      }) => {
-        calls.push("provenance:upsert");
-        assert.deepEqual(args.where.subjectId_sourceType_sourceId, {
-          subjectId: "subject-1",
-          sourceType: "project",
-          sourceId: "project-1",
-        });
-        return {};
       },
     },
   };
@@ -149,26 +136,17 @@ test("create writes subject, asset, web-origin and provenance in one transaction
       };
     },
   };
-  const assets = {
-    getOrCreateAsset: async () => {
-      calls.push("asset:upsert");
-      return { id: "asset-1", subjectId: "subject-1", naturalKey: "https://app.example.com" };
-    },
-  };
-  const service = buildService({ prisma, subjects, assets });
+  const service = buildService({ prisma, subjects });
 
   const registration = await service.create({
     origin: "HTTPS://App.Example.com:443/",
     label: "App",
     environment: "production",
     targetPaths: { "auth.login": "/login" },
-    sourceType: "project",
-    sourceId: "project-1",
   });
 
-  assert.deepEqual(calls, ["subject:upsert", "asset:upsert", "origin:upsert", "provenance:upsert"]);
+  assert.deepEqual(calls, ["subject:upsert", "origin:upsert"]);
   assert.equal(registration.subjectId, "subject-1");
-  assert.equal(registration.assetId, "asset-1");
   assert.equal(registration.webOriginId, "web-origin-1");
   assert.equal(registration.origin, "https://app.example.com");
   assert.equal(registration.verificationStatus, "PENDING");
@@ -189,8 +167,6 @@ test("create rejects an unknown target path role before writing anything", async
       origin: "https://app.example.com",
       environment: "production",
       targetPaths: { "auth.signup": "/signup" },
-      sourceType: "project",
-      sourceId: "project-1",
     }),
     /Unknown target path role/,
   );
@@ -207,12 +183,15 @@ test("requestVerification issues a DNS challenge and stores the requested method
         return fakeWebOriginRow({ verificationMethod: String(args.data.verificationMethod) });
       },
     },
+    evaluationSubject: {
+      findUnique: async () => fakeSubject(),
+    },
   };
   const service = buildService({ prisma, subjects: {} });
 
-  const challenge = await service.requestVerification("asset-1", "DNS_TXT");
+  const challenge = await service.requestVerification("subject-1", "DNS_TXT");
 
-  assert.equal(challenge.assetId, "asset-1");
+  assert.equal(challenge.subjectId, "subject-1");
   assert.equal(challenge.origin, "https://app.example.com");
   assert.equal(challenge.method, "DNS_TXT");
   assert.equal(challenge.dnsRecordName, `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX}.app.example.com`);
@@ -236,6 +215,9 @@ test("verify marks a matching DNS record VERIFIED and stamps the timestamps", as
         });
       },
     },
+    evaluationSubject: {
+      findUnique: async () => fakeSubject(),
+    },
   };
   const lookups: string[] = [];
   const fetch: VerificationFetchAccess = {
@@ -247,7 +229,7 @@ test("verify marks a matching DNS record VERIFIED and stamps the timestamps", as
   };
   const service = buildService({ prisma, subjects: {}, fetch });
 
-  const result = await service.verify("asset-1");
+  const result = await service.verify("subject-1");
 
   assert.deepEqual(lookups, [`${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX}.app.example.com`]);
   assert.equal(result.status, "VERIFIED");
@@ -269,6 +251,9 @@ test("verify counts a mismatching well-known body as a failure but keeps VERIFIE
         });
       },
     },
+    evaluationSubject: {
+      findUnique: async () => fakeSubject(),
+    },
   };
   const urls: string[] = [];
   const fetch: VerificationFetchAccess = {
@@ -280,7 +265,7 @@ test("verify counts a mismatching well-known body as a failure but keeps VERIFIE
   };
   const service = buildService({ prisma, subjects: {}, fetch });
 
-  const result = await service.verify("asset-1");
+  const result = await service.verify("subject-1");
 
   assert.deepEqual(urls, ["https://app.example.com/.well-known/nightwatch-verification.txt"]);
   assert.equal(result.status, "VERIFIED");
@@ -297,6 +282,9 @@ test("verify drops to FAILED once consecutive failures reach the threshold", asy
           verificationFailureCount: args.data.verificationFailureCount as number,
         }),
     },
+    evaluationSubject: {
+      findUnique: async () => fakeSubject(),
+    },
   };
   const fetch: VerificationFetchAccess = {
     lookupTxt: async () => [],
@@ -304,7 +292,7 @@ test("verify drops to FAILED once consecutive failures reach the threshold", asy
   };
   const service = buildService({ prisma, subjects: {}, fetch });
 
-  const result = await service.verify("asset-1");
+  const result = await service.verify("subject-1");
 
   assert.equal(result.status, "FAILED");
   assert.equal(result.consecutiveFailures, 3);
@@ -313,7 +301,7 @@ test("verify drops to FAILED once consecutive failures reach the threshold", asy
 test("verify fails the call with a wiring error when the port is not bound", async () => {
   const service = buildService({ prisma: {}, subjects: {} });
 
-  await assert.rejects(service.verify("asset-1"), /not bound/);
+  await assert.rejects(service.verify("subject-1"), /not bound/);
 });
 
 test("listActiveVerified returns only active verified origins and lazily re-verifies due rows", async () => {
@@ -323,38 +311,32 @@ test("listActiveVerified returns only active verified origins and lazily re-veri
     securityEvaluationWebOrigin: {
       findMany: async () => [
         fakeWebOriginRow({
-          assetId: "asset-due",
+          subjectId: "subject-due",
           lastVerifiedAt: due,
           verificationStatus: "VERIFIED",
-          asset: {
-            id: "asset-due",
-            subjectId: "subject-due",
-            naturalKey: "https://due.example.com",
-            displayName: "Due",
-          },
         }),
         fakeWebOriginRow({
-          assetId: "asset-fresh",
+          subjectId: "subject-fresh",
           environment: "staging",
           targetPaths: {},
           lastVerifiedAt: fresh,
           verificationStatus: "VERIFIED",
-          asset: {
-            id: "asset-fresh",
-            subjectId: "subject-fresh",
-            naturalKey: "https://fresh.example.com",
-            displayName: "Fresh",
-          },
         }),
+      ],
+    },
+    evaluationSubject: {
+      findMany: async () => [
+        { id: "subject-due", subjectKey: "https://due.example.com", displayName: "Due" },
+        { id: "subject-fresh", subjectKey: "https://fresh.example.com", displayName: "Fresh" },
       ],
     },
   };
   const service = buildService({ prisma, subjects: {} });
   const verified: string[] = [];
-  service.verify = async (assetId: string): Promise<SecurityEvaluationWebOriginVerificationResult> => {
-    verified.push(assetId);
+  service.verify = async (subjectId: string): Promise<SecurityEvaluationWebOriginVerificationResult> => {
+    verified.push(subjectId);
     return {
-      assetId,
+      subjectId,
       origin: "https://due.example.com",
       status: "VERIFIED",
       verifiedAt: fresh,
@@ -365,17 +347,16 @@ test("listActiveVerified returns only active verified origins and lazily re-veri
 
   const targets = await service.listActiveVerified();
 
-  assert.deepEqual(verified, ["asset-due"]);
+  assert.deepEqual(verified, ["subject-due"]);
   assert.equal(targets.length, 2);
   assert.deepEqual(targets[0], {
     subjectId: "subject-due",
-    assetId: "asset-due",
     origin: "https://due.example.com",
     label: "Due",
     environment: "production",
     targetPaths: { "auth.login": "/login" },
   });
-  assert.equal(targets[1].assetId, "asset-fresh");
+  assert.equal(targets[1].subjectId, "subject-fresh");
 });
 
 test("listActiveVerified drops an origin whose lazy re-verification falls to FAILED", async () => {
@@ -383,16 +364,19 @@ test("listActiveVerified drops an origin whose lazy re-verification falls to FAI
     securityEvaluationWebOrigin: {
       findMany: async () => [
         fakeWebOriginRow({
-          assetId: "asset-due",
+          subjectId: "subject-due",
           lastVerifiedAt: null,
           verificationStatus: "VERIFIED",
         }),
       ],
     },
+    evaluationSubject: {
+      findMany: async () => [{ id: "subject-due", subjectKey: "https://app.example.com", displayName: "App" }],
+    },
   };
   const service = buildService({ prisma, subjects: {} });
-  service.verify = async (assetId: string): Promise<SecurityEvaluationWebOriginVerificationResult> => ({
-    assetId,
+  service.verify = async (subjectId: string): Promise<SecurityEvaluationWebOriginVerificationResult> => ({
+    subjectId,
     origin: "https://app.example.com",
     status: "FAILED",
     verifiedAt: null,

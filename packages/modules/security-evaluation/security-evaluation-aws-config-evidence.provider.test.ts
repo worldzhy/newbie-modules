@@ -23,7 +23,7 @@ const SUBJECT: EvaluationSubjectRef = {
 
 const VERSION: EvaluationRuleSetVersionRef = {
   id: "33333333-3333-4333-8333-333333333333",
-  kind: "aws-account",
+  subjectKind: "aws-account",
   standardKey: "aws-cis-1.5",
   version: "v1",
 };

@@ -3,82 +3,37 @@
 // consumer prisma tree on `newbie modules apply`.
 //
 // The run / result / criteria / finding tables belong to the evaluation
-// skeleton (`module/evaluation`, ADR-020). This feature owns the asset
-// inventory and the web-origin ownership-verification record: `subjectId` is
-// a plain scalar with no relation — foreign keys never cross schema
-// boundaries.
+// skeleton (`module/evaluation`, ADR-020). This feature owns the subject-scoped
+// knowledge, the web-origin ownership-verification record and the code-scan
+// caches: `subjectId` is a plain scalar with no relation — foreign keys never
+// cross schema boundaries. There is no separate asset table: identity is the
+// subject coordinate `(kind, subjectKey)` (ADR-068 D7).
 
 // !! ----------------------------------------------------------- //
 // !!            [Module] Security Evaluation models             //
 // !! ----------------------------------------------------------- //
-// * SecurityEvaluationAsset                                   //
-// * SecurityEvaluationAssetProvenance                         //
 // * SecurityEvaluationWebOrigin                               //
 // * SecurityEvaluationAwsConfigKnowledgeItem                  //
 // * SecurityEvaluationNpmPackageKnowledgeItem                 //
 // ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-/// One evaluated asset, one-to-one with an EvaluationSubject row of this
-/// feature's kinds ("repository" / "aws-account" / "web-origin"). The skeleton
-/// owns the subject coordinate; this table owns the asset's inventory
-/// lifecycle.
-/// `naturalKey` is the feature's stable identity inside its scope — a
-/// repository full name or an AWS account id.
-model SecurityEvaluationAsset {
-  id          String   @id @default(uuid()) @db.Uuid
-  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
-  subjectId   String   @unique @db.Uuid
-  naturalKey  String   @db.VarChar(512)
-  displayName String   @db.VarChar(255)
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
-
-  awsConfigKnowledgeItems   SecurityEvaluationAwsConfigKnowledgeItem[]
-  npmPackageKnowledgeItems  SecurityEvaluationNpmPackageKnowledgeItem[]
-  webOrigin                 SecurityEvaluationWebOrigin?
-
-  @@index([naturalKey])
-  @@schema("module/security-evaluation")
-}
-
-/// Provenance of a subject: which host source attributed it (ADR-039). A
-/// platform-level subject may be supplied by several sources — the same
-/// repository can back applications of two projects, so the relation is many
-/// to many and the row set is what "who contributed this asset" means.
+/// Ownership-verification record of a web-origin subject (ADR-066, ADR-044).
 ///
-/// `sourceType` / `sourceId` are opaque strings: the module never resolves them
-/// to a host entity, it only stores and filters them. Provenance is used for
-/// display and remediation routing, never for authorization.
-model SecurityEvaluationAssetProvenance {
-  id              String   @id @default(uuid()) @db.Uuid
-  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
-  subjectId       String   @db.Uuid
-  sourceType      String   @db.VarChar(64)
-  sourceId        String   @db.VarChar(128)
-  firstSubmittedAt DateTime @default(now())
-  lastSubmittedAt  DateTime @default(now())
-
-  @@unique([subjectId, sourceType, sourceId])
-  @@index([sourceType, sourceId])
-  @@schema("module/security-evaluation")
-}
-
-/// Ownership-verification record of a web-origin asset (ADR-066, ADR-044).
+/// One row per subject: the subject carries the identity (`subjectKey` is the
+/// normalized origin, `displayName` the label) and provenance lives in the host
+/// (ADR-068 D8) — this table owns only what is specific to a web origin: where
+/// it runs, which path roles the rules can target, and whether the deployment
+/// still controls the origin.
 ///
-/// One row per asset: the asset carries the identity (`naturalKey` is the
-/// normalized origin, `displayName` the label) and the provenance rows carry
-/// who attributed it — this table owns only what is specific to a web origin:
-/// where it runs, which path roles the rules can target, and whether the
-/// deployment still controls the origin.
-///
-/// Only `verificationStatus = VERIFIED` and `isActive` assets are submitted for
-/// evaluation. Re-verification is lazy (the host calls `listActiveVerified`),
+/// Only `verificationStatus = VERIFIED` and `isActive` subjects are submitted
+/// for evaluation. Re-verification is lazy (the host calls `listActiveVerified`),
 /// so the module needs no scheduler; consecutive failures beyond the configured
 /// threshold move the row to `FAILED` and stop evaluation of a domain that may
 /// have changed hands.
 model SecurityEvaluationWebOrigin {
   id                   String    @id @default(uuid()) @db.Uuid
-  assetId              String    @unique @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId            String    @unique @db.Uuid
   // Free-form deployment slot chosen by the host ("production", "staging"…).
   environment          String    @db.VarChar(32)
   // Path role → relative path, e.g. { "auth.login": "/login" }. Dropping a
@@ -97,13 +52,11 @@ model SecurityEvaluationWebOrigin {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
   @@index([verificationStatus, isActive])
   @@schema("module/security-evaluation")
 }
 
-/// A current-state AWS configuration knowledge item collected from an asset:
+/// A current-state AWS configuration knowledge item collected from a subject:
 /// a password policy, an access key, a bucket's security posture… Items are
 /// upserted on collection and never deleted here; history lives in the
 /// archived run manifest, and a stale `observedAt` is what "not observed
@@ -111,38 +64,36 @@ model SecurityEvaluationWebOrigin {
 ///
 /// The KnowledgeItem suffix marks the knowledge family — collected/external
 /// knowledge consumed by judgment — not schema isomorphism across the
-/// family: this table is asset-scoped while SecurityEvaluationThreatKnowledgeItem
+/// family: this table is subject-scoped while SecurityEvaluationThreatKnowledgeItem
 /// is world-scoped (ADR-037 D9.1).
 model SecurityEvaluationAwsConfigKnowledgeItem {
   id         String   @id @default(uuid()) @db.Uuid
-  assetId    String   @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId  String   @db.Uuid
   type       String   @db.VarChar(64) // "aws.iam.account-password-policy" | ...
   key        String   @db.VarChar(512) // stable identity within the type
   value      Json?    @db.JsonB // small intrinsic values: region, mfaEnabled…
   observedAt DateTime
 
-  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  @@unique([assetId, type, key])
-  @@index([assetId, type])
+  @@unique([subjectId, type, key])
+  @@index([subjectId, type])
   @@schema("module/security-evaluation")
 }
 
 /// A current-state npm package knowledge item collected from a repository
-/// asset: the package installed at a version. Same lifecycle and family
+/// subject: the package installed at a version. Same lifecycle and family
 /// semantics as SecurityEvaluationAwsConfigKnowledgeItem.
 model SecurityEvaluationNpmPackageKnowledgeItem {
   id         String   @id @default(uuid()) @db.Uuid
-  assetId    String   @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId  String   @db.Uuid
   type       String   @db.VarChar(64) // "npm.package"
   key        String   @db.VarChar(512) // "npm:lodash@4.17.20"
   value      Json?    @db.JsonB // small intrinsic values: version, isDev, ecosystem…
   observedAt DateTime
 
-  asset SecurityEvaluationAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
-
-  @@unique([assetId, type, key])
-  @@index([assetId, type])
+  @@unique([subjectId, type, key])
+  @@index([subjectId, type])
   @@schema("module/security-evaluation")
 }
 

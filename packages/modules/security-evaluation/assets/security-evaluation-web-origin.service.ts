@@ -10,9 +10,8 @@ import { ConfigService } from "@nestjs/config";
 import { randomBytes } from "node:crypto";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { EvaluationSubjectService, toSubjectRef } from "@modules/evaluation/evaluation-subject.service";
+import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
 
-import { SecurityEvaluationAssetService } from "../assets/security-evaluation-asset.service";
 import { requirePositiveInteger } from "../persistence/security-evaluation-intel-negative-cache.repository";
 import {
   SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
@@ -46,14 +45,10 @@ export interface CreateSecurityEvaluationWebOriginInput {
   environment: string;
   /** Path role → relative path; unknown roles are rejected. */
   targetPaths?: Record<string, string>;
-  /** Provenance: which host source attributes this origin. */
-  sourceType: string;
-  sourceId: string;
 }
 
 export interface SecurityEvaluationWebOriginRegistration {
   subjectId: string;
-  assetId: string;
   webOriginId: string;
   origin: string;
   verificationStatus: SecurityEvaluationWebOriginVerificationStatus;
@@ -61,7 +56,7 @@ export interface SecurityEvaluationWebOriginRegistration {
 }
 
 export interface SecurityEvaluationWebOriginChallenge {
-  assetId: string;
+  subjectId: string;
   origin: string;
   method: SecurityEvaluationWebOriginVerificationMethod;
   token: string;
@@ -73,7 +68,7 @@ export interface SecurityEvaluationWebOriginChallenge {
 }
 
 export interface SecurityEvaluationWebOriginVerificationResult {
-  assetId: string;
+  subjectId: string;
   origin: string;
   status: SecurityEvaluationWebOriginVerificationStatus;
   verifiedAt: Date | null;
@@ -83,7 +78,6 @@ export interface SecurityEvaluationWebOriginVerificationResult {
 
 export interface SecurityEvaluationWebOriginTarget {
   subjectId: string;
-  assetId: string;
   origin: string;
   label: string;
   environment: string;
@@ -92,14 +86,14 @@ export interface SecurityEvaluationWebOriginTarget {
 
 /**
  * SecurityEvaluationWebOriginService — registration and ownership verification
- * of web-origin assets (ADR-066 §1, ADR-044 §2).
+ * of web-origin subjects (ADR-066 §1, ADR-044 §2, ADR-068 D7).
  *
- * Registration is one transaction: subject, asset and the web-origin record
- * either all exist or none do, so a half-registered origin can never enter the
- * evaluation pipeline. Identity lives on the asset (`naturalKey` is the
- * normalized origin, `displayName` the label) and attribution lives on the
- * provenance rows — this service only owns what is specific to a web origin:
- * environment, target paths and the verification lifecycle.
+ * Registration is one transaction: the subject and the web-origin record
+ * either both exist or neither do, so a half-registered origin can never enter
+ * the evaluation pipeline. Identity lives on the subject (`subjectKey` is the
+ * normalized origin, `displayName` the label) — this service only owns what is
+ * specific to a web origin: environment, target paths and the verification
+ * lifecycle. Provenance lives in the host (ADR-068 D8).
  *
  * Verification is host-driven: the module generates the token and compares
  * published values through `VerificationFetchAccess`, but never performs
@@ -116,7 +110,6 @@ export class SecurityEvaluationWebOriginService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subjects: EvaluationSubjectService,
-    private readonly assets: SecurityEvaluationAssetService,
     config: ConfigService,
     @Optional()
     @Inject(securityEvaluationVerificationFetchAccessToken)
@@ -138,7 +131,7 @@ export class SecurityEvaluationWebOriginService {
   }
 
   /**
-   * Register an origin: platform-level subject + asset + verification record,
+   * Register an origin: platform-level subject + verification record,
    * atomically. Re-registration is idempotent and never resets verification —
    * it only refreshes the label, environment and target paths.
    */
@@ -158,11 +151,10 @@ export class SecurityEvaluationWebOriginService {
         },
         transaction,
       );
-      const asset = await this.assets.getOrCreateAsset(toSubjectRef(subject), transaction);
       const webOrigin = await transaction.securityEvaluationWebOrigin.upsert({
-        where: { assetId: asset.id },
+        where: { subjectId: subject.id },
         create: {
-          assetId: asset.id,
+          subjectId: subject.id,
           environment,
           targetPaths: targetPaths as Prisma.InputJsonValue,
           verificationToken,
@@ -172,28 +164,9 @@ export class SecurityEvaluationWebOriginService {
           targetPaths: targetPaths as Prisma.InputJsonValue,
         },
       });
-      const now = new Date();
-      await transaction.securityEvaluationAssetProvenance.upsert({
-        where: {
-          subjectId_sourceType_sourceId: {
-            subjectId: subject.id,
-            sourceType: input.sourceType,
-            sourceId: input.sourceId,
-          },
-        },
-        create: {
-          subjectId: subject.id,
-          sourceType: input.sourceType,
-          sourceId: input.sourceId,
-          firstSubmittedAt: now,
-          lastSubmittedAt: now,
-        },
-        update: { lastSubmittedAt: now },
-      });
 
       return {
         subjectId: subject.id,
-        assetId: asset.id,
         webOriginId: webOrigin.id,
         origin,
         verificationStatus: webOrigin.verificationStatus as SecurityEvaluationWebOriginVerificationStatus,
@@ -208,19 +181,19 @@ export class SecurityEvaluationWebOriginService {
    * token because the old one was exposed long enough to fail repeatedly.
    */
   async requestVerification(
-    assetId: string,
+    subjectId: string,
     method: SecurityEvaluationWebOriginVerificationMethod,
   ): Promise<SecurityEvaluationWebOriginChallenge> {
     requireVerificationMethod(method);
-    const row = await this.getWebOrigin(assetId);
+    const { row, subject } = await this.getWebOrigin(subjectId);
     if (row.verificationStatus === "REVOKED") {
-      throw new BadRequestException(`Web origin ${row.asset.naturalKey} is revoked and cannot be verified.`);
+      throw new BadRequestException(`Web origin ${subject.subjectKey} is revoked and cannot be verified.`);
     }
 
     const regenerate = row.verificationStatus === "FAILED";
     const token = regenerate ? this.generateToken() : row.verificationToken;
     await this.prisma.securityEvaluationWebOrigin.update({
-      where: { assetId },
+      where: { subjectId },
       data: {
         verificationMethod: method,
         verificationToken: token,
@@ -229,7 +202,7 @@ export class SecurityEvaluationWebOriginService {
       },
     });
 
-    return buildChallenge(assetId, row.asset.naturalKey, method, token);
+    return buildChallenge(subjectId, subject.subjectKey, method, token);
   }
 
   /**
@@ -237,7 +210,7 @@ export class SecurityEvaluationWebOriginService {
    * a failed verification (the origin could not be proven), which is what the
    * three-strike rule is meant to catch.
    */
-  async verify(assetId: string): Promise<SecurityEvaluationWebOriginVerificationResult> {
+  async verify(subjectId: string): Promise<SecurityEvaluationWebOriginVerificationResult> {
     const fetch = this.verificationFetch;
     if (!fetch) {
       throw new InternalServerErrorException(
@@ -245,23 +218,21 @@ export class SecurityEvaluationWebOriginService {
       );
     }
 
-    const row = await this.getWebOrigin(assetId);
+    const { row, subject } = await this.getWebOrigin(subjectId);
     if (row.verificationStatus === "REVOKED") {
-      throw new BadRequestException(`Web origin ${row.asset.naturalKey} is revoked and cannot be verified.`);
+      throw new BadRequestException(`Web origin ${subject.subjectKey} is revoked and cannot be verified.`);
     }
     const method = row.verificationMethod as SecurityEvaluationWebOriginVerificationMethod | null;
     if (!method) {
-      throw new BadRequestException(
-        `Web origin ${row.asset.naturalKey} has no verification method; request one first.`,
-      );
+      throw new BadRequestException(`Web origin ${subject.subjectKey} has no verification method; request one first.`);
     }
 
-    const matched = await this.matchesPublishedToken(fetch, row.asset.naturalKey, method, row.verificationToken);
+    const matched = await this.matchesPublishedToken(fetch, subject.subjectKey, method, row.verificationToken);
     const now = new Date();
 
     if (matched) {
       const updated = await this.prisma.securityEvaluationWebOrigin.update({
-        where: { assetId },
+        where: { subjectId },
         data: {
           verificationStatus: "VERIFIED",
           verifiedAt: row.verifiedAt ?? now,
@@ -269,18 +240,18 @@ export class SecurityEvaluationWebOriginService {
           verificationFailureCount: 0,
         },
       });
-      return toVerificationResult(assetId, row.asset.naturalKey, updated);
+      return toVerificationResult(subjectId, subject.subjectKey, updated);
     }
 
     const failures = row.verificationFailureCount + 1;
     const updated = await this.prisma.securityEvaluationWebOrigin.update({
-      where: { assetId },
+      where: { subjectId },
       data: {
         verificationFailureCount: failures,
         verificationStatus: failures >= this.reverifyFailureThreshold ? "FAILED" : row.verificationStatus,
       },
     });
-    return toVerificationResult(assetId, row.asset.naturalKey, updated);
+    return toVerificationResult(subjectId, subject.subjectKey, updated);
   }
 
   /**
@@ -291,17 +262,27 @@ export class SecurityEvaluationWebOriginService {
   async listActiveVerified(): Promise<SecurityEvaluationWebOriginTarget[]> {
     const rows = await this.prisma.securityEvaluationWebOrigin.findMany({
       where: { isActive: true, verificationStatus: "VERIFIED" },
-      include: { asset: true },
-      orderBy: { assetId: "asc" },
+      orderBy: { subjectId: "asc" },
     });
+
+    const subjectIds = rows.map((row) => row.subjectId);
+    const subjects = subjectIds.length
+      ? await this.prisma.evaluationSubject.findMany({
+          where: { id: { in: subjectIds } },
+          select: { id: true, subjectKey: true, displayName: true },
+        })
+      : [];
+    const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
 
     const targets: SecurityEvaluationWebOriginTarget[] = [];
     for (const row of rows) {
+      const subject = subjectById.get(row.subjectId);
+      if (!subject) continue;
       const due = !row.lastVerifiedAt || Date.now() - row.lastVerifiedAt.getTime() >= this.verificationIntervalMs;
       let status = row.verificationStatus;
       if (due) {
         try {
-          status = (await this.verify(row.assetId)).status;
+          status = (await this.verify(row.subjectId)).status;
         } catch {
           // A host-side lookup error is already counted inside verify(); an
           // unbound port or a missing method leaves the row untouched.
@@ -310,10 +291,9 @@ export class SecurityEvaluationWebOriginService {
       }
       if (status !== "VERIFIED") continue;
       targets.push({
-        subjectId: row.asset.subjectId,
-        assetId: row.assetId,
-        origin: row.asset.naturalKey,
-        label: row.asset.displayName,
+        subjectId: row.subjectId,
+        origin: subject.subjectKey,
+        label: subject.displayName,
         environment: row.environment,
         targetPaths: parseTargetPaths(row.targetPaths),
       });
@@ -322,18 +302,20 @@ export class SecurityEvaluationWebOriginService {
   }
 
   /** The role → relative-path map the evidence providers resolve targets from. */
-  async pathRoles(assetId: string): Promise<Record<string, string>> {
-    const row = await this.getWebOrigin(assetId);
+  async pathRoles(subjectId: string): Promise<Record<string, string>> {
+    const { row } = await this.getWebOrigin(subjectId);
     return parseTargetPaths(row.targetPaths);
   }
 
-  private async getWebOrigin(assetId: string) {
-    const row = await this.prisma.securityEvaluationWebOrigin.findUnique({
-      where: { assetId },
-      include: { asset: true },
+  private async getWebOrigin(subjectId: string) {
+    const row = await this.prisma.securityEvaluationWebOrigin.findUnique({ where: { subjectId } });
+    if (!row) throw new NotFoundException(`Security evaluation web origin ${subjectId} not found`);
+    const subject = await this.prisma.evaluationSubject.findUnique({
+      where: { id: subjectId },
+      select: { subjectKey: true, displayName: true },
     });
-    if (!row) throw new NotFoundException(`Security evaluation web origin ${assetId} not found`);
-    return row;
+    if (!subject) throw new NotFoundException(`Evaluation subject ${subjectId} not found`);
+    return { row, subject };
   }
 
   private async matchesPublishedToken(
@@ -420,7 +402,7 @@ function parseTargetPaths(value: Prisma.JsonValue): Record<string, string> {
 }
 
 function buildChallenge(
-  assetId: string,
+  subjectId: string,
   origin: string,
   method: SecurityEvaluationWebOriginVerificationMethod,
   token: string,
@@ -428,7 +410,7 @@ function buildChallenge(
   const host = new URL(origin).hostname;
   if (method === "DNS_TXT") {
     return {
-      assetId,
+      subjectId,
       origin,
       method,
       token,
@@ -437,7 +419,7 @@ function buildChallenge(
     };
   }
   return {
-    assetId,
+    subjectId,
     origin,
     method,
     token,
@@ -446,7 +428,7 @@ function buildChallenge(
 }
 
 function toVerificationResult(
-  assetId: string,
+  subjectId: string,
   origin: string,
   row: {
     verificationStatus: string;
@@ -456,7 +438,7 @@ function toVerificationResult(
   },
 ): SecurityEvaluationWebOriginVerificationResult {
   return {
-    assetId,
+    subjectId,
     origin,
     status: row.verificationStatus as SecurityEvaluationWebOriginVerificationStatus,
     verifiedAt: row.verifiedAt,

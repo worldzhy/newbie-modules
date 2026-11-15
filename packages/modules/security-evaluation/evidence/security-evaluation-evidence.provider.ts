@@ -111,7 +111,6 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       return this.collectCodeScan(subject);
     }
 
-    const asset = await this.assets.getOrCreateAsset(subject);
     const observedAt = new Date();
     const lockfile = await this.resolveLockfile(subject);
     const manifest = await this.readManifestDependencies(subject);
@@ -119,7 +118,7 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
     const items = this.buildItems(packages, observedAt);
 
     await this.assets.upsertNpmPackageKnowledgeItems(
-      asset.id,
+      subject.id,
       packages.map((pkg) => ({
         type: SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE,
         key: dependencyKnowledgeKey(pkg.name, pkg.version),
@@ -127,7 +126,6 @@ export class SecurityEvaluationEvidenceProvider implements EvidenceProvider {
       })),
       observedAt,
     );
-    await this.assets.touchObserved(asset.id, observedAt);
 
     return {
       items,

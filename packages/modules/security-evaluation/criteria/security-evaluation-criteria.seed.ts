@@ -238,7 +238,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     if (!row) {
       try {
         row = await this.criteria.createVersion({
-          kind: baseline.kind,
+          subjectKind: baseline.kind,
           standardKey: baseline.standardKey,
           version: baseline.version,
           description: baseline.description,

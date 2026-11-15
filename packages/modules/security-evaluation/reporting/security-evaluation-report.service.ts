@@ -7,6 +7,8 @@ import {
   SECURITY_EVALUATION_REPORT_SEVERITY_TREND_DAYS,
   SECURITY_EVALUATION_REPORT_TREND_WEEKS,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
+  SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+  SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
   SECURITY_EVALUATION_SUBJECT_KINDS,
 } from "../security-evaluation.constants";
 import { deriveUrgencyRank, type SecurityEvaluationUrgency } from "../judgment/security-evaluation-urgency";
@@ -68,7 +70,7 @@ export interface SecurityEvaluationReport {
     open: number;
     bySeverity: Record<Severity, number>;
     byUrgency: Record<SecurityEvaluationUrgency, number>;
-    byEvaluationKey: {
+    byStandardKey: {
       standardKey: string;
       open: number;
       bySeverity: Record<Severity, number>;
@@ -96,7 +98,7 @@ export interface SecurityEvaluationReport {
     averageDays: number | null;
     resolvedCount: number;
     windowDays: number;
-    byEvaluationKey: {
+    byStandardKey: {
       standardKey: string;
       averageDays: number | null;
       medianDays: number | null;
@@ -149,20 +151,22 @@ export class SecurityEvaluationReportService {
     const now = new Date();
     const staleBefore = new Date(now.getTime() - SECURITY_EVALUATION_ASSET_STALE_AFTER_DAYS * DAY_MS);
 
-    // Aggregate in the database instead of loading every asset row: the report
-    // only needs total/stale counts plus the latest observation time
-    // (R5-P2-06).
-    const [assetTotal, assetStale, assetLatest] = await Promise.all([
-      this.prisma.securityEvaluationAsset.count({ where: { subjectId: { in: subjectIds } } }),
-      this.prisma.securityEvaluationAsset.count({
-        where: { subjectId: { in: subjectIds }, lastSeenAt: { lt: staleBefore } },
-      }),
-      this.prisma.securityEvaluationAsset.aggregate({
-        where: { subjectId: { in: subjectIds } },
-        _max: { lastSeenAt: true },
-      }),
-    ]);
-    const lastObservedAt = assetLatest._max.lastSeenAt;
+    // "Observed recently" is no longer a column on an asset row (ADR-068 D7):
+    // a subject counts as observed when at least one knowledge item of its kind
+    // was collected after `staleBefore` — repository → npm packages,
+    // aws-account → config items, web-origin → its verification record. The
+    // aggregation runs in the database (R5-P2-06) so cost is bounded by subject
+    // count, not item count.
+    const observedAtBySubject = await this.observedAtBySubject(subjects);
+    let assetTotal = 0;
+    let assetStale = 0;
+    let lastObservedAt: Date | null = null;
+    for (const subject of subjects) {
+      assetTotal += 1;
+      const observedAt = observedAtBySubject.get(subject.id) ?? null;
+      if (!observedAt || observedAt < staleBefore) assetStale += 1;
+      if (observedAt && (!lastObservedAt || observedAt > lastObservedAt)) lastObservedAt = observedAt;
+    }
 
     const latestResults = await this.latestResultsBySubject(subjectIds);
     const coverage = {
@@ -228,6 +232,52 @@ export class SecurityEvaluationReportService {
     return latest;
   }
 
+  /**
+   * Latest observation time per subject, derived from the subject-scoped
+   * knowledge tables (ADR-068 D7). A subject with no items at all has never
+   * been observed and is absent from the map.
+   */
+  private async observedAtBySubject(subjects: readonly { id: string; kind: string }[]): Promise<Map<string, Date>> {
+    const observedAt = new Map<string, Date>();
+    const record = (subjectId: string, at: Date | null | undefined) => {
+      if (!at) return;
+      const current = observedAt.get(subjectId);
+      if (!current || at > current) observedAt.set(subjectId, at);
+    };
+    const idsOfKind = (kind: string) =>
+      subjects.filter((subject) => subject.kind === kind).map((subject) => subject.id);
+    const repositoryIds = idsOfKind(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY);
+    const awsAccountIds = idsOfKind(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT);
+    const webOriginIds = idsOfKind(SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN);
+
+    const [npm, awsConfig, webOrigins] = await Promise.all([
+      repositoryIds.length
+        ? this.prisma.securityEvaluationNpmPackageKnowledgeItem.groupBy({
+            by: ["subjectId"],
+            where: { subjectId: { in: repositoryIds } },
+            _max: { observedAt: true },
+          })
+        : Promise.resolve([]),
+      awsAccountIds.length
+        ? this.prisma.securityEvaluationAwsConfigKnowledgeItem.groupBy({
+            by: ["subjectId"],
+            where: { subjectId: { in: awsAccountIds } },
+            _max: { observedAt: true },
+          })
+        : Promise.resolve([]),
+      webOriginIds.length
+        ? this.prisma.securityEvaluationWebOrigin.findMany({
+            where: { subjectId: { in: webOriginIds } },
+            select: { subjectId: true, lastVerifiedAt: true, createdAt: true },
+          })
+        : Promise.resolve([]),
+    ]);
+    for (const row of npm) record(row.subjectId, row._max.observedAt);
+    for (const row of awsConfig) record(row.subjectId, row._max.observedAt);
+    for (const row of webOrigins) record(row.subjectId, row.lastVerifiedAt ?? row.createdAt);
+    return observedAt;
+  }
+
   private async findingSummary(subjectIds: readonly string[]) {
     const bySeverity = emptySeverityCounts();
     const byUrgency = Object.fromEntries(URGENCIES.map((urgency) => [urgency, 0])) as Record<
@@ -236,7 +286,7 @@ export class SecurityEvaluationReportService {
     >;
     const byKey = new Map<string, { standardKey: string; open: number; bySeverity: Record<Severity, number> }>();
     if (subjectIds.length === 0) {
-      return { open: 0, bySeverity, byUrgency, byEvaluationKey: [], topOpen: [] };
+      return { open: 0, bySeverity, byUrgency, byStandardKey: [], topOpen: [] };
     }
 
     // One pass over the OPEN set yields the platform severity split and the
@@ -261,9 +311,7 @@ export class SecurityEvaluationReportService {
       if (severity in keyEntry.bySeverity) keyEntry.bySeverity[severity] += count;
       byKey.set(row.standardKey, keyEntry);
     }
-    const byEvaluationKey = [...byKey.values()].sort((left, right) =>
-      left.standardKey.localeCompare(right.standardKey),
-    );
+    const byStandardKey = [...byKey.values()].sort((left, right) => left.standardKey.localeCompare(right.standardKey));
 
     // Urgency lives in the JSON metadata column, so it cannot be aggregated by
     // Prisma. Iterate the OPEN findings in bounded pages and keep only the
@@ -303,7 +351,7 @@ export class SecurityEvaluationReportService {
       cursor = { id: batch[batch.length - 1].id };
     }
 
-    return { open, bySeverity, byUrgency, byEvaluationKey, topOpen };
+    return { open, bySeverity, byUrgency, byStandardKey, topOpen };
   }
 
   private async trend(subjectIds: readonly string[], since: Date) {
@@ -391,7 +439,7 @@ export class SecurityEvaluationReportService {
 
   private async mttr(subjectIds: readonly string[], since: Date, windowDays: number) {
     if (subjectIds.length === 0) {
-      return { averageDays: null, resolvedCount: 0, windowDays, byEvaluationKey: [] };
+      return { averageDays: null, resolvedCount: 0, windowDays, byStandardKey: [] };
     }
     const [overall, perKey] = await Promise.all([
       this.prisma.$queryRaw<{ averageDays: number | null; resolvedCount: number }[]>`
@@ -424,7 +472,7 @@ export class SecurityEvaluationReportService {
       averageDays: row?.averageDays ?? null,
       resolvedCount: row?.resolvedCount ?? 0,
       windowDays,
-      byEvaluationKey: perKey.map((entry) => ({
+      byStandardKey: perKey.map((entry) => ({
         standardKey: entry.standardKey,
         averageDays: entry.averageDays ?? null,
         medianDays: entry.medianDays ?? null,
