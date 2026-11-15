@@ -13,6 +13,7 @@ import {
 } from "./alert-center.constants";
 import type { AlertNotificationPort, AlertSeverity, AlertState } from "./alert-center.constants";
 import { AlertSourceRegistryService } from "./alert-source-registry.service";
+import type { RegisteredAlertSource } from "./alert-source-registry.service";
 import {
   AlertDto,
   AlertSourceDto,
@@ -421,17 +422,7 @@ export class AlertCenterService {
   async listSources(): Promise<AlertSourceDto[]> {
     const rows = await this.prisma.alertSource.findMany();
     const byKey = new Map(rows.map((row) => [row.key, row]));
-    return this.sources.getAll().map((source) => {
-      const row = byKey.get(source.key);
-      return {
-        key: source.key,
-        displayName: source.displayName,
-        defaultRepeatMinutes: source.defaultRepeatMinutes,
-        repeatMinutes: row?.repeatMinutes ?? null,
-        effectiveRepeatMinutes: row?.repeatMinutes ?? source.defaultRepeatMinutes,
-        notificationPausedUntil: row?.notificationPausedUntil ?? null,
-      };
-    });
+    return this.sources.getAll().map((source) => this.toSourceDto(source, byKey.get(source.key) ?? null));
   }
 
   /**
@@ -459,14 +450,7 @@ export class AlertCenterService {
 
     if (repeatMinutes === null && pausedUntil === null) {
       await this.prisma.alertSource.deleteMany({ where: { key } });
-      return {
-        key: source.key,
-        displayName: source.displayName,
-        defaultRepeatMinutes: source.defaultRepeatMinutes,
-        repeatMinutes: null,
-        effectiveRepeatMinutes: source.defaultRepeatMinutes,
-        notificationPausedUntil: null,
-      };
+      return this.toSourceDto(source, null);
     }
 
     const row = await this.prisma.alertSource.upsert({
@@ -474,17 +458,30 @@ export class AlertCenterService {
       create: { key, repeatMinutes, notificationPausedUntil: pausedUntil },
       update: { repeatMinutes, notificationPausedUntil: pausedUntil },
     });
+    return this.toSourceDto(source, row);
+  }
+
+  // --- Internal ------------------------------------------------------------
+
+  /** The operator-owned columns of one `AlertSource` row. */
+  private toSourceDto(
+    source: RegisteredAlertSource,
+    row: { repeatMinutes: number | null; notificationPausedUntil: Date | null } | null,
+  ): AlertSourceDto {
     return {
       key: source.key,
       displayName: source.displayName,
       defaultRepeatMinutes: source.defaultRepeatMinutes,
-      repeatMinutes: row.repeatMinutes,
-      effectiveRepeatMinutes: row.repeatMinutes ?? source.defaultRepeatMinutes,
-      notificationPausedUntil: row.notificationPausedUntil,
+      definitions: source.definitions.map((definition) => ({
+        key: definition.key,
+        displayName: definition.displayName,
+        repeatMinutes: definition.repeatMinutes,
+      })),
+      repeatMinutes: row?.repeatMinutes ?? null,
+      effectiveRepeatMinutes: row?.repeatMinutes ?? source.defaultRepeatMinutes,
+      notificationPausedUntil: row?.notificationPausedUntil ?? null,
     };
   }
-
-  // --- Internal ------------------------------------------------------------
 
   /**
    * Hand one lifecycle event to the notification domain. The alert is already

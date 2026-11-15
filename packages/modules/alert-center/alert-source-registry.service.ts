@@ -6,6 +6,18 @@ import { DEFAULT_REPEAT_MINUTES } from "./alert-center.constants";
  * registry is the single source of truth for a source's display name and its
  * default rhythm; the `AlertSource` table only stores operator overrides.
  */
+export interface AlertDefinitionDeclaration {
+  /** Stable key of one lifecycle family inside the source, e.g. "risk-spike". */
+  key: string;
+  /** Human-readable name shown in the source settings surface. */
+  displayName: string;
+  /**
+   * Rhythm this definition pins in code. When set, the source-level override
+   * does not govern it, so the settings surface must show it as fixed.
+   */
+  repeatMinutes?: number;
+}
+
 export interface AlertSourceDeclaration {
   /** Stable key, e.g. "url-check" / "heartbeat" / "cloudwatch". */
   key: string;
@@ -13,9 +25,22 @@ export interface AlertSourceDeclaration {
   displayName: string;
   /** Reminder rhythm in minutes; defaults to DEFAULT_REPEAT_MINUTES. */
   defaultRepeatMinutes?: number;
+  /**
+   * Lifecycle families this source emits. One source often owns several (one
+   * producer declares a family per alert key shape); the settings surface lists
+   * them so an operator sees what a source actually raises.
+   */
+  definitions?: AlertDefinitionDeclaration[];
 }
 
-export type RegisteredAlertSource = AlertSourceDeclaration & { defaultRepeatMinutes: number };
+export type RegisteredAlertDefinition = Required<Omit<AlertDefinitionDeclaration, "repeatMinutes">> & {
+  repeatMinutes: number | null;
+};
+
+export type RegisteredAlertSource = Omit<AlertSourceDeclaration, "definitions"> & {
+  defaultRepeatMinutes: number;
+  definitions: RegisteredAlertDefinition[];
+};
 
 /**
  * In-process registry of alert sources (ADR-065 §2). Sources are code, not
@@ -38,7 +63,26 @@ export class AlertSourceRegistryService {
         `Invalid defaultRepeatMinutes for ${declaration.key}: ${repeatMinutes}. Must be a positive integer.`,
       );
     }
-    this.sources.set(declaration.key, { ...declaration, defaultRepeatMinutes: repeatMinutes });
+    const definitions = (declaration.definitions ?? []).map((definition) => {
+      if (
+        definition.repeatMinutes !== undefined &&
+        (!Number.isInteger(definition.repeatMinutes) || definition.repeatMinutes <= 0)
+      ) {
+        throw new Error(
+          `Invalid repeatMinutes for ${declaration.key}/${definition.key}: ${definition.repeatMinutes}. Must be a positive integer.`,
+        );
+      }
+      return { ...definition, repeatMinutes: definition.repeatMinutes ?? null };
+    });
+    if (new Set(definitions.map((definition) => definition.key)).size !== definitions.length) {
+      throw new Error(`Duplicate alert definition key in source: ${declaration.key}`);
+    }
+    this.sources.set(declaration.key, {
+      key: declaration.key,
+      displayName: declaration.displayName,
+      defaultRepeatMinutes: repeatMinutes,
+      definitions,
+    });
     this.logger.log(`Alert source registered: ${declaration.key}`);
   }
 

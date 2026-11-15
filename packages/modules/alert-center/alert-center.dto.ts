@@ -173,6 +173,21 @@ export class ListAlertsResponseDto {
   nextCursor!: string | null;
 }
 
+export class AlertDefinitionDto {
+  @ApiProperty({ description: "Stable key of one lifecycle family inside the source" })
+  key!: string;
+
+  @ApiProperty()
+  displayName!: string;
+
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description: "Rhythm this definition pins in code; null means the source rhythm governs it",
+  })
+  repeatMinutes!: number | null;
+}
+
 export class AlertSourceDto {
   @ApiProperty()
   key!: string;
@@ -182,6 +197,9 @@ export class AlertSourceDto {
 
   @ApiProperty({ description: "Rhythm declared in code" })
   defaultRepeatMinutes!: number;
+
+  @ApiProperty({ type: () => AlertDefinitionDto, isArray: true, description: "Lifecycle families this source emits" })
+  definitions!: AlertDefinitionDto[];
 
   @ApiProperty({ type: Number, nullable: true, description: "Operator override; null inherits the declaration" })
   repeatMinutes!: number | null;

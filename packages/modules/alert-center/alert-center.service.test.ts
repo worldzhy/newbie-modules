@@ -126,7 +126,7 @@ function newHarness(options: { pausedUntil?: Date | null } = {}) {
     },
   });
 
-  return { service, prisma, alerts, sourceRows, events };
+  return { service, prisma, registry, alerts, sourceRows, events };
 }
 
 test("raise opens a firing alert and sends the first notification", async () => {
@@ -405,4 +405,33 @@ test("listFiringAlerts narrows by exact fingerprints when the caller knows its k
       in: [buildAlertFingerprint({ source: "job-scheduler", alertKey: "alert.dispatch-reminders" })],
     },
   });
+});
+
+test("listSources surfaces every declared definition of a multi-family source", async () => {
+  const { service, registry, sourceRows } = newHarness();
+  registry.register({
+    key: "security-evaluation",
+    displayName: "Security Evaluation",
+    defaultRepeatMinutes: 60,
+    definitions: [
+      { key: "run-failure", displayName: "Evaluation run failed" },
+      { key: "risk-spike", displayName: "Risk spike", repeatMinutes: 1440 },
+    ],
+  });
+  sourceRows.set("security-evaluation", {
+    key: "security-evaluation",
+    repeatMinutes: 15,
+    notificationPausedUntil: null,
+  });
+
+  const sources = await service.listSources();
+  const source = sources.find((entry) => entry.key === "security-evaluation")!;
+
+  // The pinned rhythm travels with the definition: an operator sees that the
+  // source override does not govern it.
+  assert.deepEqual(source.definitions, [
+    { key: "run-failure", displayName: "Evaluation run failed", repeatMinutes: null },
+    { key: "risk-spike", displayName: "Risk spike", repeatMinutes: 1440 },
+  ]);
+  assert.equal(source.effectiveRepeatMinutes, 15);
 });
