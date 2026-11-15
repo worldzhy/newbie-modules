@@ -337,7 +337,7 @@ test("listFiringAlerts caps the projection and exposes only the stable fields", 
     alert: {
       findMany: async (args: Row) => {
         captured.args = args;
-        return [{ id: "a1", scopeId: "p1", labels: { evaluationKey: "k" } }];
+        return [{ id: "a1", scopeId: "p1", labels: { standardKey: "k" } }];
       },
     },
   };
@@ -348,7 +348,7 @@ test("listFiringAlerts caps the projection and exposes only the stable fields", 
   // A caller-supplied limit can never widen the bound (R44-11).
   assert.equal(captured.args!.take, 500);
   assert.deepEqual(captured.args!.where, { source: "security-evaluation", state: "firing" });
-  assert.deepEqual(rows, [{ id: "a1", scopeId: "p1", labels: { evaluationKey: "k" } }]);
+  assert.deepEqual(rows, [{ id: "a1", scopeId: "p1", labels: { standardKey: "k" } }]);
 });
 
 test("dispatchDueReminders gives the reminder back when the adapter throws", async () => {
