@@ -287,7 +287,7 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
   }
 
   private findVersion(kind: string, standardKey: string, version: string) {
-    return this.prisma.evaluationRuleSetVersion.findFirst({ where: { kind, standardKey, version } });
+    return this.prisma.evaluationRuleSetVersion.findFirst({ where: { subjectKind: kind, standardKey, version } });
   }
 }
 
