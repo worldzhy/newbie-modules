@@ -49,32 +49,32 @@ export class AccountPermissionAuthorizer implements PermissionAuthorizer {
     }
 
     // No scope semantics on this route: the two system-level UNION paths decide.
-    //
-    const directGrant = await this.prisma.permission.findFirst({
-      where: {
-        resource,
-        action: action as PermissionAction,
-        OR: [{ role: { users: { some: { userId } } } }, { trustedUserId: userId }],
-      },
-      select: { id: true },
-    });
-
-    if (directGrant) {
-      return true;
-    }
-
-    // UNION path 2: Role → RolePermissionGroup → PermissionGroup → PermissionGroupPermission
-    const groupGrant = await this.prisma.permissionGroupPermission.findFirst({
-      where: {
-        resource,
-        action: action as PermissionAction,
-        permissionGroup: {
-          roles: { some: { role: { users: { some: { userId } } } } },
+    // They span two tables (Permission / PermissionGroupPermission), so they
+    // cannot be one OR query; running them in parallel keeps the decision at
+    // one round-trip and the result is their union.
+    const [directGrant, groupGrant] = await Promise.all([
+      // UNION path 1: Role → Permission OR trustedUserId → Permission
+      this.prisma.permission.findFirst({
+        where: {
+          resource,
+          action: action as PermissionAction,
+          OR: [{ role: { users: { some: { userId } } } }, { trustedUserId: userId }],
         },
-      },
-      select: { id: true },
-    });
+        select: { id: true },
+      }),
+      // UNION path 2: Role → RolePermissionGroup → PermissionGroup → PermissionGroupPermission
+      this.prisma.permissionGroupPermission.findFirst({
+        where: {
+          resource,
+          action: action as PermissionAction,
+          permissionGroup: {
+            roles: { some: { role: { users: { some: { userId } } } } },
+          },
+        },
+        select: { id: true },
+      }),
+    ]);
 
-    return Boolean(groupGrant);
+    return Boolean(directGrant || groupGrant);
   }
 }
