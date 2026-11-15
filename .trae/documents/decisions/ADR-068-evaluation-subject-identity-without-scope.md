@@ -314,6 +314,8 @@ model SecurityEvaluationNpmPackageKnowledgeItem {
 
 ## 后续工作
 
+> 状态（2026-11-15）：第 1–3 项已完成——registry `253f620`，宿主 `d7ad6af`（nightwatch-backend，含迁移 `20261115033006_evaluation_subject_identity`）与 `90106b0`（nightwatch-frontend wire 同步），back-port `diff -rq` 除 registry 独有的 `work-evaluation/clickhouse-migrations` 外为空。第 4–10 项待办。
+
 1. registry 侧：改 `evaluation` 模块（schema、contracts、subject service、run/finding 查询、删除端口与 `syncSubjects`、`evaluation-provider.registry.ts` 与 `evaluation.module.ts` 中「四组端口」的注释降为三组）、`work-evaluation` 与 `security-evaluation` 的调用点、**十余处**测试字面量（registry：stale-reaper / run-concurrency / runner-events；宿主：intel / web-origin / source-filter / aws-config-evidence / criteria-provider / judgment-composition 等，多数是 `scopeId: "deployment"` 或 project 坐标）。
 2. 宿主侧：`newbie modules apply` 重装装配产物 → `prisma migrate dev` 生成并提交迁移 → 清空三个模块 schema 并重建 → tsc / lint / test / build → 重启并冒烟（work-evaluation 触发一次 run、security-evaluation 触发一次仓库扫描，让主体与其下的 knowledge item / web-origin 重新落库）。
 3. 反向机械 back-port 到 registry，`diff -rq` 为空即完成；registry 侧不重复验证。
