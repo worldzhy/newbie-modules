@@ -685,6 +685,8 @@ export class ListWorkEvaluationSubjectsRequestDto extends CommonListRequestDto {
 /** Mirrors the skeleton's EvaluationSubject row (kind is always "developer" here). */
 export class WorkEvaluationSubjectResponseDto {
   @ApiProperty() id!: string;
+  @ApiProperty({ description: 'Owning feature key — always "work-evaluation" in this directory' })
+  subjectType!: string;
   @ApiProperty() kind!: string;
   @ApiProperty() subjectKey!: string;
   @ApiProperty() displayName!: string;

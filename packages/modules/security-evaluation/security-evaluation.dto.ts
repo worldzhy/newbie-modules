@@ -84,7 +84,10 @@ export class IngestSecurityEvaluationSubjectResponseDto {
 
 // --- Subject directory ---------------------------------------------------
 
-/** Platform subject directory read; the asset inventory row is gone (ADR-068 D7). */
+/**
+ * This feature's subject directory read; the asset inventory row is gone
+ * (ADR-068 D7) and the owning feature key scopes the rows (ADR-069).
+ */
 export class ListSecurityEvaluationSubjectsRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({ description: 'Restrict to one subject kind, e.g. "repository"' })
   @IsOptional()
@@ -95,6 +98,8 @@ export class ListSecurityEvaluationSubjectsRequestDto extends CommonListRequestD
 /** Mirrors one stored subject row. */
 export class SecurityEvaluationSubjectResponseDto {
   @ApiProperty() id!: string;
+  @ApiProperty({ description: 'Owning feature key — always "security-evaluation" in this directory' })
+  subjectType!: string;
   @ApiProperty({ description: 'Subject kind, e.g. "repository", "aws-account", "web-origin"' })
   kind!: string;
   @ApiProperty({ description: "Stable identity of the subject in the deployment" })
