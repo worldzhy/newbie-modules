@@ -11,6 +11,7 @@ import { SecurityEvaluationCriteriaSeed } from "./criteria/security-evaluation-c
 import { SecurityEvaluationAwsConfigEvidenceProvider } from "./evidence/security-evaluation-aws-config-evidence.provider";
 import { SecurityEvaluationCodeScanExcerptService } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationEvidenceProvider } from "./evidence/security-evaluation-evidence.provider";
+import { SecurityEvaluationWebPostureEvidenceProvider } from "./evidence/security-evaluation-web-posture-evidence.provider";
 import { AwsSecurityBulletinsAdapter } from "./knowledge/adapters/aws-security-bulletins.adapter";
 import { BleepingComputerAdapter } from "./knowledge/adapters/bleeping-computer.adapter";
 import { CisaKevAdapter } from "./knowledge/adapters/cisa-kev.adapter";
@@ -31,6 +32,7 @@ import { SecurityEvaluationIntelMatchService } from "./judgment/intel/security-e
 import { securityEvaluationIntelNegativeCacheToken } from "./judgment/intel/security-evaluation-intel-negative-cache.port";
 import { SecurityEvaluationIntelModelScopeRegistration } from "./judgment/intel/security-evaluation-intel-model-scope";
 import { SecurityEvaluationIntelReRanker } from "./judgment/intel/security-evaluation-intel-re-ranker";
+import { SecurityEvaluationWebPostureJudgment } from "./judgment/web-posture/security-evaluation-web-posture.judgment";
 import { SecurityEvaluationJudgmentService } from "./judgment/security-evaluation-judgment.service";
 import { SECURITY_EVALUATION_JUDGMENT_MECHANISMS } from "./judgment/security-evaluation-mechanism";
 import { SecurityEvaluationCodeScanVerdictCacheRepository } from "./persistence/security-evaluation-code-scan-verdict-cache.repository";
@@ -42,6 +44,7 @@ import { SecurityEvaluationRunService } from "./security-evaluation-run.service"
 import {
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+  SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
 } from "./security-evaluation.constants";
 
 /**
@@ -72,6 +75,12 @@ import {
  * `SECURITY_EVALUATION_VERIFICATION_FETCH_ACCESS` (ADR-044) is optional and
  * only needed by deployments that register web origins; the port is injected
  * optionally so a host without web origins boots unchanged.
+ *
+ * `SECURITY_EVALUATION_WEB_PROBE_ACCESS` (ADR-066 §3) is also optional at
+ * assembly time: only deployments that evaluate web origins must bind it, and
+ * running a web-origin evaluation without it fails with a wiring error instead
+ * of reporting a clean result. The same holds for
+ * `SECURITY_EVALUATION_REPOSITORY_ACCESS` and the AWS configuration port.
  */
 @Global()
 @Module({
@@ -84,6 +93,7 @@ import {
     SecurityEvaluationCriteriaProvider,
     SecurityEvaluationEvidenceProvider,
     SecurityEvaluationAwsConfigEvidenceProvider,
+    SecurityEvaluationWebPostureEvidenceProvider,
     SecurityEvaluationOsvClient,
     SecurityEvaluationDependencyJudgment,
     SecurityEvaluationAwsConfigJudgment,
@@ -96,6 +106,7 @@ import {
     SecurityEvaluationCodeScanModelScopeRegistration,
     SecurityEvaluationCodeScanExcerptService,
     SecurityEvaluationCodeScanVerdictCacheRepository,
+    SecurityEvaluationWebPostureJudgment,
     SecurityEvaluationRetentionService,
     SecurityEvaluationJudgmentService,
     // The dispatcher's mechanism set (ADR-046): each key's declared mechanisms
@@ -107,12 +118,14 @@ import {
         awsConfig: SecurityEvaluationAwsConfigJudgment,
         intel: SecurityEvaluationIntelJudgment,
         codeScan: SecurityEvaluationCodeScanMechanism,
-      ) => [dependency, awsConfig, intel, codeScan],
+        webPosture: SecurityEvaluationWebPostureJudgment,
+      ) => [dependency, awsConfig, intel, codeScan, webPosture],
       inject: [
         SecurityEvaluationDependencyJudgment,
         SecurityEvaluationAwsConfigJudgment,
         SecurityEvaluationIntelJudgment,
         SecurityEvaluationCodeScanMechanism,
+        SecurityEvaluationWebPostureJudgment,
       ],
     },
     {
@@ -156,13 +169,17 @@ import {
       ],
     },
     // Kind-scoped skeleton ports (ADR-020 D4). One judgment dispatcher serves
-    // both kinds; the standardKey on the criteria version routes the mechanism.
+    // all kinds; the standardKey on the criteria version routes the mechanism.
     {
       provide: criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
       useExisting: SecurityEvaluationCriteriaProvider,
     },
     {
       provide: criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
+      useExisting: SecurityEvaluationCriteriaProvider,
+    },
+    {
+      provide: criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN),
       useExisting: SecurityEvaluationCriteriaProvider,
     },
     {
@@ -174,11 +191,19 @@ import {
       useExisting: SecurityEvaluationAwsConfigEvidenceProvider,
     },
     {
+      provide: evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN),
+      useExisting: SecurityEvaluationWebPostureEvidenceProvider,
+    },
+    {
       provide: judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
       useExisting: SecurityEvaluationJudgmentService,
     },
     {
       provide: judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
+      useExisting: SecurityEvaluationJudgmentService,
+    },
+    {
+      provide: judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN),
       useExisting: SecurityEvaluationJudgmentService,
     },
   ],
@@ -191,10 +216,13 @@ import {
     SecurityEvaluationRetentionService,
     criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
     criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
+    criteriaProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN),
     evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
     evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
+    evidenceProviderToken(SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN),
     judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY),
     judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT),
+    judgmentPortToken(SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN),
   ],
 })
 export class SecurityEvaluationModule {}

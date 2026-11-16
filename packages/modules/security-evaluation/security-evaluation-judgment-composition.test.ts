@@ -23,6 +23,7 @@ import {
   SECURITY_EVALUATION_KEY_CODE_SCAN,
   SECURITY_EVALUATION_KEY_NPM_OSV,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
+  SECURITY_EVALUATION_KEY_WEB_POSTURE,
 } from "./security-evaluation.constants";
 
 /**
@@ -74,6 +75,7 @@ test("registry: every key declares at least one uniquely named mechanism", () =>
     SECURITY_EVALUATION_KEY_AWS_CUSTOM,
     SECURITY_EVALUATION_KEY_THREAT_INTEL,
     SECURITY_EVALUATION_KEY_CODE_SCAN,
+    SECURITY_EVALUATION_KEY_WEB_POSTURE,
   ];
   assert.deepEqual(Object.keys(SECURITY_EVALUATION_JUDGMENT_MECHANISMS_BY_KEY).sort(), [...expectedKeys].sort());
 

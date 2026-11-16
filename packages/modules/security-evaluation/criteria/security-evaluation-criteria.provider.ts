@@ -12,9 +12,12 @@ import {
   SECURITY_EVALUATION_KEY_CODE_SCAN,
   SECURITY_EVALUATION_KEY_NPM_OSV,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
+  SECURITY_EVALUATION_KEY_WEB_POSTURE,
   SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+  SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
+  SECURITY_EVALUATION_WEB_POSTURE_RULE_SET_VERSION,
 } from "../security-evaluation.constants";
 import { SecurityEvaluationCriteriaSeed } from "./security-evaluation-criteria.seed";
 
@@ -27,7 +30,9 @@ import { SecurityEvaluationCriteriaSeed } from "./security-evaluation-criteria.s
  * via `standardKey: "threat-intel"` (ADR-039); otherwise the npm/OSV
  * standardKey is selected by default. For the aws-account kind the runConfig
  * may request `standardKey: "aws-custom"` (custom hardening rules) and falls
- * back to the CIS benchmark otherwise.
+ * back to the CIS benchmark otherwise. For the web-origin kind only
+ * `standardKey: "web-posture"` is implemented; any other value (including an
+ * omitted one) returns null, exactly like an unknown kind.
  */
 @Injectable()
 export class SecurityEvaluationCriteriaProvider implements CriteriaProvider {
@@ -70,6 +75,13 @@ export class SecurityEvaluationCriteriaProvider implements CriteriaProvider {
         return {
           standardKey: SECURITY_EVALUATION_KEY_AWS_CIS_1_5,
           version: SECURITY_EVALUATION_AWS_CIS_RULE_SET_VERSION,
+        };
+      case SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN:
+        if (runConfig?.standardKey !== SECURITY_EVALUATION_KEY_WEB_POSTURE) return null;
+        await this.seed.seedWebPostureBaseline();
+        return {
+          standardKey: SECURITY_EVALUATION_KEY_WEB_POSTURE,
+          version: SECURITY_EVALUATION_WEB_POSTURE_RULE_SET_VERSION,
         };
       default:
         return null;
