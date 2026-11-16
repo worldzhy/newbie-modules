@@ -53,12 +53,14 @@ GET 不得触发写库、缓存刷新、凭证轮换、登出、发送。查询�
 
 `addCustomFilter` / `delCustomFilter` → `POST|DELETE /custom/filters[/:filterId]`；`addUser` / `deleteUser` → `POST|DELETE /system/users[/:userToken]`；`deleteSystem` → `DELETE /system/sites?type=…`（appKey 仍取自请求上下文）。DELETE 目标进路径，不放在 body。
 
+SDK 上报同样收敛为标准资源：`POST /frontend-monitor/report` → `POST /frontend-monitor/reports`（2026-11-16 第二轮拍板：`frontend-monitor-sdk` 全链路跟随；breaking，需同时更新 SDK 版本、宿主 env/镜像参数、安装凭据展示与审计白名单）。
+
 ### D5. 豁免
 
 按协议形态保留，并在代码旁注明来源：
 
 - OAuth / SSO 重定向：`GET /auth/login-by-lark|google`、`.../redirect`。
-- Webhook / SDK 上报：`POST /frontend-monitor/report`（`frontend-monitor-sdk` 直接依赖该路径）、第三方回调。
+- 第三方 Webhook / 回调按对方协议形态保留。
 - 探针：`/health`、`/ping`。
 - 动作端点不强制资源化（本轮）：`initialize-folders`、`repository-check`、`provision-*`、`trigger`、`publish`、`test-push`、`rebind`、`verify`、`rotate-external-id`、`bootstrap`、`get-or-create`、`command`、`upload*`、`create-multipart` 等。
 - 带复杂条件体的批量删除：`POST /frontend-monitor/remove/data`（`CustomDeleteFilter` 无法表达为路径或简单 query）。
@@ -140,6 +142,7 @@ GET 不得触发写库、缓存刷新、凭证轮换、登出、发送。查询�
 | `POST /system/deleteUser` | `DELETE /system/users/:userToken` |
 | `POST /system/deleteSystem` | `DELETE /system/sites?type=…` |
 | `POST /remove/customDeleteData` | `POST /remove/data` |
+| `POST /frontend-monitor/report` | `POST /frontend-monitor/reports` |
 
 所有目标路径前缀均为 `/frontend-monitor`。
 
@@ -166,7 +169,7 @@ GET 不得触发写库、缓存刷新、凭证轮换、登出、发送。查询�
 | --- | --- | --- | --- |
 | 路由所有权 | 模块自带 controller，路径随模块发布 | 宿主自有 controller 遵守同一契约 | 用 registry 即继承合规路径 |
 | 前端消费 | apits 从 Swagger 生成，改路由即改生成函数 | 同左 | 无额外适配 |
-| 豁免点 | SDK 上报、OAuth 由模块内注释标注来源 | 无 | 同左 |
+| 豁免点 | OAuth 由模块内注释标注来源 | 无 | 同左 |
 | 版本风险 | 改路由是 breaking wire change，靠 `newbie modules update` + apits 同步 | 同仓前后端同时改 | 无存量调用方 |
 
 不引入宿主实体：`task-spaces?projectId=` 只把宿主 `projectId` 当过滤值，不把 Project 变成模块的父资源；换宿主只需换参数来源。
@@ -176,5 +179,6 @@ GET 不得触发写库、缓存刷新、凭证轮换、登出、发送。查询�
 - **registry**：上述 6 个模块的 controller/DTO 与方法装饰器同步调整；改的是路由与方法，业务服务签名不变。
 - **宿主**：`npx newbie modules update <key>` 同步装配产物；`jdy` 的 `VoucherListRequestDto` 改为 query DTO；`npm run apits` 重生成 `src/api/_gen`，前端调用点切到 `@/api`。
 - **前端**：`frontend-monitor` 与 `file` 相关按钮的调用函数名随生成代码变化；`refresh-access-token` 由页面加载时的 GET 改为 POST（拦截器/请求封装同步）。
+- **SDK**：`@devbie/frontend-monitor-sdk` 的自滤清单与文档切到 `/frontend-monitor/reports`，发布 minor；已部署应用需更新 `api` 配置（旧路径 404）。
 - **验证**：registry 侧 tsc + eslint + 既有测试；宿主侧干净重启后对改动端点做冒烟；认证链路（refresh-access-token）补行为级测试。
 - **非目标**：不改响应信封 `{ code, error, data }`、不改状态码约定、不做动作端点资源化、不重命名业务 DTO 字段。

@@ -5,7 +5,7 @@
 // !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 // One row per frontend application whose browser SDK reports to
-// /frontend-monitor/report, identified by its report token. The token is a
+// /frontend-monitor/reports, identified by its report token. The token is a
 // random UUID; only its SHA-256 hash is stored, the plaintext is returned once
 // at enrollment or rotation, and revocation is a soft delete.
 //
