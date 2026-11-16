@@ -96,6 +96,7 @@ function fakePrisma() {
         subjects.push(created);
         return created;
       },
+      findUnique: async (args: { where: { id: string } }) => subjects.find((row) => row.id === args.where.id) ?? null,
     },
     securityEvaluationRepository: {
       upsert: async (args: {
@@ -116,6 +117,8 @@ function fakePrisma() {
         repositories.push(created);
         return created;
       },
+      findUnique: async (args: { where: { subjectId: string } }) =>
+        repositories.find((row) => row.subjectId === args.where.subjectId) ?? null,
     },
     securityEvaluationAwsAccount: {
       upsert: async (args: {
@@ -132,6 +135,8 @@ function fakePrisma() {
         awsAccounts.push(created);
         return created;
       },
+      findUnique: async (args: { where: { subjectId: string } }) =>
+        awsAccounts.find((row) => row.subjectId === args.where.subjectId) ?? null,
     },
     securityEvaluationWebOrigin: {
       upsert: async (args: {
@@ -158,6 +163,8 @@ function fakePrisma() {
         webOrigins.push(created);
         return created;
       },
+      findUnique: async (args: { where: { subjectId: string } }) =>
+        webOrigins.find((row) => row.subjectId === args.where.subjectId) ?? null,
     },
     $transaction: async <T>(work: (client: unknown) => Promise<T>): Promise<T> => work(prisma),
   };
@@ -394,4 +401,62 @@ test("web-origin ingest writes its verification material", async () => {
   assert.equal(fake.subjects[0].displayName, "Example");
 
   await assert.rejects(service.ingest([{ kind: "web-origin", displayName: "example.com" }]), /requires its subjectKey/);
+});
+
+test("material reads dispatch on the subject kind and never expose the web-origin token", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  const [repository] = await service.ingest([
+    { kind: "repository", displayName: "o/r", repository: { provider: "github", namespace: "o", name: "r" } },
+  ]);
+  const [awsAccount] = await service.ingest([
+    {
+      kind: "aws-account",
+      displayName: "acct",
+      awsAccount: { accountId: "123456789012", defaultRegion: "us-east-1", regions: ["us-east-1"] },
+    },
+  ]);
+  const [webOrigin] = await service.ingest([
+    { kind: "web-origin", subjectKey: "https://example.com", displayName: "example.com" },
+  ]);
+
+  assert.deepEqual(await service.material(repository.subjectId), {
+    kind: "repository",
+    provider: "github",
+    namespace: "o",
+    name: "r",
+    url: null,
+    isActive: true,
+  });
+  assert.deepEqual(await service.material(awsAccount.subjectId), {
+    kind: "aws-account",
+    accountId: "123456789012",
+    defaultRegion: "us-east-1",
+    regions: ["us-east-1"],
+    isActive: true,
+  });
+
+  const webOriginMaterial = await service.material(webOrigin.subjectId);
+  assert.equal(webOriginMaterial.kind, "web-origin");
+  // ADR-071: a read never carries the token; only the verification POST issues it.
+  assert.ok(!("verificationToken" in webOriginMaterial));
+});
+
+test("material verification is a web-origin state machine, so another kind is a bad request", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  const [repository] = await service.ingest([
+    { kind: "repository", displayName: "o/r", repository: { provider: "github", namespace: "o", name: "r" } },
+  ]);
+
+  await assert.rejects(
+    service.requestMaterialVerification(repository.subjectId, "DNS_TXT"),
+    /verification applies to web-origin subjects only/,
+  );
+  await assert.rejects(
+    service.checkMaterialVerification(repository.subjectId),
+    /verification applies to web-origin subjects only/,
+  );
 });

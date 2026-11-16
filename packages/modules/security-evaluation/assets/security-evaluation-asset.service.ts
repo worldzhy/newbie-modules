@@ -9,8 +9,14 @@ import {
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
   SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
   SECURITY_EVALUATION_SUBJECT_TYPE,
+  type SecurityEvaluationWebOriginVerificationMethod,
 } from "../security-evaluation.constants";
+import type { SecurityEvaluationSubjectMaterial } from "../security-evaluation-material.dto";
 import { SecurityEvaluationWebOriginService } from "./security-evaluation-web-origin.service";
+import type {
+  SecurityEvaluationWebOriginChallenge,
+  SecurityEvaluationWebOriginVerificationResult,
+} from "./security-evaluation-web-origin.service";
 import {
   normalizeAwsAccountId,
   normalizeAwsRegions,
@@ -174,6 +180,85 @@ export class SecurityEvaluationAssetService {
   }
 
   /**
+   * The material of one subject (ADR-071). Material hangs off the subject — the
+   * kind only decides which branch is assembled, so a new kind adds a union
+   * branch here instead of a new route.
+   */
+  async material(subjectId: string): Promise<SecurityEvaluationSubjectMaterial> {
+    const subject = await this.getSubject(subjectId);
+    switch (subject.kind) {
+      case SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN:
+        return this.webOrigins.detail(subjectId);
+      case SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY: {
+        const row = await this.prisma.securityEvaluationRepository.findUnique({ where: { subjectId } });
+        if (!row) {
+          throw new NotFoundException(`Repository material of subject ${subjectId} not found`);
+        }
+        return {
+          kind: "repository",
+          provider: row.provider,
+          namespace: row.namespace,
+          name: row.name,
+          url: row.url,
+          isActive: row.isActive,
+        };
+      }
+      case SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT: {
+        const row = await this.prisma.securityEvaluationAwsAccount.findUnique({ where: { subjectId } });
+        if (!row) {
+          throw new NotFoundException(`AWS account material of subject ${subjectId} not found`);
+        }
+        return {
+          kind: "aws-account",
+          accountId: row.accountId,
+          defaultRegion: row.defaultRegion,
+          regions: row.regions,
+          isActive: row.isActive,
+        };
+      }
+      default:
+        throw new NotFoundException(`Subject ${subjectId} carries no material for kind "${subject.kind}"`);
+    }
+  }
+
+  /**
+   * Issue (or reuse) the verification token of a web-origin subject. Verification
+   * is a web-origin state machine, so another kind is a bad request, not a
+   * missing resource.
+   */
+  async requestMaterialVerification(
+    subjectId: string,
+    method: SecurityEvaluationWebOriginVerificationMethod,
+  ): Promise<SecurityEvaluationWebOriginChallenge> {
+    await this.assertWebOriginSubject(subjectId);
+    return this.webOrigins.requestVerification(subjectId, method);
+  }
+
+  /** Persist the verification outcome of a web-origin subject (ADR-071). */
+  async checkMaterialVerification(subjectId: string): Promise<SecurityEvaluationWebOriginVerificationResult> {
+    await this.assertWebOriginSubject(subjectId);
+    return this.webOrigins.verify(subjectId);
+  }
+
+  private async assertWebOriginSubject(subjectId: string): Promise<void> {
+    const subject = await this.getSubject(subjectId);
+    if (subject.kind !== SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN) {
+      throw new BadRequestException(
+        `Subject ${subjectId} is a "${subject.kind}" subject; verification applies to web-origin subjects only.`,
+      );
+    }
+  }
+
+  private async getSubject(subjectId: string): Promise<{ kind: string }> {
+    const subject = await this.prisma.evaluationSubject.findUnique({
+      where: { id: subjectId },
+      select: { kind: true },
+    });
+    if (!subject) throw new NotFoundException(`Security evaluation subject ${subjectId} not found`);
+    return subject;
+  }
+
+  /**
    * Upsert current-state AWS configuration knowledge items. An item not
    * observed by this run keeps its old `observedAt`, which is how staleness
    * becomes visible without deleting rows.
@@ -259,11 +344,7 @@ export class SecurityEvaluationAssetService {
    * coordinate decides which delegate serves this subject.
    */
   async listKnowledgeItems(query: ListSecurityEvaluationAssetKnowledgeItemsInput) {
-    const subject = await this.prisma.evaluationSubject.findUnique({
-      where: { id: query.subjectId },
-      select: { kind: true },
-    });
-    if (!subject) throw new NotFoundException(`Security evaluation subject ${query.subjectId} not found`);
+    const subject = await this.getSubject(query.subjectId);
     const where = { subjectId: query.subjectId, ...(query.type ? { type: query.type } : {}) };
     const orderBy = [{ type: "asc" as const }, { key: "asc" as const }];
     if (subject.kind === SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT) {

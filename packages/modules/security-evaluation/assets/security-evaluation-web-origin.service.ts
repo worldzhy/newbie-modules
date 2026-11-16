@@ -24,6 +24,7 @@ import {
   type SecurityEvaluationWebOriginVerificationMethod,
   type SecurityEvaluationWebOriginVerificationStatus,
 } from "../security-evaluation.constants";
+import type { SecurityEvaluationWebOriginMaterialDto } from "../security-evaluation-material.dto";
 import {
   VerificationFetchAccess,
   securityEvaluationVerificationFetchAccessToken,
@@ -80,18 +81,6 @@ export interface SecurityEvaluationWebOriginTarget {
   origin: string;
   label: string;
   targetPaths: Record<string, string>;
-}
-
-export interface SecurityEvaluationWebOriginDetail extends SecurityEvaluationWebOriginTarget {
-  verificationStatus: SecurityEvaluationWebOriginVerificationStatus;
-  verificationMethod: SecurityEvaluationWebOriginVerificationMethod | null;
-  verificationToken: string;
-  verificationFailureCount: number;
-  verifiedAt: Date | null;
-  lastVerifiedAt: Date | null;
-  isActive: boolean;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 /**
@@ -313,23 +302,19 @@ export class SecurityEvaluationWebOriginService {
     return parseTargetPaths(row.targetPaths);
   }
 
-  /** One origin with the token and status the operator needs to publish/check it. */
-  async detail(subjectId: string): Promise<SecurityEvaluationWebOriginDetail> {
-    const { row, subject } = await this.getWebOrigin(subjectId);
+  /** The web-origin branch of a subject's material (ADR-071); the token is never part of a read. */
+  async detail(subjectId: string): Promise<SecurityEvaluationWebOriginMaterialDto> {
+    const row = await this.prisma.securityEvaluationWebOrigin.findUnique({ where: { subjectId } });
+    if (!row) throw new NotFoundException(`Security evaluation web origin ${subjectId} not found`);
     return {
-      subjectId,
-      origin: subject.subjectKey,
-      label: subject.displayName,
+      kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
       targetPaths: parseTargetPaths(row.targetPaths),
       verificationStatus: row.verificationStatus as SecurityEvaluationWebOriginVerificationStatus,
       verificationMethod: row.verificationMethod as SecurityEvaluationWebOriginVerificationMethod | null,
-      verificationToken: row.verificationToken,
       verificationFailureCount: row.verificationFailureCount,
       verifiedAt: row.verifiedAt,
       lastVerifiedAt: row.lastVerifiedAt,
       isActive: row.isActive,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
     };
   }
 

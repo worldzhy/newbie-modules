@@ -3,6 +3,7 @@
 状态：已采纳
 日期：2026-11-16
 更新：2026-11-16 — 用户批准采纳；代码实施按「## 影响」逐项落地，契约不再调整。
+更新：2026-11-16 — 用户裁决：宿主项目级 web-origin controller 整体退役，纳入「## 影响」。
 
 ## 背景
 
@@ -111,6 +112,10 @@ kind 只是 union 多一支。token 移出 GET 是同一判据的副作用：凭
   （它们是 union 成立的必要分支，不是额外扩张）。
 - ADR-044 部分取代：第 104 行「查看验证 token 的宿主 HTTP 入口…权限落 Get」与第 130
   行「宿主：`WebOrigin` controller/DTO」由本 ADR 取代，其余章节继续有效。
+- 宿主项目级 `SecurityEvaluationWebOriginController`（`projects/:projectId/web-origins`）
+  整体退役：读/注册/验证入口不再保留，token 的签发点只落在模块的
+  `POST /security-evaluation/subjects/:subjectId/material/verification`。宿主侧
+  `ProjectWebOrigin` 归属表保留，仅由 `ProjectSubjectProvider` 扫描读取。
 
 Supersedes: ADR-044（nightwatch-backend）第 104 行与第 130 行关于 web-origin
 controller/DTO 归属与 token 读取权限的表述。
