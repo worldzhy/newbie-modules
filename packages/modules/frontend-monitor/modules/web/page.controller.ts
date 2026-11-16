@@ -1,5 +1,5 @@
 import { BadRequestException, Controller, Get, Inject, Param, Query, Req } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func, pickRequestId } from "../../shared/utils";
 import { PageService } from "./services/page.service";
 import {
@@ -70,6 +70,11 @@ export class PageController {
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
   @Get(":pageId")
   @ApiOperation({ summary: "Get single page details" })
+  @ApiQuery({
+    name: "appKey",
+    required: false,
+    description: "Scope selector; must be within the caller's visible app keys",
+  })
   @ApiResponse({ type: FrontendMonitorPageDetailResponseDto })
   async getPageDetails(@Param("pageId") pageId: string, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);

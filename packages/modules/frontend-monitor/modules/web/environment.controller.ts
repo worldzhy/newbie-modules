@@ -1,5 +1,5 @@
 import { BadRequestException, Controller, Get, Inject, Param, Query, Req } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func, pickRequestId } from "../../shared/utils";
 import { EnvironmentService } from "./services/environment.service";
 import {
@@ -44,6 +44,11 @@ export class EnvironmentController {
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
   @Get("pages/:markPage")
   @ApiOperation({ summary: "Get environment info for a page" })
+  @ApiQuery({
+    name: "appKey",
+    required: false,
+    description: "Scope selector; must be within the caller's visible app keys",
+  })
   @ApiResponse({ type: FrontendMonitorEnvironmentResponseDto })
   async getEnvironmentForPage(@Param("markPage") markPage: string, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
