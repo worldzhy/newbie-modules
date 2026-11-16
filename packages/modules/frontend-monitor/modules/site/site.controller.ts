@@ -62,10 +62,10 @@ export class SiteController {
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
   @ApiOperation({ summary: "Get system by appKey (with membership gate)" })
   @ApiResponse({ type: FrontendMonitorSiteResponseDto })
-  async getSiteForId(@Req() req: UserRequest) {
+  async getSiteForId(@Param("appKey") appKey: string, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
-    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const result = await this.site.getSiteForDb(appKey);
+    const scopedAppKey = this.access.assertVisibleAppKey(appKeys, appKey);
+    const result = await this.site.getSiteForDb(scopedAppKey);
     return func.result({ data: result });
   }
 

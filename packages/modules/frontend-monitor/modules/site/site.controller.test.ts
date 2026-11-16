@@ -94,7 +94,7 @@ test("getSites asserts an explicit appKey but tolerates an absent one", async ()
 
 test("getSiteForId delegates with the scoped appKey", async () => {
   const h = harness();
-  const result = await h.controller.getSiteForId(req({ params: { appKey: "APP2" } }) as never);
+  const result = await h.controller.getSiteForId("APP2", req({}) as never);
   assert.deepEqual(result, { appKey: "APP1" });
   assert.deepEqual(h.siteCalls[0].args, ["APP2"]);
 });
