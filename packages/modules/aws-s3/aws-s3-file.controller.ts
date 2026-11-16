@@ -56,7 +56,7 @@ export class AwsS3FileController {
   //* File operations */
   //*******************/
 
-  @Get("sync")
+  @Post("sync")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @ApiOperation({ summary: "Sync files from S3 to database" })
   @ApiResponse({ type: String })
@@ -138,7 +138,7 @@ export class AwsS3FileController {
   //**********************/
 
   /** It would be better if the business layer reimplements this interface */
-  @Post("signedUploadUrl")
+  @Post("signed-upload-urls")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.S3File)
   @ApiResponse({ type: GetSignedUploadUrlResponseDto })
   async getSignedUploadUrl(@Body() body: CreateFileRequestDto) {
@@ -150,11 +150,11 @@ export class AwsS3FileController {
     return await this.s3File.getSignedUploadUrl(body);
   }
 
-  @Get("signedDownloadUrl")
+  @Get(":fileId/signed-download-url")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.S3File)
   @ApiOperation({ summary: "Get a signed download URL for a file" })
   @ApiResponse({ type: GetSignedUploadUrlResponseDto })
-  async getSignedDownloadUrl(@Query("fileId") fileId: string) {
+  async getSignedDownloadUrl(@Param("fileId") fileId: string) {
     return await this.s3File.getSignedDownloadUrl(fileId);
   }
 

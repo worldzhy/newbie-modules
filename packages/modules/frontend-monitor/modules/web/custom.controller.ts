@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Inject, Post, Query, Req } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction } from "@generated/prisma/client";
 import { func, pickRequestId } from "../../shared/utils";
@@ -22,7 +22,7 @@ export class CustomController {
     private readonly projectVisibility: VisibleAppKeysResolver,
   ) {}
 
-  @Get("/getCustomFilterList")
+  @Get("filters")
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
   @ApiOperation({ summary: "Get custom filter list" })
   @ApiResponse({ type: ListFrontendMonitorCustomFiltersResponseDto })
@@ -33,7 +33,7 @@ export class CustomController {
     return func.result({ data: result });
   }
 
-  @Post("/addCustomFilter")
+  @Post("filters")
   @RequirePermission(PermissionAction.Create, "FrontendMonitorSite")
   @ApiOperation({ summary: "Add a custom filter" })
   @ApiResponse({ type: Boolean })
@@ -47,20 +47,18 @@ export class CustomController {
     return func.result({ data: ok });
   }
 
-  @Post("/delCustomFilter")
+  @Delete("filters/:filterId")
   @RequirePermission(PermissionAction.Delete, "FrontendMonitorSite")
   @ApiOperation({ summary: "Delete a custom filter" })
   @ApiResponse({ type: Boolean })
-  async delCustomFilter(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const { _id } = body;
-    if (!_id) throw new BadRequestException("_id is required");
+  async delCustomFilter(@Param("filterId") filterId: string, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const ok = await this.webCustom.delCustomFilter(appKey, _id as string);
+    const ok = await this.webCustom.delCustomFilter(appKey, filterId);
     return func.result({ data: ok });
   }
 
-  @Get("/getAverageCustomList")
+  @Get("averages")
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
   @ApiOperation({ summary: "Get average custom category list" })
   @ApiResponse({ type: ListFrontendMonitorCustomAveragesResponseDto })

@@ -24,7 +24,7 @@ export class ErrorController {
   ) {}
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getAverageErrorList")
+  @Get("averages")
   @ApiOperation({ summary: "Get average error category list" })
   @ApiResponse({ type: ListFrontendMonitorErrorsResponseDto })
   async getAverageErrorList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -36,7 +36,7 @@ export class ErrorController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getOneErrorList")
+  @Get("ones")
   @ApiOperation({ summary: "Get single error resource list" })
   @ApiResponse({ type: ListFrontendMonitorErrorOnesResponseDto })
   async getOneErrorList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -50,7 +50,7 @@ export class ErrorController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getMarkUserErrorList")
+  @Get("mark-users")
   @ApiOperation({ summary: "Get marked user error list" })
   @ApiResponse({ type: ListFrontendMonitorErrorMarkUsersResponseDto })
   async getMarkUserErrorList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {

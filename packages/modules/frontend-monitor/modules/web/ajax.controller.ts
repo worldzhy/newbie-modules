@@ -24,7 +24,7 @@ export class AjaxController {
   ) {}
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getPageAjaxsAvg")
+  @Get("page-averages")
   @ApiOperation({ summary: "Get page ajax average performance" })
   @ApiResponse({ type: ListFrontendMonitorAjaxAveragesResponseDto })
   async getPageAjaxsAvg(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -42,7 +42,7 @@ export class AjaxController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getAverageAjaxList")
+  @Get("averages")
   @ApiOperation({ summary: "Get average ajax performance list" })
   @ApiResponse({ type: ListFrontendMonitorAjaxAveragesResponseDto })
   async getAverageAjaxList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -54,7 +54,7 @@ export class AjaxController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getOneAjaxList")
+  @Get("ones")
   @ApiOperation({ summary: "Get single ajax average performance data" })
   @ApiResponse({ type: ListFrontendMonitorAjaxOnesResponseDto })
   async getOneAjaxList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -75,7 +75,7 @@ export class AjaxController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getMarkUserAjaxList")
+  @Get("mark-users")
   @ApiOperation({ summary: "Get marked user ajax list" })
   @ApiResponse({ type: ListFrontendMonitorAjaxMarkUsersResponseDto })
   async getMarkUserAjaxList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {

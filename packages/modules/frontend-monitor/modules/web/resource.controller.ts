@@ -1,4 +1,4 @@
-import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestjs/common";
+import { Controller, Get, Inject, Param, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func, pickRequestId } from "../../shared/utils";
 import { ResourceService } from "./services/resource.service";
@@ -19,7 +19,7 @@ export class ResourceController {
   ) {}
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getResourceForType")
+  @Get("types")
   @ApiOperation({ summary: "Get resource performance list by type" })
   @ApiResponse({ type: Object })
   async getResourceForType(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -40,7 +40,7 @@ export class ResourceController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getAverageResourceList")
+  @Get("averages")
   @ApiOperation({ summary: "Get average resource performance list" })
   @ApiResponse({ type: Object })
   async getAverageResourceList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -52,7 +52,7 @@ export class ResourceController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getOneResourceAvg")
+  @Get("average")
   @ApiOperation({ summary: "Get single resource average performance" })
   @ApiResponse({ type: Object })
   async getOneResourceAvg(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -70,7 +70,7 @@ export class ResourceController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getOneResourceList")
+  @Get("ones")
   @ApiOperation({ summary: "Get single resource performance list" })
   @ApiResponse({ type: Object })
   async getOneResourceList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -90,15 +90,13 @@ export class ResourceController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getOneResourceDetail")
+  @Get(":resourceId")
   @ApiOperation({ summary: "Get single resource details" })
   @ApiResponse({ type: Object })
-  async getOneResourceDetail(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { id } = q;
-    if (!id) throw new BadRequestException("id is required");
+  async getOneResourceDetail(@Param("resourceId") resourceId: string, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const row = await this.resourceSrv.getOneResourceDetail(appKey, String(id));
+    const row = await this.resourceSrv.getOneResourceDetail(appKey, resourceId);
     return func.result({ data: row || {} });
   }
 }
