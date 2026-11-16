@@ -25,7 +25,7 @@ export class FrontendMonitorAnalysisController {
   ) {}
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getAnalysislist")
+  @Get("users")
   @ApiOperation({ summary: "Get user funnel analysis list" })
   @ApiResponse({ type: ListFrontendMonitorAnalysisUsersResponseDto })
   async getAnalysislist(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -42,7 +42,7 @@ export class FrontendMonitorAnalysisController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getAnalysisOneList")
+  @Get("tracks")
   @ApiOperation({ summary: "Get single user behavior track list" })
   @ApiResponse({ type: FrontendMonitorEnvironmentResponseDto, isArray: true })
   async getAnalysisOneList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -55,7 +55,7 @@ export class FrontendMonitorAnalysisController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getTopDatas")
+  @Get("top-data")
   @ApiOperation({ summary: "Get top data statistics" })
   @ApiResponse({ type: FrontendMonitorWebTopDatasResponseDto })
   async getTopDatas(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -71,7 +71,7 @@ export class FrontendMonitorAnalysisController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getProvinceCount")
+  @Get("province-counts")
   @ApiOperation({ summary: "Get province count statistics" })
   @ApiResponse({ type: FrontendMonitorProvinceCountResponseDto })
   async getProvinceCount(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {

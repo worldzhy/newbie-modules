@@ -9,12 +9,11 @@ import { RequireOwner } from "@modules/security/authorization/require-owner.deco
 import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
 
 /**
- * Columns a session API may return. A Session row also holds the live access
- * token, the current and previous refresh-token hashes, and the sealed
- * `refreshTokenNextSealed` retained for the idempotency window; selecting the
- * row wholesale would hand those credentials to the caller. Every endpoint
- * below projects through this select so token material never leaves the
- * database.
+ * Columns a session API may return. A Session row also holds the current and
+ * previous refresh-token hashes and the sealed `refreshTokenNextSealed`
+ * retained for the idempotency window; selecting the row wholesale would hand
+ * those credentials to the caller. Every endpoint below projects through this
+ * select so token material never leaves the database.
  */
 const SESSION_PUBLIC_SELECT = {
   id: true,

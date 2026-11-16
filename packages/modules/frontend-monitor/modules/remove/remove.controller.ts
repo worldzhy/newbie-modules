@@ -18,7 +18,9 @@ export class RemoveController {
     private readonly projectVisibility: VisibleAppKeysResolver,
   ) {}
 
-  @Post("/customDeleteData")
+  // Bulk delete driven by a multi-field filter body; POST is the protocol shape
+  // for a non-idempotent conditional delete (ADR-073 D5).
+  @Post("data")
   @RequirePermission(PermissionAction.Delete, "FrontendMonitorSite")
   @ApiOperation({ summary: "Custom delete monitoring data (with membership gate)" })
   @ApiResponse({ type: Object })

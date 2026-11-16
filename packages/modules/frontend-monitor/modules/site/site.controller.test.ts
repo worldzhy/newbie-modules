@@ -94,7 +94,7 @@ test("getSites asserts an explicit appKey but tolerates an absent one", async ()
 
 test("getSiteForId delegates with the scoped appKey", async () => {
   const h = harness();
-  const result = await h.controller.getSiteForId({}, req({ query: { appKey: "APP2" } }) as never);
+  const result = await h.controller.getSiteForId("APP2", req({}) as never);
   assert.deepEqual(result, { appKey: "APP1" });
   assert.deepEqual(h.siteCalls[0].args, ["APP2"]);
 });
@@ -106,14 +106,10 @@ test("getWebSiteList lists inside the caller's scope", async () => {
   assert.deepEqual(h.siteCalls[0].args, [["APP2"]]);
 });
 
-test("the member endpoints require a userToken", async () => {
+test("the add-member endpoint requires a userToken", async () => {
   const h = harness();
   await assert.rejects(
     () => h.controller.addWebSiteUser({}, req({ query: { appKey: "APP1" } }) as never),
-    (error) => error instanceof BadRequestException && /userToken is required/.test(error.message),
-  );
-  await assert.rejects(
-    () => h.controller.deleteWebSiteUser({}, req({ query: { appKey: "APP1" } }) as never),
     (error) => error instanceof BadRequestException && /userToken is required/.test(error.message),
   );
   assert.equal(h.siteCalls.length, 0);
@@ -123,13 +119,13 @@ test("the member endpoints require a userToken", async () => {
 test("addWebSiteUser and deleteWebSiteUser delegate with the scoped appKey and the token", async () => {
   const h = harness();
   await h.controller.addWebSiteUser({ userToken: "tok-1" }, req({ query: { appKey: "APP1" } }) as never);
-  await h.controller.deleteWebSiteUser({ userToken: "tok-2" }, req({ query: { appKey: "APP2" } }) as never);
+  await h.controller.deleteWebSiteUser("tok-2", req({ query: { appKey: "APP2" } }) as never);
   assert.deepEqual(h.siteCalls[0], { method: "addWebSiteUser", args: ["APP1", "tok-1"] });
   assert.deepEqual(h.siteCalls[1], { method: "deleteWebSiteUser", args: ["APP2", "tok-2"] });
 });
 
 test("deleteSite delegates with the appKey and the type as a string", async () => {
   const h = harness();
-  await h.controller.deleteSite({ type: "web" }, req({ query: { appKey: "APP1" } }) as never);
+  await h.controller.deleteSite("web", req({ query: { appKey: "APP1" } }) as never);
   assert.deepEqual(h.siteCalls[0], { method: "deleteSite", args: ["APP1", "web"] });
 });

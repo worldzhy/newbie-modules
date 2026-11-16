@@ -24,7 +24,7 @@ export class PvuvipController {
   ) {}
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getPvUvIpSurveyToday")
+  @Get("surveys/today")
   @ApiOperation({ summary: "Get today's PV/UV/IP survey" })
   @ApiResponse({ type: Object })
   async getPvUvIpSurveyToday(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -44,7 +44,7 @@ export class PvuvipController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getPvUvIpSurveyOne")
+  @Get("surveys")
   @ApiOperation({ summary: "Get PV/UV/IP survey for a time range" })
   @ApiResponse({ type: FrontendMonitorPvUvIpResponseDto })
   async getPvUvIpSurveyOne(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -58,7 +58,7 @@ export class PvuvipController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getHistoryPvUvIplist")
+  @Get("history")
   @ApiOperation({ summary: "Get history PV/UV/IP list" })
   @ApiResponse({ type: FrontendMonitorPvUvIpResponseDto, isArray: true })
   async getHistoryPvUvIplist(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -76,7 +76,7 @@ export class PvuvipController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getPvUvIpList")
+  @Get("series")
   @ApiOperation({ summary: "Get PV/UV/IP data list" })
   @ApiResponse({ type: Object })
   async getPvUvIpList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -94,7 +94,7 @@ export class PvuvipController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getPvUvIpOne")
+  @Get("points")
   @ApiOperation({ summary: "Get single PV/UV/IP survey" })
   @ApiResponse({ type: Object })
   async getPvUvIpOne(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {

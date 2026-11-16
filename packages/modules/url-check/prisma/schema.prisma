@@ -1,18 +1,20 @@
-// ! ------------------------------------------------------------ //
-// !              [Module] URL Check models                       //
-// ! ------------------------------------------------------------ //
-// * UrlCheckTarget                                               //
-// * UrlCheckIncident                                             //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!                  [Module] URL Check models                   //
+// !! ------------------------------------------------------------ //
+// * UrlCheckTarget                                                //
+// * UrlCheckIncident                                              //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// One external URL probed on a fixed cadence (ADR-022). Targets are
-// group-owned: groupId stores the id of the host grouping entity the probe
-// attaches to; check parameters (60s interval, 10s timeout, HTTP < 400
-// = up) are global defaults, not per-target settings. The failure counter
-// and alert-open flag drive the down/recovered notification state machine:
-// an outage alert opens at 3 consecutive failures and closes on the first
-// success afterwards. Cross-schema FK to the host application.Application
-// (same pattern as ProjectMember → module/account.User).
+// One external URL probed on a fixed cadence (ADR-022). A target is owned by a
+// host grouping entity through `groupId`, a cross-schema foreign key to
+// application.Application. Check parameters are global defaults rather than
+// per-target settings: a 60s probe interval driven by the host job, a 10s
+// timeout, and "up" for any final response below HTTP 400.
+//
+// `consecutiveFailures` and `isAlertOpen` drive the down/recovered state
+// machine: the outage alert opens at 3 consecutive failures and closes only
+// after 3 consecutive successes while open (ADR-024). Deactivating a target
+// stops probing and closes any open alert within the same transaction.
 model UrlCheckTarget {
   id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   groupId               String    @db.Uuid
@@ -20,11 +22,11 @@ model UrlCheckTarget {
   url                   String    @db.VarChar(2048)
   isActive              Boolean   @default(true)
   consecutiveFailures   Int       @default(0)
-  // Success streak while an alert is open; recovery requires sustained
-  // success (ADR-024), otherwise the counter stays 0.
+  // Success streak while an alert is open; 0 outside an outage. Recovery needs
+  // 3 successes in a row (ADR-024).
   consecutiveSuccesses  Int       @default(0)
   isAlertOpen           Boolean   @default(false)
-  // When the currently open outage alert fired; null while no alert is open.
+  // When the open outage alert started; null while no alert is open.
   alertOpenedAt         DateTime?
   lastCheckedAt         DateTime?
   lastStatusCode        Int?
@@ -41,9 +43,9 @@ model UrlCheckTarget {
 }
 
 // One outage episode of a monitored target (ADR-023): opened in the same
-// transaction that opens the outage alert, closed (recoveredAt/durationMs)
-// in the same transaction that closes it. Incident history is the durable
-// record of outages; raw per-check rows stay in ClickHouse under a TTL.
+// transaction as the outage alert and closed with it (`recoveredAt`,
+// `durationMs`). Incident history is the durable record of outages; raw
+// per-check rows stay in ClickHouse under a 90-day TTL.
 model UrlCheckIncident {
   id                      String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   targetId                String          @db.Uuid

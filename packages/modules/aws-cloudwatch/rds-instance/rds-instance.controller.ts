@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
@@ -25,7 +25,7 @@ export class RdsInstanceController {
     return await this.rdsInstanceService.listRDSInstances({ accountId, status, isWatching });
   }
 
-  @Get("fetch")
+  @Post("sync")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.RdsInstance)
   @ApiOperation({ summary: "Fetch RDS instances from AWS and sync to DB" })
   @ApiResponse({ type: Boolean })
@@ -33,7 +33,7 @@ export class RdsInstanceController {
     return await this.rdsInstanceService.fetchRDSInstances(query.accountId);
   }
 
-  @Patch("syncWatch")
+  @Patch("watch-statuses")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.RdsInstance)
   @ApiOperation({ summary: "Sync watch/unwatch status for multiple RDS instances" })
   @ApiResponse({ type: Boolean })
@@ -41,7 +41,7 @@ export class RdsInstanceController {
     return await this.rdsInstanceService.syncRDSInstancesWatch(body);
   }
 
-  @Patch("watch/:rdsInstanceId")
+  @Patch(":rdsInstanceId/watch")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.RdsInstance)
   @ApiOperation({ summary: "Watch an RDS instance" })
   @ApiResponse({ type: RdsInstanceResponseDto })

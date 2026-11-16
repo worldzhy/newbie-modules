@@ -12,8 +12,8 @@ import { RedisKeys } from "../../models/enum";
 import { ResolvedWebToken, FrontendMonitorTokenResolver } from "../../services/frontend-monitor-token.resolver";
 
 /**
- * Token-only public endpoint for frontend-monitor ingestion (ADR-016), peer to
- * heartbeat/health/backend-monitor/module-hub. The secret
+ * Token-only public ingestion endpoint (ADR-016), the standard `reports`
+ * collection under `/frontend-monitor` (ADR-073). The secret
  * FrontendMonitorInstallation token travels in the request body because the
  * browser SDK posts via navigator.sendBeacon, which cannot set headers —
  * the documented exception to the Bearer standard. The InstallationAuthGuard
@@ -31,7 +31,7 @@ export class FrontendMonitorReportController {
     private readonly tokenResolver: FrontendMonitorTokenResolver,
   ) {}
 
-  @Post("/report")
+  @Post("reports")
   @InstallationAuth("frontend-monitor")
   @AllowAnyOrigin()
   @ApiOperation({ summary: "Web SDK data report endpoint" })

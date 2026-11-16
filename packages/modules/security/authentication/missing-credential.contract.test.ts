@@ -1,15 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import type { ConfigService } from "@nestjs/config";
 import type { ExecutionContext } from "@nestjs/common";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
 
-import type { TokenService } from "../token/token.service";
-
 import { ApiKeyStrategy } from "./api-key/api-key.strategy";
 import { JwtAuthGuard } from "./jwt/jwt.guard";
-import { JwtStrategy } from "./jwt/jwt.strategy";
 
 /**
  * ADR-048 §3/§7: a request that carries no credential at all is its own
@@ -25,19 +21,6 @@ function assertSessionMissing(error: unknown): boolean {
 }
 
 describe("auth strategies without a credential", () => {
-  it("jwt strategy throws Session_Missing when no access token is present", async () => {
-    const config = {
-      getOrThrow: () => ({ defaultSecret: "secret", userAccess: { secret: "secret" } }),
-    } as unknown as ConfigService;
-    const tokenService = {
-      getTokenFromHttpRequest: () => undefined,
-    } as unknown as TokenService;
-
-    const strategy = new JwtStrategy(config, tokenService);
-
-    await assert.rejects(strategy.validate({} as never), assertSessionMissing);
-  });
-
   it("api-key strategy throws Session_Missing when key or secret header is missing", async () => {
     const strategy = new ApiKeyStrategy();
 
@@ -46,8 +29,8 @@ describe("auth strategies without a credential", () => {
   });
 
   it("jwt guard maps a request without a bearer token to Session_Missing", () => {
-    // passport-jwt rejects before validate() runs, so the strategy's own branch
-    // is unreachable for that case; the guard is where the code has to be
+    // passport-jwt rejects before validate() runs, so the strategy has no
+    // missing-credential branch; the guard is where the code has to be
     // attached. It re-runs the same extractor to tell "no credential" apart
     // from a malformed token.
     const guard = new JwtAuthGuard();

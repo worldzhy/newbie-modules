@@ -13,8 +13,8 @@ export type AlertSeverity = (typeof ALERT_SEVERITIES)[number];
 export const ALERT_STATES = ["firing", "resolved"] as const;
 export type AlertState = (typeof ALERT_STATES)[number];
 
-/** Reminder rhythm used when neither the source registration nor the row overrides it. */
-export const DEFAULT_REPEAT_MINUTES = 60;
+/** Reminder rhythm (24 hours) used when neither the source registration nor the row overrides it. */
+export const DEFAULT_REPEAT_MINUTES = 1440;
 
 /** Injection token of the host-provided notification adapter (ADR-065 §5). */
 export const ALERT_NOTIFICATION_PORT = "ALERT_NOTIFICATION_PORT";

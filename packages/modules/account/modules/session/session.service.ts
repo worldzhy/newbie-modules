@@ -18,12 +18,15 @@ import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audi
 const REFRESH_IDEMPOTENCY_WINDOW_MS = 30_000;
 
 /**
- * Session rows never store the plaintext refresh token; only callers of
- * generate()/refresh() receive the raw credential. We attach it to the
- * returned record so existing callers that read `session.refreshToken` keep
- * working without type churn.
+ * Session rows never store a usable credential: the refresh token is kept as a
+ * hash (only the caller receives the plaintext) and the access token is signed
+ * on demand with the row id as its `sid` claim, never written back (devbie
+ * ADR-051). Both are attached to the returned record so callers read one object.
  */
-type SessionWithCredentials = Prisma.SessionGetPayload<object> & { refreshToken: string };
+type SessionWithCredentials = Prisma.SessionGetPayload<object> & {
+  accessToken: string;
+  refreshToken: string;
+};
 
 @Injectable()
 export class SessionService {
@@ -47,9 +50,6 @@ export class SessionService {
     const refreshToken = this.tokenService.signUserRefreshToken({ userId: params.userId });
     const session = await tx.session.create({
       data: {
-        accessToken: this.tokenService.signUserAccessToken({
-          userId: params.userId,
-        }),
         refreshTokenHash: this.tokenService.hashToken(refreshToken),
         previousRefreshTokenHash: null,
         rotatedAt: null,
@@ -66,7 +66,9 @@ export class SessionService {
         userId: params.userId,
       },
     });
-    return { ...session, refreshToken };
+    // The id only exists after the insert, so the access token that names this
+    // session is signed afterwards and never stored (ADR-051).
+    return { ...session, accessToken: this.mintAccessToken(session), refreshToken };
   }
 
   async refresh(refreshToken: string): Promise<SessionWithCredentials> {
@@ -78,7 +80,6 @@ export class SessionService {
     // [step 2] CAS-rotate: only the row currently holding this hash wins. A
     // concurrent or replayed refresh sees count === 0 and falls through to the
     // idempotency / reuse handling below.
-    const newAccessToken = this.tokenService.signUserAccessToken({ userId: refreshTokenInfo.userId });
     const newRefreshToken = this.tokenService.signUserRefreshToken(
       { userId: refreshTokenInfo.userId },
       { expiresIn: secondsUntilUnixTimestamp(refreshTokenInfo.exp) },
@@ -88,7 +89,6 @@ export class SessionService {
     const rotation = await this.prisma.session.updateMany({
       where: { refreshTokenHash: tokenHash },
       data: {
-        accessToken: newAccessToken,
         refreshTokenHash: newHash,
         previousRefreshTokenHash: tokenHash,
         refreshTokenNextSealed: this.tokenService.sealToken(newRefreshToken),
@@ -101,7 +101,7 @@ export class SessionService {
       const session = await this.prisma.session.findUniqueOrThrow({
         where: { refreshTokenHash: newHash },
       });
-      return { ...session, refreshToken: newRefreshToken };
+      return { ...session, accessToken: this.mintAccessToken(session), refreshToken: newRefreshToken };
     }
 
     // [step 3] count === 0: the token was already rotated (or never existed).
@@ -123,6 +123,7 @@ export class SessionService {
       }
       return {
         ...rotatedSession,
+        accessToken: this.mintAccessToken(rotatedSession),
         refreshToken: this.tokenService.openSealedToken(rotatedSession.refreshTokenNextSealed),
       };
     }
@@ -142,27 +143,37 @@ export class SessionService {
     throw new NewbieException(NewbieExceptionType.Session_RefreshRejected);
   }
 
-  async destroy(token: string) {
-    // Match by access token or by the hash of a submitted refresh token. The
-    // plaintext is never stored, so a refresh token must be hashed before
-    // lookup.
-    const tokenHash = this.tokenService.hashToken(token);
-    const session = await this.prisma.session.findFirst({
-      where: { OR: [{ accessToken: token }, { refreshTokenHash: tokenHash }] },
-      select: { id: true, user: { select: { id: true } } },
-    });
-    // Destroy is idempotent: a missing session is already in the desired end
-    // state, and a concurrent destroy may win the race between findFirst and
-    // delete, so a missing-row error (P2025) is also a success.
-    if (!session) return;
-
+  /**
+   * Revoke a session by id. Revocation is row absence: every access token that
+   * names this session fails authentication on its next request (devbie
+   * ADR-051), and its refresh token stops rotating.
+   */
+  async revokeSession(sessionId: number) {
     try {
-      await this.prisma.session.delete({
-        where: { id: session.id },
-      });
+      await this.prisma.session.delete({ where: { id: sessionId } });
     } catch (error) {
+      // Idempotent: a missing session is already in the desired end state, and a
+      // concurrent revoke may win the race, so a missing-row error (P2025) is
+      // also a success.
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") return;
       throw error;
     }
+  }
+
+  /**
+   * Revoke the session currently holding a refresh token. The plaintext is never
+   * stored, so the token must be hashed before lookup.
+   */
+  async revokeByRefreshToken(refreshToken: string) {
+    const session = await this.prisma.session.findFirst({
+      where: { refreshTokenHash: this.tokenService.hashToken(refreshToken) },
+      select: { id: true },
+    });
+    if (!session) return;
+    await this.revokeSession(session.id);
+  }
+
+  private mintAccessToken(session: { id: number; userId: string }) {
+    return this.tokenService.signUserAccessToken({ userId: session.userId, sessionId: session.id });
   }
 }

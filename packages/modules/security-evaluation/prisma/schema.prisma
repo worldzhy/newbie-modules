@@ -1,47 +1,44 @@
 // Prisma schema fragment for the security-evaluation module (ADR-022).
-// This file is managed by @devbie/newbie-cli — assembled into the
-// consumer prisma tree on `newbie modules apply`.
+// This file is managed by @devbie/newbie-cli, which assembles it into the
+// consumer Prisma tree on `newbie modules apply`.
 //
-// The run / result / criteria / finding tables belong to the evaluation
-// skeleton (`module/evaluation`, ADR-020). This feature owns the subject-scoped
-// knowledge, the web-origin ownership-verification record, the repository /
-// aws-account material rows and the code-scan caches: `subjectId` is a plain
-// scalar with no relation — foreign keys never cross schema boundaries.
+// The run, result, criteria and finding tables belong to the evaluation
+// skeleton (`module/evaluation`, ADR-020). This module owns the subject-scoped
+// knowledge, the web-origin ownership-verification record, the repository and
+// aws-account material rows, and the code-scan caches. `subjectId` is a plain
+// scalar with no relation, because foreign keys never cross schema boundaries.
 // Identity is the subject coordinate `(subjectType, kind, subjectKey)`
-// (ADR-068 D7, ADR-069); the material rows below hold only what is specific to
-// their kind and are keyed by the same natural coordinate (ADR-070 D1, D2).
+// (ADR-068 D7, ADR-069); material rows hold only what is specific to their kind
+// and are keyed by the same natural coordinate (ADR-070 D1, D2).
 
-// !! ----------------------------------------------------------- //
-// !!            [Module] Security Evaluation models             //
-// !! ----------------------------------------------------------- //
-// * SecurityEvaluationWebOrigin                               //
-// * SecurityEvaluationRepository                              //
-// * SecurityEvaluationAwsAccount                              //
-// * SecurityEvaluationAwsConfigKnowledgeItem                  //
-// * SecurityEvaluationNpmPackageKnowledgeItem                 //
-// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!             [Module] Security Evaluation models              //
+// !! ------------------------------------------------------------ //
+// * SecurityEvaluationWebOrigin                                   //
+// * SecurityEvaluationRepository                                  //
+// * SecurityEvaluationAwsAccount                                  //
+// * SecurityEvaluationAwsConfigKnowledgeItem                      //
+// * SecurityEvaluationNpmPackageKnowledgeItem                     //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 /// Ownership-verification record of a web-origin subject (ADR-066, ADR-044).
 ///
-/// One row per subject: the subject carries the identity (`subjectKey` is the
-/// normalized origin, `displayName` the label) and provenance lives in the host
-/// (ADR-068 D8) — this table owns only what is specific to a web origin: where
-/// it runs, which path roles the rules can target, and whether the deployment
-/// still controls the origin.
+/// One row per subject. The subject carries the identity (`subjectKey` is the
+/// normalized origin, `displayName` the label) and provenance stays in the host
+/// (ADR-068 D8); this table owns only what is specific to a web origin: where it
+/// runs, which path roles criteria can target, and whether the deployment still
+/// controls the origin.
 ///
-/// Only `verificationStatus = VERIFIED` and `isActive` subjects are submitted
-/// for evaluation. Re-verification is lazy (the host calls `listActiveVerified`),
-/// so the module needs no scheduler; consecutive failures beyond the configured
-/// threshold move the row to `FAILED` and stop evaluation of a domain that may
-/// have changed hands.
+/// Only active, `VERIFIED` subjects are submitted for evaluation, fetched lazily
+/// through `listActiveVerified`, so the module needs no scheduler. Consecutive
+/// failures that reach the configured threshold move the row to `FAILED`, which
+/// stops evaluation of a domain that may have changed hands.
 model SecurityEvaluationWebOrigin {
   id                   String    @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK
   subjectId            String    @unique @db.Uuid
-  // Free-form deployment slot chosen by the host ("production", "staging"…).
-  environment          String    @db.VarChar(32)
-  // Path role → relative path, e.g. { "auth.login": "/login" }. Dropping a
-  // role makes criteria that depend on it report "target not configured".
+  // Path role to relative path, e.g. { "auth.login": "/login" }. A criterion
+  // depending on a dropped role reports "target not configured".
   targetPaths          Json      @default("{}") @db.JsonB
   // PENDING | VERIFIED | FAILED | REVOKED.
   verificationStatus   String    @default("PENDING") @db.VarChar(16)
@@ -62,19 +59,20 @@ model SecurityEvaluationWebOrigin {
 
 /// Repository material of a repository subject (ADR-070 D1).
 ///
-/// The host's own repository record stays the host's truth (it is referenced by
-/// application provisioning); this row is the evaluation-side copy of the
-/// coordinate, so evidence collection knows which code host and which
+/// The host keeps its own repository record as the source of truth, since
+/// application provisioning references it; this row is the evaluation-side copy
+/// of the coordinate, so evidence collection learns the code host and the
 /// `namespace/name` a subject names without reading a host table. Rows are
-/// written by ingest only and are keyed by the natural coordinate, not by a host
-/// id — several projects declaring the same repository share one row.
+/// written by ingest only and are keyed by the natural coordinate, never by a
+/// host id, so several projects naming the same repository share one row.
 model SecurityEvaluationRepository {
   id        String   @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK
   subjectId String   @unique @db.Uuid
   provider  String   @db.VarChar(32)
   // Vendor-neutral first segment of the coordinate: GitHub owner, Bitbucket
-  // workspace, … Lowercased; the subject display name keeps the original case.
+  // workspace, and so on. Lowercased; the subject display name keeps the
+  // original case.
   namespace String   @db.VarChar(255)
   name      String   @db.VarChar(255)
   url       String?  @db.VarChar(255)
@@ -88,9 +86,9 @@ model SecurityEvaluationRepository {
 
 /// AWS account material of an aws-account subject (ADR-070 D1).
 ///
-/// The account id is the natural key (a cross-account binding can be recreated
-/// without changing it). Credentials stay a host concern: the opaque
-/// `credentialRef` lives on the subject, never here.
+/// The account id is the natural key, so an existing cross-account binding can
+/// be recreated without changing it. Credentials stay a host concern: the
+/// opaque `credentialRef` lives on the subject, never here.
 model SecurityEvaluationAwsAccount {
   id            String   @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK
@@ -106,22 +104,22 @@ model SecurityEvaluationAwsAccount {
 }
 
 /// A current-state AWS configuration knowledge item collected from a subject:
-/// a password policy, an access key, a bucket's security posture… Items are
-/// upserted on collection and never deleted here; history lives in the
-/// archived run manifest, and a stale `observedAt` is what "not observed
-/// recently" means.
+/// a password policy, an access key, a bucket's security posture, and so on.
+/// Items are upserted on collection and never deleted here; history lives in the
+/// archived run manifest, and a stale `observedAt` is how "not observed
+/// recently" is expressed.
 ///
-/// The KnowledgeItem suffix marks the knowledge family — collected/external
-/// knowledge consumed by judgment — not schema isomorphism across the
-/// family: this table is subject-scoped while SecurityEvaluationThreatKnowledgeItem
-/// is world-scoped (ADR-037 D9.1).
+/// The KnowledgeItem suffix marks the knowledge family (collected or external
+/// knowledge consumed by judgment), not schema isomorphism: this table is
+/// subject-scoped, while SecurityEvaluationThreatKnowledgeItem is world-scoped
+/// (ADR-037 D9.1).
 model SecurityEvaluationAwsConfigKnowledgeItem {
   id         String   @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK
   subjectId  String   @db.Uuid
   type       String   @db.VarChar(64) // "aws.iam.account-password-policy" | ...
   key        String   @db.VarChar(512) // stable identity within the type
-  value      Json?    @db.JsonB // small intrinsic values: region, mfaEnabled…
+  value      Json?    @db.JsonB // small intrinsic values: region, mfaEnabled...
   observedAt DateTime
 
   @@unique([subjectId, type, key])
@@ -138,7 +136,7 @@ model SecurityEvaluationNpmPackageKnowledgeItem {
   subjectId  String   @db.Uuid
   type       String   @db.VarChar(64) // "npm.package"
   key        String   @db.VarChar(512) // "npm:lodash@4.17.20"
-  value      Json?    @db.JsonB // small intrinsic values: version, isDev, ecosystem…
+  value      Json?    @db.JsonB // small intrinsic values: version, isDev, ecosystem...
   observedAt DateTime
 
   @@unique([subjectId, type, key])
@@ -146,31 +144,30 @@ model SecurityEvaluationNpmPackageKnowledgeItem {
   @@schema("module/security-evaluation")
 }
 
-// !! ----------------------------------------------------------- //
-// !!            [Module] Security Evaluation Knowledge          //
-// !! ----------------------------------------------------------- //
-// * SecurityEvaluationThreatKnowledgeItem                      //
-// ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!            [Module] Security Evaluation Knowledge            //
+// !! ------------------------------------------------------------ //
+// * SecurityEvaluationThreatKnowledgeItem                         //
+// * SecurityEvaluationThreatVerdictKind (enum)                    //
+// * SecurityEvaluationThreatVerdictCache                          //
+// * SecurityEvaluationCodeScanVerdictCache                        //
+// * SecurityEvaluationCodeScanFileExcerpt                         //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-/// One piece of external threat intelligence, deduplicated by
-/// (feed, externalId). One row per unique intel item; re-fetching the
-/// same item refreshes rawPayload and bumps lastSeenAt. firstSeenAt stays at
-/// the first-seen time on purpose: the match pipeline walks it oldest-first
-/// so every collection batch eventually gets evaluated.
+/// One piece of external threat intelligence (ADR-039), deduplicated by (feed,
+/// externalId). Re-fetching an existing item refreshes `rawPayload` and bumps
+/// `lastSeenAt`; `firstSeenAt` is never rewritten, so the evidence window keeps
+/// selecting an item by its original collection time.
 ///
-/// Ported from the former threat-intelligence module (ADR-039); fields and
-/// indexes are unchanged.
-///
-/// World-scoped: unlike the asset-scoped knowledge tables above, a threat
-/// item belongs to no asset — it exists once per feed and is matched
-/// against every asset's knowledge during judgment.
+/// World-scoped: unlike the asset-scoped knowledge tables above, a threat item
+/// belongs to no asset. It exists once per feed and is matched against every
+/// asset's knowledge during judgment.
 model SecurityEvaluationThreatKnowledgeItem {
   id          String   @id @default(uuid()) @db.Uuid
   feed        String   @db.VarChar(50)
   category    String   @db.VarChar(30)
   // Stable identifier within the feed: CVE ID, ecosystem+package,
-  // vendor+event-id, or a title fingerprint. Together with `feed` it
-  // forms the deduplication key.
+  // vendor+event-id, or a title fingerprint.
   externalId  String   @db.VarChar(512)
   title       String   @db.VarChar(1024)
   summary     String?  @db.Text
@@ -191,16 +188,15 @@ model SecurityEvaluationThreatKnowledgeItem {
   @@index([category])
   @@index([severity])
   @@index([publishedAt])
-  // Match-pipeline keyset scan: WHERE firstSeenAt >= since ORDER BY firstSeenAt DESC, id.
+  // Evidence window: WHERE firstSeenAt >= since ORDER BY firstSeenAt DESC, id.
   @@index([firstSeenAt])
   @@schema("module/security-evaluation")
 }
 
 /// Verdict kinds recorded per (knowledge item, scope) in the INTEL verdict
-/// cache (formerly "negative cache", ADR-045). The cache now stores both
-/// LLM "not-relevant" verdicts (TTL 7 days by default, filtered out of
-/// subsequent pipelines) and hard-recall "hard-hit" verdicts (audit-only,
-/// always re-computed per run).
+/// cache (ADR-045). The cache stores two kinds: LLM "not-relevant" verdicts
+/// (TTL `ttlDays`, skipped by subsequent pipelines) and hard-recall "hard-hit"
+/// verdicts (audit only, re-computed on every run).
 enum SecurityEvaluationThreatVerdictKind {
   notRelevant @map("not-relevant")
   hardHit     @map("hard-hit")
@@ -208,20 +204,20 @@ enum SecurityEvaluationThreatVerdictKind {
   @@schema("module/security-evaluation")
 }
 
-/// Verdict cache for INTEL matching (ADR-045): every judgment outcome
-/// that is stable over short runs is recorded per (knowledge item, scope).
+/// Verdict cache for INTEL matching (ADR-045): every judgment outcome that is
+/// stable over short runs is recorded per (knowledge item, scope).
 ///
-/// - `not-relevant`: LLM re-ranker said this knowledge item has no bearing
-///   on this scope. Expires after the declared ttlDays (ADR-033).
-///   Subsequent runs skip the pair entirely — no re-check.
-/// - `hard-hit`: hard-recall matched this item to this scope's entities.
-///   Audit only — the pair still re-enters the pipeline each run because
-///   the hard-match result depends on the entity set, which is dynamic.
+/// - `not-relevant`: the LLM re-ranker found this knowledge item irrelevant to
+///   this scope. The pair is skipped only while the row is younger than the
+///   declared `ttlDays` (ADR-033).
+/// - `hard-hit`: hard-recall matched this item to entities of this scope. Audit
+///   only: the pair re-enters the pipeline each run because a hard match depends
+///   on the entity set, which is dynamic.
 ///
-/// A cache row is not knowledge: it has its own lifecycle (expires
-/// independently of the knowledge row), which is why it lives in its own
-/// table instead of a JSON column on the knowledge item. The composite
-/// unique key turns concurrent scope judgments into an upsert.
+/// A cache row is not knowledge, and its lifecycle is independent of the
+/// knowledge row, which is why it lives in its own table instead of a JSON
+/// column on the knowledge item. The composite unique key turns concurrent scope
+/// judgments into an upsert.
 model SecurityEvaluationThreatVerdictCache {
   id              String                              @id @default(uuid()) @db.Uuid
   knowledgeItemId  String                             @db.Uuid
@@ -245,23 +241,23 @@ model SecurityEvaluationThreatVerdictCache {
   @@schema("module/security-evaluation")
 }
 
-/// Bipolar verdict cache for CODE_SCAN LLM judgment (ADR-054): positive AND
-/// negative per-file verdicts are cached, keyed by the full judgment identity
-/// (subject, criterion, path, content hash, model, prompt version, ruleset
-/// version). Unlike the INTEL cache — where only "not-relevant" is reusable
-/// because a feed item is one-shot — a source file persists across runs, so a
-/// positive verdict is reusable too; replaying it keeps finding identities
-/// deterministic across runs and shields files skipped by a later run's
-/// budget from the absent-finding reaper.
+/// Bipolar verdict cache for CODE_SCAN LLM judgment (ADR-054): positive and
+/// negative per-file verdicts are both cached, keyed by the full judgment
+/// identity (subject, criterion, path, content hash, model, connection, prompt
+/// version, rule-set version). The INTEL cache reuses only "not-relevant"
+/// verdicts because a feed item is one-shot; a source file persists across runs,
+/// so a positive verdict is reusable too. Replaying it keeps finding identities
+/// deterministic across runs and shields files skipped by a later run's budget
+/// from the absent-finding reaper.
 ///
-/// `unavailable` verdicts are never written (ADR-045 bottom line). Rows older
-/// than the declared codeScanVerdictCacheTtlDays are misses: content or
-/// version changes already invalidate the key, so the TTL only forces a
-/// long-unchanged file to be re-judged against model drift.
+/// `unavailable` verdicts are never written (ADR-045). Rows older than the
+/// declared `codeScanVerdictCacheTtlDays` are misses: content or version changes
+/// already invalidate the key, so the TTL only forces a long-unchanged file to
+/// be re-judged against model drift.
 ///
-/// `findings` holds the structured finding entries the cached call produced
-/// for this one criterion (usually an empty array) — one row per criterion of
-/// the ruleset, all sharing the call's `inputSignature`.
+/// `cachedFindings` holds the structured finding entries the cached call produced
+/// for this one criterion (usually an empty array); every criterion of the
+/// ruleset gets its own row, and all rows of a call share its `inputSignature`.
 model SecurityEvaluationCodeScanVerdictCache {
   id             String   @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK
@@ -272,14 +268,14 @@ model SecurityEvaluationCodeScanVerdictCache {
   // SHA-256 of the full file content the verdict describes.
   contentHash    String   @db.VarChar(64)
   modelId        String   @db.VarChar(255)
-  // LLM ConnectionScope.id that produced this verdict; nullable for legacy
-  // rows written before the connectionId column existed. Two connections that
-  // happen to share the same modelId still cache separately.
+  // LLM ConnectionScope.id that produced this verdict; null on rows written
+  // before this column existed. Two connections sharing one modelId still cache
+  // separately.
   connectionId   String?  @db.Uuid
   // SHA-256 of the system prompt bytes; editing the prompt invalidates rows.
   promptVersion  String   @db.VarChar(64)
   ruleSetVersionLabel String @db.VarChar(32)
-  // Finding entries of this criterion from the cached call (JSON array).
+  // Findings of this criterion from the cached call (JSON array; usually empty).
   cachedFindings Json     @db.JsonB
   // Content address of the exact request that produced this verdict.
   inputSignature String?  @db.VarChar(64)
@@ -291,17 +287,17 @@ model SecurityEvaluationCodeScanVerdictCache {
   @@schema("module/security-evaluation")
 }
 
-/// Truncated source excerpt of one scanned file — the material the CODE_SCAN
-/// LLM actually judged (ADR-054 D7). It deliberately lives outside the
-/// archived result manifest: the manifest keeps the content hash and the
-/// truncated flag only, so the immutable result never accumulates source code.
+/// Truncated source excerpt of one scanned file: the material the CODE_SCAN LLM
+/// actually judged (ADR-054 D7). It lives outside the archived result manifest,
+/// which keeps only the content hash and the truncated flag, so the immutable
+/// result never accumulates source code.
 ///
-/// Content-addressed by (subjectId, contentHash): rescanning unchanged files
-/// writes nothing, and every run whose manifest carries that hash reads the
-/// same excerpt. `updatedAt` is the retention clock — rows older than
-/// `SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS` are physically
-/// deleted by the retention service, after which the finding detail read falls
-/// back to hash + truncated.
+/// Content-addressed by (subjectId, contentHash): rescanning an unchanged file
+/// writes nothing, and every run whose manifest carries that hash reads the same
+/// excerpt. `updatedAt` is the retention clock: rows older than
+/// `SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS` are physically deleted
+/// by the retention service, after which the finding detail read falls back to
+/// the hash and the truncated flag.
 model SecurityEvaluationCodeScanFileExcerpt {
   id          String   @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK

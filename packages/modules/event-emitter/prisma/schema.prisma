@@ -1,13 +1,13 @@
-// ! ------------------------------------------------------------ //
-// !           [Module] Event emitter models              //
-// ! ------------------------------------------------------------ //
-// * EventEmission                                                //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!                [Module] Event emitter models                 //
+// !! ------------------------------------------------------------ //
+// * EventEmission                                                 //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-/// One recorded event emission. `listenerCount` snapshots how many listeners
-/// were subscribed at emission time; `payload` is the JSON-normalized emission
-/// payload (NULL when the emitter sent none). The event catalog itself lives
-/// in memory (EventCatalogService) — only what actually fired is persisted.
+/// One recorded event emission. `listenerCount` snapshots the subscriber count
+/// at emission time; `payload` is the JSON-normalized payload, NULL when the
+/// emitter sent none. The event catalog lives in memory (EventCatalogService);
+/// only emissions are persisted.
 model EventEmission {
   id            Int      @id @default(autoincrement())
   eventKey      String

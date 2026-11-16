@@ -41,7 +41,7 @@ export class HttpAccessInterceptor implements NestInterceptor {
    * queries and installation-management endpoints remain audited.
    */
   private static readonly EXCLUDED_PATH_PREFIXES = [
-    "/frontend-monitor/report",
+    "/frontend-monitor/reports",
     "/module-hub/report",
     "/backend-monitor/ingest",
     "/health/snapshot",

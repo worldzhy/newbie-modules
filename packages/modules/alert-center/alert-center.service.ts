@@ -147,6 +147,8 @@ export class AlertCenterService {
       source.defaultRepeatMinutes,
     );
     const pausedUntil = sourceState?.notificationPausedUntil ?? null;
+    // A disabled source records the alert but must not reach the wire.
+    const enabled = sourceState?.enabled ?? true;
 
     let existing = await this.prisma.alert.findUnique({ where: { fingerprint } });
     let created: AlertRow | null = null;
@@ -182,7 +184,7 @@ export class AlertCenterService {
     }
 
     if (created) {
-      await this.deliver(created, 0, pausedUntil, now);
+      await this.deliver(created, 0, pausedUntil, now, { enabled });
       return { id: created.id, state: "firing", isNew: true };
     }
 
@@ -210,7 +212,7 @@ export class AlertCenterService {
           nextNotificationAt: nextNotificationAt(pausedUntil, repeatMinutes, now),
         },
       });
-      await this.deliver(reopened, 0, pausedUntil, now);
+      await this.deliver(reopened, 0, pausedUntil, now, { enabled });
       return { id: reopened.id, state: "firing", isNew: true };
     }
 
@@ -251,7 +253,9 @@ export class AlertCenterService {
       data: { state: "resolved", resolvedAt: input.resolvedAt ?? now, nextNotificationAt: null },
     });
     const sourceState = await this.prisma.alertSource.findUnique({ where: { key: source.key } });
-    await this.deliver(resolved, resolved.reminderCount, sourceState?.notificationPausedUntil ?? null, now);
+    await this.deliver(resolved, resolved.reminderCount, sourceState?.notificationPausedUntil ?? null, now, {
+      enabled: sourceState?.enabled ?? true,
+    });
     return { id: resolved.id };
   }
 
@@ -264,19 +268,19 @@ export class AlertCenterService {
   async dispatchDueReminders(input: { now?: Date; limit?: number } = {}): Promise<{ dispatched: number }> {
     const now = input.now ?? new Date();
     const limit = Math.min(Math.max(input.limit ?? DEFAULT_PAGE_SIZE, 1), MAX_PAGE_SIZE);
-    // Paused rows are excluded before the limit is applied. Skipping them in the
-    // loop instead would let a whole page of paused rows starve every other
-    // source until the pause ends.
-    const pausedSources = await this.prisma.alertSource.findMany({
-      where: { notificationPausedUntil: { gt: now } },
+    // Paused and disabled rows are excluded before the limit is applied. Skipping
+    // them in the loop instead would let a whole page of suppressed rows starve
+    // every other source.
+    const suppressedSources = await this.prisma.alertSource.findMany({
+      where: { OR: [{ enabled: false }, { notificationPausedUntil: { gt: now } }] },
       select: { key: true },
     });
-    const pausedKeys = pausedSources.map((row) => row.key);
+    const suppressedKeys = suppressedSources.map((row) => row.key);
     const due = await this.prisma.alert.findMany({
       where: {
         state: "firing",
         nextNotificationAt: { lte: now },
-        ...(pausedKeys.length > 0 ? { source: { notIn: pausedKeys } } : {}),
+        ...(suppressedKeys.length > 0 ? { source: { notIn: suppressedKeys } } : {}),
       },
       orderBy: { nextNotificationAt: "asc" },
       take: limit,
@@ -287,12 +291,13 @@ export class AlertCenterService {
 
     const sourceKeys = [...new Set(due.map((alert) => alert.source))];
     const sourceRows = await this.prisma.alertSource.findMany({ where: { key: { in: sourceKeys } } });
-    const pausedBySource = new Map(sourceRows.map((row) => [row.key, row.notificationPausedUntil]));
+    const stateBySource = new Map(sourceRows.map((row) => [row.key, row]));
 
     let dispatched = 0;
     for (const alert of due) {
-      const pausedUntil = pausedBySource.get(alert.source) ?? null;
-      if (isNotificationPaused(pausedUntil, now)) {
+      const sourceState = stateBySource.get(alert.source);
+      const pausedUntil = sourceState?.notificationPausedUntil ?? null;
+      if (sourceState?.enabled === false || isNotificationPaused(pausedUntil, now)) {
         continue;
       }
       const claimed = await this.prisma.alert.updateMany({
@@ -313,6 +318,7 @@ export class AlertCenterService {
         now,
         {
           skipPauseCheck: true,
+          enabled: sourceState?.enabled ?? true,
         },
       );
       if (!delivered) {
@@ -447,16 +453,19 @@ export class AlertCenterService {
     if (pausedUntil && Number.isNaN(pausedUntil.getTime())) {
       throw new BadRequestException("notificationPausedUntil must be a valid date.");
     }
+    const enabled = input.enabled === undefined ? (existing?.enabled ?? true) : input.enabled;
 
-    if (repeatMinutes === null && pausedUntil === null) {
+    // A row is only worth keeping when it overrides something: a real rhythm, a
+    // live pause, or a disabled source.
+    if (enabled && repeatMinutes === null && pausedUntil === null) {
       await this.prisma.alertSource.deleteMany({ where: { key } });
       return this.toSourceDto(source, null);
     }
 
     const row = await this.prisma.alertSource.upsert({
       where: { key },
-      create: { key, repeatMinutes, notificationPausedUntil: pausedUntil },
-      update: { repeatMinutes, notificationPausedUntil: pausedUntil },
+      create: { key, repeatMinutes, notificationPausedUntil: pausedUntil, enabled },
+      update: { repeatMinutes, notificationPausedUntil: pausedUntil, enabled },
     });
     return this.toSourceDto(source, row);
   }
@@ -466,7 +475,7 @@ export class AlertCenterService {
   /** The operator-owned columns of one `AlertSource` row. */
   private toSourceDto(
     source: RegisteredAlertSource,
-    row: { repeatMinutes: number | null; notificationPausedUntil: Date | null } | null,
+    row: { repeatMinutes: number | null; notificationPausedUntil: Date | null; enabled: boolean } | null,
   ): AlertSourceDto {
     return {
       key: source.key,
@@ -480,6 +489,7 @@ export class AlertCenterService {
       repeatMinutes: row?.repeatMinutes ?? null,
       effectiveRepeatMinutes: row?.repeatMinutes ?? source.defaultRepeatMinutes,
       notificationPausedUntil: row?.notificationPausedUntil ?? null,
+      enabled: row?.enabled ?? true,
     };
   }
 
@@ -495,8 +505,11 @@ export class AlertCenterService {
     reminderCount: number,
     pausedUntil: Date | null,
     now: Date,
-    options: { skipPauseCheck?: boolean } = {},
+    options: { skipPauseCheck?: boolean; enabled?: boolean } = {},
   ): Promise<boolean> {
+    if (options.enabled === false) {
+      return true;
+    }
     if (!options.skipPauseCheck && isNotificationPaused(pausedUntil, now)) {
       return false;
     }

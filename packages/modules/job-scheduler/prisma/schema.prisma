@@ -1,16 +1,16 @@
-// ! ------------------------------------------------------------ //
-// !           [Module] Job scheduler models              //
-// ! ------------------------------------------------------------ //
-// * JobSchedule                                                  //
-// * JobRun                                                       //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!                [Module] Job scheduler models                 //
+// !! ------------------------------------------------------------ //
+// * JobSchedule                                                   //
+// * JobRun                                                        //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-/// A schedule for one job: human-readable name, when it runs (cronExpr +
-/// timezone), whether it is enabled, and the opaque payload passed to the job
-/// handler. Business modules upsert defaults on startup
-/// (`createdVia="declaration"`); the database row wins at runtime so operators
-/// can pause a schedule, change its cron expression, or trigger it manually.
-/// The name stays declaration-owned and is re-synced on every startup.
+/// One job schedule: the job key and handler binding, when it runs (cronExpr +
+/// timezone), the enabled flag, and the opaque payload passed to the handler.
+/// Business modules declare defaults on startup (`createdVia="declaration"`);
+/// the database row wins at runtime, so operators can pause a schedule, change
+/// its cron expression, or trigger it manually. Only the name stays
+/// declaration-owned and is re-synced on every startup.
 model JobSchedule {
   id         Int      @id @default(autoincrement())
   key        String   @unique
@@ -29,8 +29,9 @@ model JobSchedule {
   @@schema("module/job-scheduler")
 }
 
-/// Execution history for one job run. `status="skipped"` records a reentry
-/// guard rejection: the previous run of the same schedule was still in progress.
+/// One job-run record: trigger source, status, timing, duration, and error.
+/// `status="skipped"` marks a run rejected by the reentry guard because the
+/// previous run of the same schedule was still in progress.
 model JobRun {
   id         Int       @id @default(autoincrement())
   scheduleId Int

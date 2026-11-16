@@ -2,10 +2,10 @@ import { Controller, Post, Body, Ip, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 import { GuardByRefreshToken } from "@modules/security/authentication/refresh-token/refresh-token.decorator";
-import { TokenService } from "@modules/security/token/token.service";
 import { LimitLoginByUserService } from "@modules/security/rate-limiter/rate-limiter.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
 import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { UserRequest } from "@modules/security/security.interface";
 import { WechatAuthService } from "@modules/account/auth/wechat/auth.service";
 import {
   WechatLoginDto,
@@ -18,7 +18,6 @@ import { LogoutResponseDto } from "@modules/account/auth/auth.dto";
 @Controller("auth/wechat")
 export class WechatAuthController {
   constructor(
-    private readonly tokenService: TokenService,
     private readonly limitLoginByUserService: LimitLoginByUserService,
     private readonly sessionService: SessionService,
     private readonly wechatAuthService: WechatAuthService,
@@ -41,27 +40,26 @@ export class WechatAuthController {
   @RequireOwner()
   @ApiOperation({ summary: "WeChat logout" })
   @ApiResponse({ type: LogoutResponseDto })
-  async logout(@Req() req): Promise<{ data: { message: string } }> {
-    // [step 1] Get access token.
-    const accessToken = this.tokenService.getTokenFromHttpRequest(req);
-
-    // [step 2] Delete session and clear user attempts.
-    if (accessToken) {
-      await this.sessionService.destroy(accessToken);
-
-      const { userId } = this.tokenService.verifyUserAccessToken(accessToken);
-      await this.limitLoginByUserService.delete(userId);
+  async logout(@Req() req: UserRequest): Promise<{ data: { message: string } }> {
+    // [step 1] The guard already resolved this request's session, so revoke by
+    // the resolved id instead of re-parsing the token (devbie ADR-051).
+    const { sessionId, userId } = req.user;
+    // The JWT strategy always resolves a session id; a credential strategy that
+    // carries none has no row to revoke, and the call is idempotent either way.
+    if (sessionId !== undefined) {
+      await this.sessionService.revokeSession(sessionId);
     }
+    await this.limitLoginByUserService.delete(userId);
 
-    // [step 3] Always return success no matter if the user exists.
+    // [step 2] Always return success no matter if the user exists.
     return {
       data: { message: "User logs out successfully" },
     };
   }
 
   @GuardByRefreshToken()
-  @Post("refresh-access-token")
-  @ApiOperation({ summary: "WeChat refresh access token" })
+  @Post("refresh-session")
+  @ApiOperation({ summary: "WeChat refresh the session" })
   @ApiResponse({ type: WechatRefreshAccessTokenResponseDto })
   async refresh(@Body() body: { refreshToken: string }) {
     return await this.wechatAuthService.refreshAccessToken({

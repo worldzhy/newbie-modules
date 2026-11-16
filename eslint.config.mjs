@@ -4,9 +4,23 @@ import nest from "@devbie/style-guide/eslint/nest";
 // The Nest layer carries type-aware rules, so it may only cover TypeScript sources.
 // Flat config has no cascading, so the scope has to live here; root tooling files
 // (eslint.config.mjs, scripts/*.mjs) are plain Node modules linted by `base` alone.
+// Blocks that are already path-scoped upstream (e.g. the strategy-exception ban on
+// `**/src/modules/**/*.strategy.ts`) must keep that scope, translated from the host
+// `src/` layout to this registry's `packages/` layout; only unscoped blocks widen to
+// every module source. Replacing `files` wholesale would apply a strategy-only rule
+// to every service and controller.
+const toRegistryFiles = (files) => {
+  const list = Array.isArray(files) ? files : [files];
+  return list.map((pattern) =>
+    pattern.startsWith("!")
+      ? `!${pattern.slice(1).replace("**/src/", "packages/")}`
+      : pattern.replace("**/src/", "packages/"),
+  );
+};
+
 const nestForModules = nest.map((config) => ({
   ...config,
-  files: ["packages/**/*.ts"],
+  files: config.files ? toRegistryFiles(config.files) : ["packages/**/*.ts"],
 }));
 
 export default [

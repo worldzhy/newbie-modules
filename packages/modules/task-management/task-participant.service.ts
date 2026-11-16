@@ -13,29 +13,9 @@ export interface GetOrCreateParticipantInput {
 export class TaskParticipantService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Visibility rule: a participant is visible when it is the requester herself,
-   * or when the user behind it shares a project with the requester.
-   */
-  private visibleTo(requesterUserId: string) {
-    return {
-      OR: [
-        { userId: requesterUserId },
-        {
-          user: {
-            projectMemberships: {
-              some: { project: { members: { some: { userId: requesterUserId } } } },
-            },
-          },
-        },
-      ],
-    };
-  }
-
-  /** List the participants the caller may see (see `visibleTo`). */
-  async listParticipants(userId: string) {
+  /** List every participant. Project membership was retired in ADR-047. */
+  async listParticipants() {
     return await this.prisma.taskParticipant.findMany({
-      where: this.visibleTo(userId),
       select: {
         id: true,
         userId: true,
@@ -46,10 +26,10 @@ export class TaskParticipantService {
     });
   }
 
-  /** Look up a participant by the host user it stands for, within the caller's reach. */
-  async getParticipantByUserId(targetUserId: string, requesterUserId: string) {
+  /** Look up a participant by the host user it stands for. */
+  async getParticipantByUserId(targetUserId: string) {
     return await this.prisma.taskParticipant.findFirst({
-      where: { userId: targetUserId, ...this.visibleTo(requesterUserId) },
+      where: { userId: targetUserId },
     });
   }
 

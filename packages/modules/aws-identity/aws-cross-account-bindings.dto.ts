@@ -112,6 +112,35 @@ export class AwsCrossAccountBindingListResponseDto {
 }
 
 /**
+ * Credential reference of one configured account: the account id it belongs
+ * to, the display name an operator entered, and the opaque reference a caller
+ * stores and later resolves through the credential-reference resolver. Accounts
+ * without a saved role ARN are omitted because their reference could not be
+ * resolved.
+ */
+export class AwsAccountCredentialRefDto {
+  @ApiProperty({ description: "Customer AWS account ID this binding grants access to" })
+  accountId!: string;
+
+  @ApiPropertyOptional({
+    description: "Platform-side display name entered by the operator; null when the account is unnamed",
+    type: String,
+  })
+  name?: string | null;
+
+  @ApiProperty({ description: 'Opaque credential reference, formatted as "aws-binding:<binding id>"' })
+  credentialRef!: string;
+}
+
+/**
+ * Response envelope for the account credential reference list.
+ */
+export class AwsAccountCredentialRefListResponseDto {
+  @ApiProperty({ type: AwsAccountCredentialRefDto, isArray: true })
+  accountCredentialRefs!: AwsAccountCredentialRefDto[];
+}
+
+/**
  * Response envelope for consumer-scoped endpoints. A consumer (project id /
  * tenant id / ...) either references one account binding or nothing at all;
  * `credential` carries the referenced binding so a consumer page can render

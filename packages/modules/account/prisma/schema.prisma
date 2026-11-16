@@ -1,25 +1,36 @@
-// ! ------------------------------------------------------------ //
-// !                [Module] Account models                 //
-// ! ------------------------------------------------------------ //
-// * User                                                         //
-// * Email                                                        //
-// * Permission                                                   //
-// * VerificationCode                                             //
-// * Session                                                      //
-// * ApprovedSubnet                                               //
-// * ApiKey                                                       //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!                   [Module] Account models                    //
+// !! ------------------------------------------------------------ //
+// * User                                                          //
+// * Email                                                         //
+// * Permission                                                    //
+// * Role                                                          //
+// * UserRole                                                      //
+// * PermissionGroup                                               //
+// * PermissionGroupPermission                                     //
+// * RolePermissionGroup                                           //
+// * VerificationCode                                              //
+// * Session                                                       //
+// * ApprovedSubnet                                                //
+// * ApiKey                                                        //
+// * AccountExternalIdentity                                       //
+// * UserStatus (enum)                                             //
+// * UserGender (enum)                                             //
+// * UserTheme (enum)                                              //
+// * MfaMethod (enum)                                              //
+// * NavPlacement (enum)                                           //
+// * PermissionAction (enum)                                       //
+// * VerificationCodeStatus (enum)                                 //
+// * VerificationCodeUse (enum)                                    //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 model User {
-  // [1] The 'User' and 'VerificationCode' models are both used for logging in.
-  // [2] The 'User' is designed for long-term use and the 'VerificationCode' is designed for short-term use.
-  // [3] Actually, the 'User' model should be named 'UserPassword' and the 'VerificationCode' should be named 'UserVerificationCode'.
   id                   String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   checkLocationOnLogin Boolean          @default(false)
   status               UserStatus       @default(ACTIVE)
   email                String?          @unique
   phone                String?          @unique
-  password             String? // automatic hashing
+  password             String? // hashed by the Prisma extension on create/update
   name                 String?
   firstName            String?
   middleName           String?
@@ -53,14 +64,14 @@ model User {
   roles                UserRole[]
   externalIdentities   AccountExternalIdentity[]
 
-  // WeChat mini-program fields
-  wechatOpenId     String? @unique // Unique WeChat user identifier
-  wechatUnionId    String? // Unique WeChat Open Platform identifier
-  wechatSessionKey String? // WeChat session key
+  // WeChat mini-program identity
+  wechatOpenId     String? @unique // per-app user id; differs across apps
+  wechatUnionId    String? // Open Platform UnionID shared across apps
+  wechatSessionKey String? // session key for decrypting WeChat payloads
 
-  // Feishu/Lark OAuth fields. larkOpenId is app-scoped and the primary SSO
-  // handle; it must share the same Feishu app as the bot so a webhook open_id
-  // resolves to the same account.
+  // Feishu/Lark OAuth identity. larkOpenId is app-scoped and is the primary
+  // SSO handle; it must come from the same Feishu app as the bot so a webhook
+  // open_id resolves to the same account.
   larkOpenId  String? @unique
   larkUnionId String?
 
@@ -81,7 +92,8 @@ model Email {
 }
 
 model Permission {
-  // Permission of Resource
+  // One action on one resource, granted through a role or directly to a
+  // trusted user.
   id            Int              @id @default(autoincrement())
   action        PermissionAction
   resource      String
@@ -127,11 +139,11 @@ model PermissionGroup {
   description   String?
   routePath     String
   // Where the group surfaces in the application chrome. Every header entry has
-  // the same standing; placement only decides whether it is rendered there.
+  // the same standing, so placement only decides whether it renders there.
   navPlacement  NavPlacement           @default(NONE)
   // Position among header entries (1-based, ascending). Gaps are allowed; the
   // frontend renders the lowest N directly and folds the rest into one overflow
-  // menu. The threshold itself is a presentation constant, not stored here.
+  // menu. The overflow threshold is a presentation constant, not stored here.
   navOrder      Int                    @default(0)
   navLabel      String
   navIcon       String?
@@ -185,9 +197,12 @@ model VerificationCode {
 
 model Session {
   id              Int      @id @default(autoincrement())
-  accessToken     String   @unique
+  // No access token is stored. The access JWT carries this row's id as `sid`
+  // and authentication resolves the row by id (devbie ADR-051), so a row never
+  // holds a usable bearer credential.
   // SHA-256 hex of the current refresh token. The plaintext is never stored
-  // (nightwatch-backend ADR-034); refresh matches by hash and rotates with a CAS update.
+  // (nightwatch-backend ADR-034); refresh matches by hash and rotates with a
+  // CAS update.
   refreshTokenHash        String   @unique
   // Hash of the token rotated out by the most recent refresh. Used to detect
   // idempotent retries of the same rotation within the short reuse window.
@@ -196,7 +211,7 @@ model Session {
   rotatedAt               DateTime?
   // AES-256-GCM sealed form of the freshly minted refresh token, retained only
   // for the idempotency window so a retried refresh returns the same token
-  // pair. Sealed at rest by TokenService — a database read never yields a
+  // pair. Sealed at rest by TokenService, so a database read never yields a
   // usable credential (nightwatch-backend ADR-034, R20-11).
   refreshTokenNextSealed String?
   ipAddress       String
@@ -212,7 +227,7 @@ model Session {
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId          String   @db.Uuid
 
-  // @unique already creates indexes for accessToken and the hash columns.
+  // @unique already indexes the hash columns.
   @@index([userId])
   @@schema("module/account")
 }
@@ -221,8 +236,8 @@ model ApprovedSubnet {
   id          Int      @id @default(autoincrement())
   subnet      String
   // Deterministic keyed hash enabling an indexed, constant-time subnet
-  // lookup. Nullable: rows created before this column are kept as-is and
-  // matched through the legacy bcrypt `subnet` fallback.
+  // lookup. Nullable: rows without it are matched through the bcrypt `subnet`
+  // value.
   subnetHmac  String?
   city        String?
   region      String?
@@ -233,7 +248,8 @@ model ApprovedSubnet {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String   @db.Uuid
 
-  // One row per (user, subnet): the deterministic HMAC doubles as a dedupe key.
+  // Dedupe key: unique on (user, subnetHmac). NULL hmac values are not deduped
+  // because Postgres treats NULLs as distinct.
   @@unique([userId, subnetHmac])
   @@index([userId])
   @@schema("module/account")
@@ -255,10 +271,10 @@ model ApiKey {
   @@schema("module/account")
 }
 
-/// External platform identity used for evidence attribution (ADR-029 in
-/// nightwatch-backend). The platform account id is the primary attribution
-/// key — never the display name or email. `platform` is an uppercase tag
-/// such as "GITHUB" or "BITBUCKET".
+/// One external platform identity per linked account, used for evidence
+/// attribution (nightwatch-backend ADR-029). The platform account id is the
+/// primary attribution key — never the display name or email. `platform` is an
+/// uppercase tag such as "GITHUB" or "BITBUCKET".
 model AccountExternalIdentity {
   id                String   @id @default(uuid()) @db.Uuid
   userId            String   @db.Uuid
@@ -334,15 +350,15 @@ enum VerificationCodeStatus {
 
 enum VerificationCodeUse {
   UNKNOWN
-  // For generating JWT.
+  // Login: the code is exchanged for a JWT.
   LOGIN_BY_EMAIL
   LOGIN_BY_PHONE
-  // For closing and recovering account.
+  // Close or recover the account.
   CLOSE_ACCOUNT_BY_EMAIL
   CLOSE_ACCOUNT_BY_PHONE
   RECOVER_ACCOUNT_BY_EMAIL
   RECOVER_ACCOUNT_BY_PHONE
-  // For other operations
+  // Binding and password operations.
   BIND_EMAIL
   BIND_PHONE
   CHANGE_PASSWORD

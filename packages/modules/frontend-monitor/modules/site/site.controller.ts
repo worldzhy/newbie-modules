@@ -1,4 +1,16 @@
-import { BadRequestException, Controller, Get, Inject, Post, Body, Query, Req } from "@nestjs/common";
+import {
+  BadRequestException,
+  Controller,
+  Delete,
+  Get,
+  Inject,
+  Patch,
+  Post,
+  Body,
+  Param,
+  Query,
+  Req,
+} from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction } from "@generated/prisma/client";
 import { SiteService } from "./site.service";
@@ -19,7 +31,7 @@ export class SiteController {
     private readonly projectVisibility: VisibleAppKeysResolver,
   ) {}
 
-  @Post("/update")
+  @Patch("sites")
   @RequirePermission(PermissionAction.Update, "FrontendMonitorSite")
   @ApiOperation({ summary: "Update a monitoring system (with membership gate)" })
   @ApiResponse({ type: Object })
@@ -32,8 +44,8 @@ export class SiteController {
     return res;
   }
 
-  @Get("/getSysForUserId")
-  @RequirePermission(PermissionAction.List, "FrontendMonitorSite", { scope: "self" })
+  @Get("sites")
+  @RequirePermission(PermissionAction.List, "FrontendMonitorSite")
   @ApiOperation({ summary: "Get systems for a user" })
   @ApiResponse({ type: FrontendMonitorSiteResponseDto, isArray: true })
   async getSites(@Query() query: Record<string, unknown>, @Req() req: UserRequest) {
@@ -46,19 +58,19 @@ export class SiteController {
     return func.result({ data: result });
   }
 
-  @Get("/getSystemForId")
+  @Get("sites/:appKey")
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
   @ApiOperation({ summary: "Get system by appKey (with membership gate)" })
   @ApiResponse({ type: FrontendMonitorSiteResponseDto })
-  async getSiteForId(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
+  async getSiteForId(@Param("appKey") appKey: string, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
-    const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const result = await this.site.getSiteForDb(appKey);
+    const scopedAppKey = this.access.assertVisibleAppKey(appKeys, appKey);
+    const result = await this.site.getSiteForDb(scopedAppKey);
     return func.result({ data: result });
   }
 
-  @Get("/list")
-  @RequirePermission(PermissionAction.List, "FrontendMonitorSite", { scope: "self" })
+  @Get("web-sites")
+  @RequirePermission(PermissionAction.List, "FrontendMonitorSite")
   @ApiOperation({ summary: "Get web system list" })
   @ApiResponse({ type: FrontendMonitorSiteResponseDto, isArray: true })
   async getWebSiteList(@Req() req: UserRequest) {
@@ -67,20 +79,18 @@ export class SiteController {
     return func.result({ data: result });
   }
 
-  @Post("/deleteUser")
+  @Delete("users/:userToken")
   @RequirePermission(PermissionAction.Delete, "FrontendMonitorSite")
   @ApiOperation({ summary: "Delete a user from a system" })
   @ApiResponse({ type: Object })
-  async deleteWebSiteUser(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const userToken = body.userToken;
-    if (!userToken) throw new BadRequestException("Delete a user from the system: userToken is required");
+  async deleteWebSiteUser(@Param("userToken") userToken: string, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const result = await this.site.deleteWebSiteUser(appKey, String(userToken));
+    const result = await this.site.deleteWebSiteUser(appKey, userToken);
     return func.result({ data: result });
   }
 
-  @Post("/addUser")
+  @Post("users")
   @RequirePermission(PermissionAction.Create, "FrontendMonitorSite")
   @ApiOperation({ summary: "Add a user to a system" })
   @ApiResponse({ type: Object })
@@ -93,15 +103,15 @@ export class SiteController {
     return func.result({ data: result });
   }
 
-  @Post("/deleteSystem")
+  @Delete("sites")
   @RequirePermission(PermissionAction.Delete, "FrontendMonitorSite")
   @ApiOperation({ summary: "Delete a system (with membership gate)" })
   @ApiResponse({ type: Object })
-  async deleteSite(@Body() body: Record<string, unknown>, @Req() req: UserRequest) {
-    const type = body.type;
+  async deleteSite(@Query("type") type: string, @Req() req: UserRequest) {
+    if (!type) throw new BadRequestException("type is required");
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const result = await this.site.deleteSite(appKey, String(type));
+    const result = await this.site.deleteSite(appKey, type);
     return func.result({ data: result });
   }
 }

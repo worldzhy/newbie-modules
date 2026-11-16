@@ -96,13 +96,31 @@ export class IngestSecurityEvaluationAwsAccountMaterialDto {
 }
 
 /**
- * One subject submission (ADR-068 D8, ADR-070 D3). The subject is platform-level
- * and identified by `(kind, subjectKey)` this feature owns; provenance lives in
- * the host, so no source is declared here. Re-submitting the same subject is
- * idempotent.
+ * Web-origin material of a `web-origin` subject (ADR-066, ADR-072 D2). The
+ * verification record itself is created by the module; a submission only decides
+ * the path role → relative path map. Omitted `targetPaths` means `{}`.
+ */
+export class IngestSecurityEvaluationWebOriginMaterialDto {
+  @ApiPropertyOptional({
+    type: "object",
+    additionalProperties: { type: "string" },
+    description: "Path role → relative path (absolute on the origin).",
+  })
+  @IsOptional()
+  @IsObject()
+  targetPaths?: Record<string, string>;
+}
+
+/**
+ * One subject submission (ADR-068 D8, ADR-070 D3, ADR-072 D2). The subject is
+ * platform-level and identified by `(kind, subjectKey)` this feature owns;
+ * provenance lives in the host, so no source is declared here.
  *
- * `repository` and `aws-account` submissions carry their material and the module
- * derives the subject key from it; other kinds supply the key directly.
+ * `POST /subjects` creates (409 on an existing subject); `POST /subjects/sync`
+ * keeps the idempotent host-alignment semantics.
+ *
+ * Each kind carries its own material and the module derives the subject key from
+ * it; `web-origin` supplies the key directly.
  */
 export class IngestSecurityEvaluationSubjectRequestDto {
   @ApiProperty({ description: 'Subject kind, e.g. "repository" or "aws-account"' })
@@ -150,10 +168,61 @@ export class IngestSecurityEvaluationSubjectRequestDto {
   @ValidateNested()
   @Type(() => IngestSecurityEvaluationAwsAccountMaterialDto)
   awsAccount?: IngestSecurityEvaluationAwsAccountMaterialDto;
+
+  @ApiPropertyOptional({ type: IngestSecurityEvaluationWebOriginMaterialDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => IngestSecurityEvaluationWebOriginMaterialDto)
+  webOrigin?: IngestSecurityEvaluationWebOriginMaterialDto;
 }
 
 export class IngestSecurityEvaluationSubjectResponseDto {
   @ApiProperty() subjectId!: string;
+}
+
+/** `PATCH /subjects/:subjectId` — only the mutable identity field (ADR-072 D3). */
+export class UpdateSecurityEvaluationSubjectRequestDto {
+  @ApiPropertyOptional({ description: "Human-readable name of the subject" })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(255)
+  displayName?: string;
+}
+
+/**
+ * `PUT` / `PATCH /subjects/:subjectId/material` (ADR-072 D3). Only the mutable
+ * material fields are accepted: a coordinate or account id is the subject
+ * identity, so changing it would be another subject. The kind is decided by the
+ * subject, not by the body — a field belonging to another kind is a 400.
+ */
+export class UpdateSecurityEvaluationSubjectMaterialRequestDto {
+  @ApiPropertyOptional({
+    type: "object",
+    additionalProperties: { type: "string" },
+    description: "web-origin: path role → relative path; PATCH merges by role, PUT replaces the map",
+  })
+  @IsOptional()
+  @IsObject()
+  targetPaths?: Record<string, string>;
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: "repository: browsable repository URL" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  url?: string | null;
+
+  @ApiPropertyOptional({ type: String, nullable: true, description: "aws-account: region collection default" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  defaultRegion?: string | null;
+
+  @ApiPropertyOptional({ type: String, isArray: true, description: "aws-account: regions collected for this account" })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  regions?: string[];
 }
 
 // --- Subject directory ---------------------------------------------------

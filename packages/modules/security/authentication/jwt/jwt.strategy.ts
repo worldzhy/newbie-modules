@@ -5,14 +5,16 @@ import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { Request } from "express";
 import { NewbieException, NewbieExceptionType } from "@devbie/newbie/exceptions/newbie.exception";
-import { TokenService } from "../../token/token.service";
+import { TokenSubject } from "../../token/token.constants";
 import { ACCESS_TOKEN_SESSION_RESOLVER, AccessTokenSessionResolver } from "../../ports/access-token-session.resolver";
+
+/** Bearer extractor shared by the passport option and validate(). */
+const extractBearerToken = ExtractJwt.fromAuthHeaderAsBearerToken();
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
   constructor(
     private readonly config: ConfigService,
-    private readonly tokenService: TokenService,
     @Optional()
     @Inject(ACCESS_TOKEN_SESSION_RESOLVER)
     private readonly sessionResolver?: AccessTokenSessionResolver,
@@ -23,33 +25,38 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
     }>("modules.security.token");
 
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: extractBearerToken,
       ignoreExpiration: false,
       passReqToCallback: true, // Pass request via the first parameter of validate
       secretOrKey: tokenConfig.userAccess.secret || tokenConfig.defaultSecret,
+      // Access tokens are the only subject accepted here. When userAccess and
+      // userRefresh both fall back to defaultSecret, the subject is the only
+      // discriminator between the two token kinds, so passport must enforce it.
+      jsonWebTokenOptions: { subject: TokenSubject.USER_ACCESS_TOKEN },
     });
   }
 
   /**
-   * 'validate' function will be called after the token in the http request passes the verification.
+   * Called by passport only after the signature, the expiry and the access-token
+   * subject have all been verified, so this resolves the live session rather
+   * than re-verifying the token.
    *
-   * For the jwt-strategy, Passport first verifies the JWT's signature and decodes the JSON.
-   * Then it invokes our validate() passing the decoded JSON as a single parameter.
+   * The token names its session through the `sid` claim, not through the token
+   * string (devbie ADR-051): the same session keeps authenticating across
+   * refreshes, and revoking the row revokes every token that names it.
    *
    * The live session/role lookup is delegated to the identity provider via
    * the AccessTokenSessionResolver port: security must not know session tables.
    */
-  async validate(req: Request) {
-    const accessToken = this.tokenService.getTokenFromHttpRequest(req);
+  async validate(req: Request, payload: { userId?: string; sid?: number }) {
+    // A request without a bearer token never reaches validate(): passport fails
+    // it first and JwtAuthGuard reports that as Session_Missing (1105). An
+    // empty extraction here therefore means the strategy and its extractor
+    // disagree — a wiring bug, not a client error.
+    const accessToken = extractBearerToken(req);
     if (!accessToken) {
-      // No credential at all (ADR-048 §3, 1105): distinct from an account that
-      // was deleted (1101) and from a revoked session (1104), so clients and
-      // metrics can tell "the caller sent nothing" apart from "the caller's
-      // session died".
-      throw new NewbieException(NewbieExceptionType.Session_Missing);
+      throw new InternalServerErrorException("JWT strategy ran without a bearer token");
     }
-
-    const accessTokenInfo = this.tokenService.verifyUserAccessToken(accessToken);
 
     if (!this.sessionResolver) {
       throw new InternalServerErrorException(
@@ -57,10 +64,19 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
       );
     }
 
-    const session = await this.sessionResolver.resolve(accessToken);
+    // Fail closed on a token that cannot name a session: tokens signed before
+    // ADR-051 carry no `sid`, and passing an undefined id to the resolver would
+    // drop the id filter on the query — an arbitrary session would match.
+    const { sid } = payload;
+    if (typeof sid !== "number" || !Number.isInteger(sid)) {
+      throw new NewbieException(NewbieExceptionType.Session_Revoked);
+    }
+
+    const session = await this.sessionResolver.resolve(sid);
 
     // Unified request.user shape across every authenticated strategy:
-    // { userId, sessionId, roles }.
-    return { userId: accessTokenInfo.userId, sessionId: session.sessionId, roles: session.roles };
+    // { userId, sessionId, roles }. userId comes from the resolved session row
+    // so the token payload cannot disagree with the stored identity.
+    return { userId: session.userId, sessionId: session.sessionId, roles: session.roles };
   }
 }

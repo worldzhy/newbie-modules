@@ -1,15 +1,14 @@
 // !! ------------------------------------------------------------ //
-// !!            [Module] AWS CloudWatch models                   //
+// !!                [Module] AWS CloudWatch models                //
 // !! ------------------------------------------------------------ //
 // * Ec2Instance                                                   //
 // * RdsInstance                                                   //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// CloudWatch data collection resolves the cross-account binding provided by
-// aws-identity (AwsCrossAccountBinding) for the account it addresses at
-// runtime; the region scope lives on the binding as well. Instances are scoped
-// directly by accountId (plain column, no foreign key — the AWS account is the
-// resource's real host and the binding row is identity, not ownership).
+// Both instance models are scoped by `accountId`, a plain column with no
+// foreign key: the AWS account owns the resource. Credentials and the region
+// list come from the aws-identity binding (AwsCrossAccountBinding) resolved at
+// collection time.
 model Ec2Instance {
   id          String   @id @default(uuid()) @db.Uuid
   instanceId  String
@@ -28,8 +27,8 @@ model Ec2Instance {
 
 model RdsInstance {
   id          String   @id @default(uuid()) @db.Uuid
-  instanceId  String   @unique // DbiResourceId
-  name        String // DBInstanceIdentifier
+  instanceId  String   @unique // AWS DbiResourceId
+  name        String // AWS DBInstanceIdentifier
   status      String
   region      String
   isWatching  Boolean  @default(false)

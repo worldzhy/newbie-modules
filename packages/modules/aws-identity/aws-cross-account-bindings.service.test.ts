@@ -72,10 +72,11 @@ function createFakePrisma(bindings: BindingRow[] = [], usages: UsageRow[] = []) 
   return {
     state: { bindings, usages },
     awsCrossAccountBinding: {
-      async findMany() {
+      async findMany(args: { where?: { roleArn?: { not: null } } } = {}) {
         // The service asks for the usages alongside each binding (include),
         // so the fake decorates every row with its consumer IDs.
-        return bindings.map((binding) => ({
+        const rows = args.where?.roleArn ? bindings.filter((row) => row.roleArn !== null) : bindings;
+        return rows.map((binding) => ({
           ...binding,
           usages: usages.filter((row) => row.bindingId === binding.id).map((row) => ({ consumerId: row.consumerId })),
         }));
@@ -297,4 +298,20 @@ test("renameAccount rejects an account that was never bootstrapped", async () =>
   const service = createService(createFakePrisma([]));
 
   await assert.rejects(() => service.renameAccount("444455556666", { name: "Nope" }));
+});
+
+test("listAccountCredentialRefs returns only role-configured accounts with their credential reference", async () => {
+  const configured = seedBinding({ id: "binding-configured", accountId: "111122223333", name: "Production" });
+  const unconfigured = seedBinding({ id: "binding-unconfigured", accountId: "444455556666", roleArn: null });
+  const service = createService(createFakePrisma([configured, unconfigured]));
+
+  const refs = await service.listAccountCredentialRefs();
+
+  assert.deepEqual(refs.accountCredentialRefs, [
+    {
+      accountId: "111122223333",
+      name: "Production",
+      credentialRef: "aws-binding:binding-configured",
+    },
+  ]);
 });

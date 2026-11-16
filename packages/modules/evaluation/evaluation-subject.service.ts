@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
@@ -60,6 +60,45 @@ export class EvaluationSubjectService {
     });
   }
 
+  /**
+   * Strict creation: an existing `(subjectType, kind, subjectKey)` is a conflict
+   * carrying the existing id, never a silent upsert (ADR-072 D1).
+   *
+   * `client` lets a feature create the subject and its per-kind record in one
+   * transaction, exactly like `getOrCreateSubject`.
+   */
+  async createSubject(descriptor: EvaluationSubjectDescriptor, client?: Prisma.TransactionClient) {
+    const prisma = client ?? this.prisma;
+    const key = {
+      subjectType: descriptor.subjectType,
+      kind: descriptor.kind,
+      subjectKey: descriptor.subjectKey,
+    };
+    const where = { subjectType_kind_subjectKey: key };
+    const existing = await prisma.evaluationSubject.findUnique({ where, select: { id: true } });
+    if (existing) throw subjectConflict(key, existing.id);
+
+    try {
+      return await prisma.evaluationSubject.create({
+        data: {
+          ...key,
+          displayName: descriptor.displayName,
+          metadata: descriptor.metadata as Prisma.InputJsonValue | undefined,
+          credentialRef: descriptor.credentialRef ?? null,
+        },
+      });
+    } catch (error) {
+      // A concurrent creation lost the unique-key race: the outcome is the same
+      // conflict, and the id still comes from the row that won. Read outside the
+      // failed transaction, which is already aborted on a real database.
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+        const winner = await this.prisma.evaluationSubject.findUnique({ where, select: { id: true } });
+        if (winner) throw subjectConflict(key, winner.id);
+      }
+      throw error;
+    }
+  }
+
   async getSubject(id: string) {
     const subject = await this.prisma.evaluationSubject.findUnique({ where: { id } });
     if (!subject) throw new NotFoundException(`Evaluation subject ${id} not found`);
@@ -80,6 +119,17 @@ export class EvaluationSubjectService {
       },
     });
   }
+}
+
+/** Conflict body of a strict creation: the caller can read or update the existing subject (ADR-072 D1). */
+function subjectConflict(
+  key: { subjectType: string; kind: string; subjectKey: string },
+  subjectId: string,
+): ConflictException {
+  return new ConflictException({
+    message: `Subject (${key.subjectType}, ${key.kind}, ${key.subjectKey}) already exists.`,
+    subjectId,
+  });
 }
 
 /** Detach a stored subject from Prisma for the ports. */

@@ -1,21 +1,21 @@
 // !! ------------------------------------------------------------ //
-// !!            [Module] AWS S3 models                      //
+// !!                    [Module] AWS S3 models                    //
 // !! ------------------------------------------------------------ //
 // * S3File                                                        //
 // * S3Bucket                                                      //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 model S3File {
   id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name           String
-  type           String? // could be 'folder'
-  size           Int? // in bytes
+  type           String? // "folder" for directories, otherwise the file extension.
+  size           Int? // bytes
   s3Bucket       String
-  s3Key          String // File name in S3 bucket.
+  s3Key          String // Object key within the bucket.
   s3Response     Json?
   parentId       String?  @db.Uuid
-  uploadId       String? // The upload ID for multi-part uploads.
-  uploadProgress Int?     @default(100) // Set to 0 when multi-part uploading starts, and 100 when completed.
+  uploadId       String? // Multipart upload ID.
+  uploadProgress Int?     @default(100) // 0 during a multipart upload, 100 when complete.
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

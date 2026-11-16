@@ -1,5 +1,5 @@
-import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { BadRequestException, Controller, Get, Inject, Param, Query, Req } from "@nestjs/common";
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func, pickRequestId } from "../../shared/utils";
 import { PageService } from "./services/page.service";
 import {
@@ -25,7 +25,7 @@ export class PageController {
   ) {}
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getAveragePageList")
+  @Get("averages")
   @ApiOperation({ summary: "Get average page performance list" })
   @ApiResponse({ type: ListFrontendMonitorPageAveragesResponseDto })
   async getAveragePageList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -37,7 +37,7 @@ export class PageController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getRealTimeAveragePageList")
+  @Get("realtime-averages")
   @ApiOperation({ summary: "Get real-time average page performance list" })
   @ApiResponse({ type: FrontendMonitorRealTimePageItemResponseDto, isArray: true })
   async getRealTimeAveragePageList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -54,7 +54,7 @@ export class PageController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getOnePageList")
+  @Get("visits")
   @ApiOperation({ summary: "Get single page performance or visit list" })
   @ApiResponse({ type: ListFrontendMonitorPageVisitsResponseDto })
   async getOnePageList(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -68,15 +68,18 @@ export class PageController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getPageDetails")
+  @Get(":pageId")
   @ApiOperation({ summary: "Get single page details" })
+  @ApiQuery({
+    name: "appKey",
+    required: false,
+    description: "Scope selector; must be within the caller's visible app keys",
+  })
   @ApiResponse({ type: FrontendMonitorPageDetailResponseDto })
-  async getPageDetails(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { id } = q;
-    if (!id) throw new BadRequestException("id is required");
+  async getPageDetails(@Param("pageId") pageId: string, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const row = await this.pageSrv.getPageDetails(appKey, String(id));
+    const row = await this.pageSrv.getPageDetails(appKey, pageId);
     return func.result({ data: row || {} });
   }
 }

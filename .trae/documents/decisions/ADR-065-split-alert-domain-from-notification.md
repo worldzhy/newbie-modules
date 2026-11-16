@@ -75,6 +75,7 @@ model AlertSource {
   key                      String    @id @db.VarChar(100) // 注册表中已声明的来源 key
   repeatMinutes            Int?                           // 覆盖注册表默认节奏；null = 继承
   notificationPausedUntil  DateTime?                      // 暂停外发到这个时刻，到期自动失效
+  enabled                  Boolean   @default(true)       // 来源级投递开关，false = 无限期停外发
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
 }
@@ -88,8 +89,8 @@ model AlertSource {
 - `source` 是一等身份，不是自由文本备注：它决定提醒间隔的默认值、暂停开关的作用范围，也是通知侧 `(source, state) → notificationKey` 映射的左键。
 - **来源清单是代码注册制**。`alert-center` 导出来源注册表（`key` / `displayName` / `defaultRepeatMinutes` / `definitions`），宿主在装配时注入本宿主的来源；`raise` 遇到未注册的 `source` 直接抛错，拼写错误与漏映射在启动期或首次调用处即暴露，数据库不会长出幽灵来源。
 - **`definitions` 是描述性清单，不是身份**。它列出该来源会发出的生命周期族（`key` / `displayName` / `repeatMinutes?`），供设置页展示；不落库、不参与 `raise` 校验，`alertKey` 仍是告警唯一身份。definition 的 `repeatMinutes` 只钉住「来源级覆盖」——`raise` 显式传入的 `repeatIntervalMinutes` 仍优先，因此设置页必须把这类节奏展示为固定，而不是可编辑的继承值。同一个 `alertKey` 空间的多个触发原因属于同一族，不得拆成多个 definition。
-- `AlertSource` 表退化为**可变状态载体**：只在用户改默认节奏或暂停时建行，`repeatMinutes` 为 null 时继承注册表值；`displayName` 与默认节奏的唯一真源是代码注册表。
-- `AlertSource` **不设 `enabled`**。暂停只停外发不停记录；若拒收 `raise`，后续 `resolve` 将找不到行，状态机会出现无法闭合的窗口。
+- `AlertSource` 表退化为**可变状态载体**：只在用户改默认节奏、暂停或开关投递时建行，`repeatMinutes` 为 null 时继承注册表值；`displayName` 与默认节奏的唯一真源是代码注册表。开关恢复默认（`enabled=true`）且无其他覆盖时行会被删除，不留下空壳。
+- `AlertSource` **不因 `enabled=false` 拒收 `raise`**。`enabled` 只关外发，与暂停同一条门禁：`raise` 照常建行、`resolve` 照常闭合，投递入口直接短路。这样既有来源级总开关，又不会让 `resolve` 找不到行而产生无法闭合的窗口。
 - **跨来源不合并**。`fingerprint` 含 `source`，每个来源的每条 `alertKey` 独立成一条告警；「同一应用多个来源同时异常」的聚合属于通知侧分组，不进告警实体。
 - 无跨域外键；通知侧要溯源时只存 `(sourceType="alert", sourceRef=<Alert.id>)` 字符串。
 
@@ -153,6 +154,8 @@ nextNotificationAt = max(source.notificationPausedUntil ?? now, now) + repeatInt
 1. **停外发不停记录**。暂停期间 `raise` 照常建行、推进 `lastSeenAt` 与 `occurrences`，`resolve` 照常落 `resolvedAt`；只是不调用通知端口。
 2. **到期最多一条迟到提醒**。恢复外发后只命中当前一次的提醒，不补发暂停期内错过的每一条。
 3. **期间发生的恢复不外发**。暂停期内 `resolve` 不发 resolved 消息，但状态照常变为 `resolved`，宿主查询可见。
+
+来源级开关（`AlertSource.enabled`）是**无限期暂停**：`enabled=false` 时 `raise` / `resolve` / `dispatchDueReminders` 都不调用通知端口，记录与状态机完全不变；重新打开后从下一次事件或下一次到点提醒恢复，不补发关闭期间的消息。它与 `notificationPausedUntil` 共用投递门禁，区别只是没有到期时间。设置页把「启用投递」做成一枚开关，保存时与节奏、暂停一起提交。
 
 `notificationPausedUntil` 只放在 `AlertSource` 上。单条告警的「延后提醒」直接写 `nextNotificationAt`，不重复设同义字段。
 

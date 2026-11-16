@@ -21,7 +21,6 @@ function buildServices() {
     1: {
       id: 1,
       userId: "user-1",
-      accessToken: "old-access",
       refreshTokenHash: hash("old-refresh"),
       previousRefreshTokenHash: null,
       rotatedAt: null,
@@ -84,6 +83,9 @@ test("refresh rotates tokens via CAS and returns the new raw refresh token", asy
   assert.equal(db[1].refreshTokenNextSealed, "sealed:new-refresh");
   assert.notEqual(db[1].refreshTokenNextSealed, "new-refresh", "the raw token must not be stored");
   assert.ok(db[1].rotatedAt);
+  // Refreshing must not touch a stored access token: the credential names the
+  // session by id and is never persisted (devbie ADR-051).
+  assert.equal(db[1].accessToken, undefined);
 });
 
 test("a retried refresh within the idempotency window returns the same minted token", async () => {

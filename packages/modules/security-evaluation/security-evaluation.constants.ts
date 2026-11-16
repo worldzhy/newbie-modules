@@ -20,7 +20,7 @@ export type SecurityEvaluationSubjectKind = (typeof SECURITY_EVALUATION_SUBJECT_
  * "role → relative path" map, so a ruleset change never forks per asset and an
  * unconfigured role simply skips the criterion.
  */
-export const SECURITY_EVALUATION_WEB_ORIGIN_PATH_ROLES = ["auth.login", "auth.otp-request", "api.session"] as const;
+export const SECURITY_EVALUATION_WEB_ORIGIN_PATH_ROLES = ["auth.login", "api.session"] as const;
 
 export type SecurityEvaluationWebOriginPathRole = (typeof SECURITY_EVALUATION_WEB_ORIGIN_PATH_ROLES)[number];
 
@@ -52,6 +52,7 @@ export const SECURITY_EVALUATION_KEY_AWS_CIS_1_5 = "aws-cis-1.5";
 export const SECURITY_EVALUATION_KEY_AWS_CUSTOM = "aws-custom";
 export const SECURITY_EVALUATION_KEY_THREAT_INTEL = "threat-intel";
 export const SECURITY_EVALUATION_KEY_CODE_SCAN = "code-scan";
+export const SECURITY_EVALUATION_KEY_WEB_POSTURE = "web-posture";
 
 /**
  * The criteria versions this build ships. Criteria are code-defined and
@@ -136,6 +137,32 @@ export const SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS = 90;
  */
 export const SECURITY_EVALUATION_CODE_SCAN_LLM_CALL_BUDGET = 180;
 
+/** The first web-posture criteria version this build ships (ADR-066 §4). */
+export const SECURITY_EVALUATION_WEB_POSTURE_RULE_SET_VERSION = "v1";
+
+/**
+ * WEB_POSTURE criteria (ADR-066 §4): one ASSERTION per externally observable
+ * fact, so a rule change is a version bump and finding fingerprints stay
+ * anchored to a stable rule key.
+ */
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_XCTO_HTML = "web-posture.x-content-type-options-html";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_XCTO_API = "web-posture.x-content-type-options-api";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_HSTS = "web-posture.hsts";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_X_POWERED_BY_HTML = "web-posture.x-powered-by-html";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_X_POWERED_BY_API = "web-posture.x-powered-by-api";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_X_FRAME_OPTIONS = "web-posture.x-frame-options";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_CSP = "web-posture.content-security-policy";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_PERMISSIONS_POLICY = "web-posture.permissions-policy";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_REFERRER_POLICY = "web-posture.referrer-policy";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_TLS_LEGACY_PROTOCOL = "web-posture.tls-legacy-protocol";
+export const SECURITY_EVALUATION_WEB_POSTURE_CRITERION_TLS_WEAK_CIPHER = "web-posture.tls-weak-cipher";
+
+/**
+ * HTTP observation budget of one web-posture run: the HTML entry point plus,
+ * at most, the API session path. TLS is a handshake, not an HTTP request.
+ */
+export const SECURITY_EVALUATION_WEB_POSTURE_MAX_HTTP_REQUESTS = 2;
+
 /** Asset knowledge vocabulary. */
 export const SECURITY_EVALUATION_KNOWLEDGE_TYPE_PACKAGE = "npm.package";
 
@@ -212,6 +239,11 @@ export const SECURITY_EVALUATION_SCHEDULES = [
   {
     standardKey: SECURITY_EVALUATION_KEY_CODE_SCAN,
     subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+    recommendedInterval: "daily",
+  },
+  {
+    standardKey: SECURITY_EVALUATION_KEY_WEB_POSTURE,
+    subjectKind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
     recommendedInterval: "daily",
   },
 ] as const;

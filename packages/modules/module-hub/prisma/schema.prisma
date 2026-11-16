@@ -1,56 +1,55 @@
-// ! ------------------------------------------------------------ //
-// !             [Module] Module Hub models                       //
-// ! ------------------------------------------------------------ //
-// * ModuleHubInstallation                                                //
-// * ModuleHubRelease                                               //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+// !! ------------------------------------------------------------ //
+// !!                  [Module] Module Hub models                  //
+// !! ------------------------------------------------------------ //
+// * ModuleHubInstallation                                         //
+// * ModuleHubRelease                                              //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// Module-hub observer-plane models. PostgreSQL schema: "module/module-hub".
-// The hub is project-agnostic: an Installation is identified solely by its
-// report token. Host-side project/application grouping lives in opaque
-// `externalRef`.
+// One installation row tracks one running deployment endpoint of a consuming
+// project: a newbie backend or a fewbie SSR process. The hub is
+// project-agnostic: a row is identified solely by its report token, and any
+// host-side project/application grouping stays in opaque `externalRef`.
 //
-// One Installation = one running deployment endpoint of a consuming project
-// (a newbie backend or fewbie SSR process). Lifecycle is derived, not stored:
-// never-seen (lastSeenAt null) / online / stale, see section 4.2 of the
-// design doc. Only revocation is an explicit persisted state.
+// Lifecycle is derived from timestamps rather than stored: never-seen
+// (`lastSeenAt` null), online, or stale. Revocation is the only explicit
+// persisted state.
 model ModuleHubInstallation {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  // Human-readable label assigned at enrollment, e.g. "nightwatch-prod".
+  // Human-readable label assigned at enrollment, e.g. "prod-eu-west".
   label String @db.VarChar(255)
-  // SHA-256 hex of the report token. The plaintext token is returned once at
-  // creation/rotation and never stored.
+  // SHA-256 hex of the report token; the plaintext is returned once at
+  // creation or rotation and never stored.
   tokenHash String @unique @db.VarChar(64)
 
   // Optional source-repository URL, supplied by the host at enrollment.
   repoUrl String? @db.VarChar(255)
-  // Opaque platform-owned tag (e.g. "projectId/applicationId"); hub never parses it.
+  // Opaque host-owned tag (e.g. "projectId/applicationId"); never parsed here.
   externalRef String? @db.VarChar(255)
 
-  // Runtime facts self-registered at process start and refreshed on reports.
-  // Framework family of the running process: "newbie" | "fewbie" | "other-node".
+  // Runtime facts self-reported at process start and refreshed on each report.
+  // One of "newbie", "fewbie", "other-node".
   framework String? @db.VarChar(32)
-  // Framework version, e.g. "newbie@0.2".
+  // Formatted "<framework>@<version>", e.g. "newbie@0.2".
   frameworkVersion String? @db.VarChar(64)
-  // Deployed application version (self-reported), e.g. git sha or semver.
+  // Self-reported deployed version, typically a git sha or a semver.
   appVersion String? @db.VarChar(64)
-  // Self-reported deployment environment, e.g. "prod". Informational only.
+  // Self-reported environment, e.g. "prod"; informational, never drives logic.
   env String? @db.VarChar(64)
-  // Self-reported instance identifier (EC2 instance id, hostname, ...).
+  // Self-reported instance identity: EC2 instance id, hostname, pod name.
   instanceId String? @db.VarChar(128)
 
-  // Registry sourceCommit the installation last reported. Derived from the
-  // first module entry's sourceCommit in the reported modules snapshot.
+  // Derived from the first module entry's sourceCommit in the last reported
+  // snapshot.
   registrySourceCommit String? @db.VarChar(64)
   // Module snapshot in the shape of `newbie status --json` modules[] entries:
   // [{key, version, sourceCommit, localPatches, installed, hasSchema,
   //   missingEnv, updateAvailable, drift?}]
   modulesSnapshot Json?
 
-  // Desired module set marked by host users, in newbie-modules.json spec shape.
-  // Pure data for read-time "target vs actual" display — NOT an execution
-  // channel: the hub never dispatches it.
+  // Desired module set recorded by host users, in newbie-modules.json shape.
+  // Read-time "target vs actual" display only: the hub never dispatches it as
+  // an execution channel.
   targetSpec Json?
 
   firstSeenAt DateTime?
@@ -65,8 +64,8 @@ model ModuleHubInstallation {
   @@schema("module/module-hub")
 }
 
-// Immutable registry catalog rows, inserted by the GitHub push webhook
-// (and a periodic fallback sync). One row per (module, registry commit).
+// One row per (module, registry commit): an immutable registry catalog entry
+// inserted by the GitHub push webhook, with a periodic fallback sync.
 model ModuleHubRelease {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
@@ -75,9 +74,8 @@ model ModuleHubRelease {
   sourceCommit String @db.VarChar(64)
   // The newbie.module.json manifest at that commit.
   manifest Json @db.JsonB
-  // Commit date of `sourceCommit` (GitHub), used for the read-time "is the
-  // installed pin older than the latest release" check. Null on rows ingested
-  // before the column existed.
+  // Commit date of `sourceCommit` in GitHub, used at read time to tell whether
+  // an installed pin predates the latest release. Null on legacy rows.
   committedAt DateTime?
 
   publishedAt DateTime @default(now())

@@ -35,7 +35,7 @@ interface FrontendMonitorInstallationDraft {
 
 /**
  * Registry of frontend-monitor browser-SDK installations. One token = one FRONTEND
- * application reporting to /frontend-monitor/report with the token in the body.
+ * application reporting to /frontend-monitor/reports with the token in the body.
  *
  * Token generation, hashing, lifecycle and verification come from security
  * (ADR-019); this class only adapts the table, mints the immutable appKey and

@@ -1,5 +1,6 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query, Req } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query, Req, Res } from "@nestjs/common";
+import { ApiBearerAuth, ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from "@nestjs/swagger";
+import type { Response } from "express";
 import { EvaluationFindingStatus, PermissionAction, Prisma } from "@generated/prisma/client";
 import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
 import { EvaluationFindingService } from "@modules/evaluation/evaluation-finding.service";
@@ -11,6 +12,13 @@ import { SecurityEvaluationAssetService } from "./assets/security-evaluation-ass
 import { SecurityEvaluationCodeScanExcerptService } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
+import { WebOriginVerificationCheckResponseDto, WebOriginVerificationDto } from "./security-evaluation-web-origin.dto";
+import {
+  SecurityEvaluationAwsAccountMaterialDto,
+  SecurityEvaluationRepositoryMaterialDto,
+  SecurityEvaluationWebOriginMaterialDto,
+  type SecurityEvaluationSubjectMaterial,
+} from "./security-evaluation-material.dto";
 import { SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS } from "./security-evaluation.constants";
 import {
   GetSecurityEvaluationFindingRequestDto,
@@ -32,8 +40,20 @@ import {
   SecurityEvaluationFindingResponseDto,
   SecurityEvaluationReportResponseDto,
   SecurityEvaluationRunAcceptedResponseDto,
+  SecurityEvaluationSubjectResponseDto,
   StartSecurityEvaluationRunRequestDto,
+  UpdateSecurityEvaluationSubjectMaterialRequestDto,
+  UpdateSecurityEvaluationSubjectRequestDto,
 } from "./security-evaluation.dto";
+
+/** The `SecurityEvaluationSubjectMaterial` union as a Swagger schema (ADR-071, ADR-072). */
+const MATERIAL_SCHEMA = {
+  oneOf: [
+    { $ref: getSchemaPath(SecurityEvaluationWebOriginMaterialDto) },
+    { $ref: getSchemaPath(SecurityEvaluationRepositoryMaterialDto) },
+    { $ref: getSchemaPath(SecurityEvaluationAwsAccountMaterialDto) },
+  ],
+};
 
 /**
  * Security-evaluation HTTP surface (ADR-022, ADR-039, ADR-068).
@@ -52,6 +72,11 @@ import {
  */
 @ApiTags("Security Evaluation")
 @ApiBearerAuth()
+@ApiExtraModels(
+  SecurityEvaluationWebOriginMaterialDto,
+  SecurityEvaluationRepositoryMaterialDto,
+  SecurityEvaluationAwsAccountMaterialDto,
+)
 @Controller("security-evaluation")
 export class SecurityEvaluationController {
   constructor(
@@ -66,16 +91,46 @@ export class SecurityEvaluationController {
 
   // --- Subject ingest ----------------------------------------------------
 
+  @Post("subjects")
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({
+    summary: "Create one subject with its material (ADR-072); 409 when the subject already exists",
+  })
+  @ApiResponse({ status: 201, type: IngestSecurityEvaluationSubjectResponseDto })
+  @ApiResponse({
+    status: 409,
+    description: "The `(kind, subjectKey)` is already taken; the existing subjectId is under `error.info.subjectId`.",
+  })
+  async createSubject(
+    @Body() body: IngestSecurityEvaluationSubjectRequestDto,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<IngestSecurityEvaluationSubjectResponseDto> {
+    const result = await this.assets.create({ ...body });
+    response.setHeader("Location", `/security-evaluation/subjects/${result.subjectId}`);
+    return result;
+  }
+
   @Post("subjects/sync")
   @HttpCode(HttpStatus.OK)
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.EvaluationSubject)
   @ApiOperation({
-    summary: "Ingest one subject (platform-level, idempotent)",
+    summary: "Ingest one subject (host alignment, idempotent); ordinary callers use POST /subjects",
   })
   @ApiResponse({ status: 200, type: IngestSecurityEvaluationSubjectResponseDto })
   async ingestSubject(@Body() body: IngestSecurityEvaluationSubjectRequestDto) {
     const [result] = await this.assets.ingest([{ ...body }]);
     return result;
+  }
+
+  @Patch("subjects/:subjectId")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({ summary: "Update the mutable identity field of one subject (displayName)" })
+  @ApiResponse({ status: 200, type: SecurityEvaluationSubjectResponseDto })
+  updateSubject(
+    @Param() params: GetSecurityEvaluationSubjectRequestDto,
+    @Body() body: UpdateSecurityEvaluationSubjectRequestDto,
+  ) {
+    return this.assets.updateSubject(params.subjectId, { displayName: body.displayName });
   }
 
   // --- Knowledge items ---------------------------------------------------
@@ -102,6 +157,86 @@ export class SecurityEvaluationController {
       page: query.page,
       pageSize: query.pageSize,
     });
+  }
+
+  // --- Subject material --------------------------------------------------
+
+  @Get("subjects/:subjectId/material")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({ summary: "Read the material of one subject — a union discriminated by kind (ADR-071)" })
+  @ApiResponse({
+    status: 200,
+    description: "Material of the subject; the token of a web-origin is never returned by a read.",
+    schema: MATERIAL_SCHEMA,
+  })
+  getSubjectMaterial(
+    @Param() params: GetSecurityEvaluationSubjectRequestDto,
+  ): Promise<SecurityEvaluationSubjectMaterial> {
+    return this.assets.material(params.subjectId);
+  }
+
+  @Put("subjects/:subjectId/material")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({
+    summary: "Replace the mutable material fields of one subject (ADR-072); omitted fields fall back to defaults",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "The replaced material, shaped like the GET response.",
+    schema: MATERIAL_SCHEMA,
+  })
+  replaceSubjectMaterial(
+    @Param() params: GetSecurityEvaluationSubjectRequestDto,
+    @Body() body: UpdateSecurityEvaluationSubjectMaterialRequestDto,
+  ): Promise<SecurityEvaluationSubjectMaterial> {
+    return this.assets.replaceMaterial(params.subjectId, body);
+  }
+
+  @Patch("subjects/:subjectId/material")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({
+    summary: "Patch the mutable material fields of one subject (ADR-072); web-origin paths merge by role",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "The patched material, shaped like the GET response.",
+    schema: MATERIAL_SCHEMA,
+  })
+  patchSubjectMaterial(
+    @Param() params: GetSecurityEvaluationSubjectRequestDto,
+    @Body() body: UpdateSecurityEvaluationSubjectMaterialRequestDto,
+  ): Promise<SecurityEvaluationSubjectMaterial> {
+    return this.assets.patchMaterial(params.subjectId, body);
+  }
+
+  @Post("subjects/:subjectId/material/verification/tokens")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({
+    summary: "Rotate the verification token; the previously published value stops matching",
+    description:
+      "Creates a new token for the origin and returns both placements to publish. Rejected with 400 once the origin is VERIFIED or REVOKED (ADR-074 D2).",
+  })
+  @ApiResponse({ status: 200, type: WebOriginVerificationDto })
+  rotateMaterialVerificationToken(
+    @Param() params: GetSecurityEvaluationSubjectRequestDto,
+  ): Promise<WebOriginVerificationDto> {
+    return this.assets.rotateMaterialVerificationToken(params.subjectId);
+  }
+
+  @Post("subjects/:subjectId/material/verification/checks")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({
+    summary: "Probe the published token at the origin and persist the verification outcome",
+    description:
+      "DNS TXT is probed first, then `.well-known`; the first hit records `verificationMethod` (ADR-074 D3).",
+  })
+  @ApiResponse({ status: 200, type: WebOriginVerificationCheckResponseDto })
+  checkMaterialVerification(
+    @Param() params: GetSecurityEvaluationSubjectRequestDto,
+  ): Promise<WebOriginVerificationCheckResponseDto> {
+    return this.assets.checkMaterialVerification(params.subjectId);
   }
 
   // --- Runs --------------------------------------------------------------

@@ -1,44 +1,50 @@
-import { Controller, Post, Req, Res } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { Controller, Post, Res } from "@nestjs/common";
+import { ApiOperation, ApiResponse, ApiTags, ApiCookieAuth } from "@nestjs/swagger";
 import { Response } from "express";
+import { Cookies } from "@devbie/newbie/decorators/cookie.decorator";
 import { CookieName, CookieService } from "@modules/security/cookie/cookie.service";
-import { TokenService } from "@modules/security/token/token.service";
-import { LimitLoginByUserService } from "@modules/security/rate-limiter/rate-limiter.service";
 import { SessionService } from "@modules/account/modules/session/session.service";
-import { RequireOwner } from "@modules/security/authorization/require-owner.decorator";
+import { NoGuard } from "@modules/security/authentication/public/public.decorator";
 import { LogoutResponseDto } from "@modules/account/auth/auth.dto";
 
+/**
+ * Logout is anonymous-tolerant and idempotent: an expired access token must
+ * not turn "sign out" into a 401, because that leaves the session alive and the
+ * refresh cookie in the browser. The endpoint therefore opts out of the
+ * authentication guard and revokes by the refresh token cookie instead — the
+ * standard way to terminate a session when the access credential may already
+ * be stale.
+ */
 @ApiTags("Account / Auth")
 @Controller("auth")
 export class LogoutController {
   constructor(
     private readonly cookieService: CookieService,
-    private readonly tokenService: TokenService,
-    private readonly limitLoginByUserService: LimitLoginByUserService,
     private readonly sessionService: SessionService,
   ) {}
 
+  @NoGuard()
   @Post("logout")
-  @RequireOwner()
-  @ApiBearerAuth()
+  @ApiCookieAuth()
   @ApiOperation({ summary: "Logout the current user" })
   @ApiResponse({ type: LogoutResponseDto })
-  async logout(@Req() req, @Res({ passthrough: true }) response: Response): Promise<{ data: { message: string } }> {
-    // [step 1] Get access token.
-    const accessToken = this.tokenService.getTokenFromHttpRequest(req);
-
-    // [step 2] Delete session and clear user attempts.
-    if (accessToken) {
-      await this.sessionService.destroy(accessToken);
-
-      const { userId } = this.tokenService.verifyUserAccessToken(accessToken);
-      await this.limitLoginByUserService.delete(userId);
+  async logout(
+    @Cookies(CookieName.REFRESH_TOKEN) refreshToken: string | undefined,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<{ data: { message: string } }> {
+    // [step 1] Revoke the session holding this refresh token. Revocation is
+    // idempotent: a missing, rotated or expired token is a no-op, so logout
+    // stays retry-safe and never discloses whether the token was valid.
+    if (refreshToken) {
+      await this.sessionService.revokeByRefreshToken(refreshToken);
     }
 
-    // [step 3] Clear cookie
+    // [step 2] Clear the cookie even when nothing was revoked, so a stale
+    // credential cannot be replayed from the browser.
     this.cookieService.clear(response, CookieName.REFRESH_TOKEN);
 
-    // [step 4] Always return success no matter if the user exists.
+    // [step 3] Always report success: logout has no failure mode the caller
+    // can act on.
     return {
       data: { message: "User logs out successfully" },
     };

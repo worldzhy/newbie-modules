@@ -1,4 +1,4 @@
-import { Controller, Get, Res } from "@nestjs/common";
+import { Controller, Post, Res } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags, ApiCookieAuth } from "@nestjs/swagger";
 import { Response } from "express";
 import { Cookies } from "@devbie/newbie/decorators/cookie.decorator";
@@ -9,13 +9,13 @@ import { LoginByPasswordResponseDto } from "@modules/account/auth/auth.dto";
 
 @ApiTags("Account / Auth")
 @Controller("auth")
-export class RefreshAccessTokenController {
+export class RefreshSessionController {
   constructor(private readonly authService: AuthService) {}
 
   @GuardByRefreshToken()
-  @Get("refresh-access-token")
+  @Post("refresh-session")
   @ApiCookieAuth()
-  @ApiOperation({ summary: "Refresh access token using refresh token cookie" })
+  @ApiOperation({ summary: "Refresh the session using the refresh token cookie" })
   @ApiResponse({ type: LoginByPasswordResponseDto })
   async refresh(
     @Cookies(CookieName.REFRESH_TOKEN) refreshToken: string,

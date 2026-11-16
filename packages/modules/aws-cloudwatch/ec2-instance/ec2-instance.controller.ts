@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Query } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
@@ -25,7 +25,7 @@ export class Ec2InstanceController {
     return await this.ec2InstanceService.listEC2Instances({ accountId, status, isWatching });
   }
 
-  @Get("fetch")
+  @Post("sync")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.Ec2Instance)
   @ApiOperation({ summary: "Fetch EC2 instances from AWS and sync to DB" })
   @ApiResponse({ type: Boolean })
@@ -33,7 +33,7 @@ export class Ec2InstanceController {
     return await this.ec2InstanceService.fetchEC2Instances(query.accountId);
   }
 
-  @Patch("syncWatch")
+  @Patch("watch-statuses")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.Ec2Instance)
   @ApiOperation({ summary: "Sync watch/unwatch status for multiple EC2 instances" })
   @ApiResponse({ type: Boolean })
@@ -41,7 +41,7 @@ export class Ec2InstanceController {
     return await this.ec2InstanceService.syncEC2InstancesWatch(body);
   }
 
-  @Patch("watch/:ec2InstanceId")
+  @Patch(":ec2InstanceId/watch")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.Ec2Instance)
   @ApiOperation({ summary: "Watch an EC2 instance" })
   @ApiResponse({ type: Ec2InstanceResponseDto })

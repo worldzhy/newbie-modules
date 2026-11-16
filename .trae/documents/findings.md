@@ -414,3 +414,55 @@ R47-12 为 2026-11-14 运行时冒烟新发现，随 `46624cf` 修复（宿主�
 | R50-03 | nightwatch-backend | job-scheduler 的 `run-failed` 与 `dispatch-watchdog` 实际是同一生命周期：看门狗复用 `ALERT_DISPATCH_REMINDERS_JOB_KEY` 作为 alertKey，与普通失败共用 alertKey 空间和 `JOB_RUN_FAILED_NOTIFICATION_KEY`（`job-run-failure.alert.ts:17-30,57-82`；`alert.watch-reminder-dispatch.job.ts:62`），但 registrar 列为两个 lifecycle family（`alert-source.registrar.ts:61-68`） | P2 | live | 自动路径 | fixed：`2e6910a` 合并为单一 `run-failed` definition，看门狗改为触发原因注释 |
 | R50-04 | newbie-modules | 新增 4 条启动期校验分支零测试：重复 source / 非法 default rhythm / 非法 definition rhythm / 重复 definition key（`alert-source-registry.service.ts:57-79`），`grep -rn "Duplicate alert definition\|Invalid repeatMinutes\|Invalid defaultRepeatMinutes" src/**/*.test.ts` 0 命中；现有 22 用例只覆盖 definitions 映射（`alert-center.service.test.ts:410-437`） | P2 | source | 维护期 | fixed：`71b6106` 新增 `alert-source-registry.service.test.ts`（4 条校验分支 + 归一化，全套 27/27） |
 | R50-05 | newbie-modules | 契约文档滞后：ADR-065 仍写 `key / displayName / defaultRepeatMinutes` 三元组、无 definitions（ADR-065:72-73,89-90），模块 schema 注释示例仍含未注册的 `cloudwatch`（`alert-center/prisma/schema.prisma:17`） | P2 | template / docs | 维护期与新宿主接入期 | fixed：`71b6106` 增补 ADR-065 §2 的 definitions 语义锚点并去掉 cloudwatch 示例；装配副本随 `2e6910a` 同步 |
+
+## round51（2026-11-15，module scope：`security-evaluation`）
+
+报告：`.trae/documents/reviews/expert-review-2026-11-15-round51-security-evaluation.md`。锚点：newbie-modules `392bdff`（评审期间由 `64f2c3f` 前进，SE 目录无变化）、nightwatch-backend `2e6910a`（同上，SE 路径无变化）、nightwatch-frontend `f4c6482`；装配 `diff -rq` 零差异；backend build/format、registry format、frontend lint/format 全绿，SE 套件 9 suites / 120 用例、含宿主 provider 单测 128 全绿。本轮 P1 在宿主仓，模块仓 3 条 P2。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R51-02 | newbie-modules | `ingest` 不校验 `kind` 白名单：未知 kind 直接建 subject（`assets/security-evaluation-asset.service.ts:267-320`），常量白名单已存在（`security-evaluation.constants.ts:9-13`）；前端 add-asset 可选 `web-origin`，经 ingest 创建时无 `SecurityEvaluationWebOrigin` 行、绕过验证，目录与报告资产计数出现"幽灵资产" | P2 | live | MEMBER / ADMIN（`Create EvaluationSubject`） | open |
+| R51-03 | newbie-modules | `aws-account` 重放 ingest 清空 `defaultRegion`：`prepareSubmission` 恒归一为 `string \| null`（`:302`），update 守卫 `defaultRegion !== undefined`（`:136`）恒真是死代码；`regions` 却是未提供则保留（`:137`） | P2 | live | 自动路径（scan job 重放缺字段时） | open |
+| R51-04 | newbie-modules | http origin 的 `WELL_KNOWN` 验证恒失败：`normalizeWebOrigin` 接受 `http:`（`assets/security-evaluation-web-origin.service.ts:363-364`），挑战与抓取硬编码 `https://${host}`（`:337`、`:428`） | P2 | live | 注册 http origin 的运维操作 | open |
+
+裁决（2026-11-15，用户）：R51-01（宿主 web-origin 注册缺归属校验）**withdrawn / closed-by-design**——「平台级的资产不做防护，哪个项目使用都可以」；共享 `environment`/`targetPaths` 被任一项目 EDITOR 覆盖按设计接受，不再作为 finding。R51-02/03/04/05/06 维持 open。
+
+## round53（2026-11-16，module scope：`alert-center`，Alert source settings 面）
+
+报告：`.trae/documents/reviews/expert-review-2026-11-16-round53-alert-source-settings.md`。锚点：newbie-modules `d628aa0`（2 dirty，均非代码）、nightwatch-backend `5cf9ab3`（5 dirty；seeds 为 round52 并行会话在途）、nightwatch-frontend `2a51b47`（0 dirty）；装配 `diff -rq` 零差异；后端 tsc/eslint/27 单测、前端 tsc 全绿。本轮无 P0/P1，全部为 static 级 P2。授权面条目（R53-04）标 provisional（seeds 在途，但 diff 未触碰 alert-center 授权）。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R53-01 | newbie-modules | 设置写入路径 `updateSource` 零测试：`alert-center.service.test.ts` 无调用，只有 mock（`:90`）；keep/clear/delete/非法值四条分支（`alert-center.service.ts:433-462`）无回归门禁 | P2 | source / live | 维护期 | open |
+| R53-02 | newbie-modules + nightwatch-frontend | 节奏覆盖只在 raise/reopen 时快照进 `Alert.repeatIntervalMinutes`（`alert-center.service.ts:136-148,194-214`），提醒扫描读行快照（`:298-305`），`updateSource` 不回写 Alert（`:433-462`）；UI 未说明“仅新建/重开生效”，而同一卡片的暂停是即时生效（`:267-283`） | P2 | live | MEMBER 改设置后所有在运行告警 | open |
+| R53-03 | newbie-modules + nightwatch-backend | 设置变更无审计、DTO 无 `updatedAt`：表有 `updatedAt`（`prisma/schema.prisma:68-69`）但 `AlertSourceDto`（`alert-center.dto.ts:191-216`）与 `toSourceDto`（`alert-center.service.ts:467-484`）均未暴露；`grep -rn "audit" src/modules/alert-center src/application/alerts` → 0 | P2 | live | MEMBER | open |
+| R53-04 | newbie-modules + nightwatch-backend | 平台级设置由项目成员继承的权限修改：`module/alert-center` 全动作同时授予 Projects 组（`prisma/seeds/permission-groups.ts:104-107`）与 Alert Center 组（`:209-217`），MEMBER 绑定除 IAM/JDY 外全部内置组（`prisma/seeds/roles.ts:5-8`），任一成员可暂停所有项目的投递 | P2 | live | MEMBER（provisional） | open |
+| R53-05 | newbie-modules | 未注册来源的覆盖行不清理且不可见：`listSources` 只映射 registry 内来源（`alert-center.service.ts:422-426`），无 prune；同 key 重新注册后旧节奏/暂停静默恢复 | P2 | source / live | 来源下线再上线 | open |
+| R53-06 | newbie-modules | 未知来源 key 返回 400 而非 404：`require()` 抛 `BadRequestException`（`alert-source-registry.service.ts:90-96`）被 `updateSource` 复用（`alert-center.service.ts:434`） | P2 | source | 调用 PUT 的客户端 | open |
+| R53-07 | nightwatch-frontend | 设置表单陈旧快照 + 无冲突检测：state 只在挂载初始化（`alert-source-settings-card.tsx:23-26`），成功后只 invalidate（`:35-38`），保存总提交两字段（`:28-34`），并发编辑静默覆盖；DTO 无 `updatedAt` 无法 409 | P2 | live | 双操作者双标签页 | open |
+| R53-08 | nightwatch-frontend | 无效节奏无错误文案，保存静默禁用：仅 `aria-invalid` + `disabled`（`alert-source-settings-card.tsx:42,57,89`），`type=number` 接受小数/科学计数法 | P2 | live | 输入非正整数 | open |
+| R53-09 | nightwatch-frontend + newbie-modules | 暂停面缺状态与影响面提示：不区分生效中/已过期、无一键恢复（需进 popover Clear，`date-picker.tsx:175-186`）、未说明抑制站内记录且跨项目生效（`README.md:36` 有、UI 无）；分钟精度截断丢失秒（`alert-source-settings-card.tsx:25,33`） | P2 | live | MEMBER | open |
+| R53-10 | nightwatch-frontend | 页面标题/描述重复：PageShell（`settings/page.tsx:16-19`）与卡片 `CardHeader`（`alert-source-settings-card.tsx:131-135`）使用同一组 i18n key | P2 | live | 所有访问者 | open |
+
+carry-over 复验：R50-01（definitions 与 producer alertKey 无绑定）仍 open——registry 仍只做结构校验（`alert-source-registry.service.ts:56-87`）；R50-02（“Fixed” 可被请求值覆盖）仍 open——优先级 requested > override > default 未变（`alert-center.service.ts:528-538`）。R50-03/04/05 复验 fixed（registrar 仅剩单一 `run-failed`；`alert-source-registry.service.test.ts` 5 例；ADR-065 已补 definitions）。
+
+## round54（2026-11-16，plan scope：提醒默认语义“首条即时 + 默认不 repeat / 只做来源级设置”）
+
+报告：`.trae/documents/reviews/expert-review-2026-11-16-round54-alert-repeat-default.md`。锚点：newbie-modules `d628aa0`、nightwatch-backend `c0cadae`（alert-center 相关目录自 round53 无改动）、nightwatch-frontend `2a51b47`（8 dirty，含 alert-center page 与 i18n，相关结论 provisional）。判定：C1 前半成立（暂停/无端口/适配器异常三前提）；C1 后半作为现状不成立（模块缺省 60、宿主 Threat Intel 1440，另三来源继承 60），作为目标需补契约；C2 成立（来源级两列已够，若含 `enabled` 则与 ADR-065 冲突）。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R54-01 | newbie-modules | 暂停 × 无重复：`deliver` 暂停时直接返回（`alert-center.service.ts:500-502`），默认无 repeat 后暂停期间 raise 的告警既无首条也无补发（现有补发依赖 `nextNotificationAt`，`alert-center.constants.ts:66-74`）；需三选一：首条不受暂停 / 暂停推迟首条 / 明确丢弃 | P2 | live | MEMBER | open |
+| R54-02 | newbie-modules + nightwatch-backend | 存量 firing 行不跟随新默认：`repeatIntervalMinutes` 为开局快照（`alert-center.service.ts:165,209`），dispatch 读行值（`:302`）；切换默认后仅新告警静默，需定义一次性收敛策略 | P2 | live | 自动路径 | open |
+| R54-03 | newbie-modules | 注册表无法表达“缺省 = 不提醒”：`defaultRepeatMinutes` 缺省即落 60（`alert-source-registry.service.ts:27,60`），DTO 必填 number（`alert-center.dto.ts:199`）；实施 C1-b 的阻塞点 | P2 | source / live | 实施期 | open |
+| R54-04 | newbie-modules | ADR-065 宣称的“一天后再提醒”无任何载体：`ADR-065:135-141` 映射到移动 `nextNotificationAt`，但端点只有 `POST /alerts`、`POST /alerts/resolve`、GET、`GET/PUT /alert-sources`（`README.md:42-44`）；只做来源级设置后该意图彻底无载体 | P2 | live | 任意登录用户 | open |
+| R54-05 | newbie-modules | 若“来源级设置”含 `enabled`，与 ADR-065 §2 裁决冲突（`ADR-065:92`：不设 enabled，拒收 raise 会让 resolve 找不到行）；需先确认范围并视情况新 ADR | P2 | source | 设计期 | resolved（用户 2026-11-16 拍板做来源级 Enable；实现为“只关外发、不拒收 raise”，与暂停共用投递门禁，ADR-065 §2/§5 已同步修订） |
+| R54-06 | newbie-modules | C1-b 属跨宿主契约语义变更（registry 默认、宿主 registrar、DTO、前端文案、ADR-065），方案未提 ADR；按设计前置规则应先出 ADR / 修订 ADR-065 对应节 | P2 | docs / template | 设计期 | open |
+
+收尾（2026-11-16）：最终决策改为“保留重复提醒，仅把默认节奏从 60 分钟改为 24 小时（1440）”，未采用“首条后默认不 repeat”。
+
+- R54-01、R54-03：随“不 repeat”方案一并作废（`superseded`）。重复提醒保留，故暂停期“既无首条也无补发”的前提消失；注册表也不需要再表达“缺省 = 不提醒”。
+- R54-04：`resolved`。模块缺省改为 1440 后，ADR-065 宣称的“一天后再提醒”首次有了载体（新生命周期按 24h 重复）。
+- R54-06：`addressed`。默认值语义变更已在 registry 与 nightwatch-backend 同步落地（常量、schema default、CLI 托管 models、migration），ADR-065 文本口径与实现一致，未另立新 ADR。
+- R54-02：`resolved`。存量 firing 行的 `repeatIntervalMinutes` 是开局快照；本次按用户决定清空历史数据，无存量行需要收敛，切换后所有告警按 24h 节奏。
+- R54-05：`resolved`（2026-11-16 追加）。用户要求补来源级 Enable 开关；实现取“无限期暂停”语义——`enabled=false` 只短路投递，`raise`/`resolve`/记录照旧，因此不触发 ADR-065 §2 担心的闭合窗口。`AlertSource` 增列、DTO/服务/测试/宿主 migration 与前端开关同步落地，ADR-065 §2/§5 文本已改。

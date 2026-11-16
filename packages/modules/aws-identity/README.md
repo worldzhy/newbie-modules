@@ -65,6 +65,8 @@ POST   /aws-cross-account-bindings/accounts/:accountId/verify
 POST   /aws-cross-account-bindings/accounts/:accountId/rotate-external-id
 DELETE /aws-cross-account-bindings/accounts/:accountId
 
+GET    /aws-cross-account-bindings/account-credential-refs
+
 GET    /aws-cross-account-bindings/consumers/:consumerId
 PUT    /aws-cross-account-bindings/consumers/:consumerId
 DELETE /aws-cross-account-bindings/consumers/:consumerId
@@ -72,6 +74,11 @@ DELETE /aws-cross-account-bindings/consumers/:consumerId
 
 The account list carries `consumerIds` per account so a host can render the
 account card (referencing projects, delete guard) without a second lookup.
+
+The account credential reference list is the compact view of the same
+accounts: only accounts with a saved role ARN appear (the rest cannot be
+resolved later), and each entry carries the account id, the display name and
+the opaque `credentialRef` that a caller stores and resolves on its own.
 
 ## Authorization
 

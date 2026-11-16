@@ -8,7 +8,7 @@ import { LoginByPasswordController } from "./login-by-password.controller";
 import { LoginByTotpController } from "./login-by-totp.controller";
 import { LoginByVerificationCodeController } from "./login-by-verificationcode.controller";
 import { LogoutController } from "./logout.controller";
-import { RefreshAccessTokenController } from "./refresh-access-token.controller";
+import { RefreshSessionController } from "./refresh-session.controller";
 import { SignupEmailVerifyController } from "./signup-email-verify.controller";
 import { SignupController } from "./signup.controller";
 import { WechatAuthController } from "./wechat/auth.controller";
@@ -36,7 +36,7 @@ import { GoogleStrategy } from "./strategies/google.strategy";
     LoginByTotpController,
     LoginByVerificationCodeController,
     LogoutController,
-    RefreshAccessTokenController,
+    RefreshSessionController,
     SignupEmailVerifyController,
     SignupController,
     WechatAuthController,

@@ -1,11 +1,15 @@
 // !! ------------------------------------------------------------ //
-// !!            [Module] Task Management models             //
+// !!               [Module] Task Management models                //
 // !! ------------------------------------------------------------ //
-// * TaskSpace (1:1 companion space for a Nightwatch Project)       //
-// * Task (Work Item)                                              //
-// * TaskParticipant (Actor, identified by the host user it stands for) //
-// * ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ //
+// * TaskSpace                                                     //
+// * TaskParticipant                                               //
+// * Task                                                          //
+// * TaskStatus (enum)                                             //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
+/// One task space per host project: a 1:1 companion container for that
+/// project's tasks, enforced by the unique `projectId`. The host adds the
+/// project relation; the space name is optional and caller-supplied.
 model TaskSpace {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   projectId   String   @unique @db.Uuid
@@ -19,18 +23,26 @@ model TaskSpace {
   @@schema("module/task-management")
 }
 
+/// One actor in the task system, identified by the host user it stands for.
+/// `name` and `avatarUrl` copy that user's display fields, captured when the
+/// participant row is created.
 model TaskParticipant {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name           String?
-  avatarUrl      String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  createdTasks   Task[]   @relation("CreatedTasks")
-  assignedTasks  Task[]   @relation("AssignedTasks")
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String?
+  avatarUrl         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdTasks      Task[]   @relation("CreatedTasks")
+  assignedTasks     Task[]   @relation("AssignedTasks")
+  lastOperatorTasks Task[]   @relation("LastOperatorTasks")
 
   @@schema("module/task-management")
 }
 
+/// One task (work item) in a space: title, description, status, optional due
+/// date, and creator/assignee participants. Status updates follow the service's
+/// transition table; deletion is soft through `deletedAt`. The last-operator
+/// fields record who most recently changed the task.
 model Task {
   id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String
@@ -57,6 +69,11 @@ model Task {
   @@schema("module/task-management")
 }
 
+/// Task lifecycle. Status updates follow the service's fixed transition table:
+/// PENDING to DEVELOPING or CANCELLED; DEVELOPING to TESTING or CANCELLED;
+/// TESTING to DEVELOPING, DEPLOYED, COMPLETED, or CANCELLED; DEPLOYED to
+/// DEVELOPING, COMPLETED, or CANCELLED. COMPLETED and CANCELLED are terminal.
+/// CANCELLED is a status, distinct from the soft delete in `deletedAt`.
 enum TaskStatus {
   PENDING
   DEVELOPING

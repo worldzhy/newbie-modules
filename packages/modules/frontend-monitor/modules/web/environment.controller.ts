@@ -1,5 +1,5 @@
-import { BadRequestException, Controller, Get, Inject, Query, Req } from "@nestjs/common";
-import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
+import { BadRequestException, Controller, Get, Inject, Param, Query, Req } from "@nestjs/common";
+import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func, pickRequestId } from "../../shared/utils";
 import { EnvironmentService } from "./services/environment.service";
 import {
@@ -23,7 +23,7 @@ export class EnvironmentController {
   ) {}
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getDataGroupBy")
+  @Get("groups")
   @ApiOperation({ summary: "Get environment data grouped by type" })
   @ApiResponse({ type: FrontendMonitorEnvironmentGroupByItemResponseDto, isArray: true })
   async getDataGroupBy(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
@@ -42,15 +42,18 @@ export class EnvironmentController {
   }
 
   @RequirePermission(PermissionAction.Get, "FrontendMonitorSite")
-  @Get("/getEnvironmentForPage")
+  @Get("pages/:markPage")
   @ApiOperation({ summary: "Get environment info for a page" })
+  @ApiQuery({
+    name: "appKey",
+    required: false,
+    description: "Scope selector; must be within the caller's visible app keys",
+  })
   @ApiResponse({ type: FrontendMonitorEnvironmentResponseDto })
-  async getEnvironmentForPage(@Query() q: Record<string, unknown>, @Req() req: UserRequest) {
-    const { markPage } = q;
-    if (!markPage) throw new BadRequestException("markPage is required");
+  async getEnvironmentForPage(@Param("markPage") markPage: string, @Req() req: UserRequest) {
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const result = await this.envSrv.getEnvironmentForPage(appKey, String(markPage));
+    const result = await this.envSrv.getEnvironmentForPage(appKey, markPage);
     return func.result({ data: result });
   }
 }

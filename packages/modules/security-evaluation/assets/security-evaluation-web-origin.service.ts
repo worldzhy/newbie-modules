@@ -24,6 +24,11 @@ import {
   type SecurityEvaluationWebOriginVerificationMethod,
   type SecurityEvaluationWebOriginVerificationStatus,
 } from "../security-evaluation.constants";
+import type { SecurityEvaluationWebOriginMaterialDto } from "../security-evaluation-material.dto";
+import type {
+  WebOriginVerificationCheckResponseDto,
+  WebOriginVerificationDto,
+} from "../security-evaluation-web-origin.dto";
 import {
   VerificationFetchAccess,
   securityEvaluationVerificationFetchAccessToken,
@@ -42,8 +47,6 @@ export interface CreateSecurityEvaluationWebOriginInput {
   origin: string;
   /** Label shown in the UI; defaults to the normalized origin. */
   label?: string;
-  /** Free-form deployment slot chosen by the host ("production", "staging"…). */
-  environment: string;
   /** Path role → relative path; unknown roles are rejected. */
   targetPaths?: Record<string, string>;
 }
@@ -56,32 +59,10 @@ export interface SecurityEvaluationWebOriginRegistration {
   verificationToken: string;
 }
 
-export interface SecurityEvaluationWebOriginChallenge {
-  subjectId: string;
-  origin: string;
-  method: SecurityEvaluationWebOriginVerificationMethod;
-  token: string;
-  /** Publish this TXT record (DNS_TXT). */
-  dnsRecordName?: string;
-  dnsRecordValue?: string;
-  /** Publish the token at this URL (WELL_KNOWN). */
-  wellKnownUrl?: string;
-}
-
-export interface SecurityEvaluationWebOriginVerificationResult {
-  subjectId: string;
-  origin: string;
-  status: SecurityEvaluationWebOriginVerificationStatus;
-  verifiedAt: Date | null;
-  lastVerifiedAt: Date | null;
-  consecutiveFailures: number;
-}
-
 export interface SecurityEvaluationWebOriginTarget {
   subjectId: string;
   origin: string;
   label: string;
-  environment: string;
   targetPaths: Record<string, string>;
 }
 
@@ -93,8 +74,7 @@ export interface SecurityEvaluationWebOriginTarget {
  * either both exist or neither do, so a half-registered origin can never enter
  * the evaluation pipeline. Identity lives on the subject (`subjectKey` is the
  * normalized origin, `displayName` the label) — this service only owns what is
- * specific to a web origin: environment, target paths and the verification
- * lifecycle. Provenance lives in the host (ADR-068 D8).
+ * specific to a web origin: target paths and the verification lifecycle. Provenance lives in the host (ADR-068 D8).
  *
  * Verification is host-driven: the module generates the token and compares
  * published values through `VerificationFetchAccess`, but never performs
@@ -132,40 +112,61 @@ export class SecurityEvaluationWebOriginService {
   }
 
   /**
-   * Register an origin: platform-level subject + verification record,
-   * atomically. Re-registration is idempotent and never resets verification —
-   * it only refreshes the label, environment and target paths.
+   * Register an origin idempotently (host alignment): platform-level subject +
+   * verification record, atomically. Re-registration refreshes the label and, when
+   * supplied, the target paths; it never resets verification and never clears
+   * paths the submission does not mention (ADR-072 D3).
    */
   async create(input: CreateSecurityEvaluationWebOriginInput): Promise<SecurityEvaluationWebOriginRegistration> {
+    return this.register(input, true);
+  }
+
+  /**
+   * Register an origin strictly (REST Create, ADR-072 D1): an origin that is
+   * already a subject is a conflict carrying the existing subject id.
+   */
+  async createStrict(input: CreateSecurityEvaluationWebOriginInput): Promise<SecurityEvaluationWebOriginRegistration> {
+    return this.register(input, false);
+  }
+
+  private async register(
+    input: CreateSecurityEvaluationWebOriginInput,
+    idempotent: boolean,
+  ): Promise<SecurityEvaluationWebOriginRegistration> {
     const origin = normalizeWebOrigin(input.origin);
-    const environment = requireEnvironment(input.environment);
-    const targetPaths = normalizeTargetPaths(input.targetPaths);
+    const targetPaths = input.targetPaths === undefined ? undefined : normalizeTargetPaths(input.targetPaths);
     const label = input.label?.trim() || origin;
     const verificationToken = this.generateToken();
 
     return this.prisma.$transaction(async (transaction) => {
-      const subject = await this.subjects.getOrCreateSubject(
-        {
-          subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
-          kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
-          subjectKey: origin,
-          displayName: label,
-        },
-        transaction,
-      );
-      const webOrigin = await transaction.securityEvaluationWebOrigin.upsert({
-        where: { subjectId: subject.id },
-        create: {
-          subjectId: subject.id,
-          environment,
-          targetPaths: targetPaths as Prisma.InputJsonValue,
-          verificationToken,
-        },
-        update: {
-          environment,
-          targetPaths: targetPaths as Prisma.InputJsonValue,
-        },
-      });
+      const descriptor = {
+        subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
+        kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
+        subjectKey: origin,
+        displayName: label,
+      };
+      const subject = idempotent
+        ? await this.subjects.getOrCreateSubject(descriptor, transaction)
+        : await this.subjects.createSubject(descriptor, transaction);
+      const webOrigin = idempotent
+        ? await transaction.securityEvaluationWebOrigin.upsert({
+            where: { subjectId: subject.id },
+            create: {
+              subjectId: subject.id,
+              targetPaths: (targetPaths ?? {}) as Prisma.InputJsonValue,
+              verificationToken,
+            },
+            update: {
+              ...(targetPaths !== undefined ? { targetPaths: targetPaths as Prisma.InputJsonValue } : {}),
+            },
+          })
+        : await transaction.securityEvaluationWebOrigin.create({
+            data: {
+              subjectId: subject.id,
+              targetPaths: (targetPaths ?? {}) as Prisma.InputJsonValue,
+              verificationToken,
+            },
+          });
 
       return {
         subjectId: subject.id,
@@ -177,42 +178,65 @@ export class SecurityEvaluationWebOriginService {
     });
   }
 
-  /**
-   * Return the challenge to publish. The token is reused while it is the one
-   * the operator may have already published; a `FAILED` origin gets a fresh
-   * token because the old one was exposed long enough to fail repeatedly.
-   */
-  async requestVerification(
+  /** Replace the whole target path map (`PUT`, ADR-072 D3); omitted means `{}`. */
+  async replaceTargetPaths(
     subjectId: string,
-    method: SecurityEvaluationWebOriginVerificationMethod,
-  ): Promise<SecurityEvaluationWebOriginChallenge> {
-    requireVerificationMethod(method);
+    targetPaths?: Record<string, string>,
+  ): Promise<SecurityEvaluationWebOriginMaterialDto> {
+    await this.getWebOrigin(subjectId);
+    await this.prisma.securityEvaluationWebOrigin.update({
+      where: { subjectId },
+      data: { targetPaths: normalizeTargetPaths(targetPaths) as Prisma.InputJsonValue },
+    });
+    return this.detail(subjectId);
+  }
+
+  /** Merge the supplied roles into the stored map (`PATCH`); other roles keep their paths. */
+  async patchTargetPaths(
+    subjectId: string,
+    patch: Record<string, string>,
+  ): Promise<SecurityEvaluationWebOriginMaterialDto> {
+    const { row } = await this.getWebOrigin(subjectId);
+    const targetPaths = { ...parseTargetPaths(row.targetPaths), ...normalizeTargetPaths(patch) };
+    await this.prisma.securityEvaluationWebOrigin.update({
+      where: { subjectId },
+      data: { targetPaths: targetPaths as Prisma.InputJsonValue },
+    });
+    return this.detail(subjectId);
+  }
+
+  /**
+   * Issue a fresh token (ADR-074 D2). The old value stops matching immediately:
+   * rotation is an explicit operator decision, not a side effect of opening the
+   * verification panel, and a verified origin has to be revoked first because
+   * rotating it would silently invalidate a proof that is in effect.
+   */
+  async rotateVerificationToken(subjectId: string): Promise<WebOriginVerificationDto> {
     const { row, subject } = await this.getWebOrigin(subjectId);
     if (row.verificationStatus === "REVOKED") {
       throw new BadRequestException(`Web origin ${subject.subjectKey} is revoked and cannot be verified.`);
     }
+    if (row.verificationStatus === "VERIFIED") {
+      throw new BadRequestException(
+        `Web origin ${subject.subjectKey} is already verified; revoke it before rotating the token.`,
+      );
+    }
 
-    const regenerate = row.verificationStatus === "FAILED";
-    const token = regenerate ? this.generateToken() : row.verificationToken;
+    const token = this.generateToken();
     await this.prisma.securityEvaluationWebOrigin.update({
       where: { subjectId },
-      data: {
-        verificationMethod: method,
-        verificationToken: token,
-        ...(regenerate ? { verificationFailureCount: 0 } : {}),
-        ...(row.verificationStatus === "VERIFIED" ? {} : { verificationStatus: "PENDING" }),
-      },
+      data: { verificationToken: token, verificationFailureCount: 0, verificationStatus: "PENDING" },
     });
-
-    return buildChallenge(subjectId, subject.subjectKey, method, token);
+    return buildVerification(subject.subjectKey, token);
   }
 
   /**
-   * Check the published token and persist the outcome. A transport failure is
-   * a failed verification (the origin could not be proven), which is what the
-   * three-strike rule is meant to catch.
+   * Probe both placements in order (ADR-074 D3) and persist the outcome. The
+   * method written on success is the evidence of which placement answered; a
+   * failed check leaves the previous method untouched, and one check counts as
+   * one failure regardless of how many placements were probed.
    */
-  async verify(subjectId: string): Promise<SecurityEvaluationWebOriginVerificationResult> {
+  async checkVerification(subjectId: string): Promise<WebOriginVerificationCheckResponseDto> {
     const fetch = this.verificationFetch;
     if (!fetch) {
       throw new InternalServerErrorException(
@@ -224,25 +248,22 @@ export class SecurityEvaluationWebOriginService {
     if (row.verificationStatus === "REVOKED") {
       throw new BadRequestException(`Web origin ${subject.subjectKey} is revoked and cannot be verified.`);
     }
-    const method = row.verificationMethod as SecurityEvaluationWebOriginVerificationMethod | null;
-    if (!method) {
-      throw new BadRequestException(`Web origin ${subject.subjectKey} has no verification method; request one first.`);
-    }
 
-    const matched = await this.matchesPublishedToken(fetch, subject.subjectKey, method, row.verificationToken);
+    const matchedMethod = await this.probePublishedToken(fetch, subject.subjectKey, row.verificationToken);
     const now = new Date();
 
-    if (matched) {
+    if (matchedMethod) {
       const updated = await this.prisma.securityEvaluationWebOrigin.update({
         where: { subjectId },
         data: {
           verificationStatus: "VERIFIED",
+          verificationMethod: matchedMethod,
           verifiedAt: row.verifiedAt ?? now,
           lastVerifiedAt: now,
           verificationFailureCount: 0,
         },
       });
-      return toVerificationResult(subjectId, subject.subjectKey, updated);
+      return toVerificationCheckResponse(subjectId, subject.subjectKey, updated);
     }
 
     const failures = row.verificationFailureCount + 1;
@@ -253,7 +274,19 @@ export class SecurityEvaluationWebOriginService {
         verificationStatus: failures >= this.reverifyFailureThreshold ? "FAILED" : row.verificationStatus,
       },
     });
-    return toVerificationResult(subjectId, subject.subjectKey, updated);
+    return toVerificationCheckResponse(subjectId, subject.subjectKey, updated);
+  }
+
+  /** First placement that shows the token wins; DNS first, then `.well-known`. */
+  private async probePublishedToken(
+    fetch: VerificationFetchAccess,
+    origin: string,
+    token: string,
+  ): Promise<SecurityEvaluationWebOriginVerificationMethod | null> {
+    for (const method of SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS) {
+      if (await this.matchesPublishedToken(fetch, origin, method, token)) return method;
+    }
+    return null;
   }
 
   /**
@@ -284,10 +317,10 @@ export class SecurityEvaluationWebOriginService {
       let status = row.verificationStatus;
       if (due) {
         try {
-          status = (await this.verify(row.subjectId)).status;
+          status = (await this.checkVerification(row.subjectId)).status;
         } catch {
-          // A host-side lookup error is already counted inside verify(); an
-          // unbound port or a missing method leaves the row untouched.
+          // A host-side lookup error is already counted inside checkVerification();
+          // an unbound port leaves the row untouched.
           status = row.verificationStatus;
         }
       }
@@ -296,7 +329,6 @@ export class SecurityEvaluationWebOriginService {
         subjectId: row.subjectId,
         origin: subject.subjectKey,
         label: subject.displayName,
-        environment: row.environment,
         targetPaths: parseTargetPaths(row.targetPaths),
       });
     }
@@ -307,6 +339,24 @@ export class SecurityEvaluationWebOriginService {
   async pathRoles(subjectId: string): Promise<Record<string, string>> {
     const { row } = await this.getWebOrigin(subjectId);
     return parseTargetPaths(row.targetPaths);
+  }
+
+  /** The web-origin branch of a subject's material (ADR-074 D1). */
+  async detail(subjectId: string): Promise<SecurityEvaluationWebOriginMaterialDto> {
+    const { row, subject } = await this.getWebOrigin(subjectId);
+    const verificationStatus = row.verificationStatus as SecurityEvaluationWebOriginVerificationStatus;
+    const pending = verificationStatus === "PENDING" || verificationStatus === "FAILED";
+    return {
+      kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
+      targetPaths: parseTargetPaths(row.targetPaths),
+      verificationStatus,
+      verificationMethod: row.verificationMethod as SecurityEvaluationWebOriginVerificationMethod | null,
+      verification: pending ? buildVerification(subject.subjectKey, row.verificationToken) : null,
+      verificationFailureCount: row.verificationFailureCount,
+      verifiedAt: row.verifiedAt,
+      lastVerifiedAt: row.lastVerifiedAt,
+      isActive: row.isActive,
+    };
   }
 
   private async getWebOrigin(subjectId: string) {
@@ -376,7 +426,15 @@ export function normalizeWebOrigin(input: string): string {
   return `${url.protocol}//${hostname}${url.port ? `:${url.port}` : ""}`;
 }
 
-function normalizeTargetPaths(input?: Record<string, string>): Record<string, string> {
+/** A relative path on the origin stays well inside a single `Location`-style segment. */
+const TARGET_PATH_MAX_LENGTH = 255;
+
+/**
+ * Validate a path role → relative path map. Roles come from the module's closed
+ * vocabulary; a path must be absolute on the origin and bounded in length, since
+ * it is later appended to the origin verbatim.
+ */
+export function normalizeTargetPaths(input?: Record<string, string>): Record<string, string> {
   if (!input) return {};
   const normalized: Record<string, string> = {};
   for (const [role, value] of Object.entries(input)) {
@@ -388,6 +446,9 @@ function normalizeTargetPaths(input?: Record<string, string>): Record<string, st
     const path = value.trim();
     if (!path.startsWith("/") || path.startsWith("//")) {
       throw new BadRequestException(`Target path for '${role}' must be an absolute path on the origin.`);
+    }
+    if (path.length > TARGET_PATH_MAX_LENGTH) {
+      throw new BadRequestException(`Target path for '${role}' must be at most ${TARGET_PATH_MAX_LENGTH} characters.`);
     }
     normalized[role] = path;
   }
@@ -403,33 +464,19 @@ function parseTargetPaths(value: Prisma.JsonValue): Record<string, string> {
   return parsed;
 }
 
-function buildChallenge(
-  subjectId: string,
-  origin: string,
-  method: SecurityEvaluationWebOriginVerificationMethod,
-  token: string,
-): SecurityEvaluationWebOriginChallenge {
+function buildVerification(origin: string, token: string): WebOriginVerificationDto {
   const host = new URL(origin).hostname;
-  if (method === "DNS_TXT") {
-    return {
-      subjectId,
-      origin,
-      method,
-      token,
-      dnsRecordName: `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX}.${host}`,
-      dnsRecordValue: `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX}${token}`,
-    };
-  }
   return {
-    subjectId,
-    origin,
-    method,
     token,
-    wellKnownUrl: `https://${host}${SECURITY_EVALUATION_WEB_ORIGIN_WELL_KNOWN_PATH}`,
+    dnsTxt: {
+      name: `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX}.${host}`,
+      value: `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX}${token}`,
+    },
+    wellKnown: { url: `https://${host}${SECURITY_EVALUATION_WEB_ORIGIN_WELL_KNOWN_PATH}` },
   };
 }
 
-function toVerificationResult(
+function toVerificationCheckResponse(
   subjectId: string,
   origin: string,
   row: {
@@ -438,7 +485,7 @@ function toVerificationResult(
     lastVerifiedAt: Date | null;
     verificationFailureCount: number;
   },
-): SecurityEvaluationWebOriginVerificationResult {
+): WebOriginVerificationCheckResponseDto {
   return {
     subjectId,
     origin,
@@ -447,20 +494,4 @@ function toVerificationResult(
     lastVerifiedAt: row.lastVerifiedAt,
     consecutiveFailures: row.verificationFailureCount,
   };
-}
-
-function requireVerificationMethod(method: string): void {
-  if (!(SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS as readonly string[]).includes(method)) {
-    throw new BadRequestException(
-      `Unknown verification method '${method}'; expected one of ${SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS.join(", ")}.`,
-    );
-  }
-}
-
-function requireEnvironment(environment: string): string {
-  const value = environment?.trim();
-  if (!value || value.length > 32) {
-    throw new BadRequestException("environment must be a non-empty string of at most 32 characters.");
-  }
-  return value;
 }

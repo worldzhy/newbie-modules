@@ -1,7 +1,9 @@
 import {
   Get,
   Post,
+  Delete,
   Body,
+  Param,
   Query,
   Controller,
   UploadedFile,
@@ -63,21 +65,21 @@ export class TencentCosController {
     return await this.cos.getObject(key);
   }
 
-  @Post("getSignedDownloadUrl")
+  @Get("signed-download-urls")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.CosFile)
   @ApiOkResponse({ type: Object })
-  async getFilePreview(@Body() body: { key: string }) {
-    return await this.cos.getSignedDownloadUrl({ key: body.key });
+  async getFilePreview(@Query("key") key: string) {
+    return await this.cos.getSignedDownloadUrl({ key });
   }
 
-  @Post("delete")
+  @Delete("files/:fileId")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.CosFile)
   @ApiOkResponse({ type: Object })
-  async deleteFile(@Body() { fileId }: { fileId: string }): Promise<any> {
+  async deleteFile(@Param("fileId") fileId: string): Promise<any> {
     return await this.cos.deleteFile(fileId);
   }
 
-  @Post("initMultipartUpload")
+  @Post("create-multipart")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.CosFile)
   @ApiCreatedResponse({ type: Object })
   async initMultipartUpload(@Body() body: { fileName: string }) {
@@ -91,7 +93,7 @@ export class TencentCosController {
     };
   }
 
-  @Post("uploadPart")
+  @Post("upload-part")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.CosFile)
   @ApiConsumes("multipart/form-data")
   @ApiCreatedResponse({ type: Object })
@@ -125,7 +127,7 @@ export class TencentCosController {
     };
   }
 
-  @Post("completeMultipartUpload")
+  @Post("complete-multipart")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.CosFile)
   @ApiCreatedResponse({ type: Object })
   async completeMultipartUpload(

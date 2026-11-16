@@ -13,7 +13,7 @@ lands in a later slice on the same run and finding lifecycle.
 | Term           | Meaning                                                                                                                                                                                                                                                                                                                                                                                       |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Subject        | The skeleton's `EvaluationSubject` row and this feature's only identity. `kind` is `repository`, `aws-account` or `web-origin`; the coordinate is `(subjectType, kind, subjectKey)` with `subjectType = "security-evaluation"` (ADR-068, ADR-069). Subjects of kinds that need host credentials carry an opaque `credentialRef` registered at ingest. Provenance lives in the host, not here. |
-| Web origin     | `SecurityEvaluationWebOrigin`, one-to-one with a web-origin subject. Owns `environment`, the `targetPaths` role map, and the ownership-verification lifecycle (token, method, status, timestamps). Identity stays on the subject (`subjectKey` = normalized origin, `displayName` = label).                                                                                                   |
+| Web origin     | `SecurityEvaluationWebOrigin`, one-to-one with a web-origin subject. Owns the `targetPaths` role map and the ownership-verification lifecycle (token, method, status, timestamps). Identity stays on the subject (`subjectKey` = normalized origin, `displayName` = label).                                                                                                                   |
 | Repository     | `SecurityEvaluationRepository`, one-to-one with a repository subject: the evaluation-side copy of the coordinate (`provider`, `namespace`, `name`, `url`). Natural key `provider:namespace/name` (lowercased); the host's own repository record stays the host's truth (ADR-070 D1, D2).                                                                                                      |
 | AWS account    | `SecurityEvaluationAwsAccount`, one-to-one with an aws-account subject: `accountId` (the natural key, 12 digits), `defaultRegion`, `regions`. Credentials stay a host concern and live on the subject's `credentialRef` (ADR-070 D1, D2).                                                                                                                                                     |
 | Knowledge item | `SecurityEvaluationAwsConfigKnowledgeItem` / `SecurityEvaluationNpmPackageKnowledgeItem`: something observed about a subject right now (`type`, `key`, small intrinsic `value`); `SecurityEvaluationThreatKnowledgeItem` is the world-scoped intel sibling. Items are upserted, never deleted here; history lives in the archived run manifest.                                               |
@@ -74,13 +74,14 @@ system-level permission grant (ADR-039 D3).
 
 ## Evaluation keys
 
-| Evaluation key | Kind          | Version | Content                                                                                        |
-| -------------- | ------------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `npm-osv`      | `repository`  | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                           |
-| `aws-cis-1.5`  | `aws-account` | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027).        |
-| `aws-custom`   | `aws-account` | `v1`    | Custom hardening criteria inherited from the predecessor aws-audit module (ADR-033/037).       |
-| `threat-intel` | `repository`  | `v1`    | Threat-intelligence relevance criteria (ADR-039).                                              |
-| `code-scan`    | `repository`  | `v1`    | Five ASSERTION risk-category criteria; every source file judged by an LLM full scan (ADR-054). |
+| Evaluation key | Kind          | Version | Content                                                                                         |
+| -------------- | ------------- | ------- | ----------------------------------------------------------------------------------------------- |
+| `npm-osv`      | `repository`  | `v1`    | One ASSERTION criterion: installed npm packages matched against OSV.                            |
+| `aws-cis-1.5`  | `aws-account` | `v1`    | Ten ASSERTION criteria of the CIS AWS Foundations Benchmark v1.5 initial set (ADR-027).         |
+| `aws-custom`   | `aws-account` | `v1`    | Custom hardening criteria inherited from the predecessor aws-audit module (ADR-033/037).        |
+| `threat-intel` | `repository`  | `v1`    | Threat-intelligence relevance criteria (ADR-039).                                               |
+| `code-scan`    | `repository`  | `v1`    | Five ASSERTION risk-category criteria; every source file judged by an LLM full scan (ADR-054).  |
+| `web-posture`  | `web-origin`  | `v1`    | Eleven ASSERTION criteria over HTTP security headers and TLS protocol/cipher posture (ADR-066). |
 
 Each CIS criterion carries `controlId`, `severity`, `remediation` and
 `knowledgeRequirements` in its metadata; the judgment reads severity from there, and
@@ -94,20 +95,25 @@ The module implements the skeleton's kind-scoped ports for both kinds:
 - `EVALUATION_CRITERIA:{repository|aws-account}` → `SecurityEvaluationCriteriaProvider`
 - `EVALUATION_EVIDENCE:repository` → `SecurityEvaluationEvidenceProvider`
 - `EVALUATION_EVIDENCE:aws-account` → `SecurityEvaluationAwsConfigEvidenceProvider`
-- `EVALUATION_JUDGMENT:{repository|aws-account}` → `SecurityEvaluationJudgmentService`
+- `EVALUATION_EVIDENCE:web-origin` → `SecurityEvaluationWebPostureEvidenceProvider`
+- `EVALUATION_JUDGMENT:{repository|aws-account|web-origin}` → `SecurityEvaluationJudgmentService`
   (looks up the mechanisms declared for `ruleSetVersion.standardKey` in the
   registry: `npm-osv` → `dependency`, `aws-cis-1.5` / `aws-custom` → `aws-config`,
-  `threat-intel` → `intel`, `code-scan` → `code-llm`, then merges their
-  judgments, ADR-046)
+  `threat-intel` → `intel`, `code-scan` → `code-llm`, `web-posture` →
+  `web-posture`, then merges their judgments, ADR-046)
 
-The host must bind four more ports, owned by this module:
+The host must bind five more ports, owned by this module:
 
 ```ts
 { provide: securityEvaluationRepositoryAccessToken, useClass: YourRepositoryAccess }
 { provide: securityEvaluationRepositorySnapshotAccessToken, useClass: YourRepositorySnapshotAccess }
 { provide: securityEvaluationAwsConfigAccessToken, useClass: YourAwsConfigAccess }
 { provide: SECURITY_EVALUATION_SCOPE_ENTITIES_PROVIDER, useClass: YourScopeEntitiesProvider }
+{ provide: SECURITY_EVALUATION_WEB_PROBE_ACCESS, useClass: YourWebProbeAccess }
 ```
+
+The last one is required only by deployments that evaluate `web-origin`
+subjects; a `web-posture` run without it fails with a wiring error.
 
 `SecurityEvaluationScopeEntitiesProvider` (ADR-058) answers one question: which
 business entities belong to _this_ subject? `null` means the host does not know
@@ -175,8 +181,23 @@ SECURITY_EVALUATION_SCHEDULES = [
   { standardKey: "aws-custom", subjectKind: "aws-account", recommendedInterval: "daily" },
   { standardKey: "threat-intel", subjectKind: "repository", recommendedInterval: "hourly" },
   { standardKey: "code-scan", subjectKind: "repository", recommendedInterval: "daily" },
+  { standardKey: "web-posture", subjectKind: "web-origin", recommendedInterval: "daily" },
 ];
 ```
+
+## WEB_POSTURE (ADR-066)
+
+`web-posture` judges an owned web origin from the outside: one HTML request, an
+optional `api.session` request, and one TLS handshake. It never authenticates,
+never follows a browser flow, and never sends a request that triggers an
+outbound email or OTP.
+
+The host must bind `SECURITY_EVALUATION_WEB_PROBE_ACCESS`; without it the run
+fails with a wiring error instead of reporting a clean result. A missing
+`api.session` path role skips only the two API header criteria and is reported
+in the coverage bucket. Findings are fingerprinted as
+`sha256(criterionKey + "\u0000" + discriminator)` where the discriminator is the
+header name with its role, the legacy TLS protocol, or the weak cipher suite.
 
 ## CODE_SCAN (ADR-054)
 

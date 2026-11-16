@@ -18,10 +18,24 @@ import {
   SECURITY_EVALUATION_KEY_CODE_SCAN,
   SECURITY_EVALUATION_KEY_NPM_OSV,
   SECURITY_EVALUATION_KEY_THREAT_INTEL,
+  SECURITY_EVALUATION_KEY_WEB_POSTURE,
   SECURITY_EVALUATION_INTELLIGENCE_RULE_SET_VERSION,
   SECURITY_EVALUATION_INTELLIGENCE_CRITERION_KEY,
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+  SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_CSP,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_HSTS,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_PERMISSIONS_POLICY,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_REFERRER_POLICY,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_TLS_LEGACY_PROTOCOL,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_TLS_WEAK_CIPHER,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_XCTO_API,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_XCTO_HTML,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_X_FRAME_OPTIONS,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_X_POWERED_BY_API,
+  SECURITY_EVALUATION_WEB_POSTURE_CRITERION_X_POWERED_BY_HTML,
+  SECURITY_EVALUATION_WEB_POSTURE_RULE_SET_VERSION,
 } from "../security-evaluation.constants";
 import {
   SECURITY_EVALUATION_AWS_CIS_BENCHMARK,
@@ -222,12 +236,139 @@ export class SecurityEvaluationCriteriaSeed implements OnModuleInit {
     });
   }
 
+  /**
+   * WEB_POSTURE criteria (ADR-066 §4): one ASSERTION per externally observable
+   * fact of a verified web origin — response-header presence and values, HSTS
+   * parameters, and TLS protocol/cipher posture. The metadata states the
+   * pass/fail predicate for readers; the mechanism carries the authoritative
+   * severity table.
+   */
+  async seedWebPostureBaseline(): Promise<void> {
+    await this.seedBaselineIfMissing({
+      kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
+      standardKey: SECURITY_EVALUATION_KEY_WEB_POSTURE,
+      version: SECURITY_EVALUATION_WEB_POSTURE_RULE_SET_VERSION,
+      description:
+        "Web posture: one bounded observation per run (the HTML entry point, the configured API session path when present, and the TLS handshake) is asserted for response-header and TLS posture.",
+      metadata: { mechanism: "web-posture", observation: "single-get-plus-tls-handshake" },
+      criteria: [
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_XCTO_HTML,
+          name: "Missing X-Content-Type-Options on HTML responses",
+          description: "The HTML entry point's response does not opt out of MIME sniffing.",
+          metadata: {
+            severity: "LOW",
+            target: "path:html",
+            predicate: 'header "x-content-type-options" is absent or its trimmed value is not "nosniff"',
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_XCTO_API,
+          name: "Missing X-Content-Type-Options on API responses",
+          description: "The configured API session path does not opt out of MIME sniffing.",
+          metadata: {
+            severity: "INFO",
+            target: "path:api.session",
+            predicate: 'header "x-content-type-options" is absent or its trimmed value is not "nosniff"',
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_HSTS,
+          name: "Missing or short HSTS",
+          description: "The origin does not require HTTPS for a meaningful lifetime.",
+          metadata: {
+            severity: "LOW",
+            target: "origin",
+            predicate: 'header "strict-transport-security" is absent or its max-age is below 15552000 seconds',
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_X_POWERED_BY_HTML,
+          name: "X-Powered-By exposed on HTML responses",
+          description: "The HTML entry point discloses the technology stack.",
+          metadata: { severity: "INFO", target: "path:html", predicate: 'header "x-powered-by" is present' },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_X_POWERED_BY_API,
+          name: "X-Powered-By exposed on API responses",
+          description: "The API session path discloses the technology stack.",
+          metadata: {
+            severity: "INFO",
+            target: "path:api.session",
+            predicate: 'header "x-powered-by" is present',
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_X_FRAME_OPTIONS,
+          name: "Missing frame embedding protection",
+          description: "The HTML entry point can be embedded by another origin.",
+          metadata: {
+            severity: "MEDIUM",
+            target: "path:html",
+            predicate: 'header "x-frame-options" is absent and the CSP header does not contain "frame-ancestors"',
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_CSP,
+          name: "Missing Content-Security-Policy",
+          description: "The HTML entry point declares no content security policy.",
+          metadata: {
+            severity: "LOW",
+            target: "path:html",
+            predicate: 'header "content-security-policy" is absent',
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_PERMISSIONS_POLICY,
+          name: "Missing Permissions-Policy",
+          description: "The HTML entry point does not restrict powerful browser features.",
+          metadata: {
+            severity: "INFO",
+            target: "path:html",
+            predicate: 'header "permissions-policy" is absent',
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_REFERRER_POLICY,
+          name: "Missing Referrer-Policy",
+          description: "The HTML entry point sends full referrers to other origins by default.",
+          metadata: {
+            severity: "LOW",
+            target: "path:html",
+            predicate: 'header "referrer-policy" is absent',
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_TLS_LEGACY_PROTOCOL,
+          name: "Deprecated TLS protocol enabled",
+          description: "The origin still negotiates TLS 1.0 or TLS 1.1.",
+          metadata: {
+            severity: "MEDIUM",
+            target: "origin",
+            predicate: "a TLS handshake reports tls10 or tls11 as supported",
+          },
+        },
+        {
+          criterionKey: SECURITY_EVALUATION_WEB_POSTURE_CRITERION_TLS_WEAK_CIPHER,
+          name: "Weak TLS cipher suite offered",
+          description: "The origin offers a cipher suite that is broken or export-grade.",
+          metadata: {
+            severity: "HIGH",
+            target: "origin",
+            predicate: "an offered cipher suite name matches NULL, anon, EXPORT, RC4, 3DES, DES or MD5",
+          },
+        },
+      ],
+    });
+  }
+
   private async seedMissingBaselines(): Promise<void> {
     await this.seedDependencyBaseline();
     await this.seedAwsConfigBaseline();
     await this.seedAwsCustomBaseline();
     await this.seedIntelligenceBaseline();
     await this.seedCodeScanBaseline();
+    await this.seedWebPostureBaseline();
   }
 
   private async seedBaselineIfMissing(baseline: BaselineSeed): Promise<void> {

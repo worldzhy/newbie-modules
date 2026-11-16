@@ -1,9 +1,8 @@
-import { Controller, Get, Query, Req, UseGuards } from "@nestjs/common";
+import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { JwtAuthGuard } from "@modules/security/authentication/jwt/jwt.guard";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
-import { UserRequest } from "@modules/security/security.interface";
 import { TaskParticipantService } from "./task-participant.service";
 import { LookupParticipantQueryDto, TaskParticipantDataResponseDto, ListTaskParticipantsResponseDto } from "./task.dto";
 
@@ -16,10 +15,10 @@ export class TaskParticipantController {
 
   @Get()
   @RequirePermission(PermissionAction.List, Prisma.ModelName.TaskParticipant)
-  @ApiOperation({ summary: "List task participants within the caller's projects" })
+  @ApiOperation({ summary: "List task participants" })
   @ApiResponse({ status: 200, type: ListTaskParticipantsResponseDto })
-  async listParticipants(@Req() req: UserRequest): Promise<ListTaskParticipantsResponseDto> {
-    const participants = await this.taskParticipantService.listParticipants(req.user.userId);
+  async listParticipants(): Promise<ListTaskParticipantsResponseDto> {
+    const participants = await this.taskParticipantService.listParticipants();
     return { success: true, data: participants };
   }
 
@@ -27,11 +26,8 @@ export class TaskParticipantController {
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.TaskParticipant)
   @ApiOperation({ summary: "Look up a participant by host user ID" })
   @ApiResponse({ status: 200, type: TaskParticipantDataResponseDto })
-  async getParticipantByUserId(
-    @Query() query: LookupParticipantQueryDto,
-    @Req() req: UserRequest,
-  ): Promise<TaskParticipantDataResponseDto> {
-    const participant = await this.taskParticipantService.getParticipantByUserId(query.userId, req.user.userId);
+  async getParticipantByUserId(@Query() query: LookupParticipantQueryDto): Promise<TaskParticipantDataResponseDto> {
+    const participant = await this.taskParticipantService.getParticipantByUserId(query.userId);
     return { success: true, data: participant };
   }
 }
