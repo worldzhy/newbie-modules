@@ -552,7 +552,7 @@ test("material verification is a web-origin state machine, so another kind is a 
   ]);
 
   await assert.rejects(
-    service.requestMaterialVerification(repository.subjectId, "DNS_TXT"),
+    service.rotateMaterialVerificationToken(repository.subjectId),
     /verification applies to web-origin subjects only/,
   );
   await assert.rejects(

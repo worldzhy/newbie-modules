@@ -25,6 +25,10 @@ import {
   type SecurityEvaluationWebOriginVerificationStatus,
 } from "../security-evaluation.constants";
 import type { SecurityEvaluationWebOriginMaterialDto } from "../security-evaluation-material.dto";
+import type {
+  WebOriginVerificationCheckResponseDto,
+  WebOriginVerificationDto,
+} from "../security-evaluation-web-origin.dto";
 import {
   VerificationFetchAccess,
   securityEvaluationVerificationFetchAccessToken,
@@ -53,27 +57,6 @@ export interface SecurityEvaluationWebOriginRegistration {
   origin: string;
   verificationStatus: SecurityEvaluationWebOriginVerificationStatus;
   verificationToken: string;
-}
-
-export interface SecurityEvaluationWebOriginChallenge {
-  subjectId: string;
-  origin: string;
-  method: SecurityEvaluationWebOriginVerificationMethod;
-  token: string;
-  /** Publish this TXT record (DNS_TXT). */
-  dnsRecordName?: string;
-  dnsRecordValue?: string;
-  /** Publish the token at this URL (WELL_KNOWN). */
-  wellKnownUrl?: string;
-}
-
-export interface SecurityEvaluationWebOriginVerificationResult {
-  subjectId: string;
-  origin: string;
-  status: SecurityEvaluationWebOriginVerificationStatus;
-  verifiedAt: Date | null;
-  lastVerifiedAt: Date | null;
-  consecutiveFailures: number;
 }
 
 export interface SecurityEvaluationWebOriginTarget {
@@ -223,41 +206,37 @@ export class SecurityEvaluationWebOriginService {
   }
 
   /**
-   * Return the challenge to publish. The token is reused while it is the one
-   * the operator may have already published; a `FAILED` origin gets a fresh
-   * token because the old one was exposed long enough to fail repeatedly.
+   * Issue a fresh token (ADR-074 D2). The old value stops matching immediately:
+   * rotation is an explicit operator decision, not a side effect of opening the
+   * verification panel, and a verified origin has to be revoked first because
+   * rotating it would silently invalidate a proof that is in effect.
    */
-  async requestVerification(
-    subjectId: string,
-    method: SecurityEvaluationWebOriginVerificationMethod,
-  ): Promise<SecurityEvaluationWebOriginChallenge> {
-    requireVerificationMethod(method);
+  async rotateVerificationToken(subjectId: string): Promise<WebOriginVerificationDto> {
     const { row, subject } = await this.getWebOrigin(subjectId);
     if (row.verificationStatus === "REVOKED") {
       throw new BadRequestException(`Web origin ${subject.subjectKey} is revoked and cannot be verified.`);
     }
+    if (row.verificationStatus === "VERIFIED") {
+      throw new BadRequestException(
+        `Web origin ${subject.subjectKey} is already verified; revoke it before rotating the token.`,
+      );
+    }
 
-    const regenerate = row.verificationStatus === "FAILED";
-    const token = regenerate ? this.generateToken() : row.verificationToken;
+    const token = this.generateToken();
     await this.prisma.securityEvaluationWebOrigin.update({
       where: { subjectId },
-      data: {
-        verificationMethod: method,
-        verificationToken: token,
-        ...(regenerate ? { verificationFailureCount: 0 } : {}),
-        ...(row.verificationStatus === "VERIFIED" ? {} : { verificationStatus: "PENDING" }),
-      },
+      data: { verificationToken: token, verificationFailureCount: 0, verificationStatus: "PENDING" },
     });
-
-    return buildChallenge(subjectId, subject.subjectKey, method, token);
+    return buildVerification(subject.subjectKey, token);
   }
 
   /**
-   * Check the published token and persist the outcome. A transport failure is
-   * a failed verification (the origin could not be proven), which is what the
-   * three-strike rule is meant to catch.
+   * Probe both placements in order (ADR-074 D3) and persist the outcome. The
+   * method written on success is the evidence of which placement answered; a
+   * failed check leaves the previous method untouched, and one check counts as
+   * one failure regardless of how many placements were probed.
    */
-  async verify(subjectId: string): Promise<SecurityEvaluationWebOriginVerificationResult> {
+  async checkVerification(subjectId: string): Promise<WebOriginVerificationCheckResponseDto> {
     const fetch = this.verificationFetch;
     if (!fetch) {
       throw new InternalServerErrorException(
@@ -269,25 +248,22 @@ export class SecurityEvaluationWebOriginService {
     if (row.verificationStatus === "REVOKED") {
       throw new BadRequestException(`Web origin ${subject.subjectKey} is revoked and cannot be verified.`);
     }
-    const method = row.verificationMethod as SecurityEvaluationWebOriginVerificationMethod | null;
-    if (!method) {
-      throw new BadRequestException(`Web origin ${subject.subjectKey} has no verification method; request one first.`);
-    }
 
-    const matched = await this.matchesPublishedToken(fetch, subject.subjectKey, method, row.verificationToken);
+    const matchedMethod = await this.probePublishedToken(fetch, subject.subjectKey, row.verificationToken);
     const now = new Date();
 
-    if (matched) {
+    if (matchedMethod) {
       const updated = await this.prisma.securityEvaluationWebOrigin.update({
         where: { subjectId },
         data: {
           verificationStatus: "VERIFIED",
+          verificationMethod: matchedMethod,
           verifiedAt: row.verifiedAt ?? now,
           lastVerifiedAt: now,
           verificationFailureCount: 0,
         },
       });
-      return toVerificationResult(subjectId, subject.subjectKey, updated);
+      return toVerificationCheckResponse(subjectId, subject.subjectKey, updated);
     }
 
     const failures = row.verificationFailureCount + 1;
@@ -298,7 +274,19 @@ export class SecurityEvaluationWebOriginService {
         verificationStatus: failures >= this.reverifyFailureThreshold ? "FAILED" : row.verificationStatus,
       },
     });
-    return toVerificationResult(subjectId, subject.subjectKey, updated);
+    return toVerificationCheckResponse(subjectId, subject.subjectKey, updated);
+  }
+
+  /** First placement that shows the token wins; DNS first, then `.well-known`. */
+  private async probePublishedToken(
+    fetch: VerificationFetchAccess,
+    origin: string,
+    token: string,
+  ): Promise<SecurityEvaluationWebOriginVerificationMethod | null> {
+    for (const method of SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS) {
+      if (await this.matchesPublishedToken(fetch, origin, method, token)) return method;
+    }
+    return null;
   }
 
   /**
@@ -329,10 +317,10 @@ export class SecurityEvaluationWebOriginService {
       let status = row.verificationStatus;
       if (due) {
         try {
-          status = (await this.verify(row.subjectId)).status;
+          status = (await this.checkVerification(row.subjectId)).status;
         } catch {
-          // A host-side lookup error is already counted inside verify(); an
-          // unbound port or a missing method leaves the row untouched.
+          // A host-side lookup error is already counted inside checkVerification();
+          // an unbound port leaves the row untouched.
           status = row.verificationStatus;
         }
       }
@@ -353,15 +341,17 @@ export class SecurityEvaluationWebOriginService {
     return parseTargetPaths(row.targetPaths);
   }
 
-  /** The web-origin branch of a subject's material (ADR-071); the token is never part of a read. */
+  /** The web-origin branch of a subject's material (ADR-074 D1). */
   async detail(subjectId: string): Promise<SecurityEvaluationWebOriginMaterialDto> {
-    const row = await this.prisma.securityEvaluationWebOrigin.findUnique({ where: { subjectId } });
-    if (!row) throw new NotFoundException(`Security evaluation web origin ${subjectId} not found`);
+    const { row, subject } = await this.getWebOrigin(subjectId);
+    const verificationStatus = row.verificationStatus as SecurityEvaluationWebOriginVerificationStatus;
+    const pending = verificationStatus === "PENDING" || verificationStatus === "FAILED";
     return {
       kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
       targetPaths: parseTargetPaths(row.targetPaths),
-      verificationStatus: row.verificationStatus as SecurityEvaluationWebOriginVerificationStatus,
+      verificationStatus,
       verificationMethod: row.verificationMethod as SecurityEvaluationWebOriginVerificationMethod | null,
+      verification: pending ? buildVerification(subject.subjectKey, row.verificationToken) : null,
       verificationFailureCount: row.verificationFailureCount,
       verifiedAt: row.verifiedAt,
       lastVerifiedAt: row.lastVerifiedAt,
@@ -474,33 +464,19 @@ function parseTargetPaths(value: Prisma.JsonValue): Record<string, string> {
   return parsed;
 }
 
-function buildChallenge(
-  subjectId: string,
-  origin: string,
-  method: SecurityEvaluationWebOriginVerificationMethod,
-  token: string,
-): SecurityEvaluationWebOriginChallenge {
+function buildVerification(origin: string, token: string): WebOriginVerificationDto {
   const host = new URL(origin).hostname;
-  if (method === "DNS_TXT") {
-    return {
-      subjectId,
-      origin,
-      method,
-      token,
-      dnsRecordName: `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX}.${host}`,
-      dnsRecordValue: `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX}${token}`,
-    };
-  }
   return {
-    subjectId,
-    origin,
-    method,
     token,
-    wellKnownUrl: `https://${host}${SECURITY_EVALUATION_WEB_ORIGIN_WELL_KNOWN_PATH}`,
+    dnsTxt: {
+      name: `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX}.${host}`,
+      value: `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX}${token}`,
+    },
+    wellKnown: { url: `https://${host}${SECURITY_EVALUATION_WEB_ORIGIN_WELL_KNOWN_PATH}` },
   };
 }
 
-function toVerificationResult(
+function toVerificationCheckResponse(
   subjectId: string,
   origin: string,
   row: {
@@ -509,7 +485,7 @@ function toVerificationResult(
     lastVerifiedAt: Date | null;
     verificationFailureCount: number;
   },
-): SecurityEvaluationWebOriginVerificationResult {
+): WebOriginVerificationCheckResponseDto {
   return {
     subjectId,
     origin,
@@ -518,12 +494,4 @@ function toVerificationResult(
     lastVerifiedAt: row.lastVerifiedAt,
     consecutiveFailures: row.verificationFailureCount,
   };
-}
-
-function requireVerificationMethod(method: string): void {
-  if (!(SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS as readonly string[]).includes(method)) {
-    throw new BadRequestException(
-      `Unknown verification method '${method}'; expected one of ${SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS.join(", ")}.`,
-    );
-  }
 }

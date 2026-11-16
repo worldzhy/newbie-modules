@@ -9,14 +9,13 @@ import {
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
   SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
   SECURITY_EVALUATION_SUBJECT_TYPE,
-  type SecurityEvaluationWebOriginVerificationMethod,
 } from "../security-evaluation.constants";
 import type { SecurityEvaluationSubjectMaterial } from "../security-evaluation-material.dto";
-import { SecurityEvaluationWebOriginService } from "./security-evaluation-web-origin.service";
 import type {
-  SecurityEvaluationWebOriginChallenge,
-  SecurityEvaluationWebOriginVerificationResult,
-} from "./security-evaluation-web-origin.service";
+  WebOriginVerificationCheckResponseDto,
+  WebOriginVerificationDto,
+} from "../security-evaluation-web-origin.dto";
+import { SecurityEvaluationWebOriginService } from "./security-evaluation-web-origin.service";
 import {
   normalizeAwsAccountId,
   normalizeAwsRegions,
@@ -402,22 +401,19 @@ export class SecurityEvaluationAssetService {
   }
 
   /**
-   * Issue (or reuse) the verification token of a web-origin subject. Verification
-   * is a web-origin state machine, so another kind is a bad request, not a
+   * Rotate the verification token of a web-origin subject (ADR-074 D2).
+   * Rotation is web-origin specific, so another kind is a bad request, not a
    * missing resource.
    */
-  async requestMaterialVerification(
-    subjectId: string,
-    method: SecurityEvaluationWebOriginVerificationMethod,
-  ): Promise<SecurityEvaluationWebOriginChallenge> {
+  async rotateMaterialVerificationToken(subjectId: string): Promise<WebOriginVerificationDto> {
     await this.assertWebOriginSubject(subjectId);
-    return this.webOrigins.requestVerification(subjectId, method);
+    return this.webOrigins.rotateVerificationToken(subjectId);
   }
 
-  /** Persist the verification outcome of a web-origin subject (ADR-071). */
-  async checkMaterialVerification(subjectId: string): Promise<SecurityEvaluationWebOriginVerificationResult> {
+  /** Probe both placements and persist the outcome (ADR-074 D3). */
+  async checkMaterialVerification(subjectId: string): Promise<WebOriginVerificationCheckResponseDto> {
     await this.assertWebOriginSubject(subjectId);
-    return this.webOrigins.verify(subjectId);
+    return this.webOrigins.checkVerification(subjectId);
   }
 
   private async assertWebOriginSubject(subjectId: string): Promise<void> {

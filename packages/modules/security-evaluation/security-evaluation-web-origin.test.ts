@@ -6,8 +6,8 @@ import type { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   SecurityEvaluationWebOriginService,
   normalizeWebOrigin,
-  type SecurityEvaluationWebOriginVerificationResult,
 } from "./assets/security-evaluation-web-origin.service";
+import type { WebOriginVerificationCheckResponseDto } from "./security-evaluation-web-origin.dto";
 import {
   SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
   SECURITY_EVALUATION_SUBJECT_TYPE,
@@ -172,14 +172,14 @@ test("create rejects an unknown target path role before writing anything", async
   assert.equal(transactions, 0);
 });
 
-test("requestVerification issues a DNS challenge and stores the requested method", async () => {
+test("rotateVerificationToken issues a fresh token and resets the failure count", async () => {
   const updates: Array<{ data: Record<string, unknown> }> = [];
   const prisma = {
     securityEvaluationWebOrigin: {
       findUnique: async () => fakeWebOriginRow(),
       update: async (args: { data: Record<string, unknown> }) => {
         updates.push(args);
-        return fakeWebOriginRow({ verificationMethod: String(args.data.verificationMethod) });
+        return fakeWebOriginRow({ verificationToken: String(args.data.verificationToken) });
       },
     },
     evaluationSubject: {
@@ -188,18 +188,59 @@ test("requestVerification issues a DNS challenge and stores the requested method
   };
   const service = buildService({ prisma, subjects: {} });
 
-  const challenge = await service.requestVerification("subject-1", "DNS_TXT");
+  const verification = await service.rotateVerificationToken("subject-1");
 
-  assert.equal(challenge.subjectId, "subject-1");
-  assert.equal(challenge.origin, "https://app.example.com");
-  assert.equal(challenge.method, "DNS_TXT");
-  assert.equal(challenge.dnsRecordName, `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX}.app.example.com`);
-  assert.equal(challenge.dnsRecordValue, `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX}token-1`);
+  assert.equal(verification.dnsTxt.name, `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX}.app.example.com`);
+  assert.equal(
+    verification.dnsTxt.value,
+    `${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX}${verification.token}`,
+  );
+  assert.equal(verification.wellKnown.url, "https://app.example.com/.well-known/nightwatch-verification.txt");
+  assert.equal(verification.token.length, 43);
+  assert.notEqual(verification.token, "token-1");
   assert.equal(updates.length, 1);
-  assert.equal(updates[0].data.verificationMethod, "DNS_TXT");
+  assert.equal(updates[0].data.verificationStatus, "PENDING");
+  assert.equal(updates[0].data.verificationFailureCount, 0);
+  assert.equal("verificationMethod" in updates[0].data, false);
 });
 
-test("verify marks a matching DNS record VERIFIED and stamps the timestamps", async () => {
+test("rotateVerificationToken refuses VERIFIED and REVOKED origins", async () => {
+  for (const status of ["VERIFIED", "REVOKED"]) {
+    const prisma = {
+      securityEvaluationWebOrigin: {
+        findUnique: async () => fakeWebOriginRow({ verificationStatus: status }),
+        update: async () => {
+          throw new Error("update must not run");
+        },
+      },
+      evaluationSubject: {
+        findUnique: async () => fakeSubject(),
+      },
+    };
+    const service = buildService({ prisma, subjects: {} });
+    await assert.rejects(service.rotateVerificationToken("subject-1"), /cannot be verified|already verified/);
+  }
+});
+
+test("detail returns the verification bundle until the origin is verified", async () => {
+  const pendingPrisma = {
+    securityEvaluationWebOrigin: { findUnique: async () => fakeWebOriginRow() },
+    evaluationSubject: { findUnique: async () => fakeSubject() },
+  };
+  const pending = await buildService({ prisma: pendingPrisma, subjects: {} }).detail("subject-1");
+  assert.equal(pending.verification?.token, "token-1");
+
+  const verifiedPrisma = {
+    securityEvaluationWebOrigin: {
+      findUnique: async () => fakeWebOriginRow({ verificationStatus: "VERIFIED", lastVerifiedAt: new Date() }),
+    },
+    evaluationSubject: { findUnique: async () => fakeSubject() },
+  };
+  const verified = await buildService({ prisma: verifiedPrisma, subjects: {} }).detail("subject-1");
+  assert.equal(verified.verification, null);
+});
+
+test("checkVerification marks a matching DNS record VERIFIED and stamps the timestamps", async () => {
   const updates: Array<{ data: Record<string, unknown> }> = [];
   const prisma = {
     securityEvaluationWebOrigin: {
@@ -228,7 +269,7 @@ test("verify marks a matching DNS record VERIFIED and stamps the timestamps", as
   };
   const service = buildService({ prisma, subjects: {}, fetch });
 
-  const result = await service.verify("subject-1");
+  const result = await service.checkVerification("subject-1");
 
   assert.deepEqual(lookups, [`${SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX}.app.example.com`]);
   assert.equal(result.status, "VERIFIED");
@@ -237,7 +278,43 @@ test("verify marks a matching DNS record VERIFIED and stamps the timestamps", as
   assert.ok(result.lastVerifiedAt instanceof Date);
 });
 
-test("verify counts a mismatching well-known body as a failure but keeps VERIFIED below the threshold", async () => {
+test("checkVerification falls back to the well-known file and records that method", async () => {
+  const updates: Array<{ data: Record<string, unknown> }> = [];
+  const prisma = {
+    securityEvaluationWebOrigin: {
+      findUnique: async () => fakeWebOriginRow({ verificationMethod: null }),
+      update: async (args: { data: Record<string, unknown> }) => {
+        updates.push(args);
+        return fakeWebOriginRow({
+          verificationStatus: "VERIFIED",
+          verificationMethod: String(args.data.verificationMethod),
+          verifiedAt: args.data.verifiedAt as Date,
+          lastVerifiedAt: args.data.lastVerifiedAt as Date,
+        });
+      },
+    },
+    evaluationSubject: {
+      findUnique: async () => fakeSubject(),
+    },
+  };
+  const urls: string[] = [];
+  const fetch: VerificationFetchAccess = {
+    lookupTxt: async () => [],
+    fetchText: async (url: string) => {
+      urls.push(url);
+      return "token-1\n";
+    },
+  };
+  const service = buildService({ prisma, subjects: {}, fetch });
+
+  const result = await service.checkVerification("subject-1");
+
+  assert.deepEqual(urls, ["https://app.example.com/.well-known/nightwatch-verification.txt"]);
+  assert.equal(result.status, "VERIFIED");
+  assert.equal(updates[0].data.verificationMethod, "WELL_KNOWN");
+});
+
+test("checkVerification counts a mismatching well-known body as a failure but keeps VERIFIED below the threshold", async () => {
   const updates: Array<{ data: Record<string, unknown> }> = [];
   const prisma = {
     securityEvaluationWebOrigin: {
@@ -264,14 +341,14 @@ test("verify counts a mismatching well-known body as a failure but keeps VERIFIE
   };
   const service = buildService({ prisma, subjects: {}, fetch });
 
-  const result = await service.verify("subject-1");
+  const result = await service.checkVerification("subject-1");
 
   assert.deepEqual(urls, ["https://app.example.com/.well-known/nightwatch-verification.txt"]);
   assert.equal(result.status, "VERIFIED");
   assert.equal(result.consecutiveFailures, 1);
 });
 
-test("verify drops to FAILED once consecutive failures reach the threshold", async () => {
+test("checkVerification drops to FAILED once consecutive failures reach the threshold", async () => {
   const prisma = {
     securityEvaluationWebOrigin: {
       findUnique: async () => fakeWebOriginRow({ verificationStatus: "VERIFIED", verificationFailureCount: 2 }),
@@ -291,16 +368,16 @@ test("verify drops to FAILED once consecutive failures reach the threshold", asy
   };
   const service = buildService({ prisma, subjects: {}, fetch });
 
-  const result = await service.verify("subject-1");
+  const result = await service.checkVerification("subject-1");
 
   assert.equal(result.status, "FAILED");
   assert.equal(result.consecutiveFailures, 3);
 });
 
-test("verify fails the call with a wiring error when the port is not bound", async () => {
+test("checkVerification fails the call with a wiring error when the port is not bound", async () => {
   const service = buildService({ prisma: {}, subjects: {} });
 
-  await assert.rejects(service.verify("subject-1"), /not bound/);
+  await assert.rejects(service.checkVerification("subject-1"), /not bound/);
 });
 
 test("listActiveVerified returns only active verified origins and lazily re-verifies due rows", async () => {
@@ -331,7 +408,7 @@ test("listActiveVerified returns only active verified origins and lazily re-veri
   };
   const service = buildService({ prisma, subjects: {} });
   const verified: string[] = [];
-  service.verify = async (subjectId: string): Promise<SecurityEvaluationWebOriginVerificationResult> => {
+  service.checkVerification = async (subjectId: string): Promise<WebOriginVerificationCheckResponseDto> => {
     verified.push(subjectId);
     return {
       subjectId,
@@ -372,7 +449,7 @@ test("listActiveVerified drops an origin whose lazy re-verification falls to FAI
     },
   };
   const service = buildService({ prisma, subjects: {} });
-  service.verify = async (subjectId: string): Promise<SecurityEvaluationWebOriginVerificationResult> => ({
+  service.checkVerification = async (subjectId: string): Promise<WebOriginVerificationCheckResponseDto> => ({
     subjectId,
     origin: "https://app.example.com",
     status: "FAILED",

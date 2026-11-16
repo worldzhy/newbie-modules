@@ -12,11 +12,7 @@ import { SecurityEvaluationAssetService } from "./assets/security-evaluation-ass
 import { SecurityEvaluationCodeScanExcerptService } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
-import {
-  RequestWebOriginVerificationDto,
-  WebOriginChallengeDto,
-  WebOriginVerificationResultDto,
-} from "./security-evaluation-web-origin.dto";
+import { WebOriginVerificationCheckResponseDto, WebOriginVerificationDto } from "./security-evaluation-web-origin.dto";
 import {
   SecurityEvaluationAwsAccountMaterialDto,
   SecurityEvaluationRepositoryMaterialDto,
@@ -213,26 +209,33 @@ export class SecurityEvaluationController {
     return this.assets.patchMaterial(params.subjectId, body);
   }
 
-  @Post("subjects/:subjectId/material/verification")
+  @Post("subjects/:subjectId/material/verification/tokens")
   @HttpCode(HttpStatus.OK)
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
-  @ApiOperation({ summary: "Pick a verification method and return the token/record the operator must publish" })
-  @ApiResponse({ status: 200, type: WebOriginChallengeDto })
-  requestMaterialVerification(
+  @ApiOperation({
+    summary: "Rotate the verification token; the previously published value stops matching",
+    description:
+      "Creates a new token for the origin and returns both placements to publish. Rejected with 400 once the origin is VERIFIED or REVOKED (ADR-074 D2).",
+  })
+  @ApiResponse({ status: 200, type: WebOriginVerificationDto })
+  rotateMaterialVerificationToken(
     @Param() params: GetSecurityEvaluationSubjectRequestDto,
-    @Body() body: RequestWebOriginVerificationDto,
-  ): Promise<WebOriginChallengeDto> {
-    return this.assets.requestMaterialVerification(params.subjectId, body.method);
+  ): Promise<WebOriginVerificationDto> {
+    return this.assets.rotateMaterialVerificationToken(params.subjectId);
   }
 
-  @Post("subjects/:subjectId/material/verification/check")
+  @Post("subjects/:subjectId/material/verification/checks")
   @HttpCode(HttpStatus.OK)
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
-  @ApiOperation({ summary: "Read the published token and persist the verification outcome" })
-  @ApiResponse({ status: 200, type: WebOriginVerificationResultDto })
+  @ApiOperation({
+    summary: "Probe the published token at the origin and persist the verification outcome",
+    description:
+      "DNS TXT is probed first, then `.well-known`; the first hit records `verificationMethod` (ADR-074 D3).",
+  })
+  @ApiResponse({ status: 200, type: WebOriginVerificationCheckResponseDto })
   checkMaterialVerification(
     @Param() params: GetSecurityEvaluationSubjectRequestDto,
-  ): Promise<WebOriginVerificationResultDto> {
+  ): Promise<WebOriginVerificationCheckResponseDto> {
     return this.assets.checkMaterialVerification(params.subjectId);
   }
 

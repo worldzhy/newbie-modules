@@ -8,17 +8,19 @@ import {
   type SecurityEvaluationWebOriginVerificationMethod,
   type SecurityEvaluationWebOriginVerificationStatus,
 } from "./security-evaluation.constants";
+import { WebOriginVerificationDto } from "./security-evaluation-web-origin.dto";
 
 /**
- * Material of one subject (ADR-071).
+ * Material of one subject (ADR-071, ADR-074).
  *
  * Material belongs to the subject, not to its kind: every material table keys on
  * `subjectId @unique`, and ingest writes the subject first and the material
  * second. The read path therefore hangs off the subject (`subjects/:subjectId
  * /material`) and the payload is a discriminated union — a new kind adds a union
- * branch, never a new route. The verification token is deliberately absent here:
- * it is issued (or reused) by `POST .../material/verification`, because a token
- * belongs to the act of verifying, not to the state of the subject.
+ * branch, never a new route. The web-origin branch carries the verification
+ * details while verification is outstanding (ADR-074 D1): the token has to be
+ * published at the operator's own origin, so treating it as a secret bought
+ * nothing and forced a read to go through a write.
  */
 export class SecurityEvaluationWebOriginMaterialDto {
   @ApiProperty({ enum: [SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN] })
@@ -36,6 +38,14 @@ export class SecurityEvaluationWebOriginMaterialDto {
 
   @ApiProperty({ enum: [...SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS], nullable: true })
   verificationMethod!: SecurityEvaluationWebOriginVerificationMethod | null;
+
+  @ApiProperty({
+    type: () => WebOriginVerificationDto,
+    nullable: true,
+    description:
+      "Token and both placements to publish while PENDING/FAILED; null once VERIFIED or REVOKED (ADR-074 D1).",
+  })
+  verification!: WebOriginVerificationDto | null;
 
   @ApiProperty({ type: Number, description: "Consecutive failed verifications; reset on success." })
   verificationFailureCount!: number;
