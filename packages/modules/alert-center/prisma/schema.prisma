@@ -31,7 +31,7 @@ model Alert {
   // firing | resolved.
   state       String  @db.VarChar(20) @default("firing")
   // Reminder cadence of this lifecycle, in minutes.
-  repeatIntervalMinutes Int  @default(60)
+  repeatIntervalMinutes Int  @default(1440)
   // Next due external reminder; null once resolved.
   nextNotificationAt   DateTime?
   // Last external reminder actually sent.

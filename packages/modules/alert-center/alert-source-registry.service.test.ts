@@ -18,6 +18,12 @@ test("a default rhythm that is not a positive integer is rejected", () => {
   assert.throws(() => registry.register(declaration({ defaultRepeatMinutes: 1.5 })), /Invalid defaultRepeatMinutes/);
 });
 
+test("an omitted default rhythm falls back to 24 hours", () => {
+  const registry = new AlertSourceRegistryService();
+  registry.register(declaration());
+  assert.equal(registry.require("url-check").defaultRepeatMinutes, 1440);
+});
+
 test("a pinned definition rhythm that is not a positive integer is rejected", () => {
   const registry = new AlertSourceRegistryService();
   assert.throws(

@@ -412,7 +412,7 @@ test("listSources surfaces every declared definition of a multi-family source", 
   registry.register({
     key: "security-evaluation",
     displayName: "Security Evaluation",
-    defaultRepeatMinutes: 60,
+    defaultRepeatMinutes: 1440,
     definitions: [
       { key: "run-failure", displayName: "Evaluation run failed" },
       { key: "risk-spike", displayName: "Risk spike", repeatMinutes: 1440 },
