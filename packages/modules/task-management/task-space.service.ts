@@ -37,18 +37,11 @@ export class TaskSpaceService {
   }
 
   /**
-   * List only the task spaces whose owning Project the user is a member of.
-   * Filters via the Prisma relation chain TaskSpace → Project → ProjectMember.
+   * List every task space. Project membership was retired in ADR-047, so there
+   * is no per-caller filter to apply.
    */
-  async listSpacesForUser(userId: string) {
+  async listSpaces() {
     return await this.prisma.taskSpace.findMany({
-      where: {
-        project: {
-          members: {
-            some: { userId },
-          },
-        },
-      },
       include: {
         _count: {
           select: { tasks: { where: { deletedAt: null } } },

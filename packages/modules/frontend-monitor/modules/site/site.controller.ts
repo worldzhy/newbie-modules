@@ -45,7 +45,7 @@ export class SiteController {
   }
 
   @Get("sites")
-  @RequirePermission(PermissionAction.List, "FrontendMonitorSite", { scope: "self" })
+  @RequirePermission(PermissionAction.List, "FrontendMonitorSite")
   @ApiOperation({ summary: "Get systems for a user" })
   @ApiResponse({ type: FrontendMonitorSiteResponseDto, isArray: true })
   async getSites(@Query() query: Record<string, unknown>, @Req() req: UserRequest) {
@@ -70,7 +70,7 @@ export class SiteController {
   }
 
   @Get("web-sites")
-  @RequirePermission(PermissionAction.List, "FrontendMonitorSite", { scope: "self" })
+  @RequirePermission(PermissionAction.List, "FrontendMonitorSite")
   @ApiOperation({ summary: "Get web system list" })
   @ApiResponse({ type: FrontendMonitorSiteResponseDto, isArray: true })
   async getWebSiteList(@Req() req: UserRequest) {
