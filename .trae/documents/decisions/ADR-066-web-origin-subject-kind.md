@@ -4,6 +4,7 @@
 更新：2026-11-14 — round46 R46-09：前端硬编码映射由「三处」订正为四处，补 `runOptionsFor` 与默认选项 409 后果（§影响）。
 更新：2026-11-16 — 专家裁决（用户授权）：本轮只交付 `web-posture`（响应头 + TLS）；`web-behavior` 整体不做——`Email Flooding via OTP` 触发外发通知、`Client-Side Only Authorization` 需页面级路径、`User Enumeration` 需要已存在账号作为对照，三者都越出 §2 边界。§1–§7 与覆盖矩阵同步收窄为 11 条 posture 规则（报告 14 条中覆盖 11、不做 3）。
 勘误：2026-11-14 — **资产表与归属验证记录从宿主下移到本模块**。本模块新增 `SecurityEvaluationWebOrigin` 表（`@@schema("module/security-evaluation")`，与 `SecurityEvaluationAsset` 一对一，`assetId @unique` + `onDelete: Cascade`）、`SecurityEvaluationWebOriginService`（`create` / `requestVerification` / `verify` / `listActiveVerified` / `pathRoles`）与可选端口 `VerificationFetchAccess`，并新增三个配置键 `webOriginVerificationIntervalDays` / `webOriginReverifyFailureThreshold` / `webOriginTokenBytes`。宿主不再建 `application.WebOrigin` 表，只保留 HTTP 入口、出网实现与项目来源上报（nightwatch-backend ADR-044 同步改写）。同批改名：模型 `SecurityEvaluationAssetSource` → `SecurityEvaluationAssetProvenance`（DTO `SecurityEvaluationAssetProvenanceResponseDto`，JSON 字段 `sources` 不变）、枚举 `SecurityEvaluationVerdictKind` → `SecurityEvaluationThreatVerdictKind`，Prisma 访问器统一为 `securityEvaluationAssetProvenance`。§1 的 `targetPaths` 因此落在本模块表上，不再是宿主 `WebOrigin.targetPaths`。同批评估 key 命名校正：`web-baseline` → `web-posture`（`baseline` 与 criteria seed 的 `BaselineSeed` 撞词，且该 key 判的是当下外部姿态而非对比基线），`web-behavior` 不变。
+勘误：2026-11-16 — 按实施现状订正（ADR-068 D8、ADR-070）：`SecurityEvaluationWebOrigin` 以 `subjectId String @unique @db.Uuid` 挂在 `EvaluationSubject` 上（不再 1:1 于 `SecurityEvaluationAsset`，无 `assetId`），模块内没有 provenance 行，项目归属留在宿主 `ProjectWebOrigin` 表；`environment` 列已删除（宿主迁移 `20261116073000_drop_web_origin_environment`），失败计数列名为 `verificationFailureCount`。
 日期：2026-11-14
 关系：扩展 ADR-022（security-evaluation 重建）的 kind 集合、ADR-037（evaluation key 与 criteria 版本化）、ADR-046（judgment mechanism 组合）、ADR-039（platform-level subject）；不取代任何既有 ADR。
 
@@ -147,7 +148,7 @@ sha256(criteriaId + "\u0000" + discriminator)
 
 ## 跨宿主 / 演进检验（registry 模块设计必填）
 
-- **无宿主词**：`web-origin`、`path`、`observation` 均为领域通用；模块不出现 consumer 实体名、状态机名或项目枚举，`environment` 只是 `VarChar(32)` 自由字符串（取值由宿主约定），项目归属以不透明 `sourceType` / `sourceId` 落在 provenance 行，不由模块解释（勘误 2026-11-14）。
+- **无宿主词**：`web-origin`、`path`、`observation` 均为领域通用；模块不出现 consumer 实体名、状态机名或项目枚举，项目归属留在宿主 `ProjectWebOrigin` 归属表，不由模块解释（勘误 2026-11-14；2026-11-16 删除 `environment` 列后表内不再有宿主约定的自由字符串）。
 - **对所有消费方一致**：不装配 `web-origin` 的宿主，其余 kind 的行为零变化；端口未绑定只在跑该 kind 时报错。
 - **演进路径**：新增检查项 = 新 criteria 版本 + 可能的新 discriminator；替换扫描工具 = 只改宿主适配器，finding 语义与 fingerprint 不变；新增 kind 仍走同一套 criterion/key/mechanism 机制。
 
