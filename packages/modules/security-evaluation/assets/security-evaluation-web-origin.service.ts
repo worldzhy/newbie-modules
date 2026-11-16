@@ -6,19 +6,20 @@ import {
   NotFoundException,
   Optional,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { randomBytes } from "node:crypto";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
 
-import { requirePositiveInteger } from "../persistence/security-evaluation-intel-negative-cache.repository";
 import {
   SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
   SECURITY_EVALUATION_SUBJECT_TYPE,
   SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX,
   SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX,
   SECURITY_EVALUATION_WEB_ORIGIN_PATH_ROLES,
+  SECURITY_EVALUATION_WEB_ORIGIN_REVERIFY_FAILURE_THRESHOLD,
+  SECURITY_EVALUATION_WEB_ORIGIN_TOKEN_BYTES,
+  SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_INTERVAL_DAYS,
   SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS,
   SECURITY_EVALUATION_WEB_ORIGIN_WELL_KNOWN_PATH,
   type SecurityEvaluationWebOriginVerificationMethod,
@@ -34,12 +35,6 @@ import {
   securityEvaluationVerificationFetchAccessToken,
 } from "../ports/web-origin-verification-access.port";
 
-const VERIFICATION_INTERVAL_DAYS_KEY = "modules.security-evaluation.webOriginVerificationIntervalDays";
-const REVERIFY_FAILURE_THRESHOLD_KEY = "modules.security-evaluation.webOriginReverifyFailureThreshold";
-const TOKEN_BYTES_KEY = "modules.security-evaluation.webOriginTokenBytes";
-
-/** Base64url expansion: 4 characters per 3 bytes, rounded up. */
-const MAX_TOKEN_BYTES = 48;
 const DAYS_MS = 86_400_000;
 
 export interface CreateSecurityEvaluationWebOriginInput {
@@ -84,32 +79,17 @@ export interface SecurityEvaluationWebOriginTarget {
  */
 @Injectable()
 export class SecurityEvaluationWebOriginService {
-  private readonly verificationIntervalMs: number;
-  private readonly reverifyFailureThreshold: number;
-  private readonly tokenBytes: number;
+  private readonly verificationIntervalMs = SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_INTERVAL_DAYS * DAYS_MS;
+  private readonly reverifyFailureThreshold = SECURITY_EVALUATION_WEB_ORIGIN_REVERIFY_FAILURE_THRESHOLD;
+  private readonly tokenBytes = SECURITY_EVALUATION_WEB_ORIGIN_TOKEN_BYTES;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly subjects: EvaluationSubjectService,
-    config: ConfigService,
     @Optional()
     @Inject(securityEvaluationVerificationFetchAccessToken)
     private readonly verificationFetch?: VerificationFetchAccess,
-  ) {
-    this.verificationIntervalMs =
-      requirePositiveInteger(
-        Number(config.getOrThrow<string>(VERIFICATION_INTERVAL_DAYS_KEY)),
-        VERIFICATION_INTERVAL_DAYS_KEY,
-      ) * DAYS_MS;
-    this.reverifyFailureThreshold = requirePositiveInteger(
-      Number(config.getOrThrow<string>(REVERIFY_FAILURE_THRESHOLD_KEY)),
-      REVERIFY_FAILURE_THRESHOLD_KEY,
-    );
-    this.tokenBytes = requirePositiveInteger(Number(config.getOrThrow<string>(TOKEN_BYTES_KEY)), TOKEN_BYTES_KEY);
-    if (this.tokenBytes > MAX_TOKEN_BYTES) {
-      throw new Error(`${TOKEN_BYTES_KEY} must be at most ${MAX_TOKEN_BYTES} bytes (VarChar(64) base64url).`);
-    }
-  }
+  ) {}
 
   /**
    * Register an origin idempotently (host alignment): platform-level subject +

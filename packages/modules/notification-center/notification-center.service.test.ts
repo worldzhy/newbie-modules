@@ -6,10 +6,6 @@ import { NotificationDeliveryRuleService } from "./notification-delivery-rule.se
 import { NotificationSettingService } from "./notification-setting.service";
 import { matchesDeliveryCondition, validateDeliveryCondition } from "./notification-center.constants";
 
-const TEST_CONFIG = {
-  getOrThrow: (key: string) => (key === "modules.notification-center.retentionDays" ? "90" : undefined),
-};
-
 function newService(state: { settingQueried: boolean }) {
   const prisma = {
     notificationSetting: {
@@ -27,12 +23,7 @@ function newService(state: { settingQueried: boolean }) {
     }),
   };
   const deliveryRules = { evaluate: async () => ({ action: "deliver", ruleId: "r1", reason: "rule" }) };
-  return new NotificationCenterService(
-    prisma as never,
-    registry as never,
-    deliveryRules as never,
-    TEST_CONFIG as never,
-  );
+  return new NotificationCenterService(prisma as never, registry as never, deliveryRules as never);
 }
 
 test("notify rejects a project outside the resolved scope before reading settings", async () => {
@@ -160,7 +151,6 @@ function newServiceWithCenter(severity: string, rules: RuleSeed[] = [], kind: "a
     prisma as never,
     registry as never,
     ruleService as never,
-    TEST_CONFIG as never,
     pushPort as never,
   );
   return {
@@ -468,7 +458,7 @@ test("markAllRead pages through unread records instead of materialising them all
       },
     },
   };
-  const service = new NotificationCenterService(prisma as never, {} as never, {} as never, TEST_CONFIG as never);
+  const service = new NotificationCenterService(prisma as never, {} as never, {} as never);
 
   const result = await service.markAllRead("u1", ["p1"]);
 

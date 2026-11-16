@@ -6,7 +6,6 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { SchedulerRegistry } from "@nestjs/schedule";
 import { CronJob } from "cron";
 import { EventEmitter2 } from "@nestjs/event-emitter";
@@ -25,22 +24,15 @@ const RECONCILE_INTERVAL_MS = 30_000;
 const CRON_JOB_NAME_PREFIX = "job-scheduler:";
 export const DEFAULT_TIMEZONE = "Asia/Shanghai";
 const PG_UNIQUE_VIOLATION = "P2002";
-const STUCK_RUN_AFTER_KEY = "modules.job-scheduler.stuckRunAfterMinutes";
-const RETENTION_DAYS_KEY = "modules.job-scheduler.retentionDays";
+/// Policy values, not deployment inputs: identical in every environment, so
+/// they are code constants rather than manifest env keys (ADR-053).
+export const JOB_RUN_STUCK_AFTER_MINUTES = 30;
+export const JOB_RUN_RETENTION_DAYS = 90;
 /// The stale-run sweeps are bounded: a boot that finds more than this many
 /// hung rows still starts, and the next trigger of each schedule converges the
 /// rest.
 const STUCK_RUN_SCAN_LIMIT = 100;
 const RUN_PRUNE_INTERVAL_MS = 60 * 60_000;
-
-/// Validates settings resolved from the assembler's bare env mapping
-/// (ADR-033): declared positive integers, no built-in fallback.
-function requirePositiveInteger(value: number, name: string): number {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`${name} must be a positive integer; received '${value}'.`);
-  }
-  return value;
-}
 
 export type JobTrigger = "schedule" | "manual";
 
@@ -76,8 +68,8 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
   private reconcileTimer?: NodeJS.Timeout;
   /// A running row older than this is declared failed by the scheduler itself
   /// (ADR-067 addendum), so a hung handler cannot stay invisible forever.
-  private readonly stuckRunAfterMinutes: number;
-  private readonly retentionDays: number;
+  private readonly stuckRunAfterMinutes = JOB_RUN_STUCK_AFTER_MINUTES;
+  private readonly retentionDays = JOB_RUN_RETENTION_DAYS;
   private lastRunPruneAt = 0;
 
   constructor(
@@ -85,17 +77,7 @@ export class JobSchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly schedulerRegistry: SchedulerRegistry,
     private readonly jobHandlerRegistry: JobHandlerRegistryService,
     private readonly eventEmitter: EventEmitter2,
-    private readonly config: ConfigService,
-  ) {
-    this.stuckRunAfterMinutes = requirePositiveInteger(
-      Number(this.config.getOrThrow<string>(STUCK_RUN_AFTER_KEY)),
-      STUCK_RUN_AFTER_KEY,
-    );
-    this.retentionDays = requirePositiveInteger(
-      Number(this.config.getOrThrow<string>(RETENTION_DAYS_KEY)),
-      RETENTION_DAYS_KEY,
-    );
-  }
+  ) {}
 
   async onModuleInit() {
     await this.reconcile();

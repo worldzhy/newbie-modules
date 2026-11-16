@@ -218,10 +218,10 @@ symbol)` — no content hash, no line numbers (those live in finding
   `SecurityEvaluationCodeScanVerdictCache`, keyed by `(subjectId,
 criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
   an unchanged file replays its cached verdict and never re-calls the model.
-  `unavailable` verdicts are never cached. Rows expire after the declared
-  `codeScanVerdictCacheTtlDays` (`SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS`, no
-  fallback) so long-unchanged files are re-judged against model drift, and the
-  TTL is enforced physically: `SecurityEvaluationRetentionService.pruneExpired()`
+  `unavailable` verdicts are never cached. Rows expire after the module
+  constant `SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS` (30, ADR-053:
+  a policy value, identical in every deployment) so long-unchanged files are
+  re-judged against model drift, and the TTL is enforced physically: `SecurityEvaluationRetentionService.pruneExpired()`
   deletes expired rows instead of leaving them as permanent read-side misses
   (the host schedules that call, next to the daily scan).
 - The LLM connection binds to the `security-evaluation-code-scan` scope.

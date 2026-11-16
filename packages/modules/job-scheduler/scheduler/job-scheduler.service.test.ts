@@ -6,11 +6,6 @@ import { JOB_RUN_FAILED_EVENT, JOB_RUN_SUCCEEDED_EVENT } from "../job-scheduler.
 
 type Row = Record<string, any>;
 
-const CONFIG: Row = {
-  "modules.job-scheduler.stuckRunAfterMinutes": "30",
-  "modules.job-scheduler.retentionDays": "30",
-};
-
 function newHarness(options: { runs?: Row[]; schedules?: Row[] } = {}) {
   const runs: Row[] = options.runs ?? [];
   const schedules: Row[] = options.schedules ?? [];
@@ -77,15 +72,7 @@ function newHarness(options: { runs?: Row[]; schedules?: Row[] } = {}) {
       emitted.push({ event, payload: payload as Row });
     },
   };
-  const config = { getOrThrow: (key: string) => CONFIG[key] };
-
-  const service = new JobSchedulerService(
-    prisma as never,
-    schedulerRegistry as never,
-    registry,
-    emitter as never,
-    config as never,
-  );
+  const service = new JobSchedulerService(prisma as never, schedulerRegistry as never, registry, emitter as never);
 
   return { service, runs, schedules, emitted };
 }

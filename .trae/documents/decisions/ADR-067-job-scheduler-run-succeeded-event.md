@@ -1,7 +1,8 @@
 # ADR-067: job-scheduler 暴露 run-succeeded 事件，job 失败告警由宿主闭合
 
-状态：已采纳
+状态：已采纳（阈值与保留期的声明方式由 devbie ADR-053 取代：改为模块常量）
 日期：2026-11-14
+Superseded by: devbie ADR-053（2026-11-17，仅限 `stuckRunAfterMinutes` / `retentionDays` 从 env 改为常量；事件契约不变）
 
 ## 背景
 

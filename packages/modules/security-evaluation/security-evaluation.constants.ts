@@ -46,6 +46,18 @@ export const SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_NAME_PREFIX = "_nightwatch-v
 export const SECURITY_EVALUATION_WEB_ORIGIN_DNS_TXT_VALUE_PREFIX = "nightwatch-verify=";
 export const SECURITY_EVALUATION_WEB_ORIGIN_WELL_KNOWN_PATH = "/.well-known/nightwatch-verification.txt";
 
+/**
+ * Ownership re-verification policy (ADR-044). Policy values, identical in every
+ * deployment, so they are code constants rather than manifest env keys
+ * (ADR-053): re-verify lazily after this many days, drop an origin to FAILED
+ * after this many consecutive failed re-verifications, and mint a token from
+ * this many random bytes (base64url-encoded, at most 48 bytes to fit
+ * VarChar(64)).
+ */
+export const SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_INTERVAL_DAYS = 30;
+export const SECURITY_EVALUATION_WEB_ORIGIN_REVERIFY_FAILURE_THRESHOLD = 3;
+export const SECURITY_EVALUATION_WEB_ORIGIN_TOKEN_BYTES = 32;
+
 /** Evaluation keys. Each standardKey is a versioned rule set within an EvaluationCategory (ADR-037). */
 export const SECURITY_EVALUATION_KEY_NPM_OSV = "npm-osv";
 export const SECURITY_EVALUATION_KEY_AWS_CIS_1_5 = "aws-cis-1.5";
@@ -71,6 +83,13 @@ export const SECURITY_EVALUATION_INTELLIGENCE_CRITERION_KEY = "threat-exposure";
  * (ADR-037 D9.4).
  */
 export const SECURITY_EVALUATION_INTEL_EVIDENCE_WINDOW_DAYS = 7;
+
+/**
+ * How long a "not-relevant" INTEL verdict stays reusable before the pair is
+ * re-judged. A policy value, identical in every deployment, so it is a code
+ * constant rather than a manifest env key (ADR-053).
+ */
+export const SECURITY_EVALUATION_INTEL_NEGATIVE_CACHE_TTL_DAYS = 7;
 
 /**
  * Maximum number of knowledge candidates a run registers as evidence items.
@@ -129,6 +148,14 @@ export const SECURITY_EVALUATION_CODE_SCAN_EXCERPT_MAX_CHARS = 12_000;
  * the content hash and the truncated flag (ADR-054 D7).
  */
 export const SECURITY_EVALUATION_CODE_SCAN_EXCERPT_RETENTION_DAYS = 90;
+
+/**
+ * How long a CODE_SCAN verdict stays reusable before the file is re-judged.
+ * Content or version changes already invalidate the cache key, so the TTL only
+ * forces a long-unchanged file to be re-judged against model drift. A policy
+ * value, identical in every deployment (ADR-053).
+ */
+export const SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS = 30;
 
 /**
  * Maximum number of LLM judgment calls a single CODE_SCAN run may spend.

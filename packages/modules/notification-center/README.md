@@ -35,7 +35,7 @@ Platform notification center. Business modules declare notifications in code, th
 
 ## Configuration
 
-`NOTIFICATION_RECORD_RETENTION_DAYS` (declared by the host manifest, ADR-033; example `90`) bounds the lifetime of `NotificationRecord` and `NotificationDeliveryAttempt` rows. Expired rows are pruned lazily on the notify path, at most once per hour; `NotificationReceipt` and `NotificationPushFailure` cascade with their record. Both ports above are Nest injection tokens bound by the host application: `NOTIFICATION_VISIBILITY_PORT` is mandatory (startup fails without it) and `NOTIFICATION_PUSH_PORT` is optional (only push delivery is skipped). Absolute links in push messages reuse the host's existing `APP_FRONTEND_URL`.
+`NOTIFICATION_RECORD_RETENTION_DAYS` (an exported constant, `90`) bounds the lifetime of `NotificationRecord` and `NotificationDeliveryAttempt` rows. It is a policy value, identical in every deployment, so it follows the code version instead of per-environment configuration (ADR-053). Expired rows are pruned lazily on the notify path, at most once per hour; `NotificationReceipt` and `NotificationPushFailure` cascade with their record. Both ports above are Nest injection tokens bound by the host application: `NOTIFICATION_VISIBILITY_PORT` is mandatory (startup fails without it) and `NOTIFICATION_PUSH_PORT` is optional (only push delivery is skipped). Absolute links in push messages reuse the host's existing `APP_FRONTEND_URL`.
 
 ## Upgrading
 

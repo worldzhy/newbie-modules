@@ -8,18 +8,6 @@
   },
   "requires": {
     "modules": ["security"],
-    "config": {
-      "event-emitter": {
-        "retentionDays": "process.env.EVENT_EMISSION_RETENTION_DAYS"
-      }
-    },
-    "env": {
-      "EVENT_EMISSION_RETENTION_DAYS": {
-        "type": "int",
-        "example": 90,
-        "description": "Days to keep EventEmission rows. Rows older than this are pruned lazily on each new emission insert."
-      }
-    },
     "dependencies": {
       "@nestjs/event-emitter": "latest"
     }
