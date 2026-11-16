@@ -16,10 +16,11 @@ import { SCOPE_PERMISSION_CHECKER, ScopePermissionChecker } from "@modules/secur
  * grant (the derived host-side "All" permission group bound to the admin role).
  * There is no hardcoded admin bypass and no wildcard matching.
  *
- * Scoped (project) decisions are delegated to the host-bound
- * SCOPE_PERMISSION_CHECKER. Per ADR-048 the two layers are not ORed: a resolved
- * scope is the sole criterion, and system-level grants only decide routes that
- * carry no scope semantics.
+ * Scoped decisions would delegate to SCOPE_PERMISSION_CHECKER. Since ADR-047
+ * retired project scope, this host binds no checker and no route carries a
+ * `scope` key, so that branch is defensive only. Per ADR-048 a resolved scope
+ * is the sole criterion when present — it never falls back to a system-level
+ * grant.
  */
 @Injectable()
 // eslint-disable-next-line @darraghor/nestjs-typed/injectable-should-be-provided -- bound via the PERMISSION_AUTHORIZER useClass provider
