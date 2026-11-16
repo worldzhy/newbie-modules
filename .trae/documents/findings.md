@@ -456,7 +456,7 @@ carry-over 复验：R50-01（definitions 与 producer alertKey 无绑定）仍 o
 | R54-02 | newbie-modules + nightwatch-backend | 存量 firing 行不跟随新默认：`repeatIntervalMinutes` 为开局快照（`alert-center.service.ts:165,209`），dispatch 读行值（`:302`）；切换默认后仅新告警静默，需定义一次性收敛策略 | P2 | live | 自动路径 | open |
 | R54-03 | newbie-modules | 注册表无法表达“缺省 = 不提醒”：`defaultRepeatMinutes` 缺省即落 60（`alert-source-registry.service.ts:27,60`），DTO 必填 number（`alert-center.dto.ts:199`）；实施 C1-b 的阻塞点 | P2 | source / live | 实施期 | open |
 | R54-04 | newbie-modules | ADR-065 宣称的“一天后再提醒”无任何载体：`ADR-065:135-141` 映射到移动 `nextNotificationAt`，但端点只有 `POST /alerts`、`POST /alerts/resolve`、GET、`GET/PUT /alert-sources`（`README.md:42-44`）；只做来源级设置后该意图彻底无载体 | P2 | live | 任意登录用户 | open |
-| R54-05 | newbie-modules | 若“来源级设置”含 `enabled`，与 ADR-065 §2 裁决冲突（`ADR-065:92`：不设 enabled，拒收 raise 会让 resolve 找不到行）；需先确认范围并视情况新 ADR | P2 | source | 设计期 | open |
+| R54-05 | newbie-modules | 若“来源级设置”含 `enabled`，与 ADR-065 §2 裁决冲突（`ADR-065:92`：不设 enabled，拒收 raise 会让 resolve 找不到行）；需先确认范围并视情况新 ADR | P2 | source | 设计期 | resolved（用户 2026-11-16 拍板做来源级 Enable；实现为“只关外发、不拒收 raise”，与暂停共用投递门禁，ADR-065 §2/§5 已同步修订） |
 | R54-06 | newbie-modules | C1-b 属跨宿主契约语义变更（registry 默认、宿主 registrar、DTO、前端文案、ADR-065），方案未提 ADR；按设计前置规则应先出 ADR / 修订 ADR-065 对应节 | P2 | docs / template | 设计期 | open |
 
 收尾（2026-11-16）：最终决策改为“保留重复提醒，仅把默认节奏从 60 分钟改为 24 小时（1440）”，未采用“首条后默认不 repeat”。
@@ -465,4 +465,4 @@ carry-over 复验：R50-01（definitions 与 producer alertKey 无绑定）仍 o
 - R54-04：`resolved`。模块缺省改为 1440 后，ADR-065 宣称的“一天后再提醒”首次有了载体（新生命周期按 24h 重复）。
 - R54-06：`addressed`。默认值语义变更已在 registry 与 nightwatch-backend 同步落地（常量、schema default、CLI 托管 models、migration），ADR-065 文本口径与实现一致，未另立新 ADR。
 - R54-02：`resolved`。存量 firing 行的 `repeatIntervalMinutes` 是开局快照；本次按用户决定清空历史数据，无存量行需要收敛，切换后所有告警按 24h 节奏。
-- R54-05：`open`（本次未涉及 `enabled` 范围决策）。
+- R54-05：`resolved`（2026-11-16 追加）。用户要求补来源级 Enable 开关；实现取“无限期暂停”语义——`enabled=false` 只短路投递，`raise`/`resolve`/记录照旧，因此不触发 ADR-065 §2 担心的闭合窗口。`AlertSource` 增列、DTO/服务/测试/宿主 migration 与前端开关同步落地，ADR-065 §2/§5 文本已改。

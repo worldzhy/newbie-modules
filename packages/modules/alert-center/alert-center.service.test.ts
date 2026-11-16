@@ -11,14 +11,15 @@ type Row = Record<string, any>;
 /** Identity of the single alert the behavior tests drive, as stored in the map. */
 const SITE_1 = buildAlertFingerprint({ source: "url-check", alertKey: "site-1" });
 
-function newHarness(options: { pausedUntil?: Date | null } = {}) {
+function newHarness(options: { pausedUntil?: Date | null; enabled?: boolean } = {}) {
   const alerts = new Map<string, Row>();
   const sourceRows = new Map<string, Row>();
-  if (options.pausedUntil !== undefined) {
+  if (options.pausedUntil !== undefined || options.enabled !== undefined) {
     sourceRows.set("url-check", {
       key: "url-check",
       repeatMinutes: null,
-      notificationPausedUntil: options.pausedUntil,
+      notificationPausedUntil: options.pausedUntil ?? null,
+      enabled: options.enabled ?? true,
     });
   }
   const events: Row[] = [];
@@ -94,9 +95,16 @@ function newHarness(options: { pausedUntil?: Date | null } = {}) {
         if (where?.key?.in) {
           rows = rows.filter((row) => where.key.in.includes(row.key));
         }
-        if (where?.notificationPausedUntil?.gt) {
-          const gt: Date = where.notificationPausedUntil.gt;
-          rows = rows.filter((row) => row.notificationPausedUntil && row.notificationPausedUntil > gt);
+        if (where?.OR) {
+          rows = rows.filter((row) =>
+            where.OR.some(
+              (clause: Row) =>
+                (clause.enabled === false && row.enabled === false) ||
+                (clause.notificationPausedUntil?.gt &&
+                  row.notificationPausedUntil &&
+                  row.notificationPausedUntil > clause.notificationPausedUntil.gt),
+            ),
+          );
         }
         return rows;
       },
@@ -232,6 +240,40 @@ test("a paused source records the alert but keeps it off the wire", async () => 
   const dueAt = alerts.get(SITE_1)!.nextNotificationAt as Date;
   // The first reminder lands after the pause, not inside it.
   assert.ok(dueAt > pausedUntil);
+});
+
+test("a disabled source records the alert but keeps it off the wire", async () => {
+  const { service, alerts, events } = newHarness({ enabled: false });
+
+  const result = await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
+
+  assert.equal(result.state, "firing");
+  assert.ok(alerts.get(SITE_1));
+  assert.equal(events.length, 0);
+});
+
+test("dispatchDueReminders skips a disabled source", async () => {
+  const { service, alerts, events } = newHarness({ enabled: false });
+  await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
+  alerts.get(SITE_1)!.nextNotificationAt = new Date(Date.now() - 1000);
+
+  const result = await service.dispatchDueReminders();
+
+  assert.equal(result.dispatched, 0);
+  assert.equal(events.length, 0);
+});
+
+test("updateSource persists a disabled source and deletes the row when re-enabled alone", async () => {
+  const { service, sourceRows } = newHarness();
+
+  const disabled = await service.updateSource("url-check", { enabled: false });
+  assert.equal(disabled.enabled, false);
+  assert.equal(sourceRows.get("url-check")?.enabled, false);
+  assert.equal((await service.listSources())[0].enabled, false);
+
+  const reenabled = await service.updateSource("url-check", { enabled: true });
+  assert.equal(reenabled.enabled, true);
+  assert.equal(sourceRows.has("url-check"), false);
 });
 
 test("dispatchDueReminders sends one reminder, advances the rhythm and counts it", async () => {

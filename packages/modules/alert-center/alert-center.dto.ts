@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import { IsBoolean, IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min } from "class-validator";
 import { ALERT_SEVERITIES, ALERT_STATES } from "./alert-center.constants";
 
 export class RaiseAlertDto {
@@ -213,6 +213,9 @@ export class AlertSourceDto {
     description: "External delivery is paused until this moment; null when not paused",
   })
   notificationPausedUntil!: Date | null;
+
+  @ApiProperty({ description: "Whether this source may deliver notifications at all" })
+  enabled!: boolean;
 }
 
 export class UpdateAlertSourceDto {
@@ -236,4 +239,9 @@ export class UpdateAlertSourceDto {
   @IsOptional()
   @IsDateString()
   notificationPausedUntil?: string | null;
+
+  @ApiPropertyOptional({ description: "Turn every notification from this source on or off" })
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
 }

@@ -64,6 +64,9 @@ model AlertSource {
   // External delivery pauses until this moment and then expires on its own.
   // Recording and resolving keep working while paused.
   notificationPausedUntil DateTime?
+  // Row-level opt-out. A disabled source keeps recording and resolving but never
+  // notifies until an operator turns it back on.
+  enabled                 Boolean   @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -63,4 +63,4 @@ export class AppModule {}
 
 ## Configuration
 
-No env vars. Both ports above are Nest injection tokens bound by the host application: `ALERT_SCOPE_VISIBILITY_PORT` is mandatory (startup fails without it) and `ALERT_NOTIFICATION_PORT` is optional (only external delivery is skipped). Reminder frequency is per source (code default 1440 minutes, row override) and per lifecycle (`raise({ repeatIntervalMinutes })`).
+No env vars. Both ports above are Nest injection tokens bound by the host application: `ALERT_SCOPE_VISIBILITY_PORT` is mandatory (startup fails without it) and `ALERT_NOTIFICATION_PORT` is optional (only external delivery is skipped). Reminder frequency is per source (code default 1440 minutes, row override) and per lifecycle (`raise({ repeatIntervalMinutes })`). An operator can also pause a source until a moment or disable it outright; a paused or disabled source keeps recording and resolving but never notifies.
