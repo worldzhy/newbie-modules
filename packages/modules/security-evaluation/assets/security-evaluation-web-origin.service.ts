@@ -82,6 +82,18 @@ export interface SecurityEvaluationWebOriginTarget {
   targetPaths: Record<string, string>;
 }
 
+export interface SecurityEvaluationWebOriginDetail extends SecurityEvaluationWebOriginTarget {
+  verificationStatus: SecurityEvaluationWebOriginVerificationStatus;
+  verificationMethod: SecurityEvaluationWebOriginVerificationMethod | null;
+  verificationToken: string;
+  verificationFailureCount: number;
+  verifiedAt: Date | null;
+  lastVerifiedAt: Date | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /**
  * SecurityEvaluationWebOriginService — registration and ownership verification
  * of web-origin subjects (ADR-066 §1, ADR-044 §2, ADR-068 D7).
@@ -299,6 +311,26 @@ export class SecurityEvaluationWebOriginService {
   async pathRoles(subjectId: string): Promise<Record<string, string>> {
     const { row } = await this.getWebOrigin(subjectId);
     return parseTargetPaths(row.targetPaths);
+  }
+
+  /** One origin with the token and status the operator needs to publish/check it. */
+  async detail(subjectId: string): Promise<SecurityEvaluationWebOriginDetail> {
+    const { row, subject } = await this.getWebOrigin(subjectId);
+    return {
+      subjectId,
+      origin: subject.subjectKey,
+      label: subject.displayName,
+      targetPaths: parseTargetPaths(row.targetPaths),
+      verificationStatus: row.verificationStatus as SecurityEvaluationWebOriginVerificationStatus,
+      verificationMethod: row.verificationMethod as SecurityEvaluationWebOriginVerificationMethod | null,
+      verificationToken: row.verificationToken,
+      verificationFailureCount: row.verificationFailureCount,
+      verifiedAt: row.verifiedAt,
+      lastVerifiedAt: row.lastVerifiedAt,
+      isActive: row.isActive,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+    };
   }
 
   private async getWebOrigin(subjectId: string) {

@@ -8,9 +8,17 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { UserRequest } from "@modules/security/security.interface";
 
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
+import { SecurityEvaluationWebOriginService } from "./assets/security-evaluation-web-origin.service";
 import { SecurityEvaluationCodeScanExcerptService } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationReportService } from "./reporting/security-evaluation-report.service";
 import { SecurityEvaluationRunService } from "./security-evaluation-run.service";
+import {
+  GetSecurityEvaluationWebOriginRequestDto,
+  RequestWebOriginVerificationDto,
+  WebOriginChallengeDto,
+  WebOriginDetailDto,
+  WebOriginVerificationResultDto,
+} from "./security-evaluation-web-origin.dto";
 import { SECURITY_EVALUATION_FINDING_STALE_AFTER_DAYS } from "./security-evaluation.constants";
 import {
   GetSecurityEvaluationFindingRequestDto,
@@ -56,6 +64,7 @@ import {
 export class SecurityEvaluationController {
   constructor(
     private readonly assets: SecurityEvaluationAssetService,
+    private readonly webOrigins: SecurityEvaluationWebOriginService,
     private readonly runs: SecurityEvaluationRunService,
     private readonly findings: EvaluationFindingService,
     private readonly results: EvaluationResultService,
@@ -102,6 +111,39 @@ export class SecurityEvaluationController {
       page: query.page,
       pageSize: query.pageSize,
     });
+  }
+
+  // --- Web-origin verification -------------------------------------------
+
+  @Get("web-origins/:subjectId")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({ summary: "Read one web origin (platform view), including the token to publish" })
+  @ApiResponse({ status: 200, type: WebOriginDetailDto })
+  getWebOrigin(@Param() params: GetSecurityEvaluationWebOriginRequestDto): Promise<WebOriginDetailDto> {
+    return this.webOrigins.detail(params.subjectId);
+  }
+
+  @Post("web-origins/:subjectId/verification")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({ summary: "Pick a verification method and return the token/record the operator must publish" })
+  @ApiResponse({ status: 200, type: WebOriginChallengeDto })
+  requestWebOriginVerification(
+    @Param() params: GetSecurityEvaluationWebOriginRequestDto,
+    @Body() body: RequestWebOriginVerificationDto,
+  ): Promise<WebOriginChallengeDto> {
+    return this.webOrigins.requestVerification(params.subjectId, body.method);
+  }
+
+  @Post("web-origins/:subjectId/verification/check")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({ summary: "Read the published token and persist the verification outcome" })
+  @ApiResponse({ status: 200, type: WebOriginVerificationResultDto })
+  checkWebOriginVerification(
+    @Param() params: GetSecurityEvaluationWebOriginRequestDto,
+  ): Promise<WebOriginVerificationResultDto> {
+    return this.webOrigins.verify(params.subjectId);
   }
 
   // --- Runs --------------------------------------------------------------
