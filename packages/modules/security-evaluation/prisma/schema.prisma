@@ -37,8 +37,6 @@ model SecurityEvaluationWebOrigin {
   id                   String    @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK
   subjectId            String    @unique @db.Uuid
-  // Free-form deployment slot chosen by the host ("production", "staging"...).
-  environment          String    @db.VarChar(32)
   // Path role to relative path, e.g. { "auth.login": "/login" }. A criterion
   // depending on a dropped role reports "target not configured".
   targetPaths          Json      @default("{}") @db.JsonB

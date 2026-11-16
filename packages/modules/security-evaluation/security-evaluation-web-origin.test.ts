@@ -42,7 +42,6 @@ function fakeConfig(): ConfigService {
 interface FakeWebOriginRow {
   id: string;
   subjectId: string;
-  environment: string;
   targetPaths: Record<string, string>;
   verificationStatus: string;
   verificationToken: string;
@@ -59,7 +58,6 @@ function fakeWebOriginRow(overrides: Partial<FakeWebOriginRow> = {}): FakeWebOri
   return {
     id: "web-origin-1",
     subjectId: "subject-1",
-    environment: "production",
     targetPaths: { "auth.login": "/login" },
     verificationStatus: "PENDING",
     verificationToken: "token-1",
@@ -144,7 +142,6 @@ test("create writes the subject and web-origin in one transaction", async () => 
   const registration = await service.create({
     origin: "HTTPS://App.Example.com:443/",
     label: "App",
-    environment: "production",
     targetPaths: { "auth.login": "/login" },
   });
 
@@ -168,7 +165,6 @@ test("create rejects an unknown target path role before writing anything", async
   await assert.rejects(
     service.create({
       origin: "https://app.example.com",
-      environment: "production",
       targetPaths: { "auth.signup": "/signup" },
     }),
     /Unknown target path role/,
@@ -320,7 +316,6 @@ test("listActiveVerified returns only active verified origins and lazily re-veri
         }),
         fakeWebOriginRow({
           subjectId: "subject-fresh",
-          environment: "staging",
           targetPaths: {},
           lastVerifiedAt: fresh,
           verificationStatus: "VERIFIED",
@@ -356,7 +351,6 @@ test("listActiveVerified returns only active verified origins and lazily re-veri
     subjectId: "subject-due",
     origin: "https://due.example.com",
     label: "Due",
-    environment: "production",
     targetPaths: { "auth.login": "/login" },
   });
   assert.equal(targets[1].subjectId, "subject-fresh");

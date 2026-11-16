@@ -42,8 +42,6 @@ export interface CreateSecurityEvaluationWebOriginInput {
   origin: string;
   /** Label shown in the UI; defaults to the normalized origin. */
   label?: string;
-  /** Free-form deployment slot chosen by the host ("production", "staging"…). */
-  environment: string;
   /** Path role → relative path; unknown roles are rejected. */
   targetPaths?: Record<string, string>;
 }
@@ -81,7 +79,6 @@ export interface SecurityEvaluationWebOriginTarget {
   subjectId: string;
   origin: string;
   label: string;
-  environment: string;
   targetPaths: Record<string, string>;
 }
 
@@ -93,8 +90,7 @@ export interface SecurityEvaluationWebOriginTarget {
  * either both exist or neither do, so a half-registered origin can never enter
  * the evaluation pipeline. Identity lives on the subject (`subjectKey` is the
  * normalized origin, `displayName` the label) — this service only owns what is
- * specific to a web origin: environment, target paths and the verification
- * lifecycle. Provenance lives in the host (ADR-068 D8).
+ * specific to a web origin: target paths and the verification lifecycle. Provenance lives in the host (ADR-068 D8).
  *
  * Verification is host-driven: the module generates the token and compares
  * published values through `VerificationFetchAccess`, but never performs
@@ -134,11 +130,10 @@ export class SecurityEvaluationWebOriginService {
   /**
    * Register an origin: platform-level subject + verification record,
    * atomically. Re-registration is idempotent and never resets verification —
-   * it only refreshes the label, environment and target paths.
+   * it only refreshes the label and target paths.
    */
   async create(input: CreateSecurityEvaluationWebOriginInput): Promise<SecurityEvaluationWebOriginRegistration> {
     const origin = normalizeWebOrigin(input.origin);
-    const environment = requireEnvironment(input.environment);
     const targetPaths = normalizeTargetPaths(input.targetPaths);
     const label = input.label?.trim() || origin;
     const verificationToken = this.generateToken();
@@ -157,12 +152,10 @@ export class SecurityEvaluationWebOriginService {
         where: { subjectId: subject.id },
         create: {
           subjectId: subject.id,
-          environment,
           targetPaths: targetPaths as Prisma.InputJsonValue,
           verificationToken,
         },
         update: {
-          environment,
           targetPaths: targetPaths as Prisma.InputJsonValue,
         },
       });
@@ -296,7 +289,6 @@ export class SecurityEvaluationWebOriginService {
         subjectId: row.subjectId,
         origin: subject.subjectKey,
         label: subject.displayName,
-        environment: row.environment,
         targetPaths: parseTargetPaths(row.targetPaths),
       });
     }
@@ -455,12 +447,4 @@ function requireVerificationMethod(method: string): void {
       `Unknown verification method '${method}'; expected one of ${SECURITY_EVALUATION_WEB_ORIGIN_VERIFICATION_METHODS.join(", ")}.`,
     );
   }
-}
-
-function requireEnvironment(environment: string): string {
-  const value = environment?.trim();
-  if (!value || value.length > 32) {
-    throw new BadRequestException("environment must be a non-empty string of at most 32 characters.");
-  }
-  return value;
 }
