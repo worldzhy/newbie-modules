@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
+import { SecurityEvaluationWebOriginService } from "./assets/security-evaluation-web-origin.service";
 
 /**
  * Behavior-level test for the platform-level ingest contract (ADR-039, ADR-068
@@ -44,10 +45,24 @@ interface FakeAwsAccountRow {
   isActive: boolean;
 }
 
+interface FakeWebOriginRow {
+  id: string;
+  subjectId: string;
+  targetPaths: Record<string, unknown>;
+  verificationToken: string;
+  verificationStatus: string;
+  verificationMethod: string | null;
+  verificationFailureCount: number;
+  verifiedAt: Date | null;
+  lastVerifiedAt: Date | null;
+  isActive: boolean;
+}
+
 function fakePrisma() {
   const subjects: FakeSubjectRow[] = [];
   const repositories: FakeRepositoryRow[] = [];
   const awsAccounts: FakeAwsAccountRow[] = [];
+  const webOrigins: FakeWebOriginRow[] = [];
   let nextId = 1;
 
   const prisma = {
@@ -118,10 +133,36 @@ function fakePrisma() {
         return created;
       },
     },
+    securityEvaluationWebOrigin: {
+      upsert: async (args: {
+        where: { subjectId: string };
+        create: { subjectId: string; targetPaths: Record<string, unknown>; verificationToken: string };
+        update: { targetPaths: Record<string, unknown> };
+      }) => {
+        const existing = webOrigins.find((row) => row.subjectId === args.where.subjectId);
+        if (existing) {
+          existing.targetPaths = args.update.targetPaths;
+          return existing;
+        }
+        // Mirrors the schema defaults on the material row.
+        const created: FakeWebOriginRow = {
+          id: `web-origin-${nextId++}`,
+          verificationStatus: "PENDING",
+          verificationMethod: null,
+          verificationFailureCount: 0,
+          verifiedAt: null,
+          lastVerifiedAt: null,
+          isActive: true,
+          ...args.create,
+        };
+        webOrigins.push(created);
+        return created;
+      },
+    },
     $transaction: async <T>(work: (client: unknown) => Promise<T>): Promise<T> => work(prisma),
   };
 
-  return { prisma: prisma as unknown as PrismaService, subjects, repositories, awsAccounts };
+  return { prisma: prisma as unknown as PrismaService, subjects, repositories, awsAccounts, webOrigins };
 }
 
 /** Minimal stand-in for EvaluationSubjectService.getOrCreateSubject. */
@@ -157,8 +198,19 @@ function fakeSubjectService(prisma: PrismaService) {
   };
 }
 
+function fakeConfig() {
+  const values: Record<string, string> = {
+    "modules.security-evaluation.webOriginVerificationIntervalDays": "7",
+    "modules.security-evaluation.webOriginReverifyFailureThreshold": "3",
+    "modules.security-evaluation.webOriginTokenBytes": "32",
+  };
+  return { getOrThrow: (key: string) => values[key] } as never;
+}
+
 function serviceWith(fake: ReturnType<typeof fakePrisma>) {
-  return new SecurityEvaluationAssetService(fake.prisma, fakeSubjectService(fake.prisma) as never);
+  const subjects = fakeSubjectService(fake.prisma);
+  const webOrigins = new SecurityEvaluationWebOriginService(fake.prisma, subjects as never, fakeConfig());
+  return new SecurityEvaluationAssetService(fake.prisma, subjects as never, webOrigins);
 }
 
 test("repository ingest derives the natural key and its material row", async () => {
@@ -324,12 +376,22 @@ test("material kinds reject submissions without their material", async () => {
   await assert.rejects(service.ingest([{ kind: "aws-account", displayName: "acct" }]), /requires its accountId/);
 });
 
-test("other kinds still carry their own subject key", async () => {
+test("web-origin ingest writes its verification material", async () => {
   const fake = fakePrisma();
   const service = serviceWith(fake);
 
   await service.ingest([{ kind: "web-origin", subjectKey: "https://example.com", displayName: "example.com" }]);
   assert.equal(fake.subjects[0].subjectKey, "https://example.com");
+  assert.equal(fake.webOrigins.length, 1);
+  assert.equal(fake.webOrigins[0].subjectId, fake.subjects[0].id);
+  assert.equal(fake.webOrigins[0].verificationStatus, "PENDING");
+  assert.ok(fake.webOrigins[0].verificationToken.length > 0);
+
+  // Re-registration is idempotent: same subject, same material row, same token.
+  await service.ingest([{ kind: "web-origin", subjectKey: "https://example.com", displayName: "Example" }]);
+  assert.equal(fake.subjects.length, 1);
+  assert.equal(fake.webOrigins.length, 1);
+  assert.equal(fake.subjects[0].displayName, "Example");
 
   await assert.rejects(service.ingest([{ kind: "web-origin", displayName: "example.com" }]), /requires its subjectKey/);
 });

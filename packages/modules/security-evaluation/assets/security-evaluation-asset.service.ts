@@ -7,8 +7,10 @@ import type { EvaluationSubjectDescriptor } from "@modules/evaluation/ports/eval
 import {
   SECURITY_EVALUATION_SUBJECT_KIND_AWS_ACCOUNT,
   SECURITY_EVALUATION_SUBJECT_KIND_REPOSITORY,
+  SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
   SECURITY_EVALUATION_SUBJECT_TYPE,
 } from "../security-evaluation.constants";
+import { SecurityEvaluationWebOriginService } from "./security-evaluation-web-origin.service";
 import {
   normalizeAwsAccountId,
   normalizeAwsRegions,
@@ -92,6 +94,7 @@ export class SecurityEvaluationAssetService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subjects: EvaluationSubjectService,
+    private readonly webOrigins: SecurityEvaluationWebOriginService,
   ) {}
 
   /**
@@ -104,6 +107,14 @@ export class SecurityEvaluationAssetService {
   ): Promise<IngestSecurityEvaluationSubjectResult[]> {
     const results: IngestSecurityEvaluationSubjectResult[] = [];
     for (const submission of submissions) {
+      // A web origin's material is its verification record (token, target
+      // paths, status); registering it through the module service keeps ingest
+      // and the project-level registration path writing the same row shape.
+      if (submission.kind === SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN) {
+        results.push({ subjectId: await this.ingestWebOrigin(submission) });
+        continue;
+      }
+
       const prepared = prepareSubmission(submission);
       const subject = await this.prisma.$transaction(async (transaction) => {
         const created = await this.subjects.getOrCreateSubject(prepared.descriptor, transaction);
@@ -143,6 +154,23 @@ export class SecurityEvaluationAssetService {
       results.push({ subjectId: subject.id });
     }
     return results;
+  }
+
+  /**
+   * Web-origin material is the verification record: registration generates the
+   * token an operator publishes and keeps re-registration idempotent without
+   * resetting an existing verification (ADR-066 §1).
+   */
+  private async ingestWebOrigin(submission: IngestSecurityEvaluationSubjectInput): Promise<string> {
+    const origin = submission.subjectKey?.trim();
+    if (!origin) {
+      throw new BadRequestException(`A ${submission.kind} subject requires its subjectKey.`);
+    }
+    const registration = await this.webOrigins.create({
+      origin,
+      label: submission.displayName,
+    });
+    return registration.subjectId;
   }
 
   /**
