@@ -129,37 +129,61 @@ export class SecurityEvaluationWebOriginService {
   }
 
   /**
-   * Register an origin: platform-level subject + verification record,
-   * atomically. Re-registration is idempotent and never resets verification —
-   * it only refreshes the label and target paths.
+   * Register an origin idempotently (host alignment): platform-level subject +
+   * verification record, atomically. Re-registration refreshes the label and, when
+   * supplied, the target paths; it never resets verification and never clears
+   * paths the submission does not mention (ADR-072 D3).
    */
   async create(input: CreateSecurityEvaluationWebOriginInput): Promise<SecurityEvaluationWebOriginRegistration> {
+    return this.register(input, true);
+  }
+
+  /**
+   * Register an origin strictly (REST Create, ADR-072 D1): an origin that is
+   * already a subject is a conflict carrying the existing subject id.
+   */
+  async createStrict(input: CreateSecurityEvaluationWebOriginInput): Promise<SecurityEvaluationWebOriginRegistration> {
+    return this.register(input, false);
+  }
+
+  private async register(
+    input: CreateSecurityEvaluationWebOriginInput,
+    idempotent: boolean,
+  ): Promise<SecurityEvaluationWebOriginRegistration> {
     const origin = normalizeWebOrigin(input.origin);
-    const targetPaths = normalizeTargetPaths(input.targetPaths);
+    const targetPaths = input.targetPaths === undefined ? undefined : normalizeTargetPaths(input.targetPaths);
     const label = input.label?.trim() || origin;
     const verificationToken = this.generateToken();
 
     return this.prisma.$transaction(async (transaction) => {
-      const subject = await this.subjects.getOrCreateSubject(
-        {
-          subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
-          kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
-          subjectKey: origin,
-          displayName: label,
-        },
-        transaction,
-      );
-      const webOrigin = await transaction.securityEvaluationWebOrigin.upsert({
-        where: { subjectId: subject.id },
-        create: {
-          subjectId: subject.id,
-          targetPaths: targetPaths as Prisma.InputJsonValue,
-          verificationToken,
-        },
-        update: {
-          targetPaths: targetPaths as Prisma.InputJsonValue,
-        },
-      });
+      const descriptor = {
+        subjectType: SECURITY_EVALUATION_SUBJECT_TYPE,
+        kind: SECURITY_EVALUATION_SUBJECT_KIND_WEB_ORIGIN,
+        subjectKey: origin,
+        displayName: label,
+      };
+      const subject = idempotent
+        ? await this.subjects.getOrCreateSubject(descriptor, transaction)
+        : await this.subjects.createSubject(descriptor, transaction);
+      const webOrigin = idempotent
+        ? await transaction.securityEvaluationWebOrigin.upsert({
+            where: { subjectId: subject.id },
+            create: {
+              subjectId: subject.id,
+              targetPaths: (targetPaths ?? {}) as Prisma.InputJsonValue,
+              verificationToken,
+            },
+            update: {
+              ...(targetPaths !== undefined ? { targetPaths: targetPaths as Prisma.InputJsonValue } : {}),
+            },
+          })
+        : await transaction.securityEvaluationWebOrigin.create({
+            data: {
+              subjectId: subject.id,
+              targetPaths: (targetPaths ?? {}) as Prisma.InputJsonValue,
+              verificationToken,
+            },
+          });
 
       return {
         subjectId: subject.id,
@@ -169,6 +193,33 @@ export class SecurityEvaluationWebOriginService {
         verificationToken: webOrigin.verificationToken,
       };
     });
+  }
+
+  /** Replace the whole target path map (`PUT`, ADR-072 D3); omitted means `{}`. */
+  async replaceTargetPaths(
+    subjectId: string,
+    targetPaths?: Record<string, string>,
+  ): Promise<SecurityEvaluationWebOriginMaterialDto> {
+    await this.getWebOrigin(subjectId);
+    await this.prisma.securityEvaluationWebOrigin.update({
+      where: { subjectId },
+      data: { targetPaths: normalizeTargetPaths(targetPaths) as Prisma.InputJsonValue },
+    });
+    return this.detail(subjectId);
+  }
+
+  /** Merge the supplied roles into the stored map (`PATCH`); other roles keep their paths. */
+  async patchTargetPaths(
+    subjectId: string,
+    patch: Record<string, string>,
+  ): Promise<SecurityEvaluationWebOriginMaterialDto> {
+    const { row } = await this.getWebOrigin(subjectId);
+    const targetPaths = { ...parseTargetPaths(row.targetPaths), ...normalizeTargetPaths(patch) };
+    await this.prisma.securityEvaluationWebOrigin.update({
+      where: { subjectId },
+      data: { targetPaths: targetPaths as Prisma.InputJsonValue },
+    });
+    return this.detail(subjectId);
   }
 
   /**
@@ -385,7 +436,15 @@ export function normalizeWebOrigin(input: string): string {
   return `${url.protocol}//${hostname}${url.port ? `:${url.port}` : ""}`;
 }
 
-function normalizeTargetPaths(input?: Record<string, string>): Record<string, string> {
+/** A relative path on the origin stays well inside a single `Location`-style segment. */
+const TARGET_PATH_MAX_LENGTH = 255;
+
+/**
+ * Validate a path role → relative path map. Roles come from the module's closed
+ * vocabulary; a path must be absolute on the origin and bounded in length, since
+ * it is later appended to the origin verbatim.
+ */
+export function normalizeTargetPaths(input?: Record<string, string>): Record<string, string> {
   if (!input) return {};
   const normalized: Record<string, string> = {};
   for (const [role, value] of Object.entries(input)) {
@@ -397,6 +456,9 @@ function normalizeTargetPaths(input?: Record<string, string>): Record<string, st
     const path = value.trim();
     if (!path.startsWith("/") || path.startsWith("//")) {
       throw new BadRequestException(`Target path for '${role}' must be an absolute path on the origin.`);
+    }
+    if (path.length > TARGET_PATH_MAX_LENGTH) {
+      throw new BadRequestException(`Target path for '${role}' must be at most ${TARGET_PATH_MAX_LENGTH} characters.`);
     }
     normalized[role] = path;
   }

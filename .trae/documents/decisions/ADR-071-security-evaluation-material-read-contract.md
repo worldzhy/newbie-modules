@@ -119,3 +119,5 @@ kind 只是 union 多一支。token 移出 GET 是同一判据的副作用：凭
 
 Supersedes: ADR-044（nightwatch-backend）第 104 行与第 130 行关于 web-origin
 controller/DTO 归属与 token 读取权限的表述。
+
+写面（创建 / subject 更新 / material 更新）见 ADR-072。

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { ConflictException } from "@nestjs/common";
 import type { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
@@ -96,7 +97,31 @@ function fakePrisma() {
         subjects.push(created);
         return created;
       },
-      findUnique: async (args: { where: { id: string } }) => subjects.find((row) => row.id === args.where.id) ?? null,
+      findUnique: async (args: {
+        where: { id?: string; subjectType_kind_subjectKey?: { subjectType: string; kind: string; subjectKey: string } };
+      }) => {
+        const key = args.where.subjectType_kind_subjectKey;
+        if (key) {
+          return (
+            subjects.find(
+              (row) =>
+                row.subjectType === key.subjectType && row.kind === key.kind && row.subjectKey === key.subjectKey,
+            ) ?? null
+          );
+        }
+        return subjects.find((row) => row.id === args.where.id) ?? null;
+      },
+      create: async (args: { data: Omit<FakeSubjectRow, "id"> }) => {
+        const created: FakeSubjectRow = { id: `subject-${nextId++}`, ...args.data };
+        subjects.push(created);
+        return created;
+      },
+      update: async (args: { where: { id: string }; data: { displayName: string } }) => {
+        const existing = subjects.find((row) => row.id === args.where.id);
+        if (!existing) throw new Error(`Unknown subject ${args.where.id}`);
+        existing.displayName = args.data.displayName;
+        return existing;
+      },
     },
     securityEvaluationRepository: {
       upsert: async (args: {
@@ -117,6 +142,17 @@ function fakePrisma() {
         repositories.push(created);
         return created;
       },
+      create: async (args: { data: Omit<FakeRepositoryRow, "id" | "isActive"> & { isActive?: boolean } }) => {
+        const created: FakeRepositoryRow = { id: `repo-${nextId++}`, isActive: true, ...args.data };
+        repositories.push(created);
+        return created;
+      },
+      update: async (args: { where: { subjectId: string }; data: Partial<Pick<FakeRepositoryRow, "url">> }) => {
+        const existing = repositories.find((row) => row.subjectId === args.where.subjectId);
+        if (!existing) throw new Error(`Unknown repository material ${args.where.subjectId}`);
+        Object.assign(existing, args.data);
+        return existing;
+      },
       findUnique: async (args: { where: { subjectId: string } }) =>
         repositories.find((row) => row.subjectId === args.where.subjectId) ?? null,
     },
@@ -135,6 +171,20 @@ function fakePrisma() {
         awsAccounts.push(created);
         return created;
       },
+      create: async (args: { data: Omit<FakeAwsAccountRow, "id" | "isActive"> & { isActive?: boolean } }) => {
+        const created: FakeAwsAccountRow = { id: `account-${nextId++}`, isActive: true, ...args.data };
+        awsAccounts.push(created);
+        return created;
+      },
+      update: async (args: {
+        where: { subjectId: string };
+        data: Partial<Pick<FakeAwsAccountRow, "defaultRegion" | "regions">>;
+      }) => {
+        const existing = awsAccounts.find((row) => row.subjectId === args.where.subjectId);
+        if (!existing) throw new Error(`Unknown aws-account material ${args.where.subjectId}`);
+        Object.assign(existing, args.data);
+        return existing;
+      },
       findUnique: async (args: { where: { subjectId: string } }) =>
         awsAccounts.find((row) => row.subjectId === args.where.subjectId) ?? null,
     },
@@ -142,11 +192,12 @@ function fakePrisma() {
       upsert: async (args: {
         where: { subjectId: string };
         create: { subjectId: string; targetPaths: Record<string, unknown>; verificationToken: string };
-        update: { targetPaths: Record<string, unknown> };
+        update: { targetPaths?: Record<string, unknown> };
       }) => {
         const existing = webOrigins.find((row) => row.subjectId === args.where.subjectId);
         if (existing) {
-          existing.targetPaths = args.update.targetPaths;
+          // ADR-072 D3: an omitted targetPaths never clears the stored map.
+          if (args.update.targetPaths !== undefined) existing.targetPaths = args.update.targetPaths;
           return existing;
         }
         // Mirrors the schema defaults on the material row.
@@ -163,6 +214,28 @@ function fakePrisma() {
         webOrigins.push(created);
         return created;
       },
+      create: async (args: {
+        data: { subjectId: string; targetPaths: Record<string, unknown>; verificationToken: string };
+      }) => {
+        const created: FakeWebOriginRow = {
+          id: `web-origin-${nextId++}`,
+          verificationStatus: "PENDING",
+          verificationMethod: null,
+          verificationFailureCount: 0,
+          verifiedAt: null,
+          lastVerifiedAt: null,
+          isActive: true,
+          ...args.data,
+        };
+        webOrigins.push(created);
+        return created;
+      },
+      update: async (args: { where: { subjectId: string }; data: Record<string, unknown> }) => {
+        const existing = webOrigins.find((row) => row.subjectId === args.where.subjectId);
+        if (!existing) throw new Error(`Unknown web-origin material ${args.where.subjectId}`);
+        Object.assign(existing, args.data);
+        return existing;
+      },
       findUnique: async (args: { where: { subjectId: string } }) =>
         webOrigins.find((row) => row.subjectId === args.where.subjectId) ?? null,
     },
@@ -172,8 +245,16 @@ function fakePrisma() {
   return { prisma: prisma as unknown as PrismaService, subjects, repositories, awsAccounts, webOrigins };
 }
 
-/** Minimal stand-in for EvaluationSubjectService.getOrCreateSubject. */
+/** Minimal stand-in for EvaluationSubjectService (both write modes). */
 function fakeSubjectService(prisma: PrismaService) {
+  const store = () =>
+    prisma as unknown as {
+      evaluationSubject: {
+        upsert: (args: unknown) => Promise<FakeSubjectRow>;
+        findUnique: (args: unknown) => Promise<{ id: string } | null>;
+        create: (args: unknown) => Promise<FakeSubjectRow>;
+      };
+    };
   return {
     getOrCreateSubject: async (descriptor: {
       subjectType: string;
@@ -183,9 +264,7 @@ function fakeSubjectService(prisma: PrismaService) {
       metadata?: Record<string, unknown>;
       credentialRef?: string | null;
     }) => {
-      const { evaluationSubject } = prisma as unknown as {
-        evaluationSubject: { upsert: (args: unknown) => Promise<FakeSubjectRow> };
-      };
+      const { evaluationSubject } = store();
       return evaluationSubject.upsert({
         where: {
           subjectType_kind_subjectKey: {
@@ -201,6 +280,27 @@ function fakeSubjectService(prisma: PrismaService) {
           ...(descriptor.credentialRef !== undefined ? { credentialRef: descriptor.credentialRef } : {}),
         },
       });
+    },
+    /** Mirrors EvaluationSubjectService.createSubject (ADR-072 D1). */
+    createSubject: async (descriptor: {
+      subjectType: string;
+      kind: string;
+      subjectKey: string;
+      displayName: string;
+      metadata?: Record<string, unknown>;
+      credentialRef?: string | null;
+    }) => {
+      const { evaluationSubject } = store();
+      const where = {
+        subjectType_kind_subjectKey: {
+          subjectType: descriptor.subjectType,
+          kind: descriptor.kind,
+          subjectKey: descriptor.subjectKey,
+        },
+      };
+      const existing = await evaluationSubject.findUnique({ where });
+      if (existing) throw new ConflictException({ message: "already exists", subjectId: existing.id });
+      return evaluationSubject.create({ data: { ...descriptor, credentialRef: descriptor.credentialRef ?? null } });
     },
   };
 }
@@ -459,4 +559,151 @@ test("material verification is a web-origin state machine, so another kind is a 
     service.checkMaterialVerification(repository.subjectId),
     /verification applies to web-origin subjects only/,
   );
+});
+
+test("create is strict: an existing subject is a conflict carrying its id (ADR-072 D1)", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+  const submission = {
+    kind: "repository",
+    displayName: "o/r",
+    repository: { provider: "github", namespace: "o", name: "r" },
+  };
+
+  const created = await service.create(submission);
+
+  await assert.rejects(service.create({ ...submission, displayName: "another label" }), (error: unknown) => {
+    assert.ok(error instanceof ConflictException);
+    assert.equal((error.getResponse() as { subjectId: string }).subjectId, created.subjectId);
+    return true;
+  });
+  assert.equal(fake.subjects.length, 1);
+  assert.equal(fake.repositories.length, 1);
+  assert.equal(fake.subjects[0].displayName, "o/r");
+});
+
+test("create writes a web-origin subject and its target paths in one transaction", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  const { subjectId } = await service.create({
+    kind: "web-origin",
+    subjectKey: "https://example.com",
+    displayName: "example.com",
+    webOrigin: { targetPaths: { "auth.login": "/signin" } },
+  });
+
+  assert.equal(fake.subjects.length, 1);
+  assert.equal(fake.subjects[0].subjectKey, "https://example.com");
+  assert.equal(fake.webOrigins.length, 1);
+  assert.equal(fake.webOrigins[0].subjectId, subjectId);
+  assert.deepEqual(fake.webOrigins[0].targetPaths, { "auth.login": "/signin" });
+  // The material carries the verification record, so the subject is immediately usable.
+  assert.equal(fake.webOrigins[0].verificationStatus, "PENDING");
+
+  await assert.rejects(
+    service.create({ kind: "web-origin", subjectKey: "https://example.com", displayName: "again" }),
+    (error: unknown) => {
+      assert.ok(error instanceof ConflictException);
+      assert.equal((error.getResponse() as { subjectId: string }).subjectId, subjectId);
+      return true;
+    },
+  );
+});
+
+test("re-ingesting a web origin without target paths keeps the stored map (ADR-072 D3)", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+
+  await service.ingest([
+    {
+      kind: "web-origin",
+      subjectKey: "https://example.com",
+      displayName: "example.com",
+      webOrigin: { targetPaths: { "auth.login": "/signin" } },
+    },
+  ]);
+  await service.ingest([{ kind: "web-origin", subjectKey: "https://example.com", displayName: "Example" }]);
+
+  assert.equal(fake.subjects[0].displayName, "Example");
+  assert.deepEqual(fake.webOrigins[0].targetPaths, { "auth.login": "/signin" });
+});
+
+test("PATCH /subjects updates only the display name", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+  const [repository] = await service.ingest([
+    { kind: "repository", displayName: "o/r", repository: { provider: "github", namespace: "o", name: "r" } },
+  ]);
+
+  const updated = await service.updateSubject(repository.subjectId, { displayName: "  Owner/Repo  " });
+
+  assert.equal(updated.displayName, "Owner/Repo");
+  assert.equal(fake.subjects[0].subjectKey, "github:o/r");
+  await assert.rejects(service.updateSubject(repository.subjectId, {}), /requires displayName/);
+});
+
+test("PUT replaces the target path map, PATCH merges by role", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+  const { subjectId } = await service.create({
+    kind: "web-origin",
+    subjectKey: "https://example.com",
+    displayName: "example.com",
+    webOrigin: { targetPaths: { "auth.login": "/login", "api.session": "/api" } },
+  });
+
+  await service.replaceMaterial(subjectId, { targetPaths: { "api.session": "/v2/session" } });
+  assert.deepEqual(fake.webOrigins[0].targetPaths, { "api.session": "/v2/session" });
+
+  await service.patchMaterial(subjectId, { targetPaths: { "auth.login": "/signin" } });
+  assert.deepEqual(fake.webOrigins[0].targetPaths, { "api.session": "/v2/session", "auth.login": "/signin" });
+});
+
+test("PUT resets the mutable fields of a repository and an aws-account to their defaults", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+  const [repository] = await service.ingest([
+    {
+      kind: "repository",
+      displayName: "o/r",
+      repository: { provider: "github", namespace: "o", name: "r", url: "https://github.com/o/r" },
+    },
+  ]);
+  const [awsAccount] = await service.ingest([
+    {
+      kind: "aws-account",
+      displayName: "acct",
+      awsAccount: { accountId: "123456789012", defaultRegion: "us-east-1", regions: ["us-east-1"] },
+    },
+  ]);
+
+  const repositoryMaterial = await service.replaceMaterial(repository.subjectId, {});
+  assert.equal(repositoryMaterial.kind, "repository");
+  assert.equal(repositoryMaterial.kind === "repository" && repositoryMaterial.url, null);
+
+  const awsMaterial = await service.replaceMaterial(awsAccount.subjectId, {});
+  assert.equal(awsMaterial.kind === "aws-account" && awsMaterial.defaultRegion, null);
+  assert.deepEqual(awsMaterial.kind === "aws-account" && awsMaterial.regions, []);
+});
+
+test("material updates reject fields of another kind and unbounded paths (ADR-072 D3)", async () => {
+  const fake = fakePrisma();
+  const service = serviceWith(fake);
+  const [repository] = await service.ingest([
+    { kind: "repository", displayName: "o/r", repository: { provider: "github", namespace: "o", name: "r" } },
+  ]);
+  const { subjectId: webOriginId } = await service.create({
+    kind: "web-origin",
+    subjectKey: "https://example.com",
+    displayName: "example.com",
+  });
+
+  await assert.rejects(service.patchMaterial(repository.subjectId, { targetPaths: {} }), /accepts only url/);
+  await assert.rejects(service.patchMaterial(webOriginId, { url: "https://x" }), /accepts only targetPaths/);
+  await assert.rejects(
+    service.patchMaterial(webOriginId, { targetPaths: { "auth.login": `/${"a".repeat(255)}` } }),
+    /at most 255 characters/,
+  );
+  await assert.rejects(service.patchMaterial(webOriginId, {}), /requires at least one field/);
 });

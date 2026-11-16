@@ -1,7 +1,8 @@
 # ADR-070: security-evaluation 素材目录内聚到模块（repository / aws-account）
 
-状态：已采纳
+状态：已采纳（D3 由 ADR-072 取代）
 日期：2026-11-15
+更新：2026-11-16 — D3「ingest 是素材唯一写入口」被 ADR-072 取代：写入口拆为 `POST /subjects`（创建）、`PATCH /subjects/:id`、`PUT|PATCH .../material`（更新），`sync` 降级为宿主对齐入口。其余章节不变。
 归属：框架层（registry `packages/modules/security-evaluation`）；宿主侧实施另起 nightwatch-backend ADR
 关联：newbie-modules ADR-066（web-origin subject kind）、ADR-068（无 scope 的 subject 身份）、ADR-069（subject ownership type）、ADR-027（CLOUD_CONFIG 端口）；nightwatch-backend ADR-037（Layer 1 subjectKey，本 ADR 部分取代）、ADR-039（平台级建模）、ADR-044（web-origin 宿主实施）
 决策记录：2026-11-15 用户「我想把 repository、weborigin、aws-account 都存到 se 模块里」；三个决策点拍板：形态 = A 素材目录、subjectKey = 自然键、退役 = 清空数据库。
