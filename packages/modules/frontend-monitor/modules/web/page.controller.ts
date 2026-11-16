@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Param, Query, Req } from "@nestjs/common";
+import { BadRequestException, Controller, Get, Inject, Param, Query, Req } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { func, pickRequestId } from "../../shared/utils";
 import { PageService } from "./services/page.service";
