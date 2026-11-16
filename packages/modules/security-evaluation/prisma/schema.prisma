@@ -31,8 +31,8 @@
 ///
 /// Only active, `VERIFIED` subjects are submitted for evaluation, fetched lazily
 /// through `listActiveVerified`, so the module needs no scheduler. Consecutive
-/// failures that reach the configured threshold move the row to `FAILED`, which
-/// stops evaluation of a domain that may have changed hands.
+/// failures that reach the module policy threshold (ADR-053) move the row to
+/// `FAILED`, which stops evaluation of a domain that may have changed hands.
 model SecurityEvaluationWebOrigin {
   id                   String    @id @default(uuid()) @db.Uuid
   // EvaluationSubject.id in "module/evaluation"; scalar, no FK
@@ -209,7 +209,7 @@ enum SecurityEvaluationThreatVerdictKind {
 ///
 /// - `not-relevant`: the LLM re-ranker found this knowledge item irrelevant to
 ///   this scope. The pair is skipped only while the row is younger than the
-///   declared `ttlDays` (ADR-033).
+///   module constant `ttlDays` (ADR-053).
 /// - `hard-hit`: hard-recall matched this item to entities of this scope. Audit
 ///   only: the pair re-enters the pipeline each run because a hard match depends
 ///   on the entity set, which is dynamic.
@@ -251,9 +251,9 @@ model SecurityEvaluationThreatVerdictCache {
 /// from the absent-finding reaper.
 ///
 /// `unavailable` verdicts are never written (ADR-045). Rows older than the
-/// declared `codeScanVerdictCacheTtlDays` are misses: content or version changes
-/// already invalidate the key, so the TTL only forces a long-unchanged file to
-/// be re-judged against model drift.
+/// `codeScanVerdictCacheTtlDays` module constant (ADR-053) are misses: content
+/// or version changes already invalidate the key, so the TTL only forces a
+/// long-unchanged file to be re-judged against model drift.
 ///
 /// `cachedFindings` holds the structured finding entries the cached call produced
 /// for this one criterion (usually an empty array); every criterion of the

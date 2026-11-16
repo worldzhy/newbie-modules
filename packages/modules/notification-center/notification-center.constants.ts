@@ -21,6 +21,13 @@ export const CENTER_SETTING_SINGLETON_ID = 1;
 export const DEFAULT_PUSH_ENABLED = false;
 export const DEFAULT_NOTIFICATION_PUSH_ENABLED = true;
 
+/**
+ * Retention window for `NotificationRecord` and `NotificationDeliveryAttempt`
+ * rows. A policy value, identical in every deployment, so it is a code
+ * constant rather than a manifest env key (ADR-053).
+ */
+export const NOTIFICATION_RECORD_RETENTION_DAYS = 90;
+
 // --- Delivery rules (ADR-062) ----------------------------------------------
 
 export const DELIVERY_RULE_ACTIONS = ["deliver", "suppress"] as const;

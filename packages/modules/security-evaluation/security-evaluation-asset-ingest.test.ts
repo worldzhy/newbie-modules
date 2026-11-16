@@ -305,18 +305,9 @@ function fakeSubjectService(prisma: PrismaService) {
   };
 }
 
-function fakeConfig() {
-  const values: Record<string, string> = {
-    "modules.security-evaluation.webOriginVerificationIntervalDays": "7",
-    "modules.security-evaluation.webOriginReverifyFailureThreshold": "3",
-    "modules.security-evaluation.webOriginTokenBytes": "32",
-  };
-  return { getOrThrow: (key: string) => values[key] } as never;
-}
-
 function serviceWith(fake: ReturnType<typeof fakePrisma>) {
   const subjects = fakeSubjectService(fake.prisma);
-  const webOrigins = new SecurityEvaluationWebOriginService(fake.prisma, subjects as never, fakeConfig());
+  const webOrigins = new SecurityEvaluationWebOriginService(fake.prisma, subjects as never);
   return new SecurityEvaluationAssetService(fake.prisma, subjects as never, webOrigins);
 }
 

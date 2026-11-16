@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { test } from "node:test";
 import { BadRequestException } from "@nestjs/common";
-import type { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import type { ChatModelPort } from "@modules/llm/chat-model.port";
 import type { ChatModelResolver } from "@modules/llm/chat-model.resolver";
@@ -20,6 +19,7 @@ import {
   type SecurityEvaluationCodeScanExcerptInput,
 } from "./evidence/security-evaluation-code-scan-excerpt.service";
 import { SecurityEvaluationRetentionService } from "./security-evaluation-retention.service";
+import { SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS } from "./security-evaluation.constants";
 import type { SecurityEvaluationAssetService } from "./assets/security-evaluation-asset.service";
 import {
   codeScanContentHash,
@@ -594,9 +594,7 @@ test("retention physically deletes expired verdict-cache rows and excerpts", asy
     },
   } as unknown as PrismaService;
   const retention = new SecurityEvaluationRetentionService(
-    new SecurityEvaluationCodeScanVerdictCacheRepository(prisma, {
-      getOrThrow: () => "30",
-    } as unknown as ConfigService),
+    new SecurityEvaluationCodeScanVerdictCacheRepository(prisma),
     new SecurityEvaluationCodeScanExcerptService(prisma),
   );
 
@@ -604,7 +602,10 @@ test("retention physically deletes expired verdict-cache rows and excerpts", asy
 
   const now = Date.now();
   const [verdictAgeDays, excerptAgeDays] = cutoffs.map((cutoff) => (now - cutoff.getTime()) / 86_400_000);
-  assert.ok(verdictAgeDays > 29 && verdictAgeDays < 31, `verdict cutoff was ${verdictAgeDays} days`);
+  assert.ok(
+    Math.abs(verdictAgeDays - SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS) < 1,
+    `verdict cutoff was ${verdictAgeDays} days`,
+  );
   assert.ok(excerptAgeDays > 89 && excerptAgeDays < 91, `excerpt cutoff was ${excerptAgeDays} days`);
 });
 
@@ -632,24 +633,4 @@ test("retained-excerpt reads apply the retention window between prune runs", asy
   assert.deepEqual([...loaded.keys()], ["fresh"]);
   const readAgeDays = (now - (queriedCutoff as Date).getTime()) / 86_400_000;
   assert.ok(readAgeDays > 89 && readAgeDays < 91, `read cutoff was ${readAgeDays} days`);
-});
-
-// --- Verdict cache TTL contract (ADR-033 discipline, ADR-054 clause 6) -------------
-
-test("code-scan verdict cache TTL is declared per environment and never falls back", () => {
-  const missing = {
-    getOrThrow: () => {
-      throw new Error("Config property is undefined");
-    },
-  } as unknown as ConfigService;
-  assert.throws(() => new SecurityEvaluationCodeScanVerdictCacheRepository({} as PrismaService, missing));
-
-  const invalid = { getOrThrow: () => "not-a-number" } as unknown as ConfigService;
-  assert.throws(
-    () => new SecurityEvaluationCodeScanVerdictCacheRepository({} as PrismaService, invalid),
-    /positive integer/,
-  );
-
-  const declared = { getOrThrow: () => "30" } as unknown as ConfigService;
-  assert.doesNotThrow(() => new SecurityEvaluationCodeScanVerdictCacheRepository({} as PrismaService, declared));
 });

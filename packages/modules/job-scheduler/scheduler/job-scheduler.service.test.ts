@@ -1,15 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { JobHandlerRegistryService } from "./handler-registry.service";
-import { JobSchedulerService } from "./job-scheduler.service";
+import { JobSchedulerService, JOB_RUN_RETENTION_DAYS } from "./job-scheduler.service";
 import { JOB_RUN_FAILED_EVENT, JOB_RUN_SUCCEEDED_EVENT } from "../job-scheduler.events";
 
 type Row = Record<string, any>;
-
-const CONFIG: Row = {
-  "modules.job-scheduler.stuckRunAfterMinutes": "30",
-  "modules.job-scheduler.retentionDays": "30",
-};
 
 function newHarness(options: { runs?: Row[]; schedules?: Row[] } = {}) {
   const runs: Row[] = options.runs ?? [];
@@ -77,15 +72,7 @@ function newHarness(options: { runs?: Row[]; schedules?: Row[] } = {}) {
       emitted.push({ event, payload: payload as Row });
     },
   };
-  const config = { getOrThrow: (key: string) => CONFIG[key] };
-
-  const service = new JobSchedulerService(
-    prisma as never,
-    schedulerRegistry as never,
-    registry,
-    emitter as never,
-    config as never,
-  );
+  const service = new JobSchedulerService(prisma as never, schedulerRegistry as never, registry, emitter as never);
 
   return { service, runs, schedules, emitted };
 }
@@ -167,8 +154,17 @@ test("the sweep closes an orphan once it crosses the threshold on a later tick",
 });
 
 test("runs older than the retention window are pruned", async () => {
-  const expired = runningRun({ id: 20, status: "success", startedAt: new Date(Date.now() - 31 * 24 * 60 * 60_000) });
-  const kept = runningRun({ id: 21, status: "success", startedAt: new Date(Date.now() - 29 * 24 * 60 * 60_000) });
+  const dayMs = 24 * 60 * 60_000;
+  const expired = runningRun({
+    id: 20,
+    status: "success",
+    startedAt: new Date(Date.now() - (JOB_RUN_RETENTION_DAYS + 1) * dayMs),
+  });
+  const kept = runningRun({
+    id: 21,
+    status: "success",
+    startedAt: new Date(Date.now() - (JOB_RUN_RETENTION_DAYS - 1) * dayMs),
+  });
   const { service, runs } = newHarness({ runs: [expired, kept], schedules: [schedule()] });
 
   await (service as unknown as { pruneExpiredRuns(): Promise<void> }).pruneExpiredRuns();

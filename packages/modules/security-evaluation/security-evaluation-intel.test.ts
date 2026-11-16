@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { BadRequestException } from "@nestjs/common";
-import type { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import type { ChatModelResolver } from "@modules/llm/chat-model.resolver";
 import type { EvaluationRuleSetVersionRef, EvaluationSubjectRef } from "@modules/evaluation/ports/evaluation.contracts";
@@ -369,51 +368,16 @@ test("the re-rank request signature is content-addressed over the exact model in
   });
 });
 
-const TTL_DAYS_KEY = "modules.security-evaluation.ttlDays";
-
-function configReturning(ttlDays: unknown): ConfigService {
-  return {
-    getOrThrow: (key: string) => {
-      if (key === TTL_DAYS_KEY) return ttlDays;
-      throw new Error(`unexpected config key: ${key}`);
-    },
-  } as unknown as ConfigService;
-}
-
-test("the verdict cache TTL comes from the declared config and never falls back (ADR-033)", () => {
-  const prisma = {} as unknown as PrismaService;
-  assert.throws(
-    () => new SecurityEvaluationIntelNegativeCacheRepository(prisma, configReturning(undefined)),
-    new RegExp(TTL_DAYS_KEY),
-  );
-  assert.throws(
-    () => new SecurityEvaluationIntelNegativeCacheRepository(prisma, configReturning(0)),
-    /positive integer/,
-  );
-  assert.throws(
-    () => new SecurityEvaluationIntelNegativeCacheRepository(prisma, configReturning(-1)),
-    /positive integer/,
-  );
-  assert.throws(
-    () => new SecurityEvaluationIntelNegativeCacheRepository(prisma, configReturning(2.5)),
-    /positive integer/,
-  );
-  assert.doesNotThrow(() => new SecurityEvaluationIntelNegativeCacheRepository(prisma, configReturning(7)));
-});
-
 test("the verdict cache reuses only rows recorded under the current signature", async () => {
-  const repository = new SecurityEvaluationIntelNegativeCacheRepository(
-    {
-      securityEvaluationThreatVerdictCache: {
-        findMany: async () => [
-          { knowledgeItemId: "same", inputSignature: "sig" },
-          { knowledgeItemId: "changed", inputSignature: "old" },
-          { knowledgeItemId: "legacy", inputSignature: null },
-        ],
-      },
-    } as unknown as PrismaService,
-    configReturning(7),
-  );
+  const repository = new SecurityEvaluationIntelNegativeCacheRepository({
+    securityEvaluationThreatVerdictCache: {
+      findMany: async () => [
+        { knowledgeItemId: "same", inputSignature: "sig" },
+        { knowledgeItemId: "changed", inputSignature: "old" },
+        { knowledgeItemId: "legacy", inputSignature: null },
+      ],
+    },
+  } as unknown as PrismaService);
 
   const uncached = await repository.filterUncached(SUBJECT.kind, SUBJECT.subjectKey, [
     { knowledgeItemId: "same", signature: "sig" },

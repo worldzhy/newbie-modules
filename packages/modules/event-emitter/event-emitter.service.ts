@@ -1,12 +1,14 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EventCatalogService } from "./event-catalog.service";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
-const RETENTION_DAYS_KEY = "modules.event-emitter.retentionDays";
+/// Retention window for `EventEmission` rows. A policy value, identical in
+/// every deployment, so it is a code constant rather than a manifest env key
+/// (ADR-053).
+export const EVENT_EMISSION_RETENTION_DAYS = 90;
 
 // Bounds on the audit payload (R47-05). The emission table is an audit trail,
 // not a data store: long strings are cut, and a payload that still exceeds the
@@ -14,17 +16,6 @@ const RETENTION_DAYS_KEY = "modules.event-emitter.retentionDays";
 // or the list API.
 const MAX_PAYLOAD_STRING_LENGTH = 2_000;
 const MAX_PAYLOAD_JSON_LENGTH = 16_000;
-
-/// Validates the retention days resolved from the assembler's bare env
-/// mapping (ADR-033): the value must be a declared positive integer — there
-/// is no built-in fallback, so a host that forgets it fails to boot instead
-/// of silently pruning on a guessed window.
-function requirePositiveInteger(value: number, name: string): number {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`${name} must be a positive integer; received '${value}'.`);
-  }
-  return value;
-}
 
 export interface EventDescription {
   key: string;
@@ -41,9 +32,9 @@ export interface EventDescription {
 export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EventEmitterService.name);
 
-  /// Retention cut point computed once at construction (a boot-time decision,
-  /// not a per-request concern).
-  private readonly retentionDays: number;
+  /// Retention cut point, fixed by the module constant (ADR-053): the same in
+  /// every deployment, so it follows the code version.
+  private readonly retentionDays = EVENT_EMISSION_RETENTION_DAYS;
 
   /// Bound once so onModuleDestroy can detach the exact same callback.
   private readonly recordEmission = (event: string | string[], payload: unknown) => {
@@ -57,13 +48,7 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     private readonly eventCatalog: EventCatalogService,
-    private readonly config: ConfigService,
-  ) {
-    this.retentionDays = requirePositiveInteger(
-      Number(this.config.getOrThrow<string>(RETENTION_DAYS_KEY)),
-      RETENTION_DAYS_KEY,
-    );
-  }
+  ) {}
 
   onModuleInit() {
     this.eventEmitter.onAny(this.recordEmission);

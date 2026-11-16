@@ -8,13 +8,13 @@ import {
   NotFoundException,
   Optional,
 } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
   CENTER_SETTING_SINGLETON_ID,
   DEFAULT_PUSH_ENABLED,
   NOTIFICATION_PUSH_PORT,
+  NOTIFICATION_RECORD_RETENTION_DAYS,
   PG_UNIQUE_VIOLATION,
   SEVERITIES,
   isNotificationSeverity,
@@ -49,19 +49,9 @@ const MAX_UNRESOLVED_PUSH_FAILURES = 200;
 // memory stays flat regardless of the unread count (R44-08).
 const MARK_ALL_READ_BATCH_SIZE = 500;
 
-const RETENTION_DAYS_KEY = "modules.notification-center.retentionDays";
 // The prune walks every old row, so it runs on the notify path at most once an
 // hour instead of once per delivery (R47-04 follows the event-emitter pattern).
 const RECORD_PRUNE_INTERVAL_MS = 60 * 60_000;
-
-/// Validates the retention window resolved from the assembler's bare env
-/// mapping (ADR-033): a declared positive integer, no built-in fallback.
-function requirePositiveInteger(value: number, name: string): number {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`${name} must be a positive integer; received '${value}'.`);
-  }
-  return value;
-}
 
 // Links stored on a notification are rendered as anchors. Site-relative paths
 // and http(s) URLs are the only forms the UI can open safely (R5-P2-02).
@@ -186,23 +176,17 @@ function describeSuppression(verdict: { reason: DeliveryDecisionReason | null; r
 @Injectable()
 export class NotificationCenterService {
   private readonly logger = new Logger(NotificationCenterService.name);
-  private readonly retentionDays: number;
+  private readonly retentionDays = NOTIFICATION_RECORD_RETENTION_DAYS;
   private lastPruneAt = 0;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly registry: NotificationRegistryService,
     private readonly deliveryRules: NotificationDeliveryRuleService,
-    private readonly config: ConfigService,
     @Optional()
     @Inject(NOTIFICATION_PUSH_PORT)
     private readonly pushPort?: NotificationPushPort,
-  ) {
-    this.retentionDays = requirePositiveInteger(
-      Number(this.config.getOrThrow<string>(RETENTION_DAYS_KEY)),
-      RETENTION_DAYS_KEY,
-    );
-  }
+  ) {}
 
   // --- Delivery ------------------------------------------------------------
 

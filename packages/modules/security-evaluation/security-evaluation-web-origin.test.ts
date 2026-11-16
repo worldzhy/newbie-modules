@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ConfigService } from "@nestjs/config";
 import type { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import {
@@ -22,22 +21,6 @@ import type { VerificationFetchAccess } from "./ports/web-origin-verification-ac
  * normalization, the two verification channels and the lazy re-verification
  * gate. Identity is the subject; there is no asset or provenance row.
  */
-
-const CONFIG_VALUES: Record<string, string> = {
-  "modules.security-evaluation.webOriginVerificationIntervalDays": "30",
-  "modules.security-evaluation.webOriginReverifyFailureThreshold": "3",
-  "modules.security-evaluation.webOriginTokenBytes": "32",
-};
-
-function fakeConfig(): ConfigService {
-  return {
-    getOrThrow: (key: string) => {
-      const value = CONFIG_VALUES[key];
-      if (value === undefined) throw new Error(`Unexpected config key ${key}`);
-      return value;
-    },
-  } as unknown as ConfigService;
-}
 
 interface FakeWebOriginRow {
   id: string;
@@ -84,7 +67,6 @@ function buildService(overrides: { prisma: unknown; subjects: unknown; fetch?: V
   return new SecurityEvaluationWebOriginService(
     overrides.prisma as PrismaService,
     overrides.subjects as never,
-    fakeConfig(),
     overrides.fetch,
   );
 }

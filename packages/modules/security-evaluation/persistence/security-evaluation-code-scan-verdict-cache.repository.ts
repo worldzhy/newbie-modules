@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
+import { SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS } from "../security-evaluation.constants";
 import {
   codeScanVerdictCacheKey,
   type SecurityEvaluationCodeScanCachedFinding,
@@ -9,29 +9,21 @@ import {
   type SecurityEvaluationCodeScanVerdictCachePort,
   type SecurityEvaluationCodeScanVerdictLookup,
 } from "../judgment/code-scan/security-evaluation-code-scan-verdict-cache.port";
-import { requirePositiveInteger } from "./security-evaluation-intel-negative-cache.repository";
-
-const TTL_DAYS_KEY = "modules.security-evaluation.codeScanVerdictCacheTtlDays";
 
 /**
  * Prisma adapter for the CODE_SCAN bipolar verdict cache (ADR-054 clause 6).
  *
- * TTL contract: `modules.security-evaluation.codeScanVerdictCacheTtlDays` is
- * declared per environment (never falls back to a guessed window, ADR-033);
- * rows older than the TTL are misses. Content or version changes already
- * invalidate the key — the TTL only forces a long-unchanged file to be
- * re-judged against model drift.
+ * TTL contract: `SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS` is a
+ * module constant (ADR-053: identical in every deployment, so it follows the
+ * code version); rows older than the TTL are misses. Content or version
+ * changes already invalidate the key — the TTL only forces a long-unchanged
+ * file to be re-judged against model drift.
  */
 @Injectable()
 export class SecurityEvaluationCodeScanVerdictCacheRepository implements SecurityEvaluationCodeScanVerdictCachePort {
-  private readonly ttlMs: number;
+  private readonly ttlMs = SECURITY_EVALUATION_CODE_SCAN_VERDICT_CACHE_TTL_DAYS * 86_400_000;
 
-  constructor(
-    private readonly prisma: PrismaService,
-    config: ConfigService,
-  ) {
-    this.ttlMs = requirePositiveInteger(Number(config.getOrThrow<string>(TTL_DAYS_KEY)), TTL_DAYS_KEY) * 86_400_000;
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   async lookup(
     input: SecurityEvaluationCodeScanVerdictLookup,

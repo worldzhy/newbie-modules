@@ -1,27 +1,13 @@
 import { Injectable } from "@nestjs/common";
-import { ConfigService } from "@nestjs/config";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
+import { SECURITY_EVALUATION_INTEL_NEGATIVE_CACHE_TTL_DAYS } from "../security-evaluation.constants";
 import type {
   SecurityEvaluationIntelCacheCandidate,
   SecurityEvaluationIntelNegativeCachePort,
   SecurityEvaluationIntelVerdictRecord,
   SecurityEvaluationThreatVerdictKind,
 } from "../judgment/intel/security-evaluation-intel-negative-cache.port";
-
-const TTL_DAYS_KEY = "modules.security-evaluation.ttlDays";
-
-/// Validates the TTL days resolved from the assembler's bare env mapping
-/// (ADR-033): the value must be a declared positive integer — there is no
-/// built-in fallback, so a host that forgets it fails to boot instead of
-/// silently expiring on a guessed window. Shared by the module's TTL-gated
-/// caches (intel negative cache, code-scan verdict cache).
-export function requirePositiveInteger(value: number, name: string): number {
-  if (!Number.isInteger(value) || value <= 0) {
-    throw new Error(`${name} must be a positive integer; received '${value}'.`);
-  }
-  return value;
-}
 
 /**
  * Prisma enum values must be identifiers, so the schema keeps the domain
@@ -46,14 +32,9 @@ const PRISMA_VERDICT: Record<SecurityEvaluationThreatVerdictKind, "notRelevant" 
  */
 @Injectable()
 export class SecurityEvaluationIntelNegativeCacheRepository implements SecurityEvaluationIntelNegativeCachePort {
-  private readonly ttlMs: number;
+  private readonly ttlMs = SECURITY_EVALUATION_INTEL_NEGATIVE_CACHE_TTL_DAYS * 86_400_000;
 
-  constructor(
-    private readonly prisma: PrismaService,
-    config: ConfigService,
-  ) {
-    this.ttlMs = requirePositiveInteger(Number(config.getOrThrow<string>(TTL_DAYS_KEY)), TTL_DAYS_KEY) * 86_400_000;
-  }
+  constructor(private readonly prisma: PrismaService) {}
 
   async filterUncached(
     subjectKind: string,
