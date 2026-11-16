@@ -58,8 +58,8 @@ export class WechatAuthController {
   }
 
   @GuardByRefreshToken()
-  @Post("refresh-access-token")
-  @ApiOperation({ summary: "WeChat refresh access token" })
+  @Post("refresh-session")
+  @ApiOperation({ summary: "WeChat refresh the session" })
   @ApiResponse({ type: WechatRefreshAccessTokenResponseDto })
   async refresh(@Body() body: { refreshToken: string }) {
     return await this.wechatAuthService.refreshAccessToken({
