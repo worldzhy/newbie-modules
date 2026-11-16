@@ -44,7 +44,7 @@ import {
   SecurityEvaluationFindingResponseDto,
   SecurityEvaluationReportResponseDto,
   SecurityEvaluationRunAcceptedResponseDto,
-  SecurityEvaluationSubjectConflictResponseDto,
+  SecurityEvaluationSubjectResponseDto,
   StartSecurityEvaluationRunRequestDto,
   UpdateSecurityEvaluationSubjectMaterialRequestDto,
   UpdateSecurityEvaluationSubjectRequestDto,
@@ -103,8 +103,7 @@ export class SecurityEvaluationController {
   @ApiResponse({ status: 201, type: IngestSecurityEvaluationSubjectResponseDto })
   @ApiResponse({
     status: 409,
-    description: "The `(kind, subjectKey)` is already taken; the body carries the existing subjectId.",
-    type: SecurityEvaluationSubjectConflictResponseDto,
+    description: "The `(kind, subjectKey)` is already taken; the existing subjectId is under `error.info.subjectId`.",
   })
   async createSubject(
     @Body() body: IngestSecurityEvaluationSubjectRequestDto,
@@ -130,7 +129,7 @@ export class SecurityEvaluationController {
   @Patch("subjects/:subjectId")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationSubject)
   @ApiOperation({ summary: "Update the mutable identity field of one subject (displayName)" })
-  @ApiResponse({ status: 200, description: "The updated subject row." })
+  @ApiResponse({ status: 200, type: SecurityEvaluationSubjectResponseDto })
   updateSubject(
     @Param() params: GetSecurityEvaluationSubjectRequestDto,
     @Body() body: UpdateSecurityEvaluationSubjectRequestDto,

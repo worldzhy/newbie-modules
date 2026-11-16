@@ -180,14 +180,6 @@ export class IngestSecurityEvaluationSubjectResponseDto {
   @ApiProperty() subjectId!: string;
 }
 
-/** 409 body of `POST /subjects`: the id lets the caller switch to PATCH or a read (ADR-072 D1). */
-export class SecurityEvaluationSubjectConflictResponseDto {
-  @ApiProperty({ description: "Id of the subject that already occupies this `(kind, subjectKey)`" })
-  subjectId!: string;
-
-  @ApiProperty() message!: string;
-}
-
 /** `PATCH /subjects/:subjectId` — only the mutable identity field (ADR-072 D3). */
 export class UpdateSecurityEvaluationSubjectRequestDto {
   @ApiPropertyOptional({ description: "Human-readable name of the subject" })

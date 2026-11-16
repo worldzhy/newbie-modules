@@ -31,7 +31,7 @@ C 被排除（即本 ADR 的动因）。B 被排除：subject 无 material 在�
 
 | 端点 | 动作 | 语义 | 响应 |
 |---|---|---|---|
-| `POST /security-evaluation/subjects` | Create | 创建 subject + 内联 material，单事务 | 201 + `Location: /security-evaluation/subjects/{subjectId}`，body `{ subjectId }`；同 `(kind, subjectKey)` 已存在 → 409，body 带已有 `subjectId` |
+| `POST /security-evaluation/subjects` | Create | 创建 subject + 内联 material，单事务 | 201 + `Location: /security-evaluation/subjects/{subjectId}`，body `{ subjectId }`；同 `(kind, subjectKey)` 已存在 → 409，已存在 subject 的 id 在 `error.info.subjectId`（本仓错误信封） |
 | `GET /security-evaluation/subjects` | List | 已有（ADR-068） | 200 |
 | `PATCH /security-evaluation/subjects/:subjectId` | Update | 改 `displayName`（部分更新） | 200 / 404 |
 | `PUT /security-evaluation/subjects/:subjectId/material` | Update | 整体替换 material | 200 / 404 |
@@ -43,7 +43,7 @@ C 被排除（即本 ADR 的动因）。B 被排除：subject 无 material 在�
 
 ### D1. POST 只创建
 
-`POST /subjects` 命中已存在的 `(kind, subjectKey)` 时返回 **409 Conflict**，响应 body 携带已存在 subject 的 `subjectId`，让调用方可以就地转为读或 PATCH，而不是被静默合并。创建成功后返回 201 与 `Location` 头。
+`POST /subjects` 命中已存在的 `(kind, subjectKey)` 时返回 **409 Conflict**，已存在 subject 的 `subjectId` 随错误信封的 `error.info.subjectId` 返回，让调用方可以就地转为读或 PATCH，而不是被静默合并。创建成功后返回 201 与 `Location` 头。
 
 幂等是 `sync` 的职责，不是 `POST` 的职责：`sync` 仍按 ADR-070 D3 做宿主枚举的 upsert（200），但它不再是前端新增资产的入口。
 
