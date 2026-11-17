@@ -1,5 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma } from "@generated/prisma/client";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { EvaluationRunStatus, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { EvaluationSubjectService } from "@modules/evaluation/evaluation-subject.service";
 import type { EvaluationSubjectDescriptor } from "@modules/evaluation/ports/evaluation.contracts";
@@ -233,6 +233,37 @@ export class SecurityEvaluationAssetService {
       throw new BadRequestException("displayName must not be empty.");
     }
     return this.prisma.evaluationSubject.update({ where: { id: subjectId }, data: { displayName } });
+  }
+
+  /**
+   * `DELETE /subjects/:subjectId` (ADR-072): remove the subject and everything
+   * scoped to it. The skeleton cascades runs, results, findings and remediation
+   * plans; this module's own rows hang off the subject by a plain scalar, so
+   * they are deleted here in the same transaction. An in-flight run blocks the
+   * delete rather than leaving a worker writing to a vanished subject.
+   */
+  async deleteSubject(subjectId: string): Promise<void> {
+    await this.getSubject(subjectId);
+    const activeRunCount = await this.prisma.evaluationRun.count({
+      where: {
+        subjectId,
+        status: { in: [EvaluationRunStatus.QUEUED, EvaluationRunStatus.RUNNING] },
+      },
+    });
+    if (activeRunCount > 0) {
+      throw new ConflictException(`Subject ${subjectId} is being evaluated; wait for the run to finish.`);
+    }
+    const scope = { where: { subjectId } };
+    await this.prisma.$transaction([
+      this.prisma.securityEvaluationWebOrigin.deleteMany(scope),
+      this.prisma.securityEvaluationRepository.deleteMany(scope),
+      this.prisma.securityEvaluationAwsAccount.deleteMany(scope),
+      this.prisma.securityEvaluationAwsConfigKnowledgeItem.deleteMany(scope),
+      this.prisma.securityEvaluationNpmPackageKnowledgeItem.deleteMany(scope),
+      this.prisma.securityEvaluationCodeScanVerdictCache.deleteMany(scope),
+      this.prisma.securityEvaluationCodeScanFileExcerpt.deleteMany(scope),
+      this.prisma.evaluationSubject.delete({ where: { id: subjectId } }),
+    ]);
   }
 
   /**

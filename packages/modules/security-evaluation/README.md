@@ -237,6 +237,7 @@ criterionKey, path, contentHash, modelId, promptVersion, ruleSetVersion)`;
 | ------ | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | POST   | `/security-evaluation/subjects/sync`                       | Ingest one platform-level subject plus its material row (idempotent per `(subjectType, kind, subjectKey)`). |
 | GET    | `/security-evaluation/subjects`                            | Subject directory, optionally filtered by kind.                                                             |
+| DELETE | `/security-evaluation/subjects/:subjectId`                 | Delete one subject with its material, knowledge and run history (409 while a run is active).                |
 | GET    | `/security-evaluation/subjects/:subjectId/knowledge-items` | Current-state knowledge items of one subject.                                                               |
 | POST   | `/security-evaluation/runs`                                | Dispatch a run: 202 once admitted (`fire-and-forget`); admission answers 400/404/409 synchronously.         |
 | GET    | `/security-evaluation/runs`                                | Run history, platform-wide or subject-filtered.                                                             |
