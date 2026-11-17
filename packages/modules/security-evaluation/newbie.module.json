@@ -7,6 +7,18 @@
     "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
-    "modules": ["evaluation", "security", "llm"]
+    "modules": ["evaluation", "security", "llm"],
+    "config": {
+      "security-evaluation": {
+        "webOrigin": {
+          "requireVerification": "process.env.SECURITY_EVALUATION_WEB_ORIGIN_REQUIRE_VERIFICATION"
+        }
+      }
+    },
+    "env": {
+      "SECURITY_EVALUATION_WEB_ORIGIN_REQUIRE_VERIFICATION": {
+        "example": "true"
+      }
+    }
   }
 }

@@ -37,9 +37,13 @@ lands in a later slice on the same run and finding lifecycle.
   `create` writes the platform subject and the web-origin record in one
   transaction; `origin` is normalized to `scheme://host[:port]` (lowercase,
   punycode, default ports omitted) and becomes the subject's `subjectKey`.
-  Evaluation is gated on ownership verification: only `isActive` and `VERIFIED`
-  origins are submitted, and `listActiveVerified` lazily re-verifies them after
-  the configured interval (ADR-044). Verification reads go through the optional
+  Evaluation admission is decided once, at run creation
+  (`SecurityEvaluationRunService.startRun`), for every caller: an active origin is
+  admitted when `verificationStatus = VERIFIED`, or when
+  `SECURITY_EVALUATION_WEB_ORIGIN_REQUIRE_VERIFICATION=false` is set explicitly.
+  The switch has no default — a missing or non-boolean value fails the run.
+  `listActiveVerified` still lazily re-verifies project-scoped targets after the
+  configured interval (ADR-044). Verification reads go through the optional
   host-bound `SECURITY_EVALUATION_VERIFICATION_FETCH_ACCESS` port.
 
 Hosts declare subjects by calling `POST /security-evaluation/subjects/sync` with
