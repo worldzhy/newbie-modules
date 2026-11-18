@@ -1,4 +1,18 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query, Req, Res } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Req,
+  Res,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiExtraModels, ApiOperation, ApiResponse, ApiTags, getSchemaPath } from "@nestjs/swagger";
 import type { Response } from "express";
 import { EvaluationFindingStatus, PermissionAction, Prisma } from "@generated/prisma/client";
@@ -131,6 +145,19 @@ export class SecurityEvaluationController {
     @Body() body: UpdateSecurityEvaluationSubjectRequestDto,
   ) {
     return this.assets.updateSubject(params.subjectId, { displayName: body.displayName });
+  }
+
+  @Delete("subjects/:subjectId")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.EvaluationSubject)
+  @ApiOperation({
+    summary: "Delete one subject with its material, knowledge and run history",
+    description:
+      "Rejected with 409 while an evaluation run of the subject is queued or running, so no worker writes to a deleted subject.",
+  })
+  @ApiResponse({ status: 204, description: "The subject and everything scoped to it are gone." })
+  async deleteSubject(@Param() params: GetSecurityEvaluationSubjectRequestDto): Promise<void> {
+    await this.assets.deleteSubject(params.subjectId);
   }
 
   // --- Knowledge items ---------------------------------------------------
