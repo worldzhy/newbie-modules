@@ -5,9 +5,10 @@ import { NewbieException, NewbieExceptionType, newbieExceptionCode } from "@devb
 import { SessionService } from "./session.service";
 
 /**
- * Behavior tests for SessionService.refresh (nightwatch-backend ADR-034). Prisma and TokenService
+ * Behavior tests for SessionService (nightwatch-backend ADR-034). Prisma and TokenService
  * are replaced by hand-rolled fakes so the test exercises the rotation CAS,
- * the idempotency window, and genuine-reuse revocation without a database.
+ * the idempotency window, genuine-reuse revocation, and the two revoke
+ * predicates without a database.
  */
 
 function hash(token: string) {
@@ -26,6 +27,24 @@ function buildServices() {
       rotatedAt: null,
       refreshTokenNextSealed: null,
     },
+    // A session whose browser still holds the previous generation: the row
+    // moved on, the cookie did not. Only logout is allowed to match it.
+    2: {
+      id: 2,
+      userId: "user-2",
+      refreshTokenHash: hash("current-token"),
+      previousRefreshTokenHash: hash("previous-token"),
+      rotatedAt: null,
+      refreshTokenNextSealed: null,
+    },
+  };
+
+  const matches = (row: any, where: any): boolean => {
+    if (where.OR) return where.OR.some((clause: any) => matches(row, clause));
+    return (
+      (where.refreshTokenHash === undefined || row.refreshTokenHash === where.refreshTokenHash) &&
+      (where.previousRefreshTokenHash === undefined || row.previousRefreshTokenHash === where.previousRefreshTokenHash)
+    );
   };
 
   const prisma: any = {
@@ -42,7 +61,7 @@ function buildServices() {
         return { ...row };
       },
       findFirst: async ({ where }: any) => {
-        const row = Object.values(db).find((s) => s.previousRefreshTokenHash === where.previousRefreshTokenHash);
+        const row = Object.values(db).find((s) => matches(s, where));
         return row ? { ...row } : null;
       },
       delete: async ({ where }: any) => {
@@ -120,4 +139,64 @@ test("a replayed refresh outside the window revokes only that session and 401s",
   // Only the offending session was deleted, not every session of the user.
   assert.equal(db[1], undefined);
   assert.equal(recorded?.params?.detail?.reason, "refresh_token_reuse");
+});
+
+test("revokeByRefreshToken revokes the session holding the current token", async () => {
+  const { service, db } = buildServices();
+
+  assert.equal(await service.revokeByRefreshToken("current-token"), "current");
+  assert.equal(db[2], undefined);
+});
+
+test("revokeByRefreshToken does not fall back to the previous generation by default", async () => {
+  const { service, db } = buildServices();
+
+  // The refresh-token strategy's expiry path: an old credential must not become
+  // a way to delete a live session.
+  assert.equal(await service.revokeByRefreshToken("previous-token"), "none");
+  assert.ok(db[2]);
+});
+
+test("logout's allowPrevious revokes the session the browser still points at", async () => {
+  const { service, db, auditLogService } = buildServices();
+  let recorded: any = null;
+  auditLogService.record = async (event: string, params: any) => {
+    recorded = { event, params };
+  };
+
+  const matched = await service.revokeByRefreshToken("previous-token", {
+    allowPrevious: true,
+    auditReason: "logout",
+  });
+
+  assert.equal(matched, "previous");
+  assert.equal(db[2], undefined);
+  assert.equal(recorded?.params?.detail?.reason, "logout");
+  assert.equal(recorded?.params?.detail?.matched, "previous");
+  assert.equal(recorded?.params?.actorId, "user-2");
+});
+
+test("routine expiry revokes without an audit entry", async () => {
+  const { service, db, auditLogService } = buildServices();
+  let recorded: any = null;
+  auditLogService.record = async (event: string, params: any) => {
+    recorded = { event, params };
+  };
+
+  assert.equal(await service.revokeByRefreshToken("current-token"), "current");
+
+  assert.equal(db[2], undefined);
+  assert.equal(recorded, null);
+});
+
+test("revokeByRefreshToken reports none for an unknown token and touches nothing", async () => {
+  const { service, db } = buildServices();
+
+  const matched = await service.revokeByRefreshToken("unknown-token", {
+    allowPrevious: true,
+    auditReason: "logout",
+  });
+
+  assert.equal(matched, "none");
+  assert.ok(db[1] && db[2]);
 });

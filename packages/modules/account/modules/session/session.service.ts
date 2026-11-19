@@ -161,16 +161,40 @@ export class SessionService {
   }
 
   /**
-   * Revoke the session currently holding a refresh token. The plaintext is never
-   * stored, so the token must be hashed before lookup.
+   * Revoke the session holding a refresh token, and report which generation
+   * matched. The plaintext is never stored, so the token must be hashed first.
+   *
+   * Both options exist for logout only. `allowPrevious`: a rotation response
+   * that is still in flight (or was dropped) leaves the browser holding the
+   * previous generation while the row already moved on; matching only the
+   * current hash would make that logout a silent no-op. `auditReason`: logout
+   * is a user-initiated revoke and is audited, while the refresh-token
+   * strategy's routine expiry path stays unrecorded.
    */
-  async revokeByRefreshToken(refreshToken: string) {
+  async revokeByRefreshToken(
+    refreshToken: string,
+    options: { allowPrevious?: boolean; auditReason?: string } = {},
+  ): Promise<"current" | "previous" | "none"> {
+    const tokenHash = this.tokenService.hashToken(refreshToken);
     const session = await this.prisma.session.findFirst({
-      where: { refreshTokenHash: this.tokenService.hashToken(refreshToken) },
-      select: { id: true },
+      where: options.allowPrevious
+        ? { OR: [{ refreshTokenHash: tokenHash }, { previousRefreshTokenHash: tokenHash }] }
+        : { refreshTokenHash: tokenHash },
+      select: { id: true, userId: true, refreshTokenHash: true },
     });
-    if (!session) return;
+    if (!session) return "none";
+
     await this.revokeSession(session.id);
+    const matched = session.refreshTokenHash === tokenHash ? "current" : "previous";
+    if (options.auditReason) {
+      await this.auditLogService.record(AuditEvent.SESSION_REVOKED, {
+        actorType: AuditActorType.USER,
+        actorId: session.userId,
+        resourceType: "session",
+        detail: { reason: options.auditReason, sessionId: session.id, matched },
+      });
+    }
+    return matched;
   }
 
   private mintAccessToken(session: { id: number; userId: string }) {
