@@ -2,7 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { TaskChangeClass, TaskStatus } from "@generated/prisma/enums";
-import { canTransition, deriveChangeClass } from "./task.service";
+import {
+  canTransition,
+  deriveChangeClass,
+  evaluateAdmission,
+  formatGateOneBlock,
+  MAX_SCOPE_PATHS,
+  planEditRequiresOverride,
+} from "./task.service";
 
 // ADR-054 D2 fixed transition table. The same status is a permitted no-op.
 test("task status transitions: BLOCKED is entered from PENDING and DEVELOPING only", () => {
@@ -50,4 +57,81 @@ test("deriveChangeClass: more than 20 allowed path globs is DESIGNED", () => {
 test("deriveChangeClass: no plan is SIMPLE", () => {
   assert.equal(deriveChangeClass(null, []), TaskChangeClass.SIMPLE);
   assert.equal(deriveChangeClass(undefined, []), TaskChangeClass.SIMPLE);
+});
+
+const READY = {
+  acceptanceCriteria: "GET /tasks returns the new field",
+  parentId: null,
+  designRef: null,
+  changeClass: TaskChangeClass.SIMPLE,
+  scopePaths: ["src/modules/task-management/**"],
+  dependsOn: [],
+  dependencyStatuses: new Map<string, TaskStatus>(),
+};
+
+// ADR-054 D4 gate 1: every rule is reported, not just the first one.
+test("evaluateAdmission: a well-formed task is admitted", () => {
+  assert.deepEqual(evaluateAdmission(READY), { admitted: true, violations: [] });
+});
+
+test("evaluateAdmission: acceptance criteria is mandatory", () => {
+  const verdict = evaluateAdmission({ ...READY, acceptanceCriteria: "   " });
+  assert.equal(verdict.admitted, false);
+  assert.deepEqual(verdict.violations, ["acceptanceCriteria is required before a task can start"]);
+});
+
+test("evaluateAdmission: a design unit never starts", () => {
+  const verdict = evaluateAdmission({ ...READY, parentId: "ckv1parent" });
+  assert.equal(verdict.admitted, false);
+  assert.deepEqual(verdict.violations, ["a design-unit task (parentId set) cannot start"]);
+});
+
+test("evaluateAdmission: DESIGNED needs a designRef, SIMPLE does not", () => {
+  assert.equal(evaluateAdmission({ ...READY, changeClass: TaskChangeClass.DESIGNED }).admitted, false);
+  assert.equal(
+    evaluateAdmission({ ...READY, changeClass: TaskChangeClass.DESIGNED, designRef: "ADR-054" }).admitted,
+    true,
+  );
+});
+
+test("evaluateAdmission: scopePaths must be non-empty and within the cap", () => {
+  assert.equal(evaluateAdmission({ ...READY, scopePaths: [] }).admitted, false);
+  const overCap = Array.from({ length: MAX_SCOPE_PATHS + 1 }, (_, index) => `src/mod${index}/**`);
+  assert.deepEqual(evaluateAdmission({ ...READY, scopePaths: overCap }).violations, [
+    `scopePaths has ${MAX_SCOPE_PATHS + 1} entries; at most ${MAX_SCOPE_PATHS} are allowed`,
+  ]);
+});
+
+test("evaluateAdmission: dependencies must exist and be COMPLETED", () => {
+  const statuses = new Map<string, TaskStatus>([
+    ["done", TaskStatus.COMPLETED],
+    ["busy", TaskStatus.DEVELOPING],
+  ]);
+  assert.deepEqual(evaluateAdmission({ ...READY, dependsOn: ["done"], dependencyStatuses: statuses }), {
+    admitted: true,
+    violations: [],
+  });
+
+  const verdict = evaluateAdmission({
+    ...READY,
+    dependsOn: ["busy", "missing"],
+    dependencyStatuses: statuses,
+  });
+  assert.deepEqual(verdict.violations, [
+    "dependency busy is DEVELOPING, not COMPLETED",
+    "dependency missing does not exist",
+  ]);
+});
+
+test("formatGateOneBlock: prefixes the violations with the gate number", () => {
+  assert.equal(formatGateOneBlock(["a", "b"]), "gate 1: a; b");
+});
+
+// ADR-054 D3 freeze: impact / scopePaths are only editable through override
+// once the plan froze.
+test("planEditRequiresOverride: only a frozen plan blocks edits", () => {
+  assert.equal(planEditRequiresOverride(null, true), false);
+  assert.equal(planEditRequiresOverride(undefined, true), false);
+  assert.equal(planEditRequiresOverride(new Date("2026-11-19T00:00:00Z"), false), false);
+  assert.equal(planEditRequiresOverride(new Date("2026-11-19T00:00:00Z"), true), true);
 });

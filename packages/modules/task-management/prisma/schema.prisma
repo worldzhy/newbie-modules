@@ -73,6 +73,10 @@ model Task {
   blockedReason          String?
   designRefJustification String?
   requirementReview      Json?
+  /// Set the first time the task starts (PENDING/BLOCKED -> DEVELOPING).
+  /// `impact`, `scopePaths` and the derived `changeClass` freeze from then on
+  /// and are only editable through the human override channel (ADR-054 D3).
+  planFrozenAt DateTime?
 
   spaceId   String    @db.Uuid
   space     TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)

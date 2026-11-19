@@ -249,6 +249,15 @@ export class UpdateTaskRequestDto extends TaskDeliveryFieldsDto {
   @IsDateString()
   @IsOptional()
   dueDate?: Date;
+
+  @ApiPropertyOptional({
+    type: String,
+    description:
+      "Reason recorded when a human overrides the frozen delivery plan (impact / scopePaths) after the task started (ADR-054 D3)",
+  })
+  @IsString()
+  @IsOptional()
+  planOverrideReason?: string;
 }
 
 export class CreateTasksBatchRequestDto {
@@ -410,6 +419,12 @@ export class TaskDto {
 
   @ApiPropertyOptional({ description: "Requirement-review summary", type: Object, nullable: true })
   requirementReview?: unknown;
+
+  @ApiPropertyOptional({
+    type: Date,
+    description: "When the delivery plan (impact / scopePaths / changeClass) froze; null until the task starts",
+  })
+  planFrozenAt?: Date | null;
 }
 
 export class TaskWithRelationsDto extends TaskDto {
