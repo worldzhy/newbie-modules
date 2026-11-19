@@ -53,6 +53,27 @@ model Task {
   updatedAt   DateTime          @updatedAt
   deletedAt   DateTime?
 
+  /// Parent task in the design/execution hierarchy. A task with a parent is a
+  /// design unit: it aggregates children and is never dispatched on its own.
+  parentId String? @db.Uuid
+  parent   Task?   @relation("TaskHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Task[]  @relation("TaskHierarchy")
+
+  /// Delivery-plan fields shared by every host that runs the delivery pipeline:
+  /// design source reference, acceptance criteria, allowed path globs, declared
+  /// impact, prerequisite task ids, origin discussion reference, and the gate
+  /// diagnostics captured when a task blocks.
+  designRef              String?
+  acceptanceCriteria     String?
+  scopePaths             String[]         @default([])
+  impact                 Json?
+  changeClass            TaskChangeClass?
+  dependsOn              String[]         @default([])
+  sourceRef              Json?
+  blockedReason          String?
+  designRefJustification String?
+  requirementReview      Json?
+
   spaceId   String    @db.Uuid
   space     TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
 
@@ -66,14 +87,17 @@ model Task {
   lastOperatorParticipant   TaskParticipant? @relation("LastOperatorTasks", fields: [lastOperatorParticipantId], references: [id], onDelete: SetNull)
   lastOperatorName          String?
 
+  @@index([parentId])
   @@schema("module/task-management")
 }
 
 /// Task lifecycle. Status updates follow the service's fixed transition table:
-/// PENDING to DEVELOPING or CANCELLED; DEVELOPING to TESTING or CANCELLED;
-/// TESTING to DEVELOPING, DEPLOYED, COMPLETED, or CANCELLED; DEPLOYED to
-/// DEVELOPING, COMPLETED, or CANCELLED. COMPLETED and CANCELLED are terminal.
-/// CANCELLED is a status, distinct from the soft delete in `deletedAt`.
+/// PENDING to DEVELOPING, BLOCKED or CANCELLED; DEVELOPING to TESTING, BLOCKED or
+/// CANCELLED; TESTING to DEVELOPING, DEPLOYED, COMPLETED or CANCELLED; DEPLOYED to
+/// DEVELOPING, COMPLETED or CANCELLED; BLOCKED to DEVELOPING or CANCELLED.
+/// COMPLETED and CANCELLED are terminal. CANCELLED is a status, distinct from
+/// the soft delete in `deletedAt`; BLOCKED means a gate stopped the task and a
+/// human must clear it.
 enum TaskStatus {
   PENDING
   DEVELOPING
@@ -81,6 +105,18 @@ enum TaskStatus {
   DEPLOYED
   COMPLETED
   CANCELLED
+  BLOCKED
+
+  @@schema("module/task-management")
+}
+
+/// Delivery-plan class, derived from `impact` and `scopePaths` rather than
+/// declared by hand: DESIGNED when the task spans several repositories, touches
+/// the schema or a contract, is irreversible, or declares more than 20 allowed
+/// path globs; SIMPLE otherwise.
+enum TaskChangeClass {
+  SIMPLE
+  DESIGNED
 
   @@schema("module/task-management")
 }

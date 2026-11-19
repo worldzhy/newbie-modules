@@ -2,15 +2,38 @@ import { ConflictException, Injectable, Logger, NotFoundException } from "@nestj
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Prisma } from "@generated/prisma/client";
-import { TaskStatus } from "@generated/prisma/enums";
+import { TaskChangeClass, TaskStatus } from "@generated/prisma/enums";
 import { CreateTaskItemDto, UpdateTaskRequestDto } from "./task.dto";
 import { TASK_STATUS_CHANGED_EVENT, type TaskStatusChangedEvent } from "./task-management.events";
 
-export { TaskStatus };
+export { TaskChangeClass, TaskStatus };
 
 export interface Operator {
   participantId?: string;
   name?: string;
+}
+
+/** Declared change impact of a task; `changeClass` is derived from it. */
+export interface TaskImpact {
+  repos?: string[];
+  touchesSchema?: boolean;
+  touchesContracts?: boolean;
+  irreversible?: boolean;
+}
+
+/** Origin discussion a task was created from, kept for clarification lookups. */
+export interface TaskSourceRef {
+  chatId?: string;
+  messageId?: string;
+}
+
+/** Requirement-review summary written during the discussion stage. */
+export interface RequirementReview {
+  reportUrl?: string;
+  contradictionCount?: number;
+  coveredCount?: number;
+  suggestionCount?: number;
+  uncoveredCount?: number;
 }
 
 export interface CreateTaskInput {
@@ -21,6 +44,16 @@ export interface CreateTaskInput {
   assigneeId?: string;
   dueDate?: Date;
   creatorId?: string;
+  parentId?: string;
+  designRef?: string;
+  acceptanceCriteria?: string;
+  scopePaths?: string[];
+  impact?: TaskImpact;
+  dependsOn?: string[];
+  sourceRef?: TaskSourceRef;
+  blockedReason?: string;
+  designRefJustification?: string;
+  requirementReview?: RequirementReview;
 }
 
 export interface CreateTasksBatchInput {
@@ -40,8 +73,8 @@ export interface ListTasksFilter {
 }
 
 const TASK_STATUS_TRANSITIONS: Readonly<Record<TaskStatus, ReadonlySet<TaskStatus>>> = {
-  [TaskStatus.PENDING]: new Set([TaskStatus.DEVELOPING, TaskStatus.CANCELLED]),
-  [TaskStatus.DEVELOPING]: new Set([TaskStatus.TESTING, TaskStatus.CANCELLED]),
+  [TaskStatus.PENDING]: new Set([TaskStatus.DEVELOPING, TaskStatus.BLOCKED, TaskStatus.CANCELLED]),
+  [TaskStatus.DEVELOPING]: new Set([TaskStatus.TESTING, TaskStatus.BLOCKED, TaskStatus.CANCELLED]),
   [TaskStatus.TESTING]: new Set([
     TaskStatus.DEVELOPING,
     TaskStatus.DEPLOYED,
@@ -49,9 +82,35 @@ const TASK_STATUS_TRANSITIONS: Readonly<Record<TaskStatus, ReadonlySet<TaskStatu
     TaskStatus.CANCELLED,
   ]),
   [TaskStatus.DEPLOYED]: new Set([TaskStatus.DEVELOPING, TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
+  [TaskStatus.BLOCKED]: new Set([TaskStatus.DEVELOPING, TaskStatus.CANCELLED]),
   [TaskStatus.COMPLETED]: new Set<TaskStatus>(),
   [TaskStatus.CANCELLED]: new Set<TaskStatus>(),
 };
+
+/**
+ * Whether a status update is allowed. An unchanged status is a no-op rather
+ * than a transition, so it is permitted for every state.
+ */
+export function canTransition(from: TaskStatus, to: TaskStatus): boolean {
+  return from === to || TASK_STATUS_TRANSITIONS[from].has(to);
+}
+
+/**
+ * Delivery-plan class of a task (ADR-054 D3). It is a pure function of the
+ * declared impact and the allowed path globs; callers never supply it.
+ */
+export function deriveChangeClass(
+  impact: TaskImpact | null | undefined,
+  scopePaths: readonly string[],
+): TaskChangeClass {
+  const designed =
+    (impact?.repos?.length ?? 0) > 1 ||
+    impact?.touchesSchema === true ||
+    impact?.touchesContracts === true ||
+    impact?.irreversible === true ||
+    scopePaths.length > 20;
+  return designed ? TaskChangeClass.DESIGNED : TaskChangeClass.SIMPLE;
+}
 
 @Injectable()
 export class TaskService {
@@ -72,6 +131,17 @@ export class TaskService {
         assigneeId: data.assigneeId,
         dueDate: data.dueDate,
         creatorId: data.creatorId,
+        parentId: data.parentId,
+        designRef: data.designRef,
+        acceptanceCriteria: data.acceptanceCriteria,
+        scopePaths: data.scopePaths ?? [],
+        impact: data.impact as Prisma.InputJsonValue | undefined,
+        changeClass: deriveChangeClass(data.impact, data.scopePaths ?? []),
+        dependsOn: data.dependsOn ?? [],
+        sourceRef: data.sourceRef as Prisma.InputJsonValue | undefined,
+        blockedReason: data.blockedReason,
+        designRefJustification: data.designRefJustification,
+        requirementReview: data.requirementReview as Prisma.InputJsonValue | undefined,
       },
     });
   }
@@ -86,6 +156,17 @@ export class TaskService {
         creatorId: input.creatorId,
         assigneeId: task.assigneeId,
         dueDate: task.dueDate,
+        parentId: task.parentId,
+        designRef: task.designRef,
+        acceptanceCriteria: task.acceptanceCriteria,
+        scopePaths: task.scopePaths ?? [],
+        impact: task.impact as Prisma.InputJsonValue | undefined,
+        changeClass: deriveChangeClass(task.impact, task.scopePaths ?? []),
+        dependsOn: task.dependsOn ?? [],
+        sourceRef: task.sourceRef as Prisma.InputJsonValue | undefined,
+        blockedReason: task.blockedReason,
+        designRefJustification: task.designRefJustification,
+        requirementReview: task.requirementReview as Prisma.InputJsonValue | undefined,
       })),
     });
 
@@ -147,13 +228,18 @@ export class TaskService {
   async updateTask(taskId: string, dto: UpdateTaskRequestDto, operator: Operator) {
     let previousStatus: TaskStatus | undefined;
     let nextStatus: TaskStatus | undefined;
+    let nextChangeClass: TaskChangeClass | undefined;
+
+    const planTouched = dto.impact !== undefined || dto.scopePaths !== undefined;
+    const current =
+      dto.status !== undefined || planTouched
+        ? await this.prisma.task.findUnique({
+            where: { id: taskId },
+            select: { status: true, deletedAt: true, impact: true, scopePaths: true },
+          })
+        : null;
 
     if (dto.status !== undefined) {
-      const current = await this.prisma.task.findUnique({
-        where: { id: taskId },
-        select: { status: true, deletedAt: true },
-      });
-
       if (!current) {
         throw new NotFoundException("Task not found");
       }
@@ -162,13 +248,23 @@ export class TaskService {
       }
 
       previousStatus = current.status;
-      if (current.status === dto.status) {
-        nextStatus = current.status;
-      } else if (!TASK_STATUS_TRANSITIONS[current.status].has(dto.status)) {
+      if (!canTransition(current.status, dto.status)) {
         throw new ConflictException(`Invalid task status transition: ${current.status} -> ${dto.status}`);
-      } else {
-        nextStatus = dto.status;
       }
+      nextStatus = dto.status;
+
+      if (nextStatus === TaskStatus.BLOCKED && nextStatus !== previousStatus && !dto.blockedReason) {
+        throw new ConflictException("blockedReason is required when a task moves to BLOCKED");
+      }
+    }
+
+    if (planTouched) {
+      if (!current) {
+        throw new NotFoundException("Task not found");
+      }
+      const impact = (dto.impact !== undefined ? dto.impact : current.impact) as TaskImpact | null;
+      const scopePaths = dto.scopePaths !== undefined ? dto.scopePaths : current.scopePaths;
+      nextChangeClass = deriveChangeClass(impact, scopePaths);
     }
 
     // The status guard is part of the UPDATE, not just a prior read: two
@@ -185,6 +281,17 @@ export class TaskService {
         description: dto.description,
         assigneeId: dto.assigneeId,
         dueDate: dto.dueDate,
+        parentId: dto.parentId,
+        designRef: dto.designRef,
+        acceptanceCriteria: dto.acceptanceCriteria,
+        scopePaths: dto.scopePaths,
+        impact: dto.impact as Prisma.InputJsonValue | undefined,
+        changeClass: nextChangeClass,
+        dependsOn: dto.dependsOn,
+        sourceRef: dto.sourceRef as Prisma.InputJsonValue | undefined,
+        blockedReason: dto.blockedReason,
+        designRefJustification: dto.designRefJustification,
+        requirementReview: dto.requirementReview as Prisma.InputJsonValue | undefined,
         ...(nextStatus !== undefined ? { status: nextStatus } : {}),
         lastOperatorParticipantId: operator.participantId,
         lastOperatorName: operator.name,

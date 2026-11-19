@@ -3,6 +3,7 @@ import { Type } from "class-transformer";
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -12,7 +13,145 @@ import {
   IsUUID,
   ValidateNested,
 } from "class-validator";
-import { TaskStatus } from "./task.service";
+import { RequirementReview, TaskChangeClass, TaskImpact, TaskSourceRef, TaskStatus } from "./task.service";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Delivery-plan DTOs (ADR-054 D2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export class TaskImpactDto implements TaskImpact {
+  @ApiPropertyOptional({
+    type: [String],
+    isArray: true,
+    description: "Repositories the task is expected to change",
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  repos?: string[];
+
+  @ApiPropertyOptional({ description: "Whether the task touches prisma schema or migrations" })
+  @IsBoolean()
+  @IsOptional()
+  touchesSchema?: boolean;
+
+  @ApiPropertyOptional({ description: "Whether the task changes cross-module or cross-repository contracts" })
+  @IsBoolean()
+  @IsOptional()
+  touchesContracts?: boolean;
+
+  @ApiPropertyOptional({ description: "Whether the task performs an irreversible operation" })
+  @IsBoolean()
+  @IsOptional()
+  irreversible?: boolean;
+}
+
+export class TaskSourceRefDto implements TaskSourceRef {
+  @ApiPropertyOptional({ type: String, description: "Discussion chat id the task came from" })
+  @IsString()
+  @IsOptional()
+  chatId?: string;
+
+  @ApiPropertyOptional({ type: String, description: "Message id inside that discussion" })
+  @IsString()
+  @IsOptional()
+  messageId?: string;
+}
+
+export class RequirementReviewDto implements RequirementReview {
+  @ApiPropertyOptional({ type: String, description: "Link to the requirement-review report" })
+  @IsString()
+  @IsOptional()
+  reportUrl?: string;
+
+  @ApiPropertyOptional({ type: Number, description: "Number of contradictions reported" })
+  @IsNumber()
+  @IsOptional()
+  contradictionCount?: number;
+
+  @ApiPropertyOptional({ type: Number, description: "Number of already-covered findings" })
+  @IsNumber()
+  @IsOptional()
+  coveredCount?: number;
+
+  @ApiPropertyOptional({ type: Number, description: "Number of suggestions" })
+  @IsNumber()
+  @IsOptional()
+  suggestionCount?: number;
+
+  @ApiPropertyOptional({ type: Number, description: "Number of uncovered areas" })
+  @IsNumber()
+  @IsOptional()
+  uncoveredCount?: number;
+}
+
+/**
+ * Fields shared by task creation and update. `changeClass` is absent on
+ * purpose: the service derives it from `impact` and `scopePaths`.
+ */
+export class TaskDeliveryFieldsDto {
+  @ApiPropertyOptional({ type: String, description: "Parent task ID (uuid); a child is not dispatched directly" })
+  @IsUUID("4")
+  @IsOptional()
+  parentId?: string;
+
+  @ApiPropertyOptional({ type: String, description: "Design source reference (ADR / spec id or path)" })
+  @IsString()
+  @IsOptional()
+  designRef?: string;
+
+  @ApiPropertyOptional({ type: String, description: "Acceptance criteria, required before a task may start" })
+  @IsString()
+  @IsOptional()
+  acceptanceCriteria?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    isArray: true,
+    description: "Allowed path globs; frozen once the task starts",
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  scopePaths?: string[];
+
+  @ApiPropertyOptional({ type: TaskImpactDto, description: "Declared change impact" })
+  @ValidateNested()
+  @Type(() => TaskImpactDto)
+  @IsOptional()
+  impact?: TaskImpactDto;
+
+  @ApiPropertyOptional({ type: [String], isArray: true, description: "Prerequisite task IDs (uuid)" })
+  @IsArray()
+  @IsUUID("4", { each: true })
+  @IsOptional()
+  dependsOn?: string[];
+
+  @ApiPropertyOptional({ type: TaskSourceRefDto, description: "Origin discussion reference" })
+  @ValidateNested()
+  @Type(() => TaskSourceRefDto)
+  @IsOptional()
+  sourceRef?: TaskSourceRefDto;
+
+  @ApiPropertyOptional({ type: String, description: "Reason captured when the task moves to BLOCKED" })
+  @IsString()
+  @IsOptional()
+  blockedReason?: string;
+
+  @ApiPropertyOptional({ type: String, description: "Why the change falls inside the designRef scope" })
+  @IsString()
+  @IsOptional()
+  designRefJustification?: string;
+
+  @ApiPropertyOptional({
+    type: RequirementReviewDto,
+    description: "Requirement-review summary from the discussion stage",
+  })
+  @ValidateNested()
+  @Type(() => RequirementReviewDto)
+  @IsOptional()
+  requirementReview?: RequirementReviewDto;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Request DTOs
@@ -54,7 +193,7 @@ export class ListTasksQueryDto {
   assigneeName?: string;
 }
 
-export class CreateTaskItemDto {
+export class CreateTaskItemDto extends TaskDeliveryFieldsDto {
   @ApiProperty({ type: String })
   @IsString()
   @IsNotEmpty()
@@ -84,7 +223,7 @@ export class CreateTaskItemDto {
 
 export class CreateTaskRequestDto extends CreateTaskItemDto {}
 
-export class UpdateTaskRequestDto {
+export class UpdateTaskRequestDto extends TaskDeliveryFieldsDto {
   @ApiPropertyOptional({ type: String })
   @IsString()
   @IsOptional()
@@ -238,6 +377,39 @@ export class TaskDto {
 
   @ApiPropertyOptional({ description: "Display name of the last operator", type: String })
   lastOperatorName?: string | null;
+
+  @ApiPropertyOptional({ description: "Parent task ID (uuid)", type: String, nullable: true })
+  parentId?: string | null;
+
+  @ApiPropertyOptional({ description: "Design source reference", type: String, nullable: true })
+  designRef?: string | null;
+
+  @ApiPropertyOptional({ description: "Acceptance criteria", type: String, nullable: true })
+  acceptanceCriteria?: string | null;
+
+  @ApiPropertyOptional({ description: "Allowed path globs", type: [String], isArray: true })
+  scopePaths?: string[];
+
+  @ApiPropertyOptional({ description: "Declared change impact", type: Object, nullable: true })
+  impact?: unknown;
+
+  @ApiPropertyOptional({ enum: TaskChangeClass, description: "Derived delivery-plan class", nullable: true })
+  changeClass?: TaskChangeClass | null;
+
+  @ApiPropertyOptional({ description: "Prerequisite task IDs (uuid)", type: [String], isArray: true })
+  dependsOn?: string[];
+
+  @ApiPropertyOptional({ description: "Origin discussion reference", type: Object, nullable: true })
+  sourceRef?: unknown;
+
+  @ApiPropertyOptional({ description: "Reason the task is blocked", type: String, nullable: true })
+  blockedReason?: string | null;
+
+  @ApiPropertyOptional({ description: "Why the change falls inside the designRef scope", type: String, nullable: true })
+  designRefJustification?: string | null;
+
+  @ApiPropertyOptional({ description: "Requirement-review summary", type: Object, nullable: true })
+  requirementReview?: unknown;
 }
 
 export class TaskWithRelationsDto extends TaskDto {
