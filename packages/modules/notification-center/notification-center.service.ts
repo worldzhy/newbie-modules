@@ -455,7 +455,7 @@ export class NotificationCenterService {
     }
     let results: PushDeliveryResult[];
     try {
-      results = await this.pushPort.pushSystemText("Notification center test message: the push channel is working.");
+      results = await this.pushPort.pushSystemText("Notification center test: push delivery is working.");
     } catch (error) {
       // Adapter-level failure (DB down enumerating bindings, Lark client crash, etc.).
       // Surface it as a single synthetic failure so the diagnostic toast shows
