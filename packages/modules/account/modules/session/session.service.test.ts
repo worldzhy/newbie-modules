@@ -118,6 +118,21 @@ test("a retried refresh within the idempotency window returns the same minted to
   assert.ok(db[1]);
 });
 
+test("a replay 45s after rotation lands inside the 60s window and does not extend it (ADR-055)", async () => {
+  const { service, db } = buildServices();
+  await service.refresh("old-refresh");
+
+  const rotatedAt = new Date(Date.now() - 45_000);
+  db[1].rotatedAt = rotatedAt;
+
+  const replay = await service.refresh("old-refresh");
+
+  assert.equal(replay.refreshToken, "new-refresh");
+  // A replay must not push the window forward: every replay stays bounded by
+  // the first rotation, so the redeemable span never grows.
+  assert.equal(db[1].rotatedAt, rotatedAt);
+});
+
 test("a replayed refresh outside the window revokes only that session and 401s", async () => {
   const { service, db, auditLogService } = buildServices();
   await service.refresh("old-refresh");

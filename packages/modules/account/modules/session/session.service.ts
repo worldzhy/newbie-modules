@@ -14,8 +14,13 @@ import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audi
  * response or a double-fetch from two tabs does not look like token theft.
  * Outside the window the same token is a genuine reuse and the session is
  * revoked (nightwatch-backend ADR-034).
+ *
+ * 60s is the arrival bound, not slack (devbie ADR-055): two refresh attempts of
+ * 15s each plus the client's 2s and 4s retry gaps put the last retry's arrival
+ * at 36s, leaving 24s of assumed network latency. Extending the window widens
+ * how long a stolen previous-generation token can be redeemed.
  */
-const REFRESH_IDEMPOTENCY_WINDOW_MS = 30_000;
+const REFRESH_IDEMPOTENCY_WINDOW_MS = 60_000;
 
 /**
  * Session rows never store a usable credential: the refresh token is kept as a
