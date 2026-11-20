@@ -19,12 +19,11 @@ import { UserRequest } from "@modules/security/security.interface";
 import { TaskService } from "./task.service";
 import { TaskActorService } from "./task-actor.service";
 import {
-  BatchCreateTasksResponseDto,
+  BatchCreateTasksResultDto,
   CreateTaskRequestDto,
-  CreateTaskResponseDto,
   CreateTasksBatchRequestDto,
-  ListTasksQueryDto,
-  TasksResponseDto,
+  ListTasksRequestDto,
+  ListTasksResponseDto,
   TaskWithRelationsDto,
   UpdateTaskRequestDto,
 } from "./task.dto";
@@ -42,13 +41,13 @@ export class TaskController {
   @Get()
   @RequirePermission(PermissionAction.List, Prisma.ModelName.Task)
   @ApiOperation({ summary: "List the tasks of a project" })
-  @ApiResponse({ status: 200, type: TasksResponseDto })
+  @ApiResponse({ status: 200, type: ListTasksResponseDto })
   async listTasksByProjectId(
     @Query("projectId") projectId: string,
-    @Query() query: ListTasksQueryDto,
-  ): Promise<TasksResponseDto> {
+    @Query() query: ListTasksRequestDto,
+  ): Promise<ListTasksResponseDto> {
     const page = query.page ?? 0;
-    const pageSize = query.pageSize ?? 10;
+    const pageSize = query.pageSize ?? 20;
 
     const result = await this.taskService.listTasks({
       projectId,
@@ -61,10 +60,10 @@ export class TaskController {
     });
 
     return {
-      success: true,
-      data: {
-        records: result.tasks,
-        total: result.total,
+      records: result.tasks,
+      pagination: {
+        countOfCurrentPage: result.tasks.length,
+        countOfTotal: result.total,
         page,
         pageSize,
       },
@@ -86,15 +85,15 @@ export class TaskController {
   @Post()
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Create a task under the project" })
-  @ApiResponse({ status: 200, type: CreateTaskResponseDto })
+  @ApiResponse({ status: 200, type: TaskWithRelationsDto })
   async createTask(
     @Query("projectId") projectId: string,
     @Body() dto: CreateTaskRequestDto,
     @Req() req: UserRequest,
-  ): Promise<CreateTaskResponseDto> {
+  ): Promise<TaskWithRelationsDto> {
     const creator = await this.taskActorService.getOrCreateHostActor({ userId: req.user.userId });
 
-    const result = await this.taskService.createTask(
+    return await this.taskService.createTask(
       {
         ...dto,
         projectId,
@@ -102,19 +101,17 @@ export class TaskController {
       },
       { actorId: creator.id, displayName: creator.displayName ?? undefined, userId: req.user.userId },
     );
-    return { success: true, data: result };
   }
 
   @Post("batch")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Batch create tasks under the project" })
-  @ApiResponse({ status: 200, type: BatchCreateTasksResponseDto })
+  @ApiResponse({ status: 200, type: BatchCreateTasksResultDto })
   async createTasksBatch(
     @Body() dto: CreateTasksBatchRequestDto,
     @Req() req: UserRequest,
-  ): Promise<BatchCreateTasksResponseDto> {
-    const result = await this.taskService.createTasksBatch(dto, { userId: req.user.userId });
-    return { success: true, data: result };
+  ): Promise<BatchCreateTasksResultDto> {
+    return await this.taskService.createTasksBatch(dto, { userId: req.user.userId });
   }
 
   @Patch(":taskId")

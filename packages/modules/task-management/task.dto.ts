@@ -13,6 +13,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { ActorKind, TaskStatus } from "@generated/prisma/enums";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 import { ChangeImpact, OriginReference, RequirementReview } from "./task.service";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -157,33 +158,21 @@ export class TaskDeliveryFieldsDto {
 // Request DTOs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class LookupActorByUserIdQueryDto {
+export class LookupActorByUserIdRequestDto {
   @ApiProperty({ type: String, description: "Host user ID the HUMAN actor stands for" })
   @IsString()
   @IsNotEmpty()
   userId!: string;
 }
 
-export class LookupActorByCrewmateIdQueryDto {
+export class LookupActorByCrewmateIdRequestDto {
   @ApiProperty({ type: String, description: "Crewmate ID the CREWMATE actor stands for" })
   @IsString()
   @IsNotEmpty()
   crewmateId!: string;
 }
 
-export class ListTasksQueryDto {
-  @ApiPropertyOptional({ type: Number, description: "Page number, 0-based", default: 0 })
-  @IsNumber()
-  @IsOptional()
-  @Type(() => Number)
-  page?: number;
-
-  @ApiPropertyOptional({ type: Number, description: "Page size", default: 10 })
-  @IsNumber()
-  @IsOptional()
-  @Type(() => Number)
-  pageSize?: number;
-
+export class ListTasksRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({ type: String, description: "Keyword matched against task title" })
   @IsString()
   @IsOptional()
@@ -456,68 +445,14 @@ export class TaskActorMemberDto {
   createdAt!: Date;
 }
 
-// ── Envelope responses ({success, data?[, message]}) ──
-
-export class ListTaskActorsResponseDto {
-  @ApiProperty()
-  success!: boolean;
-
-  @ApiProperty({ type: TaskActorListItemDto, isArray: true })
-  data!: TaskActorListItemDto[];
-}
-
-export class TaskActorDataResponseDto {
-  @ApiProperty()
-  success!: boolean;
-
-  @ApiPropertyOptional({ type: TaskActorDto, description: "Actor, null when not found" })
-  data?: TaskActorDto | null;
-}
-
-export class MembersResponseDto {
-  @ApiProperty()
-  success!: boolean;
-
-  @ApiProperty({ type: TaskActorMemberDto, isArray: true })
-  data!: TaskActorMemberDto[];
-}
-
-export class PaginatedTasksDto {
+/** Paginated list response for tasks. */
+export class ListTasksResponseDto extends CommonListResponseDto {
   @ApiProperty({ type: TaskWithRelationsDto, isArray: true })
-  records!: TaskWithRelationsDto[];
-
-  @ApiProperty({ description: "Total record count" })
-  total!: number;
-
-  @ApiProperty({ description: "Current page, 0-based" })
-  page!: number;
-
-  @ApiProperty({ description: "Page size" })
-  pageSize!: number;
+  declare records: TaskWithRelationsDto[];
 }
 
-export class TasksResponseDto {
-  @ApiProperty()
-  success!: boolean;
-
-  @ApiProperty({ type: PaginatedTasksDto })
-  data!: PaginatedTasksDto;
-}
-
-export class CreateTaskResponseDto {
-  @ApiProperty()
-  success!: boolean;
-
-  @ApiProperty({ type: TaskDto })
-  data!: TaskDto;
-}
-
-export class BatchCreateTasksResponseDto {
-  @ApiProperty()
-  success!: boolean;
-
-  @ApiProperty({ type: Object, description: "Batch creation result" })
-  data!: {
-    count: number;
-  };
+/** Result returned by the batch-create endpoint. */
+export class BatchCreateTasksResultDto {
+  @ApiProperty({ description: "Number of tasks created" })
+  count!: number;
 }
