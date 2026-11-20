@@ -120,9 +120,10 @@ export const PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET = "web-target";
 
 `PenetrationTestingExecution`（每次自动化扫描或 L4 动作的审计快照）：
 
-- `runId Uuid @unique`、`subjectId`、`level`、`authorizationId`、`snapshot Json`（解析到的 IP、端口、hostname、引擎/playbook 版本、代理策略 id）、`startedAt`、`finishedAt?`、`outcome`（`SUCCEEDED` / `FAILED` / `KILLED` / `CLEANUP_FAILED`）、`requestCount`、`killedAt?`、`killReason?`。
-- **写入时机**：在 evidence provider 内、扫描/动作结束的同一流程里立即写（含 `runId`、`snapshot`、`outcome`、`requestCount`）；终态（`finishedAt`、`KILLED`/`CLEANUP_FAILED`）在 `finally` 补齐。不能等 run 结束再写——动作已完成但 judgment 抛错或进程被杀时，骨架不会留下任何执行记录。
-- **与骨架状态的关系**：`EvaluationRunStatus` 只有 `QUEUED` / `RUNNING` / `SUCCEEDED` / `FAILED`，没有 `KILLED`。`KILLED` 与 `CLEANUP_FAILED` 只写本表 `outcome`；骨架 run 记 `FAILED` 并写 `failureReason`，两者靠 `runId` 关联。
+- `auditId Uuid @unique`、`runId Uuid? @unique`、`subjectId`、`level`、`authorizationId`、`snapshot Json`（解析到的 IP、端口、hostname、引擎/playbook 版本、代理策略 id）、`startedAt`、`finishedAt?`、`outcome`（`SUCCEEDED` / `FAILED` / `KILLED` / `CLEANUP_FAILED`）、`requestCount`、`killedAt?`、`killReason?`。
+- **`auditId` 与 `runId` 的分工**：骨架的 `EvidenceProvider.collect(subject, ruleSetVersion, runConfig)` 不接收 `runId`，因此 feature 在 `judgmentConfig` 中预生成 `auditId`（同时用作幂等键），evidence provider 在 collect 内按 `subjectId + ruleSetVersionId` 查询同版本的 `RUNNING` 骨架 run 回填 `runId`。进程若在 open 与 collect 之间死亡，`runId` 为空，`auditId` 仍把快照与骨架 run 对上。
+- **写入时机**：在 evidence provider 内、扫描/动作结束的同一流程里立即写（含 `auditId`、`runId`、`snapshot`、`outcome`、`requestCount`）；终态（`finishedAt`、`KILLED`/`CLEANUP_FAILED`）在 `finally` 补齐。不能等 run 结束再写——动作已完成但 judgment 抛错或进程被杀时，骨架不会留下任何执行记录。
+- **与骨架状态的关系**：`EvaluationRunStatus` 只有 `QUEUED` / `RUNNING` / `SUCCEEDED` / `FAILED`，没有 `KILLED`。`KILLED` 与 `CLEANUP_FAILED` 只写本表 `outcome`；骨架 run 记 `FAILED` 并写 `failureReason`，两者靠 `auditId`（`runId` 回填后亦然）关联。
 - `snapshot` 是「执行时实际扫了谁」的唯一权威记录，不能由事后补写。
 
 ### 4. 授权模型（fail-closed）

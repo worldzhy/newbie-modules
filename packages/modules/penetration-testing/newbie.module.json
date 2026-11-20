@@ -1,0 +1,12 @@
+{
+  "key": "penetration-testing",
+  "layer": "feature",
+  "wiring": {
+    "file": "penetration-testing.module",
+    "className": "PenetrationTestingModule",
+    "prismaSchema": "prisma/schema.prisma"
+  },
+  "requires": {
+    "modules": ["evaluation", "security"]
+  }
+}
