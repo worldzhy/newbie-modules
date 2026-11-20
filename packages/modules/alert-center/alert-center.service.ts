@@ -14,6 +14,7 @@ import {
 import type { AlertNotificationPort, AlertSeverity, AlertState } from "./alert-center.constants";
 import { AlertSourceRegistryService } from "./alert-source-registry.service";
 import type { RegisteredAlertSource } from "./alert-source-registry.service";
+import { AuditActorType, AuditLogService } from "@modules/audit/audit-log.service";
 import {
   AlertDto,
   AlertSourceDto,
@@ -25,10 +26,11 @@ import {
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
-// Upper bound on the firing-alert projection a producer reconciles at once
-// (R44-11). Producers converge run by run, so this is a safety valve rather
-// than a pagination cursor.
-const MAX_FIRING_ALERTS = 500;
+// Upper bound on one page of the firing-alert projection a producer reconciles
+// (R44-11). Producers that must see every row page through it with `afterId`
+// instead of raising the bound (R49-05), so a source with more firing rows than
+// this still converges.
+export const MAX_FIRING_ALERTS = 500;
 
 export interface RaiseAlertInput {
   /** Registered producer key, e.g. "url-check". */
@@ -124,6 +126,10 @@ export class AlertCenterService {
     @Optional()
     @Inject(ALERT_NOTIFICATION_PORT)
     private readonly notificationPort?: AlertNotificationPort,
+    // Optional so the module stays copy-assemblable without the audit module;
+    // an assembled host declares it in newbie.module.json's `requires`.
+    @Optional()
+    private readonly auditLog?: AuditLogService,
   ) {}
 
   // --- Lifecycle -----------------------------------------------------------
@@ -260,6 +266,62 @@ export class AlertCenterService {
   }
 
   /**
+   * Close one alert on an operator's behalf without claiming recovery
+   * (R39-11). The reason and the actor go to the audit log and no recovery
+   * notification is delivered: closing says "stop showing this", not "the
+   * problem is gone". Idempotent — a resolved row is returned unchanged.
+   */
+  async close(input: { id: string; reason: string; actorId?: string }): Promise<AlertDto> {
+    const row = await this.prisma.alert.findUnique({ where: { id: input.id } });
+    if (!row) {
+      throw new NotFoundException(`Alert not found: ${input.id}`);
+    }
+    return this.closeRow(row, input.reason, input.actorId);
+  }
+
+  /**
+   * Close the lifecycle of one producer-owned key when its subject disappears
+   * (R49-02), e.g. a url-check target is deleted while its alert is firing.
+   * Producers call this instead of `resolve()`, whose recovery notification
+   * would announce something that never happened.
+   */
+  async closeByKey(input: {
+    source: string;
+    alertKey: string;
+    scopeId?: string;
+    reason: string;
+  }): Promise<{ id: string } | null> {
+    this.sources.require(input.source);
+    const fingerprint = buildAlertFingerprint(input);
+    const row = await this.prisma.alert.findUnique({ where: { fingerprint } });
+    if (!row) {
+      return null;
+    }
+    const closed = await this.closeRow(row, input.reason);
+    return { id: closed.id };
+  }
+
+  private async closeRow(row: AlertRow, reason: string, actorId?: string): Promise<AlertDto> {
+    if (row.state === "resolved") {
+      return toAlertDto(row);
+    }
+    const closed = await this.prisma.alert.update({
+      where: { id: row.id },
+      data: { state: "resolved", resolvedAt: new Date(), nextNotificationAt: null },
+    });
+    // The alert table has no reason column, and "who stopped showing this and
+    // why" is the fact an operator needs after the fact (R39-11).
+    void this.auditLog?.record("alert.closed", {
+      actorType: actorId ? AuditActorType.USER : AuditActorType.SYSTEM,
+      actorId: actorId ?? null,
+      resourceType: "alert",
+      resourceId: closed.id,
+      detail: { source: closed.source, scopeId: closed.scopeId, reason },
+    });
+    return toAlertDto(closed);
+  }
+
+  /**
    * Send the reminders that are due now (ADR-065 §3). Idempotent and safe to
    * run concurrently: each row is claimed with a conditional update before the
    * port is called, so two scans never message the same reminder twice. The
@@ -363,6 +425,8 @@ export class AlertCenterService {
     scopeId?: string;
     alertKeys?: string[];
     limit?: number;
+    /** Id of the last row of the previous page; drains a source in pages. */
+    afterId?: string;
   }): Promise<FiringAlertRef[]> {
     const limit = Math.min(Math.max(input.limit ?? MAX_FIRING_ALERTS, 1), MAX_FIRING_ALERTS);
     const fingerprints = input.alertKeys?.map((alertKey) =>
@@ -377,8 +441,9 @@ export class AlertCenterService {
         state: "firing",
         ...(fingerprints ? { fingerprint: { in: fingerprints } } : {}),
       },
-      orderBy: { createdAt: "asc" },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: limit,
+      ...(input.afterId ? { cursor: { id: input.afterId }, skip: 1 } : {}),
       select: { id: true, scopeId: true, labels: true },
     });
     return rows.map((row) => ({

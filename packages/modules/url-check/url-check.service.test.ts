@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { EventEmitter2 } from "@nestjs/event-emitter";
 import type { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import type { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { UrlCheckService } from "./url-check.service";
@@ -209,6 +210,7 @@ function createHarness(
     prisma as unknown as PrismaService,
     clickhouse as unknown as ClickHouseService,
     groupPolicy,
+    { emit: () => true } as unknown as EventEmitter2,
   );
 
   return {

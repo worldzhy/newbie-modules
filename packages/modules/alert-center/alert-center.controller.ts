@@ -6,6 +6,7 @@ import { AlertCenterService } from "./alert-center.service";
 import {
   AlertDto,
   AlertSourceDto,
+  CloseAlertDto,
   ListAlertsRequestDto,
   ListAlertsResponseDto,
   RaiseAlertDto,
@@ -64,6 +65,18 @@ export class AlertCenterController {
       resolvedAt: body.resolvedAt ? new Date(body.resolvedAt) : undefined,
     });
     return { id: result?.id ?? null };
+  }
+
+  /**
+   * Close a firing alert that no producer will resolve (R39-11). Records the
+   * reason and the caller in the audit log; no recovery message is sent.
+   */
+  @Post("alerts/:id/close")
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.Alert)
+  @ApiOperation({ summary: "Close one alert without claiming recovery" })
+  @ApiResponse({ status: 201, type: AlertDto })
+  close(@Req() req: AuthenticatedRequest, @Param("id") id: string, @Body() body: CloseAlertDto): Promise<AlertDto> {
+    return this.alerts.close({ id, reason: body.reason, actorId: req.user.userId });
   }
 
   @Get("alerts")

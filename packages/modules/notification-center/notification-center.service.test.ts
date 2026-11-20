@@ -79,6 +79,45 @@ test("notify rejects a severity outside the vocabulary", async () => {
   assert.equal(state.settingQueried, false);
 });
 
+function newSimulatingService(centerPushEnabled: boolean, scope: string) {
+  const prisma = {
+    notificationSetting: {
+      findUnique: async () => ({ key: "k", scope, isPushEnabled: true }),
+    },
+    notificationCenterSetting: {
+      findUnique: async () => ({ id: 1, isPushEnabled: centerPushEnabled }),
+      create: async () => ({ id: 1, isPushEnabled: centerPushEnabled }),
+    },
+  };
+  const registry = { get: () => ({ kind: "event", titleTemplate: "t", detailTemplate: null }) };
+  const deliveryRules = {
+    simulate: async () => ({ decision: "deliver", ruleId: "r1", reason: "rule", labels: { notificationKey: "k" } }),
+  };
+  return new NotificationCenterService(prisma as never, registry as never, deliveryRules as never);
+}
+
+test("the simulator reports the runtime gate instead of only the rule verdict", async () => {
+  const service = newSimulatingService(false, "system");
+
+  const result = await service.simulateDelivery({} as never, []);
+
+  // The rules allow it, but the center switch keeps it in-app; reporting only
+  // "deliver" would make an operator believe the message went out (R39-12).
+  assert.equal(result.runtimeReason, "channel-off");
+  assert.equal(result.delivered, false);
+});
+
+test("the simulator does not report channel-off for a project-scope delivery", async () => {
+  const service = newSimulatingService(false, "project");
+
+  const result = await service.simulateDelivery({} as never, []);
+
+  // The host routes project pushes and the center switch does not gate them
+  // (R49-04), so the audit wording must not claim an interception.
+  assert.equal(result.runtimeReason, null);
+  assert.equal(result.delivered, true);
+});
+
 type RuleSeed = { priority: number; condition: unknown; action: string; isEnabled?: boolean };
 
 function newServiceWithCenter(severity: string, rules: RuleSeed[] = [], kind: "alert" | "event" = "event") {

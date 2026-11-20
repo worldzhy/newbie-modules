@@ -1,6 +1,17 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsBoolean, IsDateString, IsIn, IsInt, IsObject, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import {
+  IsBoolean,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  Min,
+} from "class-validator";
 import { ALERT_SEVERITIES, ALERT_STATES } from "./alert-center.constants";
 
 export class RaiseAlertDto {
@@ -63,6 +74,14 @@ export class ResolveAlertDto {
   @IsOptional()
   @IsDateString()
   resolvedAt?: string;
+}
+
+export class CloseAlertDto {
+  @ApiProperty({ description: "Why the alert is being closed; recorded in the audit log", maxLength: 500 })
+  @IsString()
+  @MaxLength(500)
+  @Matches(/\S/, { message: "reason must contain a non-whitespace character" })
+  reason!: string;
 }
 
 export class RaiseAlertResultDto {
