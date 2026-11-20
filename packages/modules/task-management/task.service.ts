@@ -1,9 +1,14 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { ConflictException, Inject, Injectable, Logger, NotFoundException, Optional } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { Prisma } from "@generated/prisma/client";
 import { TaskChangeClass, TaskStatus } from "@generated/prisma/enums";
 import { CreateTaskItemDto, UpdateTaskRequestDto } from "./task.dto";
+import {
+  TASK_PLAN_ADJUDICATOR,
+  type PlanAdjudicationVerdict,
+  type TaskPlanAdjudicator,
+} from "./task-plan-adjudicator.port";
 import {
   TASK_PLAN_OVERRIDE_EVENT,
   TASK_STATUS_CHANGED_EVENT,
@@ -190,6 +195,11 @@ export class TaskService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
+    // Hosts that can read the workspace bind a gate-1 adjudicator; without one
+    // only the record-level admission rules run.
+    @Optional()
+    @Inject(TASK_PLAN_ADJUDICATOR)
+    private readonly planAdjudicator?: TaskPlanAdjudicator,
   ) {}
 
   async createTask(data: CreateTaskInput) {
@@ -205,6 +215,7 @@ export class TaskService {
         acceptanceCriteria: data.acceptanceCriteria,
         parentId: data.parentId,
         designRef: data.designRef,
+        designRefJustification: data.designRefJustification,
         impact: data.impact,
         scopePaths: data.scopePaths ?? [],
         dependsOn: data.dependsOn ?? [],
@@ -241,22 +252,25 @@ export class TaskService {
   }
 
   async createTasksBatch(input: CreateTasksBatchInput): Promise<{ count: number }> {
-    const dependencyStatuses = await this.loadDependencyStatuses(input.tasks.flatMap((task) => task.dependsOn ?? []));
+    // A batch may create tasks straight into DEVELOPING, so it passes the same
+    // gate; the host adjudicator is async and batched here too.
+    const statuses = await Promise.all(
+      input.tasks.map((task) =>
+        this.admissionStatus(task.status || TaskStatus.PENDING, {
+          acceptanceCriteria: task.acceptanceCriteria,
+          parentId: task.parentId,
+          designRef: task.designRef,
+          designRefJustification: task.designRefJustification,
+          impact: task.impact,
+          scopePaths: task.scopePaths ?? [],
+          dependsOn: task.dependsOn ?? [],
+        }),
+      ),
+    );
 
     await this.prisma.task.createMany({
-      data: input.tasks.map((task) => {
-        const status = this.admissionStatus(
-          task.status || TaskStatus.PENDING,
-          {
-            acceptanceCriteria: task.acceptanceCriteria,
-            parentId: task.parentId,
-            designRef: task.designRef,
-            impact: task.impact,
-            scopePaths: task.scopePaths ?? [],
-            dependsOn: task.dependsOn ?? [],
-          },
-          dependencyStatuses,
-        );
+      data: input.tasks.map((task, index) => {
+        const status = statuses[index];
 
         return {
           title: task.title,
@@ -356,6 +370,7 @@ export class TaskService {
               acceptanceCriteria: true,
               parentId: true,
               designRef: true,
+              designRefJustification: true,
               dependsOn: true,
               planFrozenAt: true,
             },
@@ -413,6 +428,8 @@ export class TaskService {
         acceptanceCriteria: dto.acceptanceCriteria !== undefined ? dto.acceptanceCriteria : current.acceptanceCriteria,
         parentId: dto.parentId !== undefined ? dto.parentId : current.parentId,
         designRef: dto.designRef !== undefined ? dto.designRef : current.designRef,
+        designRefJustification:
+          dto.designRefJustification !== undefined ? dto.designRefJustification : current.designRefJustification,
         impact: (dto.impact !== undefined ? dto.impact : current.impact) as TaskImpact | null,
         scopePaths: dto.scopePaths !== undefined ? dto.scopePaths : current.scopePaths,
         dependsOn: dto.dependsOn !== undefined ? dto.dependsOn : current.dependsOn,
@@ -521,11 +538,12 @@ export class TaskService {
     acceptanceCriteria?: string | null;
     parentId?: string | null;
     designRef?: string | null;
+    designRefJustification?: string | null;
     impact?: TaskImpact | null;
     scopePaths: readonly string[];
     dependsOn: readonly string[];
   }): Promise<AdmissionVerdict> {
-    return evaluateAdmission({
+    const verdict = evaluateAdmission({
       acceptanceCriteria: input.acceptanceCriteria,
       parentId: input.parentId,
       designRef: input.designRef,
@@ -534,31 +552,45 @@ export class TaskService {
       dependsOn: input.dependsOn,
       dependencyStatuses: await this.loadDependencyStatuses(input.dependsOn),
     });
+    if (!verdict.admitted) return verdict;
+
+    // The record cannot say whether `designRef` exists or which repositories
+    // it declares; the host adjudicator answers that (ADR-054 D4, gate 1).
+    if (!this.planAdjudicator) return verdict;
+    const hostVerdict: PlanAdjudicationVerdict = await this.planAdjudicator.adjudicate({
+      designRef: input.designRef,
+      designRefJustification: input.designRefJustification,
+      impactRepos: input.impact?.repos ?? [],
+    });
+    return {
+      admitted: hostVerdict.admitted,
+      violations: [...verdict.violations, ...hostVerdict.violations],
+    };
   }
 
   /**
    * Creation and transitions share the same refusal rule: only a start lands
    * in BLOCKED, never a task that is merely being created as PENDING.
    */
-  private admissionStatus(
+  private async admissionStatus(
     requestedStatus: TaskStatus,
     facts: Omit<AdmissionInput, "changeClass" | "dependencyStatuses"> & {
       impact?: TaskImpact | null;
+      designRefJustification?: string | null;
     },
-    dependencyStatuses: ReadonlyMap<string, TaskStatus>,
-  ): { status: TaskStatus; blockedReason?: string } {
+  ): Promise<{ status: TaskStatus; blockedReason?: string }> {
     if (requestedStatus !== TaskStatus.DEVELOPING) {
       return { status: requestedStatus };
     }
 
-    const verdict = evaluateAdmission({
+    const verdict = await this.evaluateAdmission({
       acceptanceCriteria: facts.acceptanceCriteria,
       parentId: facts.parentId,
       designRef: facts.designRef,
-      changeClass: deriveChangeClass(facts.impact, facts.scopePaths),
+      designRefJustification: facts.designRefJustification,
+      impact: facts.impact,
       scopePaths: facts.scopePaths,
       dependsOn: facts.dependsOn,
-      dependencyStatuses,
     });
     return verdict.admitted
       ? { status: TaskStatus.DEVELOPING }

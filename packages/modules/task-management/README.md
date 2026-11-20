@@ -52,8 +52,23 @@ When a rule fails the request is not rejected with an error: the task lands in
 `BLOCKED` with `blockedReason` prefixed `gate 1:`, and `TASK_STATUS_CHANGED_EVENT`
 notifies the host. Creating a task directly in `DEVELOPING` runs the same rules.
 
-`designRef` resolvability and its repository relevance are host checks: they need
-the workspace decision documents, so the host prefilter owns them.
+`designRef` resolvability and its repository relevance need the workspace
+decision documents, so the module asks the host through an optional port:
+
+```ts
+export interface TaskPlanAdjudicator {
+  adjudicate(input: PlanAdjudicationInput): Promise<PlanAdjudicationVerdict>;
+}
+```
+
+Bind `TASK_PLAN_ADJUDICATOR` in a host module to run those checks; without a
+binding only the record-level rules above apply. When a bound adjudicator
+refuses, the task still lands in `BLOCKED` with the `gate 1:` prefix, and the
+host's reason is appended to the violations. `PlanAdjudicationInput` carries
+`designRef`, `designRefJustification` and `impactRepos`, so the host decides
+resolvability, supersession and whether the design's affected repositories
+intersect `impact.repos`; a `designRefJustification` is the human escape hatch
+and admits the task without further checks.
 
 ## Plan freeze and override
 
