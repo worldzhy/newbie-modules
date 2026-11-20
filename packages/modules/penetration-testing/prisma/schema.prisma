@@ -1,0 +1,162 @@
+// Prisma schema fragment for the penetration-testing module (ADR-075).
+// This file is managed by @devbie/newbie-cli, which assembles it into the
+// consumer Prisma tree on `newbie modules apply`.
+//
+// The run, result, criteria and finding tables belong to the evaluation
+// skeleton (`module/evaluation`, ADR-020). This module owns the target material,
+// the authorization (RoE) record, the L4 disposable test objects and the
+// per-execution audit snapshot. `subjectId` is a plain scalar with no relation,
+// because foreign keys never cross schema boundaries. Identity is the subject
+// coordinate `(subjectType, kind, subjectKey)`; a target row holds only what is
+// specific to a web target.
+
+// !! ------------------------------------------------------------ //
+// !!             [Module] Penetration Testing models              //
+// !! ------------------------------------------------------------ //
+// * PenetrationTestingTarget                                     //
+// * PenetrationTestingAuthorization                              //
+// * PenetrationTestingTestObject                                 //
+// * PenetrationTestingExecution                                  //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+/// Target material of a web-target subject (ADR-075 §3).
+///
+/// One row per subject. The subject carries the identity (`subjectKey` is the
+/// normalized origin, `displayName` the label); this table owns the environment,
+/// the declared ports, the path roles and the ownership-verification lifecycle.
+/// Only active, `VERIFIED` targets are submitted for evaluation.
+model PenetrationTestingTarget {
+  id                       String    @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId                String    @unique @db.Uuid
+  // PRODUCTION | NON_PRODUCTION; L4 is admitted only in NON_PRODUCTION.
+  environment              String    @db.VarChar(16)
+  // Ports the authorization declares; empty means the scheme default.
+  declaredPorts            Int[]
+  // Path role to relative path, e.g. { "entry": "/", "api.session": "/api/me" }.
+  targetPaths              Json      @default("{}") @db.JsonB
+  // PENDING | VERIFIED | FAILED | REVOKED.
+  verificationStatus       String    @default("PENDING") @db.VarChar(16)
+  verificationToken        String    @db.VarChar(64)
+  // DNS_TXT | WELL_KNOWN; null until a verification method answers.
+  verificationMethod       String?   @db.VarChar(16)
+  // Consecutive failed re-verifications; reset on success.
+  verificationFailureCount Int       @default(0)
+  verifiedAt               DateTime?
+  lastVerifiedAt           DateTime?
+  isActive                 Boolean   @default(true)
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
+
+  @@index([verificationStatus, isActive])
+  @@index([environment])
+  @@schema("module/penetration-testing")
+}
+
+/// Written authorization (rules of engagement) for one level of one subject
+/// (ADR-075 §4).
+///
+/// The three-layer gate reads this row, never the run config: a request may only
+/// name `authorizationId` as intent, and the gate reloads the approved row by
+/// `subjectId` + `level`. L3 binds a finding and an attack class; L4 binds a
+/// maintenance window. `requestedBy` and `approvedBy` must differ — one person
+/// cannot both ask and authorize.
+model PenetrationTestingAuthorization {
+  id               String    @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId        String    @db.Uuid
+  // L1 | L2 | L3 | L4
+  level            String    @db.VarChar(32)
+  // PENDING | APPROVED | REVOKED | EXPIRED
+  status           String    @default("PENDING") @db.VarChar(16)
+  // Opaque reference to the signed document held by the host document system.
+  roeDocumentRef   String    @db.VarChar(512)
+  scopeNote        String?   @db.Text
+  requestedBy      String    @db.VarChar(128)
+  approvedBy       String?   @db.VarChar(128)
+  approvedAt       DateTime?
+  revokedAt        DateTime?
+  revokeReason     String?   @db.Text
+  validFrom        DateTime
+  validUntil       DateTime
+  // Allowed target address ranges; empty means "public addresses only".
+  allowedCidrs     String[]
+  // L3: the finding being verified and the one attack class allowed.
+  findingId        String?   @db.Uuid
+  attackClass      String?   @db.VarChar(64)
+  // L4: { start, end, timezone }.
+  maintenanceWindow Json?    @db.JsonB
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([subjectId, level, status])
+  @@index([validUntil])
+  @@schema("module/penetration-testing")
+}
+
+/// A disposable object an L4 playbook may destroy (ADR-075 §2, §3).
+///
+/// The playbook can only act inside this row's locator; the object must be
+/// disposable, approved by a second operator, and unexpired. Without a matching
+/// row the L4 gate refuses to start, regardless of the authorization.
+model PenetrationTestingTestObject {
+  id             String    @id @default(uuid()) @db.Uuid
+  // EvaluationSubject.id in "module/evaluation"; scalar, no FK
+  subjectId      String    @db.Uuid
+  // RECORD | ACCOUNT | FILE | PATH
+  kind           String    @db.VarChar(16)
+  // Playbook scope: { table?, id? }, { account? }, { path? }.
+  locator        Json      @db.JsonB
+  // Cleanup locator when the playbook cannot self-clean by marker.
+  cleanupLocator Json?     @db.JsonB
+  disposable     Boolean   @default(false)
+  createdBy      String    @db.VarChar(128)
+  approvedBy     String?   @db.VarChar(128)
+  approvedAt     DateTime?
+  expiresAt      DateTime
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([subjectId, kind, expiresAt])
+  @@schema("module/penetration-testing")
+}
+
+/// Per-execution audit snapshot (ADR-075 §3).
+///
+/// Written by the evidence provider immediately after a scan or action returns,
+/// never at run end: if judgment fails or the process dies, this row is the only
+/// record of what was actually touched. `snapshot` is the authoritative answer
+/// to "which addresses did this run reach".
+///
+/// The skeleton has no KILLED status; `KILLED` and `CLEANUP_FAILED` live here and
+/// the skeleton run is recorded as FAILED with a reason, joined by `runId`.
+model PenetrationTestingExecution {
+  id            String    @id @default(uuid()) @db.Uuid
+  // Correlation id generated by the feature before the run is opened and stored
+  // in the skeleton run's judgmentConfig. The evaluation evidence port does not
+  // receive the run id, so this is the only key available while collecting.
+  auditId       String    @unique @db.Uuid
+  // EvaluationRun.id in "module/evaluation"; scalar, no FK. Linked right after
+  // the run row is opened; null only if the process died in that gap, in which
+  // case `auditId` still ties the snapshot to the skeleton row.
+  runId         String?   @unique @db.Uuid
+  subjectId     String    @db.Uuid
+  // L1 | L2 | L3 | L4
+  level         String    @db.VarChar(4)
+  // attack-surface | vulnerability-scan | exploit-verification | destructive-testing
+  standardKey   String    @db.VarChar(64)
+  authorizationId String  @db.Uuid
+  snapshot      Json      @db.JsonB
+  startedAt     DateTime
+  finishedAt    DateTime?
+  // SUCCEEDED | FAILED | KILLED | CLEANUP_FAILED
+  outcome       String    @db.VarChar(16)
+  requestCount  Int       @default(0)
+  killedAt      DateTime?
+  killReason    String?   @db.Text
+  createdAt     DateTime  @default(now())
+
+  @@index([subjectId, startedAt])
+  @@index([outcome])
+  @@schema("module/penetration-testing")
+}
