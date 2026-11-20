@@ -1,9 +1,11 @@
 import { Inject, Injectable, NotFoundException } from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
 import { assertPublicHttpUrl } from "./public-url";
 import { urlCheckGroupPolicyToken, type UrlCheckGroupPolicy } from "./ports/group-policy.port";
+import { URL_CHECK_TARGET_CLOSED_EVENT, type UrlCheckTargetClosedEvent } from "./url-check.events";
 import {
   CreateUrlCheckTargetDto,
   DeleteUrlCheckTargetResponseDto,
@@ -47,6 +49,7 @@ export class UrlCheckService {
     private readonly clickhouse: ClickHouseService,
     @Inject(urlCheckGroupPolicyToken)
     private readonly groupPolicy: UrlCheckGroupPolicy,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   list(groupIds: string[]) {
@@ -88,8 +91,8 @@ export class UrlCheckService {
     // transaction instead. The incident keeps the observed duration — no
     // recovery notification is emitted because nothing actually recovered.
     const closesOnPause = body.isActive === false && target.isAlertOpen;
-    return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.urlCheckTarget.update({
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.urlCheckTarget.update({
         where: { id: targetId },
         data: {
           ...(body.name !== undefined ? { name: body.name } : {}),
@@ -108,13 +111,43 @@ export class UrlCheckService {
           },
         });
       }
-      return updated;
+      return row;
     });
+
+    // A paused target is not probed any more, so its alert lifecycle has lost
+    // its producer exactly like a deleted target's (R49-02). The host binds
+    // the listener and closes it silently — nothing actually recovered.
+    if (closesOnPause && target.alertOpenedAt) {
+      this.eventEmitter.emit(URL_CHECK_TARGET_CLOSED_EVENT, {
+        targetId,
+        groupId: target.groupId,
+        name: updated.name,
+        url: updated.url,
+        alertOpenedAt: target.alertOpenedAt.toISOString(),
+        cause: "paused",
+      } satisfies UrlCheckTargetClosedEvent);
+    }
+    return updated;
   }
 
   async delete(targetId: string) {
-    await this.getById(targetId);
+    const target = await this.getById(targetId);
     await this.prisma.urlCheckTarget.delete({ where: { id: targetId } });
+    // A target deleted while its alert is firing leaves the lifecycle without
+    // a producer, so nothing would ever close it (R49-02). The host binds the
+    // listener and closes it without a recovery notice — the site may still be
+    // down; the operator just stopped watching it.
+    if (target.alertOpenedAt) {
+      const event: UrlCheckTargetClosedEvent = {
+        targetId,
+        groupId: target.groupId,
+        name: target.name,
+        url: target.url,
+        alertOpenedAt: target.alertOpenedAt.toISOString(),
+        cause: "deleted",
+      };
+      this.eventEmitter.emit(URL_CHECK_TARGET_CLOSED_EVENT, event);
+    }
     return { success: true } as DeleteUrlCheckTargetResponseDto;
   }
 

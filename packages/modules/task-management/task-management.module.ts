@@ -1,15 +1,13 @@
 import { Global, Module } from "@nestjs/common";
 import { TaskService } from "./task.service";
-import { TaskSpaceService } from "./task-space.service";
-import { TaskParticipantService } from "./task-participant.service";
+import { TaskActorService } from "./task-actor.service";
 import { TaskController } from "./task.controller";
-import { TaskSpaceController } from "./task-space.controller";
-import { TaskParticipantController } from "./task-participant.controller";
+import { TaskActorController } from "./task-actor.controller";
 
 @Global()
 @Module({
-  controllers: [TaskController, TaskSpaceController, TaskParticipantController],
-  providers: [TaskService, TaskSpaceService, TaskParticipantService],
-  exports: [TaskService, TaskSpaceService, TaskParticipantService],
+  controllers: [TaskController, TaskActorController],
+  providers: [TaskService, TaskActorService],
+  exports: [TaskService, TaskActorService],
 })
 export class TaskManagementModule {}

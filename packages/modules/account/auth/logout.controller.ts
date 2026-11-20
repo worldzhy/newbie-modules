@@ -1,4 +1,4 @@
-import { Controller, Post, Res } from "@nestjs/common";
+import { Controller, Logger, Post, Res } from "@nestjs/common";
 import { ApiOperation, ApiResponse, ApiTags, ApiCookieAuth } from "@nestjs/swagger";
 import { Response } from "express";
 import { Cookies } from "@devbie/newbie/decorators/cookie.decorator";
@@ -18,6 +18,8 @@ import { LogoutResponseDto } from "@modules/account/auth/auth.dto";
 @ApiTags("Account / Auth")
 @Controller("auth")
 export class LogoutController {
+  private readonly logger = new Logger(LogoutController.name);
+
   constructor(
     private readonly cookieService: CookieService,
     private readonly sessionService: SessionService,
@@ -32,11 +34,22 @@ export class LogoutController {
     @Cookies(CookieName.REFRESH_TOKEN) refreshToken: string | undefined,
     @Res({ passthrough: true }) response: Response,
   ): Promise<{ data: { message: string } }> {
-    // [step 1] Revoke the session holding this refresh token. Revocation is
-    // idempotent: a missing, rotated or expired token is a no-op, so logout
-    // stays retry-safe and never discloses whether the token was valid.
+    // [step 1] Revoke the session holding this refresh token. The browser may
+    // still hold the previous generation when a rotation response was in flight
+    // or was dropped, so the lookup falls back to it; otherwise that logout is a
+    // silent no-op and the session outlives the click. Revocation stays
+    // idempotent: an unknown or expired token is a no-op, so logout is
+    // retry-safe and never discloses whether the token was valid.
     if (refreshToken) {
-      await this.sessionService.revokeByRefreshToken(refreshToken);
+      const matched = await this.sessionService.revokeByRefreshToken(refreshToken, {
+        allowPrevious: true,
+        auditReason: "logout",
+      });
+      if (matched === "none") {
+        // Expected for a stale or twice-rotated cookie; logged at debug so the
+        // residual no-op rate is measurable without turning logout into noise.
+        this.logger.debug("Logout presented a refresh token matching no session");
+      }
     }
 
     // [step 2] Clear the cookie even when nothing was revoked, so a stale

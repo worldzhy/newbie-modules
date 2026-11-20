@@ -126,7 +126,7 @@ export class NotificationCenterController {
     @Param() params: CommonGetByStringIdRequestDto,
   ): Promise<NotificationDeliveryAttemptDto | null> {
     const visibleProjectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
-    return this.notificationCenter.getDeliveryAttempt(params.id, visibleProjectIds);
+    return this.notificationCenter.getDeliveryAttempt(req.user.userId, params.id, visibleProjectIds);
   }
 
   // --- Per-notification settings -------------------------------------------
@@ -205,7 +205,7 @@ export class NotificationCenterController {
     // Replaying a persisted record must respect the caller's project scope,
     // exactly like every other read of notification records (R39-06).
     const visibleProjectIds = await this.projectVisibility.visibleProjectIds(req.user.userId);
-    return this.deliveryRules.simulate(body, visibleProjectIds);
+    return this.notificationCenter.simulateDelivery(body, visibleProjectIds);
   }
 
   // Declared before the ":id" route so the literal segment wins.

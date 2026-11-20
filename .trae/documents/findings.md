@@ -276,7 +276,7 @@ R30-01 订正已落地（2026-11-09）：① `:119` carry-over 注记已与 `:30
 
 | ID | 仓 | 标题 | 严重度 | 暴露面 | 可达性 | 状态 |
 | --- | --- | --- | --- | --- | --- | --- |
-| R34-02 | newbie-modules | R33-01 部分闭合：LLM 产出 `title`/`detail` 原样入库（`packages/modules/evaluation/evaluation-finding.service.ts:257-258`，同写面 `:300-301`；来源 `judgment/code-scan/security-evaluation-code-scan.mechanism.ts:112-129`，提示词 `:301-311` 携带源码摘录）；`grep evaluationFinding.delete` 零处；`security-evaluation-retention.service.ts:30-35` 只清 verdict cache 与 excerpts | P2 | live | 持 `List EvaluationFinding` 者 | open |
+| R34-02 | newbie-modules | R33-01 部分闭合：LLM 产出 `title`/`detail` 原样入库（`packages/modules/evaluation/evaluation-finding.service.ts:257-258`，同写面 `:300-301`；来源 `judgment/code-scan/security-evaluation-code-scan.mechanism.ts:112-129`，提示词 `:301-311` 携带源码摘录）；`grep evaluationFinding.delete` 零处；`security-evaluation-retention.service.ts:30-35` 只清 verdict cache 与 excerpts | P2 | live | 持 `List EvaluationFinding` 者 | fixed（2026-11-19：round60 复核订正——模块早有 `suppressFinding`/`reopenFinding`（强制 note、写 `suppressedAt`/`suppressedBy`，软忽略可恢复），此前"无删除/忽略路径"不成立；缺口在前端未暴露。本轮在 `security-evaluation/page.tsx` 发现表接入"忽略/恢复"操作与强制原因弹窗，SUPPRESSED 行保留可审计、可恢复） |
 | R34-03 | newbie-modules | TOTP 封缄密钥无 keyId/轮换：`security/token/token.service.ts:255-260`（派生行 `:257`）取 `userRefresh.secret \|\| defaultSecret`，信封固定 `v1` 四段（`:213-224`、`:239-242`）；`account/modules/two-factor/two-factor.service.ts:119`（`setup` `:55` 同型）解封为实参求值、早于 `:145-161` 密码比对，解封失败即 401，用户无法凭密码关闭 TOTP；env 默认全空（`security/newbie.module.json:27-29`） | P2 | live | 运维轮换 secret → 全体 TOTP 用户 | open |
 | R34-05 | newbie-modules | 登录审计契约测试仍可静默空转：`account/auth/login-audit-coverage.test.ts:104/:113` 均 `if (!SUCCESS_SESSION_PATTERN.test(content)) return;`；逐文件实测 9 个 `LOGIN_ENTRY_FILES` 仅 `auth.service.ts` 命中 1 次；`:106` 全文匹配不保证审计早于 mint | P2 | source | 关键路径门禁 | fixed（`login-audit-coverage.test.ts` 新增 `DIRECT_MINT_FILES` 显式点名 + mint 状态双向断言：声明必命 mint、未声明不得 mint；审计断言改为「mint 后 60 行内」、TOTP gate 断言「mint 前 60 行内」——审计本就在签发之后，故以邻近性+方向表达原意） |
 | R34-11 | newbie-modules | `evidence/security-evaluation-code-scan-excerpt.service.ts:45-53` `load` 无读侧 cutoff，保留语义仅靠每日 cron；宿主 `src/modules/job-scheduler/scheduler/scheduled-job.ts:28-38` 在 `onModuleInit` 把 `isEnabled` 交给 DB 声明，可停用 | P3 | live | — | open |
@@ -321,8 +321,8 @@ round34 复核（2026-11-10 23:58–00:05，主仓报告 `devbie/.trae/documents
 | R39-08 | newbie-modules + nightwatch-frontend | 后端允许绝对 http(s) 链接（`notification-center.service.ts:53-66`），前端谓词仅站内路径（`use-open-notification.ts:23-24`）→ 按钮可见但点击无跳转 | P2 | live | 全体用户 | fixed（`openNotificationLink` 统一内外部跳转） |
 | R39-09 | newbie-modules | dedup 竞态兜底 `recordId = existing?.id ?? ""`（`notification-center.service.ts:293`）返回空 id + `deduplicated: true` | P2 | live | 并发投递 | fixed（P2002 后重查；竞态行已被删改抛 `ConflictException`，不再返回空 id） |
 | R39-10 | newbie-modules | `getOrCreateCenterSetting` 先查后建无 P2002 兜底（`notification-center.service.ts:567-580`），首次并发投递可能 500 | P2 | live | 首次并发 | fixed（`create` 捕获 `PG_UNIQUE_VIOLATION` 后重查单例行，非唯一冲突继续抛出） |
-| R39-11 | newbie-modules | `NotificationAlert` 无 TTL/自动 resolved（schema `:164-190`、`upsertAlert` `:402`），永久 firing 的告警裁决永不重算——inhibition 暂缓的同一前置（`devbie/.trae/documents/backlog.md:84`） | P2 | live | 常规事件 | open |
-| R39-12 | newbie-modules | 模拟器 `runtimeReason` 只判静默（`notification-delivery-rule.service.ts:217-229`），忽略 channel-off/subscription-off/no-port，可能给出「会推送」的错误结论 | P2 | live | 设置页访客 | open |
+| R39-11 | newbie-modules | `NotificationAlert` 无 TTL/自动 resolved（schema `:164-190`、`upsertAlert` `:402`），永久 firing 的告警裁决永不重算——inhibition 暂缓的同一前置（`devbie/.trae/documents/backlog.md:84`） | P2 | live | 常规事件 | fixed（2026-11-19 工作树：新增 `POST /alert-center/alerts/:id/close` → `AlertCenterService.close`（原因 + actor 入审计，静默关闭、不发"已恢复"），并加 `closeByKey` 供 producer 删除场景；不做 TTL 自动 resolve——触发方不再上报不能证明问题消失，用户裁决） |
+| R39-12 | newbie-modules | 模拟器 `runtimeReason` 只判静默（`notification-delivery-rule.service.ts:217-229`），忽略 channel-off/subscription-off/no-port，可能给出「会推送」的错误结论 | P2 | live | 设置页访客 | fixed（2026-11-19 工作树：`NotificationCenterService.simulateDelivery` 在规则判定后补运行时闸门（subscription-off / channel-off / no-port，且 channel-off 仅 system 域），`delivered` 改为"规则放行且无运行时拦截"；controller 改走 center；`notification-center.service.test.ts` 两例） |
 
 反驳轮（本轮）：「恢复永远新建 Alert」原句被收窄（同键场景复合唯一键确实复用，单测 `:227-233`；生产调用方全部不同键，故结论按真实调用方成立）；「静默拦截站内记录」「项目轨道忽略 channel-off 是缺陷」「`//`/`/\\` 链接绕过」「设置端点缺鉴权」「前端直接渲染 link href」均 REFUTED，理由见报告 §7。
 
@@ -466,3 +466,24 @@ carry-over 复验：R50-01（definitions 与 producer alertKey 无绑定）仍 o
 - R54-06：`addressed`。默认值语义变更已在 registry 与 nightwatch-backend 同步落地（常量、schema default、CLI 托管 models、migration），ADR-065 文本口径与实现一致，未另立新 ADR。
 - R54-02：`resolved`。存量 firing 行的 `repeatIntervalMinutes` 是开局快照；本次按用户决定清空历史数据，无存量行需要收敛，切换后所有告警按 24h 节奏。
 - R54-05：`resolved`（2026-11-16 追加）。用户要求补来源级 Enable 开关；实现取“无限期暂停”语义——`enabled=false` 只短路投递，`raise`/`resolve`/记录照旧，因此不触发 ADR-065 §2 担心的闭合窗口。`AlertSource` 增列、DTO/服务/测试/宿主 migration 与前端开关同步落地，ADR-065 §2/§5 文本已改。
+
+## round61（2026-11-19，scope=round60 修复复核的 registry 条目）
+
+报告：`nightwatch-backend/.trae/documents/reviews/expert-review-2026-11-19-round61-round60-fix-verification.md`（宿主会话产出，锚点见该报告）。本仓只登记涉及模块真源的条目。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R61-01 | newbie-modules + nightwatch-backend | （撤回）`POST /alert-center/alerts/:id/close` 缺 scope 校验。前提不成立：ADR-047 取消项目成员制后 `AlertScopeVisibilityPort.visibleScopeIds` 恒返回全部项目，scope 校验为 no-op | — | — | — | withdrawn（2026-11-19 用户质询后撤回；保留前瞻：若恢复项目成员制，`close` 需与 `raise`/`resolve` 同步补 `assertScopeWritable`） |
+| R61-02 | newbie-modules + nightwatch-backend | R49-02 的 pause 与 installation 吊销两半未闭合，alert 永久 firing | P2 | live | 可暂停/吊销者 | fixed（2026-11-19 工作树：`url-check.target-deleted` 泛化为 `url-check.target-closed`（`cause: "paused" | "deleted"`），pause/delete 双路 emit；host 孤儿清扫覆盖 heartbeat 吊销；registry 已回写） |
+| R61-03 | newbie-modules | `CloseAlertDto.reason` 允许空串，「必填原因」在 API 层不成立 | P2 | live | 持 Alert:Update 者 | fixed（2026-11-19 工作树：`@Matches(/\S/)`；registry 已回写） |
+| R61-04 | newbie-modules | `simulateDelivery` 首调写 center setting；`delivered` 语义过强 | P2 | live | 运维配置 | fixed（2026-11-19 工作树：只读 `readCenterSetting`，缺行用 `DEFAULT_PUSH_ENABLED`；`delivered`/`runtimeReason` 描述限定为中心侧判定；registry 已回写） |
+
+## round72（2026-11-20，scope=workspace）
+
+报告与命令出处：`devbie/.trae/documents/reviews/expert-review-2026-11-20-round72.md`。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R72-02 | newbie-modules | registry 模块内嵌宿主专有名词，违反 `AGENTS.md` 模块准入标准：copilot 提示词硬编码 Nightwatch 身份，task-management 的 API 描述写「Nightwatch project」 | P2 | source | 读者/API 消费方 | fixed（2026-11-20 工作树：提示词改为「operations copilot embedded in this platform's dashboard」；task-management 的 DTO 描述与四个 `@ApiOperation` summary 去宿主名；nightwatch-backend 装配副本与 `_gen/api.ts` 注释同步，`diff -rq` 为空） |
+
+注：`security-evaluation.constants.ts:45-47` 的 `_nightwatch-verify` 等属对外协议命名空间（类比 `google-site-verification`）且改动为破坏性契约，本轮不计入 finding。
