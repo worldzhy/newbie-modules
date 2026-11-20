@@ -97,8 +97,9 @@ model Task {
 
 /// Task lifecycle. Status updates follow the service's fixed transition table:
 /// PENDING to DEVELOPING, BLOCKED or CANCELLED; DEVELOPING to TESTING, BLOCKED or
-/// CANCELLED; TESTING to DEVELOPING, DEPLOYED, COMPLETED or CANCELLED; DEPLOYED to
-/// DEVELOPING, COMPLETED or CANCELLED; BLOCKED to DEVELOPING or CANCELLED.
+/// CANCELLED; TESTING to DEVELOPING, DEPLOYED, BLOCKED, COMPLETED or CANCELLED;
+/// DEPLOYED to DEVELOPING, BLOCKED, COMPLETED or CANCELLED; BLOCKED to DEVELOPING
+/// or CANCELLED.
 /// COMPLETED and CANCELLED are terminal. CANCELLED is a status, distinct from
 /// the soft delete in `deletedAt`; BLOCKED means a gate stopped the task and a
 /// human must clear it.

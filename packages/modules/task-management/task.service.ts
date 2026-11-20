@@ -88,10 +88,16 @@ const TASK_STATUS_TRANSITIONS: Readonly<Record<TaskStatus, ReadonlySet<TaskStatu
   [TaskStatus.TESTING]: new Set([
     TaskStatus.DEVELOPING,
     TaskStatus.DEPLOYED,
+    TaskStatus.BLOCKED,
     TaskStatus.COMPLETED,
     TaskStatus.CANCELLED,
   ]),
-  [TaskStatus.DEPLOYED]: new Set([TaskStatus.DEVELOPING, TaskStatus.COMPLETED, TaskStatus.CANCELLED]),
+  [TaskStatus.DEPLOYED]: new Set([
+    TaskStatus.DEVELOPING,
+    TaskStatus.BLOCKED,
+    TaskStatus.COMPLETED,
+    TaskStatus.CANCELLED,
+  ]),
   [TaskStatus.BLOCKED]: new Set([TaskStatus.DEVELOPING, TaskStatus.CANCELLED]),
   [TaskStatus.COMPLETED]: new Set<TaskStatus>(),
   [TaskStatus.CANCELLED]: new Set<TaskStatus>(),

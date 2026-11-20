@@ -11,12 +11,12 @@ import {
   planEditRequiresOverride,
 } from "./task.service";
 
-// ADR-054 D2 fixed transition table. The same status is a permitted no-op.
-test("task status transitions: BLOCKED is entered from PENDING and DEVELOPING only", () => {
+// ADR-054 D2/D4: gate 4 stops work in flight, so TESTING and DEPLOYED can block too.
+test("task status transitions: BLOCKED is entered from every in-flight state", () => {
   assert.equal(canTransition(TaskStatus.PENDING, TaskStatus.BLOCKED), true);
   assert.equal(canTransition(TaskStatus.DEVELOPING, TaskStatus.BLOCKED), true);
-  assert.equal(canTransition(TaskStatus.TESTING, TaskStatus.BLOCKED), false);
-  assert.equal(canTransition(TaskStatus.DEPLOYED, TaskStatus.BLOCKED), false);
+  assert.equal(canTransition(TaskStatus.TESTING, TaskStatus.BLOCKED), true);
+  assert.equal(canTransition(TaskStatus.DEPLOYED, TaskStatus.BLOCKED), true);
 });
 
 test("task status transitions: BLOCKED leaves to DEVELOPING or CANCELLED", () => {
