@@ -77,7 +77,17 @@ and admits the task without further checks.
 derived `changeClass`) are frozen. Updating either field requires
 `planOverrideReason`; without it the update is rejected with `409`. An accepted
 override emits `TASK_PLAN_OVERRIDE_EVENT` so the host can write the audit row.
-Who is allowed to override is enforced at the executor boundary, not here.
+
+The same applies to writing a non-empty `designRefJustification`, the escape
+hatch that lets gate 1 skip its `designRef` checks. Both writes require the
+virtual permission atom `TaskPlanOverride:Update` (ADR-054 D3: "only a human may
+override, the agent has no write permission"); `Task:Update` alone is refused
+with `403`. The service asks the bound `PERMISSION_AUTHORIZER` directly — the
+atom has no route decorator — and fails closed when no actor or authorizer is
+available. Hosts therefore grant it to ADMIN only: seed it as an
+`extraResources` entry with the whole atom set in another group's `excludeAtoms`.
+When identities carry a HUMAN/AGENT kind (ADR-056), that check can narrow to the
+kind instead of the administrative role.
 
 ## Events
 

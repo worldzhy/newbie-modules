@@ -1,7 +1,16 @@
-import { ConflictException, Inject, Injectable, Logger, NotFoundException, Optional } from "@nestjs/common";
+import {
+  ConflictException,
+  ForbiddenException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
-import { Prisma } from "@generated/prisma/client";
+import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { PERMISSION_AUTHORIZER, type PermissionAuthorizer } from "@modules/security/ports/permission.authorizer";
 import { TaskChangeClass, TaskStatus } from "@generated/prisma/enums";
 import { CreateTaskItemDto, UpdateTaskRequestDto } from "./task.dto";
 import {
@@ -21,6 +30,8 @@ export { TaskChangeClass, TaskStatus };
 export interface Operator {
   participantId?: string;
   name?: string;
+  /** Acting user; required when a write needs the plan-override authority. */
+  userId?: string;
 }
 
 /** Declared change impact of a task; `changeClass` is derived from it. */
@@ -187,11 +198,34 @@ export function evaluateAdmission(input: AdmissionInput): AdmissionVerdict {
 /**
  * Whether a plan edit needs the human override channel. `impact`,
  * `scopePaths` and the derived `changeClass` freeze when the task starts
- * (ADR-054 D3); the authority that decides *who* may override lives at the
- * executor boundary, not in this record-level check.
+ * (ADR-054 D3). This record-level check only says *whether* the channel is
+ * needed; `requiresPlanOverrideAuthority` and the service decide *who* holds it.
  */
 export function planEditRequiresOverride(planFrozenAt: Date | null | undefined, touchesPlan: boolean): boolean {
   return planFrozenAt != null && touchesPlan;
+}
+
+/**
+ * Virtual permission resource for the human-only override channel (ADR-054 D3:
+ * "only a human may override, the agent has no write permission"). No route
+ * decorator uses it; the service asks for `TaskPlanOverride:Update` directly.
+ */
+export const TASK_PLAN_OVERRIDE_RESOURCE = "TaskPlanOverride";
+
+/**
+ * Whether a write needs `TaskPlanOverride:Update`: a frozen plan edit, or a
+ * non-empty `designRefJustification`, which is the human escape hatch that
+ * skips the gate-1 design checks (ADR-054 D4). `Task:Update` alone is not
+ * enough, otherwise the executor could waive the gate it has to obey.
+ */
+export function requiresPlanOverrideAuthority(
+  planFrozenAt: Date | null | undefined,
+  touchesPlan: boolean,
+  justification: { incoming?: string; stored?: string | null },
+): boolean {
+  if (planEditRequiresOverride(planFrozenAt, touchesPlan)) return true;
+  const incoming = justification.incoming?.trim();
+  return Boolean(incoming) && incoming !== justification.stored?.trim();
 }
 
 @Injectable()
@@ -206,12 +240,23 @@ export class TaskService {
     @Optional()
     @Inject(TASK_PLAN_ADJUDICATOR)
     private readonly planAdjudicator?: TaskPlanAdjudicator,
+    // Bound by the identity provider module (account). Without it every
+    // override request is refused rather than silently allowed.
+    @Optional()
+    @Inject(PERMISSION_AUTHORIZER)
+    private readonly permissions?: PermissionAuthorizer,
   ) {}
 
-  async createTask(data: CreateTaskInput) {
+  async createTask(data: CreateTaskInput, operator?: Operator) {
     const requestedStatus = data.status || TaskStatus.PENDING;
     let status = requestedStatus;
     let blockedReason = data.blockedReason;
+
+    // `designRefJustification` is the human escape hatch for gate 1, so writing
+    // it needs the override authority even on creation.
+    if (requiresPlanOverrideAuthority(null, false, { incoming: data.designRefJustification })) {
+      await this.assertPlanOverrideAuthority(operator);
+    }
 
     // Creating a task directly in DEVELOPING is an admission, so gate 1 runs
     // here too; a refused task lands in BLOCKED with the violations recorded
@@ -257,9 +302,14 @@ export class TaskService {
     });
   }
 
-  async createTasksBatch(input: CreateTasksBatchInput): Promise<{ count: number }> {
+  async createTasksBatch(input: CreateTasksBatchInput, operator?: Operator): Promise<{ count: number }> {
     // A batch may create tasks straight into DEVELOPING, so it passes the same
     // gate; the host adjudicator is async and batched here too.
+    if (
+      input.tasks.some((task) => requiresPlanOverrideAuthority(null, false, { incoming: task.designRefJustification }))
+    ) {
+      await this.assertPlanOverrideAuthority(operator);
+    }
     const statuses = await Promise.all(
       input.tasks.map((task) =>
         this.admissionStatus(task.status || TaskStatus.PENDING, {
@@ -407,6 +457,16 @@ export class TaskService {
     // channel afterwards (ADR-054 D3).
     const planFrozenAt = current?.planFrozenAt ?? null;
     const planOverride = planEditRequiresOverride(planFrozenAt, planTouched);
+    // ADR-054 D3: only a human may rewrite a frozen plan or the gate-1
+    // justification, so both writes need the override authority.
+    if (
+      requiresPlanOverrideAuthority(planFrozenAt, planTouched, {
+        incoming: dto.designRefJustification,
+        stored: current?.designRefJustification,
+      })
+    ) {
+      await this.assertPlanOverrideAuthority(operator);
+    }
 
     if (planTouched) {
       if (!current) {
@@ -515,6 +575,26 @@ export class TaskService {
     }
 
     return updated;
+  }
+
+  /**
+   * Refuses the write unless the operator holds `TaskPlanOverride:Update`.
+   * This is the executor-boundary check ADR-054 D3 requires: a missing actor or
+   * a missing authorizer fails closed rather than letting an agent waive a gate.
+   */
+  private async assertPlanOverrideAuthority(operator: Operator | undefined): Promise<void> {
+    const allowed =
+      operator?.userId && this.permissions
+        ? await this.permissions.authorize(operator.userId, {
+            resource: TASK_PLAN_OVERRIDE_RESOURCE,
+            action: PermissionAction.Update,
+          })
+        : false;
+    if (!allowed) {
+      throw new ForbiddenException(
+        `rewriting a frozen plan or its designRefJustification requires ${TASK_PLAN_OVERRIDE_RESOURCE}:Update`,
+      );
+    }
   }
 
   async deleteTask(taskId: string, operator: Operator) {

@@ -9,6 +9,7 @@ import {
   formatGateOneBlock,
   MAX_SCOPE_PATHS,
   planEditRequiresOverride,
+  requiresPlanOverrideAuthority,
 } from "./task.service";
 
 // ADR-054 D2/D4: gate 4 stops work in flight, so TESTING and DEPLOYED can block too.
@@ -134,4 +135,19 @@ test("planEditRequiresOverride: only a frozen plan blocks edits", () => {
   assert.equal(planEditRequiresOverride(undefined, true), false);
   assert.equal(planEditRequiresOverride(new Date("2026-11-19T00:00:00Z"), false), false);
   assert.equal(planEditRequiresOverride(new Date("2026-11-19T00:00:00Z"), true), true);
+});
+
+// ADR-054 D3: the override authority is a separate atom, so `Task:Update` alone
+// cannot rewrite a frozen plan or pre-fill the gate-1 justification.
+test("requiresPlanOverrideAuthority: frozen plan edits and new justifications", () => {
+  const frozen = new Date("2026-11-19T00:00:00Z");
+  assert.equal(requiresPlanOverrideAuthority(frozen, true, {}), true);
+  assert.equal(requiresPlanOverrideAuthority(null, false, { incoming: "private repo" }), true);
+  assert.equal(
+    requiresPlanOverrideAuthority(null, false, { incoming: "private repo", stored: "another reason" }),
+    true,
+  );
+  assert.equal(requiresPlanOverrideAuthority(frozen, false, {}), false);
+  assert.equal(requiresPlanOverrideAuthority(null, false, { incoming: "   " }), false);
+  assert.equal(requiresPlanOverrideAuthority(null, false, { incoming: "same", stored: "same" }), false);
 });

@@ -22,8 +22,11 @@ export class TaskController {
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Batch create tasks in an existing task space" })
   @ApiResponse({ status: 200, type: BatchCreateTasksResponseDto })
-  async createTasksBatch(@Body() dto: CreateTasksBatchRequestDto): Promise<BatchCreateTasksResponseDto> {
-    const result = await this.taskService.createTasksBatch(dto);
+  async createTasksBatch(
+    @Body() dto: CreateTasksBatchRequestDto,
+    @Req() req: UserRequest,
+  ): Promise<BatchCreateTasksResponseDto> {
+    const result = await this.taskService.createTasksBatch(dto, { userId: req.user.userId });
     return { success: true, data: result };
   }
 
@@ -40,6 +43,7 @@ export class TaskController {
     return await this.taskService.updateTask(taskId, dto, {
       participantId: participant.id,
       name: participant.name ?? undefined,
+      userId: req.user.userId,
     });
   }
 

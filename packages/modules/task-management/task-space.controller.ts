@@ -93,11 +93,14 @@ export class TaskSpaceController {
       userId: req.user.userId,
     });
 
-    const result = await this.taskService.createTask({
-      ...dto,
-      spaceId: space.id,
-      creatorId: creator.id,
-    });
+    const result = await this.taskService.createTask(
+      {
+        ...dto,
+        spaceId: space.id,
+        creatorId: creator.id,
+      },
+      { participantId: creator.id, name: creator.name ?? undefined, userId: req.user.userId },
+    );
     return { success: true, data: result };
   }
 
