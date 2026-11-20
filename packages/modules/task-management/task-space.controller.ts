@@ -38,7 +38,7 @@ export class TaskSpaceController {
 
   @Get("project")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.TaskSpace)
-  @ApiOperation({ summary: "Get (auto-provisioning on first access) the task space of a Nightwatch project" })
+  @ApiOperation({ summary: "Get (auto-provisioning on first access) the task space of a project" })
   @ApiResponse({ status: 200, type: TaskSpaceResponseDto })
   async getSpaceByProjectId(@Query("projectId") projectId: string): Promise<TaskSpaceResponseDto> {
     const space = await this.taskSpaceService.getOrCreateSpaceForProject(projectId);
@@ -47,7 +47,7 @@ export class TaskSpaceController {
 
   @Get("tasks")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.Task)
-  @ApiOperation({ summary: "List tasks of a Nightwatch project (companion task space is ensured)" })
+  @ApiOperation({ summary: "List tasks of a project (companion task space is ensured)" })
   @ApiResponse({ status: 200, type: TasksResponseDto })
   async listTasksByProjectId(
     @Query("projectId") projectId: string,
@@ -81,7 +81,7 @@ export class TaskSpaceController {
 
   @Post("tasks")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task)
-  @ApiOperation({ summary: "Create a task under the Nightwatch project (companion task space is ensured)" })
+  @ApiOperation({ summary: "Create a task under the project (companion task space is ensured)" })
   @ApiResponse({ status: 200, type: CreateTaskResponseDto })
   async createTask(
     @Query("projectId") projectId: string,
@@ -106,7 +106,7 @@ export class TaskSpaceController {
 
   @Get("members")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.TaskSpace)
-  @ApiOperation({ summary: "List project participants with task stats by Nightwatch projectId" })
+  @ApiOperation({ summary: "List project participants with task stats by projectId" })
   @ApiResponse({ status: 200, type: MembersResponseDto })
   async listProjectMembers(@Query("projectId") projectId: string): Promise<MembersResponseDto> {
     const members = await this.taskParticipantService.listParticipantsByProjectId(projectId);

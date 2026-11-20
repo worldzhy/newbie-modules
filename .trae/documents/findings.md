@@ -477,3 +477,13 @@ carry-over 复验：R50-01（definitions 与 producer alertKey 无绑定）仍 o
 | R61-02 | newbie-modules + nightwatch-backend | R49-02 的 pause 与 installation 吊销两半未闭合，alert 永久 firing | P2 | live | 可暂停/吊销者 | fixed（2026-11-19 工作树：`url-check.target-deleted` 泛化为 `url-check.target-closed`（`cause: "paused" | "deleted"`），pause/delete 双路 emit；host 孤儿清扫覆盖 heartbeat 吊销；registry 已回写） |
 | R61-03 | newbie-modules | `CloseAlertDto.reason` 允许空串，「必填原因」在 API 层不成立 | P2 | live | 持 Alert:Update 者 | fixed（2026-11-19 工作树：`@Matches(/\S/)`；registry 已回写） |
 | R61-04 | newbie-modules | `simulateDelivery` 首调写 center setting；`delivered` 语义过强 | P2 | live | 运维配置 | fixed（2026-11-19 工作树：只读 `readCenterSetting`，缺行用 `DEFAULT_PUSH_ENABLED`；`delivered`/`runtimeReason` 描述限定为中心侧判定；registry 已回写） |
+
+## round72（2026-11-20，scope=workspace）
+
+报告与命令出处：`devbie/.trae/documents/reviews/expert-review-2026-11-20-round72.md`。
+
+| ID | 仓 | 标题 | severity | 暴露面 | 可达性 | 状态 |
+| --- | --- | --- | --- | --- | --- | --- |
+| R72-02 | newbie-modules | registry 模块内嵌宿主专有名词，违反 `AGENTS.md` 模块准入标准：copilot 提示词硬编码 Nightwatch 身份，task-management 的 API 描述写「Nightwatch project」 | P2 | source | 读者/API 消费方 | fixed（2026-11-20 工作树：提示词改为「operations copilot embedded in this platform's dashboard」；task-management 的 DTO 描述与四个 `@ApiOperation` summary 去宿主名；nightwatch-backend 装配副本与 `_gen/api.ts` 注释同步，`diff -rq` 为空） |
+
+注：`security-evaluation.constants.ts:45-47` 的 `_nightwatch-verify` 等属对外协议命名空间（类比 `google-site-verification`）且改动为破坏性契约，本轮不计入 finding。

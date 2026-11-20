@@ -6,7 +6,7 @@ export class TaskSpaceService {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Ensure the 1:1 companion TaskSpace for a Nightwatch project.
+   * Ensure the 1:1 companion TaskSpace for a project.
    *
    * Every project owns its task space implicitly: pairing is carried by the
    * unique projectId column, so repeated calls stay idempotent without a

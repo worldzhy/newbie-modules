@@ -321,7 +321,7 @@ export class TaskSpaceDto {
   @ApiProperty({ description: "TaskSpace ID (uuid)" })
   id!: string;
 
-  @ApiProperty({ description: "Nightwatch Project ID (uuid), 1:1 companion space" })
+  @ApiProperty({ description: "Project ID (uuid) this space is the 1:1 companion of" })
   projectId!: string;
 
   @ApiPropertyOptional({ description: "Space name", type: String })
