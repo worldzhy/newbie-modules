@@ -140,7 +140,7 @@ with `@OnEvent(TASK_STATUS_CHANGED_EVENT)` and route alerts themselves.
 | --------------------------------------------- | ------------------------------------------- |
 | `GET /tasks?projectId=`                       | List a project's tasks                      |
 | `GET /tasks/:taskId`                          | Read one task with actors and prerequisites |
-| `POST /tasks?projectId=`                      | Create one task                             |
+| `POST /tasks`                                 | Create one task (projectId in body)         |
 | `POST /tasks/batch`                           | Create tasks in a project                   |
 | `PATCH /tasks/:taskId`                        | Update a task (validated transitions)       |
 | `DELETE /tasks/:taskId`                       | Soft delete a task                          |

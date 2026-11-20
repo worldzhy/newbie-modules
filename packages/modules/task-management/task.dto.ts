@@ -172,7 +172,23 @@ export class LookupActorByCrewmateIdRequestDto {
   crewmateId!: string;
 }
 
+export class GetTaskRequestDto {
+  @ApiProperty({ type: String, description: "Task ID (uuid)" })
+  @IsUUID("4")
+  taskId!: string;
+}
+
+export class GetTaskActorMembersRequestDto {
+  @ApiProperty({ type: String, description: "Project whose actors are listed (uuid)" })
+  @IsUUID("4")
+  projectId!: string;
+}
+
 export class ListTasksRequestDto extends CommonListRequestDto {
+  @ApiProperty({ type: String, description: "Project the tasks belong to (uuid)" })
+  @IsUUID("4")
+  projectId!: string;
+
   @ApiPropertyOptional({ type: String, description: "Keyword matched against task title" })
   @IsString()
   @IsOptional()
@@ -211,7 +227,11 @@ export class CreateTaskItemDto extends TaskDeliveryFieldsDto {
   assigneeId?: string;
 }
 
-export class CreateTaskRequestDto extends CreateTaskItemDto {}
+export class CreateTaskRequestDto extends CreateTaskItemDto {
+  @ApiProperty({ type: String, description: "Owning project ID (uuid)" })
+  @IsUUID("4")
+  projectId!: string;
+}
 
 export class UpdateTaskRequestDto extends TaskDeliveryFieldsDto {
   @ApiPropertyOptional({ type: String })
@@ -267,7 +287,7 @@ export class CreateTasksBatchRequestDto {
 // Response DTOs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class TaskActorDto {
+export class TaskActorResponseDto {
   @ApiProperty({ description: "TaskActor ID (uuid)" })
   id!: string;
 
@@ -297,7 +317,7 @@ export class TaskActorDto {
   updatedAt!: Date;
 }
 
-export class TaskActorListItemDto {
+export class TaskActorListItemResponseDto {
   @ApiProperty({ description: "TaskActor ID (uuid)" })
   id!: string;
 
@@ -321,7 +341,7 @@ export class TaskActorListItemDto {
   avatarUrl?: string | null;
 }
 
-export class TaskDto {
+export class TaskResponseDto {
   @ApiProperty({ description: "Task ID (uuid)" })
   id!: string;
 
@@ -403,18 +423,18 @@ export class TaskDto {
   planFrozenAt?: Date | null;
 }
 
-export class TaskWithRelationsDto extends TaskDto {
-  @ApiPropertyOptional({ type: TaskActorDto, description: "Task creator" })
-  creator?: TaskActorDto | null;
+export class TaskWithRelationsResponseDto extends TaskResponseDto {
+  @ApiPropertyOptional({ type: TaskActorResponseDto, description: "Task creator" })
+  creator?: TaskActorResponseDto | null;
 
-  @ApiPropertyOptional({ type: TaskActorDto, description: "Task assignee" })
-  assignee?: TaskActorDto | null;
+  @ApiPropertyOptional({ type: TaskActorResponseDto, description: "Task assignee" })
+  assignee?: TaskActorResponseDto | null;
 
-  @ApiPropertyOptional({ type: TaskActorDto, description: "Last operator" })
-  lastOperator?: TaskActorDto | null;
+  @ApiPropertyOptional({ type: TaskActorResponseDto, description: "Last operator" })
+  lastOperator?: TaskActorResponseDto | null;
 }
 
-export class TaskActorMemberStatsDto {
+export class TaskActorMemberStatsResponseDto {
   @ApiProperty({ description: "Total active tasks assigned" })
   total!: number;
 
@@ -425,7 +445,7 @@ export class TaskActorMemberStatsDto {
   inProgress!: number;
 }
 
-export class TaskActorMemberDto {
+export class TaskActorMemberResponseDto {
   @ApiProperty({ description: "TaskActor ID (uuid)" })
   id!: string;
 
@@ -438,21 +458,18 @@ export class TaskActorMemberDto {
   @ApiPropertyOptional({ description: "Avatar URL snapshot", type: String })
   avatarUrl?: string | null;
 
-  @ApiProperty({ type: TaskActorMemberStatsDto })
-  taskStats!: TaskActorMemberStatsDto;
+  @ApiProperty({ type: TaskActorMemberStatsResponseDto })
+  taskStats!: TaskActorMemberStatsResponseDto;
 
   @ApiProperty({ type: Date })
   createdAt!: Date;
 }
 
 /** Paginated list response for tasks. */
-export class ListTasksResponseDto extends CommonListResponseDto {
-  @ApiProperty({ type: TaskWithRelationsDto, isArray: true })
-  declare records: TaskWithRelationsDto[];
-}
+export class ListTasksResponseDto extends CommonListResponseDto<TaskWithRelationsResponseDto> {}
 
 /** Result returned by the batch-create endpoint. */
-export class BatchCreateTasksResultDto {
+export class BatchCreateTasksResponseDto {
   @ApiProperty({ description: "Number of tasks created" })
   count!: number;
 }
