@@ -16,7 +16,7 @@ set (checked by the service, since Prisma cannot express the one-of constraint).
 
 ## Delivery-plan fields
 
-Tasks carry the delivery-plan fields from ADR-054 D2 so every host that runs the
+Tasks carry the delivery-plan fields from crewbie-runtime ADR-004 D2 so every host that runs the
 delivery pipeline shares the same vocabulary:
 
 | Field                          | Meaning                                                                        |
@@ -58,7 +58,7 @@ A transition into `BLOCKED` is rejected unless `blockedReason` is supplied.
 ## Gate 1: start admission
 
 `PENDING → DEVELOPING` and `BLOCKED → DEVELOPING` run the admission rules in
-`evaluateAdmission` (ADR-054 D4):
+`evaluateAdmission` (crewbie-runtime ADR-004 D4):
 
 - `acceptanceCriteria` is non-blank;
 - the task has no `parentId` (a design unit aggregates children, it does not start);
@@ -99,13 +99,13 @@ audit row.
 
 The same applies to writing a non-empty `designReferenceJustification`, the
 escape hatch that lets gate 1 skip its `designReference` checks. Both writes
-require the virtual permission atom `TaskPlanOverride:Update` (ADR-054 D3: "only
+require the virtual permission atom `TaskPlanOverride:Update` (crewbie-runtime ADR-004 D3: "only
 a human may override, the agent has no write permission"); `Task:Update` alone
 is refused with `403`. The service asks the bound `PERMISSION_AUTHORIZER`
 directly — the atom has no route decorator — and fails closed when no actor or
 authorizer is available. Hosts therefore grant it to ADMIN only: seed it as an
 `extraResources` entry with the whole atom set in another group's `excludeAtoms`.
-When identities carry a HUMAN/AGENT kind (ADR-056), that check can narrow to the
+When identities carry a HUMAN/AGENT kind (crewbie-runtime ADR-005), that check can narrow to the
 kind instead of the administrative role.
 
 ## Events
