@@ -21,12 +21,15 @@ import { TaskActorService } from "./task-actor.service";
 import {
   BatchCreateTasksResponseDto,
   CreateTaskRequestDto,
+  CreateTaskResponseDto,
   CreateTasksBatchRequestDto,
+  DeleteTaskResponseDto,
   GetTaskRequestDto,
+  GetTaskResponseDto,
   ListTasksRequestDto,
   ListTasksResponseDto,
-  TaskWithRelationsResponseDto,
   UpdateTaskRequestDto,
+  UpdateTaskResponseDto,
 } from "./task.dto";
 
 @ApiTags("Task Management")
@@ -71,8 +74,8 @@ export class TaskController {
   @Get(":taskId")
   @RequirePermission(PermissionAction.Get, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Get one task with its actors and prerequisites" })
-  @ApiResponse({ status: 200, type: TaskWithRelationsResponseDto })
-  async getTask(@Param() params: GetTaskRequestDto): Promise<TaskWithRelationsResponseDto> {
+  @ApiResponse({ status: 200, type: GetTaskResponseDto })
+  async getTask(@Param() params: GetTaskRequestDto): Promise<GetTaskResponseDto> {
     const task = await this.taskService.getTaskById(params.taskId);
     if (!task) {
       throw new NotFoundException("Task not found");
@@ -83,8 +86,8 @@ export class TaskController {
   @Post()
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Create a task under the project" })
-  @ApiResponse({ status: 201, type: TaskWithRelationsResponseDto })
-  async createTask(@Body() dto: CreateTaskRequestDto, @Req() req: UserRequest): Promise<TaskWithRelationsResponseDto> {
+  @ApiResponse({ status: 201, type: CreateTaskResponseDto })
+  async createTask(@Body() dto: CreateTaskRequestDto, @Req() req: UserRequest): Promise<CreateTaskResponseDto> {
     const creator = await this.taskActorService.getOrCreateHostActor({ userId: req.user.userId });
 
     return await this.taskService.createTask(
@@ -110,12 +113,12 @@ export class TaskController {
   @Patch(":taskId")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Update a task (validated status transitions)" })
-  @ApiResponse({ status: 200, type: TaskWithRelationsResponseDto })
+  @ApiResponse({ status: 200, type: UpdateTaskResponseDto })
   async updateTask(
     @Param() params: GetTaskRequestDto,
     @Body() dto: UpdateTaskRequestDto,
     @Req() req: UserRequest,
-  ): Promise<TaskWithRelationsResponseDto> {
+  ): Promise<UpdateTaskResponseDto> {
     const operator = await this.taskActorService.getOrCreateHostActor({ userId: req.user.userId });
     return await this.taskService.updateTask(params.taskId, dto, {
       actorId: operator.id,
@@ -127,8 +130,8 @@ export class TaskController {
   @Delete(":taskId")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Soft delete a task" })
-  @ApiResponse({ status: 200, type: TaskWithRelationsResponseDto })
-  async deleteTask(@Param() params: GetTaskRequestDto, @Req() req: UserRequest): Promise<TaskWithRelationsResponseDto> {
+  @ApiResponse({ status: 200, type: DeleteTaskResponseDto })
+  async deleteTask(@Param() params: GetTaskRequestDto, @Req() req: UserRequest): Promise<DeleteTaskResponseDto> {
     const operator = await this.taskActorService.getOrCreateHostActor({ userId: req.user.userId });
     return await this.taskService.deleteTask(params.taskId, {
       actorId: operator.id,

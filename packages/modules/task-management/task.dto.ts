@@ -287,7 +287,7 @@ export class CreateTasksBatchRequestDto {
 // Response DTOs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class TaskActorResponseDto {
+export class GetTaskActorResponseDto {
   @ApiProperty({ description: "TaskActor ID (uuid)" })
   id!: string;
 
@@ -317,7 +317,7 @@ export class TaskActorResponseDto {
   updatedAt!: Date;
 }
 
-export class TaskActorListItemResponseDto {
+export class ListTaskActorsResponseDto {
   @ApiProperty({ description: "TaskActor ID (uuid)" })
   id!: string;
 
@@ -341,7 +341,7 @@ export class TaskActorListItemResponseDto {
   avatarUrl?: string | null;
 }
 
-export class TaskResponseDto {
+export class GetTaskResponseDto {
   @ApiProperty({ description: "Task ID (uuid)" })
   id!: string;
 
@@ -421,20 +421,24 @@ export class TaskResponseDto {
       "When the delivery plan (changeImpact / allowedPaths / designReviewRequired) froze; null until the task starts",
   })
   planFrozenAt?: Date | null;
+
+  @ApiPropertyOptional({ type: GetTaskActorResponseDto, description: "Task creator" })
+  creator?: GetTaskActorResponseDto | null;
+
+  @ApiPropertyOptional({ type: GetTaskActorResponseDto, description: "Task assignee" })
+  assignee?: GetTaskActorResponseDto | null;
+
+  @ApiPropertyOptional({ type: GetTaskActorResponseDto, description: "Last operator" })
+  lastOperator?: GetTaskActorResponseDto | null;
 }
 
-export class TaskWithRelationsResponseDto extends TaskResponseDto {
-  @ApiPropertyOptional({ type: TaskActorResponseDto, description: "Task creator" })
-  creator?: TaskActorResponseDto | null;
+export class CreateTaskResponseDto extends GetTaskResponseDto {}
 
-  @ApiPropertyOptional({ type: TaskActorResponseDto, description: "Task assignee" })
-  assignee?: TaskActorResponseDto | null;
+export class UpdateTaskResponseDto extends GetTaskResponseDto {}
 
-  @ApiPropertyOptional({ type: TaskActorResponseDto, description: "Last operator" })
-  lastOperator?: TaskActorResponseDto | null;
-}
+export class DeleteTaskResponseDto extends GetTaskResponseDto {}
 
-export class TaskActorMemberStatsResponseDto {
+export class TaskActorMemberStatsDto {
   @ApiProperty({ description: "Total active tasks assigned" })
   total!: number;
 
@@ -445,7 +449,7 @@ export class TaskActorMemberStatsResponseDto {
   inProgress!: number;
 }
 
-export class TaskActorMemberResponseDto {
+export class ListTaskActorMembersResponseDto {
   @ApiProperty({ description: "TaskActor ID (uuid)" })
   id!: string;
 
@@ -458,15 +462,15 @@ export class TaskActorMemberResponseDto {
   @ApiPropertyOptional({ description: "Avatar URL snapshot", type: String })
   avatarUrl?: string | null;
 
-  @ApiProperty({ type: TaskActorMemberStatsResponseDto })
-  taskStats!: TaskActorMemberStatsResponseDto;
+  @ApiProperty({ type: TaskActorMemberStatsDto })
+  taskStats!: TaskActorMemberStatsDto;
 
   @ApiProperty({ type: Date })
   createdAt!: Date;
 }
 
 /** Paginated list response for tasks. */
-export class ListTasksResponseDto extends CommonListResponseDto<TaskWithRelationsResponseDto> {}
+export class ListTasksResponseDto extends CommonListResponseDto<GetTaskResponseDto> {}
 
 /** Result returned by the batch-create endpoint. */
 export class BatchCreateTasksResponseDto {
