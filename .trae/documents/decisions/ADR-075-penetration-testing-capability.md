@@ -2,7 +2,7 @@
 
 状态：已采纳（2026-11-21；编号取 registry 历史最大号 074 + 1）
 日期：2026-11-21
-更新：2026-11-21 — 四项待拍板已定：L1/L2 周扫、所有成员可发起申请（审批归 ADMIN）、`environment` 放 target material、扫描隔离用 Docker socket-proxy + 每次容器（宿主侧见 ADR-049）。同日按「env 不得有默认值」原则把目标 CIDR 从部署 env 收进授权记录（`allowedCidrs`）；L3 明确为受控利用层（宿主侧加入 sqlmap 只读模式），并补「严重性口径」。L4 定为 **B′：平台执行固定 playbook**（团队没有 L4 人工操作能力，专家流程必须固化进平台），新增 `PenetrationTestingTestObject` 与独立破坏性动作端口。
+更新：2026-11-21 — 四项待拍板已定：L1/L2 周扫、所有成员可发起申请（审批归 ADMIN）、`environment` 放 target material、扫描隔离用 Docker socket-proxy + 每次容器（宿主侧见 ADR-049）。同日按「env 不得有默认值」原则把目标 CIDR 从部署 env 收进授权记录（`allowedCidrs`）；L3 明确为受控利用层（宿主侧加入 sqlmap 只读模式），并补「严重性口径」。L4 定为 **B′：平台执行固定 playbook**（团队没有 L4 人工操作能力，专家流程必须固化进平台），新增 `PenetrationTestingTestObject` 与独立破坏性动作端口。评审后收敛契约：全部 criterion 为 `ASSERTION`；`standardKey` 走 `judgmentConfig`；L4 增加跨 level 互斥；`PenetrationTestingExecution` 在 `collect` 内立即写；`KILLED` / `CLEANUP_FAILED` 只落 feature；删除 `manual-finding`（骨架没有人工创建 finding 的入口）。
 
 > 归属：本仓只定 registry 契约（subject kind、evaluation key、material 表、端口形状、criteria/finding 语义）。宿主如何归属资产、如何启动临时容器与出网代理、引擎集与许可，见 nightwatch-backend ADR-049。跨仓引用写双编号。
 >
@@ -118,15 +118,12 @@ export const PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET = "web-target";
 - L4 门禁要求：`environment = NON_PRODUCTION`、维护窗口内、授权 `level = L4`、**存在匹配的 `disposable + 未过期 + 已审批` 测试对象**；任一缺失即拒绝。
 - playbook 只能在测试对象声明的 locator 内动作；locator 之外的写操作一律拒绝。
 
-`PenetrationTestingManualFinding`（人工发现录入，L3/L4）：
-
-- `subjectId`、`level`、`criterionKey`、`title`、`severity`、`description`、`attackClass?`、`evidenceRefs String[]`、`observedAt`、`enteredBy`、`confirmedBy?`、`confirmedAt?`、`status`（`DRAFT` / `CONFIRMED`）。
-- 只有 `CONFIRMED` 行进入 evidence；它是证据来源，不是直接写 finding，避免绕过 judgment 的 fingerprint 与 severity 口径。
-
 `PenetrationTestingExecution`（每次自动化扫描或 L4 动作的审计快照）：
 
 - `runId Uuid @unique`、`subjectId`、`level`、`authorizationId`、`snapshot Json`（解析到的 IP、端口、hostname、引擎/playbook 版本、代理策略 id）、`startedAt`、`finishedAt?`、`outcome`（`SUCCEEDED` / `FAILED` / `KILLED` / `CLEANUP_FAILED`）、`requestCount`、`killedAt?`、`killReason?`。
-- 由模块在 run 结束时写入；`snapshot` 是「执行时实际扫了谁」的唯一权威记录，不能由事后补写。
+- **写入时机**：在 evidence provider 内、扫描/动作结束的同一流程里立即写（含 `runId`、`snapshot`、`outcome`、`requestCount`）；终态（`finishedAt`、`KILLED`/`CLEANUP_FAILED`）在 `finally` 补齐。不能等 run 结束再写——动作已完成但 judgment 抛错或进程被杀时，骨架不会留下任何执行记录。
+- **与骨架状态的关系**：`EvaluationRunStatus` 只有 `QUEUED` / `RUNNING` / `SUCCEEDED` / `FAILED`，没有 `KILLED`。`KILLED` 与 `CLEANUP_FAILED` 只写本表 `outcome`；骨架 run 记 `FAILED` 并写 `failureReason`，两者靠 `runId` 关联。
+- `snapshot` 是「执行时实际扫了谁」的唯一权威记录，不能由事后补写。
 
 ### 4. 授权模型（fail-closed）
 
@@ -137,6 +134,10 @@ export const PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET = "web-target";
 3. **执行时快照**：宿主适配器在启动任何容器前重新解析目标域名、要求所有地址为公网（复用 `url-check/public-url.ts` 的 `assertPubliclyResolvable` 语义），并要求快照 ⊆ 授权行的 `allowedCidrs`（该列为空时只要求公网）。快照写入 `PenetrationTestingExecution.snapshot`。解析结果不在授权范围、或出现 RFC1918 / loopback / link-local / `169.254.169.254` → 直接失败，不发起任何请求。
 
 门禁落在 `PenetrationTestingRunService.startRun` 一处（对齐 `security-evaluation-run.service.ts:51-60,77-96` 的「唯一入口」写法），所有调用方（手工 `POST /runs`、周扫 job、未来调度器）都必须经过它。
+
+- **跨 level 互斥**：骨架的唯一索引只锁 `(subjectId, ruleSetVersionId)`，四个 key 是四个 version，天然可以并发。本模块必须自己补一条：L4 启动要求该 subject 不存在任何其他 key 的 `QUEUED` / `RUNNING` run；L4 活跃期间拒绝同 subject 的其他 key。否则破坏性写入会与主动扫描同时发生，「单动作 + 清理」的安全论证不成立。
+- **`runConfig` 不可信**：`judgmentConfig` 是调用方可传的 opaque JSON，骨架原样存储并传给 criteria / evidence / judgment。它只表达「请求意图」；`playbookId`、`testObjectId`、`authorizationId` 必须由门禁按 `subjectId` 重新读授权行与测试对象行校验，evidence provider 再按 `runId` 回读已审批行执行。不得从 `runConfig` 直接取授权结论。
+- **subject 创建**：`POST /targets` 用骨架的 `EvaluationSubjectService.getOrCreateSubject(descriptor, tx)`（接受事务客户端），与 material 行同事务写入；不直接 insert `EvaluationSubject`。
 
 ### 5. 扫描端口
 
@@ -149,6 +150,8 @@ export interface PenetrationScannerAccess {
 ```
 
 - 请求只含**目标语义**：归一化 origin、声明端口、路径角色、level、`standardKey`、审批引用、预算。不含引擎名、镜像、代理地址——这些是宿主实现细节。
+- **run 入参契约**：骨架的 `StartEvaluationRunInput` 只有 `subjectId`、`ruleSetVersionId?`、`requestedBy?`、`judgmentConfig?`。四个 key 共享 `web-target` kind，所以 `standardKey` 必须落进 `judgmentConfig.standardKey`（`selectVersion` 据此分派），或调用方显式传 `ruleSetVersionId`；两者都缺时 `selectVersion` 返回 `null` → 400。L4 另在 `judgmentConfig` 带 `playbookId` 与 `testObjectId`。
+- 预算超出时 evidence provider 必须让 run `FAILED`（写 `failureReason`），不得返回「部分成功」的结果。
 - 结果只含**引擎中立的观测**与**原始引擎发现**：`{ execution: { snapshot, engineVersions, requestCount, outcome }, observations, findings }`。`findings[]` 至少含 `engine`、`engineVersion`、`ruleId`、`ruleName?`、`severityRaw`、`title`、`detail?`、`location`、`evidenceRefs`。
 - 端口只声明形状与预算，不做网络 I/O、不持有 URL 白名单、不解析 DNS（与 `web-probe.access.ts:1-15` 同一纪律）。
 - 未绑定端口而跑 L1–L3 的 run → wiring error（沿用 `security-evaluation.module.ts:68-83` 的失败语义），不得产出「干净」结果。
@@ -213,22 +216,22 @@ playbook 目录（初始四个，均为「在测试对象内留下 marker、验�
 
 criteria 是**能力面**，不是单条引擎规则。nuclei 有数千条模板，若一条模板一个 criterion，规则集无法维护。
 
-| criterionKey | 覆盖 | 级别来源 |
-| --- | --- | --- |
-| `exposed-service` | 声明端口上非预期服务/版本横幅 | 引擎 |
-| `certificate-issue` | 过期、自签、主机名不匹配、弱密钥 | 确定性判定 |
-| `technology-disclosure` | Server / X-Powered-By / 错误页版本泄露 | 确定性判定 |
-| `tls-weakness` | 协议/套件弱点（复用既有 TLS 观测口径） | 确定性判定 |
-| `security-misconfiguration` | ZAP 被动/安全主动规则 | 引擎 |
-| `vulnerable-component` | 版本比对与 CVE 模板 | 引擎 + CVSS |
-| `injection` | 注入类规则 | 引擎 + CVSS |
-| `broken-access-control` | 访问控制类规则 | 引擎 + CVSS |
-| `exposed-sensitive-file` | 敏感文件/备份/调试端点 | 引擎 |
-| `confirmed-exploit` | L3 验证成功 | 引擎 + PoC 证据 |
-| `destructive-impact` | L4 playbook 成功造成并清理了受控破坏 | 引擎 + 前后状态 |
-| `manual-finding` | L3/L4 人工录入（已确认） | 录入者 + 复核 |
-| `unclassified` | 未映射到上述任一类的引擎发现（catch-all，ADR-020 D5.2 不允许静默丢弃） | 引擎 |
+| criterionKey | kind | 覆盖 | 级别来源 |
+| --- | --- | --- | --- |
+| `exposed-service` | ASSERTION | 声明端口上非预期服务/版本横幅 | 引擎 |
+| `certificate-issue` | ASSERTION | 过期、自签、主机名不匹配、弱密钥 | 确定性判定 |
+| `technology-disclosure` | ASSERTION | Server / X-Powered-By / 错误页版本泄露 | 确定性判定 |
+| `tls-weakness` | ASSERTION | 协议/套件弱点（复用既有 TLS 观测口径） | 确定性判定 |
+| `security-misconfiguration` | ASSERTION | ZAP 被动/安全主动规则 | 引擎 |
+| `vulnerable-component` | ASSERTION | 版本比对与 CVE 模板 | 引擎 + CVSS |
+| `injection` | ASSERTION | 注入类规则 | 引擎 + CVSS |
+| `broken-access-control` | ASSERTION | 访问控制类规则 | 引擎 + CVSS |
+| `exposed-sensitive-file` | ASSERTION | 敏感文件/备份/调试端点 | 引擎 |
+| `confirmed-exploit` | ASSERTION | L3 验证成功 | 引擎 + PoC 证据 |
+| `destructive-impact` | ASSERTION | L4 playbook 成功造成并清理了受控破坏 | 引擎 + 前后状态 |
+| `unclassified` | ASSERTION | 未映射到上述任一类的引擎发现（catch-all，ADR-020 D5.2 不允许静默丢弃） | 引擎 |
 
+- 全部 criterion 都是 `ASSERTION`：每个事实一条 finding，便于去重、抑制与趋势。L1 的覆盖度由骨架 `coverageStats` 表达，不设 `SCORED` 总分；未来若要总分，新增 `SCORED` criterion 并同时定义权重与 verdict 形状，属于新 criteria 版本。
 - 引擎规则 → criterion 的映射是模块内的**确定性数据表**（按 `engine + ruleId` 与 `engine + tag` 两级匹配），不是 LLM 判定。
 - fingerprint：`sha256(criterionKey + "\u0000" + engine + "\u0000" + ruleId + "\u0000" + locationKey)`，与仓内既有 identity helper 的 `sha256(parts.join("\u0000"))` 惯例一致。`locationKey` 取归一化后的 `url|ip:port|path+parameter`。subjectKey 不进哈希（finding 唯一键已含 subjectId）。
 - severity：优先使用引擎提供的 CVSS（≥9.0 CRITICAL、7.0–8.9 HIGH、4.0–6.9 MEDIUM、0.1–3.9 LOW、0 INFO）；无 CVSS 时按引擎标签映射（Critical/High/Medium/Low/Info）。不允许 LLM 重新定级。
@@ -267,8 +270,7 @@ export const PENETRATION_TESTING_SCHEDULES = [
 | `POST penetration-testing/authorizations/:id/revoke` | Update | 撤销（同时作为 kill switch 的授权侧） |
 | `POST penetration-testing/test-objects` / `:id/approve` | Create / Update | 登记并审批 L4 可破坏测试对象 |
 | `GET penetration-testing/playbooks` | List | 只读的 playbook 目录（代码常量的投影） |
-| `POST penetration-testing/manual-findings` / `:id/confirm` | Create / Update | 人工发现录入与复核 |
-| `POST penetration-testing/runs` | Create | 发起 L1–L4 run（门禁在 service；L4 必须带 playbookId + testObjectId） |
+| `POST penetration-testing/runs` | Create | 发起 L1–L4 run（门禁在 service；`judgmentConfig.standardKey` 指定 key；L4 必须带 playbookId + testObjectId） |
 | `GET penetration-testing/runs` / `findings` / `reports` | List / Get | 复用 security-evaluation 的读模型形状 |
 
 - 模型全部落在 `@@schema("module/penetration-testing")`，宿主权限种子按 namespace 自动派生 atom；动词仍只有 List / Get / Create / Update / Delete，不新增 `Manage`。
@@ -285,7 +287,7 @@ export const PENETRATION_TESTING_SCHEDULES = [
 ## 影响
 
 - registry 新增一个模块目录 `packages/modules/penetration-testing/`，变更点共 11 处，缺一即失效：
-  1. `prisma/schema.prisma`：五张表（target / authorization / test-object / manual-finding / execution）+ `@@schema("module/penetration-testing")`。
+  1. `prisma/schema.prisma`：四张表（target / authorization / test-object / execution）+ `@@schema("module/penetration-testing")`。
   2. `newbie.module.json`：`requires.modules: ["evaluation", "security"]`；无 env（端点与开关归宿主）。
   3. `penetration-testing.constants.ts`：subject kind、四个 key、级别/状态/攻击类枚举、预算与重验策略常量、schedules、playbook 目录。
   4. `ports/scanner.access.ts`：引擎中立端口与观测形状。
@@ -293,20 +295,21 @@ export const PENETRATION_TESTING_SCHEDULES = [
   6. `ports/verification.access.ts`：`lookupTxt` / `fetchText`，形状与 `web-origin-verification-access.port.ts:10-17` 一致，宿主可用同一个适配器绑两个 token。
   7. `assets/`：目标注册、归属验证、惰性重验（`listActiveVerified`）。
   8. `authorization/`：授权申请、审批、撤销、测试对象审批、有效期与 L3/L4 门禁。
-  9. `evidence/`：L1–L3 调用扫描端口；L4 调用破坏性动作端口；L3/L4 合并人工发现。
+  9. `evidence/`：L1–L3 调用扫描端口；L4 调用破坏性动作端口；在 `collect` 内立即写 `PenetrationTestingExecution`。
   10. `judgment/`：确定性 mechanism + 规则映射表 + fingerprint/severity。
   11. `criteria/`：四个规则集版本的 seed；`selectVersion` 按 kind + key 分派；未知 key 返回 `null`。
 - 宿主、前端、调度、部署见 nightwatch-backend ADR-049。
-- 负面：多一个模块与五张表；主动扫描引入 WAF 误伤与假阴性，需要在 evidence 里保留原始请求/响应以便复核；引擎升级会改变 finding lineage，趋势图会出现断点（以 `metadata.engineVersion` 标注）；L4 playbook 需要人工评审与回归，维护成本高于普通规则集。
+- 负面：多一个模块与四张表；主动扫描引入 WAF 误伤与假阴性，需要在 evidence 里保留原始请求/响应以便复核；引擎升级会改变 finding lineage，趋势图会出现断点（以 `metadata.engineVersion` 标注）；L4 playbook 需要人工评审与回归，维护成本高于普通规则集。
+- 模块必须 `@Global()`（与 `EvaluationModule`、`SecurityEvaluationModule` 一致），三个 kind 端口用 `useExisting` 绑定到 `web-target`，并在 `exports` 中暴露。
 
 ## 迁移阶段
 
 | 阶段 | 内容 | 行为变化 |
 | --- | --- | --- |
-| P0 | 本契约：kind / 四 key / 五表 / 三端口 / criteria / judgment / 单测 | 无（无目标） |
+| P0 | 本契约：kind / 四 key / 四表 / 三端口 / criteria / judgment / 单测 | 无（无目标） |
 | P1 | 宿主装配、归属验证、授权审批、临时容器与出网代理；`attack-surface` 上线 | 新增 L1 finding |
 | P2 | `vulnerability-scan` 上线（ZAP + nuclei，排除破坏性模板） | 新增 L2 finding |
-| P3 | 人工发现录入 + `exploit-verification`（逐 finding/class 审批） | 新增 L3 finding |
+| P3 | `exploit-verification`（逐 finding/class 审批；PoC 证据由 L3 run 产生） | 新增 L3 finding |
 | P4 | `destructive-testing` 受控 playbook：测试对象登记/审批、playbook 目录、破坏性动作端口、清理验证与 `CLEANUP_FAILED` 告警；灰度到 staging 目标 | 新增 L4 finding |
 | P5 | 前端页面、报表、趋势 | 可见 |
 
@@ -316,7 +319,7 @@ export const PENETRATION_TESTING_SCHEDULES = [
 - P0–P4 不做认证后扫描（需要客户账号与会话管理；后续单独立项）。
 - 不做不可逆的**外部**副作用（发邮件/短信、支付、第三方 webhook、生产数据删除）；L4 playbook 只能作用于登记且审批过的测试对象。
 - 不做任意命令/脚本执行：破坏性动作只能选代码常量 playbook；playbook 目录不可由数据库编辑，新增即新模块版本。
-- 不捆绑、不分发 Burp Suite（商业授权）；Burp 结果走人工发现录入。
+- 不捆绑、不分发 Burp Suite（商业授权）；Burp 结果作为下一次 L3 run 的 evidence 输入，不直录 finding。
 - 不做社会工程、钓鱼、物理、无线、供应链投毒。
 - 不做数据批量导出、持久化后门、横向移动；PoC 证据以「证明可利用」为上限。
 - 不扫描声明端口/IP 以外的目标，不做目标发现扩张（子域爆破、全网段扫描）。
