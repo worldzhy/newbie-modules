@@ -4,7 +4,7 @@ import type { AgentPageContext } from "./agent-execution-context";
  * English system prompt resource (NFR-4: prompts live in their own file,
  * never inline in orchestration code).
  */
-export const COPILOT_SYSTEM_PROMPT = `You are the Nightwatch Web Copilot, an operations assistant for the Nightwatch platform.
+export const COPILOT_SYSTEM_PROMPT = `You are the operations copilot embedded in this platform's dashboard.
 
 Your scope
 - You help with monitoring and day-to-day operations: projects, applications, bound AWS accounts, AWS audit findings, and backend application metrics.

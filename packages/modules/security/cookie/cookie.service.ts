@@ -121,6 +121,10 @@ export class CookieService {
       httpOnly: true,
       sameSite: "strict",
       secure: frontendUrl.startsWith("https") ? true : false,
+      // Explicit scope: without it the browser derives the path from the
+      // request URL, so a refresh issued from a deeper route would set a
+      // cookie the login endpoint does not receive (R53-05).
+      path: "/",
     };
   }
 }

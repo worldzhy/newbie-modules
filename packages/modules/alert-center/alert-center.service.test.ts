@@ -339,6 +339,57 @@ test("dispatchDueReminders does not let paused rows starve an unpaused source", 
   assert.equal(events[0].source, "heartbeat");
 });
 
+test("close resolves a firing alert without claiming recovery", async () => {
+  const { service, alerts, events } = newHarness();
+  const raised = await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
+  const row = alerts.get(SITE_1)!;
+
+  const closed = await service.close({ id: raised.id, reason: "target removed" });
+
+  assert.equal(closed.state, "resolved");
+  assert.ok(row.resolvedAt instanceof Date);
+  assert.equal(row.nextNotificationAt, null);
+  // Closing says "stop showing this", not "it recovered": no notification (R39-11).
+  assert.equal(events.length, 1);
+});
+
+test("closeByKey closes the lifecycle a producer can no longer resolve", async () => {
+  const { service, alerts } = newHarness();
+  await service.raise({ source: "url-check", alertKey: "site-1", severity: "high" });
+
+  const closed = await service.closeByKey({ source: "url-check", alertKey: "site-1", reason: "target deleted" });
+
+  assert.deepEqual(closed, { id: alerts.get(SITE_1)!.id });
+  assert.equal(alerts.get(SITE_1)!.state, "resolved");
+});
+
+test("closeByKey is a no-op when the key never fired", async () => {
+  const { service } = newHarness();
+
+  assert.equal(await service.closeByKey({ source: "url-check", alertKey: "never-fired", reason: "deleted" }), null);
+});
+
+test("listFiringAlerts pages with a keyset cursor so later rows converge too", async () => {
+  const captured: { args?: Row } = {};
+  const prisma = {
+    alert: {
+      findMany: async (args: Row) => {
+        captured.args = args;
+        return [];
+      },
+    },
+  };
+  const service = new AlertCenterService(prisma as never, {} as never);
+
+  await service.listFiringAlerts({ source: "security-evaluation", afterId: "a500" });
+
+  assert.deepEqual(captured.args!.cursor, { id: "a500" });
+  assert.equal(captured.args!.skip, 1);
+  // The cursor needs the same total order the page was read in, or the next
+  // page could repeat or skip rows (R49-05).
+  assert.deepEqual(captured.args!.orderBy, [{ createdAt: "asc" }, { id: "asc" }]);
+});
+
 test("two concurrent first raises settle on the winner row", async () => {
   const { service, prisma, alerts, events } = newHarness();
   let firstCall = true;

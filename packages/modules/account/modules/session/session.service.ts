@@ -14,8 +14,13 @@ import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audi
  * response or a double-fetch from two tabs does not look like token theft.
  * Outside the window the same token is a genuine reuse and the session is
  * revoked (nightwatch-backend ADR-034).
+ *
+ * 60s is the arrival bound, not slack (devbie ADR-055): two refresh attempts of
+ * 15s each plus the client's 2s and 4s retry gaps put the last retry's arrival
+ * at 36s, leaving 24s of assumed network latency. Extending the window widens
+ * how long a stolen previous-generation token can be redeemed.
  */
-const REFRESH_IDEMPOTENCY_WINDOW_MS = 30_000;
+const REFRESH_IDEMPOTENCY_WINDOW_MS = 60_000;
 
 /**
  * Session rows never store a usable credential: the refresh token is kept as a
@@ -38,7 +43,9 @@ export class SessionService {
   ) {}
 
   async generate(params: { ipAddress: string; userAgent: string; userId: string }): Promise<SessionWithCredentials> {
-    return this.generateWithTransaction(this.prisma, params);
+    // `PrismaService` is a structurally loose client (see ExtendedPrismaClient),
+    // so it needs the cast to stand in for the generated transaction client.
+    return this.generateWithTransaction(this.prisma as unknown as Prisma.TransactionClient, params);
   }
 
   async generateWithTransaction(
@@ -161,16 +168,40 @@ export class SessionService {
   }
 
   /**
-   * Revoke the session currently holding a refresh token. The plaintext is never
-   * stored, so the token must be hashed before lookup.
+   * Revoke the session holding a refresh token, and report which generation
+   * matched. The plaintext is never stored, so the token must be hashed first.
+   *
+   * Both options exist for logout only. `allowPrevious`: a rotation response
+   * that is still in flight (or was dropped) leaves the browser holding the
+   * previous generation while the row already moved on; matching only the
+   * current hash would make that logout a silent no-op. `auditReason`: logout
+   * is a user-initiated revoke and is audited, while the refresh-token
+   * strategy's routine expiry path stays unrecorded.
    */
-  async revokeByRefreshToken(refreshToken: string) {
+  async revokeByRefreshToken(
+    refreshToken: string,
+    options: { allowPrevious?: boolean; auditReason?: string } = {},
+  ): Promise<"current" | "previous" | "none"> {
+    const tokenHash = this.tokenService.hashToken(refreshToken);
     const session = await this.prisma.session.findFirst({
-      where: { refreshTokenHash: this.tokenService.hashToken(refreshToken) },
-      select: { id: true },
+      where: options.allowPrevious
+        ? { OR: [{ refreshTokenHash: tokenHash }, { previousRefreshTokenHash: tokenHash }] }
+        : { refreshTokenHash: tokenHash },
+      select: { id: true, userId: true, refreshTokenHash: true },
     });
-    if (!session) return;
+    if (!session) return "none";
+
     await this.revokeSession(session.id);
+    const matched = session.refreshTokenHash === tokenHash ? "current" : "previous";
+    if (options.auditReason) {
+      await this.auditLogService.record(AuditEvent.SESSION_REVOKED, {
+        actorType: AuditActorType.USER,
+        actorId: session.userId,
+        resourceType: "session",
+        detail: { reason: options.auditReason, sessionId: session.id, matched },
+      });
+    }
+    return matched;
   }
 
   private mintAccessToken(session: { id: number; userId: string }) {

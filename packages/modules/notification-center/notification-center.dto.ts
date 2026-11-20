@@ -430,11 +430,15 @@ export class SimulateDeliveryResultDto {
   @ApiProperty({
     enum: DELIVERY_RUNTIME_REASONS,
     nullable: true,
-    description: "Real-time interception found while replaying; the simulator evaluates the rule segment only",
+    description:
+      "Center-side real-time gate that would keep this notification in-app even though the rules allow delivery; null when nothing intercepts. Covers only the center switch, subscription switch and push port, not host-side routing",
   })
   runtimeReason!: string | null;
 
-  @ApiProperty({ description: "Final outcome: the rule table decided deliver" })
+  @ApiProperty({
+    description:
+      "Center-side verdict only: the rules allow delivery and no center gate intercepts it. Project-scope push is routed by the host, so true does not guarantee an external delivery",
+  })
   delivered!: boolean;
 }
 

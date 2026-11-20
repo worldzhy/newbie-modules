@@ -1,12 +1,36 @@
-import { Body, Controller, Delete, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { PermissionAction, Prisma } from "@generated/prisma/client";
 import { JwtAuthGuard } from "@modules/security/authentication/jwt/jwt.guard";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 import { TaskService } from "./task.service";
-import { TaskParticipantService } from "./task-participant.service";
-import { BatchCreateTasksResponseDto, CreateTasksBatchRequestDto, TaskDto, UpdateTaskRequestDto } from "./task.dto";
+import { TaskActorService } from "./task-actor.service";
+import {
+  BatchCreateTasksResponseDto,
+  CreateTaskRequestDto,
+  CreateTaskResponseDto,
+  CreateTasksBatchRequestDto,
+  DeleteTaskResponseDto,
+  GetTaskRequestDto,
+  GetTaskResponseDto,
+  ListTasksRequestDto,
+  ListTasksResponseDto,
+  UpdateTaskRequestDto,
+  UpdateTaskResponseDto,
+} from "./task.dto";
 
 @ApiTags("Task Management")
 @ApiBearerAuth()
@@ -15,43 +39,103 @@ import { BatchCreateTasksResponseDto, CreateTasksBatchRequestDto, TaskDto, Updat
 export class TaskController {
   constructor(
     private readonly taskService: TaskService,
-    private readonly taskParticipantService: TaskParticipantService,
+    private readonly taskActorService: TaskActorService,
   ) {}
+
+  @Get()
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.Task)
+  @ApiOperation({ summary: "List the tasks of a project" })
+  @ApiResponse({ status: 200, type: ListTasksResponseDto })
+  async listTasksByProjectId(@Query() query: ListTasksRequestDto): Promise<ListTasksResponseDto> {
+    const page = query.page ?? 0;
+    const pageSize = query.pageSize ?? 20;
+
+    const result = await this.taskService.listTasks({
+      projectId: query.projectId,
+      status: query.status,
+      keyword: query.keyword,
+      assigneeName: query.assigneeName,
+      includeCompleted: true,
+      skip: page * pageSize,
+      take: pageSize,
+    });
+
+    return {
+      records: result.tasks,
+      pagination: {
+        countOfCurrentPage: result.tasks.length,
+        countOfTotal: result.total,
+        page,
+        pageSize,
+      },
+    };
+  }
+
+  @Get(":taskId")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.Task)
+  @ApiOperation({ summary: "Get one task with its actors and prerequisites" })
+  @ApiResponse({ status: 200, type: GetTaskResponseDto })
+  async getTask(@Param() params: GetTaskRequestDto): Promise<GetTaskResponseDto> {
+    const task = await this.taskService.getTaskById(params.taskId);
+    if (!task) {
+      throw new NotFoundException("Task not found");
+    }
+    return task;
+  }
+
+  @Post()
+  @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task)
+  @ApiOperation({ summary: "Create a task under the project" })
+  @ApiResponse({ status: 201, type: CreateTaskResponseDto })
+  async createTask(@Body() dto: CreateTaskRequestDto, @Req() req: UserRequest): Promise<CreateTaskResponseDto> {
+    const creator = await this.taskActorService.getOrCreateHostActor({ userId: req.user.userId });
+
+    return await this.taskService.createTask(
+      {
+        ...dto,
+        creatorId: creator.id,
+      },
+      { actorId: creator.id, displayName: creator.displayName ?? undefined, userId: req.user.userId },
+    );
+  }
 
   @Post("batch")
   @RequirePermission(PermissionAction.Create, Prisma.ModelName.Task)
-  @ApiOperation({ summary: "Batch create tasks in an existing task space" })
-  @ApiResponse({ status: 200, type: BatchCreateTasksResponseDto })
-  async createTasksBatch(@Body() dto: CreateTasksBatchRequestDto): Promise<BatchCreateTasksResponseDto> {
-    const result = await this.taskService.createTasksBatch(dto);
-    return { success: true, data: result };
+  @ApiOperation({ summary: "Batch create tasks under the project" })
+  @ApiResponse({ status: 201, type: BatchCreateTasksResponseDto })
+  async createTasksBatch(
+    @Body() dto: CreateTasksBatchRequestDto,
+    @Req() req: UserRequest,
+  ): Promise<BatchCreateTasksResponseDto> {
+    return await this.taskService.createTasksBatch(dto, { userId: req.user.userId });
   }
 
   @Patch(":taskId")
   @RequirePermission(PermissionAction.Update, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Update a task (validated status transitions)" })
-  @ApiResponse({ status: 200, type: TaskDto })
+  @ApiResponse({ status: 200, type: UpdateTaskResponseDto })
   async updateTask(
-    @Param("taskId") taskId: string,
+    @Param() params: GetTaskRequestDto,
     @Body() dto: UpdateTaskRequestDto,
     @Req() req: UserRequest,
-  ): Promise<TaskDto> {
-    const participant = await this.taskParticipantService.getOrCreateHostParticipant({ userId: req.user.userId });
-    return await this.taskService.updateTask(taskId, dto, {
-      participantId: participant.id,
-      name: participant.name ?? undefined,
+  ): Promise<UpdateTaskResponseDto> {
+    const operator = await this.taskActorService.getOrCreateHostActor({ userId: req.user.userId });
+    return await this.taskService.updateTask(params.taskId, dto, {
+      actorId: operator.id,
+      displayName: operator.displayName ?? undefined,
+      userId: req.user.userId,
     });
   }
 
   @Delete(":taskId")
   @RequirePermission(PermissionAction.Delete, Prisma.ModelName.Task)
   @ApiOperation({ summary: "Soft delete a task" })
-  @ApiResponse({ status: 200, type: TaskDto })
-  async deleteTask(@Param("taskId") taskId: string, @Req() req: UserRequest): Promise<TaskDto> {
-    const participant = await this.taskParticipantService.getOrCreateHostParticipant({ userId: req.user.userId });
-    return await this.taskService.deleteTask(taskId, {
-      participantId: participant.id,
-      name: participant.name ?? undefined,
+  @ApiResponse({ status: 200, type: DeleteTaskResponseDto })
+  async deleteTask(@Param() params: GetTaskRequestDto, @Req() req: UserRequest): Promise<DeleteTaskResponseDto> {
+    const operator = await this.taskActorService.getOrCreateHostActor({ userId: req.user.userId });
+    return await this.taskService.deleteTask(params.taskId, {
+      actorId: operator.id,
+      displayName: operator.displayName ?? undefined,
     });
   }
 }

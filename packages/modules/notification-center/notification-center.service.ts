@@ -33,6 +33,8 @@ import {
   NotificationCenterSettingDto,
   NotificationDeliveryAttemptDto,
   NotificationPushFailureDto,
+  SimulateDeliveryRequestDto,
+  SimulateDeliveryResultDto,
   TestPushResultDto,
   UnreadCountResponseDto,
   UpdateNotificationCenterSettingDto,
@@ -187,6 +189,42 @@ export class NotificationCenterService {
     @Inject(NOTIFICATION_PUSH_PORT)
     private readonly pushPort?: NotificationPushPort,
   ) {}
+
+  /**
+   * Replay the rule table and report the real-time gates next to it (R39-12).
+   * The rule verdict alone is not the final answer: a delivery the rules allow
+   * can still be kept in-app by the subscription switch, the center switch or
+   * a missing push port, and an operator reading only "deliver" would believe
+   * the message went out.
+   */
+  async simulateDelivery(
+    input: SimulateDeliveryRequestDto,
+    visibleProjectIds: string[],
+  ): Promise<SimulateDeliveryResultDto> {
+    const result = await this.deliveryRules.simulate(input, visibleProjectIds);
+    let runtimeReason: DeliveryRuntimeReason | null = null;
+    if (result.decision === "deliver") {
+      const declaration = this.registry.get(result.labels.notificationKey);
+      const [setting, center] = await Promise.all([
+        this.prisma.notificationSetting.findUnique({ where: { key: result.labels.notificationKey } }),
+        this.readCenterSetting(),
+      ]);
+      if (declaration && setting) {
+        runtimeReason = this.resolveRuntime({
+          scope: setting.scope,
+          notificationPushEnabled: setting.isPushEnabled,
+          centerPushEnabled: center.isPushEnabled,
+          resolved: result.labels.state === "resolved",
+          declaration,
+        });
+      }
+    }
+    return {
+      ...result,
+      runtimeReason,
+      delivered: result.decision === "deliver" && runtimeReason === null,
+    };
+  }
 
   // --- Delivery ------------------------------------------------------------
 
@@ -372,11 +410,13 @@ export class NotificationCenterService {
     if (input.resolved && input.declaration.notifyOnRecovery === false) {
       return "recovery-opt-out";
     }
-    if (!input.centerPushEnabled) {
+    // Only system-scope deliveries go through the center's port, so the master
+    // switch only intercepts those; the host routes project-scope pushes and
+    // the switch does not gate them (R49-04). Recording "channel-off" for a
+    // project delivery would contradict what actually happened.
+    if (input.scope === "system" && !input.centerPushEnabled) {
       return "channel-off";
     }
-    // Only system-scope deliveries go through the center's port; project-scope
-    // ones are routed by the host, so an absent port is not an interception.
     if (input.scope === "system" && !this.pushPort) {
       return "no-port";
     }
@@ -484,6 +524,20 @@ export class NotificationCenterService {
       failed: results.filter((result) => !result.success).length,
       results,
     };
+  }
+
+  /**
+   * Read-only counterpart of `getOrCreateCenterSetting` for preview paths
+   * (R39-12). A dry run must not write: an operator asking "what would happen"
+   * should not materialise the singleton row as a side effect. A missing row
+   * means the center switch was never turned on, which is the same default the
+   * creating path would persist.
+   */
+  private async readCenterSetting(): Promise<{ isPushEnabled: boolean }> {
+    const row = await this.prisma.notificationCenterSetting.findUnique({
+      where: { id: CENTER_SETTING_SINGLETON_ID },
+    });
+    return { isPushEnabled: row?.isPushEnabled ?? DEFAULT_PUSH_ENABLED };
   }
 
   private async getOrCreateCenterSetting() {
@@ -599,9 +653,11 @@ export class NotificationCenterService {
 
   async markRead(userId: string, id: string, visibleProjectIds: string[]): Promise<MarkNotificationReadResponseDto> {
     // Scope the lookup exactly like list/unreadCount: a record outside the
-    // caller's visible projects must read as not-found, not be marked read.
+    // caller's visible projects, or older than the user account, must read as
+    // not-found rather than be marked read (R49-06).
+    const visibleSince = await this.getVisibilityFloor(userId);
     const record = await this.prisma.notificationRecord.findFirst({
-      where: { id, ...this.buildProjectVisibilityWhere(visibleProjectIds) },
+      where: { id, createdAt: { gte: visibleSince }, ...this.buildProjectVisibilityWhere(visibleProjectIds) },
     });
     if (!record) {
       throw new NotFoundException(`Notification not found: ${id}`);
@@ -656,9 +712,14 @@ export class NotificationCenterService {
    * The recorded delivery decision of one notification record (ADR-062). The
    * record list stays lean; the detail panel expands this on demand.
    */
-  async getDeliveryAttempt(id: string, visibleProjectIds: string[]): Promise<NotificationDeliveryAttemptDto | null> {
+  async getDeliveryAttempt(
+    userId: string,
+    id: string,
+    visibleProjectIds: string[],
+  ): Promise<NotificationDeliveryAttemptDto | null> {
+    const visibleSince = await this.getVisibilityFloor(userId);
     const record = await this.prisma.notificationRecord.findFirst({
-      where: { id, ...this.buildProjectVisibilityWhere(visibleProjectIds) },
+      where: { id, createdAt: { gte: visibleSince }, ...this.buildProjectVisibilityWhere(visibleProjectIds) },
       select: { id: true },
     });
     if (!record) {
@@ -742,9 +803,11 @@ export class NotificationCenterService {
 
   // Notifications created before the user account existed stay invisible,
   // otherwise newly created users would inherit the whole backlog as unread.
+  // A missing user row fails closed: an unresolvable account sees nothing
+  // instead of falling back to the whole history (R49-06).
   private async getVisibilityFloor(userId: string): Promise<Date> {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { createdAt: true } });
-    return user?.createdAt ?? new Date(0);
+    return user?.createdAt ?? new Date();
   }
 
   private async getReadIds(userId: string, notificationIds: string[]): Promise<Set<string>> {
