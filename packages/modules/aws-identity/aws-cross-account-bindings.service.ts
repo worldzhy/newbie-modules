@@ -29,6 +29,9 @@ const REFRESH_SAFETY_WINDOW_MS = 5 * 60 * 1000;
 /** Fallback lifetime when STS omits an expiration (it never does in practice). */
 const DEFAULT_SESSION_TTL_MS = 60 * 60 * 1000;
 
+/** Binding row plus the usage consumer ids loaded alongside it. */
+type BindingWithUsages = AwsCrossAccountBinding & { usages: { consumerId: string }[] };
+
 /**
  * Credential-reference vocabulary: other modules point at a binding through an
  * opaque `"aws-binding:<id>"` string captured at their own registration time,
@@ -104,7 +107,7 @@ export class AwsCrossAccountBindingsService {
       this.resolveDefaultAccountId(),
     ]);
     return {
-      accounts: bindings.map(({ usages, ...binding }) => ({
+      accounts: (bindings as BindingWithUsages[]).map(({ usages, ...binding }) => ({
         ...this.serializeBinding(binding),
         consumerIds: usages.map((usage) => usage.consumerId),
       })),

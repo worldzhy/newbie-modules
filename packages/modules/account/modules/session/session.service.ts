@@ -43,7 +43,9 @@ export class SessionService {
   ) {}
 
   async generate(params: { ipAddress: string; userAgent: string; userId: string }): Promise<SessionWithCredentials> {
-    return this.generateWithTransaction(this.prisma, params);
+    // `PrismaService` is a structurally loose client (see ExtendedPrismaClient),
+    // so it needs the cast to stand in for the generated transaction client.
+    return this.generateWithTransaction(this.prisma as unknown as Prisma.TransactionClient, params);
   }
 
   async generateWithTransaction(

@@ -1,57 +1,49 @@
 // !! ------------------------------------------------------------ //
 // !!               [Module] Task Management models                //
 // !! ------------------------------------------------------------ //
-// * TaskSpace                                                     //
-// * TaskParticipant                                               //
+// * TaskActor                                                     //
 // * Task                                                          //
-// * TaskStatus (enum)                                             //
+// * TaskDependency                                                //
+// * TaskStatus / ActorKind (enums)                                //
 // !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-/// One task space per host project: a 1:1 companion container for that
-/// project's tasks, enforced by the unique `projectId`. The host adds the
-/// project relation; the space name is optional and caller-supplied.
-model TaskSpace {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId   String   @unique @db.Uuid
-  name        String?
-  description String?
+/// One actor in the task system. A HUMAN actor stands for a host account user;
+/// a CREWMATE actor stands for a crewmate (a worker, not an account). The host
+/// adds the opaque `userId` / `crewmateId` scalars (and their unique indexes) in
+/// its own schema; this module stores only the fields shared by every host.
+/// Exactly one of the two identifiers is set, enforced by the service because
+/// Prisma cannot express a one-of constraint.
+model TaskActor {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind        ActorKind
+  displayName String?
+  avatarUrl   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tasks     Task[]
+  createdTasks      Task[] @relation("TaskCreator")
+  assignedTasks     Task[] @relation("TaskAssignee")
+  lastOperatedTasks Task[] @relation("TaskLastOperator")
 
+  @@index([kind])
   @@schema("module/task-management")
 }
 
-/// One actor in the task system, identified by the host user it stands for.
-/// `name` and `avatarUrl` copy that user's display fields, captured when the
-/// participant row is created.
-model TaskParticipant {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name              String?
-  avatarUrl         String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  createdTasks      Task[]   @relation("CreatedTasks")
-  assignedTasks     Task[]   @relation("AssignedTasks")
-  lastOperatorTasks Task[]   @relation("LastOperatorTasks")
-
-  @@schema("module/task-management")
-}
-
-/// One task (work item) in a space: title, description, status, optional due
-/// date, and creator/assignee participants. Status updates follow the service's
-/// transition table; deletion is soft through `deletedAt`. The last-operator
-/// fields record who most recently changed the task.
+/// One task (work item) in a project: title, description, status, creator and
+/// assignee actors, delivery plan, and prerequisite edges. Deletion is soft
+/// through `deletedAt`. `projectId` is the host project the task belongs to;
+/// the host adds the Project relation on top of this scalar.
 model Task {
-  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   title       String
   description String?
-  status      TaskStatus        @default(PENDING)
-  dueDate     DateTime?
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  status      TaskStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
   deletedAt   DateTime?
+
+  /// Host project that owns the task; no foreign key in this module.
+  projectId String @db.Uuid
 
   /// Parent task in the design/execution hierarchy. A task with a parent is a
   /// design unit: it aggregates children and is never dispatched on its own.
@@ -60,68 +52,86 @@ model Task {
   children Task[]  @relation("TaskHierarchy")
 
   /// Delivery-plan fields shared by every host that runs the delivery pipeline:
-  /// design source reference, acceptance criteria, allowed path globs, declared
-  /// impact, prerequisite task ids, origin discussion reference, and the gate
-  /// diagnostics captured when a task blocks.
-  designRef              String?
-  acceptanceCriteria     String?
-  scopePaths             String[]         @default([])
-  impact                 Json?
-  changeClass            TaskChangeClass?
-  dependsOn              String[]         @default([])
-  sourceRef              Json?
-  blockedReason          String?
-  designRefJustification String?
-  requirementReview      Json?
+  /// design source reference, derived design-review flag, acceptance criteria,
+  /// allowed path globs, declared change impact, origin discussion reference,
+  /// and the gate diagnostics captured when a task blocks.
+  designReference                String?
+  designReviewRequired           Boolean    @default(false)
+  acceptanceCriteria             String?
+  allowedPaths                   String[]   @default([])
+  changeImpact                   Json?
+  originReference                Json?
+  blockedReason                  String?
+  designReferenceJustification   String?
+  requirementReview              Json?
+
   /// Set the first time the task starts (PENDING/BLOCKED -> DEVELOPING).
-  /// `impact`, `scopePaths` and the derived `changeClass` freeze from then on
-  /// and are only editable through the human override channel (ADR-054 D3).
+  /// `changeImpact`, `allowedPaths` and the derived `designReviewRequired`
+  /// freeze from then on and are only editable through the human override
+  /// channel (ADR-054 D3).
   planFrozenAt DateTime?
 
-  spaceId   String    @db.Uuid
-  space     TaskSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  creatorId  String?    @db.Uuid
+  creator    TaskActor? @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
 
-  creatorId  String?         @db.Uuid
-  creator    TaskParticipant? @relation("CreatedTasks", fields: [creatorId], references: [id], onDelete: SetNull)
+  assigneeId String?    @db.Uuid
+  assignee   TaskActor? @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
 
-  assigneeId String?         @db.Uuid
-  assignee   TaskParticipant? @relation("AssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
+  lastOperatorId String?    @db.Uuid
+  lastOperator   TaskActor? @relation("TaskLastOperator", fields: [lastOperatorId], references: [id], onDelete: SetNull)
 
-  lastOperatorParticipantId String? @db.Uuid
-  lastOperatorParticipant   TaskParticipant? @relation("LastOperatorTasks", fields: [lastOperatorParticipantId], references: [id], onDelete: SetNull)
-  lastOperatorName          String?
+  /// Prerequisite edges where this task is the dependent. The join rows are the
+  /// single source of truth; there is no scalar id array to keep in sync.
+  dependencies TaskDependency[] @relation("TaskDependencies")
+  dependents   TaskDependency[] @relation("TaskDependents")
 
   @@index([parentId])
+  @@index([projectId, status])
+  @@schema("module/task-management")
+}
+
+/// Prerequisite edge between two tasks: `taskId` may not start until
+/// `prerequisiteTaskId` reaches COMPLETED. The composite primary key makes an
+/// edge unique; a self-edge is rejected by the service.
+model TaskDependency {
+  taskId             String   @db.Uuid
+  prerequisiteTaskId String   @db.Uuid
+  createdAt          DateTime @default(now())
+
+  task         Task @relation("TaskDependencies", fields: [taskId], references: [id], onDelete: Cascade)
+  prerequisite Task @relation("TaskDependents", fields: [prerequisiteTaskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, prerequisiteTaskId])
+  @@index([prerequisiteTaskId])
   @@schema("module/task-management")
 }
 
 /// Task lifecycle. Status updates follow the service's fixed transition table:
-/// PENDING to DEVELOPING, BLOCKED or CANCELLED; DEVELOPING to TESTING, BLOCKED or
-/// CANCELLED; TESTING to DEVELOPING, DEPLOYED, BLOCKED, COMPLETED or CANCELLED;
-/// DEPLOYED to DEVELOPING, BLOCKED, COMPLETED or CANCELLED; BLOCKED to DEVELOPING
-/// or CANCELLED.
+/// PENDING to DEVELOPING, BLOCKED or CANCELLED; BLOCKED to DEVELOPING or
+/// CANCELLED; DEVELOPING to TESTING, BLOCKED or CANCELLED; TESTING to DEVELOPING,
+/// MERGED, BLOCKED or CANCELLED; MERGED to DEVELOPING, DEPLOYED, BLOCKED or
+/// CANCELLED; DEPLOYED to DEVELOPING, BLOCKED, COMPLETED or CANCELLED.
 /// COMPLETED and CANCELLED are terminal. CANCELLED is a status, distinct from
 /// the soft delete in `deletedAt`; BLOCKED means a gate stopped the task and a
 /// human must clear it.
 enum TaskStatus {
   PENDING
+  BLOCKED
   DEVELOPING
   TESTING
+  MERGED
   DEPLOYED
   COMPLETED
   CANCELLED
-  BLOCKED
 
   @@schema("module/task-management")
 }
 
-/// Delivery-plan class, derived from `impact` and `scopePaths` rather than
-/// declared by hand: DESIGNED when the task spans several repositories, touches
-/// the schema or a contract, is irreversible, or declares more than 20 allowed
-/// path globs; SIMPLE otherwise.
-enum TaskChangeClass {
-  SIMPLE
-  DESIGNED
+/// Who an actor row stands for: a host account user or a crewmate. Crewmates
+/// are workers, not accounts (ADR-003 D2).
+enum ActorKind {
+  HUMAN
+  CREWMATE
 
   @@schema("module/task-management")
 }

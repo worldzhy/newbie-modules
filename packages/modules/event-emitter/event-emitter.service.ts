@@ -17,6 +17,13 @@ export const EVENT_EMISSION_RETENTION_DAYS = 90;
 const MAX_PAYLOAD_STRING_LENGTH = 2_000;
 const MAX_PAYLOAD_JSON_LENGTH = 16_000;
 
+/** Shape of one `groupBy` row; declared locally because `PrismaService` is `any`. */
+type EventEmissionStat = {
+  eventKey: string;
+  _count: { _all: number };
+  _max: { emittedAt: Date | null };
+};
+
 export interface EventDescription {
   key: string;
   name: string;
@@ -63,12 +70,12 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
   /// declared=false so nothing fires invisibly.
   async listEvents(): Promise<EventDescription[]> {
     const declarations = this.eventCatalog.listDeclarations();
-    const stats = await this.prisma.eventEmission.groupBy({
+    const stats = (await this.prisma.eventEmission.groupBy({
       by: ["eventKey"],
       _count: { _all: true },
       _max: { emittedAt: true },
-    });
-    const statsByKey = new Map(stats.map((row) => [row.eventKey, row]));
+    })) as EventEmissionStat[];
+    const statsByKey = new Map(stats.map((row) => [row.eventKey, row] as const));
 
     const events: EventDescription[] = declarations.map((declaration) => {
       const stat = statsByKey.get(declaration.key);

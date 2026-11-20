@@ -9,8 +9,7 @@
   "requires": {
     "modules": ["account", "event-emitter", "security"],
     "dependencies": {
-      "@nestjs/event-emitter": "latest",
-      "chinese-days": "^1.5.7"
+      "@nestjs/event-emitter": "latest"
     }
   }
 }

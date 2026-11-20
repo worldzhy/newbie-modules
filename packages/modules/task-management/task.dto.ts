@@ -4,7 +4,6 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
-  IsDateString,
   IsEnum,
   IsNotEmpty,
   IsNumber,
@@ -13,13 +12,14 @@ import {
   IsUUID,
   ValidateNested,
 } from "class-validator";
-import { RequirementReview, TaskChangeClass, TaskImpact, TaskSourceRef, TaskStatus } from "./task.service";
+import { ActorKind, TaskStatus } from "@generated/prisma/enums";
+import { ChangeImpact, OriginReference, RequirementReview } from "./task.service";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Delivery-plan DTOs (ADR-054 D2)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class TaskImpactDto implements TaskImpact {
+export class ChangeImpactDto implements ChangeImpact {
   @ApiPropertyOptional({
     type: [String],
     isArray: true,
@@ -46,7 +46,7 @@ export class TaskImpactDto implements TaskImpact {
   irreversible?: boolean;
 }
 
-export class TaskSourceRefDto implements TaskSourceRef {
+export class OriginReferenceDto implements OriginReference {
   @ApiPropertyOptional({ type: String, description: "Discussion chat id the task came from" })
   @IsString()
   @IsOptional()
@@ -86,8 +86,8 @@ export class RequirementReviewDto implements RequirementReview {
 }
 
 /**
- * Fields shared by task creation and update. `changeClass` is absent on
- * purpose: the service derives it from `impact` and `scopePaths`.
+ * Fields shared by task creation and update. `designReviewRequired` is absent on
+ * purpose: the service derives it from `changeImpact` and `allowedPaths`.
  */
 export class TaskDeliveryFieldsDto {
   @ApiPropertyOptional({ type: String, description: "Parent task ID (uuid); a child is not dispatched directly" })
@@ -98,7 +98,7 @@ export class TaskDeliveryFieldsDto {
   @ApiPropertyOptional({ type: String, description: "Design source reference (ADR / spec id or path)" })
   @IsString()
   @IsOptional()
-  designRef?: string;
+  designReference?: string;
 
   @ApiPropertyOptional({ type: String, description: "Acceptance criteria, required before a task may start" })
   @IsString()
@@ -113,35 +113,35 @@ export class TaskDeliveryFieldsDto {
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
-  scopePaths?: string[];
+  allowedPaths?: string[];
 
-  @ApiPropertyOptional({ type: TaskImpactDto, description: "Declared change impact" })
+  @ApiPropertyOptional({ type: ChangeImpactDto, description: "Declared change impact" })
   @ValidateNested()
-  @Type(() => TaskImpactDto)
+  @Type(() => ChangeImpactDto)
   @IsOptional()
-  impact?: TaskImpactDto;
+  changeImpact?: ChangeImpactDto;
 
   @ApiPropertyOptional({ type: [String], isArray: true, description: "Prerequisite task IDs (uuid)" })
   @IsArray()
   @IsUUID("4", { each: true })
   @IsOptional()
-  dependsOn?: string[];
+  prerequisiteTaskIds?: string[];
 
-  @ApiPropertyOptional({ type: TaskSourceRefDto, description: "Origin discussion reference" })
+  @ApiPropertyOptional({ type: OriginReferenceDto, description: "Origin discussion reference" })
   @ValidateNested()
-  @Type(() => TaskSourceRefDto)
+  @Type(() => OriginReferenceDto)
   @IsOptional()
-  sourceRef?: TaskSourceRefDto;
+  originReference?: OriginReferenceDto;
 
   @ApiPropertyOptional({ type: String, description: "Reason captured when the task moves to BLOCKED" })
   @IsString()
   @IsOptional()
   blockedReason?: string;
 
-  @ApiPropertyOptional({ type: String, description: "Why the change falls inside the designRef scope" })
+  @ApiPropertyOptional({ type: String, description: "Why the change falls inside the designReference scope" })
   @IsString()
   @IsOptional()
-  designRefJustification?: string;
+  designReferenceJustification?: string;
 
   @ApiPropertyOptional({
     type: RequirementReviewDto,
@@ -157,11 +157,18 @@ export class TaskDeliveryFieldsDto {
 // Request DTOs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class LookupParticipantQueryDto {
-  @ApiProperty({ type: String, description: "Host user ID the participant stands for" })
+export class LookupActorByUserIdQueryDto {
+  @ApiProperty({ type: String, description: "Host user ID the HUMAN actor stands for" })
   @IsString()
   @IsNotEmpty()
   userId!: string;
+}
+
+export class LookupActorByCrewmateIdQueryDto {
+  @ApiProperty({ type: String, description: "Crewmate ID the CREWMATE actor stands for" })
+  @IsString()
+  @IsNotEmpty()
+  crewmateId!: string;
 }
 
 export class ListTasksQueryDto {
@@ -209,16 +216,10 @@ export class CreateTaskItemDto extends TaskDeliveryFieldsDto {
   @IsOptional()
   status?: TaskStatus;
 
-  @ApiPropertyOptional({ type: String, description: "Assignee TaskParticipant ID (uuid)" })
+  @ApiPropertyOptional({ type: String, description: "Assignee TaskActor ID (uuid)" })
   @IsUUID("4")
   @IsOptional()
   assigneeId?: string;
-
-  @ApiPropertyOptional({ type: String, format: "date-time", description: "ISO 8601 due date" })
-  @Type(() => String)
-  @IsDateString()
-  @IsOptional()
-  dueDate?: Date;
 }
 
 export class CreateTaskRequestDto extends CreateTaskItemDto {}
@@ -239,21 +240,15 @@ export class UpdateTaskRequestDto extends TaskDeliveryFieldsDto {
   @IsOptional()
   status?: TaskStatus;
 
-  @ApiPropertyOptional({ type: String, description: "Assignee TaskParticipant ID (uuid)" })
+  @ApiPropertyOptional({ type: String, description: "Assignee TaskActor ID (uuid)" })
   @IsUUID("4")
   @IsOptional()
   assigneeId?: string;
 
-  @ApiPropertyOptional({ type: String, format: "date-time", description: "ISO 8601 due date" })
-  @Type(() => String)
-  @IsDateString()
-  @IsOptional()
-  dueDate?: Date;
-
   @ApiPropertyOptional({
     type: String,
     description:
-      "Reason recorded when a human overrides the frozen delivery plan (impact / scopePaths) after the task started (ADR-054 D3)",
+      "Reason recorded when a human overrides the frozen delivery plan (changeImpact / allowedPaths) after the task started (ADR-054 D3)",
   })
   @IsString()
   @IsOptional()
@@ -261,12 +256,12 @@ export class UpdateTaskRequestDto extends TaskDeliveryFieldsDto {
 }
 
 export class CreateTasksBatchRequestDto {
-  @ApiProperty({ type: String, description: "Owning TaskSpace ID (uuid)" })
+  @ApiProperty({ type: String, description: "Owning project ID (uuid)" })
   @IsUUID("4")
   @IsNotEmpty()
-  spaceId!: string;
+  projectId!: string;
 
-  @ApiPropertyOptional({ type: String, description: "Creator TaskParticipant ID (uuid)" })
+  @ApiPropertyOptional({ type: String, description: "Creator TaskActor ID (uuid)" })
   @IsUUID("4")
   @IsOptional()
   creatorId?: string;
@@ -283,15 +278,25 @@ export class CreateTasksBatchRequestDto {
 // Response DTOs
 // ─────────────────────────────────────────────────────────────────────────────
 
-export class TaskParticipantDto {
-  @ApiProperty({ description: "TaskParticipant ID (uuid)" })
+export class TaskActorDto {
+  @ApiProperty({ description: "TaskActor ID (uuid)" })
   id!: string;
 
-  @ApiPropertyOptional({ description: "Host user this participant stands for", type: String, nullable: true })
+  @ApiProperty({ enum: ActorKind, description: "Whether the actor is a HUMAN or a CREWMATE" })
+  kind!: ActorKind;
+
+  @ApiPropertyOptional({ description: "Host user this actor stands for (HUMAN)", type: String, nullable: true })
   userId?: string | null;
 
+  @ApiPropertyOptional({
+    description: "Crewmate this actor stands for (CREWMATE)",
+    type: String,
+    nullable: true,
+  })
+  crewmateId?: string | null;
+
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
-  name?: string | null;
+  displayName?: string | null;
 
   @ApiPropertyOptional({ description: "Avatar URL snapshot", type: String })
   avatarUrl?: string | null;
@@ -303,48 +308,28 @@ export class TaskParticipantDto {
   updatedAt!: Date;
 }
 
-export class TaskParticipantListItemDto {
-  @ApiProperty({ description: "TaskParticipant ID (uuid)" })
+export class TaskActorListItemDto {
+  @ApiProperty({ description: "TaskActor ID (uuid)" })
   id!: string;
 
-  @ApiPropertyOptional({ description: "Host user this participant stands for", type: String, nullable: true })
+  @ApiProperty({ enum: ActorKind })
+  kind!: ActorKind;
+
+  @ApiPropertyOptional({ description: "Host user this actor stands for (HUMAN)", type: String, nullable: true })
   userId?: string | null;
 
+  @ApiPropertyOptional({
+    description: "Crewmate this actor stands for (CREWMATE)",
+    type: String,
+    nullable: true,
+  })
+  crewmateId?: string | null;
+
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
-  name?: string | null;
+  displayName?: string | null;
 
   @ApiPropertyOptional({ description: "Avatar URL snapshot", type: String })
   avatarUrl?: string | null;
-}
-
-export class TaskSpaceDto {
-  @ApiProperty({ description: "TaskSpace ID (uuid)" })
-  id!: string;
-
-  @ApiProperty({ description: "Project ID (uuid) this space is the 1:1 companion of" })
-  projectId!: string;
-
-  @ApiPropertyOptional({ description: "Space name", type: String })
-  name?: string | null;
-
-  @ApiPropertyOptional({ description: "Space description", type: String })
-  description?: string | null;
-
-  @ApiProperty({ type: Date })
-  createdAt!: Date;
-
-  @ApiProperty({ type: Date })
-  updatedAt!: Date;
-}
-
-export class TaskSpaceCountDto {
-  @ApiProperty({ description: "Number of non-deleted tasks in the space" })
-  tasks!: number;
-}
-
-export class TaskSpaceWithCountDto extends TaskSpaceDto {
-  @ApiProperty({ type: TaskSpaceCountDto, description: "Relation counts" })
-  _count!: TaskSpaceCountDto;
 }
 
 export class TaskDto {
@@ -360,9 +345,6 @@ export class TaskDto {
   @ApiProperty({ enum: TaskStatus })
   status!: TaskStatus;
 
-  @ApiPropertyOptional({ type: Date, description: "Expected completion time" })
-  dueDate?: Date | null;
-
   @ApiProperty({ type: Date })
   createdAt!: Date;
 
@@ -372,76 +354,78 @@ export class TaskDto {
   @ApiPropertyOptional({ type: Date, description: "Soft-delete timestamp" })
   deletedAt?: Date | null;
 
-  @ApiProperty({ description: "Owning TaskSpace ID (uuid)" })
-  spaceId!: string;
+  @ApiProperty({ description: "Owning project ID (uuid)" })
+  projectId!: string;
 
-  @ApiPropertyOptional({ description: "Creator TaskParticipant ID (uuid)", type: String })
+  @ApiPropertyOptional({ description: "Creator TaskActor ID (uuid)", type: String })
   creatorId?: string | null;
 
-  @ApiPropertyOptional({ description: "Assignee TaskParticipant ID (uuid)", type: String })
+  @ApiPropertyOptional({ description: "Assignee TaskActor ID (uuid)", type: String })
   assigneeId?: string | null;
 
-  @ApiPropertyOptional({ description: "Last operator TaskParticipant ID (uuid)", type: String })
-  lastOperatorParticipantId?: string | null;
-
-  @ApiPropertyOptional({ description: "Display name of the last operator", type: String })
-  lastOperatorName?: string | null;
+  @ApiPropertyOptional({ description: "Last operator TaskActor ID (uuid)", type: String })
+  lastOperatorId?: string | null;
 
   @ApiPropertyOptional({ description: "Parent task ID (uuid)", type: String, nullable: true })
   parentId?: string | null;
 
   @ApiPropertyOptional({ description: "Design source reference", type: String, nullable: true })
-  designRef?: string | null;
+  designReference?: string | null;
+
+  @ApiPropertyOptional({
+    description: "Derived: the task needs a design review before it may start",
+    type: Boolean,
+  })
+  designReviewRequired?: boolean;
 
   @ApiPropertyOptional({ description: "Acceptance criteria", type: String, nullable: true })
   acceptanceCriteria?: string | null;
 
   @ApiPropertyOptional({ description: "Allowed path globs", type: [String], isArray: true })
-  scopePaths?: string[];
+  allowedPaths?: string[];
 
   @ApiPropertyOptional({ description: "Declared change impact", type: Object, nullable: true })
-  impact?: unknown;
-
-  @ApiPropertyOptional({ enum: TaskChangeClass, description: "Derived delivery-plan class", nullable: true })
-  changeClass?: TaskChangeClass | null;
+  changeImpact?: unknown;
 
   @ApiPropertyOptional({ description: "Prerequisite task IDs (uuid)", type: [String], isArray: true })
-  dependsOn?: string[];
+  prerequisiteTaskIds?: string[];
 
   @ApiPropertyOptional({ description: "Origin discussion reference", type: Object, nullable: true })
-  sourceRef?: unknown;
+  originReference?: unknown;
 
   @ApiPropertyOptional({ description: "Reason the task is blocked", type: String, nullable: true })
   blockedReason?: string | null;
 
-  @ApiPropertyOptional({ description: "Why the change falls inside the designRef scope", type: String, nullable: true })
-  designRefJustification?: string | null;
+  @ApiPropertyOptional({
+    description: "Why the change falls inside the designReference scope",
+    type: String,
+    nullable: true,
+  })
+  designReferenceJustification?: string | null;
 
   @ApiPropertyOptional({ description: "Requirement-review summary", type: Object, nullable: true })
   requirementReview?: unknown;
 
   @ApiPropertyOptional({
     type: Date,
-    description: "When the delivery plan (impact / scopePaths / changeClass) froze; null until the task starts",
+    description:
+      "When the delivery plan (changeImpact / allowedPaths / designReviewRequired) froze; null until the task starts",
   })
   planFrozenAt?: Date | null;
 }
 
 export class TaskWithRelationsDto extends TaskDto {
-  @ApiPropertyOptional({ type: TaskParticipantDto, description: "Task creator" })
-  creator?: TaskParticipantDto | null;
+  @ApiPropertyOptional({ type: TaskActorDto, description: "Task creator" })
+  creator?: TaskActorDto | null;
 
-  @ApiPropertyOptional({ type: TaskParticipantDto, description: "Task assignee" })
-  assignee?: TaskParticipantDto | null;
+  @ApiPropertyOptional({ type: TaskActorDto, description: "Task assignee" })
+  assignee?: TaskActorDto | null;
 
-  @ApiPropertyOptional({ type: TaskParticipantDto, description: "Last operator" })
-  lastOperatorParticipant?: TaskParticipantDto | null;
-
-  @ApiPropertyOptional({ type: TaskSpaceDto, description: "Owning task space" })
-  space?: TaskSpaceDto | null;
+  @ApiPropertyOptional({ type: TaskActorDto, description: "Last operator" })
+  lastOperator?: TaskActorDto | null;
 }
 
-export class TaskMemberStatsDto {
+export class TaskActorMemberStatsDto {
   @ApiProperty({ description: "Total active tasks assigned" })
   total!: number;
 
@@ -452,18 +436,21 @@ export class TaskMemberStatsDto {
   inProgress!: number;
 }
 
-export class TaskMemberDto {
-  @ApiProperty({ description: "TaskParticipant ID (uuid)" })
+export class TaskActorMemberDto {
+  @ApiProperty({ description: "TaskActor ID (uuid)" })
   id!: string;
 
+  @ApiProperty({ enum: ActorKind })
+  kind!: ActorKind;
+
   @ApiPropertyOptional({ description: "Display name snapshot", type: String })
-  name?: string | null;
+  displayName?: string | null;
 
   @ApiPropertyOptional({ description: "Avatar URL snapshot", type: String })
   avatarUrl?: string | null;
 
-  @ApiProperty({ type: TaskMemberStatsDto })
-  taskStats!: TaskMemberStatsDto;
+  @ApiProperty({ type: TaskActorMemberStatsDto })
+  taskStats!: TaskActorMemberStatsDto;
 
   @ApiProperty({ type: Date })
   createdAt!: Date;
@@ -471,28 +458,28 @@ export class TaskMemberDto {
 
 // ── Envelope responses ({success, data?[, message]}) ──
 
-export class ListTaskParticipantsResponseDto {
+export class ListTaskActorsResponseDto {
   @ApiProperty()
   success!: boolean;
 
-  @ApiProperty({ type: TaskParticipantListItemDto, isArray: true })
-  data!: TaskParticipantListItemDto[];
+  @ApiProperty({ type: TaskActorListItemDto, isArray: true })
+  data!: TaskActorListItemDto[];
 }
 
-export class TaskParticipantDataResponseDto {
+export class TaskActorDataResponseDto {
   @ApiProperty()
   success!: boolean;
 
-  @ApiPropertyOptional({ type: TaskParticipantDto, description: "Participant, null when not found" })
-  data?: TaskParticipantDto | null;
+  @ApiPropertyOptional({ type: TaskActorDto, description: "Actor, null when not found" })
+  data?: TaskActorDto | null;
 }
 
 export class MembersResponseDto {
   @ApiProperty()
   success!: boolean;
 
-  @ApiProperty({ type: TaskMemberDto, isArray: true })
-  data!: TaskMemberDto[];
+  @ApiProperty({ type: TaskActorMemberDto, isArray: true })
+  data!: TaskActorMemberDto[];
 }
 
 export class PaginatedTasksDto {
@@ -515,14 +502,6 @@ export class TasksResponseDto {
 
   @ApiProperty({ type: PaginatedTasksDto })
   data!: PaginatedTasksDto;
-}
-
-export class TaskSpaceResponseDto {
-  @ApiProperty()
-  success!: boolean;
-
-  @ApiProperty({ type: TaskSpaceDto })
-  data!: TaskSpaceDto;
 }
 
 export class CreateTaskResponseDto {

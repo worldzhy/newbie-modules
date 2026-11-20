@@ -1,5 +1,5 @@
 /**
- * Host-side half of gate 1 (ADR-054 D4): `designRef` resolvability and
+ * Host-side half of gate 1 (ADR-054 D4): `designReference` resolvability and
  * relevance. The task record alone cannot answer whether a design document
  * exists, whether it was superseded, or which repositories it declares — those
  * facts live in the workspace, so the host supplies an adjudicator.
@@ -11,11 +11,11 @@
 export const TASK_PLAN_ADJUDICATOR = Symbol("TASK_PLAN_ADJUDICATOR");
 
 export interface PlanAdjudicationInput {
-  designRef?: string | null;
+  designReference?: string | null;
   /** Human explanation recorded when the mechanical check cannot decide. */
-  designRefJustification?: string | null;
-  /** `impact.repos` of the task, already normalized to bare repository names. */
-  impactRepos: readonly string[];
+  designReferenceJustification?: string | null;
+  /** `changeImpact.repos` of the task, already normalized to bare repository names. */
+  changeImpactRepos: readonly string[];
 }
 
 export interface PlanAdjudicationVerdict {
