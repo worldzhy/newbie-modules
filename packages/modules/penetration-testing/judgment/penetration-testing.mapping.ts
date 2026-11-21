@@ -22,7 +22,7 @@ import type { PenetrationTestingEngineFinding } from "../ports/penetration-testi
  * nothing is dropped (ADR-020 D5.2).
  */
 const RULE_TABLE: readonly { engine?: string; pattern: RegExp; criterion: string }[] = [
-  { engine: "naabu", pattern: /.*/, criterion: PENETRATION_TESTING_CRITERION_EXPOSED_SERVICE },
+  { engine: "connect-probe", pattern: /.*/, criterion: PENETRATION_TESTING_CRITERION_EXPOSED_SERVICE },
   { engine: "sslyze", pattern: /.*/, criterion: PENETRATION_TESTING_CRITERION_TLS_WEAKNESS },
   {
     engine: "httpx",

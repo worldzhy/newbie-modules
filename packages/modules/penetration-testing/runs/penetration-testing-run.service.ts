@@ -1,14 +1,22 @@
 import { BadRequestException, ConflictException, Injectable, Logger } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
+import type { EvaluationRun } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
+import { EvaluationFindingService } from "@modules/evaluation/evaluation-finding.service";
+import type { ListEvaluationFindingsInput } from "@modules/evaluation/evaluation-finding.service";
+import { EvaluationResultService } from "@modules/evaluation/evaluation-result.service";
+import type { ListEvaluationResultsInput } from "@modules/evaluation/evaluation-result.service";
+import { EvaluationRunService } from "@modules/evaluation/evaluation-run.service";
+import type { ListEvaluationRunsInput, StartEvaluationRunInput } from "@modules/evaluation/evaluation-run.service";
 import { EvaluationRunnerService } from "@modules/evaluation/evaluation-runner.service";
-import type { StartEvaluationRunInput } from "@modules/evaluation/evaluation-run.service";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 import {
   findPlaybook,
   isPenetrationTestingKey,
   PENETRATION_TESTING_LEVEL_BY_KEY,
+  PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET,
   type PenetrationTestingLevel,
 } from "../penetration-testing.constants";
 import { PenetrationTestingTargetService } from "../assets/penetration-testing-target.service";
@@ -38,6 +46,10 @@ export class PenetrationTestingRunService {
     private readonly targets: PenetrationTestingTargetService,
     private readonly authorizations: PenetrationTestingAuthorizationService,
     private readonly testObjects: PenetrationTestingTestObjectService,
+    private readonly runs: EvaluationRunService,
+    private readonly criteria: EvaluationCriteriaService,
+    private readonly results: EvaluationResultService,
+    private readonly findings: EvaluationFindingService,
   ) {}
 
   async startRun(input: StartPenetrationTestingRunInput): Promise<{ runId: string }> {
@@ -93,6 +105,39 @@ export class PenetrationTestingRunService {
       );
     });
     return { runId: run.id };
+  }
+
+  /**
+   * Run history, always scoped to this feature's subject kind. The skeleton
+   * stores only `ruleSetVersionId`, so the key and version label are joined in
+   * the same way security-evaluation does.
+   */
+  async listRuns(query: Omit<ListEvaluationRunsInput, "kind">) {
+    const page = await this.runs.listRuns({ ...query, kind: PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET });
+    const records = page.records as EvaluationRun[];
+    const versionIds = [...new Set(records.map((run) => run.ruleSetVersionId))];
+    const versions = new Map(
+      (await Promise.all(versionIds.map((id) => this.criteria.getVersion(id)))).map((version) => [version.id, version]),
+    );
+    return {
+      ...page,
+      records: records.map((run) => {
+        const version = versions.get(run.ruleSetVersionId);
+        return { ...run, standardKey: version?.standardKey ?? "", ruleSetVersion: version?.version ?? "" };
+      }),
+    };
+  }
+
+  getRun(runId: string) {
+    return this.runs.findById(runId, PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET);
+  }
+
+  listResults(query: ListEvaluationResultsInput) {
+    return this.results.listResults({ ...query, kind: PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET });
+  }
+
+  listFindings(query: ListEvaluationFindingsInput) {
+    return this.findings.listFindings(query);
   }
 
   private async resolveAuthorization(

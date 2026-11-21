@@ -70,16 +70,25 @@ function harness(requestedBy = "alice", status = "PENDING") {
     attackClass: null,
     maintenanceWindow: null,
   };
+  let lastListWhere: Record<string, unknown> | undefined;
   const prisma = {
     penetrationTestingAuthorization: {
       findUnique: async () => ({ ...row }),
+      findMany: async ({ where }: { where: Record<string, unknown> }) => {
+        lastListWhere = where;
+        return [{ ...row }];
+      },
       update: async ({ data }: { data: Partial<AuthorizationRow> }) => {
         row = { ...row, ...data };
         return { ...row };
       },
     },
   } as unknown as PrismaService;
-  return { service: new PenetrationTestingAuthorizationService(prisma), current: () => row };
+  return {
+    service: new PenetrationTestingAuthorizationService(prisma),
+    current: () => row,
+    lastListFilter: () => lastListWhere,
+  };
 }
 
 describe("penetration-testing authorization", () => {
@@ -104,6 +113,16 @@ describe("penetration-testing authorization", () => {
         `module and runner disagree on '${cidr}'`,
       );
     }
+  });
+
+  it("lists authorizations with the requested filters", async () => {
+    const approved = harness("bob", "APPROVED");
+
+    const records = await approved.service.list({ subjectId: "subject-1", level: "L2", status: "APPROVED" });
+
+    assert.equal(records.length, 1);
+    assert.equal(records[0].id, "auth-1");
+    assert.deepEqual(approved.lastListFilter(), { subjectId: "subject-1", level: "L2", status: "APPROVED" });
   });
 
   it("requires the operator identity to come from a session", async () => {

@@ -41,6 +41,12 @@ export interface RequestPenetrationTestingAuthorizationInput {
   maintenanceWindow?: PenetrationTestingMaintenanceWindow;
 }
 
+export interface PenetrationTestingAuthorizationFilter {
+  subjectId?: string;
+  level?: PenetrationTestingLevel;
+  status?: string;
+}
+
 export interface PenetrationTestingAuthorizationRecord {
   id: string;
   subjectId: string;
@@ -175,6 +181,19 @@ export class PenetrationTestingAuthorizationService {
   async findById(id: string): Promise<PenetrationTestingAuthorizationRecord | null> {
     const row = await this.prisma.penetrationTestingAuthorization.findUnique({ where: { id } });
     return row ? toAuthorizationRecord(row) : null;
+  }
+
+  /** The approval queue and per-target history, newest first. */
+  async list(filter: PenetrationTestingAuthorizationFilter = {}): Promise<PenetrationTestingAuthorizationRecord[]> {
+    const rows = await this.prisma.penetrationTestingAuthorization.findMany({
+      where: {
+        ...(filter.subjectId ? { subjectId: filter.subjectId } : {}),
+        ...(filter.level ? { level: filter.level } : {}),
+        ...(filter.status ? { status: filter.status } : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    });
+    return rows.map(toAuthorizationRecord);
   }
 
   private async findOrThrow(id: string) {
