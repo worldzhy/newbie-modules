@@ -129,8 +129,15 @@ export class PenetrationTestingRunService {
     };
   }
 
-  getRun(runId: string) {
-    return this.runs.findById(runId, PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET);
+  /**
+   * One run with its criteria labels joined in, matching the list rows. The
+   * skeleton stores only `ruleSetVersionId`, so returning the raw row would
+   * leave `standardKey`/`ruleSetVersion` undefined for a detail read.
+   */
+  async getRun(runId: string) {
+    const row = await this.runs.findById(runId, PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET);
+    const version = await this.criteria.getVersion(row.ruleSetVersionId);
+    return { ...row, standardKey: version?.standardKey ?? "", ruleSetVersion: version?.version ?? "" };
   }
 
   listResults(query: ListEvaluationResultsInput) {

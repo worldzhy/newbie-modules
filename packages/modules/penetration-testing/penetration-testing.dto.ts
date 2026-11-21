@@ -8,12 +8,12 @@ import {
   IsEnum,
   IsIn,
   IsInt,
+  IsISO8601,
   IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
   IsUUID,
-  Matches,
   Max,
   MaxLength,
   Min,
@@ -212,15 +212,20 @@ export class PenetrationTestingVerificationCheckResponseDto {
 
 // --- Authorizations ------------------------------------------------------
 
+/**
+ * Absolute window an L4 action may run in. `start`/`end` are ISO-8601 instants
+ * (a time of day alone cannot be ordered against the wall clock); `timezone`
+ * is a label for operators.
+ */
 export class PenetrationTestingMaintenanceWindowDto {
-  @ApiProperty({ example: "02:00" })
+  @ApiProperty({ example: "2026-11-21T02:00:00+08:00", description: "Window start as an ISO-8601 instant" })
   @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: "start must be HH:mm" })
+  @IsISO8601()
   start!: string;
 
-  @ApiProperty({ example: "04:00" })
+  @ApiProperty({ example: "2026-11-21T04:00:00+08:00", description: "Window end as an ISO-8601 instant" })
   @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: "end must be HH:mm" })
+  @IsISO8601()
   end!: string;
 
   @ApiProperty({ example: "Asia/Shanghai" })

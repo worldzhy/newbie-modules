@@ -130,6 +130,29 @@ describe("penetration-testing authorization", () => {
     await assert.rejects(service.approve("auth-1", { id: "bob", via: "body" } as never), /must be "session"/);
   });
 
+  it("rejects an L4 window that is not an absolute, non-empty interval", async () => {
+    const { service } = harness();
+    const base = {
+      subjectId: "subject-1",
+      level: "L4" as const,
+      roeDocumentRef: "doc-1",
+      requestedBy: { id: "alice", via: "session" as const },
+      validUntil: new Date("2026-12-01T00:00:00.000Z"),
+    };
+
+    await assert.rejects(
+      service.request({ ...base, maintenanceWindow: { start: "02:00", end: "04:00", timezone: "UTC" } }),
+      /ISO-8601/,
+    );
+    await assert.rejects(
+      service.request({
+        ...base,
+        maintenanceWindow: { start: "2026-11-21T04:00:00.000Z", end: "2026-11-21T02:00:00.000Z", timezone: "UTC" },
+      }),
+      /must be after/,
+    );
+  });
+
   it("keeps separation of duties between the requester and the approver", async () => {
     const selfApproval = harness();
     await assert.rejects(

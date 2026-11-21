@@ -108,6 +108,9 @@ export class PenetrationTestingAuthorizationService {
     if (level !== "L4" && input.maintenanceWindow) {
       throw new BadRequestException("maintenanceWindow is only valid for L4 authorizations.");
     }
+    if (level === "L4" && input.maintenanceWindow) {
+      requireWindow(input.maintenanceWindow);
+    }
 
     const row = await this.prisma.penetrationTestingAuthorization.create({
       data: {
@@ -250,6 +253,22 @@ export function normalizeCidrs(input?: string[]): string[] {
     normalized.push(cidr);
   }
   return [...new Set(normalized)];
+}
+
+/**
+ * The gate orders the window against the wall clock, so both ends must be
+ * absolute ISO-8601 instants and the window must be non-empty. A time of day
+ * alone (`02:00`) parses to `NaN` downstream and silently closes the window.
+ */
+function requireWindow(window: PenetrationTestingMaintenanceWindow): void {
+  const start = Date.parse(window.start);
+  const end = Date.parse(window.end);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    throw new BadRequestException("maintenanceWindow.start and .end must be ISO-8601 instants.");
+  }
+  if (end <= start) {
+    throw new BadRequestException("maintenanceWindow.end must be after maintenanceWindow.start.");
+  }
 }
 
 function toAuthorizationRecord(row: {
