@@ -21,6 +21,7 @@ export type PenetrationTestingGateReason =
   | "AUTHORIZATION_ATTACK_CLASS_MISMATCH"
   | "L4_MAINTENANCE_WINDOW_MISSING"
   | "L4_OUTSIDE_MAINTENANCE_WINDOW"
+  | "L4_CLEANUP_PENDING_RECOVERY"
   | "PLAYBOOK_UNKNOWN"
   | "TEST_OBJECT_MISSING"
   | "TEST_OBJECT_KIND_MISMATCH"
@@ -37,6 +38,11 @@ export interface PenetrationTestingGateInput {
   testObject: PenetrationTestingTestObjectRecord | null;
   /** Standard keys of the subject's QUEUED/RUNNING runs. */
   activeStandardKeys: string[];
+  /**
+   * `startedAt` of the subject's most recent L4 execution when it ended
+   * CLEANUP_FAILED, otherwise null (ADR-050 §6). A later approval clears it.
+   */
+  lastL4CleanupFailedAt: Date | null;
   now: Date;
 }
 
@@ -146,6 +152,19 @@ export function evaluatePenetrationTestingGate(input: PenetrationTestingGateInpu
   }
   if (!insideMaintenanceWindow(window, input.now)) {
     return { ok: false, reason: "L4_OUTSIDE_MAINTENANCE_WINDOW" };
+  }
+  // A target whose last action could not be proven clean stays off-limits. The
+  // approval that follows is the operator's explicit recovery, so only an
+  // approval newer than the failed wall makes L4 available again.
+  if (
+    input.lastL4CleanupFailedAt &&
+    (!authorization.approvedAt || input.lastL4CleanupFailedAt.getTime() >= authorization.approvedAt.getTime())
+  ) {
+    return {
+      ok: false,
+      reason: "L4_CLEANUP_PENDING_RECOVERY",
+      detail: input.lastL4CleanupFailedAt.toISOString(),
+    };
   }
   if (input.activeStandardKeys.length > 0) {
     return {

@@ -61,6 +61,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization(),
       testObject: testObject(),
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(decision.ok, false);
@@ -76,6 +77,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization({ level: "L1" }),
       testObject: null,
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(inactive.ok, false);
@@ -89,6 +91,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization({ level: "L1" }),
       testObject: null,
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(unverified.ok, false);
@@ -104,6 +107,7 @@ describe("penetration-testing gate", () => {
       authorization: null,
       testObject: null,
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(missing.ok, false);
@@ -117,6 +121,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization({ level: "L1", validUntil: new Date("2026-11-20T00:00:00.000Z") }),
       testObject: null,
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(expired.ok, false);
@@ -137,6 +142,7 @@ describe("penetration-testing gate", () => {
       }),
       testObject: null,
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(mismatch.ok, false);
@@ -155,6 +161,7 @@ describe("penetration-testing gate", () => {
       }),
       testObject: null,
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(match.ok, true);
@@ -170,6 +177,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization(),
       testObject: testObject(),
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(production.ok, false);
@@ -189,6 +197,7 @@ describe("penetration-testing gate", () => {
       }),
       testObject: testObject(),
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(outside.ok, false);
@@ -202,6 +211,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization(),
       testObject: testObject(),
       activeStandardKeys: ["vulnerability-scan"],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(conflict.ok, false);
@@ -217,6 +227,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization({ level: "L2" }),
       testObject: null,
       activeStandardKeys: ["destructive-testing"],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(decision.ok, false);
@@ -232,6 +243,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization(),
       testObject: testObject(),
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(unknownPlaybook.ok, false);
@@ -245,6 +257,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization(),
       testObject: testObject({ kind: "RECORD" }),
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(wrongKind.ok, false);
@@ -260,6 +273,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization(),
       testObject: testObject(),
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(decision.ok, true);
@@ -279,6 +293,7 @@ describe("penetration-testing gate", () => {
       authorization: authorization({ level: "L1" }),
       testObject: null,
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(otherSubject.ok, false);
@@ -292,10 +307,41 @@ describe("penetration-testing gate", () => {
       authorization: authorization({ level: "L1" }),
       testObject: null,
       activeStandardKeys: [],
+      lastL4CleanupFailedAt: null,
       now,
     });
     assert.equal(otherLevel.ok, false);
     if (!otherLevel.ok) assert.equal(otherLevel.reason, "AUTHORIZATION_LEVEL_MISMATCH");
+  });
+
+  it("keeps L4 paused after an unverified cleanup until a newer approval", () => {
+    const failedAt = new Date("2026-11-21T02:30:00.000Z");
+    const paused = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
+      standardKey: "destructive-testing",
+      runConfig: { playbookId: "sqli-write-proof", testObjectId: "object-1" },
+      target,
+      authorization: authorization({ approvedAt: new Date("2026-11-20T00:00:00.000Z") }),
+      testObject: testObject(),
+      activeStandardKeys: [],
+      lastL4CleanupFailedAt: failedAt,
+      now,
+    });
+    assert.equal(paused.ok, false);
+    if (!paused.ok) assert.equal(paused.reason, "L4_CLEANUP_PENDING_RECOVERY");
+
+    const recovered = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
+      standardKey: "destructive-testing",
+      runConfig: { playbookId: "sqli-write-proof", testObjectId: "object-1" },
+      target,
+      authorization: authorization({ approvedAt: new Date("2026-11-21T02:45:00.000Z") }),
+      testObject: testObject(),
+      activeStandardKeys: [],
+      lastL4CleanupFailedAt: failedAt,
+      now,
+    });
+    assert.equal(recovered.ok, true);
   });
 
   it("evaluates absolute maintenance windows", () => {

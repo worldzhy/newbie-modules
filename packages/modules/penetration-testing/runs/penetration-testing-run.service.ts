@@ -88,6 +88,7 @@ export class PenetrationTestingRunService {
       authorization,
       testObject,
       activeStandardKeys: await this.activeStandardKeys(input.subjectId),
+      lastL4CleanupFailedAt: level === "L4" ? await this.lastL4CleanupFailedAt(input.subjectId) : null,
       now,
     });
     if (!decision.ok) {
@@ -148,6 +149,20 @@ export class PenetrationTestingRunService {
     const authorizationId = readString(runConfig, "authorizationId");
     if (authorizationId) return this.authorizations.findById(authorizationId);
     return this.authorizations.findApproved(subjectId, level);
+  }
+
+  /**
+   * ADR-050 §6: a failed cleanup pauses L4 for the subject until a newer
+   * approval. The newest L4 execution is the only authority — a later success
+   * or a re-approval moves past the wall.
+   */
+  private async lastL4CleanupFailedAt(subjectId: string): Promise<Date | null> {
+    const latest = await this.prisma.penetrationTestingExecution.findFirst({
+      where: { subjectId, level: "L4" },
+      orderBy: { startedAt: "desc" },
+      select: { outcome: true, startedAt: true },
+    });
+    return latest?.outcome === "CLEANUP_FAILED" ? latest.startedAt : null;
   }
 
   /** Standard keys of the subject's QUEUED/RUNNING runs, for cross-level exclusion. */
