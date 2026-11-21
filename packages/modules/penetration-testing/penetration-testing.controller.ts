@@ -12,16 +12,17 @@ import {
   CreatePenetrationTestingTestObjectRequestDto,
   ListPenetrationTestingAuthorizationsRequestDto,
   ListPenetrationTestingFindingsRequestDto,
+  ListPenetrationTestingFindingsResponseDto,
   ListPenetrationTestingResultsRequestDto,
+  ListPenetrationTestingResultsResponseDto,
   ListPenetrationTestingRunsRequestDto,
+  ListPenetrationTestingRunsResponseDto,
   ListPenetrationTestingTargetsRequestDto,
   ListPenetrationTestingTestObjectsRequestDto,
   PenetrationTestingAuthorizationListResponseDto,
   PenetrationTestingAuthorizationParamsDto,
   PenetrationTestingAuthorizationResponseDto,
-  PenetrationTestingFindingResponseDto,
   PenetrationTestingPlaybookListResponseDto,
-  PenetrationTestingResultResponseDto,
   PenetrationTestingRunAcceptedResponseDto,
   PenetrationTestingRunParamsDto,
   PenetrationTestingRunResponseDto,
@@ -248,7 +249,7 @@ export class PenetrationTestingController {
   @Get("runs")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationRun)
   @ApiOperation({ summary: "List this feature's runs, newest first" })
-  @ApiOkResponse({ type: PenetrationTestingRunResponseDto, isArray: false })
+  @ApiOkResponse({ type: ListPenetrationTestingRunsResponseDto })
   async listRuns(@Query() query: ListPenetrationTestingRunsRequestDto) {
     return this.runs.listRuns({
       subjectId: query.subjectId,
@@ -271,7 +272,7 @@ export class PenetrationTestingController {
   @Get("findings")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationFinding)
   @ApiOperation({ summary: "List findings for one subject (anchored, so other features never mix in)" })
-  @ApiOkResponse({ type: PenetrationTestingFindingResponseDto, isArray: false })
+  @ApiOkResponse({ type: ListPenetrationTestingFindingsResponseDto })
   async listFindings(@Query() query: ListPenetrationTestingFindingsRequestDto) {
     return this.runs.listFindings({
       subjectId: query.subjectId,
@@ -286,7 +287,7 @@ export class PenetrationTestingController {
   @Get("results")
   @RequirePermission(PermissionAction.List, Prisma.ModelName.EvaluationResult)
   @ApiOperation({ summary: "List archived results for one subject, newest first" })
-  @ApiOkResponse({ type: PenetrationTestingResultResponseDto, isArray: false })
+  @ApiOkResponse({ type: ListPenetrationTestingResultsResponseDto })
   async listResults(@Query() query: ListPenetrationTestingResultsRequestDto) {
     return this.runs.listResults({
       subjectId: query.subjectId,

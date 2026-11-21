@@ -20,7 +20,7 @@ import {
   ValidateNested,
 } from "class-validator";
 import { EvaluationFindingSeverity, EvaluationFindingStatus, EvaluationRunStatus } from "@generated/prisma/client";
-import { CommonListRequestDto } from "@devbie/newbie/common.dto";
+import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/common.dto";
 
 import {
   PENETRATION_TESTING_AUTHORIZATION_STATUSES,
@@ -464,11 +464,7 @@ export class PenetrationTestingRunResponseDto {
   @ApiPropertyOptional({ type: Date, nullable: true }) createdAt?: Date | null;
 }
 
-export class ListPenetrationTestingRunsResponseDto {
-  @ApiProperty({ type: PenetrationTestingRunResponseDto, isArray: true })
-  records!: PenetrationTestingRunResponseDto[];
-  @ApiProperty({ type: Object }) pagination!: object;
-}
+export class ListPenetrationTestingRunsResponseDto extends CommonListResponseDto<PenetrationTestingRunResponseDto> {}
 
 // --- Findings / results (skeleton read models) ---------------------------
 
@@ -519,11 +515,7 @@ export class PenetrationTestingFindingResponseDto {
   @ApiPropertyOptional({ type: Date, nullable: true }) resolvedAt?: Date | null;
 }
 
-export class ListPenetrationTestingFindingsResponseDto {
-  @ApiProperty({ type: PenetrationTestingFindingResponseDto, isArray: true })
-  records!: PenetrationTestingFindingResponseDto[];
-  @ApiProperty({ type: Object }) pagination!: object;
-}
+export class ListPenetrationTestingFindingsResponseDto extends CommonListResponseDto<PenetrationTestingFindingResponseDto> {}
 
 export class ListPenetrationTestingResultsRequestDto extends CommonListRequestDto {
   @ApiProperty({ type: String, format: "uuid" })
@@ -549,8 +541,4 @@ export class PenetrationTestingResultResponseDto {
   @ApiProperty({ type: Date }) createdAt!: Date;
 }
 
-export class ListPenetrationTestingResultsResponseDto {
-  @ApiProperty({ type: PenetrationTestingResultResponseDto, isArray: true })
-  records!: PenetrationTestingResultResponseDto[];
-  @ApiProperty({ type: Object }) pagination!: object;
-}
+export class ListPenetrationTestingResultsResponseDto extends CommonListResponseDto<PenetrationTestingResultResponseDto> {}
