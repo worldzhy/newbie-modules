@@ -54,6 +54,7 @@ const target = { environment: "NON_PRODUCTION", verificationStatus: "VERIFIED", 
 describe("penetration-testing gate", () => {
   it("rejects an unknown standard key instead of defaulting", () => {
     const decision = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "unknown",
       runConfig: {},
       target,
@@ -68,6 +69,7 @@ describe("penetration-testing gate", () => {
 
   it("rejects an inactive or unverified target", () => {
     const inactive = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "attack-surface",
       runConfig: {},
       target: { ...target, isActive: false },
@@ -80,6 +82,7 @@ describe("penetration-testing gate", () => {
     if (!inactive.ok) assert.equal(inactive.reason, "TARGET_NOT_ACTIVE");
 
     const unverified = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "attack-surface",
       runConfig: {},
       target: { ...target, verificationStatus: "PENDING" },
@@ -94,6 +97,7 @@ describe("penetration-testing gate", () => {
 
   it("rejects a missing or expired authorization", () => {
     const missing = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "attack-surface",
       runConfig: {},
       target,
@@ -106,6 +110,7 @@ describe("penetration-testing gate", () => {
     if (!missing.ok) assert.equal(missing.reason, "AUTHORIZATION_MISSING");
 
     const expired = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "attack-surface",
       runConfig: {},
       target,
@@ -120,6 +125,7 @@ describe("penetration-testing gate", () => {
 
   it("requires L3 to match the bound finding and attack class", () => {
     const mismatch = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "exploit-verification",
       runConfig: { findingId: "finding-2", attackClass: "sql-injection" },
       target,
@@ -137,6 +143,7 @@ describe("penetration-testing gate", () => {
     if (!mismatch.ok) assert.equal(mismatch.reason, "AUTHORIZATION_FINDING_MISMATCH");
 
     const match = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "exploit-verification",
       runConfig: { findingId: "finding-1", attackClass: "sql-injection" },
       target,
@@ -156,6 +163,7 @@ describe("penetration-testing gate", () => {
 
   it("refuses L4 on production, outside the window, or with another active run", () => {
     const production = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "destructive-testing",
       runConfig: { playbookId: "sqli-write-proof", testObjectId: "object-1" },
       target: { ...target, environment: "PRODUCTION" },
@@ -168,6 +176,7 @@ describe("penetration-testing gate", () => {
     if (!production.ok) assert.equal(production.reason, "L4_OUTSIDE_MAINTENANCE_WINDOW");
 
     const outside = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "destructive-testing",
       runConfig: { playbookId: "sqli-write-proof", testObjectId: "object-1" },
       target,
@@ -186,6 +195,7 @@ describe("penetration-testing gate", () => {
     if (!outside.ok) assert.equal(outside.reason, "L4_OUTSIDE_MAINTENANCE_WINDOW");
 
     const conflict = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "destructive-testing",
       runConfig: { playbookId: "sqli-write-proof", testObjectId: "object-1" },
       target,
@@ -200,6 +210,7 @@ describe("penetration-testing gate", () => {
 
   it("refuses a non-destructive run while L4 is active", () => {
     const decision = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "vulnerability-scan",
       runConfig: {},
       target,
@@ -214,6 +225,7 @@ describe("penetration-testing gate", () => {
 
   it("requires a known playbook and a matching disposable test object", () => {
     const unknownPlaybook = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "destructive-testing",
       runConfig: { playbookId: "nope", testObjectId: "object-1" },
       target,
@@ -226,6 +238,7 @@ describe("penetration-testing gate", () => {
     if (!unknownPlaybook.ok) assert.equal(unknownPlaybook.reason, "PLAYBOOK_UNKNOWN");
 
     const wrongKind = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "destructive-testing",
       runConfig: { playbookId: "upload-proof", testObjectId: "object-1" },
       target,
@@ -240,6 +253,7 @@ describe("penetration-testing gate", () => {
 
   it("admits a valid L4 action", () => {
     const decision = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
       standardKey: "destructive-testing",
       runConfig: { playbookId: "sqli-write-proof", testObjectId: "object-1" },
       target,
@@ -254,6 +268,34 @@ describe("penetration-testing gate", () => {
       assert.equal(decision.playbookId, "sqli-write-proof");
       assert.equal(decision.testObject?.id, "object-1");
     }
+  });
+
+  it("binds the authorization row to the run's subject and level", () => {
+    const otherSubject = evaluatePenetrationTestingGate({
+      subjectId: "subject-2",
+      standardKey: "attack-surface",
+      runConfig: {},
+      target,
+      authorization: authorization({ level: "L1" }),
+      testObject: null,
+      activeStandardKeys: [],
+      now,
+    });
+    assert.equal(otherSubject.ok, false);
+    if (!otherSubject.ok) assert.equal(otherSubject.reason, "AUTHORIZATION_SUBJECT_MISMATCH");
+
+    const otherLevel = evaluatePenetrationTestingGate({
+      subjectId: "subject-1",
+      standardKey: "vulnerability-scan",
+      runConfig: {},
+      target,
+      authorization: authorization({ level: "L1" }),
+      testObject: null,
+      activeStandardKeys: [],
+      now,
+    });
+    assert.equal(otherLevel.ok, false);
+    if (!otherLevel.ok) assert.equal(otherLevel.reason, "AUTHORIZATION_LEVEL_MISMATCH");
   });
 
   it("evaluates absolute maintenance windows", () => {

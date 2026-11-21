@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -114,7 +115,14 @@ export class PenetrationTestingTargetService {
     private readonly verificationFetch?: PenetrationVerificationAccess,
   ) {}
 
-  /** Register a target idempotently: re-registration refreshes declared fields but never resets verification. */
+  /**
+   * Register a target idempotently. Declared material is refreshed in place, but
+   * verification is reset only when that material changes: an identical
+   * re-registration keeps the token and the status, while a changed environment,
+   * port set or path map rotates the token and drops the row to `PENDING` so the
+   * gate refuses it until the new material is verified. A `REVOKED` row can
+   * never be resurrected.
+   */
   async create(input: CreatePenetrationTestingTargetInput): Promise<PenetrationTestingTargetRegistration> {
     const origin = normalizeWebOrigin(input.origin);
     const environment = requireEnvironment(input.environment);
@@ -133,21 +141,47 @@ export class PenetrationTestingTargetService {
         },
         transaction,
       );
-      const target = await transaction.penetrationTestingTarget.upsert({
+      const existing = await transaction.penetrationTestingTarget.findUnique({
         where: { subjectId: subject.id },
-        create: {
-          subjectId: subject.id,
-          environment,
-          declaredPorts: ports,
-          targetPaths: (targetPaths ?? {}) as Prisma.InputJsonValue,
-          verificationToken,
-        },
-        update: {
-          environment,
-          declaredPorts: ports,
-          ...(targetPaths !== undefined ? { targetPaths: targetPaths as Prisma.InputJsonValue } : {}),
-        },
       });
+      if (existing?.verificationStatus === "REVOKED") {
+        throw new ConflictException(`Penetration target ${origin} is revoked and cannot be re-registered.`);
+      }
+
+      const materialChanged =
+        existing === null ||
+        existing.environment !== environment ||
+        !samePortSet(existing.declaredPorts, ports) ||
+        (targetPaths !== undefined && !samePathMap(parseTargetPaths(existing.targetPaths), targetPaths));
+
+      const target = existing
+        ? await transaction.penetrationTestingTarget.update({
+            where: { subjectId: subject.id },
+            data: {
+              environment,
+              declaredPorts: ports,
+              ...(targetPaths !== undefined ? { targetPaths: targetPaths as Prisma.InputJsonValue } : {}),
+              ...(materialChanged
+                ? {
+                    verificationToken,
+                    verificationStatus: "PENDING",
+                    verificationMethod: null,
+                    verifiedAt: null,
+                    lastVerifiedAt: null,
+                    verificationFailureCount: 0,
+                  }
+                : {}),
+            },
+          })
+        : await transaction.penetrationTestingTarget.create({
+            data: {
+              subjectId: subject.id,
+              environment,
+              declaredPorts: ports,
+              targetPaths: (targetPaths ?? {}) as Prisma.InputJsonValue,
+              verificationToken,
+            },
+          });
 
       return {
         subjectId: subject.id,
@@ -405,6 +439,22 @@ function parseTargetPaths(value: Prisma.JsonValue): Record<string, string> {
     if (typeof path === "string") parsed[role] = path;
   }
   return parsed;
+}
+
+/** Port lists are a set: stored order is not part of the declared material. */
+function samePortSet(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) return false;
+  const leftSorted = [...left].sort((a, b) => a - b);
+  const rightSorted = [...right].sort((a, b) => a - b);
+  return leftSorted.every((port, index) => port === rightSorted[index]);
+}
+
+/** JSONB does not preserve key order, so compare the map by key/value pairs. */
+function samePathMap(left: Record<string, string>, right: Record<string, string>): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return rightKeys.every((key) => left[key] === right[key]);
 }
 
 function toVerificationCheck(

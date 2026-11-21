@@ -13,6 +13,8 @@ export type PenetrationTestingGateReason =
   | "TARGET_NOT_ACTIVE"
   | "TARGET_NOT_VERIFIED"
   | "AUTHORIZATION_MISSING"
+  | "AUTHORIZATION_SUBJECT_MISMATCH"
+  | "AUTHORIZATION_LEVEL_MISMATCH"
   | "AUTHORIZATION_NOT_YET_VALID"
   | "AUTHORIZATION_EXPIRED"
   | "AUTHORIZATION_FINDING_MISMATCH"
@@ -25,6 +27,8 @@ export type PenetrationTestingGateReason =
   | "ACTIVE_RUN_CONFLICT";
 
 export interface PenetrationTestingGateInput {
+  /** The run's subject; the authorization row must be bound to it. */
+  subjectId: string;
   standardKey: string;
   /** Client-supplied intent only; never an authorization decision. */
   runConfig: Record<string, unknown>;
@@ -60,7 +64,9 @@ export type PenetrationTestingGateDecision =
  * L4 additionally requires: NON_PRODUCTION, an absolute maintenance window that
  * contains `now`, a known playbook, a matching approved disposable test object,
  * and no other active run on the same subject. L3 requires the authorization to
- * bind exactly the finding and attack class carried by the run config.
+ * bind exactly the finding and attack class carried by the run config. Every
+ * level requires the authorization row itself to be bound to the run's subject
+ * and level, so a row fetched by id cannot authorize a different subject.
  */
 export function evaluatePenetrationTestingGate(input: PenetrationTestingGateInput): PenetrationTestingGateDecision {
   if (!isPenetrationTestingKey(input.standardKey)) {
@@ -82,6 +88,16 @@ export function evaluatePenetrationTestingGate(input: PenetrationTestingGateInpu
   }
   if (authorization.status !== "APPROVED") {
     return { ok: false, reason: "AUTHORIZATION_MISSING", detail: authorization.status };
+  }
+  if (authorization.subjectId !== input.subjectId) {
+    return { ok: false, reason: "AUTHORIZATION_SUBJECT_MISMATCH" };
+  }
+  if (authorization.level !== level) {
+    return {
+      ok: false,
+      reason: "AUTHORIZATION_LEVEL_MISMATCH",
+      detail: `authorization is ${authorization.level}, run is ${level}`,
+    };
   }
   if (input.now.getTime() < authorization.validFrom.getTime()) {
     return {

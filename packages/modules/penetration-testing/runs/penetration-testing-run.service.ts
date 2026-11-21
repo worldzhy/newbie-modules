@@ -65,6 +65,7 @@ export class PenetrationTestingRunService {
         : null;
 
     const decision = evaluatePenetrationTestingGate({
+      subjectId: input.subjectId,
       standardKey,
       runConfig,
       target: {
