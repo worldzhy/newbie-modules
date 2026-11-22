@@ -13,6 +13,7 @@ import { PenetrationTestingEvidenceProvider } from "./evidence/penetration-testi
 import { PenetrationTestingExecutionService } from "./evidence/penetration-testing-execution.service";
 import { PenetrationTestingJudgmentService } from "./judgment/penetration-testing-judgment.service";
 import { PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET } from "./penetration-testing.constants";
+import { PenetrationTestingController } from "./penetration-testing.controller";
 import { PenetrationTestingRunService } from "./runs/penetration-testing-run.service";
 
 /**
@@ -30,6 +31,7 @@ import { PenetrationTestingRunService } from "./runs/penetration-testing-run.ser
 @Global()
 @Module({
   imports: [EvaluationModule],
+  controllers: [PenetrationTestingController],
   providers: [
     PenetrationTestingTargetService,
     PenetrationTestingAuthorizationService,

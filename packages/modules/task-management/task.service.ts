@@ -445,7 +445,14 @@ export class TaskService {
       where: { id: taskId },
       include: TASK_RELATIONS,
     });
-    return task ? toTaskResponse(task) : null;
+    if (!task) {
+      return null;
+    }
+
+    // Delivery lives in the application schema and is written by the runtime,
+    // so it is fetched separately instead of widening every task relation.
+    const delivery = await this.prisma.taskDelivery.findUnique({ where: { taskId } });
+    return { ...toTaskResponse(task), delivery };
   }
 
   async updateTask(taskId: string, dto: UpdateTaskRequestDto, operator: Operator) {

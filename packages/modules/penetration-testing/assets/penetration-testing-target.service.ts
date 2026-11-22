@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -89,6 +90,29 @@ export interface PenetrationTestingVerificationCheck {
   consecutiveFailures: number;
 }
 
+/** Patchable declared material; omitted fields keep the stored value. */
+export interface UpdatePenetrationTestingTargetInput {
+  label?: string;
+  environment?: PenetrationTestingEnvironment;
+  declaredPorts?: number[];
+  targetPaths?: Record<string, string>;
+}
+
+export interface PenetrationTestingTargetFilter {
+  environment?: PenetrationTestingEnvironment;
+  verificationStatus?: string;
+  isActive?: boolean;
+}
+
+/** Both placements an operator can publish the ownership token at. */
+export interface PenetrationTestingVerificationChallenge {
+  subjectId: string;
+  origin: string;
+  verificationToken: string;
+  dnsTxt: { name: string; value: string };
+  wellKnown: { url: string; body: string };
+}
+
 /**
  * PenetrationTestingTargetService — registration and ownership verification of
  * web-target subjects (ADR-075 §4, ADR-044 §2 shape).
@@ -114,7 +138,14 @@ export class PenetrationTestingTargetService {
     private readonly verificationFetch?: PenetrationVerificationAccess,
   ) {}
 
-  /** Register a target idempotently: re-registration refreshes declared fields but never resets verification. */
+  /**
+   * Register a target idempotently. Declared material is refreshed in place, but
+   * verification is reset only when that material changes: an identical
+   * re-registration keeps the token and the status, while a changed environment,
+   * port set or path map rotates the token and drops the row to `PENDING` so the
+   * gate refuses it until the new material is verified. A `REVOKED` row can
+   * never be resurrected.
+   */
   async create(input: CreatePenetrationTestingTargetInput): Promise<PenetrationTestingTargetRegistration> {
     const origin = normalizeWebOrigin(input.origin);
     const environment = requireEnvironment(input.environment);
@@ -133,21 +164,47 @@ export class PenetrationTestingTargetService {
         },
         transaction,
       );
-      const target = await transaction.penetrationTestingTarget.upsert({
+      const existing = await transaction.penetrationTestingTarget.findUnique({
         where: { subjectId: subject.id },
-        create: {
-          subjectId: subject.id,
-          environment,
-          declaredPorts: ports,
-          targetPaths: (targetPaths ?? {}) as Prisma.InputJsonValue,
-          verificationToken,
-        },
-        update: {
-          environment,
-          declaredPorts: ports,
-          ...(targetPaths !== undefined ? { targetPaths: targetPaths as Prisma.InputJsonValue } : {}),
-        },
       });
+      if (existing?.verificationStatus === "REVOKED") {
+        throw new ConflictException(`Penetration target ${origin} is revoked and cannot be re-registered.`);
+      }
+
+      const materialChanged =
+        existing === null ||
+        existing.environment !== environment ||
+        !samePortSet(existing.declaredPorts, ports) ||
+        (targetPaths !== undefined && !samePathMap(parseTargetPaths(existing.targetPaths), targetPaths));
+
+      const target = existing
+        ? await transaction.penetrationTestingTarget.update({
+            where: { subjectId: subject.id },
+            data: {
+              environment,
+              declaredPorts: ports,
+              ...(targetPaths !== undefined ? { targetPaths: targetPaths as Prisma.InputJsonValue } : {}),
+              ...(materialChanged
+                ? {
+                    verificationToken,
+                    verificationStatus: "PENDING",
+                    verificationMethod: null,
+                    verifiedAt: null,
+                    lastVerifiedAt: null,
+                    verificationFailureCount: 0,
+                  }
+                : {}),
+            },
+          })
+        : await transaction.penetrationTestingTarget.create({
+            data: {
+              subjectId: subject.id,
+              environment,
+              declaredPorts: ports,
+              targetPaths: (targetPaths ?? {}) as Prisma.InputJsonValue,
+              verificationToken,
+            },
+          });
 
       return {
         subjectId: subject.id,
@@ -256,19 +313,75 @@ export class PenetrationTestingTargetService {
   /** Target material for a run; throws when the subject has no target row. */
   async material(subjectId: string): Promise<PenetrationTestingTargetMaterial> {
     const { row, subject } = await this.getTarget(subjectId);
+    return toTargetMaterial(row, subject);
+  }
+
+  /**
+   * Every registered target, newest first. Reads never expose the verification
+   * token; `verificationChallenge` is the one place that returns it.
+   */
+  async list(filter: PenetrationTestingTargetFilter = {}): Promise<PenetrationTestingTargetMaterial[]> {
+    const rows = await this.prisma.penetrationTestingTarget.findMany({
+      where: {
+        ...(filter.environment ? { environment: filter.environment } : {}),
+        ...(filter.verificationStatus ? { verificationStatus: filter.verificationStatus } : {}),
+        ...(filter.isActive !== undefined ? { isActive: filter.isActive } : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { subjectId: "asc" }],
+    });
+    if (rows.length === 0) return [];
+    const subjects = await this.prisma.evaluationSubject.findMany({
+      where: { id: { in: rows.map((row) => row.subjectId) } },
+      select: { id: true, subjectKey: true, displayName: true },
+    });
+    const subjectById = new Map(subjects.map((subject) => [subject.id, subject]));
+    const materials: PenetrationTestingTargetMaterial[] = [];
+    for (const row of rows) {
+      const subject = subjectById.get(row.subjectId);
+      if (subject) materials.push(toTargetMaterial(row, subject));
+    }
+    return materials;
+  }
+
+  /**
+   * Patch declared material. Delegates to `create` so the same invariants apply:
+   * a changed environment, port set or path map resets verification to `PENDING`,
+   * and a `REVOKED` target stays dead.
+   */
+  async update(
+    subjectId: string,
+    patch: UpdatePenetrationTestingTargetInput,
+  ): Promise<PenetrationTestingTargetMaterial> {
+    const current = await this.material(subjectId);
+    await this.create({
+      origin: current.origin,
+      label: patch.label ?? current.label,
+      environment: patch.environment ?? current.environment,
+      declaredPorts: patch.declaredPorts ?? current.ports,
+      targetPaths: patch.targetPaths ?? current.targetPaths,
+    });
+    return this.material(subjectId);
+  }
+
+  /** The token plus both placements, for an operator republishing ownership proof. */
+  async verificationChallenge(subjectId: string): Promise<PenetrationTestingVerificationChallenge> {
+    const { row, subject } = await this.getTarget(subjectId);
+    if (row.verificationStatus === "REVOKED") {
+      throw new BadRequestException(`Penetration target ${subject.subjectKey} is revoked and cannot be verified.`);
+    }
+    const host = new URL(subject.subjectKey).hostname;
     return {
       subjectId,
       origin: subject.subjectKey,
-      label: subject.displayName,
-      environment: row.environment as PenetrationTestingEnvironment,
-      ports: row.declaredPorts,
-      targetPaths: parseTargetPaths(row.targetPaths),
-      verificationStatus: row.verificationStatus,
-      verificationMethod: row.verificationMethod as PenetrationTestingVerificationMethod | null,
-      verificationFailureCount: row.verificationFailureCount,
-      verifiedAt: row.verifiedAt,
-      lastVerifiedAt: row.lastVerifiedAt,
-      isActive: row.isActive,
+      verificationToken: row.verificationToken,
+      dnsTxt: {
+        name: `${PENETRATION_TESTING_DNS_TXT_NAME_PREFIX}.${host}`,
+        value: `${PENETRATION_TESTING_DNS_TXT_VALUE_PREFIX}${row.verificationToken}`,
+      },
+      wellKnown: {
+        url: `https://${host}${PENETRATION_TESTING_WELL_KNOWN_PATH}`,
+        body: row.verificationToken,
+      },
     };
   }
 
@@ -405,6 +518,53 @@ function parseTargetPaths(value: Prisma.JsonValue): Record<string, string> {
     if (typeof path === "string") parsed[role] = path;
   }
   return parsed;
+}
+
+/** Port lists are a set: stored order is not part of the declared material. */
+function samePortSet(left: number[], right: number[]): boolean {
+  if (left.length !== right.length) return false;
+  const leftSorted = [...left].sort((a, b) => a - b);
+  const rightSorted = [...right].sort((a, b) => a - b);
+  return leftSorted.every((port, index) => port === rightSorted[index]);
+}
+
+/** JSONB does not preserve key order, so compare the map by key/value pairs. */
+function samePathMap(left: Record<string, string>, right: Record<string, string>): boolean {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) return false;
+  return rightKeys.every((key) => left[key] === right[key]);
+}
+
+function toTargetMaterial(
+  row: {
+    subjectId: string;
+    environment: string;
+    declaredPorts: number[];
+    targetPaths: Prisma.JsonValue;
+    verificationStatus: string;
+    verificationMethod: string | null;
+    verificationFailureCount: number;
+    verifiedAt: Date | null;
+    lastVerifiedAt: Date | null;
+    isActive: boolean;
+  },
+  subject: { subjectKey: string; displayName: string },
+): PenetrationTestingTargetMaterial {
+  return {
+    subjectId: row.subjectId,
+    origin: subject.subjectKey,
+    label: subject.displayName,
+    environment: row.environment as PenetrationTestingEnvironment,
+    ports: row.declaredPorts,
+    targetPaths: parseTargetPaths(row.targetPaths),
+    verificationStatus: row.verificationStatus,
+    verificationMethod: row.verificationMethod as PenetrationTestingVerificationMethod | null,
+    verificationFailureCount: row.verificationFailureCount,
+    verifiedAt: row.verifiedAt,
+    lastVerifiedAt: row.lastVerifiedAt,
+    isActive: row.isActive,
+  };
 }
 
 function toVerificationCheck(

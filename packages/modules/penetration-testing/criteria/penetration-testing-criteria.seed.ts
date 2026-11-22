@@ -103,7 +103,7 @@ export class PenetrationTestingCriteriaSeed implements OnModuleInit {
             metadata: {
               severity: SEVERITY[PENETRATION_TESTING_CRITERION_EXPOSED_SERVICE],
               mechanism: "engine",
-              sourceKey: "naabu+httpx",
+              sourceKey: "connect-probe+httpx",
             },
           },
           {

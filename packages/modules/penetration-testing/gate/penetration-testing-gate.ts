@@ -13,18 +13,23 @@ export type PenetrationTestingGateReason =
   | "TARGET_NOT_ACTIVE"
   | "TARGET_NOT_VERIFIED"
   | "AUTHORIZATION_MISSING"
+  | "AUTHORIZATION_SUBJECT_MISMATCH"
+  | "AUTHORIZATION_LEVEL_MISMATCH"
   | "AUTHORIZATION_NOT_YET_VALID"
   | "AUTHORIZATION_EXPIRED"
   | "AUTHORIZATION_FINDING_MISMATCH"
   | "AUTHORIZATION_ATTACK_CLASS_MISMATCH"
   | "L4_MAINTENANCE_WINDOW_MISSING"
   | "L4_OUTSIDE_MAINTENANCE_WINDOW"
+  | "L4_CLEANUP_PENDING_RECOVERY"
   | "PLAYBOOK_UNKNOWN"
   | "TEST_OBJECT_MISSING"
   | "TEST_OBJECT_KIND_MISMATCH"
   | "ACTIVE_RUN_CONFLICT";
 
 export interface PenetrationTestingGateInput {
+  /** The run's subject; the authorization row must be bound to it. */
+  subjectId: string;
   standardKey: string;
   /** Client-supplied intent only; never an authorization decision. */
   runConfig: Record<string, unknown>;
@@ -33,6 +38,11 @@ export interface PenetrationTestingGateInput {
   testObject: PenetrationTestingTestObjectRecord | null;
   /** Standard keys of the subject's QUEUED/RUNNING runs. */
   activeStandardKeys: string[];
+  /**
+   * `startedAt` of the subject's most recent L4 execution when it ended
+   * CLEANUP_FAILED, otherwise null (ADR-050 §6). A later approval clears it.
+   */
+  lastL4CleanupFailedAt: Date | null;
   now: Date;
 }
 
@@ -60,7 +70,9 @@ export type PenetrationTestingGateDecision =
  * L4 additionally requires: NON_PRODUCTION, an absolute maintenance window that
  * contains `now`, a known playbook, a matching approved disposable test object,
  * and no other active run on the same subject. L3 requires the authorization to
- * bind exactly the finding and attack class carried by the run config.
+ * bind exactly the finding and attack class carried by the run config. Every
+ * level requires the authorization row itself to be bound to the run's subject
+ * and level, so a row fetched by id cannot authorize a different subject.
  */
 export function evaluatePenetrationTestingGate(input: PenetrationTestingGateInput): PenetrationTestingGateDecision {
   if (!isPenetrationTestingKey(input.standardKey)) {
@@ -82,6 +94,16 @@ export function evaluatePenetrationTestingGate(input: PenetrationTestingGateInpu
   }
   if (authorization.status !== "APPROVED") {
     return { ok: false, reason: "AUTHORIZATION_MISSING", detail: authorization.status };
+  }
+  if (authorization.subjectId !== input.subjectId) {
+    return { ok: false, reason: "AUTHORIZATION_SUBJECT_MISMATCH" };
+  }
+  if (authorization.level !== level) {
+    return {
+      ok: false,
+      reason: "AUTHORIZATION_LEVEL_MISMATCH",
+      detail: `authorization is ${authorization.level}, run is ${level}`,
+    };
   }
   if (input.now.getTime() < authorization.validFrom.getTime()) {
     return {
@@ -130,6 +152,19 @@ export function evaluatePenetrationTestingGate(input: PenetrationTestingGateInpu
   }
   if (!insideMaintenanceWindow(window, input.now)) {
     return { ok: false, reason: "L4_OUTSIDE_MAINTENANCE_WINDOW" };
+  }
+  // A target whose last action could not be proven clean stays off-limits. The
+  // approval that follows is the operator's explicit recovery, so only an
+  // approval newer than the failed wall makes L4 available again.
+  if (
+    input.lastL4CleanupFailedAt &&
+    (!authorization.approvedAt || input.lastL4CleanupFailedAt.getTime() >= authorization.approvedAt.getTime())
+  ) {
+    return {
+      ok: false,
+      reason: "L4_CLEANUP_PENDING_RECOVERY",
+      detail: input.lastL4CleanupFailedAt.toISOString(),
+    };
   }
   if (input.activeStandardKeys.length > 0) {
     return {

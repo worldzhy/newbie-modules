@@ -1,14 +1,22 @@
 import { BadRequestException, ConflictException, Injectable, Logger } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
+import type { EvaluationRun } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
+import { EvaluationFindingService } from "@modules/evaluation/evaluation-finding.service";
+import type { ListEvaluationFindingsInput } from "@modules/evaluation/evaluation-finding.service";
+import { EvaluationResultService } from "@modules/evaluation/evaluation-result.service";
+import type { ListEvaluationResultsInput } from "@modules/evaluation/evaluation-result.service";
+import { EvaluationRunService } from "@modules/evaluation/evaluation-run.service";
+import type { ListEvaluationRunsInput, StartEvaluationRunInput } from "@modules/evaluation/evaluation-run.service";
 import { EvaluationRunnerService } from "@modules/evaluation/evaluation-runner.service";
-import type { StartEvaluationRunInput } from "@modules/evaluation/evaluation-run.service";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
 
 import {
   findPlaybook,
   isPenetrationTestingKey,
   PENETRATION_TESTING_LEVEL_BY_KEY,
+  PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET,
   type PenetrationTestingLevel,
 } from "../penetration-testing.constants";
 import { PenetrationTestingTargetService } from "../assets/penetration-testing-target.service";
@@ -38,6 +46,10 @@ export class PenetrationTestingRunService {
     private readonly targets: PenetrationTestingTargetService,
     private readonly authorizations: PenetrationTestingAuthorizationService,
     private readonly testObjects: PenetrationTestingTestObjectService,
+    private readonly runs: EvaluationRunService,
+    private readonly criteria: EvaluationCriteriaService,
+    private readonly results: EvaluationResultService,
+    private readonly findings: EvaluationFindingService,
   ) {}
 
   async startRun(input: StartPenetrationTestingRunInput): Promise<{ runId: string }> {
@@ -65,6 +77,7 @@ export class PenetrationTestingRunService {
         : null;
 
     const decision = evaluatePenetrationTestingGate({
+      subjectId: input.subjectId,
       standardKey,
       runConfig,
       target: {
@@ -75,6 +88,7 @@ export class PenetrationTestingRunService {
       authorization,
       testObject,
       activeStandardKeys: await this.activeStandardKeys(input.subjectId),
+      lastL4CleanupFailedAt: level === "L4" ? await this.lastL4CleanupFailedAt(input.subjectId) : null,
       now,
     });
     if (!decision.ok) {
@@ -94,6 +108,46 @@ export class PenetrationTestingRunService {
     return { runId: run.id };
   }
 
+  /**
+   * Run history, always scoped to this feature's subject kind. The skeleton
+   * stores only `ruleSetVersionId`, so the key and version label are joined in
+   * the same way security-evaluation does.
+   */
+  async listRuns(query: Omit<ListEvaluationRunsInput, "kind">) {
+    const page = await this.runs.listRuns({ ...query, kind: PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET });
+    const records = page.records as EvaluationRun[];
+    const versionIds = [...new Set(records.map((run) => run.ruleSetVersionId))];
+    const versions = new Map(
+      (await Promise.all(versionIds.map((id) => this.criteria.getVersion(id)))).map((version) => [version.id, version]),
+    );
+    return {
+      ...page,
+      records: records.map((run) => {
+        const version = versions.get(run.ruleSetVersionId);
+        return { ...run, standardKey: version?.standardKey ?? "", ruleSetVersion: version?.version ?? "" };
+      }),
+    };
+  }
+
+  /**
+   * One run with its criteria labels joined in, matching the list rows. The
+   * skeleton stores only `ruleSetVersionId`, so returning the raw row would
+   * leave `standardKey`/`ruleSetVersion` undefined for a detail read.
+   */
+  async getRun(runId: string) {
+    const row = await this.runs.findById(runId, PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET);
+    const version = await this.criteria.getVersion(row.ruleSetVersionId);
+    return { ...row, standardKey: version?.standardKey ?? "", ruleSetVersion: version?.version ?? "" };
+  }
+
+  listResults(query: ListEvaluationResultsInput) {
+    return this.results.listResults({ ...query, kind: PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET });
+  }
+
+  listFindings(query: ListEvaluationFindingsInput) {
+    return this.findings.listFindings(query);
+  }
+
   private async resolveAuthorization(
     subjectId: string,
     level: PenetrationTestingLevel,
@@ -102,6 +156,20 @@ export class PenetrationTestingRunService {
     const authorizationId = readString(runConfig, "authorizationId");
     if (authorizationId) return this.authorizations.findById(authorizationId);
     return this.authorizations.findApproved(subjectId, level);
+  }
+
+  /**
+   * ADR-050 §6: a failed cleanup pauses L4 for the subject until a newer
+   * approval. The newest L4 execution is the only authority — a later success
+   * or a re-approval moves past the wall.
+   */
+  private async lastL4CleanupFailedAt(subjectId: string): Promise<Date | null> {
+    const latest = await this.prisma.penetrationTestingExecution.findFirst({
+      where: { subjectId, level: "L4" },
+      orderBy: { startedAt: "desc" },
+      select: { outcome: true, startedAt: true },
+    });
+    return latest?.outcome === "CLEANUP_FAILED" ? latest.startedAt : null;
   }
 
   /** Standard keys of the subject's QUEUED/RUNNING runs, for cross-level exclusion. */

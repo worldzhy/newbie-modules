@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { isIP } from "node:net";
 import { Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 
@@ -10,12 +11,25 @@ export interface PenetrationTestingMaintenanceWindow {
   timezone: string;
 }
 
+/**
+ * Operator identity for the authorization workflow.
+ *
+ * `id` must be the authenticated user id (`request.user.userId`), never a body
+ * field. `via` is a call-site marker only: this module cannot verify where the
+ * id came from, so the contract is enforced by convention at each call site and
+ * cannot stop a controller that passes the body straight through.
+ */
+export interface PenetrationTestingOperator {
+  id: string;
+  via: "session";
+}
+
 export interface RequestPenetrationTestingAuthorizationInput {
   subjectId: string;
   level: PenetrationTestingLevel;
   roeDocumentRef: string;
   scopeNote?: string;
-  requestedBy: string;
+  requestedBy: PenetrationTestingOperator;
   validFrom?: Date;
   validUntil: Date;
   allowedCidrs?: string[];
@@ -25,6 +39,12 @@ export interface RequestPenetrationTestingAuthorizationInput {
   attackClass?: string;
   /** L4 only: the window the action may run in. */
   maintenanceWindow?: PenetrationTestingMaintenanceWindow;
+}
+
+export interface PenetrationTestingAuthorizationFilter {
+  subjectId?: string;
+  level?: PenetrationTestingLevel;
+  status?: string;
 }
 
 export interface PenetrationTestingAuthorizationRecord {
@@ -48,10 +68,13 @@ export interface PenetrationTestingAuthorizationRecord {
  * PenetrationTestingAuthorizationService — the written-authorization half of the
  * three-layer gate (ADR-075 §4).
  *
- * Separation of duties is enforced here, not in the UI: `requestedBy` and
- * `approvedBy` must differ, and a request can only move PENDING → APPROVED.
- * The gate never trusts the run config: it reloads an approved, in-window row by
- * subject and level on every run.
+ * Separation of duties is enforced here: `requestedBy` and `approvedBy` must
+ * differ, and a request can only move PENDING → APPROVED. Both ids are supplied
+ * by the caller, and the module cannot tell how they were obtained — reading them
+ * from the authenticated session is a call-site convention (see
+ * `PenetrationTestingOperator`), not a module guarantee. The gate never trusts
+ * the run config: it reloads an approved, in-window row by subject and level on
+ * every run.
  */
 @Injectable()
 export class PenetrationTestingAuthorizationService {
@@ -85,6 +108,9 @@ export class PenetrationTestingAuthorizationService {
     if (level !== "L4" && input.maintenanceWindow) {
       throw new BadRequestException("maintenanceWindow is only valid for L4 authorizations.");
     }
+    if (level === "L4" && input.maintenanceWindow) {
+      requireWindow(input.maintenanceWindow);
+    }
 
     const row = await this.prisma.penetrationTestingAuthorization.create({
       data: {
@@ -106,7 +132,7 @@ export class PenetrationTestingAuthorizationService {
     return toAuthorizationRecord(row);
   }
 
-  async approve(id: string, approvedBy: string): Promise<PenetrationTestingAuthorizationRecord> {
+  async approve(id: string, approvedBy: PenetrationTestingOperator): Promise<PenetrationTestingAuthorizationRecord> {
     const operator = requireOperator(approvedBy, "approvedBy");
     const row = await this.findOrThrow(id);
     if (row.status !== "PENDING") {
@@ -122,7 +148,11 @@ export class PenetrationTestingAuthorizationService {
     return toAuthorizationRecord(updated);
   }
 
-  async revoke(id: string, revokedBy: string, reason: string): Promise<PenetrationTestingAuthorizationRecord> {
+  async revoke(
+    id: string,
+    revokedBy: PenetrationTestingOperator,
+    reason: string,
+  ): Promise<PenetrationTestingAuthorizationRecord> {
     const operator = requireOperator(revokedBy, "revokedBy");
     const note = reason?.trim();
     if (!note) throw new BadRequestException("A revoke reason is required.");
@@ -156,6 +186,19 @@ export class PenetrationTestingAuthorizationService {
     return row ? toAuthorizationRecord(row) : null;
   }
 
+  /** The approval queue and per-target history, newest first. */
+  async list(filter: PenetrationTestingAuthorizationFilter = {}): Promise<PenetrationTestingAuthorizationRecord[]> {
+    const rows = await this.prisma.penetrationTestingAuthorization.findMany({
+      where: {
+        ...(filter.subjectId ? { subjectId: filter.subjectId } : {}),
+        ...(filter.level ? { level: filter.level } : {}),
+        ...(filter.status ? { status: filter.status } : {}),
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+    });
+    return rows.map(toAuthorizationRecord);
+  }
+
   private async findOrThrow(id: string) {
     const row = await this.prisma.penetrationTestingAuthorization.findUnique({ where: { id } });
     if (!row) throw new NotFoundException(`Penetration testing authorization ${id} not found`);
@@ -172,15 +215,60 @@ function requireLevel(value: string): PenetrationTestingLevel {
   return value as PenetrationTestingLevel;
 }
 
-function requireOperator(value: string, field: string): string {
-  const operator = value?.trim();
-  if (!operator) throw new BadRequestException(`${field} is required.`);
+function requireOperator(value: PenetrationTestingOperator, field: string): string {
+  const operator = value?.id?.trim();
+  if (!operator) throw new BadRequestException(`${field}.id is required.`);
+  if (value.via !== "session") {
+    throw new BadRequestException(
+      `${field}.via must be "session": the operator identity belongs to the authenticated session, never to a request body.`,
+    );
+  }
   return operator;
 }
 
-function normalizeCidrs(input?: string[]): string[] {
+/**
+ * Validate CIDR syntax at request time so a malformed authorization cannot be
+ * approved and then fail only when a run builds its snapshot. This mirrors the
+ * runner's parser (`deploy/penetration-runner/snapshot.mjs`); the two copies are
+ * kept aligned by the parity test, because the runner ships as a separate image.
+ */
+export function normalizeCidrs(input?: string[]): string[] {
   if (!input?.length) return [];
-  return [...new Set(input.map((cidr) => cidr.trim()).filter(Boolean))];
+  const normalized: string[] = [];
+  for (const entry of input) {
+    const cidr = entry.trim();
+    if (!cidr) throw new BadRequestException("allowedCidrs must not contain an empty entry.");
+    const [base, prefixText] = cidr.split("/");
+    const family = isIP(base);
+    if (!family) {
+      throw new BadRequestException(`allowedCidrs entry '${cidr}' is not a valid IPv4 or IPv6 CIDR.`);
+    }
+    if (prefixText !== undefined) {
+      const max = family === 4 ? 32 : 128;
+      const prefix = Number(prefixText);
+      if (!/^\d+$/.test(prefixText) || !Number.isInteger(prefix) || prefix < 0 || prefix > max) {
+        throw new BadRequestException(`allowedCidrs entry '${cidr}' must carry an IPv${family} prefix of 0-${max}.`);
+      }
+    }
+    normalized.push(cidr);
+  }
+  return [...new Set(normalized)];
+}
+
+/**
+ * The gate orders the window against the wall clock, so both ends must be
+ * absolute ISO-8601 instants and the window must be non-empty. A time of day
+ * alone (`02:00`) parses to `NaN` downstream and silently closes the window.
+ */
+function requireWindow(window: PenetrationTestingMaintenanceWindow): void {
+  const start = Date.parse(window.start);
+  const end = Date.parse(window.end);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    throw new BadRequestException("maintenanceWindow.start and .end must be ISO-8601 instants.");
+  }
+  if (end <= start) {
+    throw new BadRequestException("maintenanceWindow.end must be after maintenanceWindow.start.");
+  }
 }
 
 function toAuthorizationRecord(row: {
