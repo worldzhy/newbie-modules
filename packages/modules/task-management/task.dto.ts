@@ -341,6 +341,21 @@ export class ListTaskActorsResponseDto {
   avatarUrl?: string | null;
 }
 
+/** Delivery facts reported by the runtime once gates pass and the branch is pushed. */
+export class GetTaskDeliveryResponseDto {
+  @ApiProperty({ description: "Branch pushed by the runtime" })
+  branch!: string;
+
+  @ApiProperty({ description: "Delivered commit SHA" })
+  commitSha!: string;
+
+  @ApiPropertyOptional({ description: "Pull request URL", type: String, nullable: true })
+  pullRequestUrl?: string | null;
+
+  @ApiProperty({ type: Date, description: "When the runtime recorded the delivery" })
+  deliveredAt!: Date;
+}
+
 export class GetTaskResponseDto {
   @ApiProperty({ description: "Task ID (uuid)" })
   id!: string;
@@ -430,6 +445,12 @@ export class GetTaskResponseDto {
 
   @ApiPropertyOptional({ type: GetTaskActorResponseDto, description: "Last operator" })
   lastOperator?: GetTaskActorResponseDto | null;
+
+  @ApiPropertyOptional({
+    type: GetTaskDeliveryResponseDto,
+    description: "Delivery facts once the runtime pushed the task branch",
+  })
+  delivery?: GetTaskDeliveryResponseDto | null;
 }
 
 export class CreateTaskResponseDto extends GetTaskResponseDto {}
