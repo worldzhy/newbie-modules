@@ -71,6 +71,11 @@ model Task {
   /// channel (ADR-054 D3).
   planFrozenAt DateTime?
 
+  /// Refreshed by the runtime while it works on the task. The reaper parks
+  /// DEVELOPING tasks whose heartbeat stopped, so a dead crewmate cannot leave
+  /// a task running forever.
+  heartbeatAt DateTime?
+
   creatorId  String?    @db.Uuid
   creator    TaskActor? @relation("TaskCreator", fields: [creatorId], references: [id], onDelete: SetNull)
 
@@ -87,6 +92,7 @@ model Task {
 
   @@index([parentId])
   @@index([projectId, status])
+  @@index([status, heartbeatAt])
   @@schema("module/task-management")
 }
 
