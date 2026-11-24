@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { ConflictException, Injectable } from "@nestjs/common";
 import { Installation, InstallationKind } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import {
@@ -29,17 +29,27 @@ export class InstallationCredentialService {
   /** Issue a credential. The plaintext token is returned exactly once. */
   async create(input: CreateInstallationInput): Promise<{ installation: Installation; token: string }> {
     const token = generateInstallationToken();
-    const installation = await this.prisma.installation.create({
-      data: {
-        kind: input.kind,
-        label: input.label,
-        externalRef: input.externalRef ?? null,
-        appKey: input.appKey ?? null,
-        tokenHash: hashInstallationToken(token),
-        tokenFingerprint: installationTokenFingerprint(token),
-      },
-    });
-    return { installation, token };
+    try {
+      const installation = await this.prisma.installation.create({
+        data: {
+          kind: input.kind,
+          label: input.label,
+          externalRef: input.externalRef ?? null,
+          appKey: input.appKey ?? null,
+          tokenHash: hashInstallationToken(token),
+          tokenFingerprint: installationTokenFingerprint(token),
+        },
+      });
+      return { installation, token };
+    } catch (error) {
+      // (kind, externalRef) and appKey are unique indexes: a duplicate
+      // enrollment must answer a conflict instead of a 500, and no second
+      // credential is minted because the insert never lands.
+      if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") {
+        throw new ConflictException("An installation with this identity already exists.");
+      }
+      throw error;
+    }
   }
 
   /** Rotate the token; the previous hash stops working on the next request. */
