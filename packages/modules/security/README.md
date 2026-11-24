@@ -49,14 +49,16 @@ Collectors depend on `security`; `security` never depends on a collector:
 
 ## Configuration
 
-`newbie.module.json` maps the `security` config block to env vars. An empty default in
-that file means the host must supply the value — the registry uses empty strings for
-"no default" everywhere, so none of the token secrets ships one.
+`newbie.module.json` declares each key under `requires.env` with an **example** value,
+never a default (devbie ADR-033): the example only seeds `.env.example` and the local
+`.env` scaffold, no code path reads it, and every environment must declare every key
+explicitly — `newbie secrets check` fails the deploy when a `.env.example` key is absent
+from that environment's secret. An empty example renders `KEY=` for the operator to fill.
 
-| variable                              | default | behaviour when empty                                                                                                         |
-| ------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `INSTALLATION_TRUSTED_PROXY`          | `false` | headers are ignored and the socket peer feeds the per-IP budget; startup warns when such a budget is registered; never fails |
-| `SECURITY_DEFAULT_TOKEN_SECRET`       | none    | startup fails: `TokenService` asserts it in its constructor                                                                  |
-| `SECURITY_USER_ACCESS_TOKEN_SECRET`   | none    | falls back to `SECURITY_DEFAULT_TOKEN_SECRET`                                                                                |
-| `SECURITY_USER_REFRESH_TOKEN_SECRET`  | none    | falls back to `SECURITY_DEFAULT_TOKEN_SECRET`                                                                                |
-| `SECURITY_APIKEY_ACCESS_TOKEN_SECRET` | none    | no fallback; API-key authentication uses the host-bound verifier instead                                                     |
+| variable                              | example | runtime contract                                                                                                                                           |
+| ------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SECURITY_DEFAULT_TOKEN_SECRET`       | empty   | required: `TokenService` asserts a non-public secret of at least 32 characters and fails startup otherwise                                                 |
+| `SECURITY_USER_ACCESS_TOKEN_SECRET`   | empty   | optional: falls back to `SECURITY_DEFAULT_TOKEN_SECRET`                                                                                                    |
+| `SECURITY_USER_REFRESH_TOKEN_SECRET`  | empty   | optional: falls back to `SECURITY_DEFAULT_TOKEN_SECRET`                                                                                                    |
+| `SECURITY_APIKEY_ACCESS_TOKEN_SECRET` | empty   | not read here: API-key authentication delegates to the host-bound `ApiKeyVerifier`                                                                         |
+| `INSTALLATION_TRUSTED_PROXY`          | `false` | only `"true"` trusts `x-real-ip` / `x-forwarded-for`; otherwise the socket peer feeds the per-IP budget and startup warns when such a budget is registered |
