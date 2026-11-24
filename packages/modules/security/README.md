@@ -49,12 +49,14 @@ Collectors depend on `security`; `security` never depends on a collector:
 
 ## Configuration
 
-`newbie.module.json` maps the `security` config block to env vars:
+`newbie.module.json` maps the `security` config block to env vars. An empty default in
+that file means the host must supply the value — the registry uses empty strings for
+"no default" everywhere, so none of the token secrets ships one.
 
-- `INSTALLATION_TRUSTED_PROXY` — trust `x-real-ip` / `x-forwarded-for` when deriving
-  the client IP for the per-IP reporting budget. Defaults to `false`: without a
-  trusted proxy the module degrades explicitly and warns at startup instead of failing,
-  and per-IP accounting falls back to the socket address.
-- `SECURITY_DEFAULT_TOKEN_SECRET`, `SECURITY_USER_ACCESS_TOKEN_SECRET`,
-  `SECURITY_USER_REFRESH_TOKEN_SECRET`, `SECURITY_APIKEY_ACCESS_TOKEN_SECRET` — token
-  signing secrets.
+| variable                              | default | behaviour when empty                                                                                                         |
+| ------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `INSTALLATION_TRUSTED_PROXY`          | `false` | headers are ignored and the socket peer feeds the per-IP budget; startup warns when such a budget is registered; never fails |
+| `SECURITY_DEFAULT_TOKEN_SECRET`       | none    | startup fails: `TokenService` asserts it in its constructor                                                                  |
+| `SECURITY_USER_ACCESS_TOKEN_SECRET`   | none    | falls back to `SECURITY_DEFAULT_TOKEN_SECRET`                                                                                |
+| `SECURITY_USER_REFRESH_TOKEN_SECRET`  | none    | falls back to `SECURITY_DEFAULT_TOKEN_SECRET`                                                                                |
+| `SECURITY_APIKEY_ACCESS_TOKEN_SECRET` | none    | no fallback; API-key authentication uses the host-bound verifier instead                                                     |
