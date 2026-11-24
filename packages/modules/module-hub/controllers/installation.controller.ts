@@ -7,6 +7,7 @@ import { RequirePermission } from "@modules/security/authorization/require-permi
 import { UserRequest } from "@modules/security/security.interface";
 
 import { CreateHubInstallationDto, ListHubInstallationsQueryDto, SetHubTargetSpecDto } from "../module-hub.dto";
+import { MODULE_HUB_ROUTES } from "../module-hub.routes";
 import { ModuleHubInstallationService } from "../services/installation.service";
 import { ModuleHubReleaseService } from "../services/release.service";
 
@@ -22,7 +23,7 @@ import { ModuleHubReleaseService } from "../services/release.service";
  * comparison (Phase 2 convergence view).
  */
 @ApiTags("Module Hub")
-@Controller("module-hub")
+@Controller(MODULE_HUB_ROUTES.controller)
 export class InstallationController {
   constructor(
     private readonly installations: ModuleHubInstallationService,

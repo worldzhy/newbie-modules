@@ -7,7 +7,7 @@ Newbie module-hub observer plane. One report token = one running deployment endp
 | Group            | Auth                 | Base path                                          |
 | ---------------- | -------------------- | -------------------------------------------------- |
 | Host integration | Host JWT/Guard       | `/module-hub/installations`, `/module-hub/catalog` |
-| Instance report  | `X-Module-Hub-Token` | `POST /module-hub/report`                          |
+| Instance report  | `X-Module-Hub-Token` | `POST /module-hub/reports`                         |
 | GitHub webhook   | HMAC-SHA256          | `POST /module-hub/webhooks/registry`               |
 
 The report endpoint carries two kinds:

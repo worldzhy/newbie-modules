@@ -6,6 +6,7 @@ import { ModuleHubInstallation } from "@generated/prisma/client";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 
 import { HubReportDto, HubReportResponseDto } from "../module-hub.dto";
+import { MODULE_HUB_ROUTES } from "../module-hub.routes";
 import { ModuleHubInstallationService } from "../services/installation.service";
 import { ModuleHubReleaseService } from "../services/release.service";
 
@@ -25,14 +26,14 @@ import { ModuleHubReleaseService } from "../services/release.service";
  * `newbie modules update` + deploy, and the resulting snapshot IS the receipt.
  */
 @ApiTags("Module Hub")
-@Controller("module-hub")
+@Controller(MODULE_HUB_ROUTES.controller)
 export class ReportController {
   constructor(
     private readonly installations: ModuleHubInstallationService,
     private readonly releases: ModuleHubReleaseService,
   ) {}
 
-  @Post("report")
+  @Post(MODULE_HUB_ROUTES.reports)
   @InstallationAuth("module-hub")
   @AllowAnyOrigin()
   @ApiCreatedResponse({ type: HubReportResponseDto })

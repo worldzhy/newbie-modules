@@ -182,3 +182,7 @@ SDK 上报同样收敛为标准资源：`POST /frontend-monitor/report` → `POS
 - **SDK**：`@devbie/frontend-monitor-sdk` 的自滤清单与文档切到 `/frontend-monitor/reports`，发布 minor；已部署应用需更新 `api` 配置（旧路径 404）。
 - **验证**：registry 侧 tsc + eslint + 既有测试；宿主侧干净重启后对改动端点做冒烟；认证链路（refresh-access-token）补行为级测试。
 - **非目标**：不改响应信封 `{ code, error, data }`、不改状态码约定、不做动作端点资源化、不重命名业务 DTO 字段。
+
+## 更新记录
+
+- 2026-11-24 — 补齐 D1/D4 的存量遗漏：`POST /module-hub/report` → `POST /module-hub/reports`。module-hub 是 ADR-073 迁移清单之外的 registry 模块，其上报端点仍是单数，与 D1「资源集合用复数」及 D4 对 `/frontend-monitor/reports` 的处理同形。本次只改路径，请求/响应 DTO 与 `kind=full|ping` 语义不变。breaking wire change：registry 侧 controller + README + audit 白名单、宿主 `REPORT_PATHS.moduleHub` 与 apits 生成代码、`@devbie/newbie` reporter 文档、`@devbie/module-hub-cli` 的 `REPORT_SUFFIX` 同步；已部署实例必须同步更新 `MODULE_HUB_ENDPOINT`，旧路径 404。security-evaluation 的 `GET /security-evaluation/report` 是单例聚合读模型，保持单数。
