@@ -32,7 +32,7 @@ export class ReportController {
     private readonly releases: ModuleHubReleaseService,
   ) {}
 
-  @Post("report")
+  @Post("reports")
   @InstallationAuth("module-hub")
   @AllowAnyOrigin()
   @ApiCreatedResponse({ type: HubReportResponseDto })

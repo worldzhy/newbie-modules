@@ -42,7 +42,7 @@ export class HttpAccessInterceptor implements NestInterceptor {
    */
   private static readonly EXCLUDED_PATH_PREFIXES = [
     "/frontend-monitor/reports",
-    "/module-hub/report",
+    "/module-hub/reports",
     "/backend-monitor/ingest",
     "/health/snapshot",
     "/heartbeat/ping",
