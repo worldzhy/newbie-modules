@@ -18,7 +18,10 @@ test("work-evaluation keeps the 180s default window", () => {
 });
 
 test("every work-evaluation presence call site passes that window", () => {
+  const compact = SERVICE_SOURCE.replace(/\s+/g, " ");
   assert.ok(
-    SERVICE_SOURCE.includes("withDerivedOnlineState(row, WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS)"),
+    compact.includes(
+      "isInstallationOnline( installation.lastSeenAt, WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS,",
+    ),
   );
 });

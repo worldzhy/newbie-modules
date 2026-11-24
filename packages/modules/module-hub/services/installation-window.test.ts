@@ -19,6 +19,6 @@ test("module-hub keeps the 180s default window", () => {
 });
 
 test("every module-hub presence call site passes that window", () => {
-  assert.ok(SERVICE_SOURCE.includes("Date.now() - ONLINE_THRESHOLD_MILLISECONDS"));
+  assert.ok(SERVICE_SOURCE.includes("Date.now() - installation.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS"));
   assert.ok(SERVICE_SOURCE.includes("isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)"));
 });

@@ -19,6 +19,5 @@ test("heartbeat keeps the 90s window implied by its 30s ping interval", () => {
 
 test("every heartbeat presence call site passes that window", () => {
   assert.ok(SERVICE_SOURCE.includes("isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)"));
-  assert.ok(SERVICE_SOURCE.includes("withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS)"));
-  assert.ok(SERVICE_SOURCE.includes("Date.now() - ONLINE_THRESHOLD_MILLISECONDS"));
+  assert.ok(SERVICE_SOURCE.includes("Date.now() - installation.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS"));
 });
