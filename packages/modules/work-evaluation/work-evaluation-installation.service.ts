@@ -28,7 +28,7 @@ interface WorkEvaluationAgentState {
 }
 
 /** Projection returned by the supervisor API. No credential material. */
-interface WorkEvaluationInstallationView {
+export interface WorkEvaluationInstallationView {
   id: string;
   label: string;
   developerId: string;
