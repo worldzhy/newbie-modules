@@ -38,7 +38,9 @@ function buildService() {
   } as never;
   const models = {} as never;
   const ch = {} as never;
-  return new FrontendMonitorReportTaskService(redis, site, models, ch);
+  const prisma = {} as never;
+  const receipts = {} as never;
+  return new FrontendMonitorReportTaskService(redis, site, models, ch, prisma, receipts);
 }
 
 type DrainResult = string | null;

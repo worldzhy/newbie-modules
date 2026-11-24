@@ -18,9 +18,9 @@ const AUDIT_RESOURCE_TYPE = "heartbeat-installation";
 
 /** Runtime facts stored per installation (module/heartbeat). */
 interface HeartbeatFacts {
-  appVersion?: string;
-  env?: string;
-  instanceId?: string;
+  appVersion?: string | null;
+  env?: string | null;
+  instanceId?: string | null;
 }
 
 /** Projection returned by the host integration API. No credential material. */
@@ -261,8 +261,7 @@ export class HeartbeatInstallationService {
     actor?: string,
     detail?: Record<string, unknown>,
   ): Promise<void> {
-    await this.auditLogService.record({
-      action,
+    await this.auditLogService.record(action, {
       resourceType: AUDIT_RESOURCE_TYPE,
       resourceId,
       actorId: actor ?? null,

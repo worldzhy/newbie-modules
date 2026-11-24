@@ -167,8 +167,7 @@ export class FrontendMonitorInstallationService {
     actor?: string,
     detail?: Record<string, unknown>,
   ): Promise<void> {
-    await this.auditLogService.record({
-      action,
+    await this.auditLogService.record(action, {
       resourceType: AUDIT_RESOURCE_TYPE,
       resourceId,
       actorId: actor ?? null,
