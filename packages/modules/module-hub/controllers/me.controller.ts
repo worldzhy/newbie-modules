@@ -4,6 +4,7 @@ import { Request } from "express";
 import { ModuleHubInstallation } from "@generated/prisma/client";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 
+import { MODULE_HUB_ROUTES } from "../module-hub.routes";
 import { ModuleHubInstallationService } from "../services/installation.service";
 
 /**
@@ -21,7 +22,7 @@ import { ModuleHubInstallationService } from "../services/installation.service";
  * resource with two access paths.
  */
 @ApiTags("Module Hub")
-@Controller("module-hub")
+@Controller(MODULE_HUB_ROUTES.controller)
 export class MeController {
   constructor(private readonly installations: ModuleHubInstallationService) {}
 
