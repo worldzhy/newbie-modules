@@ -41,7 +41,7 @@ export class WebhookController {
     @Headers("x-hub-signature-256") signature: string,
     @Headers("x-github-event") event: string,
   ) {
-    const secret = this.config.get<string>("MODULE_HUB_GITHUB_WEBHOOK_SECRET");
+    const secret = this.config.get<string>("modules.moduleHub.githubWebhookSecret");
     if (!secret) {
       throw new ServiceUnavailableException(
         "Registry webhook is not configured (MODULE_HUB_GITHUB_WEBHOOK_SECRET missing); use POST /module-hub/catalog/sync instead.",

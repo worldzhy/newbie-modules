@@ -24,7 +24,8 @@ missed webhook delivery). Both share the same idempotent upsert.
 Both settings are declared under `requires.env` in `newbie.module.json`, so
 `newbie modules apply` renders them into the consumer's `.env.example` and every
 environment must provision the key (devbie ADR-033); the example value is scaffolding,
-never a runtime default.
+never a runtime default. Each key is read through the generated `modules.moduleHub`
+config subtree, not from `process.env` directly.
 
 - `MODULE_HUB_GITHUB_WEBHOOK_SECRET` — an empty value disables the webhook path:
   deliveries are rejected and the daily cron sync is the only ingestion path.

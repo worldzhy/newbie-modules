@@ -95,7 +95,7 @@ export class ModuleHubReleaseService {
   ) {}
 
   private get registryRepo(): { owner: string; repo: string } {
-    const fullName = this.config.get<string>("MODULE_HUB_REGISTRY_REPO") ?? "worldzhy/newbie-modules";
+    const fullName = this.config.get<string>("modules.moduleHub.registryRepo") ?? "worldzhy/newbie-modules";
     const [owner, repo] = fullName.split("/");
     return { owner, repo };
   }
