@@ -1,5 +1,6 @@
 import { Injectable, InternalServerErrorException, Logger, OnApplicationBootstrap } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
+import { InstallationKind } from "@generated/prisma/client";
 
 /**
  * Collector keys that may present an installation token (ADR-078).
@@ -35,6 +36,13 @@ const PRISMA_ENUM_TO_WIRE: Record<string, InstallationKindValue> = {
 /** Wire spelling of a Prisma enum value, e.g. MODULE_HUB -> "module-hub". */
 export function installationKindToWire(kind: string): InstallationKindValue {
   return PRISMA_ENUM_TO_WIRE[kind] ?? (kind.toLowerCase().replace(/_/g, "-") as InstallationKindValue);
+}
+
+/** Prisma enum member for a wire spelling, or undefined for an unknown value. */
+export function installationKindFromWire(kind: string): InstallationKind | undefined {
+  return (Object.keys(PRISMA_ENUM_TO_WIRE) as InstallationKind[]).find(
+    (candidate) => PRISMA_ENUM_TO_WIRE[candidate] === kind,
+  );
 }
 
 /** One rate-limit window: points allowed per duration. */

@@ -42,6 +42,12 @@ export interface InstallationReceipts {
   pipeline?: InstallationPipelineState;
 }
 
+/** One 5-minute bucket of outcome counts, newest first in `readBuckets`. */
+export interface InstallationReceiptBucket {
+  at: string;
+  outcomes: Partial<Record<InstallationReportOutcome, number>>;
+}
+
 /** 5-minute receipt buckets, retained for 24 hours (ADR-080). */
 export const RECEIPT_BUCKET_MS = 5 * 60 * 1000;
 export const RECEIPT_RETENTION_SECONDS = 24 * 60 * 60;
@@ -168,6 +174,37 @@ export class InstallationReceiptsService {
     } catch (error) {
       this.degraded(error);
       return empty;
+    }
+  }
+
+  /**
+   * Per-bucket outcome counts, newest first. The rejection-spike rule compares
+   * the newest bucket with the baseline of the previous ones, so the bucket
+   * boundary stays a storage detail of this service.
+   */
+  async readBuckets(kind: string, count: number, installationId?: string | null): Promise<InstallationReceiptBucket[]> {
+    if (!this.redis.isConfigured()) return [];
+
+    try {
+      const client = this.redis.getClient();
+      const buckets = this.recentBuckets(Date.now()).slice(0, count);
+      const pipeline = client.pipeline();
+      for (const bucket of buckets) {
+        pipeline.hgetall(this.kindKey(kind, bucket));
+        if (installationId) pipeline.hgetall(this.ownedKey(installationId, bucket));
+      }
+      const results = await pipeline.exec();
+      if (!results) return [];
+
+      let index = 0;
+      return buckets.map((bucket) => {
+        const kindHash = results[index++]?.[1] as Record<string, string> | null;
+        const ownedHash = installationId ? (results[index++]?.[1] as Record<string, string> | null) : null;
+        return { at: new Date(bucket).toISOString(), outcomes: this.mergeHashes(kindHash, ownedHash) };
+      });
+    } catch (error) {
+      this.degraded(error);
+      return [];
     }
   }
 
