@@ -10,6 +10,9 @@
     "modules": ["redis"],
     "config": {
       "security": {
+        "installation": {
+          "trustedProxy": "process.env.INSTALLATION_TRUSTED_PROXY"
+        },
         "token": {
           "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET",
           "userAccess": {

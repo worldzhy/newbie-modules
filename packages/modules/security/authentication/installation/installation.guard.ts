@@ -76,7 +76,7 @@ export class InstallationAuthGuard implements CanActivate {
     const descriptor = this.kindRegistry.require(kind);
 
     const req = context.switchToHttp().getRequest<InstallationAuthRequest>();
-    const sourceIp = resolveInstallationSourceIp(req);
+    const sourceIp = resolveInstallationSourceIp(req, this.kindRegistry.trustedProxy);
     const token = this.extractToken(req, descriptor);
 
     if (!token) {

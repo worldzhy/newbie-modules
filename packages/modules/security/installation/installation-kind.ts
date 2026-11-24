@@ -1,4 +1,5 @@
 import { Injectable, InternalServerErrorException, Logger, OnApplicationBootstrap } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 /**
  * Collector keys that may present an installation token (ADR-078).
@@ -89,6 +90,17 @@ export class InstallationKindRegistry implements OnApplicationBootstrap {
   private readonly logger = new Logger(InstallationKindRegistry.name);
   private readonly descriptors = new Map<string, InstallationKindDescriptor>();
 
+  /**
+   * Whether the deployment guarantees that x-real-ip / x-forwarded-for are
+   * overwritten by a trusted proxy (ADR-079). False elsewhere, where the
+   * socket peer is the only IP the server can believe.
+   */
+  readonly trustedProxy: boolean;
+
+  constructor(config: ConfigService) {
+    this.trustedProxy = config.get<string>("security.installation.trustedProxy") === "true";
+  }
+
   register(descriptor: InstallationKindDescriptor): void {
     const existing = this.descriptors.get(descriptor.kind);
     if (existing) {
@@ -124,15 +136,18 @@ export class InstallationKindRegistry implements OnApplicationBootstrap {
     const perIpKinds = this.list().filter((descriptor) => descriptor.budget.scope === "token-and-ip");
     if (perIpKinds.length === 0) return;
 
-    // A per-IP budget is only meaningful when the source IP comes from a
-    // trusted proxy chain (ADR-079). Without that guarantee the header is
-    // client-controlled and the budget is bypassable by rewriting it.
-    if (process.env.INSTALLATION_TRUSTED_PROXY !== "true") {
-      throw new Error(
-        `Installation kinds ${perIpKinds.map((d) => d.kind).join(", ")} use a per-IP budget, but INSTALLATION_TRUSTED_PROXY is not "true". ` +
-          "Terminate client connections at a trusted proxy that overwrites x-real-ip / x-forwarded-for, then set INSTALLATION_TRUSTED_PROXY=true.",
-      );
+    // ADR-079: a per-IP budget is only as trustworthy as the source IP. With a
+    // trusted proxy the headers are used; without one the socket peer is the
+    // only believable address, which is correct for direct connections but
+    // collapses every client behind an unconfigured proxy into one bucket.
+    if (this.trustedProxy) {
+      this.logger.log(`Per-IP installation budget enabled for: ${perIpKinds.map((d) => d.kind).join(", ")}.`);
+      return;
     }
-    this.logger.log(`Per-IP installation budget enabled for: ${perIpKinds.map((d) => d.kind).join(", ")}.`);
+    this.logger.warn(
+      `Installation kinds ${perIpKinds.map((d) => d.kind).join(", ")} use a per-IP budget with ` +
+        "INSTALLATION_TRUSTED_PROXY disabled: x-real-ip / x-forwarded-for are ignored and the socket peer is used. " +
+        "Behind a reverse proxy, terminate client connections there and set INSTALLATION_TRUSTED_PROXY=true.",
+    );
   }
 }

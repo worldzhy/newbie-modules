@@ -3,15 +3,16 @@ import { Request } from "express";
 /**
  * Source IP of a report request, for the per-IP installation budget (ADR-079).
  *
- * The headers are only trusted when INSTALLATION_TRUSTED_PROXY is "true": the
+ * The headers are only trusted when the host sets
+ * `security.installation.trustedProxy` (env INSTALLATION_TRUSTED_PROXY): the
  * deployment terminates client connections at a proxy that overwrites both
  * headers. When that guarantee is absent, reading them would let any caller
  * choose its own quota bucket, so the socket address is used instead. The
  * ownership of this parsing lives in security; collector modules do not
  * re-implement it.
  */
-export function resolveInstallationSourceIp(req: Request): string | undefined {
-  if (process.env.INSTALLATION_TRUSTED_PROXY === "true") {
+export function resolveInstallationSourceIp(req: Request, trustedProxy: boolean): string | undefined {
+  if (trustedProxy) {
     const realIp = req.headers["x-real-ip"];
     if (typeof realIp === "string" && realIp.trim()) return realIp.trim();
 
