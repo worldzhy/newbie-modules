@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Optional } from "@nestjs/common";
 import { Installation } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { hashInstallationToken, isInstallationTokenWellFormed } from "./installation-credential";
@@ -45,7 +45,7 @@ export class InstallationVerifier {
 
   constructor(
     private readonly prisma: PrismaService,
-    options: InstallationVerifierOptions = {},
+    @Optional() options: InstallationVerifierOptions = {},
   ) {
     this.negativeCacheTtlMs = options.negativeCacheTtlMs ?? DEFAULT_NEGATIVE_CACHE_TTL_MS;
     this.maxCacheEntries = options.maxCacheEntries ?? DEFAULT_MAX_CACHE_ENTRIES;
