@@ -4,9 +4,7 @@ import { FrontendMonitorModelsModule } from "../../models/mongo/frontend-monitor
 import { SharedModule } from "../../shared/shared.module";
 import { DayReportModule } from "@modules/frontend-monitor/modules/day-report/day-report.module";
 import { SiteModule } from "@modules/frontend-monitor/modules/site/site.module";
-import { installationResolverToken } from "@modules/security/ports/installation.resolver";
 import { FrontendMonitorInstallationService } from "../../services/frontend-monitor-installation.service";
-import { FrontendMonitorTokenResolver } from "../../services/frontend-monitor-token.resolver";
 
 import { FrontendMonitorReportController } from "./report.controller";
 
@@ -58,12 +56,8 @@ import { FrontendMonitorAccessService } from "./frontend-monitor-access.service"
     FrontendMonitorIpTaskService,
     FrontendMonitorAccessService,
     // Installation identity lives here (not on the root FrontendMonitorModule) so
-    // FrontendMonitorReportController can resolve FrontendMonitorTokenResolver without a module cycle.
+    // FrontendMonitorReportController can use the service without a module cycle.
     FrontendMonitorInstallationService,
-    FrontendMonitorTokenResolver,
-    // Bind the report-token resolver to security's SPI port (ADR-016);
-    // useExisting keeps the singleton so the token cache is never duplicated.
-    { provide: installationResolverToken("frontend-monitor"), useExisting: FrontendMonitorTokenResolver },
   ],
   // FrontendMonitorInstallationService is re-exported by the root FrontendMonitorModule for
   // consuming projects whose application layer provisions installations.
@@ -78,7 +72,6 @@ import { FrontendMonitorAccessService } from "./frontend-monitor-access.service"
     PvuvipService,
     PageService,
     FrontendMonitorAnalysisService,
-    installationResolverToken("frontend-monitor"),
   ],
 })
 export class WebModule {}

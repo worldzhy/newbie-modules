@@ -1,0 +1,65 @@
+// Prisma fragment for the security module (ADR-078 installation identity).
+//
+// One row per enrolled reporter installation, independent of collector kind.
+// Collectors own a per-kind 1:1 fact table in their own schema and reference
+// `Installation.id` as a plain scalar (`installationId`), never a foreign key:
+// relations cannot cross schema boundaries in this repository, and Prisma
+// relations require a back-relation on both sides, which would make security
+// depend on the optional collector modules.
+//
+// `kind` is the collector key ("heartbeat", "module-hub", ...). `appKey` only
+// exists for frontend-monitor and is enforced by a CHECK constraint added in
+// the host migration SQL (Prisma cannot declare CHECK constraints).
+
+enum InstallationKind {
+  HEARTBEAT @map("heartbeat")
+  HEALTH @map("health")
+  MODULE_HUB @map("module-hub")
+  BACKEND_MONITOR @map("backend-monitor")
+  FRONTEND_MONITOR @map("frontend-monitor")
+  WORK_EVALUATION @map("work-evaluation")
+
+  @@schema("module/security")
+}
+
+model Installation {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  kind InstallationKind
+
+  // Human-readable label set at enrollment.
+  label String @db.VarChar(255)
+  // SHA-256 hex of the plaintext token. The token itself is returned once at
+  // issuance or rotation and never stored or logged.
+  tokenHash String @unique @db.VarChar(64)
+
+  // Irreversible 8-hex pseudonym of the token, stored at issuance so identity
+  // reads and receipts can correlate without the plaintext token (ADR-078).
+  tokenFingerprint String @db.VarChar(8)
+
+  // Opaque host-owned tag (convention: "projectId/applicationId"); never
+  // parsed by this module. Unique per kind so one host resource cannot hold
+  // two live credentials of the same collector.
+  externalRef String? @db.VarChar(255)
+
+  // frontend-monitor only: immutable public partition key embedded in Mongo
+  // collection and ClickHouse table names. Enforced by a CHECK constraint.
+  appKey String? @unique @db.VarChar(64)
+
+  firstSeenAt DateTime?
+  lastSeenAt  DateTime?
+
+  // Issuance time; replaces the former per-table createdAt for identity reads.
+  issuedAt DateTime @default(now())
+
+  // Soft revocation: the row is retained for audit and every request carrying
+  // its token is rejected.
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([kind, externalRef])
+  @@index([kind, lastSeenAt])
+  @@schema("module/security")
+}

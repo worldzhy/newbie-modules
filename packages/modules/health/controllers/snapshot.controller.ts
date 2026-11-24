@@ -2,7 +2,7 @@ import { Body, Controller, Post, Req } from "@nestjs/common";
 import { ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
-import { HealthInstallation } from "@generated/prisma/client";
+import { Installation } from "@generated/prisma/client";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 
 import { HealthSnapshotDto, HealthSnapshotResponseDto } from "../health.dto";
@@ -13,8 +13,8 @@ import { HealthInstallationService, SNAPSHOT_INTERVAL_SECONDS } from "../service
  *
  * Authentication is the installation token presented as
  * `Authorization: Bearer <token>` (the X-Health-Token header is a deprecated
- * alias during the SDK migration window), resolved against
- * HealthInstallation.tokenHash by the InstallationAuthGuard.
+ * alias during the SDK migration window), resolved by the new shared
+ * InstallationAuthGuard against a single `Installation` row (ADR-078).
  *
  * A snapshot carries the aggregated dependency health status ("ok" | "error")
  * and per-indicator results. The response carries serverTime and the
@@ -30,7 +30,7 @@ export class SnapshotController {
   @AllowAnyOrigin()
   @ApiCreatedResponse({ type: HealthSnapshotResponseDto })
   async snapshot(
-    @Req() req: Request & { installation: HealthInstallation },
+    @Req() req: Request & { installation: Installation },
     @Body() body: HealthSnapshotDto,
   ): Promise<HealthSnapshotResponseDto> {
     await this.installations.recordSnapshot(req.installation.id, {

@@ -1,20 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { HealthInstallation, Prisma } from "@generated/prisma/client";
+import { Installation, InstallationKind, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
-import {
-  InstallationCredentialAudit,
-  InstallationCredentialStore,
-  issueInstallationCredential,
-  revokeInstallationCredential,
-  rotateInstallationCredential,
-} from "@modules/security/installation/installation-credential";
-import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
-import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
-import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
+import { InstallationCredentialService } from "@modules/security/installation/installation-credential.service";
 import { InstallationPresence, isInstallationOnline } from "@modules/security/installation/installation-presence";
 import { LivenessState, worseLivenessState } from "@modules/security/installation/liveness-state";
-import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 
 /** Requested interval between client snapshots; echoed back in the response. */
 export const SNAPSHOT_INTERVAL_SECONDS = 30;
@@ -27,10 +17,14 @@ const ONLINE_THRESHOLD_MILLISECONDS = ONLINE_THRESHOLD_SECONDS * 1000;
 /** Audit resource type for installation credential events. */
 const AUDIT_RESOURCE_TYPE = "health-installation";
 
-/** Domain columns stored next to the credential (ADR-019). */
-interface HealthInstallationDraft {
-  label: string;
-  externalRef: string | null;
+/** Facts stored per installation (module/health). */
+interface HealthFacts {
+  appVersion?: string | null;
+  env?: string | null;
+  instanceId?: string | null;
+  lastSnapshotStatus?: string | null;
+  lastSnapshotInfo?: Prisma.JsonValue | null;
+  lastSnapshotAt?: Date | null;
 }
 
 /** One failing dependency indicator from the latest snapshot. */
@@ -50,40 +44,40 @@ export interface HealthLivenessSnapshot {
   downIndicators: HealthDownIndicator[];
 }
 
+/** Projection returned by the host integration API. No credential material. */
+export interface HealthInstallationView {
+  id: string;
+  label: string;
+  externalRef: string | null;
+  appVersion: string | null;
+  env: string | null;
+  instanceId: string | null;
+  lastSnapshotStatus: string | null;
+  lastSnapshotInfo: Prisma.JsonValue | null;
+  lastSnapshotAt: Date | null;
+  firstSeenAt: Date | null;
+  lastSeenAt: Date | null;
+  issuedAt: Date;
+  revokedAt: Date | null;
+  state: LivenessState;
+}
+
 /**
- * Installation registry for the health module. One token = one running
- * deployment endpoint; the host pre-creates rows and distributes the
- * plaintext token out of band, and the running process posts a dependency
- * health snapshot periodically.
+ * Installation registry for the health module. Identity and credential live
+ * in the shared `Installation` row; this service adds the latest-snapshot
+ * fact projection and the richer state (unknown / healthy / degraded /
+ * offline) the host consumes.
  *
- * Unlike heartbeat (pure liveness), health stores the latest snapshot
- * (aggregated status + per-indicator results) and derives a richer state
- * (unknown / healthy / degraded / offline) at read time.
+ * The host pre-creates rows and distributes the plaintext token out of band,
+ * and the running process posts a dependency health snapshot periodically.
  */
 @Injectable()
-export class HealthInstallationService
-  extends BaseInstallationService<HealthInstallation>
-  implements InstallationResolver
-{
-  readonly kind = "health";
-  /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
-  readonly legacyHeader = "x-health-token";
-
-  // Credential mechanism comes from security (ADR-019); this class only adapts
-  // its table and projects the domain state.
-  private readonly credentials: InstallationCredentialStore<HealthInstallationDraft, HealthInstallation>;
-  protected readonly tokenVerifier: InstallationTokenVerifier<HealthInstallation>;
-
+export class HealthInstallationService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly credentials: InstallationCredentialService,
     private readonly auditLogService: AuditLogService,
-  ) {
-    super();
-    this.credentials = prismaInstallationCredentialStore<HealthInstallationDraft, HealthInstallation>(
-      this.prisma.healthInstallation,
-    );
-    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
-  }
+  ) {}
 
   // -------------------------------------------------------------------------
   // Installation lifecycle (host integration API)
@@ -91,45 +85,56 @@ export class HealthInstallationService
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
   async create(input: { label: string; externalRef?: string }, actor?: string) {
-    const { record, token } = await issueInstallationCredential(
-      this.credentials,
-      { label: input.label, externalRef: input.externalRef ?? null },
-      {
-        ...this.credentialAudit(actor),
-        detail: { label: input.label, externalRef: input.externalRef ?? null },
-      },
-    );
-    return { ...this.withDerivedState(record), token };
+    const { installation, token } = await this.credentials.create({
+      kind: InstallationKind.HEALTH,
+      label: input.label,
+      externalRef: input.externalRef ?? null,
+    });
+    await this.recordAudit("health.installation.created", installation.id, actor, {
+      label: input.label,
+      externalRef: input.externalRef ?? null,
+    });
+    return { ...this.toView(installation, null), token };
   }
 
   async list(query: { externalRef?: string }) {
-    const rows = await this.prisma.healthInstallation.findMany({
-      where: query.externalRef ? { externalRef: query.externalRef } : undefined,
-      orderBy: { createdAt: "desc" },
+    const installations = await this.prisma.installation.findMany({
+      where: { kind: InstallationKind.HEALTH, ...(query.externalRef ? { externalRef: query.externalRef } : {}) },
+      orderBy: { issuedAt: "desc" },
     });
-    return rows.map((row) => this.withDerivedState(row));
+    const facts = await this.factsByInstallationId(installations.map((row) => row.id));
+    return installations.map((row) => this.toView(row, facts.get(row.id) ?? null));
   }
 
   async getOrThrow(id: string) {
-    const row = await this.prisma.healthInstallation.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException(`Installation ${id} not found.`);
-    return row;
+    const installation = await this.prisma.installation.findFirst({
+      where: { id, kind: InstallationKind.HEALTH },
+    });
+    if (!installation) throw new NotFoundException(`Installation ${id} not found.`);
+    return installation;
   }
 
   async get(id: string) {
-    return this.withDerivedState(await this.getOrThrow(id));
+    const installation = await this.getOrThrow(id);
+    const facts = await this.prisma.healthAgentState.findUnique({ where: { installationId: id } });
+    return this.toView(installation, facts);
   }
 
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return rotateInstallationCredential(this.credentials, id, this.credentialAudit(actor));
+    const rotated = await this.credentials.rotate(id);
+    await this.recordAudit("health.installation.token_rotated", id, actor);
+    return rotated;
   }
 
   /** Soft revocation: snapshots are rejected (401), rows retained for audit. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
+    const revokedAt = new Date();
+    await this.credentials.setRevokedAt(id, revokedAt);
+    await this.recordAudit("health.installation.revoked", id, actor);
+    return { id, revokedAt };
   }
 
   // -------------------------------------------------------------------------
@@ -138,48 +143,49 @@ export class HealthInstallationService
 
   /**
    * Batch liveness lookup for platform-side list views: externalRef -> snapshot.
-   * One query for the whole set; an externalRef with no installation (or none
-   * at all) is simply absent from the map. When multiple installations share
-   * an externalRef, the worst state wins; ties keep the newest snapshot.
+   * One installation query plus one fact query for the whole set; an
+   * externalRef with no installation (or none at all) is simply absent from
+   * the map. When multiple installations share an externalRef, the worst
+   * state wins; ties keep the newest snapshot.
    */
   async getLivenessByExternalRefs(externalRefs: string[]): Promise<Map<string, HealthLivenessSnapshot>> {
     if (externalRefs.length === 0) return new Map();
-    const rows = await this.prisma.healthInstallation.findMany({
-      where: { externalRef: { in: externalRefs }, revokedAt: null },
-      select: {
-        externalRef: true,
-        lastSnapshotAt: true,
-        lastSnapshotStatus: true,
-        lastSnapshotInfo: true,
-      },
+    const installations = await this.prisma.installation.findMany({
+      where: { kind: InstallationKind.HEALTH, externalRef: { in: externalRefs }, revokedAt: null },
+      select: { id: true, externalRef: true },
     });
+    const facts = await this.factsByInstallationId(installations.map((row) => row.id));
     const snapshots = new Map<string, HealthLivenessSnapshot>();
-    for (const row of rows) {
-      if (!row.externalRef) continue;
-      const state = this.deriveState(row.lastSnapshotAt, row.lastSnapshotStatus);
+    for (const installation of installations) {
+      if (!installation.externalRef) continue;
+      const state = facts.get(installation.id);
+      const lastSnapshotAt = state?.lastSnapshotAt ?? null;
+      const lastSnapshotStatus = state?.lastSnapshotStatus ?? null;
+      const liveness = this.deriveState(lastSnapshotAt, lastSnapshotStatus);
       const candidate: HealthLivenessSnapshot = {
-        state,
-        lastSnapshotAt: row.lastSnapshotAt,
+        state: liveness,
+        lastSnapshotAt,
         // Indicator detail is only meaningful while the process is reporting;
         // an offline process's stale info must not masquerade as live faults.
-        downIndicators: state === LivenessState.DEGRADED ? this.extractDownIndicators(row.lastSnapshotInfo) : [],
+        downIndicators:
+          liveness === LivenessState.DEGRADED ? this.extractDownIndicators(state?.lastSnapshotInfo ?? null) : [],
       };
-      const prev = snapshots.get(row.externalRef);
+      const prev = snapshots.get(installation.externalRef);
       if (!prev) {
-        snapshots.set(row.externalRef, candidate);
+        snapshots.set(installation.externalRef, candidate);
         continue;
       }
       // Worst state wins across installations; on a tie the newer snapshot
       // carries the more current indicators.
-      const worse = worseLivenessState(prev.state, state);
-      if (worse === state && worse !== prev.state) {
-        snapshots.set(row.externalRef, candidate);
+      const worse = worseLivenessState(prev.state, liveness);
+      if (worse === liveness && worse !== prev.state) {
+        snapshots.set(installation.externalRef, candidate);
       } else if (
-        worse === state &&
+        worse === liveness &&
         candidate.lastSnapshotAt &&
         (!prev.lastSnapshotAt || candidate.lastSnapshotAt > prev.lastSnapshotAt)
       ) {
-        snapshots.set(row.externalRef, candidate);
+        snapshots.set(installation.externalRef, candidate);
       }
     }
     return snapshots;
@@ -196,15 +202,11 @@ export class HealthInstallationService
    */
   async getPresenceByExternalRefs(externalRefs: string[]): Promise<Map<string, InstallationPresence>> {
     if (externalRefs.length === 0) return new Map();
-    const rows = await this.prisma.healthInstallation.findMany({
-      where: { externalRef: { in: externalRefs } },
-      select: {
-        externalRef: true,
-        lastSnapshotAt: true,
-        lastSnapshotStatus: true,
-        revokedAt: true,
-      },
+    const rows = await this.prisma.installation.findMany({
+      where: { kind: InstallationKind.HEALTH, externalRef: { in: externalRefs } },
+      select: { externalRef: true, lastSeenAt: true, revokedAt: true },
     });
+    const now = Date.now();
     const presenceByRef = new Map<string, InstallationPresence>();
     for (const externalRef of externalRefs) {
       const scoped = rows.filter((row) => row.externalRef === externalRef);
@@ -213,11 +215,11 @@ export class HealthInstallationService
       let lastSeenAt: Date | null = null;
       let online = false;
       for (const row of active) {
-        // Newest snapshot across the non-revoked installations sharing it.
-        if (row.lastSnapshotAt && (!lastSeenAt || row.lastSnapshotAt > lastSeenAt)) {
-          lastSeenAt = row.lastSnapshotAt;
+        // Newest report across the non-revoked installations sharing it.
+        if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
+          lastSeenAt = row.lastSeenAt;
         }
-        if (isInstallationOnline(row.lastSnapshotAt, ONLINE_THRESHOLD_SECONDS)) {
+        if (isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
         }
       }
@@ -249,26 +251,31 @@ export class HealthInstallationService
     }>
   > {
     const cutoff = new Date(Date.now() - ONLINE_THRESHOLD_MILLISECONDS);
-    const rows = await this.prisma.healthInstallation.findMany({
-      where: {
-        revokedAt: null,
-        OR: [{ lastSnapshotStatus: "error" }, { lastSnapshotAt: { not: null, lt: cutoff } }, { lastSnapshotAt: null }],
-      },
-      select: {
-        id: true,
-        label: true,
-        env: true,
-        instanceId: true,
-        appVersion: true,
-        lastSnapshotAt: true,
-        lastSnapshotStatus: true,
-        lastSnapshotInfo: true,
-      },
+    const installations = await this.prisma.installation.findMany({
+      where: { kind: InstallationKind.HEALTH, revokedAt: null },
+      select: { id: true, label: true },
     });
-    return rows.map((row) => ({
-      ...row,
-      state: this.deriveState(row.lastSnapshotAt, row.lastSnapshotStatus),
-    }));
+    const facts = await this.factsByInstallationId(installations.map((row) => row.id));
+    return installations
+      .map((installation) => {
+        const state = facts.get(installation.id);
+        const lastSnapshotAt = state?.lastSnapshotAt ?? null;
+        const lastSnapshotStatus = state?.lastSnapshotStatus ?? null;
+        return {
+          id: installation.id,
+          label: installation.label,
+          env: state?.env ?? null,
+          instanceId: state?.instanceId ?? null,
+          appVersion: state?.appVersion ?? null,
+          state: this.deriveState(lastSnapshotAt, lastSnapshotStatus),
+          lastSnapshotAt,
+          lastSnapshotStatus,
+          lastSnapshotInfo: state?.lastSnapshotInfo ?? null,
+        };
+      })
+      .filter(
+        (row) => row.lastSnapshotStatus === "error" || row.lastSnapshotAt === null || row.lastSnapshotAt < cutoff,
+      );
   }
 
   // -------------------------------------------------------------------------
@@ -276,8 +283,10 @@ export class HealthInstallationService
   // -------------------------------------------------------------------------
 
   /**
-   * Look up a non-revoked installation by its plaintext token. Unknown and
-   * revoked tokens both return null so the two cases stay indistinguishable.
+   * Advance liveness and store the latest snapshot for an already-authenticated
+   * installation. Authentication happens upstream in InstallationAuthGuard
+   * (ADR-016). firstSeenAt is written exactly once, lastSeenAt always advances,
+   * and the snapshot columns are replaced on every report.
    */
   async recordSnapshot(
     installationId: string,
@@ -290,19 +299,33 @@ export class HealthInstallationService
     },
   ): Promise<void> {
     const now = new Date();
-    await this.prisma.$queryRaw`
-      UPDATE "module/health"."HealthInstallation"
+    await this.prisma.$executeRaw`
+      UPDATE "module/security"."Installation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
-          "appVersion" = COALESCE(${facts.appVersion ?? null}, "appVersion"),
-          "env" = COALESCE(${facts.env ?? null}, "env"),
-          "instanceId" = COALESCE(${facts.instanceId ?? null}, "instanceId"),
-          "lastSnapshotStatus" = ${facts.status},
-          "lastSnapshotInfo" = ${JSON.stringify(facts.info)}::jsonb,
-          "lastSnapshotAt" = ${now},
           "updatedAt" = ${now}
       WHERE "id" = ${installationId}
     `;
+    await this.prisma.healthAgentState.upsert({
+      where: { installationId },
+      create: {
+        installationId,
+        appVersion: facts.appVersion ?? null,
+        env: facts.env ?? null,
+        instanceId: facts.instanceId ?? null,
+        lastSnapshotStatus: facts.status,
+        lastSnapshotInfo: facts.info as unknown as Prisma.InputJsonValue,
+        lastSnapshotAt: now,
+      },
+      update: {
+        appVersion: facts.appVersion ?? undefined,
+        env: facts.env ?? undefined,
+        instanceId: facts.instanceId ?? undefined,
+        lastSnapshotStatus: facts.status,
+        lastSnapshotInfo: facts.info as unknown as Prisma.InputJsonValue,
+        lastSnapshotAt: now,
+      },
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -335,13 +358,48 @@ export class HealthInstallationService
     return result;
   }
 
-  private credentialAudit(actor?: string): InstallationCredentialAudit {
-    return { recorder: this.auditLogService, resourceType: AUDIT_RESOURCE_TYPE, actorId: actor };
+  private async factsByInstallationId(installationIds: string[]) {
+    if (installationIds.length === 0) return new Map<string, HealthFacts>();
+    const rows = await this.prisma.healthAgentState.findMany({
+      where: { installationId: { in: installationIds } },
+    });
+    return new Map(rows.map((row) => [row.installationId, row]));
   }
 
-  private withDerivedState(row: HealthInstallation) {
-    const state = this.deriveState(row.lastSnapshotAt, row.lastSnapshotStatus);
-    const { tokenHash: _tokenHash, ...rest } = row;
-    return { ...rest, state };
+  private toView(installation: Installation, facts: HealthFacts | null): HealthInstallationView {
+    const lastSnapshotAt = facts?.lastSnapshotAt ?? null;
+    const lastSnapshotStatus = facts?.lastSnapshotStatus ?? null;
+    return {
+      id: installation.id,
+      label: installation.label,
+      externalRef: installation.externalRef,
+      appVersion: facts?.appVersion ?? null,
+      env: facts?.env ?? null,
+      instanceId: facts?.instanceId ?? null,
+      lastSnapshotStatus,
+      lastSnapshotInfo: facts?.lastSnapshotInfo ?? null,
+      lastSnapshotAt,
+      firstSeenAt: installation.firstSeenAt,
+      lastSeenAt: installation.lastSeenAt,
+      issuedAt: installation.issuedAt,
+      revokedAt: installation.revokedAt,
+      state: this.deriveState(lastSnapshotAt, lastSnapshotStatus),
+    };
+  }
+
+  private async recordAudit(
+    action: string,
+    resourceId: string,
+    actor?: string,
+    detail?: Record<string, unknown>,
+  ): Promise<void> {
+    await this.auditLogService.record({
+      action,
+      resourceType: AUDIT_RESOURCE_TYPE,
+      resourceId,
+      actorId: actor ?? null,
+      actorType: actor ? "user" : "system",
+      detail,
+    });
   }
 }

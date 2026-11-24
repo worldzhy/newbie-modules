@@ -3,7 +3,8 @@
   "layer": "infrastructure",
   "wiring": {
     "file": "security.module",
-    "className": "SecurityModule"
+    "className": "SecurityModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
     "modules": ["redis"],
@@ -27,7 +28,8 @@
       "SECURITY_DEFAULT_TOKEN_SECRET": "",
       "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
       "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
-      "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": ""
+      "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": "",
+      "INSTALLATION_TRUSTED_PROXY": "false"
     },
     "dependencies": {
       "@nestjs/passport": "latest",

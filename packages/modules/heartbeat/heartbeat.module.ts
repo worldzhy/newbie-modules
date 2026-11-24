@@ -1,9 +1,13 @@
 import { Global, Module } from "@nestjs/common";
 
-import { installationResolverToken } from "@modules/security/ports/installation.resolver";
+import { InstallationKindRegistry, InstallationKindWire } from "@modules/security/installation/installation-kind";
 import { InstallationController } from "./controllers/installation.controller";
 import { PingController } from "./controllers/ping.controller";
-import { HeartbeatInstallationService } from "./services/installation.service";
+import {
+  HeartbeatInstallationService,
+  ONLINE_THRESHOLD_SECONDS,
+  PING_INTERVAL_SECONDS,
+} from "./services/installation.service";
 
 /**
  * Heartbeat — pure liveness plane for deployment endpoints.
@@ -20,12 +24,21 @@ import { HeartbeatInstallationService } from "./services/installation.service";
 @Global()
 @Module({
   controllers: [InstallationController, PingController],
-  providers: [
-    HeartbeatInstallationService,
-    // Bind the installation credential store to security's SPI port (ADR-016);
-    // useExisting keeps the singleton so service state is never duplicated.
-    { provide: installationResolverToken("heartbeat"), useExisting: HeartbeatInstallationService },
-  ],
-  exports: [HeartbeatInstallationService, installationResolverToken("heartbeat")],
+  providers: [HeartbeatInstallationService],
+  exports: [HeartbeatInstallationService],
 })
-export class HeartbeatModule {}
+export class HeartbeatModule {
+  constructor(registry: InstallationKindRegistry) {
+    // Declare this collector's kind once (ADR-078 decision 3). Security
+    // executes the declaration and holds no heartbeat-specific constant.
+    registry.register({
+      kind: InstallationKindWire.HEARTBEAT,
+      endpoint: "/heartbeat/ping",
+      reportIntervalSeconds: PING_INTERVAL_SECONDS,
+      offlineAfterSeconds: ONLINE_THRESHOLD_SECONDS,
+      requiresAppKey: false,
+      budget: { perKey: { points: 120, durationSeconds: 60 }, scope: "token" },
+      legacyHeader: "x-heartbeat-token",
+    });
+  }
+}

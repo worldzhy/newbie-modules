@@ -1,7 +1,7 @@
 import { Inject, Injectable, UnauthorizedException } from "@nestjs/common";
 
+import { Installation } from "@generated/prisma/client";
 import { InstallationTouchThrottle } from "@modules/security/installation/installation-touch-throttle";
-import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 import { MonitorApplicationRefResolver, monitorApplicationRefResolverToken } from "./ports/application-ref.resolver";
 import { MonitorInstallationService } from "./services/monitor-installation.service";
 
@@ -11,33 +11,26 @@ export interface ResolvedMonitorToken {
   applicationId: string;
 }
 
-/** Self-reported batch facts refreshed onto the installation row (throttled). */
+/** Self-reported batch facts refreshed onto the installation fact row (throttled). */
 export interface IngestFacts {
   env?: string;
   appVersion?: string;
   instanceId?: string;
-  kind?: string;
+  runtime?: string;
 }
 
 /**
- * Resolves backend-monitor report tokens to BackendMonitorInstallation rows.
+ * Maps an authenticated installation to the identity stamped on ClickHouse
+ * rows.
  *
- * Token verification (format, SHA-256 hash, indexed lookup, revocation) is the
- * shared security verifier (ADR-019): results are never cached positively, so
- * a revoked or rotated token is rejected on the very next request. Only the
- * liveness write remains throttled — that is a throughput concern, not a
- * credential one.
- *
- * Implements security's InstallationResolver port (ADR-016): the
- * InstallationAuthGuard calls resolve(); the throttled liveness touch runs
- * separately via touchOnIngest() once the controller's facts are parsed.
+ * Token verification (format, SHA-256 hash, indexed lookup, revocation, kind)
+ * is the shared InstallationAuthGuard (ADR-078), which puts the resolved
+ * `Installation` on the request. This class only resolves the host-bound
+ * application identity and keeps the liveness write throttled — that is a
+ * throughput concern, not a credential one.
  */
 @Injectable()
-export class MonitorTokenResolver implements InstallationResolver {
-  readonly kind = "backend-monitor";
-  /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
-  readonly legacyHeader = "x-backend-monitor-token";
-
+export class MonitorTokenResolver {
   private readonly touchThrottle = new InstallationTouchThrottle();
 
   constructor(
@@ -47,16 +40,15 @@ export class MonitorTokenResolver implements InstallationResolver {
   ) {}
 
   /**
-   * Validates the token and returns installationId plus the resolved
-   * applicationId. Throws UnauthorizedException when malformed, unknown,
-   * revoked, or when the installation has no mappable application identity.
+   * Returns installationId plus the resolved applicationId. Throws
+   * UnauthorizedException when the installation has no mappable application
+   * identity.
    */
-  async resolve(token: string): Promise<ResolvedMonitorToken> {
-    const installation = await this.installations.resolveByToken(token);
-    const applicationId = installation?.externalRef
+  resolveForIngest(installation: Installation): ResolvedMonitorToken {
+    const applicationId = installation.externalRef
       ? this.applicationRefs.resolveApplicationId(installation.externalRef)
       : null;
-    if (!installation || !applicationId) {
+    if (!applicationId) {
       throw new UnauthorizedException("Invalid backend monitor report token.");
     }
     return { installationId: installation.id, applicationId };

@@ -1,5 +1,5 @@
 import { Global, Module } from "@nestjs/common";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 
 import { CookieModule } from "./cookie/cookie.module";
 import { TokenModule } from "./token/token.module";
@@ -11,6 +11,8 @@ import { NoAuthGuard } from "./authentication/public/public.guard";
 import { ApiKeyAuthGuard } from "./authentication/api-key/api-key.guard";
 import { GoogleAuthGuard } from "./authentication/google-oauth/google.guard";
 import { InstallationAuthGuard } from "./authentication/installation/installation.guard";
+import { InstallationReceiptsExceptionFilter } from "./authentication/installation/installation-receipts.exception-filter";
+import { InstallationReceiptsInterceptor } from "./authentication/installation/installation-receipts.interceptor";
 import { JwtAuthGuard } from "./authentication/jwt/jwt.guard";
 import { PasswordAuthGuard } from "./authentication/password/password.guard";
 import { RefreshTokenAuthGuard } from "./authentication/refresh-token/refresh-token.guard";
@@ -28,6 +30,11 @@ import {
   LimitTotpLoginByUserService,
 } from "./rate-limiter/rate-limiter.service";
 import { OwnershipGuard } from "./authorization/ownership.guard";
+import { InstallationBudgetService } from "./installation/installation-budget.service";
+import { InstallationCredentialService } from "./installation/installation-credential.service";
+import { InstallationKindRegistry } from "./installation/installation-kind";
+import { InstallationReceiptsService } from "./installation/installation-receipts";
+import { InstallationVerifier } from "./installation/installation-verifier";
 
 /**
  * Foundation security machinery: the global guard pipeline, authentication
@@ -71,6 +78,15 @@ import { OwnershipGuard } from "./authorization/ownership.guard";
     LimitLoginByUserService,
     LimitInstallationByTokenService,
     LimitTotpLoginByUserService,
+
+    // Installation identity shared by all collectors (ADR-078/079/080).
+    InstallationKindRegistry,
+    InstallationVerifier,
+    InstallationCredentialService,
+    InstallationBudgetService,
+    InstallationReceiptsService,
+    { provide: APP_INTERCEPTOR, useClass: InstallationReceiptsInterceptor },
+    { provide: APP_FILTER, useClass: InstallationReceiptsExceptionFilter },
   ],
   exports: [
     LimitAccessByIpService,
@@ -78,6 +94,11 @@ import { OwnershipGuard } from "./authorization/ownership.guard";
     LimitLoginByUserService,
     LimitInstallationByTokenService,
     LimitTotpLoginByUserService,
+    InstallationKindRegistry,
+    InstallationVerifier,
+    InstallationCredentialService,
+    InstallationBudgetService,
+    InstallationReceiptsService,
     TokenModule,
     CookieModule,
     JwtAuthGuard,

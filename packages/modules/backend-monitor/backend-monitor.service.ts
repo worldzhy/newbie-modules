@@ -1,8 +1,9 @@
 import { BadRequestException, Injectable, PayloadTooLargeException } from "@nestjs/common";
+import { Installation } from "@generated/prisma/client";
 import { ClickHouseService } from "@modules/clickhouse/clickhouse.service";
 import { toClickHouseDateTime } from "@modules/clickhouse/clickhouse-datetime.util";
 import { computeErrorFingerprint } from "./error-fingerprint.util";
-import { MonitorTokenResolver, ResolvedMonitorToken } from "./monitor-token.resolver";
+import { MonitorTokenResolver } from "./monitor-token.resolver";
 import {
   BackendMonitorErrorEventDto,
   BackendMonitorRequestEventDto,
@@ -29,7 +30,7 @@ const MAX_FUTURE_SKEW_MS = 60 * 1000; // 1 minute
 
 export interface RequestLogRow {
   application_id: string;
-  // BackendMonitorInstallation that reported the row (module-hub design §9.2,
+  // installation that reported the row (module-hub design §9.2,
   // Phase 3). application_id stays the leading partition/sort key so the
   // frontend query contract is unchanged.
   installation_id: string;
@@ -76,20 +77,19 @@ export class BackendMonitorService {
   ) {}
 
   /**
-   * Authenticates one batch against its BackendMonitorInstallation token and inserts
-   * its events into ClickHouse with at most one multi-row insert per
-   * non-empty event array. The installation id is stamped on every row;
-   * application_id is mapped from the installation's externalRef so existing
-   * application-scoped queries keep working unchanged.
+   * Inserts one authenticated batch into ClickHouse with at most one multi-row
+   * insert per non-empty event array. The installation id is stamped on every
+   * row; application_id is mapped from the installation's externalRef so
+   * existing application-scoped queries keep working unchanged.
    */
-  async ingest(resolved: ResolvedMonitorToken, body: CreateBackendMonitorIngestDto): Promise<void> {
+  async ingest(installation: Installation, body: CreateBackendMonitorIngestDto): Promise<void> {
     const env = body.env ?? "";
     const instanceId = body.instanceId ?? "";
     const appVersion = body.appVersion ?? "";
 
     // Authentication happened upstream in the InstallationAuthGuard (ADR-016);
     // refresh liveness/facts under the resolver's write throttle.
-    const { installationId, applicationId } = resolved;
+    const { installationId, applicationId } = this.monitorTokenResolver.resolveForIngest(installation);
     await this.monitorTokenResolver.touchOnIngest(installationId, {
       env: env || undefined,
       appVersion: appVersion || undefined,

@@ -9,6 +9,9 @@ import { FRONTEND_MONITOR_CONFIG } from "../../../shared/frontend-monitor-config
 import { UAParser } from "ua-parser-js";
 import { RedisKeys, RedisKeyPrefix, ReportType } from "../../../models/enum";
 import { getErrorMessage } from "@devbie/newbie/utilities/error-message.util";
+import { InstallationKind } from "@generated/prisma/client";
+import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { InstallationReceiptsService } from "@modules/security/installation/installation-receipts";
 
 // A report that keeps failing to flush is retried at most this many times
 // before it is parked in the dead-letter list (R15-01/R9-07).
@@ -77,6 +80,8 @@ export class FrontendMonitorReportTaskService {
     private readonly site: SiteService,
     private readonly models: FrontendMonitorModelsService,
     private readonly ch: FrontendMonitorClickHouseService,
+    private readonly prisma: PrismaService,
+    private readonly receipts: InstallationReceiptsService,
   ) {}
 
   private pushRow(bucket: Record<string, Record<string, unknown>[]>, appKey: string, row: Record<string, unknown>) {
@@ -372,8 +377,43 @@ export class FrontendMonitorReportTaskService {
         `web report flush failed; re-queued ${requeued}, dead-lettered ${deadLettered} reports for apps: ${[...failedAppIds].join(",")}`,
       );
     }
+    await this.publishPipelineState(rawsByApp, failedAppIds);
     if (failedItems) {
       this.logger.warn(`web report tick dropped ${failedItems} unparseable/poisoned report(s) out of ${raws.length}`);
+    }
+  }
+
+  /**
+   * Publish asynchronous pipeline state for every installation whose reports
+   * were in this tick (ADR-080). The client already received 200, so a
+   * dead-letter is invisible to it; this state is the only platform signal.
+   * Best effort: a failure here must not fail the drain tick.
+   */
+  private async publishPipelineState(rawsByApp: Record<string, string[]>, failedAppIds: Set<string>): Promise<void> {
+    const appKeys = Object.keys(rawsByApp);
+    if (appKeys.length === 0) return;
+    try {
+      const [queueDepth, deadLetterCount] = await Promise.all([
+        this.redis.getClient().llen(RedisKeys.FRONTEND_REPORT_DATAS),
+        this.redis.getClient().llen(RedisKeys.FRONTEND_REPORT_DEAD_LETTERS),
+      ]);
+      const installations = await this.prisma.installation.findMany({
+        where: { kind: InstallationKind.FRONTEND_MONITOR, appKey: { in: appKeys } },
+        select: { id: true, appKey: true },
+      });
+      const lastFailureAt = failedAppIds.size > 0 ? new Date().toISOString() : undefined;
+      await Promise.all(
+        installations.map((installation) => {
+          const failed = failedAppIds.has(installation.appKey ?? "");
+          return this.receipts.setPipelineState(installation.id, {
+            queueDepth,
+            deadLetterCount,
+            ...(failed && lastFailureAt ? { lastFailureAt } : {}),
+          });
+        }),
+      );
+    } catch (e) {
+      this.logger.warn("failed to publish frontend-monitor pipeline state", getErrorMessage(e));
     }
   }
 

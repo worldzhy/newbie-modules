@@ -33,35 +33,35 @@ export class InstallationController {
   // -- Installations ---------------------------------------------------------
 
   @Post("installations")
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.ModuleHubInstallation)
+  @RequirePermission(PermissionAction.Create, "ModuleHubInstallation")
   @ApiCreatedResponse()
   async create(@Body() body: CreateHubInstallationDto, @Req() request: UserRequest) {
     return this.installations.create({ ...body, actor: request.user.userId });
   }
 
   @Get("installations")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.ModuleHubInstallation)
+  @RequirePermission(PermissionAction.List, "ModuleHubInstallation")
   @ApiOkResponse()
   async list(@Query() query: ListHubInstallationsQueryDto) {
     return this.installations.list(query);
   }
 
   @Get("installations/:id")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.ModuleHubInstallation)
+  @RequirePermission(PermissionAction.Get, "ModuleHubInstallation")
   @ApiOkResponse()
   async get(@Param() params: CommonGetByStringIdRequestDto) {
     return this.installations.get(params.id);
   }
 
   @Get("installations/:id/modules")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.ModuleHubInstallation)
+  @RequirePermission(PermissionAction.Get, "ModuleHubInstallation")
   @ApiOkResponse()
   async modules(@Param() params: CommonGetByStringIdRequestDto) {
     return this.installations.getModules(params.id);
   }
 
   @Put("installations/:id/target-spec")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.ModuleHubInstallation)
+  @RequirePermission(PermissionAction.Update, "ModuleHubInstallation")
   @ApiOkResponse()
   async setTargetSpec(
     @Param() params: CommonGetByStringIdRequestDto,
@@ -72,14 +72,14 @@ export class InstallationController {
   }
 
   @Post("installations/:id/token/regenerate")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.ModuleHubInstallation)
+  @RequirePermission(PermissionAction.Update, "ModuleHubInstallation")
   @ApiOkResponse()
   async regenerateToken(@Param() params: CommonGetByStringIdRequestDto, @Req() request: UserRequest) {
     return this.installations.regenerateToken(params.id, request.user.userId);
   }
 
   @Delete("installations/:id")
-  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.ModuleHubInstallation)
+  @RequirePermission(PermissionAction.Delete, "ModuleHubInstallation")
   @ApiOkResponse()
   async revoke(@Param() params: CommonGetByStringIdRequestDto, @Req() request: UserRequest) {
     return this.installations.revoke(params.id, request.user.userId);

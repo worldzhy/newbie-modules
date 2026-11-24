@@ -1,13 +1,12 @@
 // !! ------------------------------------------------------------ //
 // !!                    [Module] Health models                    //
 // !! ------------------------------------------------------------ //
-// * HealthInstallation                                            //
+// * HealthAgentState                                             //
 // !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// One row per running deployment endpoint enrolled with a health token: a
-// newbie backend, a fewbie SSR process, or any other node service. The module
-// is project-agnostic: platform-side grouping stays in opaque `externalRef` and
-// is never parsed here.
+// Self-reported facts of a health installation. Identity and credential live
+// in the shared `Installation` row (module/security, ADR-078); this table is
+// 1:1 with it and keeps only what a snapshot reports.
 //
 // Unlike heartbeat, which records liveness only, a health row also keeps the
 // latest dependency snapshot: the aggregated status plus each indicator's
@@ -20,18 +19,13 @@
 // - snapshot within the threshold, any other status: degraded
 // - snapshot older than the threshold: offline
 //
-// Only revocation is persisted explicitly.
-model HealthInstallation {
+// `installationId` is a plain scalar, not a relation: Prisma relations cannot
+// cross schema boundaries in this repository, and the shared table must not
+// depend on optional collector modules. 1:1 is guaranteed by the write path.
+model HealthAgentState {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  // Human-readable label set at enrollment, e.g. "nightwatch-prod".
-  label String @db.VarChar(255)
-  // SHA-256 hex of the health token. The plaintext token is returned once at
-  // creation or rotation and never stored.
-  tokenHash String @unique @db.VarChar(64)
-
-  // Opaque platform-owned tag (e.g. "projectId/applicationId"); never parsed here.
-  externalRef String? @db.VarChar(255)
+  installationId String @unique @db.Uuid
 
   // Runtime facts self-reported on each snapshot; informational only.
   appVersion String? @db.VarChar(64)
@@ -45,19 +39,11 @@ model HealthInstallation {
   lastSnapshotInfo Json?
   lastSnapshotAt DateTime?
 
-  firstSeenAt DateTime?
-  lastSeenAt DateTime?
-
-  // Soft revocation: snapshots are rejected (401); rows are retained for audit.
-  revokedAt DateTime?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Host-side batch lookups key on `externalRef`; the offline sweep filters on
-  // `lastSnapshotAt`, which is written together with `lastSeenAt` on every
-  // snapshot.
-  @@index([externalRef])
+  // The offline sweep filters on `lastSnapshotAt`, which is written together
+  // with the installation's `lastSeenAt` on every snapshot.
   @@index([lastSnapshotAt])
   @@schema("module/health")
 }

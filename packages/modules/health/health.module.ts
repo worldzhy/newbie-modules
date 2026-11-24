@@ -1,9 +1,13 @@
 import { Global, Module } from "@nestjs/common";
 
-import { installationResolverToken } from "@modules/security/ports/installation.resolver";
+import { InstallationKindRegistry, InstallationKindWire } from "@modules/security/installation/installation-kind";
 import { InstallationController } from "./controllers/installation.controller";
 import { SnapshotController } from "./controllers/snapshot.controller";
-import { HealthInstallationService } from "./services/installation.service";
+import {
+  HealthInstallationService,
+  ONLINE_THRESHOLD_SECONDS,
+  SNAPSHOT_INTERVAL_SECONDS,
+} from "./services/installation.service";
 
 /**
  * Health — dependency health plane for deployment endpoints.
@@ -21,12 +25,21 @@ import { HealthInstallationService } from "./services/installation.service";
 @Global()
 @Module({
   controllers: [InstallationController, SnapshotController],
-  providers: [
-    HealthInstallationService,
-    // Bind the installation credential store to security's SPI port (ADR-016);
-    // useExisting keeps the singleton so service state is never duplicated.
-    { provide: installationResolverToken("health"), useExisting: HealthInstallationService },
-  ],
-  exports: [HealthInstallationService, installationResolverToken("health")],
+  providers: [HealthInstallationService],
+  exports: [HealthInstallationService],
 })
-export class HealthModule {}
+export class HealthModule {
+  constructor(registry: InstallationKindRegistry) {
+    // Declare this collector's kind once (ADR-078 decision 3). Security
+    // executes the declaration and holds no health-specific constant.
+    registry.register({
+      kind: InstallationKindWire.HEALTH,
+      endpoint: "/health/snapshot",
+      reportIntervalSeconds: SNAPSHOT_INTERVAL_SECONDS,
+      offlineAfterSeconds: ONLINE_THRESHOLD_SECONDS,
+      requiresAppKey: false,
+      budget: { perKey: { points: 120, durationSeconds: 60 }, scope: "token" },
+      legacyHeader: "x-health-token",
+    });
+  }
+}

@@ -20,7 +20,7 @@ import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 
 type Row = Record<string, unknown>;
 
-const INSTALLATION = { installationId: "inst-1", appKey: "APP1" };
+const INSTALLATION = { id: "inst-1", appKey: "APP1" };
 
 function harness(options: { site?: Row | null; listLength?: number } = {}) {
   const ops: string[] = [];
@@ -54,7 +54,7 @@ function harness(options: { site?: Row | null; listLength?: number } = {}) {
     },
   };
   const touched: string[] = [];
-  const tokenResolver = {
+  const installations = {
     touchOnReport: async (installationId: string) => {
       touched.push(installationId);
     },
@@ -63,7 +63,7 @@ function harness(options: { site?: Row | null; listLength?: number } = {}) {
     site as never,
     dayReportNum as never,
     redis as never,
-    tokenResolver as never,
+    installations as never,
   );
   return { controller, ops, lpushCalls, siteCalls, counted, touched };
 }

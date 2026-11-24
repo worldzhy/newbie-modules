@@ -1,49 +1,14 @@
 // !! ------------------------------------------------------------ //
 // !!               [Module] Frontend Monitor models               //
 // !! ------------------------------------------------------------ //
-// * FrontendMonitorInstallation                                   //
+// * (no Prisma models)                                            //
 // !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// One row per frontend application whose browser SDK reports to
-// /frontend-monitor/reports, identified by its report token. The token is a
-// random UUID; only its SHA-256 hash is stored, the plaintext is returned once
-// at enrollment or rotation, and revocation is a soft delete.
+// frontend-monitor has no fact columns of its own: identity, credential,
+// appKey and liveness all live in the shared `Installation` row
+// (module/security, ADR-078). Reports flow through Redis into Mongo /
+// ClickHouse and never add a Prisma column, so no `<Kind>AgentState` table
+// exists for this kind.
 //
-// `appKey` is an immutable public partition key embedded in Mongo collection
-// names (WebPages_<appKey>) and ClickHouse table names
-// (frontend_monitor_requests_<appKey>). It is generated at enrollment and never
-// rotated.
-//
-// Host-side grouping stays in opaque `externalRef` (convention:
-// "projectId/applicationId"); the application layer matches on it to render
-// credential state. Cross-schema references use scalar ids, never foreign keys.
-//
-// Liveness is derived from `lastSeenAt`, not stored: never seen (null), online,
-// or stale after three minutes without a report. Only revocation is persisted
-// explicitly.
-model FrontendMonitorInstallation {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-
-  // Human-readable label set at enrollment, e.g. "nightwatch-frontend-monitor".
-  label String @db.VarChar(255)
-  // SHA-256 hex of the report token. The plaintext token is returned once at
-  // creation or rotation and never stored.
-  tokenHash String @unique @db.VarChar(64)
-
-  // Public partition key embedded in storage names; never rotated.
-  appKey String @unique @db.VarChar(64)
-
-  // Opaque platform-owned tag (convention: "projectId/applicationId").
-  externalRef String? @db.VarChar(255)
-
-  firstSeenAt DateTime?
-  lastSeenAt  DateTime?
-
-  // Soft revocation: reports are rejected (401); rows are retained for history.
-  revokedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@schema("module/frontend-monitor")
-}
+// The `module/frontend-monitor` schema is still created by the host migration;
+// it carries no tables that Prisma manages.

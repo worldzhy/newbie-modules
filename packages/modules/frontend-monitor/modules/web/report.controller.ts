@@ -9,7 +9,8 @@ import { FRONTEND_MONITOR_CONFIG } from "../../shared/frontend-monitor-config";
 import { DayReportNumService } from "@modules/frontend-monitor/modules/day-report/day-report-num.service";
 import { RedisService } from "@modules/redis/redis.service";
 import { RedisKeys } from "../../models/enum";
-import { ResolvedWebToken, FrontendMonitorTokenResolver } from "../../services/frontend-monitor-token.resolver";
+import { Installation } from "@generated/prisma/client";
+import { FrontendMonitorInstallationService } from "../../services/frontend-monitor-installation.service";
 
 /**
  * Token-only public ingestion endpoint (ADR-016), the standard `reports`
@@ -17,9 +18,8 @@ import { ResolvedWebToken, FrontendMonitorTokenResolver } from "../../services/f
  * FrontendMonitorInstallation token travels in the request body because the
  * browser SDK posts via navigator.sendBeacon, which cannot set headers —
  * the documented exception to the Bearer standard. The InstallationAuthGuard
- * resolves appKey; appKey is no
- * longer a credential. Resolution is cached and liveness writes are
- * throttled.
+ * resolves the shared `Installation` row and its appKey; appKey is no longer a
+ * credential. Liveness writes are throttled.
  */
 @ApiTags("Frontend Monitor / Web / Report")
 @Controller("/frontend-monitor")
@@ -28,7 +28,7 @@ export class FrontendMonitorReportController {
     private readonly site: SiteService,
     private readonly dayReportNum: DayReportNumService,
     private readonly redis: RedisService,
-    private readonly tokenResolver: FrontendMonitorTokenResolver,
+    private readonly installations: FrontendMonitorInstallationService,
   ) {}
 
   @Post("reports")
@@ -37,7 +37,7 @@ export class FrontendMonitorReportController {
   @ApiOperation({ summary: "Web SDK data report endpoint" })
   @ApiResponse({ type: String })
   async webReport(
-    @Req() req: Request & { installation: ResolvedWebToken },
+    @Req() req: Request & { installation: Installation },
     @Headers() headers: Record<string, string | undefined>,
     @Body() body: Record<string, unknown> | string,
   ) {
@@ -51,8 +51,10 @@ export class FrontendMonitorReportController {
       throw new BadRequestException("Invalid report payload");
     }
 
-    const { installationId, appKey } = req.installation;
-    await this.tokenResolver.touchOnReport(installationId);
+    const installationId = req.installation.id;
+    const appKey = req.installation.appKey;
+    if (!appKey) throw new BadRequestException(`appKey: does not exist`);
+    await this.installations.touchOnReport(installationId);
     query.appKey = appKey;
     // The SDK submits its installation token in the body (sendBeacon cannot set
     // headers). It has done its job in the guard and must not reach the Redis

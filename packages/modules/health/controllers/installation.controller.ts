@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiCreatedResponse, ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { CommonGetByStringIdRequestDto } from "@devbie/newbie/common.dto";
-import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 
@@ -19,35 +19,35 @@ export class InstallationController {
   constructor(private readonly installations: HealthInstallationService) {}
 
   @Post("installations")
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.HealthInstallation)
+  @RequirePermission(PermissionAction.Create, "HealthInstallation")
   @ApiCreatedResponse()
   async create(@Body() body: CreateHealthInstallationDto, @Req() request: UserRequest) {
     return this.installations.create(body, request.user.userId);
   }
 
   @Get("installations")
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.HealthInstallation)
+  @RequirePermission(PermissionAction.List, "HealthInstallation")
   @ApiOkResponse()
   async list(@Query() query: ListHealthInstallationsQueryDto) {
     return this.installations.list(query);
   }
 
   @Get("installations/:id")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.HealthInstallation)
+  @RequirePermission(PermissionAction.Get, "HealthInstallation")
   @ApiOkResponse()
   async get(@Param() params: CommonGetByStringIdRequestDto) {
     return this.installations.get(params.id);
   }
 
   @Post("installations/:id/token/regenerate")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.HealthInstallation)
+  @RequirePermission(PermissionAction.Update, "HealthInstallation")
   @ApiOkResponse()
   async regenerateToken(@Param() params: CommonGetByStringIdRequestDto, @Req() request: UserRequest) {
     return this.installations.regenerateToken(params.id, request.user.userId);
   }
 
   @Delete("installations/:id")
-  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.HealthInstallation)
+  @RequirePermission(PermissionAction.Delete, "HealthInstallation")
   @ApiOkResponse()
   async revoke(@Param() params: CommonGetByStringIdRequestDto, @Req() request: UserRequest) {
     return this.installations.revoke(params.id, request.user.userId);
