@@ -94,10 +94,11 @@ export class FrontendMonitorInstallationService {
   }
 
   /** Exact-match lookup by the host-mapping tag ("projectId/applicationId"). */
-  async findByExternalRef(externalRef: string): Promise<Installation | null> {
-    return this.prisma.installation.findFirst({
+  async findByExternalRef(externalRef: string): Promise<FrontendMonitorInstallationView | null> {
+    const row = await this.prisma.installation.findFirst({
       where: { kind: InstallationKind.FRONTEND_MONITOR, externalRef },
     });
+    return row ? this.toView(row) : null;
   }
 
   /** Rotate the token; the old hash stops working immediately. */
