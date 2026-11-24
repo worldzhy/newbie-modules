@@ -154,8 +154,8 @@ export class InstallationKindRegistry implements OnApplicationBootstrap {
     }
     this.logger.warn(
       `Installation kinds ${perIpKinds.map((d) => d.kind).join(", ")} use a per-IP budget with ` +
-        "INSTALLATION_TRUSTED_PROXY disabled: x-real-ip / x-forwarded-for are ignored and the socket peer is used. " +
-        "Behind a reverse proxy, terminate client connections there and set INSTALLATION_TRUSTED_PROXY=true.",
+        "SECURITY_INSTALLATION_TRUSTED_PROXY disabled: x-real-ip / x-forwarded-for are ignored and the socket peer is used. " +
+        "Behind a reverse proxy, terminate client connections there and set SECURITY_INSTALLATION_TRUSTED_PROXY=true.",
     );
   }
 }

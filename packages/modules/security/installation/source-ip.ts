@@ -4,7 +4,7 @@ import { Request } from "express";
  * Source IP of a report request, for the per-IP installation budget (ADR-079).
  *
  * The headers are only trusted when the host sets
- * `security.installation.trustedProxy` (env INSTALLATION_TRUSTED_PROXY): the
+ * `security.installation.trustedProxy` (env SECURITY_INSTALLATION_TRUSTED_PROXY): the
  * deployment terminates client connections at a proxy that overwrites both
  * headers. When that guarantee is absent, reading them would let any caller
  * choose its own quota bucket, so the socket address is used instead. The

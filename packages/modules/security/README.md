@@ -60,5 +60,4 @@ from that environment's secret. An empty example renders `KEY=` for the operator
 | `SECURITY_DEFAULT_TOKEN_SECRET`       | empty   | required: `TokenService` asserts a non-public secret of at least 32 characters and fails startup otherwise                                                 |
 | `SECURITY_USER_ACCESS_TOKEN_SECRET`   | empty   | optional: falls back to `SECURITY_DEFAULT_TOKEN_SECRET`                                                                                                    |
 | `SECURITY_USER_REFRESH_TOKEN_SECRET`  | empty   | optional: falls back to `SECURITY_DEFAULT_TOKEN_SECRET`                                                                                                    |
-| `SECURITY_APIKEY_ACCESS_TOKEN_SECRET` | empty   | not read here: API-key authentication delegates to the host-bound `ApiKeyVerifier`                                                                         |
-| `INSTALLATION_TRUSTED_PROXY`          | `false` | only `"true"` trusts `x-real-ip` / `x-forwarded-for`; otherwise the socket peer feeds the per-IP budget and startup warns when such a budget is registered |
+| `SECURITY_INSTALLATION_TRUSTED_PROXY` | `false` | only `"true"` trusts `x-real-ip` / `x-forwarded-for`; otherwise the socket peer feeds the per-IP budget and startup warns when such a budget is registered |
