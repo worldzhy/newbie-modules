@@ -192,10 +192,13 @@ export const func = {
   isObject(input: unknown): input is Record<string, unknown> {
     return input !== null && typeof input === "object";
   },
-  // Coerce an untyped ingest value to Date; numeric values are epoch ms.
+  // Coerce an untyped value to Date. Numeric values and digits-only strings are
+  // epoch milliseconds; everything else is a date string, which since ADR-077
+  // D5 is an ISO-8601 instant (`...Z`) for query bounds.
   toDate(value: unknown) {
     if (value instanceof Date) return value;
     if (typeof value === "number") return new Date(value);
+    if (typeof value === "string" && /^\d+$/.test(value)) return new Date(Number(value));
     return new Date(String(value));
   },
   // Client-supplied timestamps must never poison the drain: an unparseable

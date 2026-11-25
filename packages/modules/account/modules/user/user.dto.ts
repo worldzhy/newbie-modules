@@ -15,6 +15,7 @@ import {
   MinLength,
 } from "class-validator";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
+import { IsIanaTimezone } from "@modules/account/helpers/timezone.validator";
 
 /**
  * Request DTO for creating a user (admin endpoint).
@@ -100,8 +101,8 @@ export class CreateUserDto {
   @IsOptional()
   status?: UserStatus;
 
-  @ApiPropertyOptional({ type: String })
-  @IsString()
+  @ApiPropertyOptional({ type: String, description: 'IANA timezone name, e.g. "Asia/Shanghai".' })
+  @IsIanaTimezone()
   @IsOptional()
   timezone?: string;
 
@@ -209,8 +210,8 @@ export class UpdateUserDto {
   @IsOptional()
   status?: UserStatus;
 
-  @ApiPropertyOptional({ type: String })
-  @IsString()
+  @ApiPropertyOptional({ type: String, description: 'IANA timezone name, e.g. "Asia/Shanghai".' })
+  @IsIanaTimezone()
   @IsOptional()
   timezone?: string;
 

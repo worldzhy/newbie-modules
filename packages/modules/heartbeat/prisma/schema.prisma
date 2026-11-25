@@ -1,49 +1,28 @@
 // !! ------------------------------------------------------------ //
 // !!                  [Module] Heartbeat models                   //
 // !! ------------------------------------------------------------ //
-// * HeartbeatInstallation                                         //
+// * HeartbeatAgentState                                          //
 // !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// One row per running deployment endpoint enrolled with a heartbeat token: a
-// newbie backend, a fewbie SSR process, or any other node service. The module
-// is project-agnostic: platform-side grouping stays in opaque `externalRef` and
-// is never parsed here.
+// Self-reported runtime facts of a heartbeat installation. Identity and
+// credential live in the shared `Installation` row (module/security, ADR-078);
+// this table is 1:1 with it and keeps only what a ping reports.
 //
-// Liveness is derived from `lastSeenAt`, not stored: never seen (null), online
-// (a ping within the last 90s, i.e. fewer than three missed 30s intervals), or
-// offline. Only revocation is persisted explicitly.
-model HeartbeatInstallation {
+// `installationId` is a plain scalar, not a relation: Prisma relations cannot
+// cross schema boundaries in this repository, and the shared table must not
+// depend on optional collector modules. 1:1 is guaranteed by the write path.
+model HeartbeatAgentState {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  // Human-readable label set at enrollment, e.g. "nightwatch-prod".
-  label String @db.VarChar(255)
-  // SHA-256 hex of the heartbeat token. The plaintext token is returned once
-  // at creation or rotation and never stored.
-  tokenHash String @unique @db.VarChar(64)
-
-  // Opaque platform-owned tag (e.g. "projectId/applicationId"); never parsed here.
-  externalRef String? @db.VarChar(255)
+  installationId String @unique @db.Uuid
 
   // Runtime facts self-reported on each ping; informational only.
-  // Deployed application version, e.g. a git sha or semver.
   appVersion String? @db.VarChar(64)
-  // Deployment environment, e.g. "prod".
   env String? @db.VarChar(64)
-  // Instance identifier, e.g. an EC2 instance id or a hostname.
   instanceId String? @db.VarChar(128)
-
-  firstSeenAt DateTime?
-  lastSeenAt  DateTime?
-
-  // Soft revocation: pings are rejected (401); rows are retained for audit.
-  revokedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Host-side list views batch on `externalRef`; the offline monitor scans
-  // `lastSeenAt` every minute.
-  @@index([externalRef])
-  @@index([lastSeenAt])
   @@schema("module/heartbeat")
 }

@@ -2,11 +2,10 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req } from "@
 import { ApiHeader, ApiOperation, ApiResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
-import { PermissionAction } from "@generated/prisma/client";
+import { Installation, PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 import { BackendMonitorService } from "./backend-monitor.service";
-import { ResolvedMonitorToken } from "./monitor-token.resolver";
 import {
   CreateBackendMonitorIngestDto,
   ListBackendMonitorErrorLogsRequestDto,
@@ -22,7 +21,7 @@ export class BackendMonitorController {
 
   /**
    * Batched ingestion endpoint for backend applications (ADR-016).
-   * Authentication is the BackendMonitorInstallation report token presented
+   * Authentication is the installation report token presented
    * as `Authorization: Bearer <token>` (X-Backend-Monitor-Token is a
    * deprecated alias during the SDK migration window), resolved by the
    * InstallationAuthGuard. One call carries request metrics and/or errors,
@@ -43,7 +42,7 @@ export class BackendMonitorController {
   @AllowAnyOrigin()
   @Post("ingest")
   async ingest(
-    @Req() req: Request & { installation: ResolvedMonitorToken },
+    @Req() req: Request & { installation: Installation },
     @Body() body: CreateBackendMonitorIngestDto,
   ): Promise<void> {
     await this.backendMonitorService.ingest(req.installation, body);

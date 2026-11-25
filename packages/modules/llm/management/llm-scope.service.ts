@@ -78,8 +78,10 @@ export class LlmScopeService {
    * appended so stale rows stay visible and can be unbound.
    */
   async list(): Promise<LlmScopeBindingResponseDto[]> {
-    const assignments = await this.prisma.llmScopeAssignment.findMany({ include: { connection: true } });
-    const byScope = new Map(assignments.map((assignment) => [assignment.scope, assignment]));
+    const assignments: AssignmentWithConnection[] = await this.prisma.llmScopeAssignment.findMany({
+      include: { connection: true },
+    });
+    const byScope = new Map(assignments.map((assignment) => [assignment.scope, assignment] as const));
     const rows = new Map<string, LlmScopeBindingResponseDto>();
 
     for (const definition of this.catalog.list()) {

@@ -1,23 +1,9 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { HeartbeatInstallation } from "@generated/prisma/client";
+import { Installation, InstallationKind } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
-import {
-  InstallationCredentialAudit,
-  InstallationCredentialStore,
-  issueInstallationCredential,
-  revokeInstallationCredential,
-  rotateInstallationCredential,
-} from "@modules/security/installation/installation-credential";
-import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
-import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
-import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
-import {
-  InstallationPresence,
-  isInstallationOnline,
-  withDerivedOnlineState,
-} from "@modules/security/installation/installation-presence";
-import { InstallationResolver } from "@modules/security/ports/installation.resolver";
+import { InstallationCredentialService } from "@modules/security/installation/installation-credential.service";
+import { InstallationPresence, isInstallationOnline } from "@modules/security/installation/installation-presence";
 
 /** Requested interval between client pings; echoed back in the ping response. */
 export const PING_INTERVAL_SECONDS = 30;
@@ -30,41 +16,40 @@ const ONLINE_THRESHOLD_MILLISECONDS = ONLINE_THRESHOLD_SECONDS * 1000;
 /** Audit resource type for installation credential events. */
 const AUDIT_RESOURCE_TYPE = "heartbeat-installation";
 
-/** Domain columns stored next to the credential (ADR-019). */
-interface HeartbeatInstallationDraft {
+/** Runtime facts stored per installation (module/heartbeat). */
+interface HeartbeatFacts {
+  appVersion?: string | null;
+  env?: string | null;
+  instanceId?: string | null;
+}
+
+/** Projection returned by the host integration API. No credential material. */
+export interface HeartbeatInstallationView {
+  id: string;
   label: string;
   externalRef: string | null;
+  appVersion: string | null;
+  env: string | null;
+  instanceId: string | null;
+  firstSeenAt: Date | null;
+  lastSeenAt: Date | null;
+  issuedAt: Date;
+  revokedAt: Date | null;
+  online: boolean;
 }
 
 /**
- * Installation registry for the heartbeat module. One token = one deployment
- * endpoint; the host pre-creates rows and distributes the plaintext token out
- * of band, and the running process touches lastSeenAt on every ping.
+ * Installation registry for the heartbeat module. Identity and credential
+ * live in the shared `Installation` row; this service adds the heartbeat
+ * fact projection and the liveness queries the host consumes.
  */
 @Injectable()
-export class HeartbeatInstallationService
-  extends BaseInstallationService<HeartbeatInstallation>
-  implements InstallationResolver
-{
-  readonly kind = "heartbeat";
-  /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
-  readonly legacyHeader = "x-heartbeat-token";
-
-  // Credential mechanism comes from security (ADR-019); this class only adapts
-  // its table and projects the domain state.
-  private readonly credentials: InstallationCredentialStore<HeartbeatInstallationDraft, HeartbeatInstallation>;
-  protected readonly tokenVerifier: InstallationTokenVerifier<HeartbeatInstallation>;
-
+export class HeartbeatInstallationService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly credentials: InstallationCredentialService,
     private readonly auditLogService: AuditLogService,
-  ) {
-    super();
-    this.credentials = prismaInstallationCredentialStore<HeartbeatInstallationDraft, HeartbeatInstallation>(
-      this.prisma.heartbeatInstallation,
-    );
-    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
-  }
+  ) {}
 
   // -------------------------------------------------------------------------
   // Installation lifecycle (host integration API)
@@ -72,45 +57,55 @@ export class HeartbeatInstallationService
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
   async create(input: { label: string; externalRef?: string }, actor?: string) {
-    const { record, token } = await issueInstallationCredential(
-      this.credentials,
-      { label: input.label, externalRef: input.externalRef ?? null },
-      {
-        ...this.credentialAudit(actor),
-        detail: { label: input.label, externalRef: input.externalRef ?? null },
-      },
-    );
-    return { ...this.withDerivedState(record), token };
+    const { installation, token } = await this.credentials.create({
+      kind: InstallationKind.HEARTBEAT,
+      label: input.label,
+      externalRef: input.externalRef ?? null,
+    });
+    await this.recordAudit("heartbeat.installation.created", installation.id, actor, {
+      label: input.label,
+      externalRef: input.externalRef ?? null,
+    });
+    return { ...this.toView(installation, null), token };
   }
 
   async list(query: { externalRef?: string }) {
-    const rows = await this.prisma.heartbeatInstallation.findMany({
-      where: query.externalRef ? { externalRef: query.externalRef } : undefined,
-      orderBy: { createdAt: "desc" },
+    const installations = await this.prisma.installation.findMany({
+      where: { kind: InstallationKind.HEARTBEAT, ...(query.externalRef ? { externalRef: query.externalRef } : {}) },
+      orderBy: { issuedAt: "desc" },
     });
-    return rows.map((row) => this.withDerivedState(row));
+    const facts = await this.factsByInstallationId(installations.map((row) => row.id));
+    return installations.map((row) => this.toView(row, facts.get(row.id) ?? null));
   }
 
   async getOrThrow(id: string) {
-    const row = await this.prisma.heartbeatInstallation.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException(`Installation ${id} not found.`);
-    return row;
+    const installation = await this.prisma.installation.findFirst({
+      where: { id, kind: InstallationKind.HEARTBEAT },
+    });
+    if (!installation) throw new NotFoundException(`Installation ${id} not found.`);
+    return installation;
   }
 
   async get(id: string) {
-    return this.withDerivedState(await this.getOrThrow(id));
+    const installation = await this.getOrThrow(id);
+    const facts = await this.prisma.heartbeatAgentState.findUnique({ where: { installationId: id } });
+    return this.toView(installation, facts);
   }
 
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return rotateInstallationCredential(this.credentials, id, this.credentialAudit(actor));
+    const rotated = await this.credentials.rotate(id);
+    await this.recordAudit("heartbeat.installation.token_rotated", id, actor);
+    return rotated;
   }
 
   /** Soft revocation: pings are rejected (401), rows are retained for audit. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
+    await this.credentials.setRevokedAt(id, new Date());
+    await this.recordAudit("heartbeat.installation.revoked", id, actor);
+    return { id, revokedAt: new Date() };
   }
 
   // -------------------------------------------------------------------------
@@ -126,9 +121,9 @@ export class HeartbeatInstallationService
    */
   async getPresenceByExternalRefs(externalRefs: string[]): Promise<Map<string, InstallationPresence>> {
     if (externalRefs.length === 0) return new Map();
-    const rows = await this.prisma.heartbeatInstallation.findMany({
-      where: { externalRef: { in: externalRefs } },
-      select: { externalRef: true, lastSeenAt: true, revokedAt: true },
+    const rows = await this.prisma.installation.findMany({
+      where: { kind: InstallationKind.HEARTBEAT, externalRef: { in: externalRefs } },
+      select: { externalRef: true, lastSeenAt: true, firstSeenAt: true, revokedAt: true },
     });
     const now = Date.now();
     const presenceByRef = new Map<string, InstallationPresence>();
@@ -137,13 +132,11 @@ export class HeartbeatInstallationService
       if (scoped.length === 0) continue;
       const active = scoped.filter((row) => !row.revokedAt);
       let lastSeenAt: Date | null = null;
+      let firstSeenAt: Date | null = null;
       let online = false;
       for (const row of active) {
-        // Any online installation keeps the whole ref online; lastSeenAt is
-        // the newest ping across the non-revoked installations sharing it.
-        if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
-          lastSeenAt = row.lastSeenAt;
-        }
+        if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) lastSeenAt = row.lastSeenAt;
+        if (row.firstSeenAt && (!firstSeenAt || row.firstSeenAt < firstSeenAt)) firstSeenAt = row.firstSeenAt;
         if (row.lastSeenAt != null && isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
         }
@@ -152,6 +145,7 @@ export class HeartbeatInstallationService
         enrolled: active.length > 0,
         online,
         lastSeenAt,
+        firstSeenAt,
         revokedOnly: active.length === 0,
       });
     }
@@ -161,9 +155,8 @@ export class HeartbeatInstallationService
   /**
    * Return installations that have stopped pinging: not revoked, have been
    * seen at least once, and whose lastSeenAt is older than the online
-   * threshold. The returned shape carries the self-reported runtime facts so
-   * callers (e.g. notification wiring) can render a useful alert without
-   * issuing a second query.
+   * threshold. Runtime facts are joined so callers can render an alert
+   * without a second query.
    */
   async findOfflineInstallations(): Promise<
     Array<{
@@ -176,23 +169,27 @@ export class HeartbeatInstallationService
     }>
   > {
     const cutoff = new Date(Date.now() - ONLINE_THRESHOLD_MILLISECONDS);
-    const rows = await this.prisma.heartbeatInstallation.findMany({
+    const rows = await this.prisma.installation.findMany({
       where: {
+        kind: InstallationKind.HEARTBEAT,
         revokedAt: null,
         lastSeenAt: { not: null, lt: cutoff },
       },
-      select: {
-        id: true,
-        label: true,
-        env: true,
-        instanceId: true,
-        appVersion: true,
-        lastSeenAt: true,
-      },
+      select: { id: true, label: true, lastSeenAt: true },
     });
-    // The where clause guarantees lastSeenAt is non-null; Prisma's type does
-    // not narrow on the `not: null` condition, so filter defensively.
-    return rows.filter((row): row is typeof row & { lastSeenAt: Date } => row.lastSeenAt !== null);
+    const offline = rows.filter((row): row is typeof row & { lastSeenAt: Date } => row.lastSeenAt !== null);
+    const facts = await this.factsByInstallationId(offline.map((row) => row.id));
+    return offline.map((row) => {
+      const state = facts.get(row.id);
+      return {
+        id: row.id,
+        label: row.label,
+        env: state?.env ?? null,
+        instanceId: state?.instanceId ?? null,
+        appVersion: state?.appVersion ?? null,
+        lastSeenAt: row.lastSeenAt,
+      };
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -200,41 +197,79 @@ export class HeartbeatInstallationService
   // -------------------------------------------------------------------------
 
   /**
-   * Advance liveness for an already-authenticated installation in a single
-   * round trip. Authentication happens upstream in the InstallationAuthGuard
-   * (ADR-016). firstSeenAt is written exactly once (COALESCE), lastSeenAt
-   * always advances, runtime facts refresh when sent.
+   * Advance liveness for an already-authenticated installation. Authentication
+   * happens upstream in InstallationAuthGuard (ADR-016). firstSeenAt is written
+   * exactly once, lastSeenAt always advances, runtime facts refresh when sent.
    */
-  async recordPing(
-    installationId: string,
-    facts: {
-      appVersion?: string;
-      env?: string;
-      instanceId?: string;
-    },
-  ): Promise<void> {
+  async recordPing(installationId: string, facts: HeartbeatFacts): Promise<void> {
     const now = new Date();
-    await this.prisma.$queryRaw`
-      UPDATE "module/heartbeat"."HeartbeatInstallation"
+    await this.prisma.$executeRaw`
+      UPDATE "module/security"."Installation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
-          "appVersion" = COALESCE(${facts.appVersion ?? null}, "appVersion"),
-          "env" = COALESCE(${facts.env ?? null}, "env"),
-          "instanceId" = COALESCE(${facts.instanceId ?? null}, "instanceId"),
           "updatedAt" = ${now}
       WHERE "id" = ${installationId}
     `;
+    await this.prisma.heartbeatAgentState.upsert({
+      where: { installationId },
+      create: {
+        installationId,
+        appVersion: facts.appVersion ?? null,
+        env: facts.env ?? null,
+        instanceId: facts.instanceId ?? null,
+      },
+      update: {
+        appVersion: facts.appVersion ?? undefined,
+        env: facts.env ?? undefined,
+        instanceId: facts.instanceId ?? undefined,
+      },
+    });
   }
 
   // -------------------------------------------------------------------------
   // Helpers
   // -------------------------------------------------------------------------
 
-  private credentialAudit(actor?: string): InstallationCredentialAudit {
-    return { recorder: this.auditLogService, resourceType: AUDIT_RESOURCE_TYPE, actorId: actor };
+  private async factsByInstallationId(installationIds: string[]) {
+    if (installationIds.length === 0) return new Map<string, HeartbeatFacts>();
+    const rows = await this.prisma.heartbeatAgentState.findMany({
+      where: { installationId: { in: installationIds } },
+    });
+    return new Map(rows.map((row) => [row.installationId, row]));
   }
 
-  private withDerivedState(row: HeartbeatInstallation) {
-    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
+  private toView(installation: Installation, facts: HeartbeatFacts | null): HeartbeatInstallationView {
+    const online =
+      !installation.revokedAt &&
+      installation.lastSeenAt != null &&
+      Date.now() - installation.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS;
+    return {
+      id: installation.id,
+      label: installation.label,
+      externalRef: installation.externalRef,
+      appVersion: facts?.appVersion ?? null,
+      env: facts?.env ?? null,
+      instanceId: facts?.instanceId ?? null,
+      firstSeenAt: installation.firstSeenAt,
+      lastSeenAt: installation.lastSeenAt,
+      issuedAt: installation.issuedAt,
+      revokedAt: installation.revokedAt,
+      online,
+    };
+  }
+
+  private async recordAudit(
+    action: string,
+    resourceId: string,
+    actor?: string,
+    detail?: Record<string, unknown>,
+  ): Promise<void> {
+    await this.auditLogService.record(action, {
+      resourceType: AUDIT_RESOURCE_TYPE,
+      resourceId,
+      actorId: actor ?? null,
+      actorType: actor ? "user" : "system",
+      detail,
+    });
   }
 }

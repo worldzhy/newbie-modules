@@ -67,11 +67,7 @@ export class PvuvipController {
     if (!endTime) throw new BadRequestException("endTime is required");
     const appKeys = await this.projectVisibility.visibleAppKeys(req.user.userId);
     const appKey = this.access.assertVisibleAppKey(appKeys, pickRequestId(req, "appKey"));
-    const rows = await this.pvuvipSrv.getHistoryPvUvIplistByRange(
-      appKey,
-      new Date(Number(beginTime)),
-      new Date(Number(endTime)),
-    );
+    const rows = await this.pvuvipSrv.getHistoryPvUvIplistByRange(appKey, func.toDate(beginTime), func.toDate(endTime));
     return func.result({ data: rows || [] });
   }
 

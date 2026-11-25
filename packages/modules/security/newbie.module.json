@@ -3,12 +3,16 @@
   "layer": "infrastructure",
   "wiring": {
     "file": "security.module",
-    "className": "SecurityModule"
+    "className": "SecurityModule",
+    "prismaSchema": "prisma/schema.prisma"
   },
   "requires": {
     "modules": ["redis"],
     "config": {
       "security": {
+        "installation": {
+          "trustedProxy": "process.env.SECURITY_INSTALLATION_TRUSTED_PROXY"
+        },
         "token": {
           "defaultSecret": "process.env.SECURITY_DEFAULT_TOKEN_SECRET",
           "userAccess": {
@@ -16,9 +20,6 @@
           },
           "userRefresh": {
             "secret": "process.env.SECURITY_USER_REFRESH_TOKEN_SECRET"
-          },
-          "apiKeyAccess": {
-            "secret": "process.env.SECURITY_APIKEY_ACCESS_TOKEN_SECRET"
           }
         }
       }
@@ -27,7 +28,7 @@
       "SECURITY_DEFAULT_TOKEN_SECRET": "",
       "SECURITY_USER_ACCESS_TOKEN_SECRET": "",
       "SECURITY_USER_REFRESH_TOKEN_SECRET": "",
-      "SECURITY_APIKEY_ACCESS_TOKEN_SECRET": ""
+      "SECURITY_INSTALLATION_TRUSTED_PROXY": "false"
     },
     "dependencies": {
       "@nestjs/passport": "latest",

@@ -23,6 +23,16 @@ export function hashInstallationToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/**
+ * Stable pseudonym of a token for receipts and diagnostics (ADR-078). It is
+ * not the stored hash and not a prefix of it, so a fingerprint never narrows
+ * a tokenHash lookup. 8 hex characters are enough: tokens are UUIDv4 (122
+ * random bits), so a collision only merges two sources inside one top-N list.
+ */
+export function installationTokenFingerprint(token: string): string {
+  return createHash("sha256").update(`installation-fingerprint:${token}`).digest("hex").slice(0, 8);
+}
+
 /** True when the value can be an installation token at all. */
 export function isInstallationTokenWellFormed(token: string): boolean {
   return INSTALLATION_TOKEN_PATTERN.test(token);

@@ -2,12 +2,12 @@ import { Body, Controller, Post, Req } from "@nestjs/common";
 import { ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
-import { ModuleHubInstallation } from "@generated/prisma/client";
+import { Installation } from "@generated/prisma/client";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 
 import { HubReportDto, HubReportResponseDto } from "../module-hub.dto";
 import { MODULE_HUB_ROUTES } from "../module-hub.routes";
-import { ModuleHubInstallationService } from "../services/installation.service";
+import { ModuleHubInstallationService, REPORT_INTERVAL_SECONDS } from "../services/installation.service";
 import { ModuleHubReleaseService } from "../services/release.service";
 
 /**
@@ -15,8 +15,8 @@ import { ModuleHubReleaseService } from "../services/release.service";
  *
  * Authentication is the installation token presented as
  * `Authorization: Bearer <token>` (the X-Module-Hub-Token header is a
- * deprecated alias during the SDK migration window), resolved against
- * ModuleHubInstallation.tokenHash by the InstallationAuthGuard.
+ * deprecated alias during the SDK migration window), resolved by the shared
+ * InstallationAuthGuard against a single `Installation` row (ADR-078).
  *
  * One endpoint carries two report kinds (design doc §4.2):
  * - "full": process-start self-registration with runtime facts and snapshot;
@@ -38,7 +38,7 @@ export class ReportController {
   @AllowAnyOrigin()
   @ApiCreatedResponse({ type: HubReportResponseDto })
   async report(
-    @Req() req: Request & { installation: ModuleHubInstallation },
+    @Req() req: Request & { installation: Installation },
     @Body() body: HubReportDto,
   ): Promise<HubReportResponseDto> {
     const installation = req.installation;
@@ -67,7 +67,7 @@ export class ReportController {
 
     return {
       serverTime: new Date(),
-      reportIntervalSeconds: 60,
+      reportIntervalSeconds: REPORT_INTERVAL_SECONDS,
       latestRegistrySourceCommit: (await this.releases.getLatestRegistrySourceCommit()) ?? undefined,
     };
   }

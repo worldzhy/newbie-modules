@@ -1,34 +1,27 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { ModuleHubInstallation, Prisma } from "@generated/prisma/client";
+import { Installation, InstallationKind, Prisma } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
-import {
-  InstallationCredentialAudit,
-  InstallationCredentialStore,
-  issueInstallationCredential,
-  revokeInstallationCredential,
-  rotateInstallationCredential,
-} from "@modules/security/installation/installation-credential";
-import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
-import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
-import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
+import { InstallationCredentialService } from "@modules/security/installation/installation-credential.service";
 import {
   DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
   InstallationPresence,
   isInstallationOnline,
-  withDerivedOnlineState,
 } from "@modules/security/installation/installation-presence";
-import { InstallationResolver } from "@modules/security/ports/installation.resolver";
 import { ModuleHubReleaseService } from "./release.service";
 
 /** An installation reports every 60s; three missed intervals marks it offline (design §4.2). */
+export const REPORT_INTERVAL_SECONDS = 60;
+
+/** Three missed 60s intervals marks an installation offline (design §4.2). */
 export const ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS;
+
+const ONLINE_THRESHOLD_MILLISECONDS = ONLINE_THRESHOLD_SECONDS * 1000;
 
 /**
  * Module-hub audit events that are NOT part of the shared credential
- * lifecycle (ADR-019). Credential events (enroll/rotate/revoke) come from
- * security's InstallationAuditEvent; routine reports (ping/full) are NOT
- * audited.
+ * lifecycle (ADR-019). Credential events (enroll/rotate/revoke) follow the
+ * shared naming below; routine reports (ping/full) are NOT audited.
  */
 export const ModuleHubAuditEvent = {
   INSTALLATION_TARGET_SPEC: "installation.target-spec",
@@ -37,11 +30,38 @@ export const ModuleHubAuditEvent = {
 /** Resource type for installation-scoped audit rows. */
 const AUDIT_RESOURCE_TYPE = "module-hub-installation";
 
-/** Domain columns stored next to the credential (ADR-019). */
-interface ModuleHubInstallationDraft {
+/** Facts stored per installation (module/module-hub). */
+interface ModuleHubFacts {
+  repoUrl?: string | null;
+  framework?: string | null;
+  frameworkVersion?: string | null;
+  appVersion?: string | null;
+  env?: string | null;
+  instanceId?: string | null;
+  registrySourceCommit?: string | null;
+  modulesSnapshot?: Prisma.JsonValue | null;
+  targetSpec?: Prisma.JsonValue | null;
+}
+
+/** Projection returned by the host integration API. No credential material. */
+export interface ModuleHubInstallationView {
+  id: string;
   label: string;
-  repoUrl: string | null;
   externalRef: string | null;
+  repoUrl: string | null;
+  framework: string | null;
+  frameworkVersion: string | null;
+  appVersion: string | null;
+  env: string | null;
+  instanceId: string | null;
+  registrySourceCommit: string | null;
+  modulesSnapshot: Prisma.JsonValue | null;
+  targetSpec: Prisma.JsonValue | null;
+  firstSeenAt: Date | null;
+  lastSeenAt: Date | null;
+  issuedAt: Date;
+  revokedAt: Date | null;
+  online: boolean;
 }
 
 // --- target-spec vs reported snapshot (read-time, design §3 targetSpec) ------
@@ -206,68 +226,49 @@ export function summarizeHintCoverage(snapshot: unknown, latestByKey: Map<string
 }
 
 /**
- * Installation registry. One token = one installation instance; the host
- * pre-creates rows and distributes the plaintext report token out of band,
- * and the running process self-registers runtime facts on its first full
- * report (process-start hook, design §5.1).
+ * Installation registry. Identity and credential live in the shared
+ * `Installation` row; this service adds the module-hub fact projection. The
+ * running process self-registers runtime facts on its first full report
+ * (process-start hook, design §5.1).
  */
 @Injectable()
-export class ModuleHubInstallationService
-  extends BaseInstallationService<ModuleHubInstallation>
-  implements InstallationResolver
-{
-  readonly kind = "module-hub";
-  /** Accepted during the SDK migration window; removed once all SDKs present Bearer tokens (ADR-016). */
-  readonly legacyHeader = "x-module-hub-token";
-
-  // Credential mechanism comes from security (ADR-019); this class only adapts
-  // its table and projects the domain state.
-  private readonly credentials: InstallationCredentialStore<ModuleHubInstallationDraft, ModuleHubInstallation>;
-  protected readonly tokenVerifier: InstallationTokenVerifier<ModuleHubInstallation>;
-
+export class ModuleHubInstallationService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly credentials: InstallationCredentialService,
     private readonly auditLogService: AuditLogService,
     private readonly releases: ModuleHubReleaseService,
-  ) {
-    super();
-    this.credentials = prismaInstallationCredentialStore<ModuleHubInstallationDraft, ModuleHubInstallation>(
-      this.prisma.moduleHubInstallation,
-    );
-    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
-  }
-
-  private credentialAudit(actor?: string): InstallationCredentialAudit {
-    return { recorder: this.auditLogService, resourceType: AUDIT_RESOURCE_TYPE, actorId: actor };
-  }
-
-  private withDerivedState(row: ModuleHubInstallation) {
-    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
-  }
+  ) {}
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
   async create(input: { label: string; repoUrl?: string; externalRef?: string; actor?: string }) {
-    const { record, token } = await issueInstallationCredential(
-      this.credentials,
-      {
-        label: input.label,
-        repoUrl: input.repoUrl ?? null,
-        externalRef: input.externalRef ?? null,
-      },
-      {
-        ...this.credentialAudit(input.actor),
-        detail: { label: input.label, externalRef: input.externalRef ?? null },
-      },
-    );
-    return { ...this.withDerivedState(record), token };
+    const { installation, token } = await this.credentials.create({
+      kind: InstallationKind.MODULE_HUB,
+      label: input.label,
+      externalRef: input.externalRef ?? null,
+    });
+    const facts = await this.prisma.moduleHubAgentState.upsert({
+      where: { installationId: installation.id },
+      create: { installationId: installation.id, repoUrl: input.repoUrl ?? null },
+      update: { repoUrl: input.repoUrl ?? undefined },
+    });
+    await this.recordAudit("module-hub.installation.created", installation.id, input.actor, {
+      label: input.label,
+      externalRef: input.externalRef ?? null,
+    });
+    return { ...this.toView(installation, facts), token };
   }
 
   async list(query: { externalRef?: string }) {
-    const rows = await this.prisma.moduleHubInstallation.findMany({
-      where: query.externalRef ? { externalRef: query.externalRef } : undefined,
-      orderBy: { createdAt: "desc" },
+    const installations = await this.prisma.installation.findMany({
+      where: {
+        kind: InstallationKind.MODULE_HUB,
+        ...(query.externalRef ? { externalRef: query.externalRef } : {}),
+      },
+      orderBy: { issuedAt: "desc" },
     });
-    return rows.map((row) => this.withDerivedState(row));
+    const facts = await this.factsByInstallationId(installations.map((row) => row.id));
+    return installations.map((row) => this.toView(row, facts.get(row.id) ?? null));
   }
 
   /**
@@ -279,9 +280,9 @@ export class ModuleHubInstallationService
    */
   async getPresenceByExternalRefs(externalRefs: string[]): Promise<Map<string, InstallationPresence>> {
     if (externalRefs.length === 0) return new Map();
-    const rows = await this.prisma.moduleHubInstallation.findMany({
-      where: { externalRef: { in: externalRefs } },
-      select: { externalRef: true, lastSeenAt: true, revokedAt: true },
+    const rows = await this.prisma.installation.findMany({
+      where: { kind: InstallationKind.MODULE_HUB, externalRef: { in: externalRefs } },
+      select: { externalRef: true, lastSeenAt: true, firstSeenAt: true, revokedAt: true },
     });
     const now = Date.now();
     const presenceByRef = new Map<string, InstallationPresence>();
@@ -290,6 +291,7 @@ export class ModuleHubInstallationService
       if (scoped.length === 0) continue;
       const active = scoped.filter((row) => !row.revokedAt);
       let lastSeenAt: Date | null = null;
+      let firstSeenAt: Date | null = null;
       let online = false;
       for (const row of active) {
         // Any online installation keeps the whole ref online; lastSeenAt is
@@ -297,7 +299,10 @@ export class ModuleHubInstallationService
         if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
           lastSeenAt = row.lastSeenAt;
         }
-        if (row.lastSeenAt != null && isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
+        if (row.firstSeenAt && (!firstSeenAt || row.firstSeenAt < firstSeenAt)) {
+          firstSeenAt = row.firstSeenAt;
+        }
+        if (isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
         }
       }
@@ -305,6 +310,7 @@ export class ModuleHubInstallationService
         enrolled: active.length > 0,
         online,
         lastSeenAt,
+        firstSeenAt,
         revokedOnly: active.length === 0,
       });
     }
@@ -312,13 +318,17 @@ export class ModuleHubInstallationService
   }
 
   async getOrThrow(id: string) {
-    const row = await this.prisma.moduleHubInstallation.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException(`Installation ${id} not found.`);
-    return row;
+    const installation = await this.prisma.installation.findFirst({
+      where: { id, kind: InstallationKind.MODULE_HUB },
+    });
+    if (!installation) throw new NotFoundException(`Installation ${id} not found.`);
+    return installation;
   }
 
   async get(id: string) {
-    return this.withDerivedState(await this.getOrThrow(id));
+    const installation = await this.getOrThrow(id);
+    const facts = await this.prisma.moduleHubAgentState.findUnique({ where: { installationId: id } });
+    return this.toView(installation, facts);
   }
 
   /**
@@ -328,17 +338,18 @@ export class ModuleHubInstallationService
    * derived `updateAvailable` flag against the registry release catalog.
    */
   async getModules(id: string) {
-    const row = await this.getOrThrow(id);
-    const targetSpec = (row.targetSpec as Record<string, unknown> | null) ?? null;
+    const installation = await this.getOrThrow(id);
+    const facts = await this.prisma.moduleHubAgentState.findUnique({ where: { installationId: id } });
+    const targetSpec = (facts?.targetSpec as Record<string, unknown> | null) ?? null;
     const catalog = await this.releases.getCatalog();
     const latestByKey = new Map(catalog.map((release) => [release.moduleKey, release]));
-    const actual = annotateUpdateAvailability(row.modulesSnapshot, latestByKey);
+    const actual = annotateUpdateAvailability(facts?.modulesSnapshot ?? null, latestByKey);
     return {
       actual,
       targetSpec,
-      reportedAt: row.lastSeenAt ?? null,
+      reportedAt: installation.lastSeenAt ?? null,
       comparison: compareTargetWithSnapshot(targetSpec, actual),
-      hint: summarizeHintCoverage(row.modulesSnapshot, latestByKey),
+      hint: summarizeHintCoverage(facts?.modulesSnapshot ?? null, latestByKey),
     };
   }
 
@@ -351,9 +362,13 @@ export class ModuleHubInstallationService
     await this.getOrThrow(id);
     // Nullable Json columns distinguish "clear the value" (DbNull) from
     // "store an object" (InputJsonValue); plain null is not accepted.
-    await this.prisma.moduleHubInstallation.update({
-      where: { id },
-      data: { targetSpec: spec === null ? Prisma.DbNull : (spec as Prisma.InputJsonValue) },
+    const targetSpec = spec === null ? Prisma.DbNull : (spec as Prisma.InputJsonValue);
+    // The fact row is created lazily by the first report; a host may set the
+    // target before that, so upsert instead of update.
+    await this.prisma.moduleHubAgentState.upsert({
+      where: { installationId: id },
+      create: { installationId: id, targetSpec },
+      update: { targetSpec },
     });
     await this.auditLogService.record(ModuleHubAuditEvent.INSTALLATION_TARGET_SPEC, {
       resourceType: AUDIT_RESOURCE_TYPE,
@@ -368,13 +383,18 @@ export class ModuleHubInstallationService
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return rotateInstallationCredential(this.credentials, id, this.credentialAudit(actor));
+    const rotated = await this.credentials.rotate(id);
+    await this.recordAudit("module-hub.installation.token_rotated", id, actor);
+    return rotated;
   }
 
   /** Soft revocation: reports are rejected (401), rows are retained for audit. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
+    const revokedAt = new Date();
+    await this.credentials.setRevokedAt(id, revokedAt);
+    await this.recordAudit("module-hub.installation.revoked", id, actor);
+    return { id, revokedAt };
   }
 
   /**
@@ -406,9 +426,9 @@ export class ModuleHubInstallationService
 
   /**
    * Self-registration of runtime facts on every report (design doc §4.2).
-   * - kind="ping": only refreshes lastSeenAt.
-   * - kind="full": writes firstSeenAt once (COALESCE) and refreshes all
-   *   runtime fact columns, modulesSnapshot and registrySourceCommit.
+   * - kind="ping": only refreshes the shared row's lastSeenAt.
+   * - kind="full": writes firstSeenAt once (COALESCE) and refreshes the fact
+   *   row (runtime columns, modulesSnapshot and registrySourceCommit).
    *
    * Routine reports (full and ping) are NOT audited.
    */
@@ -428,28 +448,95 @@ export class ModuleHubInstallationService
     const now = new Date();
     if (facts.kind === "ping") {
       await this.prisma.$executeRaw`
-        UPDATE "module/module-hub"."ModuleHubInstallation"
+        UPDATE "module/security"."Installation"
         SET "lastSeenAt" = ${now}, "updatedAt" = ${now}
-        WHERE "id" = ${id}::uuid
+        WHERE "id" = ${id}
       `;
       return;
     }
-    // kind === "full": refresh all runtime fact columns + modulesSnapshot.
-    const modules = facts.modules ? await this.withPinCommitDates(facts.modules) : null;
-    const modulesJson = modules ? JSON.stringify(modules) : null;
+    // kind === "full": advance liveness, then refresh the fact row.
     await this.prisma.$executeRaw`
-      UPDATE "module/module-hub"."ModuleHubInstallation"
+      UPDATE "module/security"."Installation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
-          "framework" = ${facts.framework ?? null},
-          "frameworkVersion" = ${facts.frameworkVersion ?? null},
-          "appVersion" = ${facts.appVersion ?? null},
-          "env" = ${facts.env ?? null},
-          "instanceId" = ${facts.instanceId ?? null},
-          "registrySourceCommit" = ${facts.registrySourceCommit ?? null},
-          "modulesSnapshot" = ${modulesJson}::jsonb,
           "updatedAt" = ${now}
-      WHERE "id" = ${id}::uuid
+      WHERE "id" = ${id}
     `;
+    const modules = facts.modules ? await this.withPinCommitDates(facts.modules) : undefined;
+    await this.prisma.moduleHubAgentState.upsert({
+      where: { installationId: id },
+      create: {
+        installationId: id,
+        framework: facts.framework ?? null,
+        frameworkVersion: facts.frameworkVersion ?? null,
+        appVersion: facts.appVersion ?? null,
+        env: facts.env ?? null,
+        instanceId: facts.instanceId ?? null,
+        registrySourceCommit: facts.registrySourceCommit ?? null,
+        modulesSnapshot: modules ? (modules as Prisma.InputJsonValue) : Prisma.DbNull,
+      },
+      update: {
+        framework: facts.framework ?? undefined,
+        frameworkVersion: facts.frameworkVersion ?? undefined,
+        appVersion: facts.appVersion ?? undefined,
+        env: facts.env ?? undefined,
+        instanceId: facts.instanceId ?? undefined,
+        registrySourceCommit: facts.registrySourceCommit ?? undefined,
+        modulesSnapshot: modules ? (modules as Prisma.InputJsonValue) : undefined,
+      },
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
+
+  private async factsByInstallationId(installationIds: string[]) {
+    if (installationIds.length === 0) return new Map<string, ModuleHubFacts>();
+    const rows = await this.prisma.moduleHubAgentState.findMany({
+      where: { installationId: { in: installationIds } },
+    });
+    return new Map(rows.map((row) => [row.installationId, row]));
+  }
+
+  private toView(installation: Installation, facts: ModuleHubFacts | null): ModuleHubInstallationView {
+    const online =
+      !installation.revokedAt &&
+      installation.lastSeenAt != null &&
+      Date.now() - installation.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS;
+    return {
+      id: installation.id,
+      label: installation.label,
+      externalRef: installation.externalRef,
+      repoUrl: facts?.repoUrl ?? null,
+      framework: facts?.framework ?? null,
+      frameworkVersion: facts?.frameworkVersion ?? null,
+      appVersion: facts?.appVersion ?? null,
+      env: facts?.env ?? null,
+      instanceId: facts?.instanceId ?? null,
+      registrySourceCommit: facts?.registrySourceCommit ?? null,
+      modulesSnapshot: facts?.modulesSnapshot ?? null,
+      targetSpec: facts?.targetSpec ?? null,
+      firstSeenAt: installation.firstSeenAt,
+      lastSeenAt: installation.lastSeenAt,
+      issuedAt: installation.issuedAt,
+      revokedAt: installation.revokedAt,
+      online,
+    };
+  }
+
+  private async recordAudit(
+    action: string,
+    resourceId: string,
+    actor?: string,
+    detail?: Record<string, unknown>,
+  ): Promise<void> {
+    await this.auditLogService.record(action, {
+      resourceType: AUDIT_RESOURCE_TYPE,
+      resourceId,
+      actorId: actor ?? null,
+      actorType: actor ? "user" : "system",
+      detail,
+    });
   }
 }

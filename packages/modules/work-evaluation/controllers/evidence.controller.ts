@@ -37,7 +37,7 @@ import {
 import { WorkEvaluationEvidenceService } from "../work-evaluation-evidence.service";
 import { WorkEvaluationInstallationService } from "../work-evaluation-installation.service";
 import { WorkEvaluationSessionStore } from "../work-evaluation-session.store";
-import { ResolvedWorkEvaluationInstallationToken } from "../work-evaluation-installation-token.resolver";
+import { Installation } from "@generated/prisma/client";
 
 /**
  * Evidence surface (ADR-024): the ingest endpoints the member-side installation
@@ -100,10 +100,10 @@ export class WorkEvaluationEvidenceController {
   @ApiResponse({ status: 204, description: "Workspaces stored." })
   @ApiResponse({ status: 401, description: "Invalid or revoked installation token." })
   async reportWorkspaces(
-    @Req() req: Request & { installation: ResolvedWorkEvaluationInstallationToken },
+    @Req() req: Request & { installation: Installation },
     @Body() body: CreateWorkEvaluationWorkspaceBatchRequestDto,
   ): Promise<void> {
-    const { developerId, installationId } = req.installation;
+    const { installationId, developerId } = await this.installations.resolveScope(req.installation.id);
     for (const workspace of body.workspaces) {
       await this.evidence.reportWorkspace(developerId, installationId, workspace);
     }
@@ -119,10 +119,10 @@ export class WorkEvaluationEvidenceController {
   @ApiResponse({ status: 400, description: `More than ${MAX_SESSIONS_PER_BATCH} sessions in one batch.` })
   @ApiResponse({ status: 401, description: "Invalid or revoked installation token." })
   async reportSessions(
-    @Req() req: Request & { installation: ResolvedWorkEvaluationInstallationToken },
+    @Req() req: Request & { installation: Installation },
     @Body() body: CreateWorkEvaluationSessionBatchRequestDto,
   ): Promise<void> {
-    const { developerId, installationId } = req.installation;
+    const { installationId, developerId } = await this.installations.resolveScope(req.installation.id);
 
     // Idempotent re-ingest: the PG index is an upsert keyed by
     // (developerId, externalSessionId), and transcript chunks dedupe on
@@ -163,10 +163,10 @@ export class WorkEvaluationEvidenceController {
   @ApiOperation({ summary: "Report declared work artifacts (declared layer) from company workspaces" })
   @ApiResponse({ status: 204, description: "Documents stored." })
   async reportDocuments(
-    @Req() req: Request & { installation: ResolvedWorkEvaluationInstallationToken },
+    @Req() req: Request & { installation: Installation },
     @Body() body: CreateWorkEvaluationDeclaredDocumentBatchRequestDto,
   ): Promise<void> {
-    const { developerId, installationId } = req.installation;
+    const { installationId, developerId } = await this.installations.resolveScope(req.installation.id);
     for (const document of body.documents) {
       await this.evidence.reportDocument(developerId, document);
     }

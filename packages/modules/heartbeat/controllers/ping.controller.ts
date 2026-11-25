@@ -2,7 +2,7 @@ import { Body, Controller, Post, Req } from "@nestjs/common";
 import { ApiCreatedResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
 import { AllowAnyOrigin } from "@devbie/newbie/cors/allow-any-origin.decorator";
-import { HeartbeatInstallation } from "@generated/prisma/client";
+import { Installation } from "@generated/prisma/client";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 
 import { HeartbeatPingDto, HeartbeatPingResponseDto } from "../heartbeat.dto";
@@ -30,7 +30,7 @@ export class PingController {
   @AllowAnyOrigin()
   @ApiCreatedResponse({ type: HeartbeatPingResponseDto })
   async ping(
-    @Req() req: Request & { installation: HeartbeatInstallation },
+    @Req() req: Request & { installation: Installation },
     @Body() body: HeartbeatPingDto,
   ): Promise<HeartbeatPingResponseDto> {
     await this.installations.recordPing(req.installation.id, {

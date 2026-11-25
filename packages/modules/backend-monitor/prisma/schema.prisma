@@ -1,33 +1,28 @@
 // !! ------------------------------------------------------------ //
 // !!               [Module] Backend Monitor models                //
 // !! ------------------------------------------------------------ //
-// * BackendMonitorInstallation                                    //
+// * BackendMonitorAgentState                                     //
 // !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
-// One row per deployment endpoint that reports backend request metrics and
-// error logs, identified by its report token. The token is a random UUID; only
-// its SHA-256 hash is stored, the plaintext is returned once at enrollment or
-// rotation, and revocation is a soft delete.
+// Self-reported facts of a backend-monitor installation, which reports backend
+// request metrics and error logs. Identity and credential live in the shared
+// `Installation` row (module/security, ADR-078); this table is 1:1 with it and
+// keeps only what an ingest batch carries.
 //
-// Host-side grouping stays in opaque `externalRef` (convention:
-// "projectId/applicationId"). A host-bound resolver maps it to the
+// Host-side grouping stays in the shared row's opaque `externalRef`
+// (convention: "projectId/applicationId"). A host-bound resolver maps it to the
 // applicationId stamped on ClickHouse rows.
 //
-// Liveness is derived from `lastSeenAt`, not stored: never seen (null), online,
-// or stale after three minutes without a batch. Only revocation is persisted
-// explicitly.
-model BackendMonitorInstallation {
+// Liveness (never seen / online / stale after three minutes without a batch) is
+// derived at read time from the shared row's `lastSeenAt`.
+//
+// `installationId` is a plain scalar, not a relation: Prisma relations cannot
+// cross schema boundaries in this repository, and the shared table must not
+// depend on optional collector modules. 1:1 is guaranteed by the write path.
+model BackendMonitorAgentState {
   id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
 
-  // Human-readable label set at enrollment, e.g. "nightwatch-prod".
-  label String @db.VarChar(255)
-  // SHA-256 hex of the report token. The plaintext token is returned once at
-  // creation or rotation and never stored.
-  tokenHash String @unique @db.VarChar(64)
-
-  // Opaque platform-owned tag (convention: "projectId/applicationId"); the ingest
-  // resolver maps it to the applicationId used on ClickHouse rows.
-  externalRef String? @db.VarChar(255)
+  installationId String @unique @db.Uuid
 
   // Runtime facts refreshed from ingest batches; informational only.
   // Deployment environment, e.g. "prod".
@@ -36,14 +31,9 @@ model BackendMonitorInstallation {
   appVersion String? @db.VarChar(64)
   // Reporting instance identifier, e.g. an EC2 instance id or a hostname.
   instanceId String? @db.VarChar(128)
-  // Reporter family, e.g. "newbie"; informational.
-  kind String? @db.VarChar(32)
-
-  firstSeenAt DateTime?
-  lastSeenAt  DateTime?
-
-  // Soft revocation: ingest is rejected (401); rows are retained for history.
-  revokedAt DateTime?
+  // Runtime/reporter family, e.g. "newbie". Named `runtime` so it is not
+  // confused with the installation-level `kind` on the shared row.
+  runtime String? @db.VarChar(32)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

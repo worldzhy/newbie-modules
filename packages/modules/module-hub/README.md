@@ -21,14 +21,24 @@ missed webhook delivery). Both share the same idempotent upsert.
 
 ## Environment Variables
 
-This module declares **no** variables in `newbie.module.json`, so `newbie modules apply` adds nothing to the consumer's `.env.example` or config block. Every setting below is optional and read from the environment at runtime (compose passes `.env` through).
+Both settings are declared under `requires.env` in `newbie.module.json`, so
+`newbie modules apply` renders them into the consumer's `.env.example` and every
+environment must provision the key (devbie ADR-033); the example value is scaffolding,
+never a runtime default. Each key is read through the generated `modules.moduleHub`
+config subtree, not from `process.env` directly.
+
+- `MODULE_HUB_GITHUB_WEBHOOK_SECRET` — an empty value disables the webhook path:
+  deliveries are rejected and the daily cron sync is the only ingestion path.
+- `MODULE_HUB_REGISTRY_REPO` — example `worldzhy/newbie-modules`; leave it blank and the
+  catalog sync requests an empty repository, so blank is a misconfiguration rather than
+  a fallback.
 
 The catalog sync reads GitHub through the `github` module, so a configured GitHub credential is a **required dependency of installing module-hub, not an option**. This module declares `github` under `requires.modules`, and the host must provide `GITHUB_AUTH` (or the App triplet). A host without a credential fails the sync; there is no anonymous fallback.
 
-| Variable                           | Required                                | Description                                                                                                               |
-| ---------------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `MODULE_HUB_REGISTRY_REPO`         | No (default: `worldzhy/newbie-modules`) | Registry repository read by the catalog sync                                                                              |
-| `MODULE_HUB_GITHUB_WEBHOOK_SECRET` | No (webhook disabled when unset)        | GitHub webhook HMAC secret; without it webhook deliveries are rejected and the daily cron sync is the only ingestion path |
+| Variable                           | Empty value                       | Description                                                                                                               |
+| ---------------------------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `MODULE_HUB_REGISTRY_REPO`         | sync requests an empty repository | Registry repository read by the catalog sync (example: `worldzhy/newbie-modules`)                                         |
+| `MODULE_HUB_GITHUB_WEBHOOK_SECRET` | webhook disabled                  | GitHub webhook HMAC secret; without it webhook deliveries are rejected and the daily cron sync is the only ingestion path |
 
 ## Upgrade Hints
 

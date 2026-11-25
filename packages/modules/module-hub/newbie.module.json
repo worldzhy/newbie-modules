@@ -8,6 +8,16 @@
   },
   "requires": {
     "modules": ["audit", "github", "security"],
+    "config": {
+      "moduleHub": {
+        "githubWebhookSecret": "process.env.MODULE_HUB_GITHUB_WEBHOOK_SECRET",
+        "registryRepo": "process.env.MODULE_HUB_REGISTRY_REPO"
+      }
+    },
+    "env": {
+      "MODULE_HUB_GITHUB_WEBHOOK_SECRET": "",
+      "MODULE_HUB_REGISTRY_REPO": "worldzhy/newbie-modules"
+    },
     "dependencies": {
       "@devbie/module-hub-cli": "^1.0.2"
     }

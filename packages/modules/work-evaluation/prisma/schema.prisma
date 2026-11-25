@@ -17,7 +17,7 @@
 // * WorkEvaluationWorkspace                                       //
 // * WorkEvaluationSession                                         //
 // * WorkEvaluationDeclaredDocument                                //
-// * WorkEvaluationInstallation                                    //
+// * WorkEvaluationAgentState                                      //
 // !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 enum WorkEvaluationPeriodType {
@@ -93,8 +93,6 @@ model WorkEvaluationWorkspace {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  installation   WorkEvaluationInstallation? @relation(fields: [installationId], references: [id], onDelete: SetNull)
-
   @@unique([developerId, workspaceKey])
   @@index([developerId])
   @@schema("module/work-evaluation")
@@ -158,24 +156,18 @@ model WorkEvaluationDeclaredDocument {
   @@schema("module/work-evaluation")
 }
 
-/// Enrollment for the member-side installation agent. Same shape as the
-/// backend-monitor installation: a random UUID token, a SHA-256 hash at rest,
-/// plaintext returned once, soft revocation. The row binds the evaluatee the
-/// token may report for, so an installation agent can never write sessions for
-/// someone else.
-model WorkEvaluationInstallation {
-  id               String  @id @default(uuid()) @db.Uuid
-  label            String  @db.VarChar(128)
-  developerId  String  @db.Uuid
-  tokenHash        String  @unique @db.VarChar(64)
+/// Self-reported facts of a member-side installation agent. Identity and
+/// credential live in the shared `Installation` row (module/security, ADR-078);
+/// this table is 1:1 with it and keeps only the evaluatee binding and host
+/// facts. `developerId` is the single authorization fact for ingest: an agent
+/// may only write evidence for its own evaluatee.
+model WorkEvaluationAgentState {
+  id               String @id @default(uuid()) @db.Uuid
+  installationId   String @unique @db.Uuid
+  developerId      String @db.Uuid
   hostname         String? @db.VarChar(255)
-  firstSeenAt      DateTime?
-  lastSeenAt       DateTime?
-  revokedAt        DateTime?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-
-  workspaces WorkEvaluationWorkspace[]
 
   @@index([developerId])
   @@schema("module/work-evaluation")

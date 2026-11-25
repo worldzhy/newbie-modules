@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 
@@ -20,7 +20,7 @@ export class InstallationController {
   constructor(private readonly installations: MonitorInstallationService) {}
 
   @Post()
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.BackendMonitorInstallation)
+  @RequirePermission(PermissionAction.Create, "BackendMonitorInstallation")
   @ApiOperation({ summary: "Enroll a backend-monitor deployment installation" })
   @ApiCreatedResponse()
   create(@Body() body: CreateMonitorInstallationDto, @Req() request: UserRequest) {
@@ -28,7 +28,7 @@ export class InstallationController {
   }
 
   @Get()
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.BackendMonitorInstallation)
+  @RequirePermission(PermissionAction.List, "BackendMonitorInstallation")
   @ApiOperation({ summary: "List backend-monitor installations" })
   @ApiOkResponse()
   list(@Query() query: ListMonitorInstallationsQueryDto) {
@@ -36,7 +36,7 @@ export class InstallationController {
   }
 
   @Get(":id")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.BackendMonitorInstallation)
+  @RequirePermission(PermissionAction.Get, "BackendMonitorInstallation")
   @ApiOperation({ summary: "Get one backend-monitor installation" })
   @ApiOkResponse()
   get(@Param("id") id: string) {
@@ -44,7 +44,7 @@ export class InstallationController {
   }
 
   @Post(":id/token/regenerate")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.BackendMonitorInstallation)
+  @RequirePermission(PermissionAction.Update, "BackendMonitorInstallation")
   @ApiOperation({ summary: "Rotate the report token (plaintext returned once)" })
   @ApiOkResponse()
   regenerate(@Param("id") id: string, @Req() request: UserRequest) {
@@ -52,7 +52,7 @@ export class InstallationController {
   }
 
   @Delete(":id")
-  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.BackendMonitorInstallation)
+  @RequirePermission(PermissionAction.Delete, "BackendMonitorInstallation")
   @ApiOperation({ summary: "Revoke an installation; subsequent ingest gets 401" })
   @ApiOkResponse()
   revoke(@Param("id") id: string, @Req() request: UserRequest) {

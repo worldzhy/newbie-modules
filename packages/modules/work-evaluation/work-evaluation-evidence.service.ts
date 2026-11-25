@@ -87,7 +87,7 @@ export class WorkEvaluationEvidenceService {
     const starts = inputs.map((input) => input.startedAt.getTime());
     const periods = await this.prisma.workEvaluationPeriod.findMany({
       where: {
-        type: WorkEvaluationPeriodType.COLLECTION,
+        phase: WorkEvaluationPeriodType.COLLECTION,
         periodStart: { lte: new Date(Math.max(...starts)) },
         periodEnd: { gt: new Date(Math.min(...starts)) },
       },

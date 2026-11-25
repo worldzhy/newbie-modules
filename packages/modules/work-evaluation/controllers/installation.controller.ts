@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Post, Query, Req } from "@nestjs/common";
 import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { PermissionAction, Prisma } from "@generated/prisma/client";
+import { PermissionAction } from "@generated/prisma/client";
 import { RequirePermission } from "@modules/security/authorization/require-permission.decorator";
 import { UserRequest } from "@modules/security/security.interface";
 
@@ -29,7 +29,7 @@ export class WorkEvaluationInstallationController {
   constructor(private readonly installations: WorkEvaluationInstallationService) {}
 
   @Post()
-  @RequirePermission(PermissionAction.Create, Prisma.ModelName.WorkEvaluationInstallation)
+  @RequirePermission(PermissionAction.Create, "WorkEvaluationInstallation")
   @ApiOperation({ summary: "Enroll a member's installation agent (plaintext token returned once)" })
   @ApiCreatedResponse({ type: WorkEvaluationInstallationCredentialResponseDto })
   create(@Body() body: CreateWorkEvaluationInstallationRequestDto, @Req() request: UserRequest) {
@@ -37,7 +37,7 @@ export class WorkEvaluationInstallationController {
   }
 
   @Get()
-  @RequirePermission(PermissionAction.List, Prisma.ModelName.WorkEvaluationInstallation)
+  @RequirePermission(PermissionAction.List, "WorkEvaluationInstallation")
   @ApiOperation({ summary: "List installations" })
   @ApiOkResponse({ type: WorkEvaluationInstallationResponseDto, isArray: true })
   list(@Query() query: ListWorkEvaluationInstallationsRequestDto) {
@@ -52,7 +52,7 @@ export class WorkEvaluationInstallationController {
   }
 
   @Get(":id")
-  @RequirePermission(PermissionAction.Get, Prisma.ModelName.WorkEvaluationInstallation)
+  @RequirePermission(PermissionAction.Get, "WorkEvaluationInstallation")
   @ApiOperation({ summary: "Get one installation (no token)" })
   @ApiOkResponse({ type: WorkEvaluationInstallationResponseDto })
   get(@Param() params: GetWorkEvaluationByIdRequestDto) {
@@ -60,7 +60,7 @@ export class WorkEvaluationInstallationController {
   }
 
   @Post(":id/token/regenerate")
-  @RequirePermission(PermissionAction.Update, Prisma.ModelName.WorkEvaluationInstallation)
+  @RequirePermission(PermissionAction.Update, "WorkEvaluationInstallation")
   @ApiOperation({ summary: "Rotate the installation token (plaintext returned once)" })
   @ApiCreatedResponse({ type: WorkEvaluationInstallationCredentialResponseDto })
   regenerate(@Param() params: GetWorkEvaluationByIdRequestDto, @Req() request: UserRequest) {
@@ -68,7 +68,7 @@ export class WorkEvaluationInstallationController {
   }
 
   @Delete(":id")
-  @RequirePermission(PermissionAction.Delete, Prisma.ModelName.WorkEvaluationInstallation)
+  @RequirePermission(PermissionAction.Delete, "WorkEvaluationInstallation")
   @ApiOperation({ summary: "Revoke an installation agent; subsequent ingest gets 401" })
   @ApiOkResponse()
   revoke(@Param() params: GetWorkEvaluationByIdRequestDto, @Req() request: UserRequest) {

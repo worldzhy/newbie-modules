@@ -1,97 +1,101 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { BackendMonitorInstallation } from "@generated/prisma/client";
+import { Installation, InstallationKind } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { AuditLogService } from "@modules/audit/audit-log.service";
-import {
-  InstallationCredentialAudit,
-  InstallationCredentialStore,
-  issueInstallationCredential,
-  revokeInstallationCredential,
-  rotateInstallationCredential,
-} from "@modules/security/installation/installation-credential";
-import { prismaInstallationCredentialStore } from "@modules/security/installation/prisma-installation-credential-store";
-import { InstallationTokenVerifier } from "@modules/security/installation/installation-token.verifier";
-import { BaseInstallationService } from "@modules/security/installation/base-installation.service";
+import { InstallationCredentialService } from "@modules/security/installation/installation-credential.service";
 import {
   DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
   InstallationPresence,
   isInstallationOnline,
-  withDerivedOnlineState,
 } from "@modules/security/installation/installation-presence";
 
-/** Probes flush roughly every 5s; three minutes without a batch marks stale. */
+/** Probes flush roughly every minute; three missed batches marks stale. */
+export const REPORT_INTERVAL_SECONDS = 60;
+
+/** Three minutes without a batch marks an installation stale. */
 export const ONLINE_THRESHOLD_SECONDS = DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS;
+
+const ONLINE_THRESHOLD_MILLISECONDS = ONLINE_THRESHOLD_SECONDS * 1000;
 
 /** Audit resource type for installation credential events. */
 const AUDIT_RESOURCE_TYPE = "backend-monitor-installation";
 
-/** Domain columns stored next to the credential (ADR-019). */
-interface BackendMonitorInstallationDraft {
+/** Facts stored per installation (module/backend-monitor). */
+interface BackendMonitorFacts {
+  env?: string | null;
+  appVersion?: string | null;
+  instanceId?: string | null;
+  runtime?: string | null;
+}
+
+/** Projection returned by the host integration API. No credential material. */
+export interface MonitorInstallationView {
+  id: string;
   label: string;
   externalRef: string | null;
   env: string | null;
+  appVersion: string | null;
+  instanceId: string | null;
+  /** Reporter family, formerly the fact column `kind` (now `runtime`). */
   kind: string | null;
+  firstSeenAt: Date | null;
+  lastSeenAt: Date | null;
+  issuedAt: Date;
+  revokedAt: Date | null;
+  online: boolean;
 }
 
 /**
  * Registry of backend-monitor deployment endpoints (module-hub design §9.2,
- * Phase 3 pilot). One token = one installation; the running process presents
- * it as X-Backend-Monitor-Token on /backend-monitor/ingest.
- *
- * Token generation, hashing, lifecycle and verification come from security
- * (ADR-019); this class only adapts the table and projects domain state.
+ * Phase 3 pilot). Identity and credential live in the shared `Installation`
+ * row; this service adds the ingest fact projection and liveness queries the
+ * host consumes. The running process presents its token as
+ * X-Backend-Monitor-Token on /backend-monitor/ingest.
  */
 @Injectable()
-export class MonitorInstallationService extends BaseInstallationService<BackendMonitorInstallation> {
-  private readonly credentials: InstallationCredentialStore<
-    BackendMonitorInstallationDraft,
-    BackendMonitorInstallation
-  >;
-  protected readonly tokenVerifier: InstallationTokenVerifier<BackendMonitorInstallation>;
-
+export class MonitorInstallationService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly credentials: InstallationCredentialService,
     private readonly auditLogService: AuditLogService,
-  ) {
-    super();
-    this.credentials = prismaInstallationCredentialStore<BackendMonitorInstallationDraft, BackendMonitorInstallation>(
-      this.prisma.backendMonitorInstallation,
-    );
-    this.tokenVerifier = new InstallationTokenVerifier(this.credentials);
-  }
-
-  private credentialAudit(actor?: string): InstallationCredentialAudit {
-    return { recorder: this.auditLogService, resourceType: AUDIT_RESOURCE_TYPE, actorId: actor };
-  }
-
-  private withDerivedState(row: BackendMonitorInstallation) {
-    return withDerivedOnlineState(row, ONLINE_THRESHOLD_SECONDS);
-  }
+  ) {}
 
   /** Enroll a new installation. The plaintext token is returned ONCE. */
   async create(input: { label: string; externalRef?: string; env?: string; kind?: string }, actor?: string) {
-    const { record, token } = await issueInstallationCredential(
-      this.credentials,
-      {
-        label: input.label,
-        externalRef: input.externalRef ?? null,
+    const { installation, token } = await this.credentials.create({
+      kind: InstallationKind.BACKEND_MONITOR,
+      label: input.label,
+      externalRef: input.externalRef ?? null,
+    });
+    const facts = await this.prisma.backendMonitorAgentState.upsert({
+      where: { installationId: installation.id },
+      create: {
+        installationId: installation.id,
         env: input.env ?? null,
-        kind: input.kind ?? null,
+        runtime: input.kind ?? null,
       },
-      {
-        ...this.credentialAudit(actor),
-        detail: { label: input.label, externalRef: input.externalRef ?? null },
+      update: {
+        env: input.env ?? undefined,
+        runtime: input.kind ?? undefined,
       },
-    );
-    return { ...this.withDerivedState(record), token };
+    });
+    await this.recordAudit("backend-monitor.installation.created", installation.id, actor, {
+      label: input.label,
+      externalRef: input.externalRef ?? null,
+    });
+    return { ...this.toView(installation, facts), token };
   }
 
   async list(query: { externalRef?: string }) {
-    const rows = await this.prisma.backendMonitorInstallation.findMany({
-      where: query.externalRef ? { externalRef: query.externalRef } : undefined,
-      orderBy: { createdAt: "desc" },
+    const installations = await this.prisma.installation.findMany({
+      where: {
+        kind: InstallationKind.BACKEND_MONITOR,
+        ...(query.externalRef ? { externalRef: query.externalRef } : {}),
+      },
+      orderBy: { issuedAt: "desc" },
     });
-    return rows.map((row) => this.withDerivedState(row));
+    const facts = await this.factsByInstallationId(installations.map((row) => row.id));
+    return installations.map((row) => this.toView(row, facts.get(row.id) ?? null));
   }
 
   /**
@@ -103,9 +107,9 @@ export class MonitorInstallationService extends BaseInstallationService<BackendM
    */
   async getPresenceByExternalRefs(externalRefs: string[]): Promise<Map<string, InstallationPresence>> {
     if (externalRefs.length === 0) return new Map();
-    const rows = await this.prisma.backendMonitorInstallation.findMany({
-      where: { externalRef: { in: externalRefs } },
-      select: { externalRef: true, lastSeenAt: true, revokedAt: true },
+    const rows = await this.prisma.installation.findMany({
+      where: { kind: InstallationKind.BACKEND_MONITOR, externalRef: { in: externalRefs } },
+      select: { externalRef: true, lastSeenAt: true, firstSeenAt: true, revokedAt: true },
     });
     const now = Date.now();
     const presenceByRef = new Map<string, InstallationPresence>();
@@ -114,6 +118,7 @@ export class MonitorInstallationService extends BaseInstallationService<BackendM
       if (scoped.length === 0) continue;
       const active = scoped.filter((row) => !row.revokedAt);
       let lastSeenAt: Date | null = null;
+      let firstSeenAt: Date | null = null;
       let online = false;
       for (const row of active) {
         // Any online installation keeps the whole ref online; lastSeenAt is
@@ -121,7 +126,10 @@ export class MonitorInstallationService extends BaseInstallationService<BackendM
         if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
           lastSeenAt = row.lastSeenAt;
         }
-        if (row.lastSeenAt != null && isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
+        if (row.firstSeenAt && (!firstSeenAt || row.firstSeenAt < firstSeenAt)) {
+          firstSeenAt = row.firstSeenAt;
+        }
+        if (isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
         }
       }
@@ -129,6 +137,7 @@ export class MonitorInstallationService extends BaseInstallationService<BackendM
         enrolled: active.length > 0,
         online,
         lastSeenAt,
+        firstSeenAt,
         revokedOnly: active.length === 0,
       });
     }
@@ -136,31 +145,40 @@ export class MonitorInstallationService extends BaseInstallationService<BackendM
   }
 
   async getOrThrow(id: string) {
-    const row = await this.prisma.backendMonitorInstallation.findUnique({ where: { id } });
-    if (!row) throw new NotFoundException(`Monitor installation ${id} not found.`);
-    return row;
+    const installation = await this.prisma.installation.findFirst({
+      where: { id, kind: InstallationKind.BACKEND_MONITOR },
+    });
+    if (!installation) throw new NotFoundException(`Monitor installation ${id} not found.`);
+    return installation;
   }
 
   async get(id: string) {
-    return this.withDerivedState(await this.getOrThrow(id));
+    const installation = await this.getOrThrow(id);
+    const facts = await this.prisma.backendMonitorAgentState.findUnique({ where: { installationId: id } });
+    return this.toView(installation, facts);
   }
 
   /** Rotate the token; the old hash stops working immediately. */
   async regenerateToken(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return rotateInstallationCredential(this.credentials, id, this.credentialAudit(actor));
+    const rotated = await this.credentials.rotate(id);
+    await this.recordAudit("backend-monitor.installation.token_rotated", id, actor);
+    return rotated;
   }
 
   /** Soft revocation: ingest is rejected (401), rows are retained. */
   async revoke(id: string, actor?: string) {
     await this.getOrThrow(id);
-    return revokeInstallationCredential(this.credentials, id, this.credentialAudit(actor));
+    const revokedAt = new Date();
+    await this.credentials.setRevokedAt(id, revokedAt);
+    await this.recordAudit("backend-monitor.installation.revoked", id, actor);
+    return { id, revokedAt };
   }
 
   /**
    * Refresh liveness and self-reported facts on ingest. firstSeenAt is written
-   * once (COALESCE); fact columns keep the latest non-null value. Called by
-   * the resolver under a write throttle — ingest is high-volume.
+   * once (COALESCE); the fact row keeps the latest non-null value per column.
+   * Called by the resolver under a write throttle — ingest is high-volume.
    */
   async touchOnIngest(
     id: string,
@@ -168,20 +186,80 @@ export class MonitorInstallationService extends BaseInstallationService<BackendM
       env?: string;
       appVersion?: string;
       instanceId?: string;
-      kind?: string;
+      runtime?: string;
     },
   ) {
     const now = new Date();
     await this.prisma.$executeRaw`
-      UPDATE "module/backend-monitor"."BackendMonitorInstallation"
+      UPDATE "module/security"."Installation"
       SET "firstSeenAt" = COALESCE("firstSeenAt", ${now}),
           "lastSeenAt" = ${now},
-          "env" = COALESCE(${facts.env ?? null}, "env"),
-          "appVersion" = COALESCE(${facts.appVersion ?? null}, "appVersion"),
-          "instanceId" = COALESCE(${facts.instanceId ?? null}, "instanceId"),
-          "kind" = COALESCE(${facts.kind ?? null}, "kind"),
           "updatedAt" = ${now}
-      WHERE "id" = ${id}::uuid
+      WHERE "id" = ${id}
     `;
+    await this.prisma.backendMonitorAgentState.upsert({
+      where: { installationId: id },
+      create: {
+        installationId: id,
+        env: facts.env ?? null,
+        appVersion: facts.appVersion ?? null,
+        instanceId: facts.instanceId ?? null,
+        runtime: facts.runtime ?? null,
+      },
+      update: {
+        env: facts.env ?? undefined,
+        appVersion: facts.appVersion ?? undefined,
+        instanceId: facts.instanceId ?? undefined,
+        runtime: facts.runtime ?? undefined,
+      },
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Helpers
+  // -------------------------------------------------------------------------
+
+  private async factsByInstallationId(installationIds: string[]) {
+    if (installationIds.length === 0) return new Map<string, BackendMonitorFacts>();
+    const rows = await this.prisma.backendMonitorAgentState.findMany({
+      where: { installationId: { in: installationIds } },
+    });
+    return new Map(rows.map((row) => [row.installationId, row]));
+  }
+
+  private toView(installation: Installation, facts: BackendMonitorFacts | null): MonitorInstallationView {
+    const online =
+      !installation.revokedAt &&
+      installation.lastSeenAt != null &&
+      Date.now() - installation.lastSeenAt.getTime() <= ONLINE_THRESHOLD_MILLISECONDS;
+    return {
+      id: installation.id,
+      label: installation.label,
+      externalRef: installation.externalRef,
+      env: facts?.env ?? null,
+      appVersion: facts?.appVersion ?? null,
+      instanceId: facts?.instanceId ?? null,
+      kind: facts?.runtime ?? null,
+      firstSeenAt: installation.firstSeenAt,
+      lastSeenAt: installation.lastSeenAt,
+      issuedAt: installation.issuedAt,
+      revokedAt: installation.revokedAt,
+      online,
+    };
+  }
+
+  private async recordAudit(
+    action: string,
+    resourceId: string,
+    actor?: string,
+    detail?: Record<string, unknown>,
+  ): Promise<void> {
+    await this.auditLogService.record(action, {
+      resourceType: AUDIT_RESOURCE_TYPE,
+      resourceId,
+      actorId: actor ?? null,
+      actorType: actor ? "user" : "system",
+      detail,
+    });
   }
 }

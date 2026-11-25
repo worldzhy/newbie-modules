@@ -12,6 +12,7 @@ import {
   MinLength,
 } from "class-validator";
 import { IsStrongPassword } from "@modules/account/helpers/password.validator";
+import { IsIanaTimezone } from "@modules/account/helpers/timezone.validator";
 
 export class GetCurrentUserResponseDto {
   @ApiProperty({ type: String })
@@ -213,8 +214,8 @@ export class UpdateMeDto {
   @IsOptional()
   dateOfBirth?: string;
 
-  @ApiPropertyOptional({ type: String })
-  @IsString()
+  @ApiPropertyOptional({ type: String, description: 'IANA timezone name, e.g. "Asia/Shanghai".' })
+  @IsIanaTimezone()
   @IsOptional()
   timezone?: string;
 

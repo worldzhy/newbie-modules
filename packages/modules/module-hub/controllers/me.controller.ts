@@ -1,7 +1,7 @@
 import { Controller, Get, Req } from "@nestjs/common";
 import { ApiOkResponse, ApiTags } from "@nestjs/swagger";
 import { Request } from "express";
-import { ModuleHubInstallation } from "@generated/prisma/client";
+import { Installation } from "@generated/prisma/client";
 import { InstallationAuth } from "@modules/security/authentication/installation/installation.decorator";
 
 import { MODULE_HUB_ROUTES } from "../module-hub.routes";
@@ -29,7 +29,7 @@ export class MeController {
   @Get("me/modules")
   @InstallationAuth("module-hub")
   @ApiOkResponse()
-  async myModules(@Req() req: Request & { installation: ModuleHubInstallation }) {
+  async myModules(@Req() req: Request & { installation: Installation }) {
     const { id } = req.installation;
     const installation = await this.installations.get(id);
     const modules = await this.installations.getModules(id);

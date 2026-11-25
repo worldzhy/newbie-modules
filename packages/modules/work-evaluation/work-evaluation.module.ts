@@ -3,7 +3,7 @@ import { EvaluationModule } from "@modules/evaluation/evaluation.module";
 import { criteriaProviderToken } from "@modules/evaluation/ports/criteria.provider";
 import { evidenceProviderToken } from "@modules/evaluation/ports/evidence.provider";
 import { judgmentPortToken } from "@modules/evaluation/ports/judgment.port";
-import { installationResolverToken } from "@modules/security/ports/installation.resolver";
+import { InstallationKindRegistry, InstallationKindWire } from "@modules/security/installation/installation-kind";
 
 import { WorkEvaluationController } from "./work-evaluation.controller";
 import { WorkEvaluationInstallationController } from "./controllers/installation.controller";
@@ -11,8 +11,11 @@ import { WorkEvaluationEvidenceController } from "./controllers/evidence.control
 import { WorkEvaluationPeriodService } from "./work-evaluation-period.service";
 import { WorkEvaluationEvidenceService } from "./work-evaluation-evidence.service";
 import { WorkEvaluationSessionStore } from "./work-evaluation-session.store";
-import { WorkEvaluationInstallationService } from "./work-evaluation-installation.service";
-import { WorkEvaluationInstallationTokenResolver } from "./work-evaluation-installation-token.resolver";
+import {
+  WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
+  WORK_EVALUATION_REPORT_INTERVAL_SECONDS,
+  WorkEvaluationInstallationService,
+} from "./work-evaluation-installation.service";
 import { WorkEvaluationCriteriaProvider } from "./work-evaluation-criteria.provider";
 import { WorkEvaluationEvidenceProvider } from "./work-evaluation-evidence.provider";
 import { WorkEvaluationJudgmentService } from "./work-evaluation-judgment.service";
@@ -36,10 +39,8 @@ import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
  *
  * The run lifecycle, result immutability and the subject registry belong to
  * the skeleton; this module only implements the ports and the HTTP surface.
- * Port bindings and the installation token resolver use `useExisting` so the
- * singletons are never duplicated (the resolver's rejection cache must stay
- * single, and the registry resolves the ports by token from the global
- * container).
+ * Port bindings use `useExisting` so the singletons are never duplicated (the
+ * registry resolves the ports by token from the global container).
  */
 @Global()
 @Module({
@@ -50,18 +51,12 @@ import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
     WorkEvaluationEvidenceService,
     WorkEvaluationSessionStore,
     WorkEvaluationInstallationService,
-    WorkEvaluationInstallationTokenResolver,
     WorkEvaluationCriteriaProvider,
     WorkEvaluationEvidenceProvider,
     WorkEvaluationJudgmentTools,
     WorkEvaluationJudgmentService,
     WorkEvaluationRunService,
     WorkEvaluationModelScopeRegistration,
-    // Bind the installation token resolver to security's SPI port (ADR-016).
-    {
-      provide: installationResolverToken("work-evaluation"),
-      useExisting: WorkEvaluationInstallationTokenResolver,
-    },
     // Kind-scoped skeleton ports for subject kind "developer" (ADR-020 D4).
     {
       provide: criteriaProviderToken(WORK_EVALUATION_SUBJECT_KIND),
@@ -82,10 +77,22 @@ import { WORK_EVALUATION_SUBJECT_KIND } from "./work-evaluation.constants";
     WorkEvaluationSessionStore,
     WorkEvaluationInstallationService,
     WorkEvaluationRunService,
-    installationResolverToken("work-evaluation"),
     criteriaProviderToken(WORK_EVALUATION_SUBJECT_KIND),
     evidenceProviderToken(WORK_EVALUATION_SUBJECT_KIND),
     judgmentPortToken(WORK_EVALUATION_SUBJECT_KIND),
   ],
 })
-export class WorkEvaluationModule {}
+export class WorkEvaluationModule {
+  constructor(registry: InstallationKindRegistry) {
+    // Declare this collector's kind once (ADR-078 decision 3). The claimed
+    // token still resolves evaluatee scope through WorkEvaluationAgentState.
+    registry.register({
+      kind: InstallationKindWire.WORK_EVALUATION,
+      endpoint: "/work-evaluation/evidence/sessions",
+      reportIntervalSeconds: WORK_EVALUATION_REPORT_INTERVAL_SECONDS,
+      offlineAfterSeconds: WORK_EVALUATION_INSTALLATION_ONLINE_THRESHOLD_SECONDS,
+      requiresAppKey: false,
+      budget: { perKey: { points: 120, durationSeconds: 60 }, scope: "token" },
+    });
+  }
+}

@@ -110,7 +110,10 @@ export class RateLimiter {
           // A quota answer also proves the backend is reachable, so a probe
           // through this path promotes the limiter back to the primary.
           this.recovered();
-          return error.remainingPoints;
+          // rate-limiter-flexible clamps the remaining allowance of a rejection
+          // at 0, so a caller gating on `remaining >= 0` must still see the
+          // rejection. Report the answer as negative.
+          return Math.min(error.remainingPoints, -1);
         }
         this.degradedTo(error);
       }
@@ -119,7 +122,7 @@ export class RateLimiter {
       const res = await this.fallback.consume(key);
       return res.remainingPoints;
     } catch (error) {
-      if (isQuotaRejection(error)) return error.remainingPoints;
+      if (isQuotaRejection(error)) return Math.min(error.remainingPoints, -1);
       throw error;
     }
   }
