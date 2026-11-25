@@ -74,7 +74,7 @@ export class EventEmitterService implements OnModuleInit, OnModuleDestroy {
       by: ["eventKey"],
       _count: { _all: true },
       _max: { emittedAt: true },
-    })) as EventEmissionStat[];
+    })) as unknown as EventEmissionStat[];
     const statsByKey = new Map(stats.map((row) => [row.eventKey, row] as const));
 
     const events: EventDescription[] = declarations.map((declaration) => {

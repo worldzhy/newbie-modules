@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus } from "@nestjs/common";
+import { Controller, Get, Post, Body, Query, UseGuards, HttpCode, HttpStatus } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from "@nestjs/swagger";
 import { PermissionAction } from "@generated/prisma/client";
@@ -12,13 +12,13 @@ import { NoGuard } from "@modules/security/authentication/public/public.decorato
 export class LarkController {
   constructor(private readonly larkService: LarkService) {}
 
-  @Post("history")
+  @Get("history")
   @RequirePermission(PermissionAction.List, "LarkMessage")
   @ApiOperation({ summary: "Get chat history from Lark group" })
   @ApiBearerAuth()
   @ApiResponse({ type: Object })
   @UseGuards(AuthGuard("jwt"))
-  async getChatHistory(@Body() dto: GetChatHistoryRequestDto) {
+  async getChatHistory(@Query() dto: GetChatHistoryRequestDto) {
     return await this.larkService.getChatHistory(dto);
   }
 
