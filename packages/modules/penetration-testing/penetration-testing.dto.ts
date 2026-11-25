@@ -25,11 +25,13 @@ import { CommonListRequestDto, CommonListResponseDto } from "@devbie/newbie/comm
 import {
   PENETRATION_TESTING_AUTHORIZATION_STATUSES,
   PENETRATION_TESTING_ENVIRONMENTS,
+  PENETRATION_TESTING_EXECUTION_OUTCOMES,
   PENETRATION_TESTING_LEVELS,
   PENETRATION_TESTING_PATH_ROLES,
   PENETRATION_TESTING_TEST_OBJECT_KINDS,
   PENETRATION_TESTING_VERIFICATION_METHODS,
   type PenetrationTestingEnvironment,
+  type PenetrationTestingExecutionOutcome,
   type PenetrationTestingLevel,
   type PenetrationTestingTestObjectKind,
 } from "./penetration-testing.constants";
@@ -547,3 +549,65 @@ export class PenetrationTestingResultResponseDto {
 }
 
 export class ListPenetrationTestingResultsResponseDto extends CommonListResponseDto<PenetrationTestingResultResponseDto> {}
+
+// --- Executions (audit trail, ADR-075 §3) --------------------------------
+
+export class PenetrationTestingExecutionParamsDto {
+  @ApiProperty({ description: "The execution's auditId (correlation id)", type: String })
+  @IsString()
+  @IsNotEmpty()
+  auditId!: string;
+}
+
+export class ListPenetrationTestingExecutionsRequestDto extends CommonListRequestDto {
+  @ApiPropertyOptional({ type: String, format: "uuid", description: "Anchor on one subject" })
+  @IsOptional()
+  @IsUUID()
+  subjectId?: string;
+
+  @ApiPropertyOptional({ type: String, format: "uuid", description: "Filter to one skeleton run" })
+  @IsOptional()
+  @IsUUID()
+  runId?: string;
+
+  @ApiPropertyOptional({ enum: PENETRATION_TESTING_LEVELS })
+  @IsOptional()
+  @Type(() => String)
+  @IsIn(PENETRATION_TESTING_LEVELS)
+  level?: PenetrationTestingLevel;
+
+  @ApiPropertyOptional({ enum: PENETRATION_TESTING_EXECUTION_OUTCOMES })
+  @IsOptional()
+  @Type(() => String)
+  @IsIn(PENETRATION_TESTING_EXECUTION_OUTCOMES)
+  outcome?: PenetrationTestingExecutionOutcome;
+}
+
+export class PenetrationTestingExecutionResponseDto {
+  @ApiProperty() id!: string;
+  @ApiProperty({ description: "Correlation id matching the run's judgmentConfig.auditId" }) auditId!: string;
+  @ApiPropertyOptional({ type: String, nullable: true }) runId?: string | null;
+  @ApiProperty() subjectId!: string;
+  @ApiProperty({ enum: PENETRATION_TESTING_LEVELS }) level!: PenetrationTestingLevel;
+  @ApiProperty() standardKey!: string;
+  @ApiProperty() authorizationId!: string;
+  @ApiProperty({ type: Object, description: "Addresses the execution declared it would touch" }) snapshot!: object;
+  @ApiProperty() outcome!: string;
+  @ApiProperty() requestCount!: number;
+  @ApiProperty({ type: Date }) startedAt!: Date;
+  @ApiPropertyOptional({ type: Date, nullable: true }) finishedAt?: Date | null;
+  @ApiPropertyOptional({ type: Date, nullable: true }) killedAt?: Date | null;
+  @ApiPropertyOptional({ type: String, nullable: true }) killReason?: string | null;
+}
+
+export class ListPenetrationTestingExecutionsResponseDto extends CommonListResponseDto<PenetrationTestingExecutionResponseDto> {}
+
+// --- Run stop ------------------------------------------------------------
+
+export class StopPenetrationTestingRunRequestDto {
+  @ApiPropertyOptional({ description: "Why the run is being stopped; stored on the run row's failureReason" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
+}

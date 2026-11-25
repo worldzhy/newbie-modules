@@ -85,11 +85,46 @@ export class PenetrationTestingExecutionService {
     return this.prisma.penetrationTestingExecution.findUnique({ where: { auditId } });
   }
 
+  async findByRunId(runId: string) {
+    return this.prisma.penetrationTestingExecution.findUnique({ where: { runId } });
+  }
+
   async listBySubject(subjectId: string, take = 50) {
     return this.prisma.penetrationTestingExecution.findMany({
       where: { subjectId },
       orderBy: { startedAt: "desc" },
       take,
     });
+  }
+
+  /**
+   * Generic list with optional filters. Supports pagination via cursor or
+   * limit/offset; keeps the newest-first ordering the other list methods use.
+   */
+  async list(input: {
+    subjectId?: string;
+    runId?: string;
+    level?: PenetrationTestingLevel;
+    outcome?: PenetrationTestingExecutionOutcome;
+    limit?: number;
+    offset?: number;
+  }) {
+    const where: Prisma.PenetrationTestingExecutionWhereInput = {};
+    if (input.subjectId) where.subjectId = input.subjectId;
+    if (input.runId) where.runId = input.runId;
+    if (input.level) where.level = input.level;
+    if (input.outcome) where.outcome = input.outcome;
+    const take = Math.min(input.limit ?? 50, 200);
+    const skip = input.offset ?? 0;
+    const [records, total] = await this.prisma.$transaction([
+      this.prisma.penetrationTestingExecution.findMany({
+        where,
+        orderBy: { startedAt: "desc" },
+        take,
+        skip,
+      }),
+      this.prisma.penetrationTestingExecution.count({ where }),
+    ]);
+    return { records, total, limit: take, offset: skip };
   }
 }

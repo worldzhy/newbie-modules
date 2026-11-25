@@ -7,10 +7,13 @@ import { UserRequest } from "@modules/security/security.interface";
 import { PenetrationTestingAuthorizationService } from "./authorization/penetration-testing-authorization.service";
 import { PenetrationTestingTestObjectService } from "./authorization/penetration-testing-test-object.service";
 import { PenetrationTestingTargetService } from "./assets/penetration-testing-target.service";
+import { PenetrationTestingExecutionService } from "./evidence/penetration-testing-execution.service";
 import {
   CreatePenetrationTestingTargetRequestDto,
   CreatePenetrationTestingTestObjectRequestDto,
   ListPenetrationTestingAuthorizationsRequestDto,
+  ListPenetrationTestingExecutionsRequestDto,
+  ListPenetrationTestingExecutionsResponseDto,
   ListPenetrationTestingFindingsRequestDto,
   ListPenetrationTestingFindingsResponseDto,
   ListPenetrationTestingResultsRequestDto,
@@ -22,6 +25,8 @@ import {
   PenetrationTestingAuthorizationListResponseDto,
   PenetrationTestingAuthorizationParamsDto,
   PenetrationTestingAuthorizationResponseDto,
+  PenetrationTestingExecutionParamsDto,
+  PenetrationTestingExecutionResponseDto,
   PenetrationTestingPlaybookListResponseDto,
   PenetrationTestingRunAcceptedResponseDto,
   PenetrationTestingRunParamsDto,
@@ -38,6 +43,7 @@ import {
   RequestPenetrationTestingAuthorizationRequestDto,
   RevokePenetrationTestingAuthorizationRequestDto,
   StartPenetrationTestingRunRequestDto,
+  StopPenetrationTestingRunRequestDto,
   UpdatePenetrationTestingTargetRequestDto,
 } from "./penetration-testing.dto";
 import { PENETRATION_TESTING_PLAYBOOKS } from "./penetration-testing.constants";
@@ -61,6 +67,7 @@ export class PenetrationTestingController {
     private readonly authorizations: PenetrationTestingAuthorizationService,
     private readonly testObjects: PenetrationTestingTestObjectService,
     private readonly runs: PenetrationTestingRunService,
+    private readonly executions: PenetrationTestingExecutionService,
   ) {}
 
   // --- Targets -----------------------------------------------------------
@@ -267,6 +274,23 @@ export class PenetrationTestingController {
     return this.runs.getRun(params.runId);
   }
 
+  @Patch("runs/:runId/stop")
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(PermissionAction.Update, Prisma.ModelName.EvaluationRun)
+  @ApiOperation({
+    summary: "Stop a QUEUED or RUNNING run — transitions to CANCELLED; terminal runs are a no-op",
+  })
+  @ApiOkResponse({
+    description: "Returns { runId, status } where status is CANCELLED, the prior terminal status, or NOT_FOUND",
+  })
+  async stopRun(
+    @Param() params: PenetrationTestingRunParamsDto,
+    @Body() body: StopPenetrationTestingRunRequestDto,
+    @Req() request: UserRequest,
+  ) {
+    return this.runs.stopRun(params.runId, request.user.userId, body.reason);
+  }
+
   // --- Findings / results ------------------------------------------------
 
   @Get("findings")
@@ -295,5 +319,34 @@ export class PenetrationTestingController {
       page: query.page,
       pageSize: query.pageSize,
     });
+  }
+
+  // --- Executions (L4 audit trail, ADR-075 §3) ---------------------------
+
+  @Get("executions")
+  @RequirePermission(PermissionAction.List, Prisma.ModelName.PenetrationTestingExecution)
+  @ApiOperation({
+    summary:
+      "List execution audit rows — the destructive-action trail is visible here even when the skeleton run is orphaned",
+  })
+  @ApiOkResponse({ type: ListPenetrationTestingExecutionsResponseDto })
+  async listExecutions(@Query() query: ListPenetrationTestingExecutionsRequestDto) {
+    const { records, total, limit, offset } = await this.executions.list({
+      subjectId: query.subjectId,
+      runId: query.runId,
+      level: query.level,
+      outcome: query.outcome,
+      limit: query.pageSize,
+      offset: query.page != null ? (query.page - 1) * (query.pageSize ?? 50) : undefined,
+    });
+    return { records, total, page: offset / limit + 1, pageSize: limit };
+  }
+
+  @Get("executions/:auditId")
+  @RequirePermission(PermissionAction.Get, Prisma.ModelName.PenetrationTestingExecution)
+  @ApiOperation({ summary: "Read one execution audit row by its correlation id" })
+  @ApiOkResponse({ type: PenetrationTestingExecutionResponseDto })
+  async getExecution(@Param() params: PenetrationTestingExecutionParamsDto) {
+    return this.executions.findByAuditId(params.auditId);
   }
 }

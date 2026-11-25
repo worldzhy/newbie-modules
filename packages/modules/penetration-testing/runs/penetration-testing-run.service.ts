@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, Logger } from "@nes
 import { randomUUID } from "node:crypto";
 import type { EvaluationRun } from "@generated/prisma/client";
 import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
+import { AlertCenterService } from "@modules/alert-center/alert-center.service";
 import { EvaluationCriteriaService } from "@modules/evaluation/evaluation-criteria.service";
 import { EvaluationFindingService } from "@modules/evaluation/evaluation-finding.service";
 import type { ListEvaluationFindingsInput } from "@modules/evaluation/evaluation-finding.service";
@@ -43,6 +44,7 @@ export class PenetrationTestingRunService {
   constructor(
     private readonly runner: EvaluationRunnerService,
     private readonly prisma: PrismaService,
+    private readonly alerts: AlertCenterService,
     private readonly targets: PenetrationTestingTargetService,
     private readonly authorizations: PenetrationTestingAuthorizationService,
     private readonly testObjects: PenetrationTestingTestObjectService,
@@ -100,10 +102,29 @@ export class PenetrationTestingRunService {
     }
 
     const run = await this.runner.open({ ...input, judgmentConfig: runConfig });
+    const runAlertKey = `${input.subjectId}:${standardKey}`;
+    // A new run entering RUNNING resolves any earlier run-failed alert for the
+    // same subject+key — the retry signals the subject is still being monitored.
+    void this.alerts
+      .resolve({ source: "penetration-testing", alertKey: runAlertKey, scopeId: input.subjectId })
+      .catch(() => {});
     void this.runner.execute(run).catch((error: unknown) => {
-      this.logger.error(
-        `Penetration-testing run ${run.id} for subject ${input.subjectId} failed: ${getErrorMessage(error)}`,
-      );
+      const errorText = getErrorMessage(error);
+      this.logger.error(`Penetration-testing run ${run.id} for subject ${input.subjectId} failed: ${errorText}`);
+      // Raise run-failed alert; it auto-advances on repeated failures and
+      // resolves on the next successful retry above.
+      void this.alerts
+        .raise({
+          source: "penetration-testing",
+          alertKey: runAlertKey,
+          scopeId: input.subjectId,
+          severity: "medium",
+          labels: { standardKey, level },
+          data: { runId: run.id, error: errorText.slice(0, 200) },
+        })
+        .catch((alertError: unknown) => {
+          this.logger.error(`Failed to raise penetration-testing run-failed alert: ${getErrorMessage(alertError)}`);
+        });
     });
     return { runId: run.id };
   }
@@ -146,6 +167,33 @@ export class PenetrationTestingRunService {
 
   listFindings(query: ListEvaluationFindingsInput) {
     return this.findings.listFindings(query);
+  }
+
+  /**
+   * Stop a QUEUED or RUNNING run (ADR-075 §4). Transitions it to CANCELLED;
+   * the runner's next assertActive fencing check throws and stops further
+   * writes. A terminal run (SUCCEEDED/FAILED/CANCELLED) is a no-op.
+   */
+  async stopRun(runId: string, operatorId: string, reason?: string): Promise<{ runId: string; status: string }> {
+    const run = await this.runs.findById(runId, PENETRATION_TESTING_SUBJECT_KIND_WEB_TARGET);
+    if (!run) return { runId, status: "NOT_FOUND" };
+    const terminal = ["SUCCEEDED", "FAILED", "CANCELLED"];
+    if (terminal.includes(run.status)) {
+      return { runId, status: run.status };
+    }
+    const cancelReason = reason ?? `Cancelled by ${operatorId}`;
+    await this.runs.markCancelled(runId, cancelReason);
+    const auditId =
+      typeof run.judgmentConfig === "object" && run.judgmentConfig
+        ? String((run.judgmentConfig as Record<string, unknown>).auditId ?? "")
+        : "";
+    if (auditId) {
+      await this.prisma.penetrationTestingExecution.updateMany({
+        where: { auditId },
+        data: { outcome: "KILLED", killedAt: new Date(), killReason: cancelReason, finishedAt: new Date() },
+      });
+    }
+    return { runId, status: "CANCELLED" };
   }
 
   private async resolveAuthorization(
