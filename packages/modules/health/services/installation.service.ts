@@ -204,7 +204,7 @@ export class HealthInstallationService {
     if (externalRefs.length === 0) return new Map();
     const rows = await this.prisma.installation.findMany({
       where: { kind: InstallationKind.HEALTH, externalRef: { in: externalRefs } },
-      select: { externalRef: true, lastSeenAt: true, revokedAt: true },
+      select: { externalRef: true, lastSeenAt: true, firstSeenAt: true, revokedAt: true },
     });
     const now = Date.now();
     const presenceByRef = new Map<string, InstallationPresence>();
@@ -213,11 +213,15 @@ export class HealthInstallationService {
       if (scoped.length === 0) continue;
       const active = scoped.filter((row) => !row.revokedAt);
       let lastSeenAt: Date | null = null;
+      let firstSeenAt: Date | null = null;
       let online = false;
       for (const row of active) {
         // Newest report across the non-revoked installations sharing it.
         if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
           lastSeenAt = row.lastSeenAt;
+        }
+        if (row.firstSeenAt && (!firstSeenAt || row.firstSeenAt < firstSeenAt)) {
+          firstSeenAt = row.firstSeenAt;
         }
         if (isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
@@ -227,6 +231,7 @@ export class HealthInstallationService {
         enrolled: active.length > 0,
         online,
         lastSeenAt,
+        firstSeenAt,
         revokedOnly: active.length === 0,
       });
     }

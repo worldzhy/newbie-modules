@@ -21,12 +21,16 @@ export const DEFAULT_INSTALLATION_ONLINE_THRESHOLD_SECONDS = 180;
  * - `online` — a non-revoked installation reported within the online window.
  * - `lastSeenAt` — newest report across the non-revoked installations
  *   (null until the first contact).
+ * - `firstSeenAt` — earliest first-contact across the non-revoked
+ *   installations (null until the first contact). Rotation keeps the original
+ *   first-seen date; revocation of the oldest row moves it forward.
  * - `revokedOnly` — rows exist but every one is revoked.
  */
 export interface InstallationPresence {
   enrolled: boolean;
   online: boolean;
   lastSeenAt: Date | null;
+  firstSeenAt: Date | null;
   revokedOnly: boolean;
 }
 

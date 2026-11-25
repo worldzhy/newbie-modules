@@ -109,7 +109,7 @@ export class MonitorInstallationService {
     if (externalRefs.length === 0) return new Map();
     const rows = await this.prisma.installation.findMany({
       where: { kind: InstallationKind.BACKEND_MONITOR, externalRef: { in: externalRefs } },
-      select: { externalRef: true, lastSeenAt: true, revokedAt: true },
+      select: { externalRef: true, lastSeenAt: true, firstSeenAt: true, revokedAt: true },
     });
     const now = Date.now();
     const presenceByRef = new Map<string, InstallationPresence>();
@@ -118,12 +118,16 @@ export class MonitorInstallationService {
       if (scoped.length === 0) continue;
       const active = scoped.filter((row) => !row.revokedAt);
       let lastSeenAt: Date | null = null;
+      let firstSeenAt: Date | null = null;
       let online = false;
       for (const row of active) {
         // Any online installation keeps the whole ref online; lastSeenAt is
         // the newest ingest across the non-revoked installations sharing it.
         if (row.lastSeenAt && (!lastSeenAt || row.lastSeenAt > lastSeenAt)) {
           lastSeenAt = row.lastSeenAt;
+        }
+        if (row.firstSeenAt && (!firstSeenAt || row.firstSeenAt < firstSeenAt)) {
+          firstSeenAt = row.firstSeenAt;
         }
         if (isInstallationOnline(row.lastSeenAt, ONLINE_THRESHOLD_SECONDS, now)) {
           online = true;
@@ -133,6 +137,7 @@ export class MonitorInstallationService {
         enrolled: active.length > 0,
         online,
         lastSeenAt,
+        firstSeenAt,
         revokedOnly: active.length === 0,
       });
     }
