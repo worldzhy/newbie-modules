@@ -182,6 +182,24 @@ export class EvaluationRunService {
   }
 
   /**
+   * Operator-initiated cancellation. Transitions an active run to CANCELLED
+   * (a terminal state), which causes the runner's next assertActive fencing
+   * check to throw and stop further writes — no abort signal propagates
+   * through providers.collect() or judgment.judge().
+   */
+  async markCancelled(id: string, reason?: string): Promise<void> {
+    const updated = await this.prisma.evaluationRun.updateMany({
+      where: { id, status: { in: ACTIVE_RUN_STATUSES } },
+      data: {
+        status: EvaluationRunStatus.CANCELLED,
+        failureReason: reason ?? "Run cancelled by operator",
+        finishedAt: new Date(),
+      },
+    });
+    if (updated.count === 0) await this.assertStillActive(id, "cancelled");
+  }
+
+  /**
    * A terminal transition that matched no row must not be silent: the runner
    * would otherwise report success for a run the reaper already failed.
    */

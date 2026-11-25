@@ -39,6 +39,7 @@ enum EvaluationRunStatus {
   RUNNING
   SUCCEEDED
   FAILED
+  CANCELLED
 
   @@schema("module/evaluation")
 }
