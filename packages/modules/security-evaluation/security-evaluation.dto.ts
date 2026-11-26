@@ -609,13 +609,15 @@ export class SecurityEvaluationReportTrendPointDto {
 
 export class SecurityEvaluationReportMttrByKeyDto {
   @ApiProperty({ description: 'Evaluation key, e.g. "npm-osv"' }) standardKey!: string;
-  @ApiPropertyOptional({ description: "Mean days to resolve inside the window" }) averageDays?: number | null;
-  @ApiPropertyOptional({ description: "Median days to resolve inside the window" }) medianDays?: number | null;
+  @ApiPropertyOptional({ type: Number, description: "Mean days to resolve inside the window" })
+  averageDays?: number | null;
+  @ApiPropertyOptional({ type: Number, description: "Median days to resolve inside the window" })
+  medianDays?: number | null;
   @ApiProperty() resolvedCount!: number;
 }
 
 export class SecurityEvaluationReportMttrDto {
-  @ApiPropertyOptional({ description: "Mean days to resolve, null while nothing has been resolved" })
+  @ApiPropertyOptional({ type: Number, description: "Mean days to resolve, null while nothing has been resolved" })
   averageDays?: number | null;
   @ApiProperty() resolvedCount!: number;
   @ApiProperty() windowDays!: number;
