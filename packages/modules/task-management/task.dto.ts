@@ -22,7 +22,7 @@ import { ChangeImpact, OriginReference, RequirementReview } from "./task.service
 
 export class ChangeImpactDto implements ChangeImpact {
   @ApiPropertyOptional({
-    type: [String],
+    type: String,
     isArray: true,
     description: "Repositories the task is expected to change",
   })
@@ -107,7 +107,7 @@ export class TaskDeliveryFieldsDto {
   acceptanceCriteria?: string;
 
   @ApiPropertyOptional({
-    type: [String],
+    type: String,
     isArray: true,
     description: "Allowed path globs; frozen once the task starts",
   })
@@ -122,7 +122,7 @@ export class TaskDeliveryFieldsDto {
   @IsOptional()
   changeImpact?: ChangeImpactDto;
 
-  @ApiPropertyOptional({ type: [String], isArray: true, description: "Prerequisite task IDs (uuid)" })
+  @ApiPropertyOptional({ type: String, isArray: true, description: "Prerequisite task IDs (uuid)" })
   @IsArray()
   @IsUUID("4", { each: true })
   @IsOptional()
@@ -405,13 +405,13 @@ export class GetTaskResponseDto {
   @ApiPropertyOptional({ description: "Acceptance criteria", type: String, nullable: true })
   acceptanceCriteria?: string | null;
 
-  @ApiPropertyOptional({ description: "Allowed path globs", type: [String], isArray: true })
+  @ApiPropertyOptional({ description: "Allowed path globs", type: String, isArray: true })
   allowedPaths?: string[];
 
   @ApiPropertyOptional({ description: "Declared change impact", type: Object, nullable: true })
   changeImpact?: unknown;
 
-  @ApiPropertyOptional({ description: "Prerequisite task IDs (uuid)", type: [String], isArray: true })
+  @ApiPropertyOptional({ description: "Prerequisite task IDs (uuid)", type: String, isArray: true })
   prerequisiteTaskIds?: string[];
 
   @ApiPropertyOptional({ description: "Origin discussion reference", type: Object, nullable: true })

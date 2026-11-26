@@ -406,7 +406,7 @@ export class WorkEvaluationWorkspaceDto {
 }
 
 export class CreateWorkEvaluationWorkspaceBatchRequestDto {
-  @ApiProperty({ type: [WorkEvaluationWorkspaceDto], isArray: true })
+  @ApiProperty({ type: WorkEvaluationWorkspaceDto, isArray: true })
   @IsArray()
   @ArrayMaxSize(MAX_WORKSPACES_PER_BATCH)
   @ValidateNested({ each: true })
@@ -471,13 +471,13 @@ export class WorkEvaluationSessionDto {
   @ApiProperty() @IsNumber() messageCount!: number;
   @ApiProperty() @IsNumber() toolCallCount!: number;
 
-  @ApiPropertyOptional({ type: [String], isArray: true })
+  @ApiPropertyOptional({ type: String, isArray: true })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   toolNames?: string[];
 
-  @ApiPropertyOptional({ type: [String], isArray: true })
+  @ApiPropertyOptional({ type: String, isArray: true })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -487,7 +487,7 @@ export class WorkEvaluationSessionDto {
   @ApiProperty() @Type(() => Date) @IsDate() startedAt!: Date;
   @ApiProperty() @Type(() => Date) @IsDate() endedAt!: Date;
 
-  @ApiProperty({ type: [WorkEvaluationSessionMessageDto], isArray: true })
+  @ApiProperty({ type: WorkEvaluationSessionMessageDto, isArray: true })
   @IsArray()
   @ArrayMaxSize(MAX_MESSAGES_PER_SESSION)
   @ValidateNested({ each: true })
@@ -496,7 +496,7 @@ export class WorkEvaluationSessionDto {
 }
 
 export class CreateWorkEvaluationSessionBatchRequestDto {
-  @ApiProperty({ type: [WorkEvaluationSessionDto], isArray: true })
+  @ApiProperty({ type: WorkEvaluationSessionDto, isArray: true })
   @IsArray()
   @ArrayMaxSize(MAX_SESSIONS_PER_BATCH)
   @ValidateNested({ each: true })
@@ -519,7 +519,7 @@ export class WorkEvaluationDeclaredDocumentDto {
 }
 
 export class CreateWorkEvaluationDeclaredDocumentBatchRequestDto {
-  @ApiProperty({ type: [WorkEvaluationDeclaredDocumentDto], isArray: true })
+  @ApiProperty({ type: WorkEvaluationDeclaredDocumentDto, isArray: true })
   @IsArray()
   @ArrayMaxSize(MAX_DOCUMENTS_PER_BATCH)
   @ValidateNested({ each: true })

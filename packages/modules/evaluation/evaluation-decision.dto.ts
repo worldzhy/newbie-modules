@@ -75,7 +75,7 @@ export class CreateEvaluationRemediationPlanRequestDto {
   @IsUUID()
   subjectId!: string;
 
-  @ApiProperty({ type: [String], isArray: true, description: "Finding or result ids the plan responds to" })
+  @ApiProperty({ type: String, isArray: true, description: "Finding or result ids the plan responds to" })
   @IsArray()
   @IsString({ each: true })
   triggerIds!: string[];
@@ -180,7 +180,7 @@ export class EvaluationFindingResponseDto {
 export class EvaluationRemediationPlanResponseDto {
   @ApiProperty() id!: string;
   @ApiProperty() subjectId!: string;
-  @ApiProperty({ type: [String], isArray: true }) triggerIds!: string[];
+  @ApiProperty({ type: String, isArray: true }) triggerIds!: string[];
   @ApiPropertyOptional({ type: Object, description: "Ordered checkpoints with { dueDate, description, status }" })
   checkpoints?: object | null;
   @ApiProperty({ enum: EvaluationRemediationStatus })

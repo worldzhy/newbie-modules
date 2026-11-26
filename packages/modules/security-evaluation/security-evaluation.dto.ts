@@ -512,7 +512,7 @@ export class SecurityEvaluationFindingDetailResponseDto {
   @ApiPropertyOptional({ description: "Evaluated key of the last-seen run — echoes finding.standardKey" })
   standardKey?: string | null;
   @ApiProperty({
-    type: [SecurityEvaluationEvidenceItemResponseDto],
+    type: SecurityEvaluationEvidenceItemResponseDto,
     isArray: true,
     description: "Manifest items from the last-seen run's result that match the finding",
   })
@@ -578,12 +578,12 @@ export class SecurityEvaluationReportFindingsDto {
   @ApiProperty({ type: Object, description: "Open findings counted per urgency band" })
   byUrgency!: Record<string, number>;
   @ApiProperty({
-    type: [SecurityEvaluationReportFindingsByKeyDto],
+    type: SecurityEvaluationReportFindingsByKeyDto,
     isArray: true,
     description: "Open findings counted per standardKey and severity",
   })
   byStandardKey!: SecurityEvaluationReportFindingsByKeyDto[];
-  @ApiProperty({ type: [SecurityEvaluationReportTopFindingDto], isArray: true })
+  @ApiProperty({ type: SecurityEvaluationReportTopFindingDto, isArray: true })
   topOpen!: SecurityEvaluationReportTopFindingDto[];
 }
 
@@ -597,7 +597,7 @@ export class SecurityEvaluationReportSeverityTrendPointDto {
 
 export class SecurityEvaluationReportSeverityTrendDto {
   @ApiProperty() windowDays!: number;
-  @ApiProperty({ type: [SecurityEvaluationReportSeverityTrendPointDto], isArray: true })
+  @ApiProperty({ type: SecurityEvaluationReportSeverityTrendPointDto, isArray: true })
   points!: SecurityEvaluationReportSeverityTrendPointDto[];
 }
 
@@ -620,7 +620,7 @@ export class SecurityEvaluationReportMttrDto {
   @ApiProperty() resolvedCount!: number;
   @ApiProperty() windowDays!: number;
   @ApiProperty({
-    type: [SecurityEvaluationReportMttrByKeyDto],
+    type: SecurityEvaluationReportMttrByKeyDto,
     isArray: true,
     description: "The same window split per standardKey",
   })
@@ -633,7 +633,7 @@ export class SecurityEvaluationReportResponseDto {
   @ApiProperty({ type: SecurityEvaluationReportAssetsDto }) assets!: SecurityEvaluationReportAssetsDto;
   @ApiProperty({ type: SecurityEvaluationReportCoverageDto }) coverage!: SecurityEvaluationReportCoverageDto;
   @ApiProperty({ type: SecurityEvaluationReportFindingsDto }) findings!: SecurityEvaluationReportFindingsDto;
-  @ApiProperty({ type: [SecurityEvaluationReportTrendPointDto], isArray: true })
+  @ApiProperty({ type: SecurityEvaluationReportTrendPointDto, isArray: true })
   trend!: SecurityEvaluationReportTrendPointDto[];
   @ApiProperty({ type: SecurityEvaluationReportSeverityTrendDto })
   severityTrend!: SecurityEvaluationReportSeverityTrendDto;
