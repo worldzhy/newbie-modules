@@ -160,7 +160,10 @@ export class WorkEvaluationRuleSetVersionResponseDto {
   @ApiProperty() createdAt!: Date;
 }
 
-export class ListWorkEvaluationRuleSetVersionsResponseDto extends CommonListResponseDto<WorkEvaluationRuleSetVersionResponseDto> {}
+export class ListWorkEvaluationRuleSetVersionsResponseDto extends CommonListResponseDto<WorkEvaluationRuleSetVersionResponseDto> {
+  @ApiProperty({ type: WorkEvaluationRuleSetVersionResponseDto, isArray: true })
+  declare records: WorkEvaluationRuleSetVersionResponseDto[];
+}
 
 export class WorkEvaluationCriterionResponseDto {
   @ApiPropertyOptional({ description: "Row id — present on freshly created criteria" })
@@ -219,7 +222,10 @@ export class WorkEvaluationPeriodResponseDto {
   @ApiProperty({ enum: WorkEvaluationPeriodStatus }) status!: WorkEvaluationPeriodStatus;
 }
 
-export class ListWorkEvaluationPeriodsResponseDto extends CommonListResponseDto<WorkEvaluationPeriodResponseDto> {}
+export class ListWorkEvaluationPeriodsResponseDto extends CommonListResponseDto<WorkEvaluationPeriodResponseDto> {
+  @ApiProperty({ type: WorkEvaluationPeriodResponseDto, isArray: true })
+  declare records: WorkEvaluationPeriodResponseDto[];
+}
 
 // --- Home ground -------------------------------------------------------
 
@@ -312,7 +318,10 @@ export class WorkEvaluationSessionResponseDto {
   @ApiProperty() endedAt!: Date;
 }
 
-export class ListWorkEvaluationSessionsResponseDto extends CommonListResponseDto<WorkEvaluationSessionResponseDto> {}
+export class ListWorkEvaluationSessionsResponseDto extends CommonListResponseDto<WorkEvaluationSessionResponseDto> {
+  @ApiProperty({ type: WorkEvaluationSessionResponseDto, isArray: true })
+  declare records: WorkEvaluationSessionResponseDto[];
+}
 
 export class ListWorkEvaluationDeclaredDocumentsRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({
@@ -349,7 +358,10 @@ export class WorkEvaluationDeclaredDocumentResponseDto {
   @ApiProperty() createdAt!: Date;
 }
 
-export class ListWorkEvaluationDeclaredDocumentsResponseDto extends CommonListResponseDto<WorkEvaluationDeclaredDocumentResponseDto> {}
+export class ListWorkEvaluationDeclaredDocumentsResponseDto extends CommonListResponseDto<WorkEvaluationDeclaredDocumentResponseDto> {
+  @ApiProperty({ type: WorkEvaluationDeclaredDocumentResponseDto, isArray: true })
+  declare records: WorkEvaluationDeclaredDocumentResponseDto[];
+}
 
 // --- Reported evidence ingest ------------------------------------------
 
@@ -629,7 +641,10 @@ export class WorkEvaluationRunResponseDto {
   @ApiProperty() updatedAt!: Date;
 }
 
-export class ListWorkEvaluationRunsResponseDto extends CommonListResponseDto<WorkEvaluationRunResponseDto> {}
+export class ListWorkEvaluationRunsResponseDto extends CommonListResponseDto<WorkEvaluationRunResponseDto> {
+  @ApiProperty({ type: WorkEvaluationRunResponseDto, isArray: true })
+  declare records: WorkEvaluationRunResponseDto[];
+}
 
 export class ListWorkEvaluationResultsRequestDto extends CommonListRequestDto {
   @ApiProperty({ description: "Subject whose results are listed (newest first)" })
@@ -671,7 +686,10 @@ export class WorkEvaluationResultResponseDto {
   @ApiProperty() createdAt!: Date;
 }
 
-export class ListWorkEvaluationResultsResponseDto extends CommonListResponseDto<WorkEvaluationResultResponseDto> {}
+export class ListWorkEvaluationResultsResponseDto extends CommonListResponseDto<WorkEvaluationResultResponseDto> {
+  @ApiProperty({ type: WorkEvaluationResultResponseDto, isArray: true })
+  declare records: WorkEvaluationResultResponseDto[];
+}
 
 export class ListWorkEvaluationSubjectsRequestDto extends CommonListRequestDto {
   @ApiPropertyOptional({
@@ -695,4 +713,7 @@ export class WorkEvaluationSubjectResponseDto {
   @ApiProperty() updatedAt!: Date;
 }
 
-export class ListWorkEvaluationSubjectsResponseDto extends CommonListResponseDto<WorkEvaluationSubjectResponseDto> {}
+export class ListWorkEvaluationSubjectsResponseDto extends CommonListResponseDto<WorkEvaluationSubjectResponseDto> {
+  @ApiProperty({ type: WorkEvaluationSubjectResponseDto, isArray: true })
+  declare records: WorkEvaluationSubjectResponseDto[];
+}

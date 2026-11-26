@@ -52,4 +52,7 @@ export class ListEventEmissionsRequestDto extends CommonListRequestDto {
   eventKey?: string;
 }
 
-export class ListEventEmissionsResponseDto extends CommonListResponseDto<EventEmissionDto> {}
+export class ListEventEmissionsResponseDto extends CommonListResponseDto<EventEmissionDto> {
+  @ApiProperty({ type: EventEmissionDto, isArray: true })
+  declare records: EventEmissionDto[];
+}

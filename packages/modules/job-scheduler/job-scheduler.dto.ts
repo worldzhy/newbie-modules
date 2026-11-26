@@ -90,4 +90,7 @@ export class UpdateJobScheduleDto {
 
 export class ListJobRunsRequestDto extends CommonListRequestDto {}
 
-export class ListJobRunsResponseDto extends CommonListResponseDto<JobRunDto> {}
+export class ListJobRunsResponseDto extends CommonListResponseDto<JobRunDto> {
+  @ApiProperty({ type: JobRunDto, isArray: true })
+  declare records: JobRunDto[];
+}

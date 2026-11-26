@@ -256,7 +256,10 @@ export class SecurityEvaluationSubjectResponseDto {
   @ApiProperty() updatedAt!: Date;
 }
 
-export class ListSecurityEvaluationSubjectsResponseDto extends CommonListResponseDto<SecurityEvaluationSubjectResponseDto> {}
+export class ListSecurityEvaluationSubjectsResponseDto extends CommonListResponseDto<SecurityEvaluationSubjectResponseDto> {
+  @ApiProperty({ type: SecurityEvaluationSubjectResponseDto, isArray: true })
+  declare records: SecurityEvaluationSubjectResponseDto[];
+}
 
 // --- Knowledge items -----------------------------------------------------
 
@@ -281,7 +284,10 @@ export class SecurityEvaluationAssetKnowledgeItemResponseDto {
   @ApiProperty({ description: "When this item was last observed" }) observedAt!: Date;
 }
 
-export class ListSecurityEvaluationAssetKnowledgeItemsResponseDto extends CommonListResponseDto<SecurityEvaluationAssetKnowledgeItemResponseDto> {}
+export class ListSecurityEvaluationAssetKnowledgeItemsResponseDto extends CommonListResponseDto<SecurityEvaluationAssetKnowledgeItemResponseDto> {
+  @ApiProperty({ type: SecurityEvaluationAssetKnowledgeItemResponseDto, isArray: true })
+  declare records: SecurityEvaluationAssetKnowledgeItemResponseDto[];
+}
 
 // --- Runs ----------------------------------------------------------------
 
@@ -348,7 +354,10 @@ export class SecurityEvaluationRunResponseDto {
   @ApiProperty() updatedAt!: Date;
 }
 
-export class ListSecurityEvaluationRunsResponseDto extends CommonListResponseDto<SecurityEvaluationRunResponseDto> {}
+export class ListSecurityEvaluationRunsResponseDto extends CommonListResponseDto<SecurityEvaluationRunResponseDto> {
+  @ApiProperty({ type: SecurityEvaluationRunResponseDto, isArray: true })
+  declare records: SecurityEvaluationRunResponseDto[];
+}
 
 // --- Results -------------------------------------------------------------
 
@@ -380,7 +389,10 @@ export class SecurityEvaluationResultResponseDto {
   @ApiProperty() createdAt!: Date;
 }
 
-export class ListSecurityEvaluationResultsResponseDto extends CommonListResponseDto<SecurityEvaluationResultResponseDto> {}
+export class ListSecurityEvaluationResultsResponseDto extends CommonListResponseDto<SecurityEvaluationResultResponseDto> {
+  @ApiProperty({ type: SecurityEvaluationResultResponseDto, isArray: true })
+  declare records: SecurityEvaluationResultResponseDto[];
+}
 
 // --- Findings ------------------------------------------------------------
 
@@ -454,7 +466,10 @@ export class SecurityEvaluationFindingResponseDto {
   @ApiProperty() updatedAt!: Date;
 }
 
-export class ListSecurityEvaluationFindingsResponseDto extends CommonListResponseDto<SecurityEvaluationFindingResponseDto> {}
+export class ListSecurityEvaluationFindingsResponseDto extends CommonListResponseDto<SecurityEvaluationFindingResponseDto> {
+  @ApiProperty({ type: SecurityEvaluationFindingResponseDto, isArray: true })
+  declare records: SecurityEvaluationFindingResponseDto[];
+}
 
 // --- Finding detail + evidence -------------------------------------------
 

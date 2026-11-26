@@ -362,6 +362,12 @@ export class BackendMonitorErrorLogResponseDto {
   ingested_at!: string;
 }
 
-export class ListBackendMonitorRequestLogsResponseDto extends CommonListResponseDto<BackendMonitorRequestLogResponseDto> {}
+export class ListBackendMonitorRequestLogsResponseDto extends CommonListResponseDto<BackendMonitorRequestLogResponseDto> {
+  @ApiProperty({ type: BackendMonitorRequestLogResponseDto, isArray: true })
+  declare records: BackendMonitorRequestLogResponseDto[];
+}
 
-export class ListBackendMonitorErrorLogsResponseDto extends CommonListResponseDto<BackendMonitorErrorLogResponseDto> {}
+export class ListBackendMonitorErrorLogsResponseDto extends CommonListResponseDto<BackendMonitorErrorLogResponseDto> {
+  @ApiProperty({ type: BackendMonitorErrorLogResponseDto, isArray: true })
+  declare records: BackendMonitorErrorLogResponseDto[];
+}

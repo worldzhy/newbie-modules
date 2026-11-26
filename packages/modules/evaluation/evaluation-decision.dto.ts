@@ -227,4 +227,7 @@ export class EvaluationResultResponseDto {
   @ApiProperty() createdAt!: Date;
 }
 
-export class ListEvaluationRemediationPlansResponseDto extends CommonListResponseDto<EvaluationRemediationPlanResponseDto> {}
+export class ListEvaluationRemediationPlansResponseDto extends CommonListResponseDto<EvaluationRemediationPlanResponseDto> {
+  @ApiProperty({ type: EvaluationRemediationPlanResponseDto, isArray: true })
+  declare records: EvaluationRemediationPlanResponseDto[];
+}

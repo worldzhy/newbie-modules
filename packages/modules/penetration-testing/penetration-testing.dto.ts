@@ -471,7 +471,10 @@ export class PenetrationTestingRunResponseDto {
   @ApiPropertyOptional({ type: Date, nullable: true }) createdAt?: Date | null;
 }
 
-export class ListPenetrationTestingRunsResponseDto extends CommonListResponseDto<PenetrationTestingRunResponseDto> {}
+export class ListPenetrationTestingRunsResponseDto extends CommonListResponseDto<PenetrationTestingRunResponseDto> {
+  @ApiProperty({ type: PenetrationTestingRunResponseDto, isArray: true })
+  declare records: PenetrationTestingRunResponseDto[];
+}
 
 // --- Findings / results (skeleton read models) ---------------------------
 
@@ -522,7 +525,10 @@ export class PenetrationTestingFindingResponseDto {
   @ApiPropertyOptional({ type: Date, nullable: true }) resolvedAt?: Date | null;
 }
 
-export class ListPenetrationTestingFindingsResponseDto extends CommonListResponseDto<PenetrationTestingFindingResponseDto> {}
+export class ListPenetrationTestingFindingsResponseDto extends CommonListResponseDto<PenetrationTestingFindingResponseDto> {
+  @ApiProperty({ type: PenetrationTestingFindingResponseDto, isArray: true })
+  declare records: PenetrationTestingFindingResponseDto[];
+}
 
 export class ListPenetrationTestingResultsRequestDto extends CommonListRequestDto {
   @ApiProperty({ type: String, format: "uuid" })
@@ -548,7 +554,10 @@ export class PenetrationTestingResultResponseDto {
   @ApiProperty({ type: Date }) createdAt!: Date;
 }
 
-export class ListPenetrationTestingResultsResponseDto extends CommonListResponseDto<PenetrationTestingResultResponseDto> {}
+export class ListPenetrationTestingResultsResponseDto extends CommonListResponseDto<PenetrationTestingResultResponseDto> {
+  @ApiProperty({ type: PenetrationTestingResultResponseDto, isArray: true })
+  declare records: PenetrationTestingResultResponseDto[];
+}
 
 // --- Executions (audit trail, ADR-075 §3) --------------------------------
 
@@ -600,7 +609,10 @@ export class PenetrationTestingExecutionResponseDto {
   @ApiPropertyOptional({ type: String, nullable: true }) killReason?: string | null;
 }
 
-export class ListPenetrationTestingExecutionsResponseDto extends CommonListResponseDto<PenetrationTestingExecutionResponseDto> {}
+export class ListPenetrationTestingExecutionsResponseDto extends CommonListResponseDto<PenetrationTestingExecutionResponseDto> {
+  @ApiProperty({ type: PenetrationTestingExecutionResponseDto, isArray: true })
+  declare records: PenetrationTestingExecutionResponseDto[];
+}
 
 // --- Run stop ------------------------------------------------------------
 

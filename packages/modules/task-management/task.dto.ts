@@ -491,7 +491,10 @@ export class ListTaskActorMembersResponseDto {
 }
 
 /** Paginated list response for tasks. */
-export class ListTasksResponseDto extends CommonListResponseDto<GetTaskResponseDto> {}
+export class ListTasksResponseDto extends CommonListResponseDto<GetTaskResponseDto> {
+  @ApiProperty({ type: GetTaskResponseDto, isArray: true })
+  declare records: GetTaskResponseDto[];
+}
 
 /** Result returned by the batch-create endpoint. */
 export class BatchCreateTasksResponseDto {
