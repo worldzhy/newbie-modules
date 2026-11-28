@@ -23,6 +23,7 @@ export class AccountAccessTokenSessionResolver implements AccessTokenSessionReso
       where: { id: sessionId },
       select: {
         id: true,
+        oauthScope: true,
         user: {
           select: {
             id: true,
@@ -47,6 +48,6 @@ export class AccountAccessTokenSessionResolver implements AccessTokenSessionReso
     }
 
     const roles = session.user.roles.map((ur) => ur.role.name);
-    return { userId: session.user.id, sessionId: session.id, roles };
+    return { userId: session.user.id, sessionId: session.id, roles, oauthScope: session.oauthScope };
   }
 }

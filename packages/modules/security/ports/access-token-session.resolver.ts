@@ -12,6 +12,12 @@ export interface ResolvedAccessTokenSession {
   userId: string;
   sessionId: number;
   roles: string[];
+  /**
+   * OAuth scope granted at authorize time (ADR-081). Null for web-UI sessions.
+   * The security layer copies this onto request.user so ScopeGuard can enforce
+   * it without knowing how sessions are stored.
+   */
+  oauthScope?: string | null;
 }
 
 export interface AccessTokenSessionResolver {

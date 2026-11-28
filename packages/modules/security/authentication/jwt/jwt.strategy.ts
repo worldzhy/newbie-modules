@@ -75,8 +75,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, "jwt") {
     const session = await this.sessionResolver.resolve(sid);
 
     // Unified request.user shape across every authenticated strategy:
-    // { userId, sessionId, roles }. userId comes from the resolved session row
-    // so the token payload cannot disagree with the stored identity.
-    return { userId: session.userId, sessionId: session.sessionId, roles: session.roles };
+    // { userId, sessionId, roles, oauthScope }. userId comes from the resolved
+    // session row so the token payload cannot disagree with the stored identity.
+    return {
+      userId: session.userId,
+      sessionId: session.sessionId,
+      roles: session.roles,
+      oauthScope: session.oauthScope ?? null,
+    };
   }
 }

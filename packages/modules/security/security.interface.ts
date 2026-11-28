@@ -15,6 +15,12 @@ export interface AccessTokenParsed {
   userId: string;
   sessionId?: number;
   roles?: string[];
+  /**
+   * Present only for sessions minted by the OAuth authorize flow (ADR-081).
+   * Null/undefined for web-UI sessions carrying the user's full role set.
+   * ScopeGuard checks this field to decide whether the caller is authorised.
+   */
+  oauthScope?: string | null;
 }
 
 type CombinedRequest = ExpressRequest & typeof NestRequest;
