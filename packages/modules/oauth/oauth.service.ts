@@ -5,14 +5,15 @@ import { PrismaService } from "@devbie/newbie/prisma/prisma.service";
 import { generateHash } from "@devbie/newbie/utilities/common.util";
 import { TokenService } from "@modules/security/token/token.service";
 import { AuditActorType, AuditEvent, AuditLogService } from "@modules/audit/audit-log.service";
-import { SessionService } from "../session/session.service";
+import { SessionService } from "@modules/account/modules/session/session.service";
 
 /**
- * Authorization Code Flow (RFC 6749 §4.1) with PKCE (RFC 7636), sunk into the
- * account module per ADR-081. The business state (clients, codes, consents)
- * lives here; bearer transport stays in security. Access tokens are minted by
- * the existing SessionService so an OAuth session is indistinguishable from a
- * web session except for its non-null `oauthClientId` / `oauthScope` columns.
+ * Authorization Code Flow (RFC 6749 §4.1) with PKCE (RFC 7636). Standalone
+ * module (ADR-081), so the host can opt in via `newbie modules add oauth`.
+ * Business state (clients, codes, consents) lives here; bearer transport
+ * stays in security. Access tokens are minted by account's SessionService so
+ * an OAuth session is indistinguishable from a web session except for its
+ * non-null `oauthClientId` / `oauthScope` columns.
  */
 
 /** Authorization codes are single-use and short-lived. */

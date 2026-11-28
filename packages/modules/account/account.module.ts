@@ -10,7 +10,6 @@ import { AuthModule } from "./auth/auth.module";
 
 import { ApiKeyModule } from "./modules/api-key/api-key.module";
 import { ApprovedSubnetModule } from "./modules/approved-subnet/approved-subnet.module";
-import { OAuthModule } from "./modules/oauth/oauth.module";
 import { PermissionGroupModule } from "./modules/permission-group/permission-group.module";
 import { PermissionModule } from "./modules/permission/permission.module";
 import { RoleModule } from "./modules/role/role.module";
@@ -31,7 +30,6 @@ import { AccountLoginAccountResolver } from "./security-ports/login-account.reso
 
     ApiKeyModule,
     ApprovedSubnetModule,
-    OAuthModule,
     PermissionGroupModule,
     PermissionModule,
     RoleModule,

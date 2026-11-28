@@ -1,0 +1,93 @@
+// !! ------------------------------------------------------------ //
+// !!                   [Module] OAuth models                      //
+// !! ------------------------------------------------------------ //
+// * OAuthClient                                                    //
+// * OAuthAuthorizationCode                                         //
+// * OAuthConsent                                                   //
+// !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
+
+/// A registered third-party client that may initiate the OAuth Authorization
+/// Code flow (ADR-081). Created and revoked only by an admin; end users do
+/// not self-register. Public clients (e.g. desktop apps) leave
+/// `clientSecretHash` null and authenticate via PKCE only.
+model OAuthClient {
+  id                Int       @id @default(autoincrement())
+  // Public-facing identifier handed to clients, e.g. "ledger". Stable,
+  // human-readable, unique.
+  clientId          String    @unique
+  // Hash of the client secret. Null for public (PKCE-only) clients. The
+  // plaintext is returned exactly once at creation.
+  clientSecretHash  String?
+  // Allowed redirect URIs. The authorize endpoint rejects any redirect_uri
+  // not exactly matching one of these entries.
+  redirectUris      String[]
+  // Scope whitelist this client may request. authorize() intersects the
+  // requested scope with this list; anything outside is rejected.
+  scopes            String[]
+  description       String?
+  // Soft-revocation: a revoked client can no longer initiate authorize or
+  // token exchanges, but historical rows are preserved for audit.
+  revokedAt         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  createdBy         String    @db.Uuid
+  creator           User      @relation(fields: [createdBy], references: [id], onDelete: Restrict)
+
+  sessions           Session[]
+  authorizationCodes OAuthAuthorizationCode[]
+  consents           OAuthConsent[]
+
+  @@index([createdBy])
+  @@schema("module/oauth")
+}
+
+/// Short-lived, one-time authorization code issued at the end of the
+/// authorize flow. Exchanged exactly once at /oauth/token; replay detection
+/// is via `usedAt`.
+model OAuthAuthorizationCode {
+  id                  Int       @id @default(autoincrement())
+  code                String    @unique
+  clientId            String
+  client              OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  userId              String    @db.Uuid
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // PKCE challenge (S256). The verifier is supplied at token exchange and
+  // must hash to this value.
+  codeChallenge       String
+  codeChallengeMethod String    @default("S256")
+  // The scope subset actually granted (intersection of requested with the
+  // client whitelist). Carried into the minted Session row.
+  scope               String
+  // The redirect_uri used at authorize time. Token exchange must present
+  // the identical value.
+  redirectUri         String
+  expiresAt           DateTime
+  usedAt              DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([expiresAt])
+  @@schema("module/oauth")
+}
+
+/// A user's standing consent to a client. Once granted, repeated authorize
+/// calls with the same (or narrower) scope skip the consent page. Revoking
+/// the row forces the next authorize to render the consent page again.
+model OAuthConsent {
+  id           Int       @id @default(autoincrement())
+  userId       String    @db.Uuid
+  clientId      String
+  // The scope subset the user has approved. Widening the requested scope
+  // beyond this value forces a fresh consent.
+  scopeGranted  String
+  consentedAt   DateTime  @default(now())
+  revokedAt     DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client       OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+  @@index([userId])
+  @@index([clientId])
+  @@schema("module/oauth")
+}

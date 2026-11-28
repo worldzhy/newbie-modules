@@ -1,0 +1,17 @@
+{
+  "key": "oauth",
+  "layer": "capability",
+  "wiring": {
+    "file": "oauth.module",
+    "className": "OAuthModule",
+    "prismaSchema": "prisma/schema.prisma"
+  },
+  "requires": {
+    "modules": ["account", "security", "audit"],
+    "config": {
+      "oauth": {
+        "authorizationCodeTtlSeconds": 300
+      }
+    }
+  }
+}
