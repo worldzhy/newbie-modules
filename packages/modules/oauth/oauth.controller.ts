@@ -112,8 +112,7 @@ export class OAuthController {
   @ApiBearerAuth()
   @Get("oauth/authorize")
   @ApiOperation({ summary: "Start the OAuth authorize flow" })
-  @ApiResponse({ status: 302, description: "Redirect back to the client with code & state" })
-  @ApiResponse({ status: 200, description: "Consent challenge; front-end renders the consent page" })
+  @ApiResponse({ status: 302, description: "Redirect back to the client with code & state, or to the consent page" })
   async authorize(
     @Req() req: UserRequest,
     @Res() res: Response,
@@ -141,13 +140,17 @@ export class OAuthController {
         `${result.redirectUri}${separator}code=${encodeURIComponent(result.code)}&state=${encodeURIComponent(result.state)}`,
       );
     }
-    // Defer to the front-end consent page.
-    return res.status(200).json({
-      requireConsent: true,
-      clientId: result.client.clientId,
-      clientDescription: result.client.description,
-      requestedScope: result.requestedScope,
+    // Redirect to the front-end consent page with the challenge params.
+    const frontendUrl = process.env.APP_FRONTEND_URL ?? "http://localhost:3001";
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      scope,
+      code_challenge: codeChallenge ?? "",
+      code_challenge_method: codeChallengeMethod ?? "",
+      state: state ?? "",
     });
+    return res.redirect(302, `${frontendUrl}/oauth/consent?${params.toString()}`);
   }
 
   /**
