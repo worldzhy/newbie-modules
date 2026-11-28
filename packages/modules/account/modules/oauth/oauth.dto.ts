@@ -84,6 +84,18 @@ export class OAuthClientResponseDto {
 
   @ApiProperty({ type: String })
   createdBy!: string;
+
+  /**
+   * Plaintext client secret, returned exactly once at creation (ADR-081). It is
+   * never stored in plaintext and never returned again; the admin must copy it
+   * immediately. Absent on list and revoke responses.
+   */
+  @ApiPropertyOptional({
+    type: String,
+    nullable: true,
+    description: "Plaintext secret, returned only at creation time",
+  })
+  clientSecret?: string | null;
 }
 
 /**
