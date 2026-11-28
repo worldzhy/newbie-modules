@@ -18,7 +18,7 @@ import {
 export class CreateOAuthClientDto {
   @ApiProperty({
     type: String,
-    example: "demo-app",
+    example: "client-app",
     description: "Stable, human-readable client id handed to third parties",
   })
   @IsString()
@@ -29,7 +29,7 @@ export class CreateOAuthClientDto {
   @ApiProperty({
     type: String,
     isArray: true,
-    example: ["demo-app://oauth/callback"],
+    example: ["client-app://oauth/callback"],
     description: "Allowed redirect URIs; authorize rejects anything not exactly matching one entry",
   })
   @IsArray()
@@ -52,7 +52,7 @@ export class CreateOAuthClientDto {
   @IsNotEmpty()
   scopes!: string[];
 
-  @ApiPropertyOptional({ type: String, example: "Demo desktop app" })
+  @ApiPropertyOptional({ type: String, example: "Client desktop app" })
   @IsString()
   @MaxLength(256)
   @IsOptional()

@@ -12,7 +12,7 @@
 /// `clientSecretHash` null and authenticate via PKCE only.
 model OAuthClient {
   id                Int       @id @default(autoincrement())
-  // Public-facing identifier handed to clients, e.g. "demo-app". Stable,
+  // Public-facing identifier handed to clients, e.g. "client-app". Stable,
   // human-readable, unique.
   clientId          String    @unique
   // Hash of the client secret. Null for public (PKCE-only) clients. The
