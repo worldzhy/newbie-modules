@@ -29,7 +29,7 @@ import {
 import { OAuthService } from "./oauth.service";
 
 /**
- * Two endpoint families (ADR-081):
+ * Two endpoint families:
  *
  * 1. Public OAuth protocol endpoints — `/oauth/*`. The authorize flow requires
  *    an existing web session (the caller is a logged-in browser user granting a

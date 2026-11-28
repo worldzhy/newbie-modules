@@ -9,11 +9,11 @@ import { SessionService } from "@modules/account/modules/session/session.service
 
 /**
  * Authorization Code Flow (RFC 6749 §4.1) with PKCE (RFC 7636). Standalone
- * module (ADR-081), so the host can opt in via `newbie modules add oauth`.
- * Business state (clients, codes, consents) lives here; bearer transport
- * stays in security. Access tokens are minted by account's SessionService so
- * an OAuth session is indistinguishable from a web session except for its
- * non-null `oauthClientId` / `oauthScope` columns.
+ * module, so the host can opt in via `newbie modules add oauth`. Business
+ * state (clients, codes, consents) lives here; bearer transport stays in
+ * security. Access tokens are minted by account's SessionService so an OAuth
+ * session is indistinguishable from a web session except for its non-null
+ * `oauthClientId` / `oauthScope` columns.
  */
 
 /** Authorization codes are single-use and short-lived. */
@@ -65,9 +65,9 @@ export class OAuthService {
       });
     }
 
-    // The first shipped client ("ledger") is a public desktop app and carries
-    // no secret. A confidential client's secret is generated here and returned
-    // exactly once; only its hash is stored.
+    // A public client (e.g. a desktop app) carries no secret. A confidential
+    // client's secret is generated here and returned exactly once; only its
+    // hash is stored.
     const clientSecret = await this.tokenService.generateRandomString(48, "url-safe");
     const client = await this.prisma.oAuthClient.create({
       data: {

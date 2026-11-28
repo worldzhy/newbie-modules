@@ -5,15 +5,15 @@ import type { UserRequest } from "../security.interface";
 export const OAUTH_SCOPE_KEY = "oauth-scope";
 
 /**
- * Marks a route as requiring an OAuth scope (ADR-081).
+ * Marks a route as requiring an OAuth scope.
  *
  * Web-UI sessions (oauthScope === null) always pass: this guard only restricts
  * sessions minted by the OAuth authorize flow. When the caller is an OAuth
  * client, the granted scope string must include every listed scope token.
  *
  * Scope tokens are space-separated in the grant (RFC 6749 §3.3). A route that
- * declares @RequireScope("ledger:read") passes when oauthScope contains
- * "ledger:read" anywhere in its token list.
+ * declares @RequireScope("resource:read") passes when oauthScope contains
+ * "resource:read" anywhere in its token list.
  */
 export const RequireScope = (...scopes: string[]) => SetMetadata(OAUTH_SCOPE_KEY, scopes);
 

@@ -4,22 +4,22 @@ import { createHash } from "node:crypto";
 import { OAuthService } from "./oauth.service";
 
 /**
- * Behavior tests for OAuthService (nightwatch-backend ADR-081, RFC 6749 §4.1
- * + RFC 7636 PKCE). Prisma, TokenService, SessionService and AuditLogService
- * are replaced by hand-rolled fakes so the tests exercise the authorize
- * validation, consent short-circuit, code minting, PKCE verification, replay
- * rejection and scope whitelist intersection without a database.
+ * Behavior tests for OAuthService (RFC 6749 §4.1 + RFC 7636 PKCE). Prisma,
+ * TokenService, SessionService and AuditLogService are replaced by hand-rolled
+ * fakes so the tests exercise the authorize validation, consent
+ * short-circuit, code minting, PKCE verification, replay rejection and scope
+ * whitelist intersection without a database.
  */
 
 const S256 = (verifier: string) => createHash("sha256").update(verifier).digest("base64url");
 
 function buildServices() {
   const client = {
-    clientId: "ledger",
+    clientId: "demo-app",
     clientSecretHash: null,
-    redirectUris: ["ledger://oauth/callback"],
+    redirectUris: ["demo-app://oauth/callback"],
     scopes: ["identity"],
-    description: "Ledger desktop app",
+    description: "Demo desktop app",
     revokedAt: null,
     createdBy: "admin-1",
   };
@@ -89,7 +89,7 @@ test("authorize rejects a redirect_uri outside the client whitelist", async () =
     () =>
       service.authorize({
         userId: "user-1",
-        clientId: "ledger",
+        clientId: "demo-app",
         redirectUri: "https://evil.example/callback",
         scope: "identity",
         codeChallenge: S256("verifier"),
@@ -106,8 +106,8 @@ test("authorize rejects a scope outside the client whitelist", async () => {
     () =>
       service.authorize({
         userId: "user-1",
-        clientId: "ledger",
-        redirectUri: "ledger://oauth/callback",
+        clientId: "demo-app",
+        redirectUri: "demo-app://oauth/callback",
         scope: "identity admin",
         codeChallenge: S256("verifier"),
         codeChallengeMethod: "S256",
@@ -123,8 +123,8 @@ test("authorize requires an S256 PKCE challenge", async () => {
     () =>
       service.authorize({
         userId: "user-1",
-        clientId: "ledger",
-        redirectUri: "ledger://oauth/callback",
+        clientId: "demo-app",
+        redirectUri: "demo-app://oauth/callback",
         scope: "identity",
         codeChallenge: "",
         codeChallengeMethod: "plain",
@@ -138,8 +138,8 @@ test("authorize with no standing consent returns a consent challenge", async () 
   const { service } = buildServices();
   const result = await service.authorize({
     userId: "user-1",
-    clientId: "ledger",
-    redirectUri: "ledger://oauth/callback",
+    clientId: "demo-app",
+    redirectUri: "demo-app://oauth/callback",
     scope: "identity",
     codeChallenge: S256("verifier"),
     codeChallengeMethod: "S256",
@@ -152,26 +152,26 @@ test("approveConsent persists the standing consent and issues a redirect code", 
   const { service, consents, codes } = buildServices();
   const result = await service.approveConsent({
     userId: "user-1",
-    clientId: "ledger",
+    clientId: "demo-app",
     scope: "identity",
-    redirectUri: "ledger://oauth/callback",
+    redirectUri: "demo-app://oauth/callback",
     codeChallenge: S256("verifier"),
     state: "xyz",
   });
   assert.equal(result.requireConsent, false);
   assert.ok(result.code);
   assert.equal(result.state, "xyz");
-  assert.equal(consents["user-1:ledger"].scopeGranted, "identity");
+  assert.equal(consents["user-1:demo-app"].scopeGranted, "identity");
   assert.ok(codes[result.code]);
 });
 
 test("authorize with a standing covering consent skips the page and redirects", async () => {
   const { service, consents } = buildServices();
-  consents["user-1:ledger"] = { userId: "user-1", clientId: "ledger", scopeGranted: "identity", revokedAt: null };
+  consents["user-1:demo-app"] = { userId: "user-1", clientId: "demo-app", scopeGranted: "identity", revokedAt: null };
   const result = await service.authorize({
     userId: "user-1",
-    clientId: "ledger",
-    redirectUri: "ledger://oauth/callback",
+    clientId: "demo-app",
+    redirectUri: "demo-app://oauth/callback",
     scope: "identity",
     codeChallenge: S256("verifier"),
     codeChallengeMethod: "S256",
@@ -185,16 +185,16 @@ test("exchangeCodeForToken mints tokens for a valid code and correct PKCE verifi
   const { service, codes } = buildServices();
   const issued = await service.approveConsent({
     userId: "user-1",
-    clientId: "ledger",
+    clientId: "demo-app",
     scope: "identity",
-    redirectUri: "ledger://oauth/callback",
+    redirectUri: "demo-app://oauth/callback",
     codeChallenge: S256("verifier"),
     state: "s",
   });
   const token = await service.exchangeCodeForToken({
     code: issued.code,
-    redirectUri: "ledger://oauth/callback",
-    clientId: "ledger",
+    redirectUri: "demo-app://oauth/callback",
+    clientId: "demo-app",
     codeVerifier: "verifier",
     ipAddress: "127.0.0.1",
     userAgent: "test",
@@ -209,9 +209,9 @@ test("exchangeCodeForToken rejects a wrong PKCE verifier", async () => {
   const { service } = buildServices();
   const issued = await service.approveConsent({
     userId: "user-1",
-    clientId: "ledger",
+    clientId: "demo-app",
     scope: "identity",
-    redirectUri: "ledger://oauth/callback",
+    redirectUri: "demo-app://oauth/callback",
     codeChallenge: S256("verifier"),
     state: "s",
   });
@@ -219,8 +219,8 @@ test("exchangeCodeForToken rejects a wrong PKCE verifier", async () => {
     () =>
       service.exchangeCodeForToken({
         code: issued.code,
-        redirectUri: "ledger://oauth/callback",
-        clientId: "ledger",
+        redirectUri: "demo-app://oauth/callback",
+        clientId: "demo-app",
         codeVerifier: "wrong-verifier",
         ipAddress: "127.0.0.1",
         userAgent: "test",
@@ -233,16 +233,16 @@ test("exchangeCodeForToken rejects a replayed (already used) code", async () => 
   const { service } = buildServices();
   const issued = await service.approveConsent({
     userId: "user-1",
-    clientId: "ledger",
+    clientId: "demo-app",
     scope: "identity",
-    redirectUri: "ledger://oauth/callback",
+    redirectUri: "demo-app://oauth/callback",
     codeChallenge: S256("verifier"),
     state: "s",
   });
   await service.exchangeCodeForToken({
     code: issued.code,
-    redirectUri: "ledger://oauth/callback",
-    clientId: "ledger",
+    redirectUri: "demo-app://oauth/callback",
+    clientId: "demo-app",
     codeVerifier: "verifier",
     ipAddress: "127.0.0.1",
     userAgent: "test",
@@ -252,8 +252,8 @@ test("exchangeCodeForToken rejects a replayed (already used) code", async () => 
     () =>
       service.exchangeCodeForToken({
         code: issued.code,
-        redirectUri: "ledger://oauth/callback",
-        clientId: "ledger",
+        redirectUri: "demo-app://oauth/callback",
+        clientId: "demo-app",
         codeVerifier: "verifier",
         ipAddress: "127.0.0.1",
         userAgent: "test",
@@ -266,9 +266,9 @@ test("exchangeCodeForToken rejects a redirect_uri mismatch", async () => {
   const { service } = buildServices();
   const issued = await service.approveConsent({
     userId: "user-1",
-    clientId: "ledger",
+    clientId: "demo-app",
     scope: "identity",
-    redirectUri: "ledger://oauth/callback",
+    redirectUri: "demo-app://oauth/callback",
     codeChallenge: S256("verifier"),
     state: "s",
   });
@@ -276,8 +276,8 @@ test("exchangeCodeForToken rejects a redirect_uri mismatch", async () => {
     () =>
       service.exchangeCodeForToken({
         code: issued.code,
-        redirectUri: "ledger://other-callback",
-        clientId: "ledger",
+        redirectUri: "demo-app://other-callback",
+        clientId: "demo-app",
         codeVerifier: "verifier",
         ipAddress: "127.0.0.1",
         userAgent: "test",
@@ -292,7 +292,7 @@ test("createClient rejects a duplicate clientId", async () => {
     () =>
       service.createClient({
         actorId: "admin-1",
-        data: { clientId: "ledger", redirectUris: ["ledger://oauth/callback"], scopes: ["identity"] },
+        data: { clientId: "demo-app", redirectUris: ["demo-app://oauth/callback"], scopes: ["identity"] },
       }),
     (err: any) => err.getResponse?.().error === "invalid_client",
   );

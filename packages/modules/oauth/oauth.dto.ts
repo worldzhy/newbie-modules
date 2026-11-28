@@ -12,14 +12,13 @@ import {
 
 /**
  * Client registration is admin-only and irreversible in the credential sense:
- * the plaintext secret is returned exactly once on creation (ADR-081). A
- * public client (e.g. a desktop app) omits the secret and authenticates solely
- * through PKCE.
+ * the plaintext secret is returned exactly once on creation. A public client
+ * (e.g. a desktop app) omits the secret and authenticates solely through PKCE.
  */
 export class CreateOAuthClientDto {
   @ApiProperty({
     type: String,
-    example: "ledger",
+    example: "demo-app",
     description: "Stable, human-readable client id handed to third parties",
   })
   @IsString()
@@ -30,7 +29,7 @@ export class CreateOAuthClientDto {
   @ApiProperty({
     type: String,
     isArray: true,
-    example: ["ledger://oauth/callback"],
+    example: ["demo-app://oauth/callback"],
     description: "Allowed redirect URIs; authorize rejects anything not exactly matching one entry",
   })
   @IsArray()
@@ -53,7 +52,7 @@ export class CreateOAuthClientDto {
   @IsNotEmpty()
   scopes!: string[];
 
-  @ApiPropertyOptional({ type: String, example: "Ledger desktop app" })
+  @ApiPropertyOptional({ type: String, example: "Demo desktop app" })
   @IsString()
   @MaxLength(256)
   @IsOptional()
@@ -86,8 +85,8 @@ export class OAuthClientResponseDto {
   createdBy!: string;
 
   /**
-   * Plaintext client secret, returned exactly once at creation (ADR-081). It is
-   * never stored in plaintext and never returned again; the admin must copy it
+   * Plaintext client secret, returned exactly once at creation. It is never
+   * stored in plaintext and never returned again; the admin must copy it
    * immediately. Absent on list and revoke responses.
    */
   @ApiPropertyOptional({

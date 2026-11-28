@@ -7,12 +7,12 @@
 // !! ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄ ⌄  //
 
 /// A registered third-party client that may initiate the OAuth Authorization
-/// Code flow (ADR-081). Created and revoked only by an admin; end users do
-/// not self-register. Public clients (e.g. desktop apps) leave
+/// Code flow. Created and revoked only by an admin; end users do not
+/// self-register. Public clients (e.g. desktop apps) leave
 /// `clientSecretHash` null and authenticate via PKCE only.
 model OAuthClient {
   id                Int       @id @default(autoincrement())
-  // Public-facing identifier handed to clients, e.g. "ledger". Stable,
+  // Public-facing identifier handed to clients, e.g. "demo-app". Stable,
   // human-readable, unique.
   clientId          String    @unique
   // Hash of the client secret. Null for public (PKCE-only) clients. The
