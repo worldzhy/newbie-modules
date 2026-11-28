@@ -41,6 +41,12 @@ export const AuditEvent = {
   MFA_ENABLED: "mfa.enabled",
   MFA_REBOUND: "mfa.rebound",
   MFA_DISABLED: "mfa.disabled",
+  // OAuth Authorization Server (ADR-081)
+  OAUTH_CLIENT_CREATED: "oauth-client.created",
+  OAUTH_CLIENT_REVOKED: "oauth-client.revoked",
+  OAUTH_AUTHORIZE_CONSENT: "oauth.authorize_consent",
+  OAUTH_TOKEN_ISSUED: "oauth.token_issued",
+  OAUTH_TOKEN_REVOKED: "oauth.token_revoked",
 } as const;
 
 export type AuditLogRecordParams = {
